@@ -3349,7 +3349,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-tungstenite 0.27.0",
- "tower 0.4.13",
+ "tower 0.5.2",
  "tower-http 0.5.2",
  "tower-sessions",
  "tower-sessions-sqlx-store",
