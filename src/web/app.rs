@@ -14,8 +14,9 @@ use crate::web::handlers::activitypub::{
 use crate::web::handlers::admin::{
     admin_banners, admin_banners_fragment, admin_collaborative_sessions, admin_communities,
     admin_community_posts, admin_flag_banner, admin_flag_post, admin_post_detail, admin_posts,
-    admin_posts_fragment, admin_user_posts, admin_users, download_collaborative_archive,
-    download_collaborative_diagnostics,
+    admin_posts_fragment, admin_user_posts, admin_users, collaborative_archive_manifest,
+    download_collaborative_archive, download_collaborative_diagnostics,
+    replay_collaborative_session,
 };
 use crate::web::handlers::auth::{
     api_login, api_logout, api_me, api_signup, do_login, do_logout, do_signup, login, signup,
@@ -118,6 +119,13 @@ fn static_router() -> Router {
         .nest_service(
             "/static/viewer",
             ServeDir::new("neo-cucumber/dist-viewer"),
+        )
+        // The staff-only session replay viewer. Its assets are public, like
+        // every other bundle; what it can read is not, because the endpoints
+        // it fetches from are behind the admin extractor.
+        .nest_service(
+            "/static/replay",
+            ServeDir::new("neo-cucumber/dist-replay"),
         )
         // tegaki is MIT, which asks that its notice travel with the copies.
         // Only css/js/lib are mounted and none of those files carry a header,
@@ -296,6 +304,14 @@ impl App {
             .route(
                 "/admin/collaborative-sessions/:uuid/diagnostics",
                 get(download_collaborative_diagnostics),
+            )
+            .route(
+                "/admin/collaborative-sessions/:uuid/manifest",
+                get(collaborative_archive_manifest),
+            )
+            .route(
+                "/admin/collaborative-sessions/:uuid/replay",
+                get(replay_collaborative_session),
             )
             .route("/admin/banners", get(admin_banners))
             .route("/admin/banners-fragment", get(admin_banners_fragment))

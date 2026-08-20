@@ -614,6 +614,33 @@ pub async fn download_session(
     Ok(out)
 }
 
+/// What a recording says about itself: canvas, participants, and the span it
+/// covers. None when the session has no recording.
+pub async fn read_manifest(
+    state: &AppState,
+    room_uuid: Uuid,
+) -> Result<Option<serde_json::Value>, Box<dyn std::error::Error + Send + Sync>> {
+    let Some(bucket) = bucket(&state.config) else {
+        return Ok(None);
+    };
+    let object = s3_client(&state.config)
+        .get_object()
+        .bucket(bucket)
+        .key(manifest_key(room_uuid))
+        .send()
+        .await;
+    match object {
+        Ok(object) => {
+            let bytes = object.body.collect().await?.into_bytes();
+            Ok(Some(serde_json::from_slice(&bytes)?))
+        }
+        // A session that was never recorded has no manifest, which is an
+        // answer rather than a failure.
+        Err(e) if e.raw_response().map(|r| r.status().as_u16()) == Some(404) => Ok(None),
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
 /// Every synchronisation report filed for a session, newest last.
 ///
 /// Returned as one JSON array so a session's reports can be read together:

@@ -24,6 +24,7 @@ dist-ssr
 # run `pnpm run build:viewer` once instead.
 dist-viewer
 dist-offline
+dist-replay
 dist-lib
 *.local
 

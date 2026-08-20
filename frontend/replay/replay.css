@@ -1,0 +1,48 @@
+/* Staff-only chrome, deliberately plain: this is a tool for reading a
+   recording, not a page anybody is shown. */
+body {
+  margin: 0;
+  padding: 1rem;
+  font-family: system-ui, sans-serif;
+  background: #f5f5f5;
+}
+
+.replay-status {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+/* A recording that does not start at the room's first message cannot produce
+   the drawing, and the canvas below it is a fragment. Said loudly, because a
+   fragment looks exactly like a finished picture. */
+.replay-incomplete {
+  color: #7a1020;
+  font-weight: 600;
+}
+
+.replay-canvas {
+  position: relative;
+  display: inline-block;
+  background: #fff;
+  border: 1px solid #ccc;
+}
+
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.replay-scrubber {
+  flex: 1 1 240px;
+  min-width: 160px;
+}
+
+.replay-readout {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: #444;
+}

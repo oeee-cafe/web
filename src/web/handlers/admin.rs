@@ -607,6 +607,37 @@ pub async fn download_collaborative_diagnostics(
     Ok(axum::Json(reports).into_response())
 }
 
+/// GET /admin/collaborative-sessions/:uuid/manifest — what a recording says
+/// about itself, for the player to size a canvas and name the layers by.
+pub async fn collaborative_archive_manifest(
+    _admin: AdminUser,
+    Path(room_uuid): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let manifest = crate::web::handlers::collaborate::archive::read_manifest(&state, room_uuid)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read the manifest: {}", e))?;
+    match manifest {
+        Some(manifest) => Ok(axum::Json(manifest).into_response()),
+        None => Err(AppError::NotFound("No recording for this session".to_string())),
+    }
+}
+
+/// GET /admin/collaborative-sessions/:uuid/replay — the recording, played
+/// back through the painter that drew it.
+///
+/// The page holds no permission of its own: it fetches the manifest and the
+/// log from the two admin endpoints above, so serving it to anyone else would
+/// get them a viewer that can read nothing.
+pub async fn replay_collaborative_session(
+    _admin: AdminUser,
+    Path(_room_uuid): Path<Uuid>,
+) -> Result<Response, AppError> {
+    let html = std::fs::read_to_string("neo-cucumber/dist-replay/index.html")
+        .map_err(|_| anyhow::anyhow!("The replay viewer has not been built"))?;
+    Ok(Html(html).into_response())
+}
+
 #[cfg(test)]
 mod tests {
     //! `cargo check` validates the handlers but not the Jinja, so render every
@@ -1072,6 +1103,11 @@ mod tests {
         // stream they disagree with.
         assert!(rendered.contains(
             "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/diagnostics"
+        ));
+        // The recording is worth more played than read, so the viewer comes
+        // first on the row.
+        assert!(rendered.contains(
+            "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/replay"
         ));
     }
 

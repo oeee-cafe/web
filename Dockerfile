@@ -61,6 +61,7 @@ COPY --from=rust-builder /app/cli ./
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist/ ./neo-cucumber/dist/
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-viewer/ ./neo-cucumber/dist-viewer/
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-offline/ ./neo-cucumber/dist-offline/
+COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-replay/ ./neo-cucumber/dist-replay/
 
 # Versions the static asset URLs the server hands out, so a deploy invalidates
 # browser and CDN caches and nothing else does. Read at runtime and declared in
