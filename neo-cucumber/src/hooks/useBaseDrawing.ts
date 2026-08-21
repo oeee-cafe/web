@@ -13,6 +13,7 @@ import { RegionDrag, type RegionRect } from "../neo/regionDrag";
 import { StrokeSmoother, strokeSmootherSizeFor } from "../neo/strokeSmoother";
 import type { BezierPreviewStyle } from "../neo/regionPreview";
 import { screenToArtwork } from "../neo/canvasTransform";
+import { notePointerType, penPreferred } from "../utils/penPreference";
 
 /**
  * Copies the control points so a preview can move a handle without writing it
@@ -537,7 +538,33 @@ export const useBaseDrawing = (
 
       e.preventDefault();
 
+      notePointerType(e.pointerType);
+
       if (interactionSuspendedRef.current) return;
+
+      // Once a pen has been used here, fingers navigate rather than draw: they
+      // still pinch, and the pinch still pans, but the marks are the pen's.
+      // Without this a resting hand draws, because it reaches the glass before
+      // the nib does and there is nothing at that moment to tell it apart from
+      // someone drawing with a finger. The pan tool is the one exception --
+      // moving the canvas is all it can do, so any pointer may.
+      if (
+        e.pointerType === "touch" &&
+        penPreferred() &&
+        currentDrawingStateRef.current.brushType !== "pan"
+      ) {
+        return;
+      }
+
+      // A pen landing while a finger's press is still being held has caught the
+      // palm that arrived a moment before it. Nothing has been drawn yet -- that
+      // is what the hold is for -- so the press can be dropped whole and the pen
+      // given the canvas. This is the case the latch above cannot cover: the
+      // first pen of the session, which nothing has had a chance to learn from
+      // yet.
+      if (e.pointerType === "pen" && pendingTouchPressRef.current) {
+        cleanupPointerState(pendingTouchPressRef.current.pointerId);
+      }
 
       if (
         drawingStateRef.current.activePointerId !== null &&
@@ -981,6 +1008,10 @@ export const useBaseDrawing = (
     };
 
     const handlePointerMove = (e: PointerEvent) => {
+      // Hover counts: a pen that reports it announces itself before it touches
+      // down, which sets the latch a whole stroke earlier than first contact.
+      notePointerType(e.pointerType);
+
       if (interactionSuspendedRef.current) return;
 
       // Before the active-pointer guard: a hovering pointer has no stroke to
