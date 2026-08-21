@@ -172,6 +172,7 @@ post-report-error = Failed to submit report. Please try again.
 allow-relay = Allow relay posts
 allow-replay = Let others watch the replay
 replay-private = Only you can watch this replay
+replay-private-staff = Private replay, shown to you as staff
 sensitive = Sensitive
 draft-post = Draft post
 

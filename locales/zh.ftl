@@ -174,6 +174,7 @@ post-report-error = 提交举报失败。请重试。
 allow-relay = 允许接续创作
 allow-replay = 允许他人观看回放
 replay-private = 只有你能观看这个回放
+replay-private-staff = 私密回放（以工作人员身份查看）
 sensitive = 敏感内容
 draft-post = 草稿作品
 

@@ -1018,7 +1018,7 @@ mod template_tests {
     #[test]
     fn a_closed_replay_is_linked_for_its_author_only() {
         let author = "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d";
-        let stranger = json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d"});
+        let stranger = json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "user"});
         let link = "/9c881320-2b43-4afa-b2bb-7128c8a3e985/replay";
 
         let open = render_post_page("true", author, json!(null));
@@ -1033,14 +1033,31 @@ mod template_tests {
             "a closed replay should not be linked for someone else"
         );
 
-        let closed_to_author = render_post_page("false", author, json!({"id": author}));
+        let closed_to_author =
+            render_post_page("false", author, json!({"id": author, "role": "user"}));
         assert!(
             closed_to_author.contains(link),
             "a closed replay should still be linked for its author"
         );
         assert!(
-            closed_to_author.contains("replay-private"),
+            closed_to_author.contains("(replay-private)"),
             "the author should be told the replay is only theirs to watch"
+        );
+
+        // Staff keep the link for moderation, under a label that does not tell
+        // them the replay is theirs.
+        let closed_to_staff = render_post_page(
+            "false",
+            author,
+            json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "admin"}),
+        );
+        assert!(
+            closed_to_staff.contains(link),
+            "a closed replay should still be linked for staff"
+        );
+        assert!(
+            closed_to_staff.contains("(replay-private-staff)"),
+            "staff should be told the replay is private, not that it is theirs"
         );
     }
 

@@ -694,11 +694,14 @@ pub async fn post_view(
 /// Whether this viewer may watch the post's replay.
 ///
 /// The recording is kept either way — `allow_replay` says who may watch it, and
-/// an author is never shut out of their own. A post map without the key at all
-/// reads as allowed, which is the default the column carries.
+/// an author is never shut out of their own. Staff can watch a closed replay
+/// too: a drawing gets reported for what happens while it is being drawn as
+/// often as for how it ends up, and moderation that cannot see the strokes is
+/// moderation of the thumbnail. A post map without the key at all reads as
+/// allowed, which is the default the column carries.
 fn may_watch_replay(
     post: &std::collections::HashMap<String, Option<String>>,
-    viewer_id: Option<Uuid>,
+    viewer: Option<&crate::models::user::User>,
 ) -> bool {
     let allowed = post
         .get("allow_replay")
@@ -708,15 +711,21 @@ fn may_watch_replay(
     if allowed {
         return true;
     }
-    match (post.get("author_id").and_then(|v| v.as_ref()), viewer_id) {
-        (Some(author_id), Some(viewer_id)) => *author_id == viewer_id.to_string(),
-        _ => false,
+    let Some(viewer) = viewer else {
+        return false;
+    };
+    if viewer.is_admin() {
+        return true;
     }
+    post.get("author_id")
+        .and_then(|v| v.as_ref())
+        .is_some_and(|author_id| *author_id == viewer.id.to_string())
 }
 
 #[cfg(test)]
 mod replay_visibility_tests {
     use super::may_watch_replay;
+    use crate::models::user::{User, UserRole};
     use std::collections::HashMap;
     use uuid::Uuid;
 
@@ -729,25 +738,61 @@ mod replay_visibility_tests {
         post
     }
 
+    fn viewer(id: Uuid, role: UserRole) -> User {
+        User {
+            id,
+            login_name: "someone".to_string(),
+            password_hash: String::new(),
+            display_name: "Someone".to_string(),
+            email: None,
+            email_verified_at: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            banner_id: None,
+            preferred_language: None,
+            deleted_at: None,
+            show_sensitive_content: false,
+            role,
+        }
+    }
+
     #[test]
     fn an_open_replay_is_open_to_anyone() {
         let author = Uuid::new_v4();
         assert!(may_watch_replay(&post(author, Some("true")), None));
         assert!(may_watch_replay(
             &post(author, Some("true")),
-            Some(Uuid::new_v4())
+            Some(&viewer(Uuid::new_v4(), UserRole::User))
         ));
     }
 
     #[test]
     fn a_closed_replay_is_only_the_authors() {
         let author = Uuid::new_v4();
-        assert!(may_watch_replay(&post(author, Some("false")), Some(author)));
+        assert!(may_watch_replay(
+            &post(author, Some("false")),
+            Some(&viewer(author, UserRole::User))
+        ));
         assert!(!may_watch_replay(
             &post(author, Some("false")),
-            Some(Uuid::new_v4())
+            Some(&viewer(Uuid::new_v4(), UserRole::User))
         ));
         assert!(!may_watch_replay(&post(author, Some("false")), None));
+    }
+
+    #[test]
+    fn staff_can_watch_a_closed_replay() {
+        let author = Uuid::new_v4();
+        assert!(may_watch_replay(
+            &post(author, Some("false")),
+            Some(&viewer(Uuid::new_v4(), UserRole::Admin))
+        ));
+        // Moderator is not what `is_admin` means, and every other staff gate on
+        // the site draws the line in the same place.
+        assert!(!may_watch_replay(
+            &post(author, Some("false")),
+            Some(&viewer(Uuid::new_v4(), UserRole::Moderator))
+        ));
     }
 
     #[test]
@@ -817,7 +862,7 @@ pub async fn post_replay_view(
     }
     // Personal posts (community_id is None) are always accessible
 
-    if !may_watch_replay(&post, auth_session.user.as_ref().map(|u| u.id)) {
+    if !may_watch_replay(&post, auth_session.user.as_ref()) {
         // Logged out, this may be the author on another device; otherwise the
         // replay is simply not there to be watched.
         if auth_session.user.is_none() {
@@ -914,7 +959,7 @@ pub async fn post_replay_view_mobile(
     }
     // Personal posts (community_id is None) are always accessible
 
-    if !may_watch_replay(&post, auth_session.user.as_ref().map(|u| u.id)) {
+    if !may_watch_replay(&post, auth_session.user.as_ref()) {
         return Ok(StatusCode::NOT_FOUND.into_response());
     }
 
@@ -3018,7 +3063,7 @@ pub async fn post_replay_view_by_login_name(
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
-    if !may_watch_replay(&post, auth_session.user.as_ref().map(|u| u.id)) {
+    if !may_watch_replay(&post, auth_session.user.as_ref()) {
         if auth_session.user.is_none() {
             return Ok(redirect_to_login(&format!(
                 "/@{}/{}/replay",

@@ -174,6 +174,7 @@ post-report-error = 報告の送信に失敗しました。もう一度お試し
 allow-relay = リレー描画を許可
 allow-replay = 他の人にリプレイを見せる
 replay-private = このリプレイはあなただけが見られます
+replay-private-staff = 非公開のリプレイ（スタッフとして表示）
 sensitive = 敏感な内容
 draft-post = 一時保管された図
 

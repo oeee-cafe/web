@@ -132,11 +132,12 @@
             <p>
               {{ ftl_get_message("post-duration") }}: {{ post.paint_duration }}
               {# A replay the author has closed is still linked for the author
-                 themselves, said so they can tell it is only theirs to watch. #}
-              {% if post.replay_filename and (post.allow_replay == "true" or current_user.id == post.author_id) %}
+                 themselves and for staff, labelled either way so whoever is
+                 looking can tell the link is not one the public gets. #}
+              {% if post.replay_filename and (post.allow_replay == "true" or current_user.id == post.author_id or current_user.role == "admin") %}
                 · <a href="/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}/replay">{{ ftl_get_message("post-replay") }}</a>
                 {% if post.allow_replay != "true" %}
-                  <span class="muted">({{ ftl_get_message("replay-private") }})</span>
+                  <span class="muted">({{ ftl_get_message("replay-private" if current_user.id == post.author_id else "replay-private-staff") }})</span>
                 {% endif %}
               {% endif %}
             </p>
