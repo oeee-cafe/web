@@ -28,6 +28,9 @@
 //! and a reader has to be able to tell.
 
 use aws_sdk_s3::primitives::ByteStream;
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use redis::AsyncCommands;
 use serde::Serialize;
 use tracing::{debug, error, info, warn};
@@ -364,10 +367,46 @@ pub fn s3_client(config: &AppConfig) -> aws_sdk_s3::Client {
     aws_sdk_s3::Client::from_conf(s3_config)
 }
 
-/// Objects are named by the first sequence they hold, zero-padded so a plain
-/// listing is in order and a repeated flush overwrites itself.
+/// What a stored chunk is called.
+///
+/// Named by the first sequence it holds, zero-padded so a plain listing is in
+/// sequence order and a repeated flush overwrites itself rather than
+/// duplicating. The suffix says how it is stored: recordings are mostly one
+/// connection id and one history id repeated per entry, which is sixty per
+/// cent of the bytes and compresses five- or sixfold.
+const CHUNK_SUFFIX: &str = ".oeeelog.gz";
+
+/// What the first chunks were written as, before they were compressed. Read
+/// but never written: two of them exist and there is no reason they should
+/// stop working.
+const CHUNK_SUFFIX_PLAIN: &str = ".oeeelog";
+
 fn chunk_key(room_uuid: Uuid, first_seq: u64) -> String {
-    format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/{first_seq:012}.oeeelog")
+    format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/{first_seq:012}{CHUNK_SUFFIX}")
+}
+
+/// Compresses a chunk for storage.
+fn compress(chunk: &[u8]) -> Result<Vec<u8>, std::io::Error> {
+    use std::io::Write;
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(chunk)?;
+    encoder.finish()
+}
+
+/// Restores one, or passes it through when it was stored before compression.
+///
+/// Decompressed here rather than handed on compressed: what a reader gets is
+/// the format its decoder is written against, in both languages, and the
+/// verified reader stays untouched by how the bytes happened to be kept.
+fn decompress(stored: &[u8]) -> Result<Vec<u8>, std::io::Error> {
+    use std::io::Read;
+    if stored.starts_with(&[0x1f, 0x8b]) {
+        let mut out = Vec::new();
+        GzDecoder::new(stored).read_to_end(&mut out)?;
+        Ok(out)
+    } else {
+        Ok(stored.to_vec())
+    }
 }
 
 fn manifest_key(room_uuid: Uuid) -> String {
@@ -445,13 +484,20 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
             let _ = buffer.drop_front(room_uuid, entries.len()).await;
             return written;
         };
-        let body = encode_chunk(&entries);
         let count = entries.len();
+        let body = match compress(&encode_chunk(&entries)) {
+            Ok(body) => body,
+            Err(e) => {
+                error!("Failed to compress a chunk for room {}: {}", room_uuid, e);
+                return written;
+            }
+        };
 
         if let Err(e) = client
             .put_object()
             .bucket(bucket)
             .key(chunk_key(room_uuid, first_seq))
+            .content_type("application/gzip")
             .body(ByteStream::from(body))
             .send()
             .await
@@ -661,7 +707,12 @@ async fn archived_bounds(state: &AppState, room_uuid: Uuid) -> (Option<u64>, Opt
             for object in listed.contents() {
                 let Some(key) = object.key() else { continue };
                 let Some(name) = key.rsplit('/').next() else { continue };
-                let Some(stem) = name.strip_suffix(".oeeelog") else { continue };
+                let Some(stem) = name
+                    .strip_suffix(CHUNK_SUFFIX)
+                    .or_else(|| name.strip_suffix(CHUNK_SUFFIX_PLAIN))
+                else {
+                    continue;
+                };
                 if let Ok(seq) = stem.parse::<u64>() {
                     first = Some(first.map_or(seq, |held: u64| held.min(seq)));
                 }
@@ -740,7 +791,7 @@ pub async fn download_session(
         .contents()
         .iter()
         .filter_map(|object| object.key())
-        .filter(|key| key.ends_with(".oeeelog"))
+        .filter(|key| key.ends_with(CHUNK_SUFFIX) || key.ends_with(CHUNK_SUFFIX_PLAIN))
         .map(|key| key.to_string())
         .collect();
     // Names are the zero-padded first sequence, so this is sequence order.
@@ -754,7 +805,7 @@ pub async fn download_session(
             .key(&key)
             .send()
             .await?;
-        out.extend_from_slice(&object.body.collect().await?.into_bytes());
+        out.extend_from_slice(&decompress(&object.body.collect().await?.into_bytes())?);
     }
     Ok(out)
 }
@@ -971,6 +1022,48 @@ mod tests {
         assert_eq!(
             selected_bucket(Some("oeee-cafe-archive")),
             Some("oeee-cafe-archive")
+        );
+    }
+
+    /// Storage is compressed; what a reader is handed is not. The decoders on
+    /// both sides are written against the plain format and there is no reason
+    /// they should have to know how the bytes were kept.
+    #[test]
+    fn a_chunk_survives_being_compressed_for_storage() {
+        let entries = vec![
+            message(1_700_000_000_000, 1, &[0x16, 0x01, 0x02]),
+            message(1_700_000_000_050, 2, &[0x14, 0x01]),
+        ];
+        let plain = encode_chunk(&entries);
+        let stored = compress(&plain).expect("compress");
+        assert_eq!(decompress(&stored).expect("decompress"), plain);
+        assert_eq!(decode_chunk(&decompress(&stored).unwrap()), Some(entries));
+    }
+
+    /// Two chunks were written before this, and there is no reason they should
+    /// stop reading.
+    #[test]
+    fn a_chunk_stored_before_compression_still_reads() {
+        let entries = vec![message(5, 9, &[0x16, 0x03])];
+        let plain = encode_chunk(&entries);
+        assert_eq!(decompress(&plain).expect("passthrough"), plain);
+    }
+
+    /// The saving is the whole reason for it. Real recordings run five- or
+    /// sixfold; this only asks that a body of repeated framing does not come
+    /// out bigger than it went in.
+    #[test]
+    fn compressing_a_recording_makes_it_smaller() {
+        let entries: Vec<ArchivedMessage> = (1..200)
+            .map(|seq| message(1_700_000_000_000 + seq, seq, &[0x16, 0x01, 0x02, 0x03]))
+            .collect();
+        let plain = encode_chunk(&entries);
+        let stored = compress(&plain).expect("compress");
+        assert!(
+            stored.len() * 3 < plain.len(),
+            "{} compressed to {}",
+            plain.len(),
+            stored.len()
         );
     }
 

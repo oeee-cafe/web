@@ -52,6 +52,9 @@ serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.145"
 serde_with = "3.7.0"
 sha256 = "1.5.0"
+# Recordings are mostly one repeated connection id and history id per entry,
+# so they compress five- or sixfold; see collaborate::archive.
+flate2 = "1.0"
 time = "0.3.34"
 tokio = { version = "1.47.1", features = ["full"] }
 tokio-tungstenite = "0.27.0"
