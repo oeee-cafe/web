@@ -19,7 +19,8 @@ import { encodePainterOperation } from "../collaborate/binaryProtocol";
 import { decodeArchive, type ArchivedEntry } from "./archiveLog";
 import { createReplay } from "./player";
 
-const MAGIC = [0x4f, 0x45, 0x45, 0x45, 0x4c, 0x4f, 0x47, 0x01];
+const MAGIC = [0x4f, 0x45, 0x45, 0x45, 0x4c, 0x4f, 0x47, 0x02];
+const HISTORY = "00000000-0000-0000-0000-000000000007";
 
 function stroke(x: number): PainterOperation {
   return {
@@ -31,16 +32,17 @@ function stroke(x: number): PainterOperation {
 }
 
 function archive(count: number, gap: number): Uint8Array {
-  const bytes: number[] = [...MAGIC];
+  const raw = HISTORY.replace(/-/g, "").match(/../g)!.map((b) => parseInt(b, 16));
+  const name = [...new TextEncoder().encode("conn")];
+  const bytes: number[] = [...MAGIC, ...raw, 1, name.length, ...name];
   for (let i = 0; i < count; i++) {
     const payload = new Uint8Array(encodePainterOperation(1, stroke(i)));
-    const header = new TextEncoder().encode(`1|conn||${i + 1}|h\n`);
-    const frame = [...header, ...payload];
-    const prefix = new Uint8Array(12);
-    const view = new DataView(prefix.buffer);
-    view.setUint32(0, frame.length, true);
-    view.setBigUint64(4, BigInt(1_700_000_000_000 + i * gap), true);
-    bytes.push(...prefix, ...frame);
+    const fixed = new Uint8Array(22);
+    const view = new DataView(fixed.buffer);
+    view.setBigUint64(2, BigInt(i + 1), true);
+    view.setBigUint64(10, BigInt(1_700_000_000_000 + i * gap), true);
+    view.setUint32(18, payload.length, true);
+    bytes.push(...fixed, ...payload);
   }
   return Uint8Array.from(bytes);
 }

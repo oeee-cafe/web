@@ -618,11 +618,11 @@ async fn every_sequenced_message_lands_in_the_archive_in_order() {
         let entries = buffer.peek(harness.room, 100).await.expect("peek");
         assert_eq!(entries.len(), 8);
         for (index, entry) in entries.iter().enumerate() {
-            assert_eq!(entry.broadcast.seq, Some(index as u64 + 1));
-            assert_eq!(entry.broadcast.payload, vec![0x16, index as u8]);
+            assert_eq!(Some(entry.seq), Some(index as u64 + 1));
+            assert_eq!(entry.payload, vec![0x16, index as u8]);
             // Which connection sent it, which is the attribution the live
             // history does not keep.
-            assert_eq!(entry.broadcast.from_connection, "conn-a");
+            assert_eq!(entry.sender, "conn-a");
             assert!(entry.at > 0, "a recorded message is stamped");
         }
         // Non-decreasing, so a replay can pace itself by them.
@@ -705,7 +705,7 @@ async fn the_archive_buffer_is_drained_only_by_the_flusher_that_claimed_it() {
         buffer.drop_front(harness.room, 3).await.expect("drop");
         let rest = buffer.peek(harness.room, 100).await.expect("peek");
         assert_eq!(rest.len(), 2);
-        assert_eq!(rest[0].broadcast.seq, Some(4));
+        assert_eq!(Some(rest[0].seq), Some(4));
 
         buffer.release(harness.room).await.expect("release");
         assert!(buffer.claim(harness.room).await.expect("claim after release"));
@@ -770,7 +770,7 @@ async fn what_was_said_is_kept_apart_from_what_was_drawn() {
         // is rebuilt from.
         let entries = buffer.peek(harness.room, 100).await.expect("peek");
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].broadcast.payload, vec![0x16, 0x01]);
+        assert_eq!(entries[0].payload, vec![0x16, 0x01]);
     })
     .await
     .expect("chat separation scenario timed out");
@@ -804,7 +804,7 @@ async fn a_checkpoint_compacts_history_and_leaves_the_archive_whole() {
 
         // The recording has not.
         let entries = buffer.peek(harness.room, 100).await.expect("peek");
-        let recorded: Vec<u64> = entries.iter().filter_map(|entry| entry.broadcast.seq).collect();
+        let recorded: Vec<u64> = entries.iter().map(|entry| entry.seq).collect();
         assert_eq!(recorded, vec![1, 2, 3, 4, 5, 6]);
     })
     .await

@@ -103,8 +103,8 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     mounted = null;
     canvasHost.textContent = "";
     const painter = mount(canvasHost, {
-      width: manifest.width,
-      height: manifest.height,
+      width: manifest.canvas.width,
+      height: manifest.canvas.height,
       mode: { kind: "standard" },
       // No toolbox: nothing here is editable, and a replay that offered a
       // brush would be inviting somebody to draw on the record.
@@ -204,11 +204,11 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     .join(", ");
   status.textContent =
     `${replay.length} drawing messages of ${entries.length} recorded` +
-    `  ·  ${manifest.width}×${manifest.height}` +
+    `  ·  ${manifest.canvas.width}×${manifest.canvas.height}` +
     (participants ? `  ·  ${participants}` : "") +
     (manifest.sealed ? "" : "  ·  not sealed") +
     (partial
-      ? `  ·  INCOMPLETE: this recording starts at sequence ${manifest.first_seq}, so everything before it is missing`
+      ? `  ·  INCOMPLETE: this recording starts at sequence ${manifest.recording.first_seq}, so everything before it is missing`
       : "");
   if (partial) status.classList.add("replay-incomplete");
 }

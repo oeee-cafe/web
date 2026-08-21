@@ -15,7 +15,8 @@ import { createReplay, drawableEntries, timeline, MAX_GAP_MS } from "./player";
 
 const WIDTH = 64;
 const HEIGHT = 48;
-const MAGIC = [0x4f, 0x45, 0x45, 0x45, 0x4c, 0x4f, 0x47, 0x01];
+const MAGIC = [0x4f, 0x45, 0x45, 0x45, 0x4c, 0x4f, 0x47, 0x02];
+const HISTORY = "00000000-0000-0000-0000-000000000007";
 
 let hosts: HTMLElement[] = [];
 let painters: PainterHandle[] = [];
@@ -44,16 +45,23 @@ function stroke(at: { x: number; y: number }): PainterOperation {
 
 /** A recording, framed exactly as the server writes one. */
 function archive(marks: { user: number; at: number; point: { x: number; y: number } }[]): Uint8Array {
-  const bytes: number[] = [...MAGIC];
+  const senders = [...new Set(marks.map((mark) => `conn-${mark.user}`))];
+  const raw = HISTORY.replace(/-/g, "").match(/../g)!.map((b) => parseInt(b, 16));
+  const bytes: number[] = [...MAGIC, ...raw, senders.length];
+  for (const sender of senders) {
+    const name = [...new TextEncoder().encode(sender)];
+    bytes.push(name.length, ...name);
+  }
   marks.forEach((mark, index) => {
     const payload = new Uint8Array(encodePainterOperation(mark.user, stroke(mark.point)));
-    const header = new TextEncoder().encode(`1|conn-${mark.user}||${index + 1}|history-id\n`);
-    const frame = [...header, ...payload];
-    const prefix = new Uint8Array(12);
-    const view = new DataView(prefix.buffer);
-    view.setUint32(0, frame.length, true);
-    view.setBigUint64(4, BigInt(mark.at), true);
-    bytes.push(...prefix, ...frame);
+    const fixed = new Uint8Array(22);
+    const view = new DataView(fixed.buffer);
+    fixed[0] = 0;
+    fixed[1] = senders.indexOf(`conn-${mark.user}`);
+    view.setBigUint64(2, BigInt(index + 1), true);
+    view.setBigUint64(10, BigInt(mark.at), true);
+    view.setUint32(18, payload.length, true);
+    bytes.push(...fixed, ...payload);
   });
   return Uint8Array.from(bytes);
 }
@@ -191,7 +199,7 @@ describe("pacing", () => {
       at,
       seq: index + 1,
       from: "conn",
-      historyId: "h",
+      historyId: HISTORY,
       payload: new Uint8Array(),
     }));
 
@@ -239,8 +247,8 @@ describe("what a replay draws", () => {
     resetPoint[0] = 0x0d;
     const drawing = new Uint8Array(encodePainterOperation(1, stroke(FIRST)));
     const entries: ArchivedEntry[] = [
-      { at: 1, seq: 1, from: "c", historyId: "h", payload: resetPoint },
-      { at: 2, seq: 2, from: "c", historyId: "h", payload: drawing },
+      { at: 1, seq: 1, from: "c", historyId: HISTORY, payload: resetPoint },
+      { at: 2, seq: 2, from: "c", historyId: HISTORY, payload: drawing },
     ];
     const drawable = drawableEntries(entries);
     expect(drawable).toHaveLength(1);

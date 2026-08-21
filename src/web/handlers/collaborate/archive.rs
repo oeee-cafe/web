@@ -45,6 +45,7 @@ use super::redis_state::RoomBroadcast;
 const ARCHIVE_PREFIX: &str = "oeee:archive:v1:";
 const ARCHIVE_CLAIM_PREFIX: &str = "oeee:archive_claim:v1:";
 const ARCHIVE_CHAT_PREFIX: &str = "oeee:archive_chat:v1:";
+const ARCHIVE_BOUNDS_PREFIX: &str = "oeee:archive_bounds:v1:";
 
 /// How long un-flushed entries wait in Redis before they are given up on.
 ///
@@ -66,10 +67,6 @@ const FLUSH_BATCH: isize = 2048;
 pub const FLUSH_EVERY: u64 = 512;
 
 const FLUSH_CLAIM_TTL: u64 = 120;
-
-/// `OEEELOG` and a format byte. A chunk that does not begin with this is not
-/// one of ours, and a reader should say so rather than interpret it.
-const CHUNK_MAGIC: [u8; 8] = *b"OEEELOG\x01";
 
 /// Where a session's objects live, under the bucket the images already use.
 const ARCHIVE_R2_PREFIX: &str = "collaborate-archive";
@@ -98,6 +95,10 @@ pub fn buffer_key(room_uuid: Uuid) -> String {
     format!("{}{}", ARCHIVE_PREFIX, room_uuid)
 }
 
+fn bounds_key(room_uuid: Uuid) -> String {
+    format!("{}{}", ARCHIVE_BOUNDS_PREFIX, room_uuid)
+}
+
 fn chat_buffer_key(room_uuid: Uuid) -> String {
     format!("{}{}", ARCHIVE_CHAT_PREFIX, room_uuid)
 }
@@ -106,80 +107,192 @@ fn archive_claim_key(room_uuid: Uuid) -> String {
     format!("{}{}", ARCHIVE_CLAIM_PREFIX, room_uuid)
 }
 
-/// One recorded message: when it was sequenced, and the broadcast itself.
+/// One recorded message.
+///
+/// Flat on purpose: what a reader wants is the position, the moment and the
+/// bytes. The identifiers that are the same for every message in a chunk --
+/// the room's history and the small set of connections that spoke -- are in
+/// the chunk's header, written once. Repeating them per entry is what made a
+/// recording sixty per cent framing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArchivedMessage {
     /// Milliseconds since the epoch, taken on the server when the sequence was
-    /// assigned. The drawing messages carry no time of their own -- a replay
-    /// has no pacing without this, and a post-mortem no way to say how long a
-    /// client took over anything.
+    /// assigned. Drawing messages carry no time of their own, so this is the
+    /// only thing a replay can pace itself by.
     pub at: u64,
-    pub broadcast: RoomBroadcast,
+    /// Canonical position. Contiguous in a whole recording.
+    pub seq: u64,
+    /// The connection that sent it, or the literal `system` for the messages
+    /// the server sequences on the room's behalf.
+    pub sender: String,
+    /// Which history this position belongs to. Copied from the chunk header,
+    /// so a reader can see a replaced history without having to track chunks.
+    pub history_id: Uuid,
+    /// The message itself, exactly as the room received it.
+    pub payload: Vec<u8>,
 }
 
-/// A chunk: the magic, then each entry as a length and its bytes.
+/// The kind of an entry.
 ///
-/// Self-describing per entry rather than per file, because the reader that
-/// matters most is the one opening a chunk from a session that went wrong,
-/// possibly a truncated one. A short tail costs the entries in it and nothing
-/// before them.
-pub fn encode_chunk(entries: &[ArchivedMessage]) -> Vec<u8> {
+/// One byte that costs a recording almost nothing and is the reason this
+/// format can grow. Everything today is a canonical message; a keyframe, a
+/// marker, or anything else added later gets its own kind, and a reader that
+/// predates it skips the entry by its length rather than losing the file.
+const KIND_MESSAGE: u8 = 0;
+
+/// `OEEELOG` and the format version.
+const CHUNK_MAGIC: [u8; 8] = *b"OEEELOG\x02";
+
+/// Fixed part of an entry: kind, sender index, sequence, time, length.
+const ENTRY_HEADER: usize = 1 + 1 + 8 + 8 + 4;
+
+fn put_u64(out: &mut Vec<u8>, value: u64) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+/// A chunk: what is true of all of it, then each message.
+///
+/// ```text
+/// header := "OEEELOG\x02" | history_id (16) | senders (u8 count, each u8 len + utf8)
+/// entry  := kind (u8) | sender index (u8) | seq (u64) | at (u64) | len (u32) | payload
+/// ```
+///
+/// Chunks concatenate: a header met at an entry boundary starts a new one, so
+/// a whole session downloaded end to end reads exactly like one of the objects
+/// it is made of.
+pub fn encode_chunk(history_id: Uuid, messages: &[ArchivedMessage]) -> Vec<u8> {
+    let mut senders: Vec<&str> = Vec::new();
+    for message in messages {
+        if !senders.iter().any(|held| *held == message.sender) {
+            senders.push(&message.sender);
+        }
+    }
+    // More than this many connections in one chunk cannot be indexed by a
+    // byte. A room seats eight, so it takes a chunk spanning thirty-one
+    // reconnections to reach it; the rest are recorded as `system`, which is
+    // wrong about who sent them and right about everything else.
+    senders.truncate(255);
+
     let mut out = Vec::from(CHUNK_MAGIC);
-    for entry in entries {
-        let frame = entry.broadcast.encode();
-        out.extend_from_slice(&(frame.len() as u32).to_le_bytes());
-        out.extend_from_slice(&entry.at.to_le_bytes());
-        out.extend_from_slice(&frame);
+    out.extend_from_slice(history_id.as_bytes());
+    out.push(senders.len() as u8);
+    for sender in &senders {
+        let bytes = sender.as_bytes();
+        let length = bytes.len().min(255);
+        out.push(length as u8);
+        out.extend_from_slice(&bytes[..length]);
+    }
+
+    for message in messages {
+        let index = senders
+            .iter()
+            .position(|held| *held == message.sender)
+            .unwrap_or(0);
+        out.push(KIND_MESSAGE);
+        out.push(index as u8);
+        put_u64(&mut out, message.seq);
+        put_u64(&mut out, message.at);
+        out.extend_from_slice(&(message.payload.len() as u32).to_le_bytes());
+        out.extend_from_slice(&message.payload);
     }
     out
 }
 
-/// Every whole entry in a chunk. `None` only when the magic is wrong, so a
-/// file that is not an archive is distinguishable from one that is empty.
+fn read_u64(bytes: &[u8], at: usize) -> u64 {
+    let mut held = [0u8; 8];
+    held.copy_from_slice(&bytes[at..at + 8]);
+    u64::from_le_bytes(held)
+}
+
+/// Reads a chunk header, returning what it says and where the entries start.
+fn read_header(bytes: &[u8], at: usize) -> Option<(Uuid, Vec<String>, usize)> {
+    let mut cursor = at + CHUNK_MAGIC.len();
+    let raw: [u8; 16] = bytes.get(cursor..cursor + 16)?.try_into().ok()?;
+    let history_id = Uuid::from_bytes(raw);
+    cursor += 16;
+    let count = *bytes.get(cursor)? as usize;
+    cursor += 1;
+    let mut senders = Vec::with_capacity(count);
+    for _ in 0..count {
+        let length = *bytes.get(cursor)? as usize;
+        cursor += 1;
+        let name = std::str::from_utf8(bytes.get(cursor..cursor + length)?).ok()?;
+        senders.push(name.to_string());
+        cursor += length;
+    }
+    Some((history_id, senders, cursor))
+}
+
+/// Every whole entry in a recording, in order.
 ///
-/// Chunks concatenate: a header met at an entry boundary is skipped rather
-/// than read as a length, so a whole session downloaded as one stream reads
-/// exactly like one of the objects it is made of. Everything that consumes an
-/// archive then has one case instead of two.
+/// `None` only when the file does not begin with a header, so "not ours" is
+/// distinguishable from "empty". A truncated tail costs the entries in it and
+/// nothing before them: the file most worth reading is the one from a session
+/// that went wrong, which is also the one most likely to be short.
 pub fn decode_chunk(bytes: &[u8]) -> Option<Vec<ArchivedMessage>> {
-    if bytes.len() < CHUNK_MAGIC.len() || bytes[..CHUNK_MAGIC.len()] != CHUNK_MAGIC {
+    if !bytes.starts_with(&CHUNK_MAGIC) {
         return None;
     }
-    let mut entries = Vec::new();
-    let mut at = CHUNK_MAGIC.len();
-    while at + 12 <= bytes.len() {
+    let (mut history_id, mut senders, mut at) = read_header(bytes, 0)?;
+    let mut messages = Vec::new();
+    while at + ENTRY_HEADER <= bytes.len() {
         if bytes[at..].starts_with(&CHUNK_MAGIC) {
-            at += CHUNK_MAGIC.len();
+            // The next chunk of a concatenated stream: everything below is
+            // true of it instead.
+            let (next_history, next_senders, next_at) = match read_header(bytes, at) {
+                Some(header) => header,
+                None => break,
+            };
+            history_id = next_history;
+            senders = next_senders;
+            at = next_at;
             continue;
         }
-        let len = u32::from_le_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]]) as usize;
-        let timestamp = u64::from_le_bytes([
-            bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7],
-            bytes[at + 8], bytes[at + 9], bytes[at + 10], bytes[at + 11],
-        ]);
-        let start = at + 12;
-        let Some(frame) = bytes.get(start..start + len) else {
-            // A truncated tail: everything whole before it still reads.
+        let kind = bytes[at];
+        let sender = bytes[at + 1] as usize;
+        let seq = read_u64(bytes, at + 2);
+        let stamp = read_u64(bytes, at + 10);
+        let length = u32::from_le_bytes([
+            bytes[at + 18],
+            bytes[at + 19],
+            bytes[at + 20],
+            bytes[at + 21],
+        ]) as usize;
+        let start = at + ENTRY_HEADER;
+        let Some(payload) = bytes.get(start..start + length) else {
             break;
         };
-        match RoomBroadcast::decode(frame) {
-            Some(broadcast) => entries.push(ArchivedMessage { at: timestamp, broadcast }),
-            // Framing we do not recognise. Stop rather than guess where the
-            // next entry begins.
-            None => break,
+        at = start + length;
+        // A kind this reader predates is skipped by its length rather than
+        // guessed at. That is what the byte is for.
+        if kind != KIND_MESSAGE {
+            continue;
         }
-        at = start + len;
+        messages.push(ArchivedMessage {
+            at: stamp,
+            seq,
+            sender: senders.get(sender).cloned().unwrap_or_default(),
+            history_id,
+            payload: payload.to_vec(),
+        });
     }
-    Some(entries)
+    Some(messages)
 }
 
 /// Splits a buffered `"<millis>:<frame>"`.
+///
+/// The buffer keeps the broadcast as it went out, which is what the sequencer
+/// already had in hand; flattening it is this side's job.
 fn decode_buffered(entry: &[u8]) -> Option<ArchivedMessage> {
     let split = entry.iter().position(|&byte| byte == b':')?;
     let at = std::str::from_utf8(&entry[..split]).ok()?.parse().ok()?;
+    let broadcast = RoomBroadcast::decode(&entry[split + 1..])?;
     Some(ArchivedMessage {
         at,
-        broadcast: RoomBroadcast::decode(&entry[split + 1..])?,
+        seq: broadcast.seq?,
+        sender: broadcast.from_connection,
+        history_id: broadcast.history_id.unwrap_or_default(),
+        payload: broadcast.payload,
     })
 }
 
@@ -322,22 +435,56 @@ async fn buffered_chat(
 /// part that cannot be recovered later: the canonical stream addresses people
 /// by a one-byte session id, and what that id meant lives in a Redis key with
 /// an hour on it.
+///
+/// The account id is kept alongside the login name because a login name can be
+/// changed and the account it belongs to cannot -- a replay from last year
+/// should still credit the right person.
 #[derive(Debug, Serialize)]
 pub struct ArchiveManifest {
     pub format: &'static str,
     pub version: u32,
     pub session: Uuid,
-    pub width: i32,
-    pub height: i32,
-    /// The first sequence this archive holds. Anything above 1 means the
-    /// recording began mid-session and cannot be rendered from nothing.
-    pub first_seq: Option<u64>,
-    pub last_seq: Option<u64>,
-    /// Session id to login name, for the layer stack and for attribution.
+    pub canvas: ArchiveCanvas,
+    /// When the room was made, and when it was ended if it was.
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    /// How long the session was open. None while it is still going.
+    pub duration_ms: Option<i64>,
+    pub recording: ArchiveSpan,
+    /// Session id to account and login name, in join order -- which is the
+    /// order ids are handed out, and so the order layers stack in.
     pub participants: Vec<ArchiveParticipant>,
     /// True once the session ended and everything buffered was written.
     pub sealed: bool,
     pub updated_at: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ArchiveCanvas {
+    pub width: i32,
+    pub height: i32,
+    /// Which painter this room ran. Only `standard` exists today -- the
+    /// collaborative page mounts nothing else -- and it is recorded anyway,
+    /// because the day a second one is offered every archive written before it
+    /// would otherwise be ambiguous about which it was, with no way left to
+    /// find out.
+    pub mode: &'static str,
+}
+
+/// What the stored chunks actually hold, as opposed to what the room reached.
+#[derive(Debug, Serialize)]
+pub struct ArchiveSpan {
+    /// The first sequence archived. Anything but 1 means the recording began
+    /// mid-session and cannot be rendered from nothing.
+    pub first_seq: Option<u64>,
+    /// The last sequence archived -- what is in the file, not where the room
+    /// got to. A reader checking completeness needs the former.
+    pub last_seq: Option<u64>,
+    /// The span the messages cover, for a player that wants to draw a scrub
+    /// bar before it has downloaded the log.
+    pub first_at: Option<u64>,
+    pub last_at: Option<u64>,
+    pub messages: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -475,17 +622,10 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
         }
         // Ephemeral messages never reach the sequencer, so every entry here
         // has a position; the first one names the object.
-        let Some(first_seq) = entries.iter().find_map(|entry| entry.broadcast.seq) else {
-            error!(
-                "Archive buffer for room {} holds {} entries with no sequence; dropping them",
-                room_uuid,
-                entries.len()
-            );
-            let _ = buffer.drop_front(room_uuid, entries.len()).await;
-            return written;
-        };
+        let first_seq = entries[0].seq;
+        let history_id = entries[0].history_id;
         let count = entries.len();
-        let body = match compress(&encode_chunk(&entries)) {
+        let body = match compress(&encode_chunk(history_id, &entries)) {
             Ok(body) => body,
             Err(e) => {
                 error!("Failed to compress a chunk for room {}: {}", room_uuid, e);
@@ -513,6 +653,9 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
             // next time, over the same bytes.
             warn!("Failed to trim the archive buffer for room {}: {}", room_uuid, e);
             return written + count;
+        }
+        if let Err(e) = note_written(state, room_uuid, &entries).await {
+            warn!("Failed to record what was archived for room {}: {}", room_uuid, e);
         }
         written += count;
         debug!(
@@ -566,70 +709,67 @@ pub async fn seal_room(state: &AppState, room_uuid: Uuid, force: bool) {
     );
 }
 
-async fn write_manifest(
+/// What a room has actually had written out.
+///
+/// Kept as it is written rather than worked out afterwards: the alternative is
+/// downloading every chunk to find out what is in them, and the manifest is
+/// rewritten on every flush.
+#[derive(Debug, Default)]
+struct ArchivedBounds {
+    first_seq: Option<u64>,
+    last_seq: Option<u64>,
+    first_at: Option<u64>,
+    last_at: Option<u64>,
+    messages: u64,
+}
+
+async fn note_written(
     state: &AppState,
     room_uuid: Uuid,
-    sealed: bool,
+    entries: &[ArchivedMessage],
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let session = sqlx::query!(
-        "SELECT width, height FROM collaborative_sessions WHERE id = $1",
-        room_uuid
-    )
-    .fetch_optional(&state.db_pool)
-    .await?;
-    let Some(session) = session else {
+    let Some(first) = entries.first() else {
         return Ok(());
     };
-
-    let assigned = state.redis_state.get_user_ids(room_uuid).await?;
-    let mut participants = Vec::new();
-    if !assigned.is_empty() {
-        let user_ids: Vec<Uuid> = assigned.keys().copied().collect();
-        let rows = sqlx::query!(
-            "SELECT id, login_name FROM users WHERE id = ANY($1)",
-            &user_ids
-        )
-        .fetch_all(&state.db_pool)
+    let last = entries.last().unwrap_or(first);
+    let mut conn = state.redis_pool.get().await?;
+    let key = bounds_key(room_uuid);
+    // The firsts are set once and never moved; the lasts follow the newest
+    // chunk. A repeated flush of the same chunk therefore restates them rather
+    // than double-counting anything but the message tally, which is the one
+    // field a retry can inflate -- and a tally high by a chunk is a better
+    // failure than a manifest that lies about the span.
+    conn.hset_nx::<_, _, _, ()>(&key, "first_seq", first.seq).await?;
+    conn.hset_nx::<_, _, _, ()>(&key, "first_at", first.at).await?;
+    conn.hset::<_, _, _, ()>(&key, "last_seq", last.seq).await?;
+    conn.hset::<_, _, _, ()>(&key, "last_at", last.at).await?;
+    conn.hincr::<_, _, _, ()>(&key, "messages", entries.len() as i64)
         .await?;
-        for row in rows {
-            if let Some(session_id) = assigned.get(&row.id) {
-                participants.push(ArchiveParticipant {
-                    session_id: *session_id,
-                    user_id: row.id,
-                    login_name: row.login_name,
-                });
-            }
-        }
-        participants.sort_by_key(|participant| participant.session_id);
-    }
-
-    let (first_seq, last_seq) = archived_bounds(state, room_uuid).await;
-
-    let manifest = ArchiveManifest {
-        format: "oeee-collab-archive",
-        version: 1,
-        session: room_uuid,
-        width: session.width,
-        height: session.height,
-        first_seq,
-        last_seq,
-        participants,
-        sealed,
-        updated_at: chrono::Utc::now().to_rfc3339(),
-    };
-
-    let Some(bucket) = bucket(&state.config) else {
-        return Ok(());
-    };
-    s3_client(&state.config)
-        .put_object()
-        .bucket(bucket)
-        .key(manifest_key(room_uuid))
-        .content_type("application/json")
-        .body(ByteStream::from(serde_json::to_vec(&manifest)?))
-        .send()
-        .await?;
+    conn.expire::<_, ()>(&key, ARCHIVE_BUFFER_TTL as i64).await?;
     Ok(())
+}
+
+async fn archived_bounds(state: &AppState, room_uuid: Uuid) -> ArchivedBounds {
+    let read: Result<std::collections::HashMap<String, u64>, _> = async {
+        let mut conn = state.redis_pool.get().await?;
+        let held: std::collections::HashMap<String, u64> =
+            conn.hgetall(bounds_key(room_uuid)).await?;
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(held)
+    }
+    .await;
+    match read {
+        Ok(held) => ArchivedBounds {
+            first_seq: held.get("first_seq").copied(),
+            last_seq: held.get("last_seq").copied(),
+            first_at: held.get("first_at").copied(),
+            last_at: held.get("last_at").copied(),
+            messages: held.get("messages").copied().unwrap_or(0),
+        },
+        Err(e) => {
+            warn!("Failed to read archive bounds for room {}: {}", room_uuid, e);
+            ArchivedBounds::default()
+        }
+    }
 }
 
 /// Stores the transcript, whole, and returns how many lines it holds.
@@ -686,46 +826,83 @@ pub async fn read_chat(
     }
 }
 
-/// The span the stored chunks cover, from their names and the buffer's tail.
-///
-/// Read from the listing rather than remembered, so a manifest rewritten by a
-/// later flush describes what is actually in the bucket.
-async fn archived_bounds(state: &AppState, room_uuid: Uuid) -> (Option<u64>, Option<u64>) {
-    let Some(bucket) = bucket(&state.config) else {
-        return (None, None);
+async fn write_manifest(
+    state: &AppState,
+    room_uuid: Uuid,
+    sealed: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let session = sqlx::query!(
+        "SELECT width, height, created_at, ended_at FROM collaborative_sessions WHERE id = $1",
+        room_uuid
+    )
+    .fetch_optional(&state.db_pool)
+    .await?;
+    let Some(session) = session else {
+        return Ok(());
     };
-    let client = s3_client(&state.config);
-    let listed = client
-        .list_objects_v2()
-        .bucket(bucket)
-        .prefix(format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/"))
-        .send()
-        .await;
-    let mut first = None;
-    match listed {
-        Ok(listed) => {
-            for object in listed.contents() {
-                let Some(key) = object.key() else { continue };
-                let Some(name) = key.rsplit('/').next() else { continue };
-                let Some(stem) = name
-                    .strip_suffix(CHUNK_SUFFIX)
-                    .or_else(|| name.strip_suffix(CHUNK_SUFFIX_PLAIN))
-                else {
-                    continue;
-                };
-                if let Ok(seq) = stem.parse::<u64>() {
-                    first = Some(first.map_or(seq, |held: u64| held.min(seq)));
-                }
+
+    let assigned = state.redis_state.get_user_ids(room_uuid).await?;
+    let mut participants = Vec::new();
+    if !assigned.is_empty() {
+        let user_ids: Vec<Uuid> = assigned.keys().copied().collect();
+        let rows = sqlx::query!(
+            "SELECT id, login_name FROM users WHERE id = ANY($1)",
+            &user_ids
+        )
+        .fetch_all(&state.db_pool)
+        .await?;
+        for row in rows {
+            if let Some(session_id) = assigned.get(&row.id) {
+                participants.push(ArchiveParticipant {
+                    session_id: *session_id,
+                    user_id: row.id,
+                    login_name: row.login_name,
+                });
             }
         }
-        Err(e) => warn!("Failed to list the archive for room {}: {}", room_uuid, e),
+        participants.sort_by_key(|participant| participant.session_id);
     }
 
-    // The newest sequence the room has reached, which the last stored chunk
-    // ends on once the buffer is empty.
-    let store = super::redis_messages::RedisMessageStore::new(state.redis_pool.clone());
-    let last = store.current_sequence(room_uuid).await.ok().flatten();
-    (first, last)
+    let bounds = archived_bounds(state, room_uuid).await;
+    let started = session.created_at.and_utc();
+    let manifest = ArchiveManifest {
+        format: "oeee-collab-archive",
+        version: 2,
+        session: room_uuid,
+        canvas: ArchiveCanvas {
+            width: session.width,
+            height: session.height,
+            mode: "standard",
+        },
+        started_at: started.to_rfc3339(),
+        ended_at: session.ended_at.map(|at| at.to_rfc3339()),
+        duration_ms: session
+            .ended_at
+            .map(|at| (at - started).num_milliseconds()),
+        recording: ArchiveSpan {
+            first_seq: bounds.first_seq,
+            last_seq: bounds.last_seq,
+            first_at: bounds.first_at,
+            last_at: bounds.last_at,
+            messages: bounds.messages,
+        },
+        participants,
+        sealed,
+        updated_at: chrono::Utc::now().to_rfc3339(),
+    };
+
+    let Some(bucket) = bucket(&state.config) else {
+        return Ok(());
+    };
+    s3_client(&state.config)
+        .put_object()
+        .bucket(bucket)
+        .key(manifest_key(room_uuid))
+        .content_type("application/json")
+        .body(ByteStream::from(serde_json::to_vec(&manifest)?))
+        .send()
+        .await?;
+    Ok(())
 }
 
 /// The largest report accepted. The trace is bounded at 512 events by the
@@ -902,16 +1079,19 @@ pub fn maybe_flush(state: &AppState, room_uuid: Uuid, seq: u64) {
 mod tests {
     use super::*;
 
+    const HISTORY: Uuid = Uuid::from_u128(7);
+
     fn message(at: u64, seq: u64, payload: &[u8]) -> ArchivedMessage {
+        sent_by("conn-1", at, seq, payload)
+    }
+
+    fn sent_by(sender: &str, at: u64, seq: u64, payload: &[u8]) -> ArchivedMessage {
         ArchivedMessage {
             at,
-            broadcast: RoomBroadcast {
-                from_connection: "conn-1".to_string(),
-                target_connection: None,
-                seq: Some(seq),
-                history_id: Some(Uuid::from_u128(7)),
-                payload: payload.to_vec(),
-            },
+            seq,
+            sender: sender.to_string(),
+            history_id: HISTORY,
+            payload: payload.to_vec(),
         }
     }
 
@@ -919,45 +1099,94 @@ mod tests {
     fn a_chunk_round_trips_every_entry_in_order() {
         let entries = vec![
             message(1_700_000_000_000, 1, &[0x16, 0x01, 0x02]),
-            message(1_700_000_000_050, 2, &[0x14, 0x01]),
-            message(1_700_000_000_900, 3, &[]),
+            sent_by("conn-2", 1_700_000_000_050, 2, &[0x14, 0x01]),
+            sent_by("system", 1_700_000_000_900, 3, &[]),
         ];
-        let decoded = decode_chunk(&encode_chunk(&entries)).expect("a chunk");
+        let decoded = decode_chunk(&encode_chunk(HISTORY, &entries)).expect("a chunk");
         assert_eq!(decoded, entries);
+    }
+
+    /// The connection that sent each message survives, from a table written
+    /// once rather than a name repeated on every entry -- and `system`, which
+    /// is what the server sequences the room's own messages under, is not a
+    /// UUID and never needed to be.
+    #[test]
+    fn senders_are_named_once_and_pointed_at() {
+        let entries = vec![
+            sent_by("conn-a", 1, 1, &[0x16]),
+            sent_by("conn-b", 2, 2, &[0x16]),
+            sent_by("conn-a", 3, 3, &[0x16]),
+            sent_by("system", 4, 4, &[0x0d]),
+        ];
+        let encoded = encode_chunk(HISTORY, &entries);
+        // Three distinct names, each written once however many messages they
+        // sent.
+        assert_eq!(encoded.windows(6).filter(|w| *w == b"conn-a").count(), 1);
+        assert_eq!(encoded.windows(6).filter(|w| *w == b"system").count(), 1);
+        assert_eq!(decode_chunk(&encoded).expect("a chunk"), entries);
     }
 
     /// Drawing payloads are arbitrary bytes, and the length prefix is what
     /// keeps a delimiter out of the question.
     #[test]
     fn a_payload_that_looks_like_framing_survives() {
-        let entries = vec![message(5, 9, b"OEEELOG\x01\x00\x00\x00\x0a:|\n1|")];
-        let decoded = decode_chunk(&encode_chunk(&entries)).expect("a chunk");
+        let entries = vec![message(5, 9, b"OEEELOG\x02\x00\x00\x00\x0a:|\n1|")];
+        let decoded = decode_chunk(&encode_chunk(HISTORY, &entries)).expect("a chunk");
         assert_eq!(decoded, entries);
     }
 
     /// A session is downloaded as its objects end to end, so the reader has to
-    /// treat that as one log rather than as the first chunk followed by
-    /// rubbish.
+    /// treat that as one log -- and pick up the second chunk's own history and
+    /// sender table rather than reading it through the first one's.
     #[test]
     fn chunks_concatenate_into_one_readable_log() {
-        let first = vec![message(1, 1, &[0x16, 0x01]), message(2, 2, &[0x16, 0x02])];
-        let second = vec![message(3, 3, &[0x14, 0x01])];
-        let mut joined = encode_chunk(&first);
-        joined.extend_from_slice(&encode_chunk(&second));
+        let other = Uuid::from_u128(11);
+        let first = vec![sent_by("conn-a", 1, 1, &[0x16, 0x01])];
+        let second = vec![ArchivedMessage {
+            at: 2,
+            seq: 2,
+            sender: "conn-z".to_string(),
+            history_id: other,
+            payload: vec![0x14],
+        }];
+        let mut joined = encode_chunk(HISTORY, &first);
+        joined.extend_from_slice(&encode_chunk(other, &second));
 
         let decoded = decode_chunk(&joined).expect("a log");
         assert_eq!(decoded, [first, second].concat());
+        // A replaced history is visible without the reader tracking chunks.
+        assert_eq!(decoded[0].history_id, HISTORY);
+        assert_eq!(decoded[1].history_id, other);
     }
 
     #[test]
     fn an_empty_chunk_is_still_a_chunk() {
-        assert_eq!(decode_chunk(&encode_chunk(&[])), Some(Vec::new()));
+        assert_eq!(decode_chunk(&encode_chunk(HISTORY, &[])), Some(Vec::new()));
+    }
+
+    /// The byte that lets this format grow. An entry of a kind written after
+    /// this reader is skipped by its length, so a file with one in it still
+    /// yields everything else rather than being lost.
+    #[test]
+    fn an_entry_of_an_unknown_kind_is_skipped_not_fatal() {
+        let known = vec![message(1, 1, &[0x16, 0x01]), message(3, 3, &[0x16, 0x03])];
+        let mut encoded = encode_chunk(HISTORY, &known);
+        // Splice a future entry in between: kind 99, sender 0, seq 2, one byte.
+        let mut future = vec![99u8, 0];
+        future.extend_from_slice(&2u64.to_le_bytes());
+        future.extend_from_slice(&2u64.to_le_bytes());
+        future.extend_from_slice(&1u32.to_le_bytes());
+        future.push(0xff);
+        let split = encoded.len() - (ENTRY_HEADER + 2);
+        encoded.splice(split..split, future);
+
+        assert_eq!(decode_chunk(&encoded).expect("a chunk"), known);
     }
 
     #[test]
     fn rejects_bytes_that_are_not_an_archive() {
         assert_eq!(decode_chunk(b""), None);
-        assert_eq!(decode_chunk(b"OEEELOG\x02"), None);
+        assert_eq!(decode_chunk(b"OEEELOG\x01"), None);
         assert_eq!(decode_chunk(b"not a log at all"), None);
     }
 
@@ -971,26 +1200,33 @@ mod tests {
             message(2, 2, &[0x17; 8]),
             message(3, 3, &[0x18; 8]),
         ];
-        let whole = encode_chunk(&entries);
-        // From the magic onwards: a file cut before that is not identifiable
-        // as an archive at all, which `rejects_bytes_that_are_not_an_archive`
-        // is the case for.
-        for cut in CHUNK_MAGIC.len()..whole.len() {
+        let whole = encode_chunk(HISTORY, &entries);
+        // From the header onwards: a file cut before that is not identifiable
+        // as an archive at all.
+        let header = read_header(&whole, 0).expect("a header").2;
+        for cut in header..whole.len() {
             let decoded = decode_chunk(&whole[..cut]).expect("a chunk");
-            assert!(
-                decoded.len() <= entries.len(),
-                "cut {cut} produced more entries than were written"
-            );
             assert_eq!(decoded[..], entries[..decoded.len()], "cut {cut}");
         }
     }
 
+    /// The buffer keeps the broadcast as it went out; flattening it into a
+    /// recorded message is this side's job.
     #[test]
     fn a_buffered_entry_round_trips_through_its_redis_encoding() {
-        let entry = message(1_700_000_000_123, 42, &[0x16, 0x03]);
-        let mut raw = format!("{}:", entry.at).into_bytes();
-        raw.extend_from_slice(&entry.broadcast.encode());
-        assert_eq!(decode_buffered(&raw), Some(entry));
+        let broadcast = RoomBroadcast {
+            from_connection: "conn-1".to_string(),
+            target_connection: None,
+            seq: Some(42),
+            history_id: Some(HISTORY),
+            payload: vec![0x16, 0x03],
+        };
+        let mut raw = b"1700000000123:".to_vec();
+        raw.extend_from_slice(&broadcast.encode());
+        assert_eq!(
+            decode_buffered(&raw),
+            Some(message(1_700_000_000_123, 42, &[0x16, 0x03]))
+        );
     }
 
     #[test]
@@ -1034,7 +1270,7 @@ mod tests {
             message(1_700_000_000_000, 1, &[0x16, 0x01, 0x02]),
             message(1_700_000_000_050, 2, &[0x14, 0x01]),
         ];
-        let plain = encode_chunk(&entries);
+        let plain = encode_chunk(HISTORY, &entries);
         let stored = compress(&plain).expect("compress");
         assert_eq!(decompress(&stored).expect("decompress"), plain);
         assert_eq!(decode_chunk(&decompress(&stored).unwrap()), Some(entries));
@@ -1045,7 +1281,7 @@ mod tests {
     #[test]
     fn a_chunk_stored_before_compression_still_reads() {
         let entries = vec![message(5, 9, &[0x16, 0x03])];
-        let plain = encode_chunk(&entries);
+        let plain = encode_chunk(HISTORY, &entries);
         assert_eq!(decompress(&plain).expect("passthrough"), plain);
     }
 
@@ -1057,7 +1293,7 @@ mod tests {
         let entries: Vec<ArchivedMessage> = (1..200)
             .map(|seq| message(1_700_000_000_000 + seq, seq, &[0x16, 0x01, 0x02, 0x03]))
             .collect();
-        let plain = encode_chunk(&entries);
+        let plain = encode_chunk(HISTORY, &entries);
         let stored = compress(&plain).expect("compress");
         assert!(
             stored.len() * 3 < plain.len(),
