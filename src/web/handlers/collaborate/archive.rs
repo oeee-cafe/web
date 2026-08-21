@@ -41,6 +41,7 @@ use super::redis_state::RoomBroadcast;
 
 const ARCHIVE_PREFIX: &str = "oeee:archive:v1:";
 const ARCHIVE_CLAIM_PREFIX: &str = "oeee:archive_claim:v1:";
+const ARCHIVE_CHAT_PREFIX: &str = "oeee:archive_chat:v1:";
 
 /// How long un-flushed entries wait in Redis before they are given up on.
 ///
@@ -92,6 +93,10 @@ fn selected_bucket(configured: Option<&str>) -> Option<&str> {
 /// position.
 pub fn buffer_key(room_uuid: Uuid) -> String {
     format!("{}{}", ARCHIVE_PREFIX, room_uuid)
+}
+
+fn chat_buffer_key(room_uuid: Uuid) -> String {
+    format!("{}{}", ARCHIVE_CHAT_PREFIX, room_uuid)
 }
 
 fn archive_claim_key(room_uuid: Uuid) -> String {
@@ -234,6 +239,79 @@ impl ArchiveBuffer {
     }
 }
 
+/// One line of a room's conversation, as it is kept.
+///
+/// Beside the log rather than in it. Chat never reaches the sequencer -- it is
+/// broadcast and forgotten, with the last hundred lines held in Redis for
+/// somebody joining -- so it has no canonical position, and giving it a
+/// made-up one to fit the binary format would put a thing that is not a mark
+/// into the stream a canvas is rebuilt from. It is text; it is kept as text.
+#[derive(Debug, Serialize)]
+pub struct ArchivedChat {
+    /// Milliseconds since the epoch, from the sender's own clock -- this is
+    /// what the chat frame carries, and the transcript is read against the
+    /// recording's timeline rather than used to order anything.
+    pub at: u64,
+    pub user_id: Uuid,
+    pub login_name: String,
+    pub message: String,
+}
+
+/// Keeps one line, if this deployment keeps anything.
+///
+/// Called with the frame the *server* built, which carries the name it
+/// authenticated rather than the one the client claimed.
+pub async fn record_chat(state: &AppState, room_uuid: Uuid, frame: &[u8]) {
+    if bucket(&state.config).is_none() {
+        return;
+    }
+    let Some(chat) = super::messages::ChatMessage::parse(frame) else {
+        warn!("Could not read a chat frame for room {} to record it", room_uuid);
+        return;
+    };
+    let line = ArchivedChat {
+        at: chat.timestamp,
+        user_id: chat.user_id,
+        login_name: chat.username,
+        message: chat.message,
+    };
+    let encoded = match serde_json::to_string(&line) {
+        Ok(encoded) => encoded,
+        Err(e) => {
+            warn!("Could not encode a chat line for room {}: {}", room_uuid, e);
+            return;
+        }
+    };
+    let result: Result<(), Box<dyn std::error::Error + Send + Sync>> = async {
+        let mut conn = state.redis_pool.get().await?;
+        let key = chat_buffer_key(room_uuid);
+        conn.rpush::<_, _, ()>(&key, encoded).await?;
+        conn.expire::<_, ()>(&key, ARCHIVE_BUFFER_TTL as i64).await?;
+        Ok(())
+    }
+    .await;
+    if let Err(e) = result {
+        warn!("Failed to record a chat line for room {}: {}", room_uuid, e);
+    }
+}
+
+/// Every line held for a room, oldest first.
+///
+/// Never trimmed as it is written out: the transcript is stored whole each
+/// time, so the buffer has to keep holding the whole thing. It is text, and a
+/// session's worth of it is smaller than one snapshot.
+async fn buffered_chat(
+    state: &AppState,
+    room_uuid: Uuid,
+) -> BufferResult<Vec<serde_json::Value>> {
+    let mut conn = state.redis_pool.get().await?;
+    let raw: Vec<String> = conn.lrange(chat_buffer_key(room_uuid), 0, -1).await?;
+    Ok(raw
+        .iter()
+        .filter_map(|line| serde_json::from_str(line).ok())
+        .collect())
+}
+
 /// What a reader needs that the operations do not carry.
 ///
 /// Written beside the chunks and rewritten as they land, so an archive of a
@@ -296,6 +374,10 @@ fn manifest_key(room_uuid: Uuid) -> String {
     format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/manifest.json")
 }
 
+fn chat_key(room_uuid: Uuid) -> String {
+    format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/chat.json")
+}
+
 /// Moves everything buffered for a room into the bucket.
 ///
 /// Returns how many messages were written. Never an error the caller has to
@@ -317,7 +399,14 @@ pub async fn flush_room(state: &AppState, room_uuid: Uuid) -> usize {
     }
 
     let written = write_chunks(state, room_uuid, &buffer).await;
-    if written > 0 {
+    let chatted = match write_chat(state, room_uuid).await {
+        Ok(lines) => lines,
+        Err(e) => {
+            warn!("Failed to store the transcript for room {}: {}", room_uuid, e);
+            0
+        }
+    };
+    if written > 0 || chatted > 0 {
         if let Err(e) = write_manifest(state, room_uuid, false).await {
             warn!("Failed to write the archive manifest for room {}: {}", room_uuid, e);
         }
@@ -406,13 +495,15 @@ pub async fn seal_room(state: &AppState, room_uuid: Uuid, force: bool) {
         return;
     }
     if !force {
-        match ArchiveBuffer::new(state.redis_pool.clone())
+        let drawing = ArchiveBuffer::new(state.redis_pool.clone())
             .pending(room_uuid)
-            .await
-        {
-            Ok(0) => return,
-            Ok(_) => {}
-            Err(e) => {
+            .await;
+        let chat = buffered_chat(state, room_uuid).await.map(|held| held.len());
+        match (drawing, chat) {
+            // A room that talked and never drew still has something to keep.
+            (Ok(0), Ok(0)) => return,
+            (Ok(_), _) | (_, Ok(_)) => {}
+            (Err(e), _) => {
                 warn!("Failed to read the archive buffer for room {}: {}", room_uuid, e);
                 return;
             }
@@ -493,6 +584,60 @@ async fn write_manifest(
         .send()
         .await?;
     Ok(())
+}
+
+/// Stores the transcript, whole, and returns how many lines it holds.
+///
+/// Rewritten rather than appended because object storage has no append and a
+/// session's conversation is a few kilobytes: writing all of it each time is
+/// both simpler and idempotent, where stitching would have to know what it had
+/// already written.
+async fn write_chat(
+    state: &AppState,
+    room_uuid: Uuid,
+) -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
+    let Some(bucket) = bucket(&state.config) else {
+        return Ok(0);
+    };
+    let lines = buffered_chat(state, room_uuid).await?;
+    if lines.is_empty() {
+        return Ok(0);
+    }
+    s3_client(&state.config)
+        .put_object()
+        .bucket(bucket)
+        .key(chat_key(room_uuid))
+        .content_type("application/json")
+        .body(ByteStream::from(serde_json::to_vec(&lines)?))
+        .send()
+        .await?;
+    Ok(lines.len())
+}
+
+/// The transcript as stored, for the viewer and for staff reading one back.
+pub async fn read_chat(
+    state: &AppState,
+    room_uuid: Uuid,
+) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error + Send + Sync>> {
+    let Some(bucket) = bucket(&state.config) else {
+        return Ok(Vec::new());
+    };
+    let object = s3_client(&state.config)
+        .get_object()
+        .bucket(bucket)
+        .key(chat_key(room_uuid))
+        .send()
+        .await;
+    match object {
+        Ok(object) => {
+            let bytes = object.body.collect().await?.into_bytes();
+            Ok(serde_json::from_slice(&bytes)?)
+        }
+        // A room where nobody said anything has no transcript, which is an
+        // answer rather than a failure.
+        Err(e) if e.raw_response().map(|r| r.status().as_u16()) == Some(404) => Ok(Vec::new()),
+        Err(e) => Err(Box::new(e)),
+    }
 }
 
 /// The span the stored chunks cover, from their names and the buffer's tail.

@@ -46,3 +46,47 @@ body {
   font-size: 0.75rem;
   color: #444;
 }
+
+/* Canvas and conversation side by side: the point of keeping a transcript is
+   reading it against what was being drawn at the time. */
+.replay-stage {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.replay-transcript {
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-height: 480px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.replay-chat-line {
+  margin: 0 0 0.35rem 0;
+}
+
+.replay-chat-who {
+  font-weight: 600;
+  margin-right: 0.4rem;
+}
+
+.replay-chat-who::after {
+  content: ":";
+}
+
+/* Said later than the canvas has reached. Dimmed rather than hidden, so the
+   shape of the conversation is visible while you scrub through it. */
+.replay-chat-future {
+  opacity: 0.35;
+}
+
+.replay-chat-empty {
+  margin: 0;
+  color: #777;
+}

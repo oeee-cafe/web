@@ -1029,6 +1029,10 @@ async fn handle_incoming_messages(
                     if let Err(e) = store.append_chat_message(ctx.room_uuid, data).await {
                         error!("Failed to preserve recent chat in room {}: {}", ctx.room_uuid, e);
                     }
+                    // And into the recording. `data` here is the frame the
+                    // server built in `process_server_message`, so the name on
+                    // it is the one it authenticated.
+                    super::archive::record_chat(ctx.state, ctx.room_uuid, data).await;
                 }
             }
             messages::broadcast_message(&msg, ctx.room_uuid, ctx.connection_id, ctx.state).await;

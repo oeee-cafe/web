@@ -15,8 +15,8 @@ use crate::web::handlers::admin::{
     admin_banners, admin_banners_fragment, admin_collaborative_sessions, admin_communities,
     admin_community_posts, admin_flag_banner, admin_flag_post, admin_post_detail, admin_posts,
     admin_posts_fragment, admin_user_posts, admin_users, collaborative_archive_manifest,
-    download_collaborative_archive, download_collaborative_diagnostics,
-    replay_collaborative_session,
+    collaborative_session_chat, download_collaborative_archive,
+    download_collaborative_diagnostics, replay_collaborative_session,
 };
 use crate::web::handlers::auth::{
     api_login, api_logout, api_me, api_signup, do_login, do_logout, do_signup, login, signup,
@@ -308,6 +308,10 @@ impl App {
             .route(
                 "/admin/collaborative-sessions/:uuid/manifest",
                 get(collaborative_archive_manifest),
+            )
+            .route(
+                "/admin/collaborative-sessions/:uuid/chat",
+                get(collaborative_session_chat),
             )
             .route(
                 "/admin/collaborative-sessions/:uuid/replay",

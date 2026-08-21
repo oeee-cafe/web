@@ -8,6 +8,55 @@ use uuid::Uuid;
 use super::db;
 use super::utils::{bytes_to_uuid, read_u64_le};
 
+#[cfg(test)]
+mod chat_framing_tests {
+    use super::ChatMessage;
+    use uuid::Uuid;
+
+    /// A frame the server wrote has to read back as what it wrote, including
+    /// the awkward text people actually send.
+    #[test]
+    fn a_chat_message_round_trips() {
+        for message in [
+            "hello",
+            "",
+            "여기까지 하죠",
+            "emoji 🎨 and a | pipe and a : colon",
+            "a\nnewline",
+        ] {
+            let original = ChatMessage {
+                user_id: Uuid::from_u128(9),
+                timestamp: 1_700_000_000_123,
+                username: "miro".to_string(),
+                message: message.to_string(),
+            };
+            assert_eq!(
+                ChatMessage::parse(&original.serialize()).map(|held| held.message),
+                Some(message.to_string()),
+                "{message:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_a_frame_that_is_not_chat_or_is_cut_short() {
+        let whole = ChatMessage {
+            user_id: Uuid::from_u128(1),
+            timestamp: 1,
+            username: "umu".to_string(),
+            message: "hi".to_string(),
+        }
+        .serialize();
+        assert!(ChatMessage::parse(&whole).is_some());
+        for length in 0..whole.len() {
+            assert!(ChatMessage::parse(&whole[..length]).is_none(), "{length}");
+        }
+        let mut wrong_type = whole.clone();
+        wrong_type[0] = 0x16;
+        assert!(ChatMessage::parse(&wrong_type).is_none());
+    }
+}
+
 pub struct EndSessionContext<'a> {
     pub user_id: Uuid,
     pub user_login_name: &'a str,
@@ -172,6 +221,35 @@ impl LayersMessage {
 }
 
 impl ChatMessage {
+    /// The inverse of `serialize`, for anything that has to read a chat frame
+    /// back rather than pass it along.
+    ///
+    /// Here beside the writer because the layout is one thing: a second reader
+    /// somewhere else is how the two drift, and the frame this parses is the
+    /// one the server built, with the name it authenticated rather than the
+    /// one the client claimed.
+    pub fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() < 27 || data[0] != MessageType::Chat as u8 {
+            return None;
+        }
+        let user_id = bytes_to_uuid(&data[1..17]).ok()?;
+        let timestamp = read_u64_le(data, 17);
+        let username_len = u16::from_le_bytes([data[25], data[26]]) as usize;
+        let username_end = 27 + username_len;
+        let username = std::str::from_utf8(data.get(27..username_end)?).ok()?;
+        let message_len =
+            u16::from_le_bytes([*data.get(username_end)?, *data.get(username_end + 1)?]) as usize;
+        let message_start = username_end + 2;
+        let message = std::str::from_utf8(data.get(message_start..message_start + message_len)?)
+            .ok()?;
+        Some(Self {
+            user_id,
+            timestamp,
+            username: username.to_string(),
+            message: message.to_string(),
+        })
+    }
+
     pub fn serialize(&self) -> Vec<u8> {
         let username_bytes = self.username.as_bytes();
         let username_len = username_bytes.len() as u16;

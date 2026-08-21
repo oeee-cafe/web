@@ -745,6 +745,37 @@ async fn a_room_with_nothing_buffered_has_nothing_left_to_seal() {
     .expect("seal skipping scenario timed out");
 }
 
+/// Chat never reaches the sequencer, so it is not in the log and has to be
+/// kept beside it -- and a room that talked and never drew is still a room
+/// with something worth keeping.
+#[tokio::test]
+async fn what_was_said_is_kept_apart_from_what_was_drawn() {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        let harness = start_harness().await;
+        let store = RedisMessageStore::new(harness.pool.clone());
+        let buffer = ArchiveBuffer::new(harness.pool.clone());
+        let channel = format!("oeee:pubsub:{}", harness.room);
+
+        store
+            .sequence_and_publish(harness.room, &[0x16, 0x01], "conn-a", &channel)
+            .await
+            .expect("sequence");
+        store
+            .append_chat_message(harness.room, &[0x03, 0x01])
+            .await
+            .expect("chat");
+
+        // The drawing buffer holds the stroke and nothing else: a chat line in
+        // there would be a message that is not a mark in the stream a canvas
+        // is rebuilt from.
+        let entries = buffer.peek(harness.room, 100).await.expect("peek");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].broadcast.payload, vec![0x16, 0x01]);
+    })
+    .await
+    .expect("chat separation scenario timed out");
+}
+
 /// The recording outlives the working set. A checkpoint squashes history at
 /// its base and the room keeps drawing; the archive still holds every message
 /// from before it, which is the whole reason it exists.

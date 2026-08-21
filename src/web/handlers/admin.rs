@@ -623,6 +623,24 @@ pub async fn collaborative_archive_manifest(
     }
 }
 
+/// GET /admin/collaborative-sessions/:uuid/chat — what was said in a session,
+/// beside the recording of what was drawn.
+///
+/// Chat never enters canonical history: it is broadcast and forgotten, with
+/// only the last hundred lines held for somebody joining. This is the kept
+/// copy, and staff-only like everything else about a recording -- a
+/// transcript is the most personal thing a session produces.
+pub async fn collaborative_session_chat(
+    _admin: AdminUser,
+    Path(room_uuid): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let lines = crate::web::handlers::collaborate::archive::read_chat(&state, room_uuid)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read the transcript: {}", e))?;
+    Ok(axum::Json(lines).into_response())
+}
+
 /// GET /admin/collaborative-sessions/:uuid/replay — the recording, played
 /// back through the painter that drew it.
 ///
@@ -1108,6 +1126,11 @@ mod tests {
         // first on the row.
         assert!(rendered.contains(
             "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/replay"
+        ));
+        // What was said, which is kept beside the recording and never entered
+        // canonical history.
+        assert!(rendered.contains(
+            "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/chat"
         ));
     }
 

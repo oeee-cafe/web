@@ -7,8 +7,14 @@
  */
 
 import { mount, type PainterHandle } from "neo-cucumber";
-import { decodeArchive, isRenderable, type ArchiveManifest } from "./archiveLog";
-import { createReplay, type ReplayHandle } from "./player";
+import {
+  chatOffsets,
+  decodeArchive,
+  isRenderable,
+  type ArchiveManifest,
+  type ArchivedChat,
+} from "./archiveLog";
+import { createReplay, timeline, type ReplayHandle } from "./player";
 
 const SPEEDS = [1, 2, 4, 16];
 
@@ -31,9 +37,10 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   const status = el("p", "replay-status", "Loading the recording…");
   host.appendChild(status);
 
-  const [manifestResponse, logResponse] = await Promise.all([
+  const [manifestResponse, logResponse, chatResponse] = await Promise.all([
     fetch(`/admin/collaborative-sessions/${session}/manifest`, { credentials: "include" }),
     fetch(`/admin/collaborative-sessions/${session}/archive`, { credentials: "include" }),
+    fetch(`/admin/collaborative-sessions/${session}/chat`, { credentials: "include" }),
   ]);
 
   if (!manifestResponse.ok || !logResponse.ok) {
@@ -56,10 +63,36 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   // the finished picture.
   const partial = !isRenderable(manifest);
 
+  // A room that only talked has no drawing to play, and its transcript is
+  // still worth reading.
+  const chat: ArchivedChat[] = chatResponse.ok ? await chatResponse.json() : [];
+
+  const stage = el("div", "replay-stage");
   const canvasHost = el("div", "replay-canvas");
+  const transcript = el("div", "replay-transcript");
+  stage.append(canvasHost, transcript);
   const controls = el("div", "replay-controls");
-  host.appendChild(canvasHost);
+  host.appendChild(stage);
   host.appendChild(controls);
+
+  // Lined up against the first recorded message, so the conversation reads
+  // beside the drawing rather than as a list on its own.
+  const firstAt = entries.length > 0 ? entries[0].at : 0;
+  const chatAt = chatOffsets(chat, firstAt);
+  const chatRows: HTMLElement[] = [];
+  if (chat.length === 0) {
+    transcript.appendChild(el("p", "replay-chat-empty", "Nothing was said."));
+  }
+  chat.forEach((line, index) => {
+    const row = el("p", "replay-chat-line");
+    const who = el("span", "replay-chat-who", line.login_name);
+    const said = el("span", "replay-chat-said", line.message);
+    row.append(who, said);
+    row.title = new Date(line.at).toISOString();
+    transcript.appendChild(row);
+    chatRows.push(row);
+    void index;
+  });
 
   let mounted: PainterHandle | null = null;
   const newPainter = async (): Promise<PainterHandle> => {
@@ -95,6 +128,9 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   };
 
   const painter = await newPainter();
+  // The same schedule the player runs on, for placing the transcript against
+  // it.
+  const drawnAt = timeline(entries);
 
   const playButton = el("button", "replay-button", "Play");
   const restartButton = el("button", "replay-button", "Restart");
@@ -122,6 +158,16 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
       readout.textContent =
         `${shown} / ${replay.length}` +
         (entry ? `  ·  seq ${entry.seq}  ·  ${new Date(entry.at).toISOString()}` : "");
+      // Everything said up to here, so the conversation arrives as the drawing
+      // does rather than all at once at the top.
+      const reached = index >= 0 ? drawnAt[index] ?? 0 : -1;
+      let last: HTMLElement | null = null;
+      chatRows.forEach((row, line) => {
+        const spoken = chatAt[line] <= reached;
+        row.classList.toggle("replay-chat-future", !spoken);
+        if (spoken) last = row;
+      });
+      last?.scrollIntoView({ block: "nearest" });
     },
   });
 

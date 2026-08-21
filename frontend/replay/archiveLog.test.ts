@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { decodeArchive, isRenderable, type ArchiveManifest } from "./archiveLog";
+import {
+  chatOffsets,
+  decodeArchive,
+  isRenderable,
+  type ArchiveManifest,
+} from "./archiveLog";
 
 /**
  * The reader and the writer are in different languages, so the only thing
@@ -108,5 +113,24 @@ describe("whether a recording can be rendered", () => {
     expect(isRenderable(manifest(1))).toBe(true);
     expect(isRenderable(manifest(3310))).toBe(false);
     expect(isRenderable(manifest(null))).toBe(false);
+  });
+});
+
+describe("placing a transcript against a recording", () => {
+  const line = (at: number) => ({ at, user_id: "u", login_name: "miro", message: "hi" });
+
+  /** Read against the first recorded message, so a conversation arrives as the
+   * drawing does rather than all at once at the top. */
+  it("measures each line from the first recorded message", () => {
+    expect(chatOffsets([line(1_000), line(4_500)], 1_000)).toEqual([0, 3_500]);
+  });
+
+  /**
+   * Chat carries the sender's clock and the log carries the server's, so a
+   * line can be stamped before the first message. It belongs at the start
+   * rather than at a negative offset nothing can scroll to.
+   */
+  it("keeps a line stamped before the recording at the start", () => {
+    expect(chatOffsets([line(500)], 1_000)).toEqual([0]);
   });
 });

@@ -113,3 +113,23 @@ export type ArchiveManifest = {
 export function isRenderable(manifest: ArchiveManifest): boolean {
   return manifest.first_seq === 1;
 }
+
+/** One line of a session's conversation, as it is kept beside the log. */
+export type ArchivedChat = {
+  at: number;
+  user_id: string;
+  login_name: string;
+  message: string;
+};
+
+/**
+ * Where each line of the transcript falls on the recording's timeline.
+ *
+ * Chat carries the sender's own clock and the log carries the server's, so the
+ * two are not the same measurement -- this lines them up by wall-clock time
+ * against the first recorded message, which is close enough to read a
+ * conversation against a drawing and is not offered as anything more.
+ */
+export function chatOffsets(chat: ArchivedChat[], firstMessageAt: number): number[] {
+  return chat.map((line) => Math.max(0, line.at - firstMessageAt));
+}
