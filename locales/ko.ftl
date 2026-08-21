@@ -172,6 +172,8 @@ post-report-success = 게시물이 신고되었습니다. 커뮤니티를 안전
 post-report-error = 신고 제출에 실패했습니다. 다시 시도해주세요.
 
 allow-relay = 릴레이 그림 허용
+allow-replay = 다른 사람에게 리플레이 공개
+replay-private = 이 리플레이는 나만 볼 수 있습니다
 sensitive = 민감한 내용
 draft-post = 임시 보관된 그림
 

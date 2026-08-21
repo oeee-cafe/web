@@ -32,6 +32,13 @@
                {% if post.allow_relay == "true" %}checked{% endif %}>
         <label for="allow_relay">{{ ftl_get_message("allow-relay") }}</label>
     </div>
+    <div class="form-group form-group-checkbox">
+        <input type="checkbox"
+               name="allow_replay"
+               id="allow_replay"
+               {% if post.allow_replay == "true" %}checked{% endif %}>
+        <label for="allow_replay">{{ ftl_get_message("allow-replay") }}</label>
+    </div>
     <div class="form-actions">
         <button type="button" class="btn" hx-get="/posts/{{ post_id }}" hx-target="#post-edit-container" hx-swap="outerHTML">{{ ftl_get_message("cancel") }}</button>
         <button type="submit" class="btn">{{ ftl_get_message("save") }}</button>

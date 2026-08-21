@@ -551,6 +551,7 @@ pub async fn get_post_details_json(
         },
         is_sensitive: post_data.is_sensitive,
         allow_relay: post_data.allow_relay,
+        allow_replay: post_data.allow_replay,
         published_at_utc: post_data.published_at_utc,
         community: match (
             post_data.community_id,
@@ -1076,6 +1077,9 @@ pub struct EditPostRequest {
     pub hashtags: Option<String>,
     pub is_sensitive: bool,
     pub allow_relay: bool,
+    /// Absent from a client that predates the field, which cannot have meant
+    /// anything by it — the post keeps whatever it was set to.
+    pub allow_replay: Option<bool>,
 }
 
 pub async fn edit_post_api(
@@ -1142,6 +1146,13 @@ pub async fn edit_post_api(
             .into_response());
     }
 
+    let allow_replay = request.allow_replay.unwrap_or_else(|| {
+        post.get("allow_replay")
+            .and_then(|v| v.as_ref())
+            .map(|v| v != "false")
+            .unwrap_or(true)
+    });
+
     // Update the post
     edit_post(
         &mut tx,
@@ -1150,6 +1161,7 @@ pub async fn edit_post_api(
         request.content,
         request.is_sensitive,
         request.allow_relay,
+        allow_replay,
     )
     .await?;
 

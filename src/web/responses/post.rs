@@ -85,6 +85,7 @@ pub struct PostDetail {
     pub image: ImageInfo,
     pub is_sensitive: bool,
     pub allow_relay: bool,
+    pub allow_replay: bool,
     pub published_at_utc: Option<String>,
     pub community: Option<PostCommunityInfo>,
     pub hashtags: Vec<String>,

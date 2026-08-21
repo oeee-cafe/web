@@ -967,6 +967,128 @@ mod template_tests {
         }
     }
 
+    /// The post page's own view of a post, string-valued like the real
+    /// context, with the replay switch and author left to the caller.
+    fn post_page(allow_replay: &str, author_id: &str) -> serde_json::Value {
+        json!({
+            "id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+            "author_id": author_id,
+            "title": "Tandemaus",
+            "content": "a description",
+            "image_width": "640",
+            "image_height": "480",
+            "image_filename": "abcdef0123.png",
+            "image_tool": "neo-cucumber",
+            "replay_filename": "30ca3f590dda85e21dbc94250199a692b4fa5c7d626ea3445acef3bcf3c1338a.pch",
+            "published_at": "2025-03-26 21:15:04",
+            "paint_duration": "00:14:58",
+            "viewer_count": "3",
+            "allow_relay": "true",
+            "allow_replay": allow_replay,
+            "login_name": "someone",
+            "display_name": "Someone",
+        })
+    }
+
+    fn render_post_page(allow_replay: &str, author_id: &str, viewer: serde_json::Value) -> String {
+        let env = test_support::env();
+        env.get_template("post_view.jinja")
+            .unwrap_or_else(|e| panic!("post_view.jinja loads: {e:#}"))
+            .render(context! {
+                post => post_page(allow_replay, author_id),
+                post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                current_user => viewer,
+                r2_public_endpoint_url => "https://images.example",
+                base_url => "https://oeee.example",
+                domain => "oeee.example",
+                comments => Vec::<serde_json::Value>::new(),
+                collaborative_participants => Vec::<serde_json::Value>::new(),
+                reaction_counts => Vec::<serde_json::Value>::new(),
+                hashtags => Vec::<serde_json::Value>::new(),
+                child_posts => Vec::<serde_json::Value>::new(),
+                post_community => json!(null),
+                parent_post_data => json!(null),
+                ..chrome()
+            })
+            .unwrap_or_else(|e| panic!("post_view.jinja renders: {e:#}"))
+    }
+
+    /// The replay switch is enforced in the handler; this is the other half of
+    /// it -- the link a stranger is not supposed to be offered.
+    #[test]
+    fn a_closed_replay_is_linked_for_its_author_only() {
+        let author = "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d";
+        let stranger = json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d"});
+        let link = "/9c881320-2b43-4afa-b2bb-7128c8a3e985/replay";
+
+        let open = render_post_page("true", author, json!(null));
+        assert!(
+            open.contains(link),
+            "an open replay should be linked for anyone"
+        );
+
+        let closed_to_stranger = render_post_page("false", author, stranger);
+        assert!(
+            !closed_to_stranger.contains(link),
+            "a closed replay should not be linked for someone else"
+        );
+
+        let closed_to_author = render_post_page("false", author, json!({"id": author}));
+        assert!(
+            closed_to_author.contains(link),
+            "a closed replay should still be linked for its author"
+        );
+        assert!(
+            closed_to_author.contains("replay-private"),
+            "the author should be told the replay is only theirs to watch"
+        );
+    }
+
+    /// The edit form is where a published post's replay gets turned off, and
+    /// an unchecked box submits nothing -- so a box that fails to reflect the
+    /// stored value silently flips it on the next save.
+    #[test]
+    fn the_edit_form_reflects_the_stored_replay_switch() {
+        let env = test_support::env();
+        let template = env
+            .get_template("post_edit.jinja")
+            .unwrap_or_else(|e| panic!("post_edit.jinja loads: {e:#}"));
+        let render = |allow_replay: &str| {
+            template
+                .render(context! {
+                    post => json!({
+                        "title": "Tandemaus",
+                        "content": "a description",
+                        "is_sensitive": "false",
+                        "allow_relay": "true",
+                        "allow_replay": allow_replay,
+                    }),
+                    post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                    hashtags => "",
+                    ..chrome()
+                })
+                .unwrap_or_else(|e| panic!("post_edit.jinja renders: {e:#}"))
+        };
+
+        /// The rest of the `<input>` tag that carries the replay switch.
+        fn checkbox(rendered: &str) -> String {
+            let (_, tail) = rendered
+                .rsplit_once("id=\"allow_replay\"")
+                .expect("the replay checkbox");
+            let (tag, _) = tail.split_once('>').expect("the checkbox tag ends");
+            tag.to_string()
+        }
+
+        assert!(
+            checkbox(&render("true")).contains("checked"),
+            "an open replay should render a checked box"
+        );
+        assert!(
+            !checkbox(&render("false")).contains("checked"),
+            "a closed replay should render an unchecked box"
+        );
+    }
+
     #[test]
     fn replay_pages_do_not_load_the_retired_applet() {
         for template in [

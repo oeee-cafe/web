@@ -170,6 +170,8 @@ post-report-success = Post reported successfully. Thank you for helping keep our
 post-report-error = Failed to submit report. Please try again.
 
 allow-relay = Allow relay posts
+allow-replay = Let others watch the replay
+replay-private = Only you can watch this replay
 sensitive = Sensitive
 draft-post = Draft post
 

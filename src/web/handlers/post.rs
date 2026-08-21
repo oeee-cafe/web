@@ -691,6 +691,73 @@ pub async fn post_view(
     }
 }
 
+/// Whether this viewer may watch the post's replay.
+///
+/// The recording is kept either way — `allow_replay` says who may watch it, and
+/// an author is never shut out of their own. A post map without the key at all
+/// reads as allowed, which is the default the column carries.
+fn may_watch_replay(
+    post: &std::collections::HashMap<String, Option<String>>,
+    viewer_id: Option<Uuid>,
+) -> bool {
+    let allowed = post
+        .get("allow_replay")
+        .and_then(|v| v.as_ref())
+        .map(|v| v != "false")
+        .unwrap_or(true);
+    if allowed {
+        return true;
+    }
+    match (post.get("author_id").and_then(|v| v.as_ref()), viewer_id) {
+        (Some(author_id), Some(viewer_id)) => *author_id == viewer_id.to_string(),
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod replay_visibility_tests {
+    use super::may_watch_replay;
+    use std::collections::HashMap;
+    use uuid::Uuid;
+
+    fn post(author: Uuid, allow_replay: Option<&str>) -> HashMap<String, Option<String>> {
+        let mut post = HashMap::new();
+        post.insert("author_id".to_string(), Some(author.to_string()));
+        if let Some(allow_replay) = allow_replay {
+            post.insert("allow_replay".to_string(), Some(allow_replay.to_string()));
+        }
+        post
+    }
+
+    #[test]
+    fn an_open_replay_is_open_to_anyone() {
+        let author = Uuid::new_v4();
+        assert!(may_watch_replay(&post(author, Some("true")), None));
+        assert!(may_watch_replay(
+            &post(author, Some("true")),
+            Some(Uuid::new_v4())
+        ));
+    }
+
+    #[test]
+    fn a_closed_replay_is_only_the_authors() {
+        let author = Uuid::new_v4();
+        assert!(may_watch_replay(&post(author, Some("false")), Some(author)));
+        assert!(!may_watch_replay(
+            &post(author, Some("false")),
+            Some(Uuid::new_v4())
+        ));
+        assert!(!may_watch_replay(&post(author, Some("false")), None));
+    }
+
+    #[test]
+    fn a_post_without_the_key_is_open() {
+        // The column defaults to true, so its absence must not read as a
+        // closed replay -- that would hide every replay on the site.
+        assert!(may_watch_replay(&post(Uuid::new_v4(), None), None));
+    }
+}
+
 pub async fn post_replay_view(
     auth_session: AuthSession,
     headers: HeaderMap,
@@ -749,6 +816,15 @@ pub async fn post_replay_view(
         }
     }
     // Personal posts (community_id is None) are always accessible
+
+    if !may_watch_replay(&post, auth_session.user.as_ref().map(|u| u.id)) {
+        // Logged out, this may be the author on another device; otherwise the
+        // replay is simply not there to be watched.
+        if auth_session.user.is_none() {
+            return Ok(redirect_to_login(&format!("/posts/{}/replay", id)));
+        }
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    }
 
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
@@ -837,6 +913,10 @@ pub async fn post_replay_view_mobile(
         }
     }
     // Personal posts (community_id is None) are always accessible
+
+    if !may_watch_replay(&post, auth_session.user.as_ref().map(|u| u.id)) {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    }
 
     let template_filename = match post.get("replay_filename") {
         Some(replay_filename) => {
@@ -945,6 +1025,7 @@ pub struct PostPublishForm {
     content: String,
     is_sensitive: Option<String>,
     allow_relay: Option<String>,
+    allow_replay: Option<String>,
     hashtags: Option<String>,
 }
 
@@ -975,6 +1056,7 @@ pub async fn post_publish(
 
     let is_sensitive = form.is_sensitive == Some("on".to_string());
     let allow_relay = form.allow_relay == Some("on".to_string());
+    let allow_replay = form.allow_replay == Some("on".to_string());
 
     // Parse community_id if present, otherwise None for personal posts
     let community_id = post
@@ -1000,6 +1082,7 @@ pub async fn post_publish(
         form.content.clone(),
         is_sensitive,
         allow_relay,
+        allow_replay,
     )
     .await;
 
@@ -2049,6 +2132,7 @@ pub struct EditPostForm {
     pub content: String,
     pub is_sensitive: Option<String>,
     pub allow_relay: Option<String>,
+    pub allow_replay: Option<String>,
     pub hashtags: Option<String>,
 }
 
@@ -2090,6 +2174,7 @@ pub async fn hx_do_edit_post(
         form.content.clone(),
         form.is_sensitive == Some("on".to_string()),
         form.allow_relay == Some("on".to_string()),
+        form.allow_replay == Some("on".to_string()),
     )
     .await;
 
@@ -2932,6 +3017,16 @@ pub async fn post_replay_view_by_login_name(
         }
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
+
+    if !may_watch_replay(&post, auth_session.user.as_ref().map(|u| u.id)) {
+        if auth_session.user.is_none() {
+            return Ok(redirect_to_login(&format!(
+                "/@{}/{}/replay",
+                login_name, post_id
+            )));
+        }
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    }
 
     let community_id = post
         .get("community_id")

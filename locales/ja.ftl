@@ -172,6 +172,8 @@ post-report-success = 投稿が報告されました。コミュニティの安�
 post-report-error = 報告の送信に失敗しました。もう一度お試しください。
 
 allow-relay = リレー描画を許可
+allow-replay = 他の人にリプレイを見せる
+replay-private = このリプレイはあなただけが見られます
 sensitive = 敏感な内容
 draft-post = 一時保管された図
 

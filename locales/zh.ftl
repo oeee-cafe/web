@@ -172,6 +172,8 @@ post-report-success = 帖子已被举报。感谢您帮助维护社区安全。
 post-report-error = 提交举报失败。请重试。
 
 allow-relay = 允许接续创作
+allow-replay = 允许他人观看回放
+replay-private = 只有你能观看这个回放
 sensitive = 敏感内容
 draft-post = 草稿作品
 

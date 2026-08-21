@@ -131,8 +131,13 @@
             <p>{{ ftl_get_message("post-published-at") }}: {{ post.published_at }}</p>
             <p>
               {{ ftl_get_message("post-duration") }}: {{ post.paint_duration }}
-              {% if post.replay_filename %}
+              {# A replay the author has closed is still linked for the author
+                 themselves, said so they can tell it is only theirs to watch. #}
+              {% if post.replay_filename and (post.allow_replay == "true" or current_user.id == post.author_id) %}
                 · <a href="/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}/replay">{{ ftl_get_message("post-replay") }}</a>
+                {% if post.allow_replay != "true" %}
+                  <span class="muted">({{ ftl_get_message("replay-private") }})</span>
+                {% endif %}
               {% endif %}
             </p>
             {% if post.community_slug %}

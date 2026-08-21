@@ -136,6 +136,7 @@ pub struct PostDetailForJson {
     pub image_tool: String,
     pub is_sensitive: bool,
     pub allow_relay: bool,
+    pub allow_replay: bool,
     pub published_at_utc: Option<String>,
     pub community_id: Option<Uuid>,
     pub community_name: Option<String>,
@@ -717,6 +718,7 @@ pub async fn find_post_by_id(
                 posts.created_at,
                 posts.updated_at,
                 posts.allow_relay,
+                posts.allow_replay,
                 posts.parent_post_id,
                 users.display_name AS display_name,
                 users.login_name AS login_name,
@@ -771,6 +773,10 @@ pub async fn find_post_by_id(
             Some(row.viewer_count.to_string()),
         );
         map.insert("allow_relay".to_string(), Some(row.allow_relay.to_string()));
+        map.insert(
+            "allow_replay".to_string(),
+            Some(row.allow_replay.to_string()),
+        );
 
         let created_at_seoul = row.created_at.with_timezone(&Seoul);
         let created_at_human_readable = created_at_seoul.format("%Y-%m-%d %H:%M").to_string();
@@ -833,6 +839,7 @@ pub async fn find_post_detail_for_json(
                 posts.content,
                 (posts.is_sensitive OR posts.is_explicit) AS \"is_sensitive!\",
                 posts.allow_relay,
+                posts.allow_replay,
                 posts.author_id,
                 posts.community_id,
                 posts.parent_post_id,
@@ -882,6 +889,7 @@ pub async fn find_post_detail_for_json(
             image_tool: row.image_tool.unwrap_or_else(|| "neo".to_string()),
             is_sensitive: row.is_sensitive,
             allow_relay: row.allow_relay,
+            allow_replay: row.allow_replay,
             published_at_utc: row.published_at.map(|dt| dt.to_rfc3339()),
             community_id: row.community_id,
             community_name: row.community_name,
@@ -1164,6 +1172,7 @@ pub async fn publish_post(
     content: String,
     is_sensitive: bool,
     allow_relay: bool,
+    allow_replay: bool,
 ) -> Result<()> {
     let q = query!(
         "
@@ -1173,13 +1182,15 @@ pub async fn publish_post(
                 title = $1,
                 content = $2,
                 is_sensitive = $3,
-                allow_relay = $4
-            WHERE id = $5
+                allow_relay = $4,
+                allow_replay = $5
+            WHERE id = $6
         ",
         title,
         content,
         is_sensitive,
         allow_relay,
+        allow_replay,
         id
     );
     q.execute(&mut **tx).await?;
@@ -1193,6 +1204,7 @@ pub async fn edit_post(
     content: String,
     is_sensitive: bool,
     allow_relay: bool,
+    allow_replay: bool,
 ) -> Result<()> {
     let q = query!(
         "
@@ -1201,13 +1213,15 @@ pub async fn edit_post(
                 title = $1,
                 content = $2,
                 is_sensitive = $3,
-                allow_relay = $4
-            WHERE id = $5
+                allow_relay = $4,
+                allow_replay = $5
+            WHERE id = $6
         ",
         title,
         content,
         is_sensitive,
         allow_relay,
+        allow_replay,
         id
     );
     q.execute(&mut **tx).await?;
