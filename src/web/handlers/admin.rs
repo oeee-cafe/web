@@ -569,24 +569,52 @@ pub async fn download_collaborative_archive(
     _admin: AdminUser,
     Path(room_uuid): Path<Uuid>,
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
 ) -> Result<Response, AppError> {
-    let log = crate::web::handlers::collaborate::archive::download_session(&state, room_uuid)
+    let archive = crate::web::handlers::collaborate::archive::download_session(&state, room_uuid)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to read the archive: {}", e))?;
-    if log.is_empty() {
+    if archive.is_empty() {
         return Err(AppError::NotFound("No archive for this session".to_string()));
     }
-    Ok((
-        [
-            (header::CONTENT_TYPE, "application/octet-stream".to_string()),
-            (
-                header::CONTENT_DISPOSITION,
-                format!("attachment; filename=\"{room_uuid}.oeeelog\""),
-            ),
-        ],
-        log,
-    )
-        .into_response())
+
+    // A recording is mostly its own framing and goes over the wire at about a
+    // third of its size. Compressed here rather than passed through from
+    // storage: a session is kept as one gzip member per chunk, and
+    // concatenating members is legal but leans on every consumer handling a
+    // multi-member stream. Since this path already has to inflate each chunk
+    // to join them, one deflate on the way out removes the question, and the
+    // measured difference between one member and several is nothing.
+    //
+    // Content-Encoding rather than a `.gz` body, so what a reader decodes is
+    // the recording either way -- the browser inflates before the player sees
+    // it, and a person following the link gets the plain file.
+    let wants_gzip = headers
+        .get(header::ACCEPT_ENCODING)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.contains("gzip"));
+
+    let compressed = wants_gzip
+        .then(|| crate::web::handlers::collaborate::archive::compress(&archive))
+        .transpose()
+        // Not worth failing a download over; it is only smaller.
+        .unwrap_or_else(|e| {
+            tracing::warn!("Could not compress the archive for {}: {}", room_uuid, e);
+            None
+        });
+
+    let mut response = axum::response::Response::builder()
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{room_uuid}.oeeelog\""),
+        );
+    if compressed.is_some() {
+        response = response.header(header::CONTENT_ENCODING, "gzip");
+    }
+    Ok(response
+        .body(axum::body::Body::from(compressed.unwrap_or(archive)))
+        .map_err(|e| anyhow::anyhow!("Failed to build the archive response: {}", e))?)
 }
 
 /// GET /admin/collaborative-sessions/:uuid/diagnostics — what each client

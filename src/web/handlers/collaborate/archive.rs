@@ -532,8 +532,9 @@ fn chunk_key(room_uuid: Uuid, first_seq: u64) -> String {
     format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/{first_seq:012}{CHUNK_SUFFIX}")
 }
 
-/// Compresses a chunk for storage.
-fn compress(chunk: &[u8]) -> Result<Vec<u8>, std::io::Error> {
+/// Compresses a recording, for storing one chunk or for sending a whole
+/// session over the wire.
+pub fn compress(chunk: &[u8]) -> Result<Vec<u8>, std::io::Error> {
     use std::io::Write;
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(chunk)?;
