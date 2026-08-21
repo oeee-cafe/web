@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, type PainterHandle, type PainterOperation } from "neo-cucumber";
 import { encodePainterOperation } from "../collaborate/binaryProtocol";
 import { decodeArchive, type ArchivedEntry } from "./archiveLog";
-import { createReplay, drawableEntries, gapBefore, MAX_GAP_MS } from "./player";
+import { createReplay, drawableEntries, timeline, MAX_GAP_MS } from "./player";
 
 /**
  * A replay has to reach the canvas it recorded.
@@ -196,19 +196,34 @@ describe("pacing", () => {
     }));
 
   /** Gaps within a stroke are milliseconds and survive untouched. */
-  it("keeps the real gap between messages", () => {
-    expect(gapBefore(entries([1000, 1040]), 1, 1)).toBe(40);
-    expect(gapBefore(entries([1000, 1040]), 1, 4)).toBe(10);
+  it("keeps the real gaps between messages", () => {
+    expect(timeline(entries([1000, 1040, 1060]))).toEqual([0, 40, 60]);
   });
 
   /** A room spends most of its life idle, and watching that back faithfully
    * would mean watching nothing. */
   it("shortens the pauses between them", () => {
-    expect(gapBefore(entries([0, 600_000]), 1, 1)).toBe(MAX_GAP_MS);
+    expect(timeline(entries([0, 600_000, 600_010]))).toEqual([
+      0,
+      MAX_GAP_MS,
+      MAX_GAP_MS + 10,
+    ]);
   });
 
-  it("has nothing to wait for before the first message", () => {
-    expect(gapBefore(entries([1000]), 0, 1)).toBe(0);
+  /**
+   * Recorded times are server arrival times and repeat: a burst sequenced
+   * inside one millisecond is due all at once, because that is what it was.
+   * Spacing them out is what made playback stutter -- a timer per message
+   * cannot go below the browser's clamp, so eight hundred messages recorded
+   * at the same instant took three and a half seconds to replay.
+   */
+  it("makes a burst due all at once", () => {
+    expect(timeline(entries([1000, 1000, 1000, 1000]))).toEqual([0, 0, 0, 0]);
+  });
+
+  it("starts at nothing", () => {
+    expect(timeline(entries([1000]))).toEqual([0]);
+    expect(timeline([])).toEqual([]);
   });
 });
 

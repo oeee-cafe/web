@@ -64,13 +64,37 @@ export function drawableEntries(entries: ArchivedEntry[]) {
     );
 }
 
-/** How long to wait before the message at `index`, at a given speed. */
-export function gapBefore(entries: ArchivedEntry[], index: number, speed: number): number {
-  if (index <= 0 || index >= entries.length) return 0;
-  const gap = entries[index].at - entries[index - 1].at;
-  if (!Number.isFinite(gap) || gap <= 0) return 0;
-  return Math.min(gap, MAX_GAP_MS) / speed;
+/**
+ * When each message is due, in milliseconds from the start of playback.
+ *
+ * Computed once, ahead of time, because it is the schedule rather than a
+ * decision: a clock reads it, and reading it must not cost anything per
+ * message. Recorded timestamps are server arrival times and can repeat -- a
+ * burst sequenced inside one millisecond is due all at once, which is what it
+ * was.
+ */
+export function timeline(entries: ArchivedEntry[]): number[] {
+  const offsets = new Array<number>(entries.length);
+  let at = 0;
+  for (let index = 0; index < entries.length; index++) {
+    if (index > 0) {
+      const gap = entries[index].at - entries[index - 1].at;
+      at += Number.isFinite(gap) && gap > 0 ? Math.min(gap, MAX_GAP_MS) : 0;
+    }
+    offsets[index] = at;
+  }
+  return offsets;
 }
+
+/**
+ * How long one frame may spend applying messages.
+ *
+ * Half a frame at 60Hz, so the repaint the painter does on the same frame
+ * still has room. A burst longer than this is spread over the frames after it
+ * rather than blocking the page, which is what a player should do when it
+ * cannot keep up.
+ */
+const FRAME_BUDGET_MS = 8;
 
 export type ReplayHandle = {
   /** Applies everything up to and including `index`, from a blank canvas. */
@@ -95,15 +119,21 @@ type ReplayOptions = {
 
 export function createReplay(options: ReplayOptions): ReplayHandle {
   const drawable = drawableEntries(options.entries);
+  const due = timeline(drawable.map((held) => held.entry));
   let painter = options.painter;
   /** How many messages are on the canvas. -1 is blank. */
   let applied = -1;
   let playing = false;
   let speed = 1;
-  let timer: number | null = null;
+  let frame: number | null = null;
   let destroyed = false;
-  /** Serialises seeks and steps: both apply operations, and two at once would
-   * interleave them. */
+  /** Where playback has reached on the timeline. Advanced by the wall clock
+   * rather than by counting messages, so a frame that applies twenty of them
+   * and a frame that applies none both leave it in the right place. */
+  let virtual = 0;
+  let lastFrameAt = 0;
+  /** Serialises seeks against playback: both apply operations, and two at
+   * once would interleave them. */
   let chain: Promise<void> = Promise.resolve();
 
   const progress = () => options.onProgress?.(applied, playing);
@@ -115,27 +145,47 @@ export function createReplay(options: ReplayOptions): ReplayHandle {
     }
   };
 
-  const step = () => {
-    timer = null;
-    if (!playing || destroyed) return;
+  /** Applies everything the clock has passed, within one frame's budget. */
+  const pump = () => {
     chain = chain.then(async () => {
       if (!playing || destroyed) return;
-      const next = applied + 1;
-      if (next >= drawable.length) {
-        playing = false;
-        progress();
-        return;
+      const until = performance.now() + FRAME_BUDGET_MS;
+      while (playing && !destroyed) {
+        const next = applied + 1;
+        if (next >= drawable.length) {
+          playing = false;
+          break;
+        }
+        // Not due yet, and everything after it is later still.
+        if (due[next] > virtual) break;
+        await painter.applyCanonicalOperation(drawable[next].operation);
+        applied = next;
+        // Out of budget: the rest is due on the frames after this one, where
+        // the clock will still be ahead of them.
+        if (performance.now() >= until) break;
       }
-      await applyThrough(next);
+      // Once per frame rather than once per message: the readout and the
+      // scrubber are DOM, and a burst would otherwise write them a hundred
+      // times over for one thing anybody could see.
       progress();
-      if (!playing || destroyed) return;
-      const wait = gapBefore(
-        drawable.map((held) => held.entry),
-        next + 1,
-        speed,
-      );
-      timer = window.setTimeout(step, wait);
     });
+    return chain;
+  };
+
+  const onFrame = (now: number) => {
+    frame = null;
+    if (!playing || destroyed) return;
+    virtual += (now - lastFrameAt) * speed;
+    lastFrameAt = now;
+    void pump();
+    frame = requestAnimationFrame(onFrame);
+  };
+
+  const stopFrames = () => {
+    if (frame !== null) {
+      cancelAnimationFrame(frame);
+      frame = null;
+    }
   };
 
   return {
@@ -151,6 +201,9 @@ export function createReplay(options: ReplayOptions): ReplayHandle {
           applied = -1;
         }
         await applyThrough(target);
+        // The clock follows the canvas, so resuming carries on from here
+        // rather than racing to catch up with where it had got to.
+        virtual = target >= 0 ? due[target] : 0;
         progress();
       });
       await chain;
@@ -159,15 +212,13 @@ export function createReplay(options: ReplayOptions): ReplayHandle {
       if (playing || destroyed) return;
       if (applied >= drawable.length - 1) return;
       playing = true;
+      lastFrameAt = performance.now();
       progress();
-      step();
+      frame = requestAnimationFrame(onFrame);
     },
     pause() {
       playing = false;
-      if (timer !== null) {
-        window.clearTimeout(timer);
-        timer = null;
-      }
+      stopFrames();
       progress();
     },
     setSpeed(next: number) {
@@ -176,7 +227,7 @@ export function createReplay(options: ReplayOptions): ReplayHandle {
     destroy() {
       destroyed = true;
       playing = false;
-      if (timer !== null) window.clearTimeout(timer);
+      stopFrames();
     },
   };
 }
