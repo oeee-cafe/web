@@ -29,6 +29,7 @@
 
 use aws_sdk_s3::primitives::ByteStream;
 use flate2::read::GzDecoder;
+use futures_util::{StreamExt, TryStreamExt};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use redis::AsyncCommands;
@@ -67,6 +68,16 @@ const FLUSH_BATCH: isize = 2048;
 pub const FLUSH_EVERY: u64 = 512;
 
 const FLUSH_CLAIM_TTL: u64 = 120;
+
+/// How many of a session's chunks are fetched at once.
+///
+/// A round trip to object storage is about forty milliseconds from the app
+/// host, and a session is one chunk per five hundred messages -- fetched one
+/// after another, a long afternoon's drawing would spend over a second in
+/// nothing but waiting. Bounded rather than unbounded because the whole
+/// recording is held in memory while it is assembled, and forty requests at
+/// once buys nothing over eight.
+const FETCH_CONCURRENCY: usize = 8;
 
 /// Where a session's objects live, under the bucket the images already use.
 const ARCHIVE_R2_PREFIX: &str = "collaborate-archive";
@@ -975,15 +986,46 @@ pub async fn download_session(
     // Names are the zero-padded first sequence, so this is sequence order.
     keys.sort();
 
-    let mut out = Vec::new();
-    for key in keys {
-        let object = client
-            .get_object()
-            .bucket(bucket)
-            .key(&key)
-            .send()
-            .await?;
-        out.extend_from_slice(&decompress(&object.body.collect().await?.into_bytes())?);
+    assemble(keys, |key| {
+        let client = client.clone();
+        let bucket = bucket.to_string();
+        async move {
+            let object = client.get_object().bucket(bucket).key(&key).send().await?;
+            let bytes = object.body.collect().await?.into_bytes();
+            Ok(decompress(&bytes)?)
+        }
+    })
+    .await
+}
+
+/// Fetches a session's chunks and joins them into one log.
+///
+/// Separate from where the bytes come from because the property that matters
+/// here is the joining: several requests are in flight at once and they finish
+/// in whatever order they like, so a bug would show up as a recording that is
+/// silently out of order rather than as a failure. `buffered` yields results
+/// in the order the keys were given however the requests complete, which is
+/// what makes that safe -- and what the test below pins.
+///
+/// A chunk that fails takes the whole download with it. A recording with a
+/// hole in it that reads as whole is worse than one that failed to arrive.
+async fn assemble<F, Fut>(
+    keys: Vec<String>,
+    fetch: F,
+) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>,
+{
+    let chunks: Vec<Vec<u8>> = futures_util::stream::iter(keys)
+        .map(fetch)
+        .buffered(FETCH_CONCURRENCY)
+        .try_collect()
+        .await?;
+
+    let mut out = Vec::with_capacity(chunks.iter().map(|chunk| chunk.len()).sum());
+    for chunk in chunks {
+        out.extend_from_slice(&chunk);
     }
     Ok(out)
 }
@@ -1302,6 +1344,43 @@ mod tests {
             plain.len(),
             stored.len()
         );
+    }
+
+    /// Several chunks are in flight at once and finish in whatever order they
+    /// like. A recording assembled in the order they *arrive* would be
+    /// silently out of order -- it would still decode, and every sequence in
+    /// it would be wrong.
+    #[tokio::test]
+    async fn chunks_are_joined_in_key_order_however_they_arrive() {
+        let keys: Vec<String> = (0..16).map(|index| format!("chunk-{index:02}")).collect();
+        let joined = assemble(keys.clone(), |key| async move {
+            // The later the key, the sooner it comes back: the arrival order
+            // is exactly the reverse of the order the log needs.
+            let index: u64 = key.trim_start_matches("chunk-").parse().unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(20 - index)).await;
+            Ok(format!("[{index}]").into_bytes())
+        })
+        .await
+        .expect("assembled");
+
+        let expected: String = (0..16).map(|index| format!("[{index}]")).collect();
+        assert_eq!(String::from_utf8(joined).unwrap(), expected);
+    }
+
+    /// One chunk that will not come back fails the download rather than
+    /// yielding the rest, which would be a recording with a hole in it that
+    /// reads as whole.
+    #[tokio::test]
+    async fn a_chunk_that_fails_fails_the_whole_download() {
+        let keys: Vec<String> = (0..8).map(|index| format!("chunk-{index}")).collect();
+        let result = assemble(keys, |key| async move {
+            if key.ends_with('5') {
+                return Err("gone".into());
+            }
+            Ok(key.into_bytes())
+        })
+        .await;
+        assert!(result.is_err());
     }
 
     #[test]
