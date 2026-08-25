@@ -1158,6 +1158,14 @@ mod template_tests {
             // without this the painter has no height at all.
             assert!(rendered.contains("#neo-cucumber-root {"));
             assert!(rendered.contains("height: 100dvh;"));
+            // Saving leaves this page for good, so the adapter asks first --
+            // and it asks in the page's words, because the page is the only
+            // side of this that knows the reader's language. `entry.ts` reads
+            // them off the button's dataset and falls back to English without
+            // them, which nobody would notice until a Korean reader met an
+            // English dialog. (Stubbed ftl_get_message echoes the id.)
+            assert!(rendered.contains("data-confirm=\"draw-save-confirm\""));
+            assert!(rendered.contains("data-cancel=\"cancel\""));
         }
     }
 
@@ -1184,6 +1192,8 @@ mod template_tests {
             assert!(rendered.contains("\"height\":40"));
             assert!(rendered.contains("\"kind\":\"banner\""));
             assert!(!rendered.contains("neo.js"));
+            assert!(rendered.contains("data-confirm=\"draw-save-confirm\""));
+            assert!(rendered.contains("data-cancel=\"cancel\""));
         }
     }
 }

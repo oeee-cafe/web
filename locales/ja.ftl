@@ -120,6 +120,7 @@ edit-community-button = コミュニティに移動
 save = 保存
 cancel = キャンセル
 delete = 削除
+draw-save-confirm = この絵を保存しますか？保存すると、続きを描くことはできません。
 
 post-created-at = 絵を描いた時刻
 post-published-at = 発行時刻

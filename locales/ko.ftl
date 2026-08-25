@@ -120,6 +120,7 @@ edit-community-button = 커뮤니티로 이동
 save = 저장
 cancel = 취소
 delete = 삭제
+draw-save-confirm = 이 그림을 저장할까요? 저장한 뒤에는 이어서 그릴 수 없습니다.
 
 post-created-at = 그린 시각
 post-published-at = 발행 시각

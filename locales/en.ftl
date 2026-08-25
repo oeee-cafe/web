@@ -118,6 +118,7 @@ edit-community-button = Move to Community
 save = Save
 cancel = Cancel
 delete = Delete
+draw-save-confirm = Save this drawing? You will not be able to keep drawing on it afterwards.
 
 post-created-at = Created
 post-published-at = Published

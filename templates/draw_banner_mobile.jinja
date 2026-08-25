@@ -23,7 +23,9 @@
   <body>
     <div id="neo-cucumber-root"></div>
     <button id="oeee-painter-save" type="button" disabled
-            style="position:fixed;top:8px;right:8px;z-index:80">Save</button>
+            data-confirm="{{ ftl_get_message("draw-save-confirm") }}"
+            data-cancel="{{ ftl_get_message("cancel") }}"
+            style="position:fixed;top:8px;right:8px;z-index:80">{{ ftl_get_message("save") }}</button>
     <script id="neo-cucumber-config" type="application/json">{{ painter_config | safe }}</script>
     <script type="module"
             src="{{ '/static/neo-cucumber/offline.js' | cachebuster | safe }}"></script>

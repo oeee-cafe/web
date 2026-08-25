@@ -18,7 +18,9 @@
   </style>
   <div id="neo-cucumber-root"></div>
   <div class="center">
-    <button id="oeee-painter-save" type="button" disabled>{{ ftl_get_message("save") }}</button>
+    <button id="oeee-painter-save" type="button" disabled
+            data-confirm="{{ ftl_get_message("draw-save-confirm") }}"
+            data-cancel="{{ ftl_get_message("cancel") }}">{{ ftl_get_message("save") }}</button>
   </div>
   <script id="neo-cucumber-config" type="application/json">{{ painter_config | safe }}</script>
   <script type="module"

@@ -29,6 +29,7 @@ import { ConnectionStatusModal } from "./components/modals/ConnectionStatusModal
 import { InitializationErrorModal } from "./components/modals/InitializationErrorModal";
 import { LoadingModal } from "./components/modals/LoadingModal";
 import { RoomFullModal } from "./components/modals/RoomFullModal";
+import { SaveConfirmationModal } from "./components/modals/SaveConfirmationModal";
 import { SessionEndingModal } from "./components/modals/SessionEndingModal";
 import {
   decodePainterOperation,
@@ -183,6 +184,7 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [sessionEnding, setSessionEnding] = useState(false);
+  const [saveConfirmation, setSaveConfirmation] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgress>({
     phase: "joining", receivedSequence: 0, appliedSequence: 0, targetSequence: null,
   });
@@ -1075,7 +1077,12 @@ export default function App() {
         </div>
         <div ref={painterElementRef} className="h-full w-full" />
         <ConnectionStatusModal isCatchingUp={isCatchingUp} connectionState={connectionState} syncProgress={syncProgress} synchronizationError={synchronizationError} onReconnect={() => location.reload()} onDownloadPNG={downloadPng} />
-        {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => void saveCollaborativeDrawing()} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : <Trans>Save to Gallery</Trans>}</button>}
+        {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => setSaveConfirmation(true)} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : <Trans>Save to Gallery</Trans>}</button>}
+        <SaveConfirmationModal
+          isOpen={saveConfirmation}
+          onCancel={() => setSaveConfirmation(false)}
+          onConfirm={() => { setSaveConfirmation(false); void saveCollaborativeDrawing(); }}
+        />
         <SessionEndingModal isOpen={sessionEnding} />
       </div>
     </div>

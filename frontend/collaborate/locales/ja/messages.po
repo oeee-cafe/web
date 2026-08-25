@@ -17,15 +17,19 @@ msgstr ""
 msgid "Authentication Failed"
 msgstr "認証に失敗しました"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:57
+#: ../frontend/collaborate/components/SessionHeader.tsx:56
 msgid "by"
 msgstr "作成者:"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:72
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:41
+msgid "Cancel"
+msgstr "キャンセル"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:71
 msgid "Connected"
 msgstr "接続済み"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:78
+#: ../frontend/collaborate/components/SessionHeader.tsx:77
 msgid "Connecting"
 msgstr "接続中"
 
@@ -39,16 +43,16 @@ msgid "Connection lost. Your work is saved locally."
 msgstr "接続が失われました。作業はローカルに保存されました。"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:84
+#: ../frontend/collaborate/components/SessionHeader.tsx:83
 msgid "Disconnected"
 msgstr "切断済み"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:79
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:122
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:121
 msgid "Download PNG"
 msgstr "PNG をダウンロード"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:49
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:48
 msgid "Failed to save session. Please try downloading as PNG instead."
 msgstr "セッションの保存に失敗しました。代わりに PNG としてダウンロードしてください。"
 
@@ -57,8 +61,8 @@ msgstr "セッションの保存に失敗しました。代わりに PNG とし�
 msgid "Go to Lobby"
 msgstr "ロビーに戻る"
 
-#: ../frontend/collaborate/App.tsx:707
-#: ../frontend/collaborate/App.tsx:711
+#: ../frontend/collaborate/App.tsx:999
+#: ../frontend/collaborate/App.tsx:1003
 msgid "Help"
 msgstr "ヘルプ"
 
@@ -70,7 +74,7 @@ msgstr "初期化に失敗しました"
 msgid "Initializing collaboration session..."
 msgstr "コラボレーションセッションを初期化中..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:90
+#: ../frontend/collaborate/components/SessionHeader.tsx:89
 msgid "Loading"
 msgstr "読み込み中"
 
@@ -83,7 +87,7 @@ msgstr "読み込み中..."
 msgid "Message too long (max 500 characters)"
 msgstr "メッセージが長すぎます（最大500文字）"
 
-#: ../frontend/collaborate/App.tsx:607
+#: ../frontend/collaborate/App.tsx:894
 msgid "No Title"
 msgstr "無題"
 
@@ -102,24 +106,30 @@ msgstr "再接続"
 msgid "Retry"
 msgstr "再試行"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:140
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:139
 msgid "Return to Lobby"
 msgstr "ロビーに戻る"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:132
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:131
 msgid "Save as PNG"
 msgstr "PNG として保存"
 
-#: ../frontend/collaborate/App.tsx:744
-#: ../frontend/collaborate/App.tsx:788
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:111
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
+msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
+msgstr "この絵をギャラリーに保存しますか？保存すると全員のセッションが終了し、誰も続きを描けなくなります。"
+
+#: ../frontend/collaborate/App.tsx:1036
+#: ../frontend/collaborate/App.tsx:1080
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:110
 msgid "Save to Gallery"
 msgstr "ギャラリーに保存"
 
-#: ../frontend/collaborate/App.tsx:744
-#: ../frontend/collaborate/App.tsx:788
+#: ../frontend/collaborate/App.tsx:1036
+#: ../frontend/collaborate/App.tsx:1080
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:106
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
 msgid "Saving..."
 msgstr "保存中..."
 
@@ -127,7 +137,7 @@ msgstr "保存中..."
 msgid "Send"
 msgstr "送信"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:70
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:69
 msgid "Session Expired"
 msgstr "セッションが期限切れです"
 
@@ -139,11 +149,11 @@ msgstr "セッション満員"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "セッションが終了します。描画をギャラリーに保存中..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:67
+#: ../frontend/collaborate/components/SessionHeader.tsx:66
 msgid "Share"
 msgstr "共有"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:64
+#: ../frontend/collaborate/components/SessionHeader.tsx:63
 msgid "Share this session"
 msgstr "このセッションを共有"
 
@@ -151,19 +161,19 @@ msgstr "このセッションを共有"
 msgid "The shared drawing could not be synchronized safely. Your current canvas is still available to download."
 msgstr "共有中の絵を安全に同期できませんでした。現在のキャンバスはダウンロードできます。"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:85
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:84
 msgid "This collaborative session has ended due to inactivity. As the owner, you can save it to the gallery or download it as a PNG."
 msgstr "非アクティブのためコラボレーションセッションが終了しました。オーナーとして、ギャラリーに保存するか PNG としてダウンロードできます。"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:84
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:83
 msgid "This collaborative session has ended due to inactivity. The session has already been saved to the gallery, but you can download it as a PNG."
 msgstr "非アクティブのためコラボレーションセッションが終了しました。セッションはすでにギャラリーに保存されていますが、PNG としてダウンロードできます。"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:86
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:85
 msgid "This collaborative session has ended due to inactivity. You can save your work locally as a PNG before leaving."
 msgstr "非アクティブのためコラボレーションセッションが終了しました。退出前にローカルに PNG として保存できます。"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:45
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:44
 msgid "This session has already been saved. You can only download it as a PNG."
 msgstr "このセッションはすでに保存されています。PNG としてのみダウンロードできます。"
 

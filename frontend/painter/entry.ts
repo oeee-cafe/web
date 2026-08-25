@@ -1,7 +1,9 @@
 import {
   mount,
+  NEO_BUTTON,
   NEO_PANEL,
   NEO_PANEL_BUTTON,
+  NEO_TITLEBAR,
   type PainterMode,
   type PainterHandle,
 } from "neo-cucumber";
@@ -134,6 +136,9 @@ const pageSaveButton = saveButton;
 
 const config = JSON.parse(configElement.textContent) as OeeePainterConfig;
 
+/** What the page calls saving, in the reader's language. */
+const saveLabel = pageSaveButton.textContent?.trim() || "Save";
+
 /**
  * Fill the bar above the painter.
  *
@@ -261,13 +266,97 @@ void painter.ready
     alert("Failed to start the painter.");
   });
 
+/**
+ * Asked before a drawing is sent.
+ *
+ * Saving is the end of this page: the drawing goes to the server and the
+ * browser leaves for the post or the profile, so there is no coming back to
+ * add the line that was still missing. The button that does it sits in the
+ * toolbox among the drawing tools, one stray tap from whichever of them was
+ * actually meant, which is exactly the mistake `beforeunload` above already
+ * guards the header's link against.
+ *
+ * Its chrome is the painter's own, from the class names neo-cucumber exports,
+ * and its words come off the button the page rendered -- the page is the only
+ * thing here that knows the reader's language.
+ */
+function confirmSave(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className =
+      "fixed inset-0 z-[9999] flex items-center justify-center bg-black/70";
+
+    const panel = document.createElement("div");
+    panel.className = `${NEO_PANEL} max-w-sm shadow-lg`;
+
+    const titleBar = document.createElement("div");
+    titleBar.className = `${NEO_TITLEBAR} px-[4px] text-[11px] leading-[14px]`;
+    titleBar.textContent = saveLabel;
+
+    const body = document.createElement("div");
+    body.className = "p-[12px] text-center";
+
+    const message = document.createElement("p");
+    message.className = "m-0 mb-[12px]";
+    message.textContent =
+      pageSaveButton.dataset.confirm || "Save this drawing?";
+
+    const actions = document.createElement("div");
+    actions.className = "flex justify-center gap-[6px]";
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = NEO_BUTTON;
+    cancelButton.textContent = pageSaveButton.dataset.cancel || "Cancel";
+
+    const confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.className = NEO_BUTTON;
+    confirmButton.textContent = saveLabel;
+
+    const close = (answer: boolean) => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      backdrop.remove();
+      resolve(answer);
+    };
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key !== "Escape") return;
+      // The painter binds shortcuts to the window; Escape here means this
+      // dialog and nothing else.
+      event.stopPropagation();
+      event.preventDefault();
+      close(false);
+    }
+
+    document.addEventListener("keydown", onKeyDown, true);
+    backdrop.addEventListener("click", () => close(false));
+    panel.addEventListener("click", (event) => event.stopPropagation());
+    cancelButton.addEventListener("click", () => close(false));
+    confirmButton.addEventListener("click", () => close(true));
+
+    actions.append(cancelButton, confirmButton);
+    body.append(message, actions);
+    panel.append(titleBar, body);
+    backdrop.append(panel);
+    document.body.append(backdrop);
+    confirmButton.focus();
+  });
+}
+
 saveButton.addEventListener("click", () => {
   saveButton.disabled = true;
-  void submit(painter, config, startedAt, () => {
-    leaving = true;
-  }).catch((error) => {
-    console.error(error);
-    alert("Failed to save drawing. Please try again.");
-    saveButton.disabled = false;
-  });
+  void confirmSave()
+    .then((confirmed) => {
+      if (!confirmed) {
+        saveButton.disabled = false;
+        return;
+      }
+      return submit(painter, config, startedAt, () => {
+        leaving = true;
+      }).catch((error) => {
+        console.error(error);
+        alert("Failed to save drawing. Please try again.");
+        saveButton.disabled = false;
+      });
+    });
 });
