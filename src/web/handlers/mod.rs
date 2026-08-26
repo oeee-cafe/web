@@ -1106,6 +1106,64 @@ mod template_tests {
         );
     }
 
+    /// The relay page is now rendered for personal posts too, where there is
+    /// no community to name above the canvas or to link back to. Every use of
+    /// one has to survive its absence.
+    #[test]
+    fn the_relay_page_renders_with_and_without_a_community() {
+        let env = test_support::env();
+        let template = env
+            .get_template("draw_post_cucumber.jinja")
+            .unwrap_or_else(|e| panic!("draw_post_cucumber.jinja loads: {e:#}"));
+        let render = |community_name: serde_json::Value, community_slug: serde_json::Value| {
+            template
+                .render(context! {
+                    parent_post => json!({
+                        "id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                        "title": "Tandemaus",
+                        "image_width": "640",
+                        "image_height": "480",
+                        "image_filename": "abcdef0123.png",
+                        "login_name": "someone",
+                    }),
+                    width => 640,
+                    height => 480,
+                    community_name => community_name,
+                    community_slug => community_slug,
+                    community_id => json!(null),
+                    is_relay => true,
+                    painter_config => "{}",
+                    ..chrome()
+                })
+                .unwrap_or_else(|e| panic!("draw_post_cucumber.jinja renders: {e:#}"))
+        };
+
+        let in_a_community = render(json!("Tegaki"), json!("tegaki"));
+        assert!(
+            in_a_community.contains("data-home=\"/communities/@tegaki\""),
+            "a relay in a community should lead back to it"
+        );
+        assert!(
+            in_a_community.contains("@ Tegaki"),
+            "a relay in a community should be labelled with it"
+        );
+
+        let personal = render(json!(null), json!(null));
+        assert!(
+            personal.contains("data-home=\"/\""),
+            "a personal relay has nowhere but home to lead back to, got: {}",
+            personal
+                .lines()
+                .filter(|l| l.contains("data-home"))
+                .collect::<Vec<_>>()
+                .join(" | ")
+        );
+        assert!(
+            !personal.contains("data-subtitle=\"@"),
+            "a personal relay should name no community"
+        );
+    }
+
     #[test]
     fn replay_pages_do_not_load_the_retired_applet() {
         for template in [

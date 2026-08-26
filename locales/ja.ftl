@@ -270,6 +270,7 @@ community-invite-user-not-found = ユーザーが見つかりません
 community-invite-already-member = すでにメンバーです
 community-invite-already-invited = すでに保留中の招待があります
 private-community-no-access = このプライベートコミュニティにアクセスできません。
+relay-not-allowed = この絵は作者がリレーを許可していません。
 community-remove-member = メンバーを削除
 community-remove-member-confirm = 本当にこのメンバーを削除しますか？
 community-retract-invitation = 招待を取り消す

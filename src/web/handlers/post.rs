@@ -293,6 +293,150 @@ async fn send_post_to_community_followers(
     Ok(())
 }
 
+/// Whether the author left this drawing open to being relayed.
+///
+/// The post page only offers the button when they did. This is that same rule,
+/// applied to whoever arrives at the URL another way.
+fn relay_is_allowed(post: &std::collections::HashMap<String, Option<String>>) -> bool {
+    post.get("allow_relay").and_then(|value| value.as_deref()) == Some("true")
+}
+
+#[cfg(test)]
+mod relay_permission_tests {
+    use super::relay_is_allowed;
+    use std::collections::HashMap;
+
+    fn post(allow_relay: Option<&str>) -> HashMap<String, Option<String>> {
+        let mut post = HashMap::new();
+        if let Some(allow_relay) = allow_relay {
+            post.insert("allow_relay".to_string(), Some(allow_relay.to_string()));
+        }
+        post
+    }
+
+    #[test]
+    fn only_a_drawing_left_open_may_be_relayed() {
+        assert!(relay_is_allowed(&post(Some("true"))));
+        assert!(!relay_is_allowed(&post(Some("false"))));
+        // The column is not null, so a post always carries the flag -- but a
+        // missing one must not read as permission.
+        assert!(!relay_is_allowed(&post(None)));
+    }
+}
+
+/// Turned away from a drawing whose author closed it to relays.
+fn relay_closed(
+    headers: &HeaderMap,
+    auth_session: &AuthSession,
+    messages: Messages,
+    post_id: Uuid,
+) -> axum::response::Response {
+    flash_error_and_redirect(
+        headers,
+        auth_session
+            .user
+            .as_ref()
+            .and_then(|user| user.preferred_language.clone()),
+        messages,
+        "relay-not-allowed",
+        &format!("/posts/{}", post_id),
+    )
+}
+
+/// The relay page: the parent's drawing, opened in the painter its home uses.
+///
+/// The community is what decides that painter -- a two-tone community relays
+/// into its own two colours, and its name goes in the bar above the canvas --
+/// so a post that has no community relays into the standard painter with
+/// nothing named above it. Nothing further along needs one either: `/draw`
+/// renders exactly this page for a personal drawing, and `/draw/finish` files
+/// what comes back under the parent's community, which for a personal parent is
+/// none. That is what makes a personal post relayable at all: the relay stays
+/// in the drawer's own namespace instead of landing in a community.
+async fn render_relay_page(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    current_user: Option<crate::models::user::User>,
+    ftl_lang: String,
+    post_id: Uuid,
+    post: &std::collections::HashMap<String, Option<String>>,
+    community: Option<crate::models::community::Community>,
+) -> Result<axum::response::Response, AppError> {
+    let template: minijinja::Template<'_, '_> =
+        state.env.get_template("draw_post_cucumber.jinja")?;
+    let common_ctx = CommonContext::build(tx, current_user.as_ref().map(|user| user.id)).await?;
+
+    let width = post
+        .get("image_width")
+        .and_then(|v| v.as_ref())
+        .ok_or_else(|| AppError::InvalidFormData("Missing image_width".to_string()))?
+        .parse::<u32>()?;
+    let height = post
+        .get("image_height")
+        .and_then(|v| v.as_ref())
+        .ok_or_else(|| AppError::InvalidFormData("Missing image_height".to_string()))?
+        .parse::<u32>()?;
+    let image_filename = post
+        .get("image_filename")
+        .and_then(|v| v.as_ref())
+        .ok_or_else(|| AppError::InvalidFormData("Missing image_filename".to_string()))?;
+
+    let painter_mode = match community.as_ref().and_then(|community| {
+        Some((
+            community.background_color.as_ref()?,
+            community.foreground_color.as_ref()?,
+        ))
+    }) {
+        Some((background, foreground)) => json!({
+            "kind": "two-tone",
+            "backgroundColor": background,
+            "foregroundColor": foreground,
+        }),
+        None => json!({ "kind": "standard" }),
+    };
+    let painter_config = serde_json::to_string(&json!({
+        "width": width,
+        "height": height,
+        "communityId": community.as_ref().map(|community| community.id.to_string()),
+        "parentPostId": post_id.to_string(),
+        "initialImageUrl": format!(
+            "{}/image/{}/{}?relay={}",
+            state.config.r2_public_endpoint_url,
+            &image_filename[..2],
+            image_filename,
+            post_id,
+        ),
+        "locale": ftl_lang.clone(),
+        "submission": { "kind": "post" },
+        "mode": painter_mode,
+    }))?;
+
+    let rendered = template
+        .render(context! {
+            parent_post => post,
+            current_user => current_user,
+            community_name => community.as_ref().map(|community| community.name.clone()),
+            width => width,
+            height => height,
+            background_color => community
+                .as_ref()
+                .and_then(|community| community.background_color.clone()),
+            foreground_color => community
+                .as_ref()
+                .and_then(|community| community.foreground_color.clone()),
+            community_id => community.as_ref().map(|community| community.id.to_string()),
+            community_slug => community.as_ref().map(|community| community.slug.clone()),
+            is_relay => true,
+            draft_post_count => common_ctx.draft_post_count,
+            unread_notification_count => common_ctx.unread_notification_count,
+            ftl_lang,
+            painter_config
+        })
+        .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
+
+    Ok(Html(rendered).into_response())
+}
+
 pub async fn post_relay_view(
     auth_session: AuthSession,
     headers: HeaderMap,
@@ -325,119 +469,51 @@ pub async fn post_relay_view(
         .and_then(|v| v.as_ref())
         .and_then(|s| Uuid::parse_str(s).ok());
 
-    if let Some(cid) = community_id {
-        let community = find_community_by_id(&mut tx, cid).await?;
-        if let Some(ref comm) = community {
-            // If community is private, check if user is a member
-            if comm.visibility == crate::models::community::CommunityVisibility::Private {
-                match &auth_session.user {
-                    Some(user) => {
-                        let user_role =
-                            get_user_role_in_community(&mut tx, user.id, comm.id).await?;
-                        if user_role.is_none() {
-                            // User is not a member of this private community
-                            let accept_language = headers
-                                .get(axum::http::header::ACCEPT_LANGUAGE)
-                                .cloned()
-                                .unwrap_or_else(|| axum::http::HeaderValue::from_static(""));
-                            let user_preferred_language = user.preferred_language.clone();
-                            let bundle = get_bundle(&accept_language, user_preferred_language);
-                            let error_message = safe_get_message(&bundle, "private-community-no-access");
-                            messages.error(error_message);
-                            return Ok(Redirect::to("/").into_response());
-                        }
+    let community = match community_id {
+        Some(cid) => find_community_by_id(&mut tx, cid).await?,
+        None => None,
+    };
+
+    if let Some(ref comm) = community {
+        // If community is private, check if user is a member
+        if comm.visibility == crate::models::community::CommunityVisibility::Private {
+            match &auth_session.user {
+                Some(user) => {
+                    let user_role = get_user_role_in_community(&mut tx, user.id, comm.id).await?;
+                    if user_role.is_none() {
+                        // User is not a member of this private community
+                        return Ok(flash_error_and_redirect(
+                            &headers,
+                            user.preferred_language.clone(),
+                            messages,
+                            "private-community-no-access",
+                            "/",
+                        ));
                     }
-                    None => {
-                        // Not logged in, cannot access private community - redirect to login
-                        return Ok(redirect_to_login(&format!("/posts/{}/relay", id)));
-                    }
+                }
+                None => {
+                    // Not logged in, cannot access private community - redirect to login
+                    return Ok(redirect_to_login(&format!("/posts/{}/relay", id)));
                 }
             }
         }
     }
     // Personal posts (community_id is None) are always accessible
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("draw_post_cucumber.jinja")?;
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
+    if !relay_is_allowed(&post) {
+        return Ok(relay_closed(&headers, &auth_session, messages, uuid));
+    }
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-
-    // Relay only works for community posts, not personal posts
-    let post_data = post.clone();
-    let community_id = post_data
-        .get("community_id")
-        .and_then(|id| id.as_ref())
-        .and_then(|id_str| Uuid::parse_str(id_str).ok());
-
-    let community_id = match community_id {
-        Some(id) => id,
-        None => {
-            // Personal posts cannot be relayed
-            return Ok((
-                StatusCode::BAD_REQUEST,
-                "Personal posts cannot be relayed to communities".to_string(),
-            )
-                .into_response());
-        }
-    };
-
-    let community = find_community_by_id(&mut tx, community_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Resource".to_string()))?;
-    let width = post.get("image_width")
-        .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_width".to_string()))?
-        .parse::<u32>()?;
-    let height = post.get("image_height")
-        .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_height".to_string()))?
-        .parse::<u32>()?;
-    let image_filename = post.get("image_filename")
-        .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_filename".to_string()))?;
-    let painter_mode = match (&community.background_color, &community.foreground_color) {
-        (Some(background), Some(foreground)) => json!({
-            "kind": "two-tone",
-            "backgroundColor": background,
-            "foregroundColor": foreground,
-        }),
-        _ => json!({ "kind": "standard" }),
-    };
-    let painter_config = serde_json::to_string(&json!({
-        "width": width,
-        "height": height,
-        "communityId": community_id.to_string(),
-        "parentPostId": uuid.to_string(),
-        "initialImageUrl": format!(
-            "{}/image/{}/{}?relay={}",
-            state.config.r2_public_endpoint_url,
-            &image_filename[..2],
-            image_filename,
-            uuid,
-        ),
-        "locale": ftl_lang.clone(),
-        "submission": { "kind": "post" },
-        "mode": painter_mode,
-    }))?;
-    let rendered = template.render(context! {
-        parent_post => post.clone(),
-        current_user => auth_session.user,
-        community_name => community.name,
-        width => width,
-        height => height,
-        background_color => community.background_color,
-        foreground_color => community.foreground_color,
-        community_id => community_id.to_string(),
-        is_relay => true,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
+    render_relay_page(
+        &state,
+        &mut tx,
+        auth_session.user,
         ftl_lang,
-        painter_config
-    })?;
-
-    Ok(Html(rendered).into_response())
+        uuid,
+        &post,
+        community,
+    )
+    .await
 }
 
 pub async fn post_view(
@@ -2837,58 +2913,8 @@ pub async fn post_relay_view_by_login_name(
 
     let db = &state.db_pool;
     let mut tx: sqlx::Transaction<'_, sqlx::Postgres> = db.begin().await?;
-    let post = find_post_by_id(&mut tx, uuid).await?;
-
-    match post {
-        Some(ref post_data) => {
-            let post_login_name = post_data
-                .get("login_name")
-                .and_then(|v| v.as_ref())
-                .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
-
-            // Check if post is in a private community and if user has access
-            let community_id = post_data
-                .get("community_id")
-                .and_then(|v| v.as_ref())
-                .and_then(|s| Uuid::parse_str(s).ok());
-
-            let community = if let Some(cid) = community_id {
-                find_community_by_id(&mut tx, cid).await?
-            } else {
-                None
-            };
-
-            // Verify correct slug and redirect if needed
-            if let Some(ref comm) = community {
-                if login_name != comm.slug {
-                    let correct_url = format!("/@{}/{}/relay", comm.slug, post_id);
-                    return Ok(Redirect::to(&correct_url).into_response());
-                }
-            } else if &login_name != post_login_name {
-                let correct_url = format!("/@{}/{}/relay", post_login_name, post_id);
-                return Ok(Redirect::to(&correct_url).into_response());
-            }
-
-            if let Some(ref comm) = community {
-                // If community is private, check if user is a member
-                if comm.visibility == crate::models::community::CommunityVisibility::Private {
-                    match &auth_session.user {
-                        Some(user) => {
-                            let user_role =
-                                get_user_role_in_community(&mut tx, user.id, comm.id).await?;
-                            if user_role.is_none() {
-                                // User is not a member of this private community
-                                return Ok(flash_error_and_redirect(&headers, user.preferred_language.clone(), messages, "private-community-no-access", "/"));
-                            }
-                        }
-                        None => {
-                            // Not logged in, cannot access private community - redirect to login
-                            return Ok(redirect_to_login(&format!("/@{}/{}/relay", login_name, post_id)));
-                        }
-                    }
-                }
-            }
-        }
+    let post = match find_post_by_id(&mut tx, uuid).await? {
+        Some(post) => post,
         None => {
             return Ok((
                 StatusCode::NOT_FOUND,
@@ -2896,90 +2922,76 @@ pub async fn post_relay_view_by_login_name(
             )
                 .into_response());
         }
-    }
-    let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
+    };
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("draw_post_cucumber.jinja")?;
+    let post_login_name = post
+        .get("login_name")
+        .and_then(|v| v.as_ref())
+        .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
 
-    // Relay only works for community posts, not personal posts
-    let post_data = post.clone();
-    let community_id = post_data
+    // Check if post is in a private community and if user has access
+    let community_id = post
         .get("community_id")
-        .and_then(|id| id.as_ref())
-        .and_then(|id_str| Uuid::parse_str(id_str).ok());
+        .and_then(|v| v.as_ref())
+        .and_then(|s| Uuid::parse_str(s).ok());
 
-    let community_id = match community_id {
-        Some(id) => id,
-        None => {
-            // Personal posts cannot be relayed
-            return Ok((
-                StatusCode::BAD_REQUEST,
-                "Personal posts cannot be relayed to communities".to_string(),
-            )
-                .into_response());
+    let community = match community_id {
+        Some(cid) => find_community_by_id(&mut tx, cid).await?,
+        None => None,
+    };
+
+    // Verify correct slug and redirect if needed
+    if let Some(ref comm) = community {
+        if login_name != comm.slug {
+            let correct_url = format!("/@{}/{}/relay", comm.slug, post_id);
+            return Ok(Redirect::to(&correct_url).into_response());
         }
+    } else if &login_name != post_login_name {
+        let correct_url = format!("/@{}/{}/relay", post_login_name, post_id);
+        return Ok(Redirect::to(&correct_url).into_response());
+    }
+
+    // Relaying is drawing, and drawing needs an account. This route is outside
+    // the login-required group, so without this a signed-out reader is handed
+    // the painter and only told at Save that the drawing cannot be kept.
+    let Some(user) = auth_session.user.clone() else {
+        return Ok(redirect_to_login(&format!(
+            "/@{}/{}/relay",
+            login_name, post_id
+        )));
     };
 
-    let community = find_community_by_id(&mut tx, community_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Resource".to_string()))?;
+    if let Some(ref comm) = community {
+        // If community is private, check if user is a member
+        if comm.visibility == crate::models::community::CommunityVisibility::Private {
+            let user_role = get_user_role_in_community(&mut tx, user.id, comm.id).await?;
+            if user_role.is_none() {
+                // User is not a member of this private community
+                return Ok(flash_error_and_redirect(
+                    &headers,
+                    user.preferred_language.clone(),
+                    messages,
+                    "private-community-no-access",
+                    "/",
+                ));
+            }
+        }
+    }
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-    let width = post.get("image_width")
-        .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_width".to_string()))?
-        .parse::<u32>()?;
-    let height = post.get("image_height")
-        .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_height".to_string()))?
-        .parse::<u32>()?;
-    let image_filename = post.get("image_filename")
-        .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_filename".to_string()))?;
-    let painter_mode = match (&community.background_color, &community.foreground_color) {
-        (Some(background), Some(foreground)) => json!({
-            "kind": "two-tone",
-            "backgroundColor": background,
-            "foregroundColor": foreground,
-        }),
-        _ => json!({ "kind": "standard" }),
-    };
-    let painter_config = serde_json::to_string(&json!({
-        "width": width,
-        "height": height,
-        "communityId": community_id.to_string(),
-        "parentPostId": uuid.to_string(),
-        "initialImageUrl": format!(
-            "{}/image/{}/{}?relay={}",
-            state.config.r2_public_endpoint_url,
-            &image_filename[..2],
-            image_filename,
-            uuid,
-        ),
-        "locale": ftl_lang.clone(),
-        "submission": { "kind": "post" },
-        "mode": painter_mode,
-    }))?;
+    if !relay_is_allowed(&post) {
+        return Ok(relay_closed(&headers, &auth_session, messages, uuid));
+    }
 
-    let rendered = template
-        .render(context! {
-            parent_post => post.clone(),
-            current_user => auth_session.user,
-                community_name => community.name,
-            width => width,
-            height => height,
-            background_color => community.background_color,
-            foreground_color => community.foreground_color,
-            community_id => community_id.to_string(),
-            is_relay => true,
-            draft_post_count => common_ctx.draft_post_count,
-            unread_notification_count => common_ctx.unread_notification_count,
-            ftl_lang,
-            painter_config
-        })
-        .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
-    Ok(Html(rendered).into_response())
+    render_relay_page(
+        &state,
+        &mut tx,
+        Some(user),
+        ftl_lang,
+        uuid,
+        &post,
+        community,
+    )
+    .await
 }
 
 pub async fn post_replay_view_by_login_name(
