@@ -44,7 +44,7 @@
   <body>
     <script type="text/javascript">
       Tegaki.onCloseViewerClick = function () {
-        window.location.href = "/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}";
+        window.location.href = "/@{{ post.login_name }}/{{ post_id }}";
       };
 
       Tegaki.open({

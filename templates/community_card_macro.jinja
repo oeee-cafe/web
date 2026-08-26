@@ -15,7 +15,7 @@
     <div class="community-card-strip">
       {% if community.recent_posts %}
         {% for post in community.recent_posts %}
-          <a href="/@{{ community.slug }}/{{ post.id }}" class="community-strip-cell">
+          <a href="/@{{ post.author_login_name }}/{{ post.id }}" class="community-strip-cell">
             <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
                  alt=""
                  width="{{ post.image_width }}"

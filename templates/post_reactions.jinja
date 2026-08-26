@@ -11,7 +11,7 @@
         {% endif %}
       </a>
     {% elif post %}
-      <a href="/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}/reactions">
+      <a href="/@{{ post.login_name }}/{{ post_id }}/reactions">
         {{ total_count }}
         {% if total_count == 1 %}
           {{ ftl_get_message("post-reaction") }}

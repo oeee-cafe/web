@@ -2,7 +2,7 @@
 
 {% macro render_post_card(post, depth) %}
   <div style="margin-left: {{ depth * 20 }}px; margin-bottom: 15px;">
-    <a href="/@{{ post.community_slug if post.community_slug else post.user_login_name }}/{{ post.id }}" class="post-card" style="text-decoration: none; color: inherit; display: block; border: 1px solid var(--main-border-color); padding: 15px;">
+    <a href="/@{{ post.user_login_name }}/{{ post.id }}" class="post-card" style="text-decoration: none; color: inherit; display: block; border: 1px solid var(--main-border-color); padding: 15px;">
       <div style="display: flex; gap: 10px; align-items: flex-start;">
         <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
              alt="{{ post.title or 'No title' }}"
@@ -57,7 +57,7 @@
     {# Canonical post URL is /@slug-or-login-name/id, the same form the page
        links to itself by; /posts/id only redirects there. #}
     <meta property="og:url"
-          content="{{ base_url|safe }}/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}" />
+          content="{{ base_url|safe }}/@{{ post.login_name }}/{{ post_id }}" />
     <meta property="og:image"
           content="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
     <meta property="og:image:width" content="{{ post.image_width }}" />
@@ -91,7 +91,7 @@
         {# LEFT COLUMN: Image #}
         <div class="post-detail-left">
           {% if post.image_tool in ["neo", "neo-cucumber", "cucumber"] and post.allow_relay == "true" %}
-            <a href="/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}/relay">
+            <a href="/@{{ post.login_name }}/{{ post_id }}/relay">
               <img class="post-image-full"
                    width="{{ post.image_width }}"
                    height="{{ post.image_height }}"
@@ -135,7 +135,7 @@
                  themselves and for staff, labelled either way so whoever is
                  looking can tell the link is not one the public gets. #}
               {% if post.replay_filename and (post.allow_replay == "true" or current_user.id == post.author_id or current_user.role == "admin") %}
-                · <a href="/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}/replay">{{ ftl_get_message("post-replay") }}</a>
+                · <a href="/@{{ post.login_name }}/{{ post_id }}/replay">{{ ftl_get_message("post-replay") }}</a>
                 {% if post.allow_replay != "true" %}
                   <span class="muted">({{ ftl_get_message("replay-private" if current_user.id == post.author_id else "replay-private-staff") }})</span>
                 {% endif %}
@@ -144,7 +144,7 @@
             {% if post.community_slug %}
               <p>{{ ftl_get_message("community") }}: <a href="/communities/@{{ post.community_slug }}">{{ post.community_name }}</a>
                 {% if current_user.id == post.author_id and (not post_community or post_community.visibility != "private") and not post.parent_post_id and not (post_community and post_community.background_color and post_community.foreground_color) %}
-                  (<a href="/@{{ post.community_slug }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit") }}</a>)
+                  (<a href="/@{{ post.login_name }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit") }}</a>)
                 {% endif %}
               </p>
             {% else %}
@@ -188,11 +188,11 @@
             {% if current_user %}
               <div class="post-action-buttons">
                 {% if post.image_tool in ["neo", "neo-cucumber", "cucumber"] and post.allow_relay == "true" %}
-                  <button type="button" onclick="window.location.href='/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}/relay'">{{ ftl_get_message("post-relay") }}</button>
+                  <button type="button" onclick="window.location.href='/@{{ post.login_name }}/{{ post_id }}/relay'">{{ ftl_get_message("post-relay") }}</button>
                 {% endif %}
                 <button type="button" onclick="document.getElementById('reply-form-{{ post_id }}').style.display = document.getElementById('reply-form-{{ post_id }}').style.display === 'none' ? 'block' : 'none'">{{ ftl_get_message("post-reply-with-drawing") }}</button>
                 <button type="button" onclick="
-                  const url = '{{ base_url|safe }}/@{{ post.community_slug if post.community_slug else post.login_name }}/{{ post_id }}';
+                  const url = '{{ base_url|safe }}/@{{ post.login_name }}/{{ post_id }}';
                   if (navigator.share) {
                     navigator.share({ title: '{{ post.title|default(ftl_get_message("post-no-title"))|safe }}', url: url });
                   } else {

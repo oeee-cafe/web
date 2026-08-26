@@ -513,6 +513,52 @@ pub async fn find_published_posts_by_community_id(
         .collect())
 }
 
+/// The path of a post's canonical page.
+///
+/// A post is its author's. The author's actor is what `Create`s the Note and
+/// what `attributedTo` names; a community only `Announce`s that Note to the
+/// community's followers, the way a boost does, and a booster no more owns the
+/// page than it owns the post. `/@{community}/{id}` therefore redirects here,
+/// rather than the other way round — which also keeps a post's address still
+/// when it moves between communities, something `do_post_edit_community` does
+/// without federating anything at all, and which would otherwise leave every
+/// server that had federated the post holding a link to somewhere else.
+///
+/// This is the only place that rule is written down: `post_view_by_login_name`
+/// redirects anything else to it, and `create_note_from_post` publishes it as
+/// the Note's `url`, so the address people hold and the address we federate
+/// cannot drift apart.
+pub fn post_page_path(author_login_name: &str, post_id: Uuid) -> String {
+    format!("/@{}/{}", author_login_name, post_id)
+}
+
+/// [`post_page_path`] as the absolute URL ActivityPub publishes.
+pub fn post_page_url(domain: &str, author_login_name: &str, post_id: Uuid) -> String {
+    format!(
+        "https://{}{}",
+        domain,
+        post_page_path(author_login_name, post_id)
+    )
+}
+
+#[cfg(test)]
+mod post_page_tests {
+    use super::{post_page_path, post_page_url};
+    use uuid::Uuid;
+
+    /// The author names the page whether or not the post is in a community —
+    /// the community slug is not an input, which is the rule.
+    #[test]
+    fn the_author_names_the_page() {
+        let id = Uuid::nil();
+        assert_eq!(post_page_path("miro", id), format!("/@miro/{id}"));
+        assert_eq!(
+            post_page_url("oeee.cafe", "miro", id),
+            format!("https://oeee.cafe/@miro/{id}")
+        );
+    }
+}
+
 /// Struct for recent post thumbnails in community cards
 pub struct CommunityRecentPost {
     pub id: Uuid,

@@ -12,7 +12,7 @@
   {% set title = post.title if post.title else ftl_get_message("post-untitled") %}
   <div class="posts-grid-item{% if admin and post.deleted_at %} deleted{% endif %}">
     <a class="post-card-image"
-       href="{% if admin %}/admin/posts/{{ post.id }}{% else %}/@{{ post.community_slug if post.community_slug else handle }}/{{ post.id }}{% endif %}"
+       href="{% if admin %}/admin/posts/{{ post.id }}{% else %}/@{{ handle }}/{{ post.id }}{% endif %}"
        aria-label="{{ title }} by {{ handle }}">
       <img width="{{ post.image_width }}"
            height="{{ post.image_height }}"

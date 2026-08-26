@@ -8,7 +8,7 @@
       <div class="posts-grid">
         {% for post in posts %}
           <div class="posts-grid-item">
-            <a href="/@{{ post.community_slug if post.community_slug else post.user_login_name }}/{{ post.id }}" target="_blank">
+            <a href="/@{{ post.user_login_name }}/{{ post.id }}" target="_blank">
               <img alt="{{ post.title }}"
                    width="{{ post.image_width }}"
                    height="{{ post.image_height }}"

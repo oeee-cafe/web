@@ -1,8 +1,7 @@
-{# Macro to generate correct post permalink based on whether post has community #}
+{# A post's permalink. Its author names the page whatever community the post
+   was posted to — see `post_page_path` in src/models/post.rs, which is where
+   that is decided and which every other handle redirects to. #}
 {% macro post_url(post, post_id="") %}
-{%- if post.community_slug -%}
-/@{{ post.community_slug }}/{{ post_id or post.id }}
-{%- else -%}
-/@{{ post.login_name or post.user_login_name or post.author_login_name }}/{{ post_id or post.id }}
-{%- endif -%}
-{% endmacro %}
+{%- set author = post.login_name or post.user_login_name or post.author_login_name -%}
+/@{{ author }}/{{ post_id or post.id }}
+{%- endmacro %}

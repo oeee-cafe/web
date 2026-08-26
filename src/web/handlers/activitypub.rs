@@ -1629,71 +1629,6 @@ pub fn generate_object_id(domain: &str) -> Result<Url, AppError> {
     ))?)
 }
 
-/// The canonical page for a post: the URL `post_view_by_login_name` redirects
-/// to. A post that belongs to a community lives under the community's slug, so
-/// the author form answers 303 — and publishing the form that redirects leaves
-/// every server that federates the post holding a link the site itself does not
-/// consider canonical.
-fn post_page_url(
-    domain: &str,
-    community_slug: Option<&str>,
-    author_username: &str,
-    post_id: Uuid,
-) -> String {
-    let handle = community_slug.unwrap_or(author_username);
-    format!("https://{}/@{}/{}", domain, handle, post_id)
-}
-
-/// [`post_page_url`] for a post as `find_post_by_id` returns it, looking up the
-/// community it belongs to.
-async fn canonical_post_url(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    post: &std::collections::HashMap<String, Option<String>>,
-    post_id: Uuid,
-    author_username: &str,
-    domain: &str,
-) -> Result<Url, AppError> {
-    let community_slug = match post
-        .get("community_id")
-        .and_then(|v| v.as_ref())
-        .and_then(|id| Uuid::parse_str(id).ok())
-    {
-        Some(community_id) => find_community_by_id(tx, community_id)
-            .await?
-            .map(|community| community.slug),
-        None => None,
-    };
-    Ok(post_page_url(domain, community_slug.as_deref(), author_username, post_id).parse()?)
-}
-
-#[cfg(test)]
-mod canonical_post_url_tests {
-    use super::post_page_url;
-    use uuid::Uuid;
-
-    /// A post outside any community lives under its author's name.
-    #[test]
-    fn a_post_without_a_community_uses_its_author() {
-        let id = Uuid::nil();
-        assert_eq!(
-            post_page_url("oeee.cafe", None, "miro", id),
-            format!("https://oeee.cafe/@miro/{id}")
-        );
-    }
-
-    /// A post in a community lives under the community's slug — which is what
-    /// `post_view_by_login_name` redirects the author form to, and so is the
-    /// URL the Note has to advertise.
-    #[test]
-    fn a_post_in_a_community_uses_the_community() {
-        let id = Uuid::nil();
-        assert_eq!(
-            post_page_url("oeee.cafe", Some("pokemon"), "miro", id),
-            format!("https://oeee.cafe/@pokemon/{id}")
-        );
-    }
-}
-
 pub async fn create_note_from_post(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     post_id: Uuid,
@@ -1747,7 +1682,8 @@ pub async fn create_note_from_post(
     }
 
     // Create URLs and IDs
-    let post_url = canonical_post_url(tx, &post, post_id, &author_actor.username, domain).await?;
+    let post_url: Url =
+        crate::models::post::post_page_url(domain, &author_actor.username, post_id).parse()?;
 
     let note_id: Url = format!("https://{}/ap/posts/{}", domain, post_id).parse()?;
 
@@ -1828,7 +1764,8 @@ pub async fn create_updated_note_from_post(
     }
 
     // Create URLs and IDs
-    let post_url = canonical_post_url(tx, &post, post_id, &author_actor.username, domain).await?;
+    let post_url: Url =
+        crate::models::post::post_page_url(domain, &author_actor.username, post_id).parse()?;
 
     let note_id: Url = format!("https://{}/ap/posts/{}", domain, post_id).parse()?;
 

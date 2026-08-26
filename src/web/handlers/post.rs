@@ -2485,21 +2485,14 @@ pub async fn post_view_by_login_name(
                 None
             };
 
-            // Determine the correct slug for this post
-            if let Some(ref comm) = community {
-                // Post has community - slug should be community slug
-                if login_name != comm.slug {
-                    // Wrong slug - redirect to correct one
-                    let correct_url = format!("/@{}/{}", comm.slug, post_id);
-                    return Ok(Redirect::to(&correct_url).into_response());
-                }
-            } else {
-                // Post has no community - slug should be author login_name
-                if &login_name != post_login_name {
-                    // Wrong slug - redirect to correct one
-                    let correct_url = format!("/@{}/{}", post_login_name, post_id);
-                    return Ok(Redirect::to(&correct_url).into_response());
-                }
+            // A post's page is its author's, whatever community it was posted
+            // to: `post_page_path` is where that is decided, and every other
+            // handle redirects here.
+            if &login_name != post_login_name {
+                return Ok(
+                    Redirect::to(&crate::models::post::post_page_path(post_login_name, uuid))
+                        .into_response(),
+                );
             }
             if let Some(community) = community {
                 // If community is private, check if user is a member
