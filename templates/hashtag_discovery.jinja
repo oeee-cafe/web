@@ -22,8 +22,12 @@
                hx-trigger="input changed delay:300ms, search"
                hx-target="#hashtag-results"
                hx-swap="innerHTML"
-               hx-include="[name='sort']" />
+               hx-include="[name='sort']"
+               hx-indicator="#hashtag-search-indicator" />
         <button type="submit">{{ ftl_get_message("search") }}</button>
+        <span id="hashtag-search-indicator"
+              class="htmx-indicator search-indicator"
+              role="status">{{ ftl_get_message("searching") }}</span>
       </form>
 
       {# Shown during a search too, now that searching no longer reloads the

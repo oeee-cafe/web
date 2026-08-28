@@ -191,6 +191,7 @@ hashtag-no-posts = No posts with this hashtag yet
 hashtag-discovery = Hashtags
 hashtag-search-placeholder = Search hashtags...
 search = Search
+searching = Searching…
 search-results-for = Search results for
 no-hashtags-found = No hashtags found
 sort-by = Sort by

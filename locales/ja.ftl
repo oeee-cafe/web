@@ -193,6 +193,7 @@ hashtag-no-posts = このハッシュタグがついた投稿はまだありま�
 hashtag-discovery = ハッシュタグ
 hashtag-search-placeholder = ハッシュタグを検索...
 search = 検索
+searching = 検索中…
 search-results-for = 検索結果
 no-hashtags-found = ハッシュタグが見つかりませんでした
 sort-by = 並べ替え

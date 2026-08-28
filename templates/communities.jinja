@@ -62,7 +62,15 @@
                  hx-trigger="input changed delay:300ms, search"
                  hx-target="#public-communities-list"
                  hx-swap="innerHTML"
-                 hx-include="[name='sort']" />
+                 hx-include="[name='sort']"
+                 hx-indicator="#community-search-indicator" />
+          {# The one control on this page that cannot say it is working by
+             disabling itself — doing that mid-keystroke would drop what was
+             being typed. htmx puts .htmx-request straight onto the element
+             hx-indicator names, and its own stylesheet reveals it. #}
+          <span id="community-search-indicator"
+                class="htmx-indicator search-indicator"
+                role="status">{{ ftl_get_message("searching") }}</span>
           <label class="community-sort">
             {{ ftl_get_message("community-sort") }}
             <select name="sort"

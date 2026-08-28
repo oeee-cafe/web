@@ -193,6 +193,7 @@ hashtag-no-posts = 暂无使用此标签的作品
 hashtag-discovery = 标签
 hashtag-search-placeholder = 搜索标签...
 search = 搜索
+searching = 搜索中…
 search-results-for = 搜索结果
 no-hashtags-found = 未找到标签
 sort-by = 排序

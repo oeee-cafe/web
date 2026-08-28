@@ -193,6 +193,7 @@ hashtag-no-posts = 이 해시태그가 달린 게시물이 아직 없습니다
 hashtag-discovery = 해시태그
 hashtag-search-placeholder = 해시태그 검색...
 search = 검색
+searching = 검색 중…
 search-results-for = 검색 결과
 no-hashtags-found = 해시태그를 찾을 수 없습니다
 sort-by = 정렬

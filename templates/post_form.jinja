@@ -86,7 +86,11 @@
                    hx-trigger="keyup changed delay:300ms"
                    hx-target="#hashtag-suggestions"
                    hx-include="[name='hashtags']"
-                   hx-vals='js:{q: document.getElementById("hashtags-input").value.split(/[,\s]+/).pop()}' />
+                   hx-vals='js:{q: document.getElementById("hashtags-input").value.split(/[,\s]+/).pop()}'
+                   hx-indicator="#hashtag-autocomplete-indicator" />
+            <span id="hashtag-autocomplete-indicator"
+                  class="htmx-indicator search-indicator"
+                  role="status">{{ ftl_get_message("searching") }}</span>
             <div id="hashtag-suggestions"
                  class="hashtag-autocomplete"
                  role="listbox"
