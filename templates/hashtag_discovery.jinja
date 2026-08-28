@@ -7,53 +7,49 @@
     <h2>{{ ftl_get_message("hashtag-discovery") }}</h2>
 
     <div class="hashtag-discovery-controls">
+      {# The form still GETs /hashtags, so this works with scripting off and
+         Enter still navigates to a bookmarkable URL. The htmx attributes on
+         the input search as you type on top of that — the same arrangement
+         the community directory has had, which this page did not. #}
       <form method="get" action="/hashtags" class="hashtag-search-form">
         <input type="text"
                name="q"
                placeholder="{{ ftl_get_message("hashtag-search-placeholder") }}"
                value="{% if search_query %}{{ search_query }}{% endif %}"
-               class="hashtag-search-input" />
+               class="hashtag-search-input"
+               autocomplete="off"
+               hx-get="/api/hashtags/cards"
+               hx-trigger="input changed delay:300ms, search"
+               hx-target="#hashtag-results"
+               hx-swap="innerHTML"
+               hx-include="[name='sort']" />
         <button type="submit">{{ ftl_get_message("search") }}</button>
       </form>
 
-      {% if not search_query %}
-        <div class="hashtag-sort-controls">
-          <span>{{ ftl_get_message("sort-by") }}:</span>
-          <a href="/hashtags?sort=trending" class="{% if sort_by == 'trending' %}active{% endif %}">
-            {{ ftl_get_message("sort-trending") }}
-          </a>
-          <a href="/hashtags?sort=popular" class="{% if sort_by == 'popular' %}active{% endif %}">
-            {{ ftl_get_message("sort-popular") }}
-          </a>
-          <a href="/hashtags?sort=recent" class="{% if sort_by == 'recent' %}active{% endif %}">
-            {{ ftl_get_message("sort-recent") }}
-          </a>
-          <a href="/hashtags?sort=alphabetical" class="{% if sort_by == 'alphabetical' %}active{% endif %}">
-            {{ ftl_get_message("sort-alphabetical") }}
-          </a>
-        </div>
-      {% endif %}
+      {# Shown during a search too, now that searching no longer reloads the
+         page: hiding them on the first keystroke would leave no way back to
+         browsing without clearing the box by hand. `sort` rides along on the
+         search request via hx-include. #}
+      <div class="hashtag-sort-controls">
+        <input type="hidden" name="sort" value="{{ sort_by }}" />
+        <span>{{ ftl_get_message("sort-by") }}:</span>
+        <a href="/hashtags?sort=trending" class="{% if sort_by == 'trending' %}active{% endif %}">
+          {{ ftl_get_message("sort-trending") }}
+        </a>
+        <a href="/hashtags?sort=popular" class="{% if sort_by == 'popular' %}active{% endif %}">
+          {{ ftl_get_message("sort-popular") }}
+        </a>
+        <a href="/hashtags?sort=recent" class="{% if sort_by == 'recent' %}active{% endif %}">
+          {{ ftl_get_message("sort-recent") }}
+        </a>
+        <a href="/hashtags?sort=alphabetical" class="{% if sort_by == 'alphabetical' %}active{% endif %}">
+          {{ ftl_get_message("sort-alphabetical") }}
+        </a>
+      </div>
     </div>
 
-    {% if search_query %}
-      <p class="hashtag-search-info">
-        {{ ftl_get_message("search-results-for") }} "<strong>{{ search_query }}</strong>"
-      </p>
-    {% endif %}
-
-    {% if hashtags %}
-      <div class="hashtag-discovery-grid">
-        {% for hashtag in hashtags %}
-          <div class="hashtag-discovery-item">
-            <a href="/hashtags/{{ hashtag.name }}">
-              <span class="hashtag-name">#{{ hashtag.display_name }}</span>
-              <span class="hashtag-count">{{ hashtag.post_count }} {{ ftl_get_message("hashtag-post-count") }}</span>
-            </a>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p>{{ ftl_get_message("no-hashtags-found") }}</p>
-    {% endif %}
+    <div id="hashtag-results">
+      {% include "hashtag_results.jinja" %}
+    </div>
   </div>
 {% endblock content %}

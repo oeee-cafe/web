@@ -1302,6 +1302,55 @@ mod template_tests {
     }
 
     #[test]
+    fn the_hashtag_results_render_for_both_the_page_and_the_search_box() {
+        // Rendered inline by the page and standalone by /api/hashtags/cards.
+        // The standalone call passes no `sort_by`, no `current_user` and no
+        // chrome, so anything the fragment reaches for beyond its own three
+        // keys would 500 the search box while the page stayed fine.
+        let env = test_support::env();
+        let template = env
+            .get_template("hashtag_results.jinja")
+            .unwrap_or_else(|e| panic!("hashtag_results.jinja loads: {e:#}"));
+
+        let tags = vec![json!({
+            "name": "oekaki",
+            "display_name": "oekaki",
+            "post_count": 12,
+        })];
+
+        let searched = template
+            .render(context! {
+                hashtags => tags.clone(),
+                search_query => Some("oek"),
+                ftl_lang => "en",
+            })
+            .unwrap_or_else(|e| panic!("renders a search: {e:#}"));
+        assert!(searched.contains("hashtag-search-info"));
+        assert!(searched.contains("/hashtags/oekaki"));
+
+        let browsing = template
+            .render(context! {
+                hashtags => tags,
+                search_query => None::<String>,
+                ftl_lang => "en",
+            })
+            .unwrap_or_else(|e| panic!("renders while browsing: {e:#}"));
+        assert!(
+            !browsing.contains("hashtag-search-info"),
+            "browsing is not a search and should not claim to be one"
+        );
+
+        let empty = template
+            .render(context! {
+                hashtags => Vec::<serde_json::Value>::new(),
+                search_query => Some("zzzz"),
+                ftl_lang => "en",
+            })
+            .unwrap_or_else(|e| panic!("renders no matches: {e:#}"));
+        assert!(empty.contains("no-hashtags-found"));
+    }
+
+    #[test]
     fn the_notification_chrome_renders_standalone() {
         // Both are swapped in by handlers as well as included by the page, so
         // they have to stand up with only the keys those handlers pass.

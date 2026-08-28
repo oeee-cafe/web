@@ -1,0 +1,26 @@
+{# The hashtag list and the line above it naming the search it answers.
+
+   Rendered inline by hashtag_discovery.jinja for the first paint and
+   standalone by GET /api/hashtags/cards as the reader types, so it must not
+   depend on anything that handler does not pass. Same split, and the same
+   reason for it, as community_cards_fragment.jinja. #}
+{% if search_query %}
+  <p class="hashtag-search-info">
+    {{ ftl_get_message("search-results-for") }} "<strong>{{ search_query }}</strong>"
+  </p>
+{% endif %}
+
+{% if hashtags %}
+  <div class="hashtag-discovery-grid">
+    {% for hashtag in hashtags %}
+      <div class="hashtag-discovery-item">
+        <a href="/hashtags/{{ hashtag.name }}">
+          <span class="hashtag-name">#{{ hashtag.display_name }}</span>
+          <span class="hashtag-count">{{ hashtag.post_count }} {{ ftl_get_message("hashtag-post-count") }}</span>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>{{ ftl_get_message("no-hashtags-found") }}</p>
+{% endif %}

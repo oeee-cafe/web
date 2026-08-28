@@ -48,7 +48,9 @@ use crate::web::handlers::draw::{
     banner_draw_finish, draw_finish, start_banner_draw, start_banner_draw_mobile, start_draw,
     start_draw_get, start_draw_mobile,
 };
-use crate::web::handlers::hashtag::{hashtag_autocomplete, hashtag_discovery, hashtag_view};
+use crate::web::handlers::hashtag::{
+    hashtag_autocomplete, hashtag_cards, hashtag_discovery, hashtag_view,
+};
 use crate::web::handlers::home::{
     add_reaction_api, create_comment_api, delete_comment_api, delete_post_api, edit_post_api,
     get_active_communities_json, get_latest_comments_json, get_post_comments_api,
@@ -527,6 +529,7 @@ impl App {
             .route("/hashtags", get(hashtag_discovery))
             .route("/hashtags/:hashtag_name", get(hashtag_view))
             .route("/api/hashtags/autocomplete", get(hashtag_autocomplete))
+            .route("/api/hashtags/cards", get(hashtag_cards))
             .route("/@:slug", get(profile_or_community))
             .route("/@:login_name/embed", get(profile_iframe))
             .route("/@:login_name/banners/embed", get(profile_banners_iframe))

@@ -109,6 +109,51 @@ pub struct HashtagDiscoveryQuery {
 }
 
 /// Hashtag discovery/search page
+/// GET /api/hashtags/cards — the hashtag list alone, for the search box.
+///
+/// Shares `hashtag_results.jinja` with the page, and reaches the same
+/// `search_hashtags` / sort queries `hashtag_discovery` does, so typing into
+/// the box and loading the URL cannot disagree about what matches. The page
+/// still answers the plain form GET for anyone without scripting.
+pub async fn hashtag_cards(
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    Query(params): Query<HashtagDiscoveryQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let db = &state.db_pool;
+    let mut tx = db.begin().await?;
+
+    let sort_by = params.sort.as_deref().unwrap_or("trending");
+    // An empty box is browsing, not a search for the empty string: the box
+    // fires on every keystroke, including the one that clears it.
+    let query = params.q.as_deref().map(str::trim).filter(|q| !q.is_empty());
+
+    let hashtags = if let Some(query) = query {
+        let normalized_query = query.replace('-', "_");
+        search_hashtags(&mut tx, &normalized_query, 100).await?
+    } else {
+        match sort_by {
+            "popular" => get_all_hashtags_by_popularity(db, 100).await?,
+            "recent" => get_all_hashtags_by_recency(db, 100).await?,
+            "alphabetical" => get_all_hashtags_alphabetically(db, 100).await?,
+            _ => get_trending_hashtags(&mut tx, 100).await?,
+        }
+    };
+
+    tx.commit().await?;
+
+    let rendered = state
+        .env
+        .get_template("hashtag_results.jinja")?
+        .render(context! {
+            hashtags => hashtags,
+            search_query => query,
+            ftl_lang,
+        })?;
+
+    Ok(Html(rendered).into_response())
+}
+
 pub async fn hashtag_discovery(
     auth_session: AuthSession,
     State(state): State<AppState>,
