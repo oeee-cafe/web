@@ -25,14 +25,14 @@
                             {% else %}
                                 <button hx-post="/banners/{{ banner.id }}/activate"
                                         hx-swap="none"
-                                        hx-on::after-request="window.location.reload()"
+                                        hx-on::after:request="window.location.reload()"
                                         style="margin-top: 0.5rem; width: 100%;">
                                     {{ ftl_get_message("banner-management-set-active") }}
                                 </button>
                                 <button hx-delete="/banners/{{ banner.id }}"
                                         hx-confirm="{{ ftl_get_message("banner-management-delete-confirm") }}"
                                         hx-swap="none"
-                                        hx-on::after-request="window.location.reload()"
+                                        hx-on::after:request="window.location.reload()"
                                         style="margin-top: 0.25rem; width: 100%; background-color: #d32f2f; color: white;">
                                     {{ ftl_get_message("banner-management-delete") }}
                                 </button>

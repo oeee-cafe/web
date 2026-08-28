@@ -1,6 +1,9 @@
+{# :inherited so the cancel button below, which declares neither, still
+   swaps this whole form back out. htmx 4 does not pass attributes down to
+   children on its own. Both still apply to the form's own hx-put. #}
 <form hx-put="/communities/{{ community_id }}"
-      hx-target="this"
-      hx-swap="outerHTML">
+      hx-target:inherited="this"
+      hx-swap:inherited="outerHTML">
     {% if error_message %}
     <div style="color: red; margin-bottom: 10px;">
         <strong>{{ error_message }}</strong>

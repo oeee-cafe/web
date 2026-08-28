@@ -28,7 +28,11 @@
 {% block content %}
   <div class="center">
     {% block community_edit_block %}
-      <div hx-target="this" hx-swap="outerHTML" class="community-header">
+      {# :inherited so the edit button below still swaps this header out.
+         htmx 4 does not pass attributes down to children on its own. #}
+      <div hx-target:inherited="this"
+           hx-swap:inherited="outerHTML"
+           class="community-header">
         <div>
           <h2>{{ community.name }}</h2>
           <p class="community-handle">@{{ community.slug }}@{{ domain }}</p>
