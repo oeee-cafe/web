@@ -82,7 +82,9 @@ use crate::web::handlers::profile::{
     profile_banners_iframe, profile_followings_json, profile_iframe, profile_json,
     profile_or_community, profile_settings, unfollow_profile_api,
 };
-use crate::web::handlers::report::{report_post_api, report_profile_api};
+use crate::web::handlers::report::{
+    hx_report_post, hx_report_profile, report_post_api, report_profile_api,
+};
 use crate::web::handlers::search::search_json;
 use crate::web::handlers::well_known::{
     android_assetlinks, apple_app_site_association, robots_txt, sitemap_xml,
@@ -379,6 +381,9 @@ impl App {
             .route("/api/v1/posts/:post_id", delete(delete_post_api))
             .route("/api/v1/posts/:post_id", put(edit_post_api))
             .route("/api/v1/posts/:post_id/report", post(report_post_api))
+            // The site's own report modals. Same work, HTML back.
+            .route("/posts/:post_id/report", post(hx_report_post))
+            .route("/@:login_name/report", post(hx_report_profile))
             .route(
                 "/api/v1/posts/:post_id/comments",
                 get(get_post_comments_api),

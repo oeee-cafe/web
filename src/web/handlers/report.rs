@@ -1,14 +1,17 @@
 use crate::app_error::AppError;
 use crate::models::post::find_post_by_id;
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession};
-use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage};
+use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::state::AppState;
 use axum::extract::{Path, State};
+use axum::response::Html;
+use axum::Form;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use lettre::{Message, SmtpTransport, Transport};
+use minijinja::context;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -302,4 +305,82 @@ This is an automated report notification from oeee.cafe",
             message: "Profile reported successfully".to_string(),
         }),
     ))
+}
+
+/// The same two reports, submitted from the site instead of from the phone.
+///
+/// Both delegate to the API handlers above rather than restating any of it, so
+/// the mail that reaches abuse@ is identical whichever client sent it. What
+/// differs is the reply: the browser gets a rendered sentence to swap into the
+/// modal it was submitted from, where the JSON body and its status would be
+/// useless.
+///
+/// Failures come back as 200 with the message inside, deliberately. These
+/// forms sit in a modal over a dimmed page, and `web::htmx::error_banner`
+/// renders into the site header — which is behind that dim. An answer the
+/// reporter cannot see is no better than the silence this replaces.
+async fn render_report_result(
+    state: &AppState,
+    ftl_lang: &str,
+    key: &str,
+) -> Result<axum::response::Response, AppError> {
+    let template = state.env.get_template("report_result.jinja")?;
+    let rendered = template.render(context! { message_key => key, ftl_lang })?;
+    Ok(Html(rendered).into_response())
+}
+
+/// POST /posts/:post_id/report
+pub async fn hx_report_post(
+    auth_session: AuthSession,
+    accept_language: ExtractAcceptLanguage,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(post_id): Path<Uuid>,
+    Form(form): Form<ReportPostRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let outcome = report_post_api(
+        auth_session,
+        accept_language,
+        State(state.clone()),
+        Path(post_id),
+        Json(form),
+    )
+    .await;
+
+    let key = match outcome {
+        Ok(_) => "post-report-success",
+        Err(e) => {
+            tracing::warn!("post report from the web form failed: {}", e);
+            "post-report-error"
+        }
+    };
+    render_report_result(&state, &ftl_lang, key).await
+}
+
+/// POST /@:login_name/report
+pub async fn hx_report_profile(
+    auth_session: AuthSession,
+    accept_language: ExtractAcceptLanguage,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+    Form(form): Form<ReportPostRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let outcome = report_profile_api(
+        auth_session,
+        accept_language,
+        State(state.clone()),
+        Path(login_name),
+        Json(form),
+    )
+    .await;
+
+    let key = match outcome {
+        Ok(_) => "profile-report-success",
+        Err(e) => {
+            tracing::warn!("profile report from the web form failed: {}", e);
+            "profile-report-error"
+        }
+    };
+    render_report_result(&state, &ftl_lang, key).await
 }

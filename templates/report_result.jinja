@@ -1,0 +1,14 @@
+{# What the report modals swap in once abuse@ has been mailed, or once the
+   attempt has failed. Replaces the form, so the modal is left holding the
+   outcome and a way out rather than a form the reporter might submit twice.
+
+   `message_key` is picked by web::handlers::report — the template does not
+   decide whether it succeeded, only how it reads. #}
+<div class="report-result">
+  <p>{{ ftl_get_message(message_key) }}</p>
+  <div class="report-result-actions">
+    <button type="button" onclick="this.closest('[id$=report-modal]').style.display = 'none'">
+      {{ ftl_get_message("close") }}
+    </button>
+  </div>
+</div>

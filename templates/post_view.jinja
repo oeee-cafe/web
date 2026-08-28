@@ -200,7 +200,7 @@
                   }
                 ">{{ ftl_get_message("post-share") }}</button>
                 {% if current_user.id != post.author_id %}
-                  <button type="button" onclick="showReportModal('{{ post_id }}')">{{ ftl_get_message("post-report") }}</button>
+                  <button type="button" onclick="showReportModal()">{{ ftl_get_message("post-report") }}</button>
                 {% endif %}
                 {% if current_user.id == post.author_id %}
                   <button hx-get="/posts/{{ post_id }}/edit" hx-target="#post-edit-container" hx-swap="outerHTML">{{ ftl_get_message("edit") }}</button>
@@ -346,7 +346,14 @@
   <div id="report-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
     <div style="background: var(--main-bg-color); padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
       <h2>{{ ftl_get_message("post-report-title") }}</h2>
-      <form id="report-form" onsubmit="submitReport(event, '{{ post_id }}')">
+      {# `required` on the textarea is the empty-description check: htmx runs
+         HTML5 validation before it will issue a request for a form, so the
+         hand-written length test this replaces had nothing left to do. #}
+      <form id="report-form"
+            hx-post="/posts/{{ post_id }}/report"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-disable="find button">
         <label for="report-description">{{ ftl_get_message("post-report-description-label") }}</label>
         <textarea id="report-description"
                   name="description"
@@ -363,7 +370,7 @@
   </div>
 
   <script>
-    function showReportModal(postId) {
+    function showReportModal() {
       const modal = document.getElementById('report-modal');
       modal.style.display = 'flex';
       document.getElementById('report-description').value = '';
@@ -372,41 +379,6 @@
 
     function hideReportModal() {
       document.getElementById('report-modal').style.display = 'none';
-    }
-
-    async function submitReport(event, postId) {
-      event.preventDefault();
-      const description = document.getElementById('report-description').value.trim();
-      const submitButton = event.target.querySelector('button[type="submit"]');
-
-      if (description.length === 0) {
-        alert('{{ ftl_get_message("post-report-error") }}');
-        return;
-      }
-
-      submitButton.disabled = true;
-
-      try {
-        const response = await fetch(`/api/v1/posts/${postId}/report`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ description }),
-        });
-
-        if (response.ok) {
-          alert('{{ ftl_get_message("post-report-success") }}');
-          hideReportModal();
-        } else {
-          const error = await response.json();
-          alert(error.message || '{{ ftl_get_message("post-report-error") }}');
-        }
-      } catch (error) {
-        alert('{{ ftl_get_message("post-report-error") }}');
-      } finally {
-        submitButton.disabled = false;
-      }
     }
 
     // Close modal when clicking outside

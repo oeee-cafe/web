@@ -120,6 +120,7 @@ edit = Edit
 edit-community-button = Move to Community
 save = Save
 cancel = Cancel
+close = Close
 delete = Delete
 draw-save-confirm = Save this drawing? You will not be able to keep drawing on it afterwards.
 

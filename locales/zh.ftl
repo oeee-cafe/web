@@ -122,6 +122,7 @@ edit = 编辑
 edit-community-button = 移至社区
 save = 保存
 cancel = 取消
+close = 关闭
 delete = 删除
 draw-save-confirm = 要保存这幅画吗？保存后将无法继续绘制。
 
