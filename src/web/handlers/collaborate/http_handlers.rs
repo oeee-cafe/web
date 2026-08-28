@@ -1070,7 +1070,9 @@ mod tests {
             .expect("renders");
         assert!(rendered.contains("hx-get=\"/collaborate/sessions\""));
         assert!(rendered.contains("hx-trigger=\"every 15s\""));
-        assert!(rendered.contains("hx-swap=\"outerHTML\""));
+        // Morph, not replace: the list repaints every 15s and rebuilding it
+        // wholesale dropped focus and hover off cards that had not changed.
+        assert!(rendered.contains("hx-swap=\"outerMorph\""));
         assert!(rendered.contains("id=\"collaborate-sessions\""));
     }
 

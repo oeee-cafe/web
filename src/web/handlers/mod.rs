@@ -236,7 +236,7 @@ where
     }
 }
 
-fn get_bundle(
+pub(crate) fn get_bundle(
     accept_language: &HeaderValue,
     user_preferred_language: Option<Language>,
 ) -> FluentBundle<&FluentResource, IntlLangMemoizer> {

@@ -207,7 +207,8 @@
                   <form hx-delete="/posts/{{ post_id }}"
                         hx-confirm="{{ ftl_get_message('post-delete-confirm') }}"
                         hx-target="body"
-                        style="display: inline;">
+                        style="display: inline;"
+                        hx-disable="find button">
                     <button type="submit">{{ ftl_get_message("delete") }}</button>
                   </form>
                 {% endif %}
@@ -313,7 +314,8 @@
             </p>
           {% endif %}
           {% if current_user %}
-            <form id="comment-form" hx-post="/comments" hx-swap="outerHTML" hx-target="#comments">
+            <form id="comment-form" hx-post="/comments" hx-swap="outerHTML" hx-target="#comments"
+                  hx-disable="find button">
               <input type="hidden" name="post_id" value="{{ post_id }}">
               <input type="hidden" id="parent_comment_id" name="parent_comment_id" value="">
               <div id="reply-info" style="display: none; margin-bottom: 10px; padding: 8px; background: var(--secondary-bg-color); border-left: 3px solid var(--main-border-color);">

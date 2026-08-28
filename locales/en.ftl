@@ -2,6 +2,9 @@ brand = Oeee Cafe
 email-from-address = Oeee Cafe <noreply@oeee.cafe>
 error-404 = Page not found.
 error-403 = You do not have permission to access this page.
+htmx-error-forbidden = You do not have permission to do that.
+htmx-error-request = That did not go through. Reload the page and try again.
+htmx-error-server = Something went wrong on our side. Please try again in a moment.
 
 about = Oeee Cafe is an oekaki board.
 user-contributors = Users who made Oeee Cafe together
@@ -289,9 +292,7 @@ community-delete-confirm-prompt = Type the community ID to confirm deletion
 community-delete-final-confirm = Are you sure you want to delete this community? This action cannot be undone.
 community-delete-button = Delete Community
 
-invitations = Invitations
 invitations-pending = Pending invitations
-invitations-none = You have no pending invitations
 invitation-from = Invitation from
 invitation-to-community = to join
 invitation-accept = Accept

@@ -17,18 +17,22 @@
                             <li>
                                 <a href="{{ link.url }}" target="_blank">{{ link.description }}</a> ({{ ftl_get_message("profile-link-order") }}: {{ link.index }})
                                 <button hx-post="/@{{ user.login_name }}/settings/links/{{ link.id }}/up"
-                                        hx-target="#links">{{ ftl_get_message("profile-link-move-up") }}</button>
+                                        hx-target="#links"
+                                       hx-disable="this">{{ ftl_get_message("profile-link-move-up") }}</button>
                                 <button hx-post="/@{{ user.login_name }}/settings/links/{{ link.id }}/down"
-                                        hx-target="#links">{{ ftl_get_message("profile-link-move-down") }}</button>
+                                        hx-target="#links"
+                                       hx-disable="this">{{ ftl_get_message("profile-link-move-down") }}</button>
                                 <button hx-delete="/@{{ user.login_name }}/settings/links/{{ link.id }}"
                                         hx-target="#links"
-                                        hx-confirm="{{ ftl_get_message("profile-link-delete-confirm") }}">
+                                        hx-confirm="{{ ftl_get_message("profile-link-delete-confirm") }}"
+                                        hx-disable="this">
                                     {{ ftl_get_message("profile-link-delete") }}
                                 </button>
                             </li>
                         {% endfor %}
                     </ul>
-                    <form hx-post="/@{{ user.login_name }}/settings/links" hx-target="#links">
+                    <form hx-post="/@{{ user.login_name }}/settings/links" hx-target="#links"
+                          hx-disable="find button">
                         <fieldset>
                             <legend>{{ ftl_get_message("profile-link-add") }}</legend>
                             <input type="url" name="url" placeholder="https://example.com">

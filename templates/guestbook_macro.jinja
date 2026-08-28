@@ -14,7 +14,8 @@
       {% if
         current_user and current_user.id == entry.recipient_id %}
         <form hx-post="/@{{ user.login_name }}/guestbook/{{ entry.id }}/reply"
-              hx-swap="outerHTML">
+              hx-swap="outerHTML"
+              hx-disable="find button">
           <textarea name="content" title="{{ ftl_get_message("guestbook-reply") }}"></textarea>
           <input type="submit" value="{{ ftl_get_message("guestbook-reply-write") }}" />
         </form>
@@ -26,7 +27,8 @@
       <form hx-delete="/@{{ user.login_name }}/guestbook/{{ entry.id }}"
             hx-swap="outerHTML"
             hx-target="closest .guestbook-entry"
-            hx-confirm="{{ ftl_get_message("guestbook-delete-confirm") }}">
+            hx-confirm="{{ ftl_get_message("guestbook-delete-confirm") }}"
+            hx-disable="find button">
         <input type="submit" value="{{ ftl_get_message("guestbook-delete") }}" />
       </form>
     {% endif %}

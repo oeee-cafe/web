@@ -601,6 +601,12 @@ impl App {
             .route("/password-reset/verify", post(password_reset_verify))
             .fallback(handler_404)
             .merge(protected_router)
+            // Inside the auth layer, so the session is already in the
+            // extensions and a failed request can be explained in the
+            // language the reader chose rather than the one they asked for.
+            .layer(axum::middleware::from_fn(
+                crate::web::htmx::error_banner,
+            ))
             .layer(MessagesManagerLayer)
             .layer(auth_layer)
             .with_state(self.state.clone())

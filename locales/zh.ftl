@@ -2,6 +2,9 @@ brand = 黄瓜咖啡馆
 email-from-address = 黄瓜咖啡馆 <noreply@oeee.cafe>
 error-404 = 页面未找到
 error-403 = 您无权访问此页面。
+htmx-error-forbidden = 您没有执行此操作的权限。
+htmx-error-request = 操作未能完成。请刷新页面后重试。
+htmx-error-server = 我们这边出了点问题。请稍后再试。
 
 about = 黄瓜画板是一个可以画画的留言板。
   以前也被称为黄瓜削皮。
@@ -291,9 +294,7 @@ community-delete-confirm-prompt = 输入社区ID以确认删除
 community-delete-final-confirm = 您确定要删除此社区吗？此操作无法撤销。
 community-delete-button = 删除社区
 
-invitations = 邀请
 invitations-pending = 待处理的邀请
-invitations-none = 没有待处理的邀请
 invitation-from = 邀请来自
 invitation-to-community = 加入社区
 invitation-accept = 接受

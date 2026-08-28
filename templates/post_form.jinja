@@ -122,7 +122,8 @@
     <form hx-delete="/posts/{{ post_id }}"
           hx-confirm="{{ ftl_get_message("post-delete-confirm") }}"
           hx-target="body"
-          class="delete-form">
+          class="delete-form"
+          hx-disable="find button">
       <button type="submit" class="delete-button">{{ ftl_get_message("delete") }}</button>
     </form>
   </div>

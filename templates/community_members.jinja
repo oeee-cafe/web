@@ -45,7 +45,8 @@
                       hx-delete="/communities/@{{ community.slug }}/invitations/{{ invitation.id }}"
                       hx-confirm="{{ ftl_get_message("community-retract-invitation-confirm") }}"
                       hx-target="closest tr"
-                      hx-swap="outerHTML swap:0s">
+                      hx-swap="outerHTML swap:0s"
+                      hx-disable="this">
                 {{ ftl_get_message("community-retract-invitation") }}
               </button>
             </td>
@@ -93,7 +94,8 @@
                       hx-delete="/communities/@{{ community.slug }}/members/{{ member.user_id }}"
                       hx-confirm="{{ ftl_get_message("community-remove-member-confirm") }}"
                       hx-target="closest tr"
-                      hx-swap="outerHTML swap:0s">
+                      hx-swap="outerHTML swap:0s"
+                      hx-disable="this">
                 {{ ftl_get_message("community-remove-member") }}
               </button>
               {% endif %}
@@ -103,7 +105,8 @@
               <button class="btn-danger"
                       hx-post="/communities/@{{ community.slug }}/leave"
                       hx-confirm="{{ ftl_get_message("community-leave-confirm") }}"
-                      hx-target="body">
+                      hx-target="body"
+                      hx-disable="this">
                 {{ ftl_get_message("community-leave") }}
               </button>
             </td>

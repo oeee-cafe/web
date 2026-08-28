@@ -2,11 +2,17 @@
    standalone by GET /collaborate/sessions, so the wrapper carries its own poll
    attributes and swaps itself — a fragment that dropped them would poll once
    and then go quiet. Styling lives in collaborate_lobby.jinja, which is the
-   only page that includes this. #}
+   only page that includes this.
+
+   Morphed rather than replaced: this repaints every 15s, and outerHTML threw
+   away and rebuilt every card each time — losing :hover, losing the keyboard
+   focus of anyone tabbing through the join links, and restarting the CSS on
+   cards that had not changed at all. A morph touches only the cards whose
+   contents actually moved. #}
 <div id="collaborate-sessions"
      hx-get="/collaborate/sessions"
      hx-trigger="every 15s"
-     hx-swap="outerHTML">
+     hx-swap="outerMorph">
   {% macro session_card(session, show_visibility) %}
     <div class="session-card">
       <div class="session-header">

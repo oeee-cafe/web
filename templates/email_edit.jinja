@@ -1,4 +1,5 @@
-<form hx-post="/account/request-verify-email" hx-swap="outerHTML">
+<form hx-post="/account/request-verify-email" hx-swap="outerHTML"
+      hx-disable="find button">
   <fieldset>
     <legend>{{ ftl_get_message("account-change-email") }}</legend>
     {% if current_user.email_verified_at %}

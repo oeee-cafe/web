@@ -28,7 +28,8 @@
   {% endif %}
   <form hx-post="/admin/posts/{{ post.id }}/explicit"
         hx-target="#post-flag-panel"
-        hx-swap="outerHTML">
+        hx-swap="outerHTML"
+        hx-disable="find button">
     <input type="hidden"
            name="is_explicit"
            value="{% if post.is_explicit %}false{% else %}true{% endif %}" />

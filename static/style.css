@@ -2768,3 +2768,24 @@ legend {
 .neo-cucumber-replay-status {
   margin: 0;
 }
+
+/* Where web::htmx::error_banner puts the reason a control failed. Empty on
+   every page that has not had one fail, so it takes no room until it holds
+   something — a permanently reserved strip of red would read as a warning
+   about the page rather than about the click. */
+.htmx-error:empty {
+  display: none;
+}
+
+.htmx-error {
+  margin: var(--space-3) auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-color);
+  border-radius: 4px;
+  background-color: var(--danger-bg-color);
+  color: var(--danger-text-color);
+}
+
+.htmx-error-message {
+  margin: 0;
+}

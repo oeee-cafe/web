@@ -1,7 +1,8 @@
 <form id="post-edit-container"
       hx-put="/posts/{{ post_id }}"
       hx-target="this"
-      hx-swap="outerHTML">
+      hx-swap="outerHTML"
+      hx-disable="find button">
     <div class="form-group">
         <label>{{ ftl_get_message("post-title") }}:</label>
         <input type="text" name="title" value="{{ post.title }}">

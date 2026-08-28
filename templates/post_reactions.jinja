@@ -35,7 +35,8 @@
               hx-vals='{"emoji": "{{ reaction.emoji }}"}'
               hx-target="#post-reactions-{{ post_id }}"
               hx-swap="outerHTML"
-              title="{% if reaction.reacted_by_user %}Remove your {{ reaction.emoji }}{% else %}React with {{ reaction.emoji }}{% endif %}">
+              title="{% if reaction.reacted_by_user %}Remove your {{ reaction.emoji }}{% else %}React with {{ reaction.emoji }}{% endif %}"
+              hx-disable="this">
         {{ reaction.emoji }} {{ reaction.count }}
       </button>
     {% else %}

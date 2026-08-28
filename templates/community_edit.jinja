@@ -3,7 +3,8 @@
    children on its own. Both still apply to the form's own hx-put. #}
 <form hx-put="/communities/{{ community_id }}"
       hx-target:inherited="this"
-      hx-swap:inherited="outerHTML">
+      hx-swap:inherited="outerHTML"
+      hx-disable="find button">
     {% if error_message %}
     <div style="color: red; margin-bottom: 10px;">
         <strong>{{ error_message }}</strong>
@@ -86,7 +87,8 @@
             hx-target="body"
             hx-swap="innerHTML"
             style="background-color: var(--danger-color, #dc2626); color: white; cursor: not-allowed; border: none;"
-        >
+        
+        hx-disable="this">
             {{ ftl_get_message("community-delete-button") }}
         </button>
     </form>

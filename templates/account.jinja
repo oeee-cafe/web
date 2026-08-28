@@ -43,7 +43,8 @@
       </fieldset>
       <input type="submit" value="{{ ftl_get_message("account-info-edit") }}" />
     </form>
-    <form hx-post="/account/request-verify-email" hx-swap="outerHTML">
+    <form hx-post="/account/request-verify-email" hx-swap="outerHTML"
+          hx-disable="find button">
       <fieldset>
         <legend>{{ ftl_get_message("account-change-email") }}</legend>
         {% if current_user.email_verified_at %}
@@ -103,7 +104,8 @@
           hx-delete="/account/delete"
           hx-confirm="{{ ftl_get_message("account-delete-confirm") }}"
           hx-target="#delete-error"
-          hx-swap="innerHTML">
+          hx-swap="innerHTML"
+          hx-disable="find button">
       <fieldset class="dangerous">
         <legend>{{ ftl_get_message("account-delete") }}</legend>
         <p class="dangerous">{{ ftl_get_message("account-delete-warning") }}</p>

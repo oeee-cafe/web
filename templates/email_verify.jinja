@@ -1,4 +1,5 @@
-<form hx-post="/account/verify-email" hx-swap="outerHTML">
+<form hx-post="/account/verify-email" hx-swap="outerHTML"
+      hx-disable="find button">
   <input type="hidden" name="challenge_id" value="{{ challenge_id }}" />
   <fieldset>
     <legend>{{ ftl_get_message("account-change-email") }}</legend>

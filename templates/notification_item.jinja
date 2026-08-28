@@ -123,7 +123,8 @@
                 title="{{ ftl_get_message('notification-mark-read') }}"
                 hx-post="/notifications/{{ notification.id }}/mark-read"
                 hx-target="closest .notification"
-                hx-swap="outerHTML">
+                hx-swap="outerHTML"
+                hx-disable="this">
           {{ ftl_get_message("notification-mark-read") }}
         </button>
       {% endif %}
@@ -132,7 +133,8 @@
               hx-delete="/notifications/{{ notification.id }}"
               hx-target="closest .notification"
               hx-swap="outerHTML"
-              hx-confirm="{{ ftl_get_message('notification-delete-confirm') }}">
+              hx-confirm="{{ ftl_get_message('notification-delete-confirm') }}"
+              hx-disable="this">
         {{ ftl_get_message("notification-delete") }}
       </button>
     </div>

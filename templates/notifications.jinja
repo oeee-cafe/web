@@ -10,7 +10,8 @@
         <button class="notification-mark-all-button"
                 hx-post="/notifications/mark-all-read"
                 hx-swap="none"
-                hx-on::after:request="window.location.reload()">
+                hx-on::after:request="window.location.reload()"
+                hx-disable="this">
           {{ ftl_get_message("notification-mark-all-read") }}
         </button>
       {% endif %}

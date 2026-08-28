@@ -2,6 +2,9 @@ brand = OEEEカフェ
 email-from-address = OEEEカフェ <noreply@oeee.cafe>
 error-404 = ページが見つかりません.
 error-403 = このページにアクセスする権限がありません。
+htmx-error-forbidden = その操作を行う権限がありません。
+htmx-error-request = 処理できませんでした。ページを再読み込みしてからもう一度お試しください。
+htmx-error-server = サーバー側で問題が発生しました。しばらくしてからもう一度お試しください。
 
 about = お絵かきの発音はOEEEカフェに似ています。
   OEEEは韓国語でキュウリという意味です。
@@ -291,9 +294,7 @@ community-delete-confirm-prompt = 削除を確認するためにコミュニテ�
 community-delete-final-confirm = 本当にこのコミュニティを削除しますか？この操作は元に戻せません。
 community-delete-button = コミュニティを削除
 
-invitations = 招待
 invitations-pending = 保留中の招待
-invitations-none = 保留中の招待はありません
 invitation-from = 招待元
 invitation-to-community = コミュニティ参加招待
 invitation-accept = 承諾

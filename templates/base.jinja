@@ -6,13 +6,6 @@
     <link rel="stylesheet"
           href="{{ '/static/style.css' | cachebuster | safe }}"
           type="text/css" />
-    {# htmx 4 swaps every response but 204 and 304, error pages included.
-       AppError answers 4xx/5xx with JSON and several of the handlers below it
-       reply with a bare 404 or 403, so on its defaults a failed request would
-       paint a JSON blob — or nothing at all — over the form that made it.
-       This restores htmx 2's "do not swap an error" rule. htmx reads the meta
-       while its own <script> is parsed, so it has to be declared above it. #}
-    <meta name="htmx-config" content='{"noSwap":[204,304,"4xx","5xx"]}' />
     <script src="https://unpkg.com/htmx.org@4.0.0/dist/htmx.min.js"
             integrity="sha384-BvJpBiO8Kh31EqtJe5DRIeWrHWnCGkwytKs9NKFi86Hhw96dEqdEMzZDeK9iEGTc"
             crossorigin="anonymous"></script>
@@ -114,6 +107,11 @@
           </li>
         {% endfor %}
       </ul>
+      {# Where a failed htmx request lands. web::htmx::error_banner retargets
+         every error response at this id, so a control that fails says so
+         instead of going quiet. Empty until something goes wrong; the CSS
+         gives it no box of its own while it holds nothing. #}
+      <div id="htmx-error" class="htmx-error center"></div>
     </header>
     <main>
       {% block content %}

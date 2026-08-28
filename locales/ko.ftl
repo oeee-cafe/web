@@ -2,6 +2,9 @@ brand = 오이카페
 email-from-address = 오이카페 <noreply@oeee.cafe>
 error-404 = 페이지를 찾을 수 없습니다.
 error-403 = 이 페이지에 접근할 권한이 없습니다.
+htmx-error-forbidden = 그 작업을 수행할 권한이 없습니다.
+htmx-error-request = 요청이 처리되지 않았습니다. 페이지를 새로 고친 뒤 다시 시도해 주세요.
+htmx-error-server = 서버에 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.
 
 about = 오에카키는 그림을 그릴 수 있는 게시판입니다.
   옛날에는 오에카키를 오이깎이라고도 불렀습니다.
@@ -291,9 +294,7 @@ community-delete-confirm-prompt = 삭제를 확인하려면 커뮤니티 ID를 �
 community-delete-final-confirm = 정말 이 커뮤니티를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
 community-delete-button = 커뮤니티 삭제
 
-invitations = 초대
 invitations-pending = 대기 중인 초대
-invitations-none = 대기 중인 초대가 없습니다
 invitation-from = 초대한 사람
 invitation-to-community = 커뮤니티 가입 초대
 invitation-accept = 수락

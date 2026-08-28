@@ -1,13 +1,15 @@
 {% macro follow_button() %}
   {% if current_user.id != user.id %}
-    <form hx-post="/@{{ user.login_name }}/follow" hx-swap="outerHTML">
+    <form hx-post="/@{{ user.login_name }}/follow" hx-swap="outerHTML"
+          hx-disable="find button">
       <button type="submit" class="button-follow">{{ ftl_get_message("follow") }}</button>
     </form>
   {% endif %}
 {% endmacro %}
 {% macro unfollow_button() %}
   {% if current_user.id != user.id %}
-    <form hx-post="/@{{ user.login_name }}/unfollow" hx-swap="outerHTML">
+    <form hx-post="/@{{ user.login_name }}/unfollow" hx-swap="outerHTML"
+          hx-disable="find button">
       <button type="submit" class="button-unfollow">{{ ftl_get_message("unfollow") }}</button>
     </form>
   {% endif %}

@@ -40,7 +40,8 @@
   </div>
 </div>
 {% if current_user and current_user.id != user.id %}
-  <form hx-post="/@{{ user.login_name }}/guestbook" hx-swap="outerHTML">
+  <form hx-post="/@{{ user.login_name }}/guestbook" hx-swap="outerHTML"
+        hx-disable="find button">
     <textarea name="content" title="{{ ftl_get_message("guestbook") }}"></textarea>
     <input type="submit" value="{{ ftl_get_message("guestbook-write") }}" />
   </form>

@@ -29,7 +29,8 @@
   {% endif %}
   <form hx-post="/admin/banners/{{ banner.id }}/explicit"
         hx-target="#banner-{{ banner.id }}"
-        hx-swap="outerHTML">
+        hx-swap="outerHTML"
+        hx-disable="find button">
     <input type="hidden"
            name="is_explicit"
            value="{% if banner.is_explicit %}false{% else %}true{% endif %}" />
