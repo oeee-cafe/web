@@ -1256,6 +1256,90 @@ mod template_tests {
     }
 
     #[test]
+    fn the_banner_grid_renders_the_shape_its_handler_passes() {
+        // `list_user_banners` returns a real DateTime and a real bool, and the
+        // grid pipes the first through `datetimeformat` and branches on the
+        // second. Parsing sees none of that, and both buttons on this page now
+        // swap this template in, so a render failure would take out activating
+        // and deleting rather than one page load.
+        let env = test_support::env();
+        let template = env
+            .get_template("banner_grid.jinja")
+            .unwrap_or_else(|e| panic!("banner_grid.jinja loads: {e:#}"));
+
+        let banner = |is_active: bool| {
+            json!({
+                "id": "6f2b4e4c-95f6-4d8a-9c47-1f2f3f4a5b6c",
+                "image_filename": "abcd1234.png",
+                "created_at": "2026-08-29T04:00:00Z",
+                "is_active": is_active,
+            })
+        };
+        let rendered = template
+            .render(context! {
+                banners => vec![
+                    (banner(true), "https://img.example/image/ab/abcd1234.png"),
+                    (banner(false), "https://img.example/image/ab/abcd1234.png"),
+                ],
+                ftl_lang => "en",
+            })
+            .unwrap_or_else(|e| panic!("banner_grid.jinja renders: {e:#}"));
+
+        assert!(
+            rendered.contains("id=\"banner-grid\""),
+            "both buttons target this id; without it their swaps go nowhere"
+        );
+        // One card is active and shows no buttons, the other shows both.
+        assert_eq!(
+            rendered.matches("hx-target=\"#banner-grid\"").count(),
+            2,
+            "the inactive card should offer exactly activate and delete"
+        );
+        assert!(
+            !rendered.contains("location.reload"),
+            "these buttons stopped reloading the page"
+        );
+    }
+
+    #[test]
+    fn the_notification_chrome_renders_standalone() {
+        // Both are swapped in by handlers as well as included by the page, so
+        // they have to stand up with only the keys those handlers pass.
+        let env = test_support::env();
+
+        let nav = env
+            .get_template("nav_notifications.jinja")
+            .unwrap_or_else(|e| panic!("nav_notifications.jinja loads: {e:#}"));
+        let with_count = nav
+            .render(context! { unread_notification_count => 3, ftl_lang => "en" })
+            .expect("nav renders with a count");
+        let without = nav
+            .render(context! { unread_notification_count => 0, ftl_lang => "en" })
+            .expect("nav renders at zero");
+        assert!(with_count.contains("(3)"), "the badge should show the count");
+        assert!(!without.contains('('), "zero unread shows no parenthesised count");
+        assert!(
+            with_count.contains("id=\"nav-notifications\""),
+            "the partial targets this id, so it has to survive its own swap"
+        );
+
+        let header = env
+            .get_template("notifications_header.jinja")
+            .unwrap_or_else(|e| panic!("notifications_header.jinja loads: {e:#}"));
+        let unread = header
+            .render(context! { unread_notification_count => 2, ftl_lang => "en" })
+            .expect("header renders with unread");
+        let all_read = header
+            .render(context! { unread_notification_count => 0, ftl_lang => "en" })
+            .expect("header renders with none unread");
+        assert!(unread.contains("mark-all-read"));
+        assert!(
+            !all_read.contains("mark-all-read"),
+            "the button has to remove itself once there is nothing left to mark"
+        );
+    }
+
+    #[test]
     fn the_report_result_looks_up_the_key_it_was_handed() {
         // The handler picks one of four Fluent keys and passes it in as a
         // value. That indirection is easy to get wrong in a way parsing

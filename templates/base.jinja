@@ -83,7 +83,7 @@
               </div>
             {% endif %}
             <div>
-              <a href="/notifications">{{ ftl_get_message("notifications") }}{% if unread_notification_count is defined and unread_notification_count > 0 %} ({{ unread_notification_count }}){% endif %}</a>
+              {% include "nav_notifications.jinja" %}
             </div>
             <div>
               <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>

@@ -1466,8 +1466,45 @@ pub async fn delete_banner_api(
 }
 
 /// HTML endpoint to activate a banner
+/// Render the banner grid for one user.
+///
+/// Shared by the page and by the two buttons on it, so what a click swaps in
+/// is the same markup a reload would have produced — which is what those
+/// buttons used to do the expensive way.
+async fn render_banner_grid(
+    state: &AppState,
+    user_id: Uuid,
+    ftl_lang: &str,
+) -> Result<String, AppError> {
+    let db = &state.db_pool;
+    let mut tx = db.begin().await?;
+    let banners = list_user_banners(&mut tx, user_id).await?;
+    tx.commit().await?;
+
+    let banners_with_urls: Vec<_> = banners
+        .into_iter()
+        .map(|banner| {
+            let image_prefix = &banner.image_filename[..2];
+            let image_url = format!(
+                "{}/image/{}/{}",
+                state.config.r2_public_endpoint_url, image_prefix, banner.image_filename
+            );
+            (banner, image_url)
+        })
+        .collect();
+
+    Ok(state
+        .env
+        .get_template("banner_grid.jinja")?
+        .render(context! {
+            banners => banners_with_urls,
+            ftl_lang,
+        })?)
+}
+
 pub async fn do_activate_banner(
     auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(banner_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -1481,12 +1518,16 @@ pub async fn do_activate_banner(
 
     tx.commit().await?;
 
-    Ok(StatusCode::OK.into_response())
+    // Two cards changed, not one: this banner gained the active badge and
+    // whichever held it lost it. The grid is the smallest honest unit.
+    let grid = render_banner_grid(&state, user.id, &ftl_lang).await?;
+    Ok(Html(grid).into_response())
 }
 
 /// HTML endpoint to delete a banner
 pub async fn do_delete_banner(
     auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(banner_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -1575,5 +1616,6 @@ pub async fn do_delete_banner(
 
     tx.commit().await?;
 
-    Ok(StatusCode::OK.into_response())
+    let grid = render_banner_grid(&state, user.id, &ftl_lang).await?;
+    Ok(Html(grid).into_response())
 }

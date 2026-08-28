@@ -1,0 +1,14 @@
+{# The header's notifications link and its unread count.
+
+   Its own template with its own id because every notification action changes
+   the number in it: marking one read, marking all read, deleting an unread
+   one. Those handlers answer with an `<hx-partial>` pointed here, so the count
+   is corrected by the same request that caused it to change. Before this it
+   was only ever right on a fresh page load, and sat there overstating the
+   unread count for the rest of the visit. #}
+<span id="nav-notifications">
+  <a href="/notifications">
+    {{- ftl_get_message("notifications") -}}
+    {%- if unread_notification_count is defined and unread_notification_count > 0 %} ({{ unread_notification_count }}){% endif -%}
+  </a>
+</span>

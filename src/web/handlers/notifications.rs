@@ -136,6 +136,29 @@ pub async fn list_notifications(
     Ok(Html(rendered).into_response())
 }
 
+/// Render the header's notification link, wrapped as an `<hx-partial>`.
+///
+/// Every action on this page changes the unread count, and the count lives in
+/// the site header, outside whatever the action targeted. htmx 4's
+/// `<hx-partial>` carries its own target, so a handler can hand back the row
+/// it was asked for *and* the corrected badge in one response, and the number
+/// stops drifting from the list it counts.
+async fn nav_notification_badge(state: &AppState, user_id: Uuid, ftl_lang: &str) -> Result<String, AppError> {
+    let db = &state.db_pool;
+    let mut tx = db.begin().await?;
+    let unread = get_unread_count(&mut tx, user_id).await?;
+    tx.commit().await?;
+
+    let template = state.env.get_template("nav_notifications.jinja")?;
+    let rendered = template.render(context! {
+        unread_notification_count => unread,
+        ftl_lang,
+    })?;
+    Ok(format!(
+        "<hx-partial hx-target=\"#nav-notifications\" hx-swap=\"outerHTML\">{rendered}</hx-partial>"
+    ))
+}
+
 /// Mark a specific notification as read
 pub async fn mark_notification_read(
     auth_session: AuthSession,
@@ -172,7 +195,8 @@ pub async fn mark_notification_read(
             ftl_lang,
         })?;
 
-        Ok(Html(rendered).into_response())
+        let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
+        Ok(Html(format!("{rendered}{badge}")).into_response())
     } else {
         Ok((StatusCode::NOT_FOUND, Html("".to_string())).into_response())
     }
@@ -201,6 +225,66 @@ pub async fn mark_all_notifications_read(
     }))
 }
 
+/// POST /notifications/mark-all-read — the button on the notifications page.
+///
+/// The JSON twin above still serves `/api/v1/...` for the phone. This one
+/// answers in three pieces: the re-rendered list as the main swap, and
+/// partials for the badge in the header and for the button itself, which has
+/// to disappear now that nothing is unread. It replaces a `hx-swap="none"`
+/// that called `window.location.reload()` — a full document fetch, all its
+/// queries included, to change a number and hide a button.
+pub async fn hx_mark_all_notifications_read(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+) -> Result<impl IntoResponse, AppError> {
+    let db = &state.db_pool;
+    let mut tx = db.begin().await?;
+
+    let user = auth_session
+        .user
+        .as_ref()
+        .ok_or(AppError::Unauthorized)?
+        .clone();
+
+    mark_all_notifications_as_read(&mut tx, user.id).await?;
+
+    // Re-read the first batch inside the same work: every row's "mark read"
+    // button has to go, and the rows are what the button targets.
+    let notifications = fetch_notifications(&mut tx, user.id, NOTIFICATIONS_PER_BATCH, 0).await?;
+    let has_more = notifications.len() as i64 == NOTIFICATIONS_PER_BATCH;
+
+    tx.commit().await?;
+
+    let rows = state
+        .env
+        .get_template("notifications_fragment.jinja")?
+        .render(context! {
+            notifications => notifications,
+            has_more => has_more,
+            next_url => notifications_fragment_url(NOTIFICATIONS_PER_BATCH),
+            ftl_lang,
+        })?;
+
+    // Zero unread, so this renders the header without its button.
+    let header = state
+        .env
+        .get_template("notifications_header.jinja")?
+        .render(context! {
+            unread_notification_count => 0,
+            ftl_lang,
+        })?;
+
+    let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
+
+    Ok(Html(format!(
+        "{rows}\
+         <hx-partial hx-target=\"#notifications-header\" hx-swap=\"outerHTML\">{header}</hx-partial>\
+         {badge}"
+    ))
+    .into_response())
+}
+
 /// Get the unread notification count for the current user
 pub async fn get_unread_notification_count(
     auth_session: AuthSession,
@@ -226,6 +310,7 @@ pub async fn get_unread_notification_count(
 pub async fn delete_notification_handler(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Path(notification_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = &state.db_pool;
@@ -242,8 +327,10 @@ pub async fn delete_notification_handler(
     tx.commit().await?;
 
     if success {
-        // Return empty response to remove the notification from DOM
-        Ok(Html("".to_string()).into_response())
+        // Empty main content removes the row; the partial alongside it fixes
+        // the badge, which was counting a notification that no longer exists.
+        let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
+        Ok(Html(badge).into_response())
     } else {
         Ok((StatusCode::NOT_FOUND, Html("".to_string())).into_response())
     }

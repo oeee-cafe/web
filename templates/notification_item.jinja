@@ -128,11 +128,16 @@
           {{ ftl_get_message("notification-mark-read") }}
         </button>
       {% endif %}
+      {# swapEmpty:true because the response is now nothing but an
+         <hx-partial> carrying the corrected badge. htmx skips the main swap
+         when a response is only partials, which would leave the row it was
+         asked to delete sitting on the page. Verified in a browser: without
+         this the badge updates and the row stays. #}
       <button class="notification-delete"
               title="{{ ftl_get_message('notification-delete') }}"
               hx-delete="/notifications/{{ notification.id }}"
               hx-target="closest .notification"
-              hx-swap="outerHTML"
+              hx-swap="outerHTML swapEmpty:true"
               hx-confirm="{{ ftl_get_message('notification-delete-confirm') }}"
               hx-disable="this">
         {{ ftl_get_message("notification-delete") }}

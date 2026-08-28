@@ -58,7 +58,8 @@ use crate::web::handlers::home::{
 use crate::web::handlers::notifications::{
     api_delete_notification, api_list_notifications, api_mark_notification_read,
     delete_notification_handler, get_unread_notification_count, list_notifications,
-    mark_all_notifications_read, mark_notification_read, notifications_fragment,
+    hx_mark_all_notifications_read, mark_all_notifications_read, mark_notification_read,
+    notifications_fragment,
 };
 use crate::web::handlers::password_reset::{
     password_reset_request, password_reset_request_page, password_reset_verify,
@@ -199,7 +200,7 @@ impl App {
             )
             .route(
                 "/notifications/mark-all-read",
-                post(mark_all_notifications_read),
+                post(hx_mark_all_notifications_read),
             )
             .route(
                 "/notifications/:notification_id/mark-read",

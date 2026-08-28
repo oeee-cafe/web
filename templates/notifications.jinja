@@ -4,18 +4,7 @@
 {% endblock title %}
 {% block content %}
   <div class="center">
-    <div class="notifications-header">
-      <h2 class="notifications-title">{{ ftl_get_message("notifications") }}</h2>
-      {% if unread_notification_count > 0 %}
-        <button class="notification-mark-all-button"
-                hx-post="/notifications/mark-all-read"
-                hx-swap="none"
-                hx-on::after:request="window.location.reload()"
-                hx-disable="this">
-          {{ ftl_get_message("notification-mark-all-read") }}
-        </button>
-      {% endif %}
-    </div>
+    {% include "notifications_header.jinja" %}
 
     {# Invitations use the notification row's proportions — one line, time and
        controls on the right — so the two lists scan as one page rather than as
@@ -59,7 +48,7 @@
     {# Rows live in notifications_fragment.jinja so the first batch and every
        scrolled batch share one definition. #}
     {% if notifications %}
-      <div class="notification-list">
+      <div class="notification-list" id="notification-list">
         {% include "notifications_fragment.jinja" %}
       </div>
     {% elif not invitations %}

@@ -1,0 +1,47 @@
+{# The whole grid of a user's banners.
+
+   Its own template because activating one banner changes two cards — the new
+   one gains the active badge and loses its buttons, the old one does the
+   reverse — so no single card is a big enough unit to swap. Both
+   `do_activate_banner` and `do_delete_banner` render this and hand it back,
+   which is what replaced the `hx-swap="none"` plus `window.location.reload()`
+   the buttons used to carry.
+
+   Swapped with `outerMorph`: every card holds an <img> pulled from R2, and
+   replacing the grid outright discarded and refetched all of them for a change
+   that usually moves one badge. #}
+<div class="banner-grid" id="banner-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+    {% for banner_tuple in banners %}
+        {% set banner = banner_tuple[0] %}
+        {% set image_url = banner_tuple[1] %}
+        <div class="banner-item" style="border: 1px solid #ccc; padding: 0.5rem; border-radius: 4px; {% if banner.is_active %}background-color: #e8f5e9;{% endif %}">
+            <img src="{{ image_url }}" alt="Banner" style="width: 100%; height: auto; display: block;">
+            <div style="margin-top: 0.5rem;">
+                <div style="font-size: 0.875rem; color: var(--main-text-muted-color);">
+                    {{ ftl_get_message("banner-management-created") }}: {{ banner.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}
+                </div>
+                {% if banner.is_active %}
+                    <div style="font-weight: bold; color: #2e7d32; margin-top: 0.25rem;">
+                        {{ ftl_get_message("banner-management-active-badge") }}
+                    </div>
+                {% else %}
+<button hx-post="/banners/{{ banner.id }}/activate"
+                            hx-target="#banner-grid"
+                            hx-swap="outerMorph"
+                            style="margin-top: 0.5rem; width: 100%;"
+                            hx-disable="this">
+                        {{ ftl_get_message("banner-management-set-active") }}
+                    </button>
+                    <button hx-delete="/banners/{{ banner.id }}"
+                            hx-confirm="{{ ftl_get_message("banner-management-delete-confirm") }}"
+                            hx-target="#banner-grid"
+                            hx-swap="outerMorph"
+                            style="margin-top: 0.25rem; width: 100%; background-color: #d32f2f; color: white;"
+                            hx-disable="this">
+                        {{ ftl_get_message("banner-management-delete") }}
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+</div>

@@ -1,0 +1,18 @@
+{# The page title and the "mark all read" button, which exists only while
+   something is unread.
+
+   Split out so `mark_all_notifications_read` can send it back as an
+   `<hx-partial>` — the button has to remove itself, and it cannot do that from
+   inside a swap it is not the target of. #}
+<div class="notifications-header" id="notifications-header">
+  <h2 class="notifications-title">{{ ftl_get_message("notifications") }}</h2>
+  {% if unread_notification_count > 0 %}
+    <button class="notification-mark-all-button"
+            hx-post="/notifications/mark-all-read"
+            hx-target="#notification-list"
+            hx-swap="innerHTML"
+            hx-disable="this">
+      {{ ftl_get_message("notification-mark-all-read") }}
+    </button>
+  {% endif %}
+</div>
