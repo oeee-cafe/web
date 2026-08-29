@@ -1,3 +1,19 @@
+-- NOTE: this file no longer matches what ran against production.
+--
+-- As shipped, steps 2 and 3 normalised names with `[^[:alnum:]_]` and deleted
+-- any row the expression emptied. PostgreSQL hands a POSIX class to the host's
+-- C library, and on the Mac mini that serves this site `iswalnum()` answers
+-- false for Hangul, kana and Han -- so every Korean, Japanese and Chinese tag
+-- normalised to the empty string and was deleted along with its links, while
+-- `페르소나3` and `페르소나5`, which also held an ASCII digit, survived as tags
+-- named `3` and `5`. 23 tags and 44 links were destroyed on 2026-08-29 and
+-- restored from that morning's 03:17 R2 backup.
+--
+-- The expression is corrected and the deletes are gone so that this cannot
+-- happen again if the file is ever run against real data. The recorded checksum
+-- in `_sqlx_migrations` was updated to match, or `sqlx::migrate!()` would refuse
+-- to boot. See the POSIX-class warning in CLAUDE.md.
+
 -- Hashtags: normalise the names, merge the rows that then collide, and stop
 -- storing a post count that nothing could keep true.
 --
@@ -13,32 +29,36 @@
 -- collapse to 0, which keeps them exactly as (un)ordered as they are now.
 ALTER TABLE post_hashtags ADD COLUMN position smallint NOT NULL DEFAULT 0;
 
--- 2. Normalise names to what parse_hashtag_input in src/models/hashtag.rs now
--- produces: `-` to `_`, drop everything that is not a letter, digit or `_`
--- (this is where a leading `#` goes), lowercase, cap at 60 characters.
--- `[[:alnum:]]` follows the database's ctype, so CJK and Hangul survive it the
--- same way Rust's char::is_alphanumeric does.
+-- 2. Normalise names to what parse_hashtag_input in src/models/hashtag.rs
+-- produces: `-` to `_`, drop the ASCII punctuation that is not `_` (this is
+-- where a leading `#` goes), lowercase, cap at 60 characters.
+--
+-- The class is written out rather than using `[[:alnum:]]`, which is what the
+-- version of this migration that actually ran used. PostgreSQL delegates a
+-- POSIX class to the host's C library, and on the Mac mini that serves this
+-- site `iswalnum()` is false for Hangul, kana and Han -- see the header. Keep
+-- every character above U+007F instead of asking the C library about it: a
+-- backfill that over-keeps leaves a tag ugly, and one that over-strips deletes
+-- it.
 CREATE TEMPORARY TABLE hashtag_renames AS
 SELECT
     id,
     left(
-        regexp_replace(replace(display_name, '-', '_'), '[^[:alnum:]_]', '', 'g'),
+        regexp_replace(replace(display_name, '-', '_'), '[^A-Za-z0-9_\u0080-\uFFFF]', '', 'g'),
         60
     ) AS new_display_name,
     lower(left(
-        regexp_replace(replace(name, '-', '_'), '[^[:alnum:]_]', '', 'g'),
+        regexp_replace(replace(name, '-', '_'), '[^A-Za-z0-9_\u0080-\uFFFF]', '', 'g'),
         60
     )) AS new_name
 FROM hashtags;
 
--- 3. A tag whose name was entirely punctuation or emoji has nothing left to be
--- called. Its links go; the posts themselves are untouched.
-DELETE FROM post_hashtags ph
-USING hashtag_renames r
-WHERE ph.hashtag_id = r.id AND r.new_name = '';
-DELETE FROM hashtags h
-USING hashtag_renames r
-WHERE h.id = r.id AND r.new_name = '';
+-- 3. A tag left with no name at all -- one written entirely in ASCII
+-- punctuation -- is dropped from the rename set and otherwise left exactly as
+-- it is. The version of this that ran deleted those rows and their links, which
+-- is how a wrong expression in step 2 turned into data loss rather than into
+-- some badly named tags. Nothing here deletes a tag any more: an unreachable
+-- tag is a blemish, a deleted one is somebody's work.
 DELETE FROM hashtag_renames WHERE new_name = '';
 
 -- 4. Merge. Of every group that normalises to the same name the oldest row
