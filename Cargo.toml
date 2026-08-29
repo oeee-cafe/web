@@ -3,6 +3,10 @@ name = "oeee-cafe"
 version = "0.1.0"
 edition = "2021"
 publish = false
+# Named explicitly rather than left to auto-detection: if build.rs ever goes
+# missing, cargo would quietly build without it and new migrations would stop
+# being embedded again. This turns that into a build failure.
+build = "build.rs"
 default-run = "oeee-cafe"
 
 [[bin]]

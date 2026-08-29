@@ -12,7 +12,9 @@ RUN case "$(uname -m)" in \
     tar -xz --strip-components=1 -C /usr/local/bin/
 
 # Copy source files
-COPY Cargo.toml Cargo.lock ./
+# build.rs is what makes a migrations-only change rebuild the binary; without it
+# here, cargo finds no build script and silently skips the dependency tracking.
+COPY Cargo.toml Cargo.lock build.rs ./
 COPY locales/ ./locales/
 COPY migrations/ ./migrations/
 COPY src/ ./src/
