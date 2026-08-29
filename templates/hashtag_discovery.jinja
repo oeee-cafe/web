@@ -25,6 +25,11 @@
                hx-include="[name='sort']"
                hx-indicator="#hashtag-search-indicator" />
         <button type="submit">{{ ftl_get_message("search") }}</button>
+        {# Inside the form, not beside it: submitting without scripting sends
+           whatever is in the form, and while this sat in the sort controls
+           below, pressing Enter dropped the chosen order and went back to
+           trending. hx-include reaches it either way. #}
+        <input type="hidden" name="sort" value="{{ sort_by }}" />
         <span id="hashtag-search-indicator"
               class="htmx-indicator search-indicator"
               role="status">{{ ftl_get_message("searching") }}</span>
@@ -32,21 +37,26 @@
 
       {# Shown during a search too, now that searching no longer reloads the
          page: hiding them on the first keystroke would leave no way back to
-         browsing without clearing the box by hand. `sort` rides along on the
-         search request via hx-include. #}
+         browsing without clearing the box by hand. Each link keeps the search
+         it was clicked from, so reordering results does not silently throw the
+         query away. #}
+      {% set search_suffix = "&q=" ~ (search_query|urlencode) if search_query else "" %}
       <div class="hashtag-sort-controls">
-        <input type="hidden" name="sort" value="{{ sort_by }}" />
         <span>{{ ftl_get_message("sort-by") }}:</span>
-        <a href="/hashtags?sort=trending" class="{% if sort_by == 'trending' %}active{% endif %}">
+        <a href="/hashtags?sort=trending{{ search_suffix }}"
+           class="{% if sort_by == 'trending' %}active{% endif %}">
           {{ ftl_get_message("sort-trending") }}
         </a>
-        <a href="/hashtags?sort=popular" class="{% if sort_by == 'popular' %}active{% endif %}">
+        <a href="/hashtags?sort=popular{{ search_suffix }}"
+           class="{% if sort_by == 'popular' %}active{% endif %}">
           {{ ftl_get_message("sort-popular") }}
         </a>
-        <a href="/hashtags?sort=recent" class="{% if sort_by == 'recent' %}active{% endif %}">
+        <a href="/hashtags?sort=recent{{ search_suffix }}"
+           class="{% if sort_by == 'recent' %}active{% endif %}">
           {{ ftl_get_message("sort-recent") }}
         </a>
-        <a href="/hashtags?sort=alphabetical" class="{% if sort_by == 'alphabetical' %}active{% endif %}">
+        <a href="/hashtags?sort=alphabetical{{ search_suffix }}"
+           class="{% if sort_by == 'alphabetical' %}active{% endif %}">
           {{ ftl_get_message("sort-alphabetical") }}
         </a>
       </div>

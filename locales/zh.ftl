@@ -188,7 +188,7 @@ draft-posts-count = 个草稿
 draft-empty = 您还没有草稿
 
 # Hashtags
-hashtag-post-count = 篇作品
+hashtag-post-count = { $count } 篇作品
 hashtag-no-posts = 暂无使用此标签的作品
 hashtag-discovery = 标签
 hashtag-search-placeholder = 搜索标签...

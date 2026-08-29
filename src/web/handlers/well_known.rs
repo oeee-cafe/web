@@ -1,5 +1,7 @@
 use crate::app_error::AppError;
-use crate::models::sitemap::{sitemap_communities, sitemap_posts, sitemap_profiles, SitemapEntry};
+use crate::models::sitemap::{
+    sitemap_communities, sitemap_hashtags, sitemap_posts, sitemap_profiles, SitemapEntry,
+};
 use crate::web::state::AppState;
 use axum::extract::State;
 use axum::{
@@ -16,6 +18,7 @@ use serde_json::json;
 const SITEMAP_POST_LIMIT: i64 = 20_000;
 const SITEMAP_PROFILE_LIMIT: i64 = 10_000;
 const SITEMAP_COMMUNITY_LIMIT: i64 = 5_000;
+const SITEMAP_HASHTAG_LIMIT: i64 = 5_000;
 
 /// Handler for Apple App Site Association (Universal Links)
 /// This endpoint is used by iOS to verify the app's association with the domain
@@ -91,11 +94,15 @@ pub async fn sitemap_xml(State(state): State<AppState>) -> Result<impl IntoRespo
     let posts = sitemap_posts(&mut tx, SITEMAP_POST_LIMIT).await?;
     let profiles = sitemap_profiles(&mut tx, SITEMAP_PROFILE_LIMIT).await?;
     let communities = sitemap_communities(&mut tx, SITEMAP_COMMUNITY_LIMIT).await?;
+    // The directory at /hashtags was listed but not one tag page, so nothing a
+    // tag collects was reachable by a crawler that had not already found the
+    // drawings individually.
+    let hashtags = sitemap_hashtags(&mut tx, SITEMAP_HASHTAG_LIMIT).await?;
     tx.commit().await?;
 
     let mut xml = String::with_capacity(
         // Roughly 150 bytes per entry, plus the static pages and the envelope.
-        (posts.len() + profiles.len() + communities.len() + 8) * 150,
+        (posts.len() + profiles.len() + communities.len() + hashtags.len() + 8) * 150,
     );
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
     xml.push('\n');
@@ -114,7 +121,12 @@ pub async fn sitemap_xml(State(state): State<AppState>) -> Result<impl IntoRespo
         xml.push_str(&format!("  <url><loc>{}{}</loc></url>\n", base_url, path));
     }
 
-    for entry in posts.iter().chain(&profiles).chain(&communities) {
+    for entry in posts
+        .iter()
+        .chain(&profiles)
+        .chain(&communities)
+        .chain(&hashtags)
+    {
         push_url(&mut xml, &base_url, entry);
     }
 

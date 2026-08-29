@@ -8,9 +8,7 @@ use crate::models::community::{
     find_community_by_id, get_known_communities, get_user_role_in_community, is_user_member,
 };
 use crate::models::follow;
-use crate::models::hashtag::{
-    get_hashtags_for_post, link_post_to_hashtags, parse_hashtag_input, unlink_post_hashtags,
-};
+use crate::models::hashtag::{get_hashtags_for_post, set_post_hashtags};
 use crate::models::image::find_image_by_id;
 use crate::models::notification::{
     create_notification, get_notification_by_id, get_unread_count, send_push_for_notification,
@@ -30,7 +28,10 @@ use crate::web::handlers::activitypub::{
     create_note_from_post, create_updated_note_from_post, generate_object_id, Announce, Create,
     Note, UpdateNote,
 };
-use crate::web::handlers::{get_bundle, handler_404, parse_id_with_legacy_support, safe_get_message, ExtractFtlLang, ParsedId};
+use crate::web::handlers::{
+    get_bundle, handler_404, parse_id_with_legacy_support, safe_get_message, ExtractFtlLang,
+    ParsedId,
+};
 use crate::web::state::AppState;
 use activitypub_federation::fetch::object_id::ObjectId;
 use activitypub_federation::traits::Actor as ActivityPubActor;
@@ -558,7 +559,13 @@ pub async fn post_view(
                                 get_user_role_in_community(&mut tx, user.id, community.id).await?;
                             if user_role.is_none() {
                                 // User is not a member of this private community
-                                return Ok(flash_error_and_redirect(&headers, user.preferred_language.clone(), messages, "private-community-no-access", "/"));
+                                return Ok(flash_error_and_redirect(
+                                    &headers,
+                                    user.preferred_language.clone(),
+                                    messages,
+                                    "private-community-no-access",
+                                    "/",
+                                ));
                             }
                         }
                         None => {
@@ -923,7 +930,8 @@ pub async fn post_replay_view(
                                 .unwrap_or_else(|| axum::http::HeaderValue::from_static(""));
                             let user_preferred_language = user.preferred_language.clone();
                             let bundle = get_bundle(&accept_language, user_preferred_language);
-                            let error_message = safe_get_message(&bundle, "private-community-no-access");
+                            let error_message =
+                                safe_get_message(&bundle, "private-community-no-access");
                             messages.error(error_message);
                             return Ok(Redirect::to("/").into_response());
                         }
@@ -1207,13 +1215,10 @@ pub async fn post_publish(
     )
     .await;
 
-    // Handle hashtags if provided
-    if let Some(hashtags_input) = &form.hashtags {
-        if !hashtags_input.trim().is_empty() {
-            let hashtag_names = parse_hashtag_input(hashtags_input);
-            let _ = link_post_to_hashtags(&mut tx, post_id, &hashtag_names).await;
-        }
-    }
+    // Not `let _ =`: a tag that fails to store aborts the transaction this
+    // publish is running in, so swallowing the error only moved the failure to
+    // whichever query ran next and made it unattributable.
+    set_post_hashtags(&mut tx, post_id, form.hashtags.as_deref()).await?;
 
     // Find the actor for this user to send ActivityPub activities
     let actor = Actor::find_by_user_id(&mut tx, user_id).await?;
@@ -1848,7 +1853,9 @@ pub async fn post_edit_community(
         .and_then(|id_str| Uuid::parse_str(id_str).ok());
 
     // Get current community details with owner info (if post is in a community)
-    let (current_community_result, current_community_recent_posts) = if let Some(comm_id) = current_community_id {
+    let (current_community_result, current_community_recent_posts) = if let Some(comm_id) =
+        current_community_id
+    {
         let community_result = sqlx::query!(
             r#"
             SELECT
@@ -1946,7 +1953,9 @@ pub async fn post_edit_community(
         }
     }
     for c in &public_communities {
-        if current_community_id.map_or(true, |curr_id| c.id != curr_id) && !known_ids.contains(&c.id) {
+        if current_community_id.map_or(true, |curr_id| c.id != curr_id)
+            && !known_ids.contains(&c.id)
+        {
             all_community_ids.push(c.id);
         }
     }
@@ -2020,7 +2029,10 @@ pub async fn post_edit_community(
             continue;
         }
         // Filter out private communities - moving to private communities is restricted
-        if matches!(c.visibility, crate::models::community::CommunityVisibility::Private) {
+        if matches!(
+            c.visibility,
+            crate::models::community::CommunityVisibility::Private
+        ) {
             continue;
         }
 
@@ -2070,12 +2082,14 @@ pub async fn post_edit_community(
     }
 
     // Separate by visibility type and participation
-    let mut unlisted_communities: Vec<_> = all_communities.iter()
+    let mut unlisted_communities: Vec<_> = all_communities
+        .iter()
         .filter(|c| c.get("visibility").and_then(|v| v.as_str()) == Some("unlisted"))
         .cloned()
         .collect();
 
-    let mut public_participated_communities: Vec<_> = all_communities.iter()
+    let mut public_participated_communities: Vec<_> = all_communities
+        .iter()
         .filter(|c| {
             c.get("visibility").and_then(|v| v.as_str()) == Some("public")
                 && c.get("has_participated").and_then(|v| v.as_bool()) == Some(true)
@@ -2083,7 +2097,8 @@ pub async fn post_edit_community(
         .cloned()
         .collect();
 
-    let mut public_other_communities: Vec<_> = all_communities.iter()
+    let mut public_other_communities: Vec<_> = all_communities
+        .iter()
         .filter(|c| {
             c.get("visibility").and_then(|v| v.as_str()) == Some("public")
                 && c.get("has_participated").and_then(|v| v.as_bool()) == Some(false)
@@ -2299,14 +2314,7 @@ pub async fn hx_do_edit_post(
     )
     .await;
 
-    // Handle hashtags: first unlink existing ones, then link new ones
-    let _ = unlink_post_hashtags(&mut tx, post_uuid).await;
-    if let Some(hashtags_input) = &form.hashtags {
-        if !hashtags_input.trim().is_empty() {
-            let hashtag_names = parse_hashtag_input(hashtags_input);
-            let _ = link_post_to_hashtags(&mut tx, post_uuid, &hashtag_names).await;
-        }
-    }
+    set_post_hashtags(&mut tx, post_uuid, form.hashtags.as_deref()).await?;
 
     let post = find_post_by_id(&mut tx, post_uuid).await?;
 
@@ -2512,9 +2520,9 @@ pub async fn hx_delete_post(
             )
         };
 
-    // Unlink hashtags before deleting post to properly decrement post_count
-    let _ = unlink_post_hashtags(&mut tx, post_uuid).await;
-
+    // The tags stay on the post. Deletion here is soft, and a tag counts and
+    // lists only undeleted posts, so there is nothing to decrement and a post
+    // that comes back comes back tagged.
     delete_post_with_activity(&mut tx, post_uuid, Some(&state)).await?;
     tx.commit().await?;
 
@@ -2565,10 +2573,11 @@ pub async fn post_view_by_login_name(
             // to: `post_page_path` is where that is decided, and every other
             // handle redirects here.
             if &login_name != post_login_name {
-                return Ok(
-                    Redirect::to(&crate::models::post::post_page_path(post_login_name, uuid))
-                        .into_response(),
-                );
+                return Ok(Redirect::to(&crate::models::post::post_page_path(
+                    post_login_name,
+                    uuid,
+                ))
+                .into_response());
             }
             if let Some(community) = community {
                 // If community is private, check if user is a member
@@ -2579,7 +2588,13 @@ pub async fn post_view_by_login_name(
                                 get_user_role_in_community(&mut tx, user.id, community.id).await?;
                             if user_role.is_none() {
                                 // User is not a member of this private community
-                                return Ok(flash_error_and_redirect(&headers, user.preferred_language.clone(), messages, "private-community-no-access", "/"));
+                                return Ok(flash_error_and_redirect(
+                                    &headers,
+                                    user.preferred_language.clone(),
+                                    messages,
+                                    "private-community-no-access",
+                                    "/",
+                                ));
                             }
                         }
                         None => {
@@ -3051,12 +3066,21 @@ pub async fn post_replay_view_by_login_name(
                                 get_user_role_in_community(&mut tx, user.id, comm.id).await?;
                             if user_role.is_none() {
                                 // User is not a member of this private community
-                                return Ok(flash_error_and_redirect(&headers, user.preferred_language.clone(), messages, "private-community-no-access", "/"));
+                                return Ok(flash_error_and_redirect(
+                                    &headers,
+                                    user.preferred_language.clone(),
+                                    messages,
+                                    "private-community-no-access",
+                                    "/",
+                                ));
                             }
                         }
                         None => {
                             // Not logged in, cannot access private community - redirect to login
-                            return Ok(redirect_to_login(&format!("/@{}/{}/replay", login_name, post_id)));
+                            return Ok(redirect_to_login(&format!(
+                                "/@{}/{}/replay",
+                                login_name, post_id
+                            )));
                         }
                     }
                 }
@@ -3607,7 +3631,7 @@ pub async fn get_movable_communities_api(
     Path(post_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     use crate::models::post::{get_movable_communities, is_post_movable};
-    use crate::web::responses::post::{MovableCommunity, MovableCommunitiesResponse};
+    use crate::web::responses::post::{MovableCommunitiesResponse, MovableCommunity};
 
     let user = auth_session.user.ok_or(AppError::Unauthorized)?;
     let db = &state.db_pool;

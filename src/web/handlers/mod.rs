@@ -1351,6 +1351,107 @@ mod template_tests {
     }
 
     #[test]
+    fn the_hashtag_page_draws_the_shared_post_cards() {
+        // This page used to write its own <img> tags. That is how sensitive
+        // drawings came to be blurred everywhere except here, and how it came
+        // to load every thumbnail eagerly with no way to reach the next batch.
+        let env = test_support::env();
+        let rendered = env
+            .get_template("hashtag_view.jinja")
+            .unwrap_or_else(|e| panic!("hashtag_view.jinja loads: {e:#}"))
+            .render(context! {
+                hashtag => json!({
+                    "name": "oekaki",
+                    "display_name": "Oekaki",
+                    "post_count": 2,
+                }),
+                post_count => 2,
+                feed => json!({
+                    "posts": [{
+                        "id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                        "title": "Tandemaus",
+                        "user_login_name": "someone",
+                        "image_filename": "abcdef.png",
+                        "image_width": 300,
+                        "image_height": 300,
+                        "is_sensitive": true,
+                        "community_slug": null,
+                        "community_name": null,
+                        "published_at": "2026-08-01T00:00:00Z",
+                    }],
+                    "has_more": true,
+                    "next_url": "/hashtags/oekaki/posts?offset=60&limit=60",
+                }),
+                ..chrome()
+            })
+            .unwrap_or_else(|e| panic!("hashtag_view.jinja renders: {e:#}"));
+
+        assert!(
+            rendered.contains(r#"class="sensitive""#),
+            "a sensitive drawing has to be blurred here too"
+        );
+        assert!(rendered.contains(r#"loading="lazy""#));
+        // The autoescaper writes `/` as `&#x2f;` in attributes.
+        let links_in = rendered.replace("&#x2f;", "/").replace("&amp;", "&");
+        assert!(
+            links_in.contains("/hashtags/oekaki/posts?offset=60"),
+            "the page needs the sentinel that loads the next batch"
+        );
+        // The count is passed separately from the tag now, because it is
+        // counted over what this viewer can actually see.
+        assert!(rendered.contains("hashtag-post-count(count=2)"));
+    }
+
+    #[test]
+    fn the_hashtag_page_names_the_tag_in_its_link_preview() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("hashtag_view.jinja")
+            .unwrap_or_else(|e| panic!("hashtag_view.jinja loads: {e:#}"))
+            .render(context! {
+                // A tag in a non-Latin script has to survive being put in a URL.
+                hashtag => json!({ "name": "그림", "display_name": "그림", "post_count": 0 }),
+                post_count => 0,
+                feed => json!({ "posts": [], "has_more": false, "next_url": "" }),
+                ..chrome()
+            })
+            .unwrap_or_else(|e| panic!("hashtag_view.jinja renders empty: {e:#}"));
+
+        assert!(
+            rendered.contains(
+                r#"content="https://oeee.test/hashtags/%EA%B7%B8%EB%A6%BC""#
+            ),
+            "og:url should be the escaped canonical name, got: {}",
+            &rendered[..rendered.find("</head>").unwrap_or(400)]
+        );
+        assert!(rendered.contains("hashtag-no-posts"));
+    }
+
+    #[test]
+    fn the_hashtag_suggestions_are_options_a_keyboard_can_reach() {
+        // The menu used to be plain <li>s that only answered a click, inside a
+        // container announcing itself as a listbox.
+        let env = test_support::env();
+        let rendered = env
+            .get_template("hashtag_autocomplete.jinja")
+            .unwrap_or_else(|e| panic!("hashtag_autocomplete.jinja loads: {e:#}"))
+            .render(context! {
+                hashtags => vec![json!({
+                    "name": "oekaki",
+                    "display_name": "Oekaki",
+                    "post_count": 12,
+                })],
+                ftl_lang => "en",
+            })
+            .unwrap_or_else(|e| panic!("hashtag_autocomplete.jinja renders: {e:#}"));
+
+        assert!(rendered.contains(r#"role="option""#));
+        assert!(rendered.contains(r#"id="hashtag-option-0""#));
+        assert!(rendered.contains(r#"aria-selected="false""#));
+        assert!(rendered.contains("hashtag-post-count(count=12)"));
+    }
+
+    #[test]
     fn the_notification_chrome_renders_standalone() {
         // Both are swapped in by handlers as well as included by the page, so
         // they have to stand up with only the keys those handlers pass.
@@ -1365,8 +1466,14 @@ mod template_tests {
         let without = nav
             .render(context! { unread_notification_count => 0, ftl_lang => "en" })
             .expect("nav renders at zero");
-        assert!(with_count.contains("(3)"), "the badge should show the count");
-        assert!(!without.contains('('), "zero unread shows no parenthesised count");
+        assert!(
+            with_count.contains("(3)"),
+            "the badge should show the count"
+        );
+        assert!(
+            !without.contains('('),
+            "zero unread shows no parenthesised count"
+        );
         assert!(
             with_count.contains("id=\"nav-notifications\""),
             "the partial targets this id, so it has to survive its own swap"
@@ -1444,7 +1551,8 @@ mod template_tests {
                 "close",
             ] {
                 assert!(
-                    text.lines().any(|line| line.starts_with(&format!("{key} = "))),
+                    text.lines()
+                        .any(|line| line.starts_with(&format!("{key} = "))),
                     "{locale}.ftl has no {key}, so that modal would show its own key name"
                 );
             }

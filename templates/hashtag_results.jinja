@@ -14,9 +14,9 @@
   <div class="hashtag-discovery-grid">
     {% for hashtag in hashtags %}
       <div class="hashtag-discovery-item">
-        <a href="/hashtags/{{ hashtag.name }}">
+        <a href="/hashtags/{{ hashtag.name|urlencode }}">
           <span class="hashtag-name">#{{ hashtag.display_name }}</span>
-          <span class="hashtag-count">{{ hashtag.post_count }} {{ ftl_get_message("hashtag-post-count") }}</span>
+          <span class="hashtag-count">{{ ftl_format_pattern("hashtag-post-count", {"count": hashtag.post_count}) }}</span>
         </a>
       </div>
     {% endfor %}

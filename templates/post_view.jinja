@@ -170,7 +170,7 @@
                 {% if hashtags %}
                   <div class="post-hashtags">
                     {% for hashtag in hashtags %}
-                      <a href="/hashtags/{{ hashtag.name }}" class="hashtag-link">#{{ hashtag.display_name }}</a>
+                      <a href="/hashtags/{{ hashtag.name|urlencode }}" class="hashtag-link">#{{ hashtag.display_name }}</a>
                     {% endfor %}
                   </div>
                 {% endif %}

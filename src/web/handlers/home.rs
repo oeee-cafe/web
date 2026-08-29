@@ -8,15 +8,15 @@ use crate::models::comment::{
 use crate::models::community::{
     get_communities_members_count, get_public_communities, is_user_member, Community,
 };
-use crate::models::hashtag::{get_hashtags_for_post, link_post_to_hashtags, parse_hashtag_input, unlink_post_hashtags};
+use crate::models::hashtag::{get_hashtags_for_post, set_post_hashtags};
 use crate::models::notification::{
     create_notification, get_notification_by_id, get_unread_count, send_push_for_notification,
     CreateNotificationParams, NotificationType,
 };
 use crate::models::post::{
-    build_thread_tree, delete_post_with_activity, edit_post, find_following_posts_by_user_id, find_post_by_id,
-    find_post_detail_for_json, find_public_posts, find_recent_posts_by_communities,
-    SerializableThreadedPost,
+    build_thread_tree, delete_post_with_activity, edit_post, find_following_posts_by_user_id,
+    find_post_by_id, find_post_detail_for_json, find_public_posts,
+    find_recent_posts_by_communities, SerializableThreadedPost,
 };
 use crate::models::reaction::{
     create_reaction, delete_reaction, find_reactions_by_post_id_and_emoji, find_user_reaction,
@@ -90,9 +90,14 @@ pub async fn home(
         (None, false)
     };
 
-    let posts =
-        find_public_posts(&mut tx, HOME_POSTS_PER_BATCH, 0, viewer_user_id, viewer_show_sensitive)
-            .await?;
+    let posts = find_public_posts(
+        &mut tx,
+        HOME_POSTS_PER_BATCH,
+        0,
+        viewer_user_id,
+        viewer_show_sensitive,
+    )
+    .await?;
     tx.commit().await?;
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("home.jinja")?;
@@ -1059,10 +1064,7 @@ pub async fn delete_post_api(
             .into_response());
     }
 
-    // Unlink hashtags before deleting post to properly decrement post_count
-    let _ = unlink_post_hashtags(&mut tx, post_uuid).await;
-
-    // Delete the post
+    // Tags are left on the post: see the note in models::hashtag::unlink.
     delete_post_with_activity(&mut tx, post_uuid, Some(&state)).await?;
 
     tx.commit().await?;
@@ -1165,14 +1167,10 @@ pub async fn edit_post_api(
     )
     .await?;
 
-    // Handle hashtags: first unlink existing ones, then link new ones
-    let _ = unlink_post_hashtags(&mut tx, post_uuid).await;
-    if let Some(hashtags_input) = &request.hashtags {
-        if !hashtags_input.trim().is_empty() {
-            let hashtag_names = parse_hashtag_input(hashtags_input);
-            let _ = link_post_to_hashtags(&mut tx, post_uuid, &hashtag_names).await;
-        }
-    }
+    // Absent leaves the tags alone, the same reading `allow_replay` above gets:
+    // an edit from a client that predates the field used to unlink every tag
+    // the post had and put none back.
+    set_post_hashtags(&mut tx, post_uuid, request.hashtags.as_deref()).await?;
 
     tx.commit().await?;
 

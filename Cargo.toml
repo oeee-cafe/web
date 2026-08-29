@@ -42,7 +42,9 @@ intl-memoizer = "0.5.1"
 lazy_static = "1.4.0"
 lettre = "0.11.6"
 markdown = "1.0.0"
-minijinja = { version = "2.12.0", features = ["loader"] }
+# `urlencode` is not on by default: templates need it to put a tag name in
+# a URL, and a tag can be 그림.
+minijinja = { version = "2.12.0", features = ["loader", "urlencode"] }
 minijinja-contrib = { version = "2.12.0", features = ["datetime", "timezone"] }
 rand = "0.8.5"
 reqwest = { version = "0.12", features = ["json"] }

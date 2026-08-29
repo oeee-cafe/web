@@ -188,7 +188,7 @@ draft-posts-count = 개의 임시 보관함
 draft-empty = 아직 임시 보관된 그림이 없습니다
 
 # Hashtags
-hashtag-post-count = 개의 게시물
+hashtag-post-count = 게시물 { $count }개
 hashtag-no-posts = 이 해시태그가 달린 게시물이 아직 없습니다
 hashtag-discovery = 해시태그
 hashtag-search-placeholder = 해시태그 검색...

@@ -1,8 +1,19 @@
+{# Suggestions under the tag field, swapped in by htmx as someone types.
+
+   Every item is a real option in the listbox the input owns: this used to be a
+   list of <li>s that only answered a click, inside a container that told a
+   screen reader it was a listbox, so the suggestions were unreachable by
+   keyboard and unannounced. post_form.jinja drives selection from the input. #}
 {% if hashtags %}
-  <ul class="hashtag-autocomplete-list">
+  <ul class="hashtag-autocomplete-list" role="presentation">
     {% for hashtag in hashtags %}
-      <li class="hashtag-autocomplete-item" data-hashtag="{{ hashtag.display_name }}">
-        #{{ hashtag.display_name }} <span class="hashtag-post-count">({{ hashtag.post_count }})</span>
+      <li id="hashtag-option-{{ loop.index0 }}"
+          class="hashtag-autocomplete-item"
+          role="option"
+          aria-selected="false"
+          data-hashtag="{{ hashtag.display_name }}">
+        #{{ hashtag.display_name }}
+        <span class="hashtag-post-count">{{ ftl_format_pattern('hashtag-post-count', {'count': hashtag.post_count}) }}</span>
       </li>
     {% endfor %}
   </ul>

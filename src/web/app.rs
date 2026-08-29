@@ -15,8 +15,8 @@ use crate::web::handlers::admin::{
     admin_banners, admin_banners_fragment, admin_collaborative_sessions, admin_communities,
     admin_community_posts, admin_flag_banner, admin_flag_post, admin_post_detail, admin_posts,
     admin_posts_fragment, admin_user_posts, admin_users, collaborative_archive_manifest,
-    collaborative_session_chat, download_collaborative_archive,
-    download_collaborative_diagnostics, replay_collaborative_session,
+    collaborative_session_chat, download_collaborative_archive, download_collaborative_diagnostics,
+    replay_collaborative_session,
 };
 use crate::web::handlers::auth::{
     api_login, api_logout, api_me, api_signup, do_login, do_logout, do_signup, login, signup,
@@ -37,9 +37,8 @@ use crate::web::handlers::community::{
     get_members, get_public_communities_json, get_user_invitations_json, hx_delete_community,
     hx_do_edit_community, hx_edit_community, invite_user, invite_user_json, leave_community_json,
     load_more_community_posts, members_page, redirect_community_to_unified, remove_member,
-    remove_member_json,
-    retract_invitation, retract_invitation_json, search_public_communities_json,
-    update_community_json,
+    remove_member_json, retract_invitation, retract_invitation_json,
+    search_public_communities_json, update_community_json,
 };
 use crate::web::handlers::devices::{
     delete_device_handler, list_devices_handler, register_device_handler,
@@ -49,7 +48,7 @@ use crate::web::handlers::draw::{
     start_draw_get, start_draw_mobile,
 };
 use crate::web::handlers::hashtag::{
-    hashtag_autocomplete, hashtag_cards, hashtag_discovery, hashtag_view,
+    hashtag_autocomplete, hashtag_cards, hashtag_discovery, hashtag_view, load_more_hashtag_posts,
 };
 use crate::web::handlers::home::{
     add_reaction_api, create_comment_api, delete_comment_api, delete_post_api, edit_post_api,
@@ -59,8 +58,8 @@ use crate::web::handlers::home::{
 };
 use crate::web::handlers::notifications::{
     api_delete_notification, api_list_notifications, api_mark_notification_read,
-    delete_notification_handler, get_unread_notification_count, list_notifications,
-    hx_mark_all_notifications_read, mark_all_notifications_read, mark_notification_read,
+    delete_notification_handler, get_unread_notification_count, hx_mark_all_notifications_read,
+    list_notifications, mark_all_notifications_read, mark_notification_read,
     notifications_fragment,
 };
 use crate::web::handlers::password_reset::{
@@ -121,17 +120,11 @@ use tower_sessions_sqlx_store::PostgresStore;
 /// agrees with itself no matter what happens here.
 fn static_router() -> Router {
     Router::new()
-        .nest_service(
-            "/static/viewer",
-            ServeDir::new("neo-cucumber/dist-viewer"),
-        )
+        .nest_service("/static/viewer", ServeDir::new("neo-cucumber/dist-viewer"))
         // The staff-only session replay viewer. Its assets are public, like
         // every other bundle; what it can read is not, because the endpoints
         // it fetches from are behind the admin extractor.
-        .nest_service(
-            "/static/replay",
-            ServeDir::new("neo-cucumber/dist-replay"),
-        )
+        .nest_service("/static/replay", ServeDir::new("neo-cucumber/dist-replay"))
         // tegaki is MIT, which asks that its notice travel with the copies.
         // Only css/js/lib are mounted and none of those files carry a header,
         // so without this the notice is in the repository but not reachable
@@ -528,6 +521,7 @@ impl App {
             .route("/communities/:id/embed", get(community_iframe))
             .route("/hashtags", get(hashtag_discovery))
             .route("/hashtags/:hashtag_name", get(hashtag_view))
+            .route("/hashtags/:hashtag_name/posts", get(load_more_hashtag_posts))
             .route("/api/hashtags/autocomplete", get(hashtag_autocomplete))
             .route("/api/hashtags/cards", get(hashtag_cards))
             .route("/@:slug", get(profile_or_community))
@@ -577,11 +571,11 @@ impl App {
             // handlers/collaborate/preview.rs.
             .route(
                 "/collaborate/:uuid/preview",
-                get(serve_session_preview).put(upload_session_preview).layer(
-                    DefaultBodyLimit::max(
+                get(serve_session_preview)
+                    .put(upload_session_preview)
+                    .layer(DefaultBodyLimit::max(
                         crate::web::handlers::collaborate::preview::MAX_PREVIEW_BYTES,
-                    ),
-                ),
+                    )),
             )
             .route(
                 "/collaborate/:uuid/preview/claim",
@@ -613,9 +607,7 @@ impl App {
             // Inside the auth layer, so the session is already in the
             // extensions and a failed request can be explained in the
             // language the reader chose rather than the one they asked for.
-            .layer(axum::middleware::from_fn(
-                crate::web::htmx::error_banner,
-            ))
+            .layer(axum::middleware::from_fn(crate::web::htmx::error_banner))
             .layer(MessagesManagerLayer)
             .layer(auth_layer)
             .with_state(self.state.clone())

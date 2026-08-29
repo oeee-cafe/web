@@ -1,28 +1,98 @@
 {% extends "base.jinja" %}
 {% block head %}
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // Handle hashtag autocomplete clicks
-      document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('hashtag-autocomplete-item')) {
-          const input = document.getElementById('hashtags-input');
-          const hashtag = e.target.dataset.hashtag;
-          const currentValue = input.value;
+    // The tag field's suggestion menu. It used to answer a click and nothing
+    // else, inside a container that announced itself as a listbox — so anyone
+    // working from the keyboard, and anyone on a screen reader, had a menu they
+    // could neither reach nor dismiss.
+    document.addEventListener('DOMContentLoaded', function () {
+      var input = document.getElementById('hashtags-input');
+      var menu = document.getElementById('hashtag-suggestions');
+      if (!input || !menu) return;
 
-          // Split by comma or space and get all tags except the last one being typed
-          const tags = currentValue.split(/[,\s]+/).filter(t => t.trim());
-          tags.pop(); // Remove the last incomplete tag
+      // The separators the server splits on, so the tag being typed is the same
+      // one either side sees. The full-width forms are what an IME emits.
+      var SEPARATORS = /[\s,\u3001\uFF0C#\uFF03]+/;
+      var active = -1;
 
-          // Add the selected hashtag and join back
-          tags.push(hashtag);
-          input.value = tags.join(', ') + ', ';
+      function options() {
+        return Array.prototype.slice.call(
+          menu.querySelectorAll('.hashtag-autocomplete-item')
+        );
+      }
 
-          // Clear the suggestions
-          document.getElementById('hashtag-suggestions').innerHTML = '';
+      function highlight(index) {
+        var items = options();
+        active = items.length ? (index + items.length) % items.length : -1;
+        items.forEach(function (item, i) {
+          var on = i === active;
+          item.classList.toggle('is-active', on);
+          item.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        input.setAttribute(
+          'aria-activedescendant',
+          active >= 0 ? items[active].id : ''
+        );
+      }
 
-          // Focus back on input
-          input.focus();
+      function close() {
+        menu.innerHTML = '';
+        active = -1;
+        input.setAttribute('aria-expanded', 'false');
+        input.setAttribute('aria-activedescendant', '');
+      }
+
+      function choose(item) {
+        var tags = input.value.split(SEPARATORS).filter(function (t) {
+          return t.trim();
+        });
+        tags.pop(); // the partial tag this suggestion replaces
+        tags.push(item.dataset.hashtag);
+        input.value = tags.join(', ') + ', ';
+        close();
+        input.focus();
+      }
+
+      menu.addEventListener('click', function (e) {
+        var item = e.target.closest('.hashtag-autocomplete-item');
+        if (item) choose(item);
+      });
+
+      menu.addEventListener('mousemove', function (e) {
+        var item = e.target.closest('.hashtag-autocomplete-item');
+        if (item) highlight(options().indexOf(item));
+      });
+
+      input.addEventListener('keydown', function (e) {
+        var items = options();
+        if (e.key === 'Escape') {
+          close();
+          return;
         }
+        if (!items.length) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          highlight(active + 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          highlight(active - 1);
+        } else if (e.key === 'Enter' && active >= 0) {
+          // Only when a suggestion is highlighted: otherwise Enter still
+          // submits the post, which is what it does with the menu closed.
+          e.preventDefault();
+          choose(items[active]);
+        }
+      });
+
+      // A fresh batch of suggestions starts with nothing highlighted.
+      menu.addEventListener('htmx:afterSwap', function () {
+        active = -1;
+        input.setAttribute('aria-expanded', options().length ? 'true' : 'false');
+        input.setAttribute('aria-activedescendant', '');
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!menu.contains(e.target) && e.target !== input) close();
       });
     });
   </script>
@@ -75,18 +145,23 @@
         <div class="form-group">
           <label for="hashtags-input">{{ ftl_get_message("post-hashtags") }}:</label>
           <div class="hashtag-input-container">
+            {# hx-vals sends only the tag being typed. hx-include used to send
+               the whole field alongside it, which the endpoint never read. #}
             <input type="text"
                    id="hashtags-input"
                    name="hashtags"
                    placeholder="{{ ftl_get_message("post-hashtags-placeholder") }}"
                    autocomplete="off"
                    maxlength="500"
+                   role="combobox"
+                   aria-expanded="false"
+                   aria-controls="hashtag-suggestions"
+                   aria-autocomplete="list"
                    aria-describedby="hashtags-hint"
                    hx-get="/api/hashtags/autocomplete"
                    hx-trigger="keyup changed delay:300ms"
                    hx-target="#hashtag-suggestions"
-                   hx-include="[name='hashtags']"
-                   hx-vals='js:{q: document.getElementById("hashtags-input").value.split(/[,\s]+/).pop()}'
+                   hx-vals='js:{q: document.getElementById("hashtags-input").value.split(/[\s,\u3001\uFF0C#\uFF03]+/).pop()}'
                    hx-indicator="#hashtag-autocomplete-indicator" />
             <span id="hashtag-autocomplete-indicator"
                   class="htmx-indicator search-indicator"

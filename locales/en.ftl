@@ -186,7 +186,11 @@ draft-posts-count = drafts
 draft-empty = You don't have any drafts yet
 
 # Hashtags
-hashtag-post-count = posts
+hashtag-post-count =
+    { $count ->
+        [one] { $count } post
+       *[other] { $count } posts
+    }
 hashtag-no-posts = No posts with this hashtag yet
 hashtag-discovery = Hashtags
 hashtag-search-placeholder = Search hashtags...

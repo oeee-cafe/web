@@ -1159,12 +1159,51 @@ pub struct Note {
     extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
+/// A `Hashtag` on a Note.
+///
+/// Outbound, this is how a drawing's tags reach other instances: without them
+/// nothing we federate is findable by tag anywhere but here. Inbound it is
+/// parsed and then deliberately dropped — a Note arriving here becomes a
+/// comment on a local post, and comments carry no tags — but it has to parse or
+/// the whole Note does not.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Tag {
     r#type: String,
     href: Option<Url>,
     name: Option<String>,
+}
+
+impl Tag {
+    fn hashtag(domain: &str, hashtag: &crate::models::hashtag::PostHashtag) -> Option<Tag> {
+        Some(Tag {
+            r#type: "Hashtag".to_string(),
+            href: format!(
+                "https://{}/hashtags/{}",
+                domain,
+                urlencoding::encode(&hashtag.name)
+            )
+            .parse()
+            .ok(),
+            // With the `#`, which is what every implementation expects to read
+            // and what the name in the database deliberately does not carry.
+            name: Some(format!("#{}", hashtag.display_name)),
+        })
+    }
+}
+
+/// A post's tags as `Hashtag` objects. A tag that cannot be turned into a URL
+/// is left out rather than failing the delivery of the drawing.
+async fn hashtag_tags(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    post_id: Uuid,
+    domain: &str,
+) -> Result<Vec<Tag>, AppError> {
+    Ok(crate::models::hashtag::get_hashtags_for_post(tx, post_id)
+        .await?
+        .iter()
+        .filter_map(|hashtag| Tag::hashtag(domain, hashtag))
+        .collect())
 }
 
 pub struct NoteParams {
@@ -1177,6 +1216,7 @@ pub struct NoteParams {
     pub updated: Option<String>,
     pub url: Url,
     pub attachment: Vec<Attachment>,
+    pub tag: Vec<Tag>,
 }
 
 impl Note {
@@ -1194,7 +1234,7 @@ impl Note {
             attachment: params.attachment,
             in_reply_to: None,
             reply_target: None,
-            tag: Vec::new(),
+            tag: params.tag,
             source: None,
             extra: std::collections::HashMap::new(),
         }
@@ -1706,6 +1746,7 @@ pub async fn create_note_from_post(
         updated: None,
         url: post_url,
         attachment: attachments,
+        tag: hashtag_tags(tx, post_id, domain).await?,
     });
 
     Ok(note)
@@ -1792,6 +1833,7 @@ pub async fn create_updated_note_from_post(
         updated: Some(updated),
         url: post_url,
         attachment: attachments,
+        tag: hashtag_tags(tx, post_id, domain).await?,
     });
 
     Ok(note)

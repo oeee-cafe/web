@@ -188,7 +188,7 @@ draft-posts-count = 件の下書き
 draft-empty = まだ下書きがありません
 
 # Hashtags
-hashtag-post-count = 件の投稿
+hashtag-post-count = { $count }件の投稿
 hashtag-no-posts = このハッシュタグがついた投稿はまだありません
 hashtag-discovery = ハッシュタグ
 hashtag-search-placeholder = ハッシュタグを検索...

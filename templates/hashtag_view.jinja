@@ -2,19 +2,24 @@
 {% block title %}
   {{ super() }} | #{{ hashtag.display_name }}
 {% endblock title %}
+{% block head %}
+  {% include "post_feed_head.jinja" %}
+{% endblock head %}
 {% block social_meta %}
   <meta property="og:site_name" content="{{ ftl_get_message('brand') }}" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="#{{ hashtag.display_name }}" />
   <meta property="og:description"
-        content="{{ hashtag.post_count }} {{ ftl_get_message('hashtag-post-count') }}" />
+        content="{{ ftl_format_pattern('hashtag-post-count', {'count': post_count}) }}" />
+  {# The stored name, escaped: the display name differs from it in case, and a
+     tag in a non-Latin script has to survive being put in a URL. #}
   <meta property="og:url"
-        content="{{ base_url|safe }}/hashtags/{{ hashtag.display_name }}" />
+        content="{{ base_url|safe }}/hashtags/{{ hashtag.name|urlencode }}" />
   {# Lead with the most recent drawing carrying the tag, which is a far better
      preview than the site mark. #}
-  {% if posts %}
+  {% if feed.posts %}
     <meta property="og:image"
-          content="{{ r2_public_endpoint_url|safe }}/image/{{ posts[0].image_filename[:2] }}/{{ posts[0].image_filename }}" />
+          content="{{ r2_public_endpoint_url|safe }}/image/{{ feed.posts[0].image_filename[:2] }}/{{ feed.posts[0].image_filename }}" />
     <meta name="twitter:card" content="summary_large_image" />
   {% else %}
     <meta property="og:image" content="{{ base_url|safe }}/static/favicon.png" />
@@ -23,24 +28,30 @@
   <meta name="twitter:site" content="@oeee_cafe" />
 {% endblock social_meta %}
 {% block content %}
-  <div class="center">
-    <h2>#{{ hashtag.display_name }}</h2>
-    <p style="color: var(--main-text-muted-color); font-size: 14px; margin: 5px 0;">{{ hashtag.post_count }} {{ ftl_get_message("hashtag-post-count") }}</p>
+  <div class="center-wide">
+    <div class="hashtag-view-header">
+      <h2>#{{ hashtag.display_name }}</h2>
+      {# Counted over the same filter the grid below is drawn from, so this is
+         the number of drawings on the page rather than a stored counter that
+         had drifted from it. #}
+      <p class="hashtag-view-count">{{ ftl_format_pattern("hashtag-post-count", {"count": post_count}) }}</p>
+    </div>
 
-    <h3>{{ ftl_get_message("recent-drawings") }}</h3>
-    {% if posts %}
-      <div class="posts-grid">
-        {% for post in posts %}
-          <div class="posts-grid-item">
-            <a href="/@{{ post.user_login_name }}/{{ post.id }}">
-              <img alt="{{ post.title }}"
-                   width="{{ post.image_width }}"
-                   height="{{ post.image_height }}"
-                   src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-            </a>
-          </div>
-        {% endfor %}
-      </div>
+    {# The shared feed: same cards, same sensitive blur, same column control and
+       same infinite scroll as / and a community page. This page used to write
+       its own <img> tags, which is how sensitive drawings ended up unblurred
+       here and nowhere else, and how it came to load fifty full-size images at
+       once with no way to reach the fifty-first. #}
+    {% if feed.posts %}
+      <section role="region" aria-labelledby="post-feed-heading">
+        <div class="feed-header">
+          <h2 id="post-feed-heading" class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
+          {% include "post_feed_controls.jinja" %}
+        </div>
+        <div class="posts-grid" id="post-feed-grid">
+          {% include "post_feed_fragment.jinja" %}
+        </div>
+      </section>
     {% else %}
       <p>{{ ftl_get_message("hashtag-no-posts") }}</p>
     {% endif %}

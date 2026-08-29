@@ -1224,7 +1224,10 @@ pub async fn publish_post(
         "
             UPDATE posts
             SET
-                published_at = now(),
+                -- Keep the first publication time. Nothing stopped the publish
+                -- form being submitted twice, and the second one used to move
+                -- the drawing back to the top of every feed.
+                published_at = COALESCE(published_at, now()),
                 title = $1,
                 content = $2,
                 is_sensitive = $3,
@@ -1296,19 +1299,13 @@ pub async fn edit_post_community(
 
 /// Check if a post can be moved to a different community
 /// Returns true if the post is movable (not part of a thread and not in private/two-tone community)
-pub async fn is_post_movable(
-    tx: &mut Transaction<'_, Postgres>,
-    post_id: Uuid,
-) -> Result<bool> {
+pub async fn is_post_movable(tx: &mut Transaction<'_, Postgres>, post_id: Uuid) -> Result<bool> {
     // Check if post has a parent (is a reply)
-    let has_parent = query!(
-        r#"SELECT parent_post_id FROM posts WHERE id = $1"#,
-        post_id
-    )
-    .fetch_one(&mut **tx)
-    .await?
-    .parent_post_id
-    .is_some();
+    let has_parent = query!(r#"SELECT parent_post_id FROM posts WHERE id = $1"#, post_id)
+        .fetch_one(&mut **tx)
+        .await?
+        .parent_post_id
+        .is_some();
 
     if has_parent {
         return Ok(false);

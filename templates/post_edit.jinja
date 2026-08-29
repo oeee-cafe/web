@@ -12,12 +12,17 @@
         <textarea name="content">{{ post.content }}</textarea>
     </div>
     <div class="form-group">
-        <label>{{ ftl_get_message("post-hashtags") }}:</label>
+        <label for="post-edit-hashtags">{{ ftl_get_message("post-hashtags") }}:</label>
+        {# Same cap the publish form has always carried. Without it a long
+           enough line was a failed edit rather than a truncated tag. #}
         <input type="text"
+               id="post-edit-hashtags"
                name="hashtags"
                value="{{ hashtags }}"
+               maxlength="500"
+               aria-describedby="post-edit-hashtags-hint"
                placeholder="{{ ftl_get_message("post-hashtags-placeholder") }}">
-        <span class="form-hint">{{ ftl_get_message("post-hashtags-hint") }}</span>
+        <span id="post-edit-hashtags-hint" class="form-hint">{{ ftl_get_message("post-hashtags-hint") }}</span>
     </div>
     <div class="form-group form-group-checkbox">
         <input type="checkbox"

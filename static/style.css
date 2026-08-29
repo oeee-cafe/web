@@ -1280,8 +1280,30 @@ nav a:visited,
   border-bottom: none;
 }
 
-.hashtag-autocomplete-item:hover {
+.hashtag-autocomplete-item:hover,
+/* Arrow keys move this, so it has to look the same as hovering: the menu is
+   reachable from the keyboard now, and a highlight only the mouse can produce
+   would leave that navigation invisible. */
+.hashtag-autocomplete-item.is-active {
   background-color: var(--main-nav-bg-color);
+}
+
+.hashtag-autocomplete-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* The heading above a tag's drawings. The count used to carry its colour and
+   size in a style attribute on the element itself. */
+.hashtag-view-header {
+  margin-bottom: var(--space-4);
+}
+
+.hashtag-view-count {
+  color: var(--main-text-muted-color);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0;
 }
 
 /* Hashtag Discovery Page */
