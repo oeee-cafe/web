@@ -5,7 +5,6 @@
 {% block head %}
   {# Same page width and column-restore script the / and /home feeds use, so the
      finished-drawings grid behaves identically here. #}
-  {% include "post_feed_head.jinja" %}
 {% endblock head %}
 {# One tier of the community picker. data-search is what the filter box matches
    against, lowercased server-side so the script only has to lowercase the
@@ -20,6 +19,7 @@
   {% endif %}
 {% endmacro %}
 {% block content %}
+  {% include "post_feed_head.jinja" %}
   <div class="center-wide">
     <h2>{{ ftl_get_message("collaborate-title") }}</h2>
     {# Signed-out visitors can browse the gallery below; only creating a

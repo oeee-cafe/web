@@ -775,7 +775,9 @@ mod tests {
         // The nav bar is full-bleed with its contents in the page column, the
         // same as every other page — admin no longer widens the header to match
         // its own full-bleed grid.
-        assert!(rendered.contains("<nav class=\"nav-bar\">"));
+        // Matched on the class rather than the whole tag: the nav also carries
+        // the boost attribute now, and this assertion is about its layout.
+        assert!(rendered.contains("<nav class=\"nav-bar\""));
         assert!(rendered.contains("id=\"menubar\" class=\"center\""));
     }
 

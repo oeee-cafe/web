@@ -42,13 +42,27 @@
                width="{%- if ftl_lang == "ja" -%} 345px {%- else -%} 270px {%- endif -%}" />
         </a>
       </h1>
-      <nav class="nav-bar">
+      {# Boost scoped to the nav, not the body.
+         A boosted response has its whole <head> discarded except the title,
+         and htmx re-runs swapped scripts by cloning the tag — which does not
+         re-evaluate a <script type="module"> the browser has already loaded,
+         because the module map is keyed on the URL and `cachebuster` holds it
+         fixed for a deploy. Body-wide boost therefore leaves the painter
+         unmounted the *second* time someone opens a drawing page in a session.
+         Measured, not inferred.
+
+         Scoping it here keeps every link that reaches a module bundle out of
+         it: they all live in page bodies, outside this nav. The one exception
+         is the draw form below, which says so itself. #}
+      <nav class="nav-bar" hx-boost:inherited="true">
         <div id="menubar" class="center">
           <div>
             <a href="/about">{{ ftl_get_message('brand') }}?</a>
           </div>
           {% if current_user %}
-            <form action="/draw" method="post">
+            {# The one control in this nav that loads a module bundle. Boosting
+               it would mount the painter once per session and never again. #}
+            <form action="/draw" method="post" hx-boost="false">
               <input type="hidden" name="tool" value="neo" />
               <input type="hidden" name="width" value="300" />
               <input type="hidden" name="height" value="300" />

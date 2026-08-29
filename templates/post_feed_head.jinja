@@ -1,6 +1,14 @@
-{# Head fragment shared by the /, /home and /collaborate feeds: the pre-paint
-   column restore. Included from each page's {% block head %} so the feeds
-   cannot drift apart.
+{# Shared by the /, /home, /communities/@x and /collaborate feeds: the
+   pre-paint column restore. Included from the top of each page's
+   {% block content %} so the feeds cannot drift apart.
+
+   It sits in the body rather than the head because the nav is boosted, and a
+   boosted response has its entire <head> thrown away bar the title — left up
+   there it would simply stop running the moment anyone reached a feed through
+   the nav, and the grid would ignore their saved column count. At the top of
+   the content it still runs before the grid below it is parsed, so it is
+   still applied before that grid paints, and htmx re-executes it on every
+   boosted swap.
 
    No page-width override lives here any more. It used to widen the whole page
    to 1600px, which moved the header too — the logo and nav sat flush left on

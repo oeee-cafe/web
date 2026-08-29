@@ -3,9 +3,9 @@
   {{ super() }} | {{ ftl_get_message("timeline") }}
 {% endblock title %}
 {% block head %}
-  {% include "post_feed_head.jinja" %}
 {% endblock head %}
 {% block content %}
+  {% include "post_feed_head.jinja" %}
   <div class="center-wide">
     {# Same chrome as /: shared head, controls, grid and card fragment. The two
        feeds differ only in which query fills them and where the sentinel

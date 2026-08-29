@@ -1256,6 +1256,94 @@ mod template_tests {
     }
 
     #[test]
+    fn nothing_in_the_boosted_nav_reaches_a_module_bundle() {
+        // The nav carries hx-boost. A boosted navigation swaps the body and
+        // re-runs its scripts by cloning the tags, which does *not* re-evaluate
+        // a `<script type="module">` the browser has already loaded — the
+        // module map is keyed on the URL and `cachebuster` holds it fixed for a
+        // deploy. So a nav entry pointing at a page that mounts a painter would
+        // work once per session and then quietly stop, with a blank canvas and
+        // no error.
+        //
+        // Everything that mounts one is reached from a page body instead, where
+        // boost does not apply. This test is what keeps that true: adding a
+        // link to the nav fails here until its destination is listed, which is
+        // the moment to check the destination does not load a bundle.
+        let env = test_support::env();
+        let rendered = env
+            .get_template("home.jinja")
+            .unwrap_or_else(|e| panic!("home.jinja loads: {e:#}"))
+            .render(context! {
+                feed => context! {
+                    posts => Vec::<serde_json::Value>::new(),
+                    has_more => false,
+                    next_url => "",
+                },
+                current_user => json!({ "login_name": "artist", "id": "u1" }),
+                messages => Vec::<serde_json::Value>::new(),
+                draft_post_count => 0,
+                unread_notification_count => 0,
+                ftl_lang => "en",
+            })
+            .unwrap_or_else(|e| panic!("home.jinja renders: {e:#}"));
+
+        let nav = rendered
+            .split_once("<nav")
+            .and_then(|(_, rest)| rest.split_once("</nav>"))
+            .map(|(nav, _)| nav.to_string())
+            .expect("base.jinja renders a nav");
+
+        assert!(
+            nav.contains("hx-boost:inherited=\"true\""),
+            "the nav should still be the boosted scope"
+        );
+        assert!(
+            !rendered.contains("<body hx-boost") && !rendered.contains("<main hx-boost"),
+            "boost must stay scoped to the nav; widening it re-admits the drawing routes"
+        );
+
+        // Every destination reachable from the nav, and why it is safe.
+        // Add here only after checking the page does not mount a bundle.
+        let allowed = [
+            "/about",
+            "/collaborate",
+            "/communities",
+            "/hashtags",
+            "/home",
+            "/notifications",
+            "/account",
+            "/login",
+            "/signup",
+            "/posts/drafts",
+        ];
+
+        for (attr, _) in [("href=\"", 0), ("action=\"", 0)] {
+            for piece in nav.split(attr).skip(1) {
+                let target = piece.split('"').next().unwrap_or_default();
+                // Profile links carry the viewer's own name.
+                if target.starts_with("/@") {
+                    continue;
+                }
+                // The draw form is the one nav entry that does reach a bundle,
+                // and it says so by opting out of boost.
+                if target == "/draw" {
+                    assert!(
+                        nav.contains("action=\"/draw\" method=\"post\" hx-boost=\"false\"")
+                            || nav.contains("hx-boost=\"false\""),
+                        "the draw form must opt out of boost"
+                    );
+                    continue;
+                }
+                assert!(
+                    allowed.contains(&target),
+                    "{target} is new in the boosted nav — confirm it does not load a \
+                     <script type=\"module\"> before adding it to the list in this test"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn the_banner_grid_renders_the_shape_its_handler_passes() {
         // `list_user_banners` returns a real DateTime and a real bool, and the
         // grid pipes the first through `datetimeformat` and branches on the

@@ -3,9 +3,9 @@
   {{ ftl_get_message("brand") }}
 {% endblock title %}
 {% block head %}
-  {% include "post_feed_head.jinja" %}
 {% endblock head %}
 {% block content %}
+  {% include "post_feed_head.jinja" %}
   <div class="center-wide">
     {# The public post grid is the whole page: communities and recent comments
        moved off home. Cards, controls and page chrome are shared with /home so

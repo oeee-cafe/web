@@ -23,9 +23,9 @@
   <link rel="alternate"
         type="application/activity+json"
         href="https://{{ domain }}/ap/communities/{{ community.id }}" />
-  {% include "post_feed_head.jinja" %}
 {% endblock head %}
 {% block content %}
+  {% include "post_feed_head.jinja" %}
   <div class="center">
     {% block community_edit_block %}
       {# :inherited so the edit button below still swaps this header out.
