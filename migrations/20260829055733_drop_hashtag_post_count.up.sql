@@ -1,0 +1,22 @@
+-- Drop the tag post counter.
+--
+-- It was a stored number that had to be corrected by hand every time anything
+-- changed what it counted, and the set it counts is defined by columns in three
+-- other tables -- posts.published_at, posts.deleted_at, posts.community_id and
+-- communities.visibility -- all of which change without going near a hashtags
+-- row. So it was wrong in six independent ways at once: personal posts were
+-- never counted, republishing double-incremented, three delete paths never
+-- decremented, moving a post between communities adjusted nothing, changing a
+-- community's visibility adjusted nothing, and it counted link rows rather than
+-- visible posts, so it included drafts and deleted drawings. GREATEST(x - 1, 0)
+-- then clamped the drift out of sight instead of letting it surface.
+--
+-- merge_and_normalize_hashtags replaced it with the hashtag_stats view, which
+-- derives the number from the same predicate find_posts_by_hashtag lists by, so
+-- a tag's count and the drawings on its page cannot disagree. The column has
+-- been unread since that release.
+--
+-- Split off into its own migration because deploys are blue/green: the release
+-- being replaced by that one still selected this column, and dropping it in the
+-- same step would have broken the colour that was still serving.
+ALTER TABLE hashtags DROP COLUMN post_count;
