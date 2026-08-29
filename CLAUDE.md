@@ -12,6 +12,25 @@ When running psql commands, specify the database name like `psql oeee_cafe`.
 
 When creating SQLx migrations, use the command `sqlx migrate add`.
 
+Never use a POSIX character class — `[[:alnum:]]`, `[[:alpha:]]`, `[[:punct:]]`
+— in SQL that touches user text. PostgreSQL delegates them to the host's C
+library, and on the production Mac mini `iswalnum()` answers **false** for
+Hangul, kana and Han:
+
+```sql
+SELECT regexp_replace('그림', '[^[:alnum:]_]', '', 'g');  -- ''
+```
+
+`20260828204049_merge_and_normalize_hashtags` normalised tag names that way and
+deleted every Korean, Japanese and Chinese tag on the site, because a name that
+normalises to nothing was treated as a name made only of punctuation. It was
+tested against a local database seeded with ASCII, which is the same shape of
+mistake as not testing it at all. Write the range out (`[a-zA-Z0-9_]`, as every
+other constraint in `migrations/` does) when ASCII really is what you mean, and
+when it is not, do the work in Rust — `char::is_alphanumeric` is Unicode-aware —
+or check the expression against real non-ASCII rows on the *server*, not on a
+Linux CI box whose locale data disagrees with the one that will run it.
+
 ### Deploys
 
 `deploy.sh` is blue/green: `oeee-cafe-blue` and `oeee-cafe-green` take turns,
