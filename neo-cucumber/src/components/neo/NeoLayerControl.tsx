@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import {
   NEO_LAYER_BG,
   NEO_LAYER_CONTROL,
@@ -24,6 +25,15 @@ interface NeoLayerControlProps {
  * diagonal across its half of the button -- the top half is the foreground,
  * the bottom the background -- so both layers' states are visible even though
  * only one is named.
+ *
+ * The swap waits for the release rather than taking the press. A touch screen
+ * has no second button, so it asks for the context menu with a long press --
+ * which arrives as an ordinary press first and `contextmenu` after it. Swapping
+ * on the press meant a long press swapped the layer and then hid the one it had
+ * just swapped to, and nothing about that is visible: the button reads the new
+ * layer, the canvas goes on taking every stroke and recording it, and the only
+ * sign is a drawing that has stopped appearing. A context menu now cancels the
+ * swap its own press was going to make.
  */
 export function NeoLayerControl({
   current,
@@ -33,6 +43,8 @@ export function NeoLayerControl({
   onToggleVisible,
 }: NeoLayerControlProps) {
   const labels = usePainterLabels();
+  /** The press that will swap layers, if nothing claims it first. */
+  const pendingSwap = useRef<number | null>(null);
 
   return (
     <button
@@ -41,10 +53,19 @@ export function NeoLayerControl({
       title="Switch layer — right-click to hide it"
       onPointerDown={(e) => {
         if (e.button === 2) return;
+        pendingSwap.current = e.pointerId;
+      }}
+      onPointerUp={(e) => {
+        if (pendingSwap.current !== e.pointerId) return;
+        pendingSwap.current = null;
         onSwitch();
+      }}
+      onPointerCancel={() => {
+        pendingSwap.current = null;
       }}
       onContextMenu={(e) => {
         e.preventDefault();
+        pendingSwap.current = null;
         onToggleVisible();
       }}
     >
