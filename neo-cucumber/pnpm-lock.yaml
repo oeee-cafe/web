@@ -72,9 +72,6 @@ importers:
       globals:
         specifier: ^16.4.0
         version: 16.4.0
-      lightningcss:
-        specifier: ^1.33.0
-        version: 1.33.0
       playwright:
         specifier: ^1.62.1
         version: 1.62.1
@@ -4082,6 +4079,7 @@ snapshots:
       lightningcss-linux-x64-musl: 1.33.0
       lightningcss-win32-arm64-msvc: 1.33.0
       lightningcss-win32-x64-msvc: 1.33.0
+    optional: true
 
   lines-and-columns@1.2.4: {}
 
