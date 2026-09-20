@@ -2756,6 +2756,11 @@ legend {
   border: 1px solid var(--main-border-color, #888);
   background: #fff;
   max-width: 100%;
+  /* `pixelated` is Firefox 93. This file is served as written, without the
+     build pass that spells neo-cucumber's own stylesheets out for Firefox 56,
+     so the prefixed form is here by hand -- a replay scaled up with smoothing
+     on is not the drawing that was recorded. */
+  image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
 }
 .neo-cucumber-replay-controls {
