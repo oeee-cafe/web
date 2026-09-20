@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
 import { lingui } from "@lingui/vite-plugin";
+import { LEGACY_BROWSER_TARGET, legacyCss } from "./vite/legacyBrowsers";
 
 const packageRoot = import.meta.dirname;
 const replayRoot = resolve(packageRoot, "../frontend/replay");
@@ -36,8 +37,11 @@ export default defineConfig({
     react({ plugins: [["@lingui/swc-plugin", {}]] }),
     tailwindcss(),
     lingui(),
+    legacyCss(),
   ],
   build: {
+    // Firefox 56 syntax, for Waterfox Classic; see vite/legacyBrowsers.ts.
+    target: LEGACY_BROWSER_TARGET,
     outDir: resolve(packageRoot, "dist-replay"),
     emptyOutDir: true,
     rollupOptions: {

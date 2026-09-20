@@ -110,6 +110,13 @@ export function NeoWindow({
       );
     };
     settle();
+    // `ResizeObserver` is Firefox 69, and this package targets 56 so that it
+    // runs in Waterfox Classic. Where it is missing the window is still
+    // settled on open and on every viewport change below; what is lost is the
+    // correction for a panel that grows after that -- a layer added, a tool
+    // panel unfolded -- which leaves a window that can sit too low until the
+    // next resize, rather than one that misbehaves.
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(settle);
     observer.observe(frame);
     return () => observer.disconnect();

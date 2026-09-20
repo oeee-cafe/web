@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
 import { lingui } from "@lingui/vite-plugin";
+import { LEGACY_BROWSER_TARGET, legacyCss } from "./vite/legacyBrowsers";
 import { resolve } from "node:path";
 
 export default defineConfig({
@@ -29,8 +30,11 @@ export default defineConfig({
     react({ plugins: [["@lingui/swc-plugin", {}]] }),
     tailwindcss(),
     lingui(),
+    legacyCss(),
   ],
   build: {
+    // Firefox 56 syntax, for Waterfox Classic; see vite/legacyBrowsers.ts.
+    target: LEGACY_BROWSER_TARGET,
     outDir: "dist-offline",
     emptyOutDir: true,
     lib: {

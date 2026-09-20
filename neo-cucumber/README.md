@@ -95,6 +95,22 @@ specifier (`@import "neo-cucumber/style.css"`) rather than by relative path,
 and the CSS reads identically whether it resolves through a workspace alias or
 through an installed package.
 
+## Browser support
+
+The published bundles are built for **Firefox 56** and newer, which is what
+Waterfox Classic runs. That is a deliberate floor rather than an accident of
+tooling: the browsers still carrying NPAPI are the ones oekaki users keep for
+the original PaintBBS and ShiPainter applets, and the painter should open for
+them too. Syntax is lowered by esbuild and the stylesheet ships without
+cascade layers; see `vite/legacyBrowsers.ts`.
+
+One known gap: flexbox `gap` landed in Firefox 63, so on older engines the
+toolbox rows lose their gutters and sit flush. Nothing is unusable, but the
+chrome is not pixel-faithful to NEO there.
+
+Hosts that compile their own Tailwind should know that `neo-cucumber/style.css`
+is emitted unlayered, so its rules take part in the normal cascade.
+
 ## Contract principles
 
 - No React types in the public interface.
