@@ -4,7 +4,7 @@ import { build } from "vite";
 import type { Rollup } from "vite";
 import type { Node } from "acorn";
 import offlineConfig from "../vite.offline.config";
-import { flattenCascadeLayers } from "./legacyBrowsers";
+import { addFlexGapFallback, flattenCascadeLayers } from "./legacyBrowsers";
 
 describe("flattenCascadeLayers", () => {
   it("unwraps a layer and keeps what was in it", () => {
@@ -64,6 +64,87 @@ describe("flattenCascadeLayers", () => {
       expect(flattened).toContain(declaration);
     }
     expect(flattened).not.toContain("@layer");
+  });
+});
+
+describe("addFlexGapFallback", () => {
+  const generated = (css: string) => addFlexGapFallback(css).slice(css.length);
+
+  it("spaces a flex row along the inline axis", () => {
+    expect(generated(".gap-\\[3px\\]{gap:3px}")).toContain(
+      ".gap-\\[3px\\]:not(.flex-col):not(.grid)>*+*{margin-left:3px}",
+    );
+  });
+
+  it("spaces a flex column along the block axis instead", () => {
+    expect(generated(".gap-\\[3px\\]{gap:3px}")).toContain(
+      ".flex-col.gap-\\[3px\\]>*+*{margin-top:3px}",
+    );
+  });
+
+  /*
+   * Firefox 56 shipped Grid with `grid-gap`, three versions before the
+   * rename to `gap`. Sibling margins would put a gutter before every item
+   * but the first of the whole grid, not the first of each row.
+   */
+  it("gives a grid grid-gap rather than margins", () => {
+    const out = generated(".gap-\\[2px\\]{gap:2px}");
+    expect(out).toContain(".gap-\\[2px\\]{grid-gap:2px}");
+    expect(out).toContain(":not(.grid)");
+  });
+
+  it("keeps the two axes apart when they differ", () => {
+    const out = generated(".g{row-gap:4px;column-gap:8px}");
+    expect(out).toContain(".g{grid-row-gap:4px;grid-column-gap:8px}");
+    expect(out).toContain(".g:not(.flex-col):not(.grid)>*+*{margin-left:8px}");
+    expect(out).toContain(".flex-col.g>*+*{margin-top:4px}");
+  });
+
+  it("reads the two-value gap shorthand as row then column", () => {
+    const out = generated(".g{gap:4px 8px}");
+    expect(out).toContain("margin-left:8px");
+    expect(out).toContain("margin-top:4px");
+  });
+
+  it("does not split a value on the spaces inside calc()", () => {
+    const out = generated(".g{gap:calc(var(--spacing) * 2)}");
+    expect(out).toContain("margin-left:calc(var(--spacing) * 2)");
+    expect(out).not.toContain("margin-left:calc(var(--spacing)}");
+  });
+
+  it("re-wraps a variant's fallback in the query it came from", () => {
+    const out = generated(
+      "@media (pointer:coarse){.pointer-coarse\\:gap-\\[5px\\]{gap:5px}}",
+    );
+    expect(out).toContain("@media (pointer:coarse){.pointer-coarse");
+    expect(out).toContain("margin-left:5px");
+  });
+
+  it("puts everything behind a query no engine with gap answers", () => {
+    const out = generated(".g{gap:1px}");
+    expect(out.startsWith("@supports not (row-gap:1px){")).toBe(true);
+    expect(out.endsWith("}")).toBe(true);
+  });
+
+  it("adds nothing to a sheet that never asks for a gap", () => {
+    const css = ".x{color:red}@media print{.y{display:none}}";
+    expect(addFlexGapFallback(css)).toBe(css);
+  });
+
+  /*
+   * `.flex-col` and `.grid` are composed onto the gap class, which only
+   * works while the gap class is the entire selector. A hand-written
+   * `.panel .row { gap: 2px }` would silently produce `.flex-col.panel .row`,
+   * which means something else entirely.
+   */
+  it("leaves a selector it cannot compose onto alone", () => {
+    expect(generated(".panel .row{gap:2px}")).toBe("");
+    expect(generated(".a,.b{gap:2px}")).toBe("");
+    expect(generated(".a>.b{gap:2px}")).toBe("");
+  });
+
+  it("ignores gap-like descriptors that are not style rules", () => {
+    expect(generated("@keyframes x{from{gap:2px}to{gap:4px}}")).toBe("");
   });
 });
 

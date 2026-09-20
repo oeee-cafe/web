@@ -104,9 +104,14 @@ the original PaintBBS and ShiPainter applets, and the painter should open for
 them too. Syntax is lowered by esbuild and the stylesheet ships without
 cascade layers; see `vite/legacyBrowsers.ts`.
 
-One known gap: flexbox `gap` landed in Firefox 63, so on older engines the
-toolbox rows lose their gutters and sit flush. Nothing is unusable, but the
-chrome is not pixel-faithful to NEO there.
+Flexbox `gap` landed in Firefox 63, so on older engines `gap-*` is spaced the
+way NEO spaces things instead — a margin on the item rather than a gutter
+distributed by the container — and grids fall back to `grid-gap`. This is
+generated into the stylesheet behind `@supports not (row-gap:1px)`, so a
+browser that has `gap` never reads it and the cascade there is unchanged.
+
+A wrapping row is the one case it does not reproduce exactly: its second line
+keeps a leading margin that `gap` would have dropped.
 
 Hosts that compile their own Tailwind should know that `neo-cucumber/style.css`
 is emitted unlayered, so its rules take part in the normal cascade.

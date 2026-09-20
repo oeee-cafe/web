@@ -39,5 +39,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "../frontend/painter", "../frontend/collaborate"]
+  "include": [
+    "src",
+    "../frontend/painter",
+    "../frontend/collaborate",
+    "vite/**/*.browser.test.ts"
+  ]
 }

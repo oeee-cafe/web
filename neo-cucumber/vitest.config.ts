@@ -61,7 +61,11 @@ export default defineConfig({
             // Firefox 56, and a check on the bundles they produce.
             "vite/**/*.test.ts",
           ],
-          exclude: ["src/**/*.browser.test.{ts,tsx}", "../frontend/**/*.browser.test.{ts,tsx}"],
+          exclude: [
+            "src/**/*.browser.test.{ts,tsx}",
+            "../frontend/**/*.browser.test.{ts,tsx}",
+            "vite/**/*.browser.test.ts",
+          ],
         },
       },
       {
@@ -86,6 +90,8 @@ export default defineConfig({
           include: [
             "src/**/*.browser.test.{ts,tsx}",
             "../frontend/**/*.browser.test.{ts,tsx}",
+            // The Firefox 56 gap fallback, measured against real layout.
+            "vite/**/*.browser.test.ts",
           ],
           /*
            * One file at a time.
