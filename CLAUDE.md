@@ -133,6 +133,45 @@ pnpm run extract
 pnpm run compile
 ```
 
+### The browser floor is Firefox 56
+
+Every bundle here is built for **Firefox 56**, which is Waterfox Classic's
+engine — the last Gecko with NPAPI, and so the browser oekaki users keep
+around for the original PaintBBS and ShiPainter applets. Somebody opening this
+painter in it is usually that same person. `vite/legacyBrowsers.ts` holds both
+halves and the reasoning; all six vite configs import it.
+
+Two things there are easy to undo by accident:
+
+- **`build.target`.** Without it Vite emits ES2022, and Firefox 56 rejects the
+  file whole — the page is blank with one `SyntaxError: missing : after
+  property id`, which is what a class field looks like to that parser. Class
+  fields, `??`, `?.` and optional catch binding all arrive this way from React
+  and from our own source; esbuild lowers them, so nothing needs writing in an
+  older style.
+- **`legacyCss()`.** Tailwind v4 puts 86% of its output inside `@layer`, which
+  is Firefox 97, and an engine that does not know an at-rule drops the block
+  entire — the painter arrives with a palette and no chrome at all. The plugin
+  unwraps the layers in place, which also frees the `@supports` fallback that
+  seeds every `--tw-*` property.
+
+`vite/legacyBrowsers.test.ts` builds the real offline bundle and parses it, so
+a dependency bump that reintroduces either one fails the node project rather
+than the browser nobody here runs. Check it fails when you expect it to: an
+earlier version of that test quietly loaded `vite.config.ts` instead of the
+config under test and passed no matter what.
+
+What is *not* solved: flexbox `gap` is Firefox 63, so `gap-*` utilities do
+nothing there and those rows sit flush. It cannot be polyfilled in CSS —
+fixing it means margins instead of `gap` in the painter's own chrome, and
+`toolboxParity.browser.test.tsx` is what would hold that honest.
+
+Runtime APIs are a separate matter from syntax: esbuild lowers grammar and
+nothing else. `structuredClone` (94), `Array.prototype.flatMap` (62) and
+`ResizeObserver` (69) each needed handling in source. React's own uses of
+`queueMicrotask`, `reportError` and `AbortController` are already
+feature-detected, so they need nothing.
+
 ### Icons
 
 Icons are drawn by `src/components/Icon.tsx`, never by `@iconify/react`

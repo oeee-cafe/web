@@ -54,7 +54,13 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["src/**/*.test.ts", "../frontend/**/*.test.ts"],
+          include: [
+            "src/**/*.test.ts",
+            "../frontend/**/*.test.ts",
+            // The build-time helpers that keep the bundles readable by
+            // Firefox 56, and a check on the bundles they produce.
+            "vite/**/*.test.ts",
+          ],
           exclude: ["src/**/*.browser.test.{ts,tsx}", "../frontend/**/*.browser.test.{ts,tsx}"],
         },
       },

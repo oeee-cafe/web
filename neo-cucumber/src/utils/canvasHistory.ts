@@ -52,6 +52,7 @@ import type {
   CanonicalPainterOperation,
   LocalPainterOperation,
 } from "../operations";
+import { cloneOperation } from "./cloneOperation";
 import { pngDataToLayer } from "./canvasSnapshot";
 import { inflateCoverage } from "./rasterCodec";
 import { extentFor, fontSizeForBrush, TEXT_FONT_FAMILY } from "../neo/tools";
@@ -809,7 +810,7 @@ export class CanvasHistory {
   getCanonicalOperations(): CanonicalPainterOperation[] {
     return this.canonicalLog.map((entry) => ({
       ...entry,
-      operation: structuredClone(entry.operation),
+      operation: cloneOperation(entry.operation),
     }));
   }
 

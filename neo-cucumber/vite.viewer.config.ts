@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import { lingui } from "@lingui/vite-plugin";
+import { LEGACY_BROWSER_TARGET, legacyCss } from "./vite/legacyBrowsers";
 import path from "node:path";
 
 /**
@@ -19,8 +20,10 @@ export default defineConfig({
   // The SWC plugin is here for Lingui's macro rather than for React: the
   // viewer has no components, but its labels are messages like every other
   // string in this package and the macro is what turns them into catalog ids.
-  plugins: [react({ plugins: [["@lingui/swc-plugin", {}]] }), lingui()],
+  plugins: [react({ plugins: [["@lingui/swc-plugin", {}]] }), lingui(), legacyCss()],
   build: {
+    // Firefox 56 syntax, for Waterfox Classic; see vite/legacyBrowsers.ts.
+    target: LEGACY_BROWSER_TARGET,
     outDir: "dist-viewer",
     emptyOutDir: true,
     lib: {

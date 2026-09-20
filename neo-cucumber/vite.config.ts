@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
 import { lingui } from "@lingui/vite-plugin";
+import { LEGACY_BROWSER_TARGET, legacyCss } from "./vite/legacyBrowsers";
 
 // https://vite.dev/config/
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,8 +32,11 @@ export default defineConfig({
     }),
     tailwindcss(),
     lingui(),
+    legacyCss(),
   ],
   build: {
+    // Firefox 56 syntax, for Waterfox Classic; see vite/legacyBrowsers.ts.
+    target: LEGACY_BROWSER_TARGET,
     outDir: "dist-example",
     emptyOutDir: true,
     rollupOptions: {

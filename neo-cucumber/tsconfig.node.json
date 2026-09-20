@@ -25,6 +25,9 @@
     "vite.config.ts",
     "vite.viewer.config.ts",
     "vite.offline.config.ts",
-    "vite.library.config.ts"
+    "vite.library.config.ts",
+    "vite.collaborate.config.ts",
+    "vite.replay.config.ts",
+    "vite/**/*.ts"
   ]
 }

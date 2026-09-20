@@ -155,11 +155,13 @@ export const useCanvasHistory = (maxHistorySize: number = 30) => {
       canUndo: canUndo(),
       canRedo: canRedo(),
       /** What the stack actually holds, counting a shared tile once. */
+      // Two passes rather than `flatMap`, which is Firefox 62 and this
+      // package targets 56. `retainedBytes` counts each tile once by
+      // identity, so it does not care that the layers arrive regrouped.
       retainedBytes: retainedBytes(
-        historyRef.current.flatMap((state) => [
-          state.foreground,
-          state.background,
-        ])
+        historyRef.current
+          .map((state) => state.foreground)
+          .concat(historyRef.current.map((state) => state.background))
       ),
     };
   }, [canUndo, canRedo]);
