@@ -155,6 +155,33 @@ Two things there are easy to undo by accident:
   unwraps the layers in place, which also frees the `@supports` fallback that
   seeds every `--tw-*` property.
 
+The same plugin repairs three more things that each look like a different bug
+and are all one shape — modern CSS that an old engine discards rather than
+degrades:
+
+- **Selector lists.** One unparseable selector voids the *whole* list, by the
+  spec, not by quirk. Tailwind declares its theme on `:root,:host`, and
+  `:host` is Firefox 63, so 56 lost `--color-white` and `--spacing` together:
+  the canvas painted in the page's own background because `bg-white` had
+  nothing to resolve. `addLegacyFallbacks()` re-emits the readable selectors
+  as their own rule just before the original. `:is()`, `:where()`, `:has()`
+  and `::file-selector-button` get the same treatment.
+- **Shorthands newer than the engine.** `inset`, `padding-inline`,
+  `padding-block`, `margin-inline` and `margin-block` are Firefox 66;
+  unprefixed `user-select` is 69 and `tab-size` is 91. Each is spelled out
+  into longhands or a `-moz-` prefix immediately before itself — never
+  hoisted, because `padding:1px;padding-inline:4px` does not mean what
+  `padding-inline:4px;padding:1px` means.
+- **Gradient colour stops.** Two positions on one stop (`transparent 0 14px`)
+  is Firefox 83, and a gradient that will not parse takes the whole
+  `background-image` with it. That is why `.neo-ground` in `src/App.css`
+  writes each stop twice; it is the grid behind the canvas, and the symptom
+  was a flat field.
+
+Every pass only ever *adds*. No rule is dropped and no declaration rewritten
+in place, so an engine that understood the input still computes exactly what
+it did before.
+
 `vite/legacyBrowsers.test.ts` builds the real offline bundle and parses it, so
 a dependency bump that reintroduces either one fails the node project rather
 than the browser nobody here runs. Check it fails when you expect it to: an

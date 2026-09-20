@@ -149,6 +149,188 @@ function findBlockEnd(css: string, open: number): number {
 }
 
 /**
+ * Selector syntax Firefox 56 cannot parse.
+ *
+ * `:host` is Shadow DOM, 63. `:is()` and `:where()` are 78, `:has()` 121,
+ * `::file-selector-button` 82. `::backdrop` is in here because it rides along
+ * in Tailwind's reset lists and costs nothing to be careful about.
+ */
+const UNPARSEABLE_SELECTOR =
+  /:host\b|:is\(|:where\(|:has\(|::file-selector-button|::backdrop/i;
+
+/**
+ * Keep the half of a selector list that Firefox 56 can read.
+ *
+ * One unknown selector invalidates the *entire* list -- that is the CSS
+ * spec's own error handling, not a quirk -- and Tailwind v4 hands its theme
+ * to `:root,:host`. On Firefox 56 that rule vanishes whole, taking
+ * `--color-white`, `--color-black` and `--spacing` with it. The visible
+ * result is a canvas with no white to paint on, because `bg-white` resolves
+ * to `var(--color-white)` and there is no longer any such thing, and every
+ * utility built on the spacing scale silently computing to nothing.
+ *
+ * So the readable selectors are emitted a second time, as their own rule,
+ * directly before the original. A browser that understands the whole list
+ * applies both and the later one settles every tie with identical values;
+ * Firefox 56 sees only the copy. Nothing is removed, because the original
+ * is still what modern engines should be reading.
+ */
+function legacySelectorList(selector: string): string | null {
+  const parts = splitTopLevel(selector, ",");
+  if (!parts.some((part) => UNPARSEABLE_SELECTOR.test(part))) return null;
+  const readable = parts.filter((part) => !UNPARSEABLE_SELECTOR.test(part));
+  return readable.length ? readable.join(",") : null;
+}
+
+/**
+ * Longhands and prefixes for shorthands that arrived after Firefox 56.
+ *
+ * Each entry turns one declaration into the declarations that say the same
+ * thing to an older engine. They are emitted immediately before the original,
+ * never hoisted to the top of the rule: `padding:1px;padding-inline:4px` means
+ * something different from `padding-inline:4px;padding:1px`, and a fallback
+ * that reorders declarations is a fallback that changes the answer.
+ */
+const LEGACY_DECLARATIONS: Record<
+  string,
+  (value: string) => Record<string, string> | null
+> = {
+  // The logical shorthands are Firefox 66; the longhands under them are 41.
+  "padding-inline": (v) => axis(v, "padding-inline-start", "padding-inline-end"),
+  "padding-block": (v) => axis(v, "padding-block-start", "padding-block-end"),
+  "margin-inline": (v) => axis(v, "margin-inline-start", "margin-inline-end"),
+  "margin-block": (v) => axis(v, "margin-block-start", "margin-block-end"),
+  // `inset` is Firefox 66. `mx-auto` on the canvas rides on this too.
+  inset: (v) => box(v),
+  // Unprefixed `user-select` is Firefox 69 -- NEO writes all four prefixes on
+  // `.NEO` for the same reason. `tab-size` unprefixed is 91.
+  "user-select": (v) => ({ "-moz-user-select": v }),
+  "tab-size": (v) => ({ "-moz-tab-size": v }),
+};
+
+/** `<start> [<end>]`, the way a logical axis shorthand is written. */
+function axis(
+  value: string,
+  start: string,
+  end: string,
+): Record<string, string> | null {
+  const parts = splitTopLevel(value, " ");
+  if (parts.length === 0 || parts.length > 2) return null;
+  return { [start]: parts[0], [end]: parts[1] ?? parts[0] };
+}
+
+/** The one-to-four value box rule, as `inset` uses it. */
+function box(value: string): Record<string, string> | null {
+  const p = splitTopLevel(value, " ");
+  if (p.length === 0 || p.length > 4) return null;
+  const top = p[0];
+  const right = p[1] ?? top;
+  const bottom = p[2] ?? top;
+  const left = p[3] ?? right;
+  return { top, right, bottom, left };
+}
+
+/** Rewrite one declaration block, adding what Firefox 56 needs as it goes. */
+function legacyDeclarations(body: string): string {
+  let changed = false;
+  const out: string[] = [];
+
+  for (const declaration of splitTopLevel(body, ";")) {
+    const colon = declaration.indexOf(":");
+    if (colon !== -1) {
+      const property = declaration.slice(0, colon).trim();
+      const value = declaration.slice(colon + 1).trim();
+      const legacy = LEGACY_DECLARATIONS[property]?.(value);
+      if (legacy) {
+        for (const [name, replacement] of Object.entries(legacy)) {
+          out.push(`${name}:${replacement}`);
+        }
+        changed = true;
+      }
+    }
+    out.push(declaration);
+  }
+
+  return changed ? out.join(";") : body;
+}
+
+/**
+ * Everything above, over one stylesheet.
+ *
+ * Both passes only ever add: no rule is dropped and no declaration is
+ * rewritten in place, so an engine that understood the input still computes
+ * exactly what it computed before.
+ */
+export function addLegacyFallbacks(css: string): string {
+  return rewriteStyleRules(css, (selector, body) => {
+    const patched = legacyDeclarations(body);
+    const legacy = legacySelectorList(selector);
+    const original = `${selector}{${patched}}`;
+    return legacy ? `${legacy}{${patched}}${original}` : original;
+  });
+}
+
+/**
+ * Rewrite every style rule, descending through the conditional groups.
+ *
+ * `@keyframes`, `@font-face` and `@property` are stepped over rather than
+ * into: their contents look like rules and declarations but are neither, and
+ * a `from{}` is not a selector.
+ */
+function rewriteStyleRules(
+  css: string,
+  transform: (selector: string, body: string) => string,
+): string {
+  let out = "";
+  let i = 0;
+  let start = 0;
+
+  while (i < css.length) {
+    const ch = css[i];
+    if (ch === '"' || ch === "'") {
+      i = skipString(css, i);
+      continue;
+    }
+    if (ch === "/" && css[i + 1] === "*") {
+      const found = css.indexOf("*/", i + 2);
+      i = found === -1 ? css.length : found + 2;
+      continue;
+    }
+    if (ch === ";") {
+      out += css.slice(start, i + 1);
+      i += 1;
+      start = i;
+      continue;
+    }
+    if (ch !== "{") {
+      i += 1;
+      continue;
+    }
+
+    const prelude = css.slice(start, i);
+    const selector = prelude.trim();
+    const indent = prelude.slice(0, prelude.length - prelude.trimStart().length);
+    const close = findBlockEnd(css, i);
+    const body = css.slice(i + 1, close);
+
+    if (selector.startsWith("@")) {
+      out += /^@(media|supports|container|layer|document)\b/i.test(selector)
+        ? `${prelude}{${rewriteStyleRules(body, transform)}}`
+        : `${prelude}{${body}}`;
+    } else if (selector) {
+      out += indent + transform(selector, body);
+    } else {
+      out += `${prelude}{${body}}`;
+    }
+
+    i = close + 1;
+    start = i;
+  }
+
+  return out + css.slice(start);
+}
+
+/**
  * The engines this spacing fallback is for, and no others.
  *
  * Flexbox `gap` is Firefox 63. There is no feature query for it, so this
@@ -352,9 +534,11 @@ export function legacyCss(): Plugin {
           typeof asset.source === "string"
             ? asset.source
             : new TextDecoder().decode(asset.source);
-        // Layers first: the fallback reads the rules it is spacing, and it
-        // has to see them at the depth they will ship at.
-        asset.source = addFlexGapFallback(flattenCascadeLayers(source));
+        // Layers first: the later passes read the rules they are repairing,
+        // and have to see them at the depth they will ship at.
+        asset.source = addFlexGapFallback(
+          addLegacyFallbacks(flattenCascadeLayers(source)),
+        );
       }
     },
   };
