@@ -149,7 +149,193 @@ function findBlockEnd(css: string, open: number): number {
 }
 
 /**
- * Runs {@link flattenCascadeLayers} over every stylesheet a build emits.
+ * The engines this spacing fallback is for, and no others.
+ *
+ * Flexbox `gap` is Firefox 63. There is no feature query for it, so this
+ * tests unprefixed `row-gap`, which arrived in 61 when Grid's `grid-gap` was
+ * renamed. The two disagree only for 61 and 62, and what those get is the
+ * spacing they would have had anyway.
+ */
+const NO_FLEX_GAP = "@supports not (row-gap:1px)";
+
+/**
+ * Space rows and columns the way NEO does, for engines without `gap`.
+ *
+ * NEO never asks a container to distribute space; the spacing belongs to the
+ * item. `.toolTipOff` carries `margin-top: 3px`, `.colorTipOff` carries
+ * `margin-right: 4px`, `.layerControl` carries `margin-top: 6px`. That is
+ * what this reproduces -- a margin on each item after the first -- except
+ * that it is selected for rather than written onto every element, so a
+ * conditionally rendered button cannot leave a gap behind it and the call
+ * sites keep using `gap-*` like anything else in this package.
+ *
+ * Grids are handled by `grid-gap` instead, which Firefox 56 has had since
+ * Grid shipped in 52 and which gets multi-row spacing exactly right where a
+ * sibling margin would put a gutter before every item but the row's first.
+ *
+ * Everything emitted here sits inside `@supports not (row-gap:1px)`, so no
+ * engine that has `gap` ever reads a rule of it: the modern cascade is
+ * untouched, byte for byte, which is not something a change to 49 call sites
+ * could have promised.
+ *
+ * The one case it does not reproduce is a wrapping row, where the items of a
+ * second line keep the leading margin `gap` would have dropped.
+ */
+export function addFlexGapFallback(css: string): string {
+  const blocks: string[] = [];
+
+  forEachStyleRule(css, (selector, body, media) => {
+    // Every Tailwind gap utility is a single class, which is what makes
+    // `.flex-col` and `.grid` below composable with it. Anything else is
+    // hand-written and left alone.
+    if (!/^\.[^\s,>+~]+$/.test(selector)) return;
+
+    const gaps = readGaps(body);
+    if (!gaps.row && !gaps.column) return;
+
+    const rules: string[] = [];
+    const legacy: string[] = [];
+    if (gaps.row && gaps.column && gaps.row === gaps.column) {
+      legacy.push(`grid-gap:${gaps.row}`);
+    } else {
+      if (gaps.row) legacy.push(`grid-row-gap:${gaps.row}`);
+      if (gaps.column) legacy.push(`grid-column-gap:${gaps.column}`);
+    }
+    rules.push(`${selector}{${legacy.join(";")}}`);
+
+    /*
+     * A flex row, the default direction, spaces along the inline axis;
+     * `flex-col` spaces along the block one; a grid took `grid-gap` above and
+     * wants neither.
+     *
+     * Which container a rule is for is settled by `:not()` rather than by
+     * setting a margin and then zeroing it again further down. A reset would
+     * outrank the `ml-*` and `mt-*` utilities a child may carry of its own --
+     * `NeoWindow`'s title label is a `ml-[4px]` span inside a `gap-[3px]`
+     * row -- and silently drop them on exactly the browsers this is for.
+     */
+    if (gaps.column) {
+      rules.push(
+        `${selector}:not(.flex-col):not(.grid)>*+*{margin-left:${gaps.column}}`,
+      );
+    }
+    if (gaps.row) {
+      rules.push(`.flex-col${selector}>*+*{margin-top:${gaps.row}}`);
+    }
+
+    const emitted = rules.join("");
+    blocks.push(media.length ? `${media.join("{")}{${emitted}}` : emitted);
+  });
+
+  return blocks.length ? `${css}${NO_FLEX_GAP}{${blocks.join("")}}` : css;
+}
+
+/** The row and column gaps a declaration block asks for, if any. */
+function readGaps(body: string): { row?: string; column?: string } {
+  const gaps: { row?: string; column?: string } = {};
+  for (const declaration of splitTopLevel(body, ";")) {
+    const colon = declaration.indexOf(":");
+    if (colon === -1) continue;
+    const property = declaration.slice(0, colon).trim();
+    const value = declaration.slice(colon + 1).trim();
+    if (!value) continue;
+
+    if (property === "row-gap") gaps.row = value;
+    else if (property === "column-gap") gaps.column = value;
+    else if (property === "gap") {
+      // `gap: <row> <column>`, or one value standing for both.
+      const parts = splitTopLevel(value, " ").filter(Boolean);
+      gaps.row = parts[0];
+      gaps.column = parts[1] ?? parts[0];
+    }
+  }
+  return gaps;
+}
+
+/** Split on `separator`, ignoring any that sit inside brackets or quotes. */
+function splitTopLevel(value: string, separator: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  let i = 0;
+  while (i < value.length) {
+    const ch = value[i];
+    if (ch === '"' || ch === "'") {
+      i = skipString(value, i);
+      continue;
+    }
+    if (ch === "(" || ch === "[") depth += 1;
+    else if (ch === ")" || ch === "]") depth -= 1;
+    else if (ch === separator && depth === 0) {
+      parts.push(value.slice(start, i).trim());
+      start = i + 1;
+    }
+    i += 1;
+  }
+  parts.push(value.slice(start).trim());
+  return parts.filter((part) => part.length > 0);
+}
+
+/**
+ * Visit every style rule, with the at-rules it is nested in.
+ *
+ * `visit` receives the selector, the declaration block, and the preludes of
+ * the enclosing conditional rules, outermost first -- `gap` utilities reach
+ * this sheet under `@media` for their responsive and `pointer-coarse`
+ * variants, and a fallback for one has to be re-wrapped in the same query.
+ */
+function forEachStyleRule(
+  css: string,
+  visit: (selector: string, body: string, media: string[]) => void,
+  media: string[] = [],
+): void {
+  let i = 0;
+  let start = 0;
+
+  while (i < css.length) {
+    const ch = css[i];
+    if (ch === '"' || ch === "'") {
+      i = skipString(css, i);
+      continue;
+    }
+    if (ch === "/" && css[i + 1] === "*") {
+      const found = css.indexOf("*/", i + 2);
+      i = found === -1 ? css.length : found + 2;
+      continue;
+    }
+    if (ch === ";") {
+      // A statement rather than a block -- `@charset "utf-8";` and the like.
+      // What came before it is not the prelude of anything.
+      start = i + 1;
+      i += 1;
+      continue;
+    }
+    if (ch !== "{") {
+      i += 1;
+      continue;
+    }
+
+    const prelude = css.slice(start, i).trim();
+    const close = findBlockEnd(css, i);
+    const body = css.slice(i + 1, close);
+
+    if (prelude.startsWith("@")) {
+      // Only conditional groups contain style rules worth descending into.
+      // `@keyframes` percentages and `@property` descriptors are not rules.
+      if (/^@(media|supports|container|layer)\b/i.test(prelude)) {
+        forEachStyleRule(body, visit, [...media, prelude]);
+      }
+    } else if (prelude) {
+      visit(prelude, body, media);
+    }
+
+    i = close + 1;
+    start = i;
+  }
+}
+
+/**
+ * Runs the Firefox 56 rewrites over every stylesheet a build emits.
  *
  * `enforce: "post"` and `generateBundle` put it after Vite has minified the
  * CSS to `build.cssTarget`, so this rewrites the bytes that ship rather than
@@ -166,7 +352,9 @@ export function legacyCss(): Plugin {
           typeof asset.source === "string"
             ? asset.source
             : new TextDecoder().decode(asset.source);
-        asset.source = flattenCascadeLayers(source);
+        // Layers first: the fallback reads the rules it is spacing, and it
+        // has to see them at the depth they will ship at.
+        asset.source = addFlexGapFallback(flattenCascadeLayers(source));
       }
     },
   };

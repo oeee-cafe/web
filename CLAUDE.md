@@ -161,10 +161,25 @@ than the browser nobody here runs. Check it fails when you expect it to: an
 earlier version of that test quietly loaded `vite.config.ts` instead of the
 config under test and passed no matter what.
 
-What is *not* solved: flexbox `gap` is Firefox 63, so `gap-*` utilities do
-nothing there and those rows sit flush. It cannot be polyfilled in CSS —
-fixing it means margins instead of `gap` in the painter's own chrome, and
-`toolboxParity.browser.test.tsx` is what would hold that honest.
+Flexbox `gap` is Firefox 63, so `gap-*` utilities would do nothing there and
+every toolbox row would sit flush. `addFlexGapFallback()` spaces them the way
+NEO does — NEO never asks a container to distribute space, it hangs the
+spacing on the item (`.toolTipOff` carries `margin-top: 3px`, `.colorTipOff`
+carries `margin-right: 4px`), and the fallback is that same margin, selected
+for with `> * + *` instead of written onto every element. Grids get
+`grid-gap`, which Firefox 56 has had since Grid shipped in 52 and which gets
+a new row's first item right where a sibling margin would indent it.
+
+All of it sits inside `@supports not (row-gap:1px)`, so no engine that has
+`gap` reads a rule of it and the modern cascade is untouched — which is why
+this is generated rather than written into the 49 call sites.
+
+Two things it does not reproduce, both pinned in
+`vite/legacyBrowsers.browser.test.ts`: a wrapping row keeps the leading
+margin `gap` would have dropped on its second line, and on the axis being
+spaced the fallback outranks a child's own `ml-*`/`mt-*` (so `NeoWindow`'s
+title sits 3px from the dots rather than 7px). The other axis is untouched,
+which is what keeps the modals' `mb-*` intact.
 
 Runtime APIs are a separate matter from syntax: esbuild lowers grammar and
 nothing else. `structuredClone` (94), `Array.prototype.flatMap` (62) and

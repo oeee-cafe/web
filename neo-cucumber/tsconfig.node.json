@@ -29,5 +29,8 @@
     "vite.collaborate.config.ts",
     "vite.replay.config.ts",
     "vite/**/*.ts"
-  ]
+  ],
+  // The DOM-measuring test beside them belongs to the app project, which is
+  // the one with a `lib` that has a `document` in it.
+  "exclude": ["vite/**/*.browser.test.ts"]
 }
