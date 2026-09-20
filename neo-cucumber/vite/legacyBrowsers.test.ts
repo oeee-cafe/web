@@ -183,6 +183,29 @@ describe("addLegacyFallbacks: properties after Firefox 56", () => {
     expect(addLegacyFallbacks(css)).toBe(css);
   });
 
+  /*
+   * What actually hid NEO's grid, and only in the light palette: `#bbf` and
+   * `14px` run together into a five-character hex run that is not a colour,
+   * where `#22223f` and `14px` give a run of eight that is.
+   */
+  it("restores the space a minifier drops after a closing paren", () => {
+    expect(
+      addLegacyFallbacks(".g{background-image:linear-gradient(red,var(--a)14px)}"),
+    ).toBe(".g{background-image:linear-gradient(red,var(--a) 14px)}");
+  });
+
+  it("does not add a space where calc() would change meaning", () => {
+    for (const value of ["calc(var(--a)*2)", "calc(var(--a)-2px)", "calc(var(--a)/2)"]) {
+      const css = `.a{width:${value}}`;
+      expect(addLegacyFallbacks(css)).toBe(css);
+    }
+  });
+
+  it("does not reach inside a quoted value", () => {
+    const css = '.a{content:")x"}';
+    expect(addLegacyFallbacks(css)).toBe(css);
+  });
+
   it("leaves a declaration block it has nothing to say about alone", () => {
     const css = ".a{color:red;margin:0}";
     expect(addLegacyFallbacks(css)).toBe(css);
@@ -399,6 +422,19 @@ describe("the offline bundle, as Firefox 56 would read it", () => {
     expect(text).toContain("margin-inline-start:auto");
     expect(text).toMatch(/top:[^;]+;right:[^;]+;bottom:[^;]+;left:[^;]+;inset:/);
     expect(text).toContain("-moz-user-select:");
+  }, 60_000);
+
+  it("never lets a value end a function hard against the next token", async () => {
+    const text = await stylesheet();
+
+    /*
+     * `var(--neo-bk2)14px` is two tokens by the spec and one run of text to
+     * an engine that substitutes by re-parsing the string. The light palette
+     * turned it into `#bbf14px` and lost NEO's grid; the dark palette's
+     * `#22223f14px` happened to survive. Nothing in the sheet may ship that
+     * way, whichever colour is standing in the gap.
+     */
+    expect(text.match(/\)[0-9A-Za-z#]/g) ?? []).toEqual([]);
   }, 60_000);
 
   it("asks for hard pixels in a spelling Firefox 56 knows", async () => {

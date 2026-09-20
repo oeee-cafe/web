@@ -182,14 +182,26 @@ degrades:
   painter slightly worse, it makes it smoothed — the drawing canvas and the
   replay canvas are both scaled up and both ask for hard pixels.
 
-That last one is worth remembering as a lesson about *how* these surface.
-It was reported as "the grid is missing in light mode; dark is fine", which
-reads like a colour bug and is not one. NEO's ground is a 16px tile with a
-one pixel line, and in the light palette that line is a 16% step down in
-luminance where the dark palette's is a 90% step up. One softened edge, one
-declaration, one engine — and only one of the two themes looks broken. When
-something here fails in one theme only, suspect a rendering hint before
-suspecting the tokens.
+- **Whitespace a minifier is entitled to drop.** `var(--neo-bk2)14px` is two
+  tokens by the spec, so esbuild removes the space between them. Gecko's
+  first custom-property implementation substituted by re-serialising the
+  value and parsing the text again, which joins them back into one run.
+  `separateAfterFunctions()` puts the space back — never before `-`, `+`,
+  `*` or `/`, because inside `calc()` that whitespace is part of the grammar.
+
+That last one is the lesson worth keeping, because of how it presented: "the
+grid is missing in light mode; dark mode is fine". A symptom in one theme and
+not the other reads like a colour or contrast problem, and it is worth
+measuring luminance exactly once before noticing that `.neo-ground` is a
+single rule that mentions neither theme. What differed was the *length* of
+the substituted value: `#bbf` and `14px` join into `#bbf14px`, a five
+character hex run and not a colour, where `#22223f` and `14px` join into
+`#22223f14px`, whose run of eight is one. Light lost the whole
+`background-image`; dark kept its line.
+
+So when a theme-specific symptom has no theme-specific rule behind it, stop
+looking at the colours and look at what their token text does to the
+characters beside it.
 
 `static/style.css` is served as written and never sees this build pass, so
 the prefixed spelling is in that file by hand for

@@ -246,6 +246,46 @@ function box(value: string): Record<string, string> | null {
   return { top, right, bottom, left };
 }
 
+/**
+ * Put back the space a minifier drops after a closing parenthesis.
+ *
+ * `var(--neo-bk2)14px` is two tokens to a tokenizer that follows the spec,
+ * so esbuild is right to save the byte. Gecko's first custom-property
+ * implementation substituted by re-serializing the value and parsing the
+ * text again, and that turns the pair into one run of characters.
+ *
+ * Which is why NEO's grid went missing in the light palette and not the dark
+ * one, from a single rule that says nothing about either: `#bbf` and `14px`
+ * run together into `#bbf14px`, whose hex run is five characters and not a
+ * colour, while `#22223f` and `14px` give `#22223f14px`, whose run of eight
+ * is. One theme's ground kept its line and the other's lost the whole
+ * `background-image`.
+ *
+ * A space is added only before a character that could have joined the
+ * previous token -- never before `-`, `+`, `*` or `/`, because inside
+ * `calc()` the whitespace around those is part of the grammar and
+ * `calc(var(--a)-2px)` does not mean `calc(var(--a) -2px)`.
+ */
+function separateAfterFunctions(value: string): string {
+  let out = "";
+  let i = 0;
+
+  while (i < value.length) {
+    const ch = value[i];
+    if (ch === '"' || ch === "'") {
+      const end = skipString(value, i);
+      out += value.slice(i, end);
+      i = end;
+      continue;
+    }
+    out += ch;
+    if (ch === ")" && /[0-9A-Za-z#]/.test(value[i + 1] ?? "")) out += " ";
+    i += 1;
+  }
+
+  return out;
+}
+
 /** Rewrite one declaration block, adding what Firefox 56 needs as it goes. */
 function legacyDeclarations(body: string): string {
   let changed = false;
@@ -253,18 +293,29 @@ function legacyDeclarations(body: string): string {
 
   for (const declaration of splitTopLevel(body, ";")) {
     const colon = declaration.indexOf(":");
-    if (colon !== -1) {
-      const property = declaration.slice(0, colon).trim();
-      const value = declaration.slice(colon + 1).trim();
-      const legacy = LEGACY_DECLARATIONS[property]?.(value);
-      if (legacy) {
-        for (const [name, replacement] of Object.entries(legacy)) {
-          out.push(`${name}:${replacement}`);
-        }
-        changed = true;
-      }
+    if (colon === -1) {
+      out.push(declaration);
+      continue;
     }
-    out.push(declaration);
+
+    const property = declaration.slice(0, colon).trim();
+    const value = declaration.slice(colon + 1).trim();
+    const spaced = separateAfterFunctions(value);
+
+    const legacy = LEGACY_DECLARATIONS[property]?.(spaced);
+    if (legacy) {
+      for (const [name, replacement] of Object.entries(legacy)) {
+        out.push(`${name}:${replacement}`);
+      }
+      changed = true;
+    }
+
+    if (spaced === value) {
+      out.push(declaration);
+    } else {
+      out.push(`${property}:${spaced}`);
+      changed = true;
+    }
   }
 
   return changed ? out.join(";") : body;
