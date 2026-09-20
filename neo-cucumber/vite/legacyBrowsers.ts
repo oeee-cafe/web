@@ -206,6 +206,22 @@ const LEGACY_DECLARATIONS: Record<
   // `.NEO` for the same reason. `tab-size` unprefixed is 91.
   "user-select": (v) => ({ "-moz-user-select": v }),
   "tab-size": (v) => ({ "-moz-tab-size": v }),
+  /*
+   * `pixelated` is Firefox 93 and `crisp-edges` 65; `-moz-crisp-edges` has
+   * been there since 3.6. Dropping the declaration does not leave a painter
+   * slightly worse, it leaves it smoothed: the drawing canvas and the replay
+   * canvas are both scaled up and both say `pixelated` to stop exactly that.
+   *
+   * It is also what hid NEO's grid. The ground is a 16px tile with a one
+   * pixel line, and in the light palette that line is a 16% step down in
+   * luminance where the dark palette's is a 90% step up -- so a softened
+   * edge that dark shrugs off takes light with it. Same declaration, same
+   * engine, and only one of them looks broken.
+   */
+  "image-rendering": (v) =>
+    v === "pixelated" || v === "crisp-edges"
+      ? { "image-rendering": "-moz-crisp-edges" }
+      : null,
 };
 
 /** `<start> [<end>]`, the way a logical axis shorthand is written. */

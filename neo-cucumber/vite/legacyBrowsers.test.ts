@@ -164,6 +164,25 @@ describe("addLegacyFallbacks: properties after Firefox 56", () => {
     );
   });
 
+  /*
+   * The one that hid NEO's grid in light and left it alone in dark: a
+   * softened one-pixel line survives a 90% luminance step and does not
+   * survive a 16% one.
+   */
+  it("gives image-rendering the spelling an old Gecko knows", () => {
+    expect(addLegacyFallbacks(".a{image-rendering:pixelated}")).toBe(
+      ".a{image-rendering:-moz-crisp-edges;image-rendering:pixelated}",
+    );
+    expect(addLegacyFallbacks(".a{image-rendering:crisp-edges}")).toBe(
+      ".a{image-rendering:-moz-crisp-edges;image-rendering:crisp-edges}",
+    );
+  });
+
+  it("leaves image-rendering alone when it is not asking for hard pixels", () => {
+    const css = ".a{image-rendering:auto}";
+    expect(addLegacyFallbacks(css)).toBe(css);
+  });
+
   it("leaves a declaration block it has nothing to say about alone", () => {
     const css = ".a{color:red;margin:0}";
     expect(addLegacyFallbacks(css)).toBe(css);
@@ -380,6 +399,17 @@ describe("the offline bundle, as Firefox 56 would read it", () => {
     expect(text).toContain("margin-inline-start:auto");
     expect(text).toMatch(/top:[^;]+;right:[^;]+;bottom:[^;]+;left:[^;]+;inset:/);
     expect(text).toContain("-moz-user-select:");
+  }, 60_000);
+
+  it("asks for hard pixels in a spelling Firefox 56 knows", async () => {
+    const text = await stylesheet();
+
+    // Every `pixelated` in the sheet, and there is one on the drawing canvas
+    // as well as on the ground, arrives with the prefixed form ahead of it.
+    const modern = text.match(/image-rendering:pixelated/g) ?? [];
+    const legacy = text.match(/image-rendering:-moz-crisp-edges/g) ?? [];
+    expect(modern.length).toBeGreaterThan(0);
+    expect(legacy.length).toBe(modern.length);
   }, 60_000);
 });
 

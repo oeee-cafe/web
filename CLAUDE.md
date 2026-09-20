@@ -177,6 +177,23 @@ degrades:
   `background-image` with it. That is why `.neo-ground` in `src/App.css`
   writes each stop twice; it is the grid behind the canvas, and the symptom
   was a flat field.
+- **`image-rendering`.** `pixelated` is Firefox 93 and `crisp-edges` is 65;
+  `-moz-crisp-edges` has been there since 3.6. Losing this does not make a
+  painter slightly worse, it makes it smoothed — the drawing canvas and the
+  replay canvas are both scaled up and both ask for hard pixels.
+
+That last one is worth remembering as a lesson about *how* these surface.
+It was reported as "the grid is missing in light mode; dark is fine", which
+reads like a colour bug and is not one. NEO's ground is a 16px tile with a
+one pixel line, and in the light palette that line is a 16% step down in
+luminance where the dark palette's is a 90% step up. One softened edge, one
+declaration, one engine — and only one of the two themes looks broken. When
+something here fails in one theme only, suspect a rendering hint before
+suspecting the tokens.
+
+`static/style.css` is served as written and never sees this build pass, so
+the prefixed spelling is in that file by hand for
+`.neo-cucumber-replay-canvas`.
 
 Every pass only ever *adds*. No rule is dropped and no declaration rewritten
 in place, so an engine that understood the input still computes exactly what
