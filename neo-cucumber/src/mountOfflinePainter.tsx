@@ -5,7 +5,6 @@ import { i18n } from "@lingui/core";
 import Painter from "./Painter";
 import { DefaultI18n } from "./components/DefaultI18n";
 import { setupI18n } from "./utils/i18n";
-import { installNeoGround } from "./neo/neoBackground";
 import { PainterLabelContext } from "./hooks/usePainterLabels";
 import type { ImageSource, PainterError, PainterHandle } from "./public";
 
@@ -29,7 +28,6 @@ export function mountOfflinePainter(
   }
 
   setupI18n(config.locale || "en");
-  installNeoGround();
 
   let mounted = true;
   let controller: PainterHandle | null = null;
