@@ -138,20 +138,34 @@
  * in CSS makes it follow theme tokens synchronously; a generated data URL can
  * retain pixels from the preceding theme even after the solid colour changes.
  */
+/*
+ * Each stop is written twice rather than as `transparent 0 14px`. Two
+ * positions on one colour stop is CSS Images 4, which is Firefox 83, and a
+ * gradient an engine cannot parse takes the whole `background-image` with it
+ * -- on Waterfox Classic that is the grid gone and a flat field left behind.
+ * The long form says the same thing and has been understood since gradients
+ * existed.
+ */
 .neo-ground {
   background-color: var(--neo-bk);
   background-image:
     linear-gradient(
       to right,
-      transparent 0 14px,
-      var(--neo-bk2) 14px 15px,
-      transparent 15px 16px
+      transparent 0,
+      transparent 14px,
+      var(--neo-bk2) 14px,
+      var(--neo-bk2) 15px,
+      transparent 15px,
+      transparent 16px
     ),
     linear-gradient(
       to bottom,
-      transparent 0 14px,
-      var(--neo-bk2) 14px 15px,
-      transparent 15px 16px
+      transparent 0,
+      transparent 14px,
+      var(--neo-bk2) 14px,
+      var(--neo-bk2) 15px,
+      transparent 15px,
+      transparent 16px
     );
   background-size: 16px 16px;
   image-rendering: pixelated;

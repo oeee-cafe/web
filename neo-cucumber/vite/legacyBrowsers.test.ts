@@ -4,7 +4,11 @@ import { build } from "vite";
 import type { Rollup } from "vite";
 import type { Node } from "acorn";
 import offlineConfig from "../vite.offline.config";
-import { addFlexGapFallback, flattenCascadeLayers } from "./legacyBrowsers";
+import {
+  addFlexGapFallback,
+  addLegacyFallbacks,
+  flattenCascadeLayers,
+} from "./legacyBrowsers";
 
 describe("flattenCascadeLayers", () => {
   it("unwraps a layer and keeps what was in it", () => {
@@ -64,6 +68,105 @@ describe("flattenCascadeLayers", () => {
       expect(flattened).toContain(declaration);
     }
     expect(flattened).not.toContain("@layer");
+  });
+});
+
+describe("addLegacyFallbacks: selector lists", () => {
+  /*
+   * The bug this exists for. One unknown selector invalidates the whole
+   * list, and Tailwind hands its theme to `:root,:host` -- so Firefox 56
+   * lost `--color-white` and `--spacing` together, which showed up as a
+   * canvas with the page's background instead of white.
+   */
+  it("keeps the readable half of a list, ahead of the original", () => {
+    expect(addLegacyFallbacks(":root,:host{--color-white:#fff}")).toBe(
+      ":root{--color-white:#fff}:root,:host{--color-white:#fff}",
+    );
+  });
+
+  it("keeps a list that mixes plain selectors with :where()", () => {
+    expect(
+      addLegacyFallbacks("button,input:where([type=button]){appearance:button}"),
+    ).toBe(
+      "button{appearance:button}button,input:where([type=button]){appearance:button}",
+    );
+  });
+
+  it("does not split a comma that belongs to :is()", () => {
+    const out = addLegacyFallbacks("h1,:is(h2,h3){margin:0}");
+    expect(out).toBe("h1{margin:0}h1,:is(h2,h3){margin:0}");
+  });
+
+  it("adds nothing when the whole list is unreadable", () => {
+    const css = "::file-selector-button{margin:0}";
+    expect(addLegacyFallbacks(css)).toBe(css);
+  });
+
+  it("adds nothing when every selector is already readable", () => {
+    const css = ".a,.b{color:red}";
+    expect(addLegacyFallbacks(css)).toBe(css);
+  });
+
+  it("reaches rules nested in a conditional group", () => {
+    expect(
+      addLegacyFallbacks("@media print{:root,:host{--a:1px}}"),
+    ).toBe("@media print{:root{--a:1px}:root,:host{--a:1px}}");
+  });
+
+  it("does not treat a keyframe step as a selector", () => {
+    const css = "@keyframes spin{from{inset:0}to{inset:1px}}";
+    expect(addLegacyFallbacks(css)).toBe(css);
+  });
+});
+
+describe("addLegacyFallbacks: properties after Firefox 56", () => {
+  it("expands the logical axis shorthands to their longhands", () => {
+    expect(addLegacyFallbacks(".p{padding-inline:4px}")).toBe(
+      ".p{padding-inline-start:4px;padding-inline-end:4px;padding-inline:4px}",
+    );
+    expect(addLegacyFallbacks(".p{padding-block:1px 2px}")).toBe(
+      ".p{padding-block-start:1px;padding-block-end:2px;padding-block:1px 2px}",
+    );
+  });
+
+  it("expands inset by the one-to-four value box rule", () => {
+    expect(addLegacyFallbacks(".a{inset:0}")).toBe(
+      ".a{top:0;right:0;bottom:0;left:0;inset:0}",
+    );
+    expect(addLegacyFallbacks(".a{inset:1px 2px 3px}")).toBe(
+      ".a{top:1px;right:2px;bottom:3px;left:2px;inset:1px 2px 3px}",
+    );
+  });
+
+  it("does not split a value on the spaces inside calc()", () => {
+    expect(addLegacyFallbacks(".a{inset:calc(var(--s) * 2)}")).toContain(
+      "top:calc(var(--s) * 2);right:calc(var(--s) * 2)",
+    );
+  });
+
+  it("prefixes user-select and tab-size the way NEO does", () => {
+    expect(addLegacyFallbacks(".a{user-select:none}")).toBe(
+      ".a{-moz-user-select:none;user-select:none}",
+    );
+    expect(addLegacyFallbacks(".a{tab-size:4}")).toBe(
+      ".a{-moz-tab-size:4;tab-size:4}",
+    );
+  });
+
+  /*
+   * `padding:1px;padding-inline:4px` and `padding-inline:4px;padding:1px`
+   * compute differently, so the longhands go immediately before the
+   * shorthand they stand in for rather than at the top of the block.
+   */
+  it("keeps each fallback next to the declaration it replaces", () => {
+    expect(addLegacyFallbacks(".a{padding:1px;padding-inline:4px}")).toBe(
+      ".a{padding:1px;padding-inline-start:4px;padding-inline-end:4px;padding-inline:4px}",
+    );
+  });
+
+  it("leaves a declaration block it has nothing to say about alone", () => {
+    const css = ".a{color:red;margin:0}";
+    expect(addLegacyFallbacks(css)).toBe(css);
   });
 });
 
@@ -225,19 +328,58 @@ describe("the offline bundle, as Firefox 56 would read it", () => {
     expect(offenders).toEqual([]);
   }, 60_000);
 
-  it("ships no cascade layers, which would take the chrome with them", async () => {
+  /** The one stylesheet the offline bundle emits, as text. */
+  async function stylesheet(): Promise<string> {
     const css = (await built).find(
       (entry) => entry.type === "asset" && entry.fileName.endsWith(".css"),
     );
     expect(css?.type).toBe("asset");
     const source = (css as { source: string | Uint8Array }).source;
-    const text =
-      typeof source === "string" ? source : new TextDecoder().decode(source);
+    return typeof source === "string"
+      ? source
+      : new TextDecoder().decode(source);
+  }
+
+  it("ships no cascade layers, which would take the chrome with them", async () => {
+    const text = await stylesheet();
 
     expect(text).not.toContain("@layer");
     // The sheet is still the whole sheet: the layers were unwrapped, not cut.
     expect(text).toContain("--neo-tool-button");
     expect(text.length).toBeGreaterThan(20_000);
+  }, 60_000);
+
+  it("leaves the theme readable without Shadow DOM selectors", async () => {
+    const text = await stylesheet();
+
+    /*
+     * Tailwind declares its theme on `:root,:host`, and `:host` is Firefox
+     * 63 -- one unknown selector voids the whole list, so Firefox 56 lost
+     * `--color-white` and `--spacing` at a stroke. The canvas came out the
+     * colour of the page behind it because `bg-white` had nothing to resolve.
+     */
+    expect(text).toMatch(/(^|[;}]):root\{[^}]*--color-white/);
+    expect(text).toMatch(/(^|[;}]):root\{[^}]*--spacing/);
+  }, 60_000);
+
+  it("draws NEO's grid with stops an old engine can parse", async () => {
+    const text = await stylesheet();
+
+    // Two positions on one stop is Firefox 83, and an unparseable gradient
+    // takes the whole `background-image` with it -- the ground goes flat.
+    const ground = text.match(/\.neo-ground\{[^}]*\}/)?.[0] ?? "";
+    expect(ground).toContain("linear-gradient");
+    expect(ground).not.toMatch(/transparent\s+0\s+14px/);
+  }, 60_000);
+
+  it("spells the post-56 shorthands out as longhands too", async () => {
+    const text = await stylesheet();
+
+    // `inset`, the logical axis shorthands and unprefixed `user-select` are
+    // all Firefox 66 or later; `mx-auto` on the canvas rides on one of them.
+    expect(text).toContain("margin-inline-start:auto");
+    expect(text).toMatch(/top:[^;]+;right:[^;]+;bottom:[^;]+;left:[^;]+;inset:/);
+    expect(text).toContain("-moz-user-select:");
   }, 60_000);
 });
 
