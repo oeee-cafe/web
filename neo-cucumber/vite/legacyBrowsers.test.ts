@@ -165,9 +165,9 @@ describe("addLegacyFallbacks: properties after Firefox 56", () => {
   });
 
   /*
-   * The one that hid NEO's grid in light and left it alone in dark: a
-   * softened one-pixel line survives a 90% luminance step and does not
-   * survive a 16% one.
+   * For the two canvases, which are scaled up and smoothed without it. Not
+   * for the ground: this went in while chasing NEO's missing grid and did
+   * not fix it.
    */
   it("gives image-rendering the spelling an old Gecko knows", () => {
     expect(addLegacyFallbacks(".a{image-rendering:pixelated}")).toBe(

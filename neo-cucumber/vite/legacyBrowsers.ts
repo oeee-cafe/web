@@ -212,11 +212,10 @@ const LEGACY_DECLARATIONS: Record<
    * slightly worse, it leaves it smoothed: the drawing canvas and the replay
    * canvas are both scaled up and both say `pixelated` to stop exactly that.
    *
-   * It is also what hid NEO's grid. The ground is a 16px tile with a one
-   * pixel line, and in the light palette that line is a 16% step down in
-   * luminance where the dark palette's is a 90% step up -- so a softened
-   * edge that dark shrugs off takes light with it. Same declaration, same
-   * engine, and only one of them looks broken.
+   * This was added while chasing NEO's missing grid and is not what fixed
+   * it -- that was `separateAfterFunctions()` below. It stays because the
+   * two canvases need it on its own account, not because it explains
+   * anything about the ground.
    */
   "image-rendering": (v) =>
     v === "pixelated" || v === "crisp-edges"
