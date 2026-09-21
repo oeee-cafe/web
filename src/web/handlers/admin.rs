@@ -772,13 +772,13 @@ mod tests {
         // `adjustable` or the slider changes nothing.
         assert!(rendered.contains("admin-grid adjustable"));
         assert!(rendered.contains("id=\"admin-cols\""));
-        // The nav bar is full-bleed with its contents in the page column, the
-        // same as every other page — admin no longer widens the header to match
-        // its own full-bleed grid.
+        // The toolbar is the same on every page — admin does not get a header
+        // of its own to match its full-bleed grid. It spans the window, with
+        // no page column to widen.
         // Matched on the class rather than the whole tag: the nav also carries
-        // the boost attribute now, and this assertion is about its layout.
+        // the boost attribute, and this assertion is about its layout.
         assert!(rendered.contains("<nav class=\"nav-bar\""));
-        assert!(rendered.contains("id=\"menubar\" class=\"center\""));
+        assert!(rendered.contains("<div id=\"menubar\">"));
     }
 
     #[test]
