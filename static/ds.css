@@ -826,7 +826,7 @@ html {
 /* In the desktop app on macOS the window's controls take the first 96px of
    the bar (the app pads it), which only the first row needs to clear: the
    sections' row reaches back to the usual 16px. */
-html[data-desktop="macos"]:not([data-fullscreen]) .nav-bar.is-stacked .toolbar-links {
+html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   width: calc(100% + 80px);
   margin-left: -80px;
 }
