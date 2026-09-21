@@ -4,15 +4,24 @@
   <div class="center"><h2>{{ ftl_get_message("profile-draw-banner") }}</h2></div>
   <link rel="stylesheet"
         href="{{ '/static/neo-cucumber/offline.css' | cachebuster | safe }}" />
-  {# The painter has always covered this page whole -- it used to pin itself to
-     the viewport, over the site's own header. It only fills what it is given
-     now, so the page has to say that it wants the screen, which keeps this
-     page looking exactly as it did. #}
+  {# The painter takes the screen below the toolbar. It only fills what it is
+     given, so the page has to say that it wants the screen; it stops at the
+     toolbar because that is the window's title bar on every page, the
+     painter's included. #}
   <style>
+    /* The ground behind the painter is the window's: the system grey and
+       its grid, the same surface as the toolbar above, in either theme.
+       NEO's own lavender ground belongs to a page that is nothing but the
+       painter. Three :roots outrank every theme selector in the painter's
+       sheet, which uses two. */
+    :root:root:root {
+      --neo-bk: var(--ground-color);
+      --neo-bk2: var(--ground-grid-solid);
+    }
     #neo-cucumber-root {
       position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      height: 100dvh;
+      top: 53px; left: 0; right: 0; bottom: 0;
+      height: calc(100dvh - 53px);
       z-index: 50;
     }
   </style>

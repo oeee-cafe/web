@@ -29,28 +29,30 @@
   --leading-normal: 1.5;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --main-bg-color: white;
-    --main-text-color: black;
-    --main-nav-bg-color: #c4ee62;
-    --main-border-color: #3c6712;
-    --main-highlight-color: #ef842d;
-    --main-anchor-color: black;
-    /* Darker than the `gray` and `#666` it replaces, both of which failed
-       contrast against white (3.9:1 and — in dark mode — 2.4:1). This is
-       7:1. */
-    --main-text-muted-color: #595959;
-    --main-highlight-hover-color: #d97826;
-    --danger-color: #dc2626;
-    --danger-hover-color: #b91c1c;
-    --danger-bg-color: #fef2f2;
-    --danger-text-color: #991b1b;
-  }
+/* Light unless the system is dark and nothing says otherwise, or the painter's
+   theme switch -- `neo-cucumber-theme`, applied as `data-theme` on the root
+   by theme_head.jinja before the page paints -- says dark. The painter's own
+   tokens follow the same rule, so the page and the painter never disagree. */
+:root {
+  --main-bg-color: white;
+  --main-text-color: black;
+  --main-nav-bg-color: #c4ee62;
+  --main-border-color: #3c6712;
+  --main-highlight-color: #ef842d;
+  --main-anchor-color: black;
+  /* Darker than the `gray` and `#666` it replaces, both of which failed
+     contrast against white (3.9:1 and — in dark mode — 2.4:1). This is
+     7:1. */
+  --main-text-muted-color: #595959;
+  --main-highlight-hover-color: #d97826;
+  --danger-color: #dc2626;
+  --danger-hover-color: #b91c1c;
+  --danger-bg-color: #fef2f2;
+  --danger-text-color: #991b1b;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --main-bg-color: #2c2c2c;
     --main-text-color: #e0e0e0;
     --main-nav-bg-color: #2c2c2c;
@@ -65,6 +67,22 @@
     --danger-bg-color: rgba(220, 38, 38, 0.12);
     --danger-text-color: #fca5a5;
   }
+}
+
+:root[data-theme="dark"] {
+  --main-bg-color: #2c2c2c;
+  --main-text-color: #e0e0e0;
+  --main-nav-bg-color: #2c2c2c;
+  --main-border-color: #5a5a5a;
+  --main-highlight-color: #ff8c00;
+  --main-anchor-color: #e0e0e0;
+  /* 5.3:1 on the dark background. */
+  --main-text-muted-color: #a0a0a0;
+  --main-highlight-hover-color: #ffa333;
+  --danger-color: #ef4444;
+  --danger-hover-color: #dc2626;
+  --danger-bg-color: rgba(220, 38, 38, 0.12);
+  --danger-text-color: #fca5a5;
 }
 
 /* Aliases for names the drafts page already used but nothing ever defined, so
@@ -222,9 +240,13 @@ nav a:visited,
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --drawing-frame: rgba(255, 255, 255, 0.4);
   }
+}
+
+:root[data-theme="dark"] {
+  --drawing-frame: rgba(255, 255, 255, 0.4);
 }
 
 .sr-only {

@@ -2,6 +2,7 @@
 <html lang="{{ ftl_lang }}">
   <head>
     <meta charset="UTF-8">
+    {% include "theme_head.jinja" %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>
       {% if parent_post %}Re: {{ parent_post.title }}{% else %}{{ ftl_get_message("community-drawing-new") }}{% endif %}
