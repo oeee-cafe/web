@@ -774,6 +774,17 @@ pub async fn post_view(
     }
 }
 
+/// Whether the replay is watched on the post's own page, in place of the
+/// drawing: every NEO recording is, and post_view.jinja starts it when the
+/// address ends in `#replay`, which is where the replay routes now send
+/// someone once they have been let in. Tegaki's player takes the whole
+/// window, so its recordings keep a page of their own.
+fn plays_inline(post: &std::collections::HashMap<String, Option<String>>) -> bool {
+    post.get("replay_filename")
+        .and_then(|name| name.as_deref())
+        .is_some_and(|name| name.ends_with(".pch"))
+}
+
 /// Whether this viewer may watch the post's replay.
 ///
 /// The recording is kept either way — `allow_replay` says who may watch it, and
@@ -953,6 +964,10 @@ pub async fn post_replay_view(
             return Ok(redirect_to_login(&format!("/posts/{}/replay", id)));
         }
         return Ok(StatusCode::NOT_FOUND.into_response());
+    }
+
+    if plays_inline(&post) {
+        return Ok(Redirect::to(&format!("/posts/{}#replay", id)).into_response());
     }
 
     let common_ctx =
@@ -3106,6 +3121,10 @@ pub async fn post_replay_view_by_login_name(
         .get("community_id")
         .and_then(|id| id.as_ref())
         .and_then(|id_str| Uuid::parse_str(id_str).ok());
+
+    if plays_inline(&post) {
+        return Ok(Redirect::to(&format!("/@{}/{}#replay", login_name, post_id)).into_response());
+    }
 
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;

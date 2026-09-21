@@ -75,21 +75,41 @@
   {% set reply_widths = [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1024] %}
   {% set reply_heights = [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 768, 800] %}
   {% set can_relay = post.image_tool in ["neo", "neo-cucumber", "cucumber"] and post.allow_relay == "true" %}
+  {% set can_watch_replay = post.replay_filename and (post.allow_replay == "true" or current_user.id == post.author_id or current_user.role == "admin") %}
+  {% set inline_replay = can_watch_replay and post.replay_filename[-4:] == ".pch" %}
   {% set two_tone = post_community and post_community.background_color and post_community.foreground_color %}
   <div class="post-page">
     <div class="post-stage">
-      {# Shown at a whole multiple of its own size that fits, as the painter
-         zooms -- a fractional step would make some pixels wider than
-         others. Larger than the stage, it is scaled down smoothly. #}
-      <div class="post-stage-frame" data-post-stage
-           data-width="{{ post.image_width }}" data-height="{{ post.image_height }}">
-        {% if can_relay %}<a href="/@{{ post.login_name }}/{{ post_id }}/relay" title="{{ ftl_get_message('post-relay') }}">{% endif %}
-        <img draggable="false" class="post-stage-image"
-             width="{{ post.image_width }}"
-             height="{{ post.image_height }}"
-             alt="{{ post.title }}"
-             src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-        {% if can_relay %}</a>{% endif %}
+      <div class="post-stage-column">
+        {# Shown at a whole multiple of its own size that fits, as the painter
+           zooms -- a fractional step would make some pixels wider than
+           others. Larger than the stage, it is scaled down smoothly. #}
+        <div class="post-stage-frame" data-post-stage
+             data-width="{{ post.image_width }}" data-height="{{ post.image_height }}">
+          {% if can_relay %}<a href="/@{{ post.login_name }}/{{ post_id }}/relay" title="{{ ftl_get_message('post-relay') }}">{% endif %}
+          <img draggable="false" class="post-stage-image"
+               width="{{ post.image_width }}"
+               height="{{ post.image_height }}"
+               alt="{{ post.title }}"
+               src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
+          {% if can_relay %}</a>{% endif %}
+        </div>
+        {% if inline_replay %}
+          {# The replay plays here, in the drawing's place and at its size:
+             the viewer is fetched when it is asked for, mounted in this box,
+             and taken down again by Close. #}
+          <div class="post-stage-replay" id="post-stage-replay" hidden
+               data-replay="{{ r2_public_endpoint_url|safe }}/replay/{{ post.replay_filename[:2] }}/{{ post.replay_filename }}"
+               data-viewer="{{ '/static/viewer/neo-cucumber-replay.js' | cachebuster }}"
+               data-lang="{{ ftl_lang }}"></div>
+          <div class="post-stage-bar">
+            <button type="button" class="ds-button" data-replay-start>
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg>
+              {{ ftl_get_message("post-replay") }}
+            </button>
+            <button type="button" class="ds-button" data-replay-stop hidden>{{ ftl_get_message("close") }}</button>
+          </div>
+        {% endif %}
       </div>
     </div>
 
@@ -143,8 +163,10 @@
             {# A replay the author has closed is still linked for the author
                themselves and for staff, labelled either way so whoever is
                looking can tell the link is not one the public gets. #}
-            {% if post.replay_filename and (post.allow_replay == "true" or current_user.id == post.author_id or current_user.role == "admin") %}
-              <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/replay">{{ ftl_get_message("post-replay") }}</a>
+            {% if can_watch_replay %}
+              {# A NEO replay plays over the drawing (data-replay-start); the
+                 address is still the replay's, for a new tab or no script. #}
+              <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/replay"{% if inline_replay %} data-replay-start{% endif %}>{{ ftl_get_message("post-replay") }}</a>
               {% if post.allow_replay != "true" %}
                 <span class="muted">({{ ftl_get_message("replay-private" if current_user.id == post.author_id else "replay-private-staff") }})</span>
               {% endif %}
@@ -349,7 +371,7 @@
         var img = frame.querySelector("img");
         var width = parseInt(frame.getAttribute("data-width"), 10);
         var height = parseInt(frame.getAttribute("data-height"), 10);
-        var stage = frame.parentNode;
+        var stage = frame.parentNode.parentNode;
         var room = stage.clientWidth;
         // The stage's height is the window's, less the toolbar, on a wide
         // screen; a phone scrolls, so only the width counts there.
@@ -361,6 +383,64 @@
       }
       fitStage();
       window.addEventListener("resize", fitStage);
+
+      // The replay, in the drawing's place. The viewer is its own small
+      // bundle, fetched the first time it is wanted; it draws at the file's
+      // size, and the stage shows it at the size the drawing was shown.
+      var box = document.getElementById("post-stage-replay");
+      if (!box) return;
+      var frame = document.querySelector("[data-post-stage]");
+      var stopButton = document.querySelector("[data-replay-stop]");
+      var startButtons = document.querySelectorAll("[data-replay-start]");
+      var viewer = null;
+      function loadViewer(done) {
+        if (window.NeoCucumberReplay) return done();
+        var script = document.createElement("script");
+        script.src = box.getAttribute("data-viewer");
+        script.onload = done;
+        document.head.appendChild(script);
+      }
+      function start() {
+        if (viewer) return;
+        var shown = frame.querySelector("img").getBoundingClientRect().width;
+        box.style.setProperty("--post-stage-shown", Math.round(shown) + "px");
+        box.hidden = false;
+        frame.hidden = true;
+        stopButton.hidden = false;
+        for (var i = 0; i < startButtons.length; i++) {
+          if (startButtons[i].tagName === "BUTTON") startButtons[i].hidden = true;
+        }
+        loadViewer(function () {
+          viewer = window.NeoCucumberReplay.mount(box, {
+            replay: box.getAttribute("data-replay"),
+            width: parseInt(frame.getAttribute("data-width"), 10),
+            height: parseInt(frame.getAttribute("data-height"), 10),
+            lang: box.getAttribute("data-lang")
+          });
+        });
+      }
+      function stop() {
+        if (viewer) viewer.dispose();
+        viewer = null;
+        box.hidden = true;
+        frame.hidden = false;
+        stopButton.hidden = true;
+        for (var i = 0; i < startButtons.length; i++) startButtons[i].hidden = false;
+        if (location.hash === "#replay" && window.history.replaceState) {
+          history.replaceState(null, "", location.pathname + location.search);
+        }
+      }
+      for (var i = 0; i < startButtons.length; i++) {
+        startButtons[i].addEventListener("click", function (event) {
+          if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+          event.preventDefault();
+          start();
+          box.scrollIntoView({ block: "nearest" });
+        });
+      }
+      stopButton.addEventListener("click", stop);
+      // Arriving from a replay address (the routes send NEO replays here).
+      if (location.hash === "#replay") start();
     })();
 
     function modalToggle(id, open) {
