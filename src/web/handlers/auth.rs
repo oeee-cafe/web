@@ -49,6 +49,9 @@ pub struct CreateUserForm {
     password_confirm: String,
     display_name: String,
     next: Option<String>,
+    /// The Community Guidelines and Privacy Policy box. A checkbox that is
+    /// not ticked is not sent at all, so it is its presence that agrees.
+    agree: Option<String>,
 }
 
 pub async fn do_signup(
@@ -64,6 +67,18 @@ pub async fn do_signup(
         .map(|u| u.preferred_language)
         .unwrap_or_else(|| None);
     let bundle = get_bundle(&accept_language, user_preferred_language);
+
+    // Checked here as well as by the box's `required`: a form posted without
+    // the page, or from a page cached before the box existed, must not make
+    // an account nobody agreed for.
+    if form.agree.is_none() {
+        messages.error(safe_get_message(&bundle, "signup-agree-required"));
+        let back = match form.next.as_deref() {
+            Some(next) => format!("/signup?next={}", urlencoding::encode(next)),
+            None => "/signup".to_string(),
+        };
+        return Ok(Redirect::to(&back).into_response());
+    }
 
     if form.password != form.password_confirm {
         messages.error(safe_get_message(

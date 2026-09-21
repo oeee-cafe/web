@@ -1,50 +1,57 @@
 {% extends "base.jinja" %}
+{% from "user_pill_macro.jinja" import user_pill %}
 {% block title %}
-  {{ super() }} | {{ ftl_get_message("brand") }}?
+  {{ super() }} | {{ ftl_get_message("nav-about") }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <h2>{{ ftl_get_message("brand") }}?</h2>
-    <p>{{ ftl_get_message("about") }}</p>
-    <p style="margin-top: 2em;">
-      <a href="/privacy">{{ ftl_get_message("privacy-policy") }}</a>
-      ·
-      <a href="/policy">{{ ftl_get_message("community-guidelines") }}</a>
-    </p>
-    <h3>Links</h3>
-    <ul>
-      <li>
-        iOS: <a href="https://apps.apple.com/us/app/oeee-cafe/id6754636117">App Store</a>
-      </li>
-      <li>
-        Android: <a href="https://play.google.com/store/apps/details?id=cafe.oeee">Google Play</a>
-      </li>
-      <li>
-        Fediverse: <a href="https://planet.moe/@oeee_cafe">@oeee_cafe</a>
-      </li>
-      <li>
-        GitHub: <a href="https://github.com/oeee-cafe">oeee-cafe</a>
-      </li>
-      <li>
-        X: <a href="https://x.com/oeee_cafe">@oeee_cafe</a>
-      </li>
-    </ul>
-    {% if users_with_public_posts_and_banner|length > 0 %}
-      <h3>{{ ftl_get_message("user-contributors") }}</h3>
-      <div class="banners-grid">
-        {% for user in users_with_public_posts_and_banner %}
-          <div class="banners-grid-item">
-            <a href="/@{{ user.login_name }}"
-               alt="{{ user.display_name }} (@{{ user.login_name }})">
-              <img width="{{ user.banner_image_width }}"
-                   height="{{ user.banner_image_height }}"
-                   alt="{{ user.display_name }} (@{{ user.login_name }}) 동맹 배너"
-                   class="banner"
-                   src="{{ r2_public_endpoint_url }}/image/{{ user.banner_image_filename[:2] }}/{{ user.banner_image_filename }}" />
-            </a>
-          </div>
-        {% endfor %}
+  {# What the site is, as an application's About window says it: the name
+     and a line on what it is, then where else to get it, where else to find
+     it, the documents it keeps, and the people who draw here -- each a
+     button or a chip rather than a bulleted list of links. #}
+  <div class="profile about-page">
+    <section class="profile-card ds-card about-card">
+      <div class="profile-identity">
+        <h1 class="profile-name">{{ ftl_get_message("brand") }}</h1>
+        <p class="about-lede">{{ ftl_get_message("about") }}</p>
       </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="profile-section-label">{{ ftl_get_message("about-apps") }}</div>
+      <div class="about-buttons">
+        <a class="ds-button" href="https://apps.apple.com/us/app/oeee-cafe/id6754636117" target="_blank" rel="noopener">App Store (iOS)<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+        <a class="ds-button" href="https://play.google.com/store/apps/details?id=cafe.oeee" target="_blank" rel="noopener">Google Play (Android)<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="profile-section-label">{{ ftl_get_message("about-elsewhere") }}</div>
+      <div class="profile-chips">
+        <a class="profile-chip" href="https://planet.moe/@oeee_cafe" target="_blank" rel="noopener">Fediverse · @oeee_cafe<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+        <a class="profile-chip" href="https://github.com/oeee-cafe" target="_blank" rel="noopener">GitHub · oeee-cafe<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+        <a class="profile-chip" href="https://x.com/oeee_cafe" target="_blank" rel="noopener">X · @oeee_cafe<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="profile-section-label">{{ ftl_get_message("about-documents") }}</div>
+      <div class="about-buttons">
+        <a class="ds-button" href="/policy">{{ ftl_get_message("community-guidelines") }}</a>
+        <a class="ds-button" href="/privacy">{{ ftl_get_message("privacy-policy") }}</a>
+      </div>
+    </section>
+
+    {% if users_with_public_posts_and_banner|length > 0 %}
+      {# Everyone who draws here in the open and has a banner, as the same
+         pill a profile shows its allies in. #}
+      <section class="profile-section">
+        <div class="profile-section-label">{{ ftl_get_message("user-contributors") }}</div>
+        <div class="profile-allies">
+          {% for user in users_with_public_posts_and_banner %}
+            {{ user_pill("/@" ~ user.login_name, user.banner_image_filename, user.banner_image_width, user.banner_image_height, user.display_name, "@" ~ user.login_name, r2_public_endpoint_url) }}
+          {% endfor %}
+        </div>
+      </section>
     {% endif %}
   </div>
 {% endblock content %}

@@ -3411,3 +3411,102 @@ a.user-pill:hover {
 .auth-divider span {
   padding: 0 var(--ds-space-3);
 }
+
+/* The agreement: a box to tick, and the two pages it agrees to. */
+.auth-agree {
+  margin: var(--ds-space-2) 0 var(--ds-space-3);
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-field);
+}
+
+.auth-agree-check {
+  display: flex;
+  align-items: flex-start;
+  font-size: var(--ds-text-m);
+  line-height: 1.45;
+}
+
+.auth-agree-check input {
+  flex: none;
+  margin: 2px 8px 0 0;
+}
+
+.auth-agree-links {
+  display: flex;
+  flex-wrap: wrap;
+  margin: var(--ds-space-2) 0 0 24px;
+}
+
+.auth-agree-links > * {
+  margin: 0 6px 6px 0;
+}
+
+/* ---------------------------------------------------------------------------
+   About, and the documents the site keeps
+   --------------------------------------------------------------------------- */
+.about-page {
+  max-width: 820px;
+}
+
+.about-lede {
+  margin: var(--ds-space-2) 0 0;
+  max-width: 60ch;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-l);
+  line-height: 1.5;
+}
+
+.about-buttons {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.about-buttons > * {
+  margin: 0 var(--ds-space-2) var(--ds-space-2) 0;
+}
+
+.doc-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.doc-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--ds-space-4);
+}
+
+.doc-bar > * {
+  margin-bottom: var(--ds-space-2);
+}
+
+.doc-card {
+  padding: var(--ds-space-6) var(--ds-space-6) var(--ds-space-5);
+}
+
+.doc-title {
+  margin: 0 0 var(--ds-space-4);
+  font-size: var(--ds-text-2xl);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* A measure the eye can follow, and room between lines. */
+.doc-body {
+  max-width: 64ch;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-base);
+  line-height: 1.75;
+  white-space: pre-line;
+  word-wrap: break-word;
+}
+
+@media (max-width: 600px) {
+  .doc-card {
+    padding: var(--ds-space-5) var(--ds-space-4);
+  }
+}
