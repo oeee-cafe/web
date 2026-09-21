@@ -1,35 +1,26 @@
 {% import "comments_macro.jinja" as comments_macro %}
 
+{# A drawing in a thread -- the one this replies to, or one replying to it:
+   a small framed square and what it is, as one target. Replies to replies
+   step in under their parent. #}
 {% macro render_post_card(post, depth) %}
-  <div style="margin-left: {{ depth * 20 }}px; margin-bottom: 15px;">
-    <a href="/@{{ post.user_login_name }}/{{ post.id }}" class="post-card" style="text-decoration: none; color: inherit; display: block; border: 1px solid var(--main-border-color); padding: 15px;">
-      <div style="display: flex; gap: 10px; align-items: flex-start;">
+  <div class="post-thread-item" style="margin-left: {{ depth * 16 }}px">
+    <a href="/@{{ post.user_login_name }}/{{ post.id }}" class="post-thread-card">
+      <span class="post-thread-thumb">
         <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
-             alt="{{ post.title or 'No title' }}"
-             style="max-width: 100px; height: auto; border: 1px solid #ccc;">
-        <div style="flex-grow: 1;">
-          <div>
-            <span style="font-weight: bold;">
-              {% if post.title %}{{ post.title }}{% else %}{{ ftl_get_message("post-no-title") }}{% endif %}
-            </span>
-          </div>
-          {% if post.content %}
-            <div style="color: var(--main-text-muted-color); font-size: 0.85em; margin-top: 4px; line-height: 1.3;">
-              {{ post.content[:100] }}{% if post.content|length > 100 %}...{% endif %}
-            </div>
-          {% endif %}
-          <div style="color: var(--main-text-muted-color); font-size: 0.9em; margin-top: 4px;">
-            by <span style="font-weight: normal;">{{ post.user_display_name }}</span>
-            <span class="muted">{{ post.user_actor_handle }}</span>
-            {% if post.published_at_formatted %}
-              · {{ post.published_at_formatted }}
-            {% endif %}
-            {% if post.comments_count > 0 %}
-              · {{ post.comments_count }} {{ ftl_get_message("post-comments") }}
-            {% endif %}
-          </div>
-        </div>
-      </div>
+             alt=""
+             draggable="false"
+             loading="lazy"
+             decoding="async" />
+      </span>
+      <span class="post-thread-text">
+        <span class="post-thread-title">{% if post.title %}{{ post.title }}{% else %}{{ ftl_get_message("post-no-title") }}{% endif %}</span>
+        <span class="post-thread-meta">
+          {{ post.user_display_name }}
+          {% if post.published_at %}· {{ post.published_at|ago }}{% endif %}
+          {% if post.comments_count > 0 %}· {{ post.comments_count }} {{ ftl_get_message("post-comments") }}{% endif %}
+        </span>
+      </span>
     </a>
     {% if post.children %}
       {% for child in post.children %}
@@ -76,316 +67,359 @@
   {% endif %}
 {% endblock head %}
 {% block content %}
-  <div class="center">
-    <div class="post-sidebar">
-      {# Parent post #}
+  {# A drawing, laid out as an application shows a document: the drawing on
+     the ground, as the painter shows it, and beside it one card that says
+     what it is and what you can do with it; then the drawings answering it
+     and the conversation. On a phone the card follows the drawing. #}
+  {# The reply-with-drawing sizes, as the community page offers them. #}
+  {% set reply_widths = [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1024] %}
+  {% set reply_heights = [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 768, 800] %}
+  {% set can_relay = post.image_tool in ["neo", "neo-cucumber", "cucumber"] and post.allow_relay == "true" %}
+  {% set two_tone = post_community and post_community.background_color and post_community.foreground_color %}
+  <div class="post-page">
+    <div class="post-stage">
+      {# Shown at a whole multiple of its own size that fits, as the painter
+         zooms -- a fractional step would make some pixels wider than
+         others. Larger than the stage, it is scaled down smoothly. #}
+      <div class="post-stage-frame" data-post-stage
+           data-width="{{ post.image_width }}" data-height="{{ post.image_height }}">
+        {% if can_relay %}<a href="/@{{ post.login_name }}/{{ post_id }}/relay" title="{{ ftl_get_message('post-relay') }}">{% endif %}
+        <img draggable="false" class="post-stage-image"
+             width="{{ post.image_width }}"
+             height="{{ post.image_height }}"
+             alt="{{ post.title }}"
+             src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
+        {% if can_relay %}</a>{% endif %}
+      </div>
+    </div>
+
+    <div class="post-side">
       {% if parent_post_data %}
-        <div class="parent-post-section">
-          <h3 class="section-heading">{{ ftl_get_message("post-replying-to") }}</h3>
+        <section class="post-thread">
+          <div class="profile-section-label">{{ ftl_get_message("post-replying-to") }}</div>
           {{ render_post_card(parent_post_data, 0) }}
-        </div>
+        </section>
       {% endif %}
 
-      {# Two-column layout: Image on left, Info on right #}
-      <div class="post-detail-container">
-        {# LEFT COLUMN: Image #}
-        <div class="post-detail-left">
-          {% if post.image_tool in ["neo", "neo-cucumber", "cucumber"] and post.allow_relay == "true" %}
-            <a href="/@{{ post.login_name }}/{{ post_id }}/relay">
-              <img draggable="false" class="post-image-full"
-                   width="{{ post.image_width }}"
-                   height="{{ post.image_height }}"
-                   alt="{{ post.title }}"
-                   src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-            </a>
-          {% else %}
-            <img draggable="false" class="post-image-full"
-                 width="{{ post.image_width }}"
-                 height="{{ post.image_height }}"
-                 alt="{{ post.title }}"
-                 src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-          {% endif %}
+      <section class="ds-card post-inspector">
+        {# Who drew it, above what it is called, as a byline sits over a
+           headline; the people who drew it together follow. #}
+        <div class="post-inspector-byline">
+          <a class="post-inspector-author" href="/@{{ post.login_name }}">{{ post.display_name }}</a>
+          <span class="post-inspector-handle">@{{ post.login_name }}</span>
+          {% for participant in collaborative_participants %}
+            {% if participant.login_name != post.login_name %}
+              <span class="post-inspector-handle">·</span>
+              <a class="post-inspector-author" href="/@{{ participant.login_name }}" title="@{{ participant.login_name }}">{{ participant.display_name }}</a>
+            {% endif %}
+          {% endfor %}
         </div>
-
-        {# RIGHT COLUMN: Info #}
-        <div class="post-detail-right">
-          {# Author Info #}
-          <div class="post-author-info">
-            <div>
-              <strong>{{ ftl_get_message("post-author") }}:</strong>
-              <a href="/@{{ post.login_name }}">{{ post.display_name }}</a>
-              <span class="muted fediverse-handle">@{{ post.login_name }}@{{ domain }}</span>
-            </div>
-            {% if collaborative_participants %}
-              <div class="collaborative-participants">
-                <strong>{{ ftl_get_message("post-collaborative-participants") }}:</strong>
-                {% for participant in collaborative_participants %}
-                  <a href="/@{{ participant.login_name }}">@{{ participant.display_name }}</a>{% if not loop.last %}, {% endif %}
+        {% block post_edit_block %}
+          <div id="post-edit-container" hx-target="this" hx-swap="outerHTML">
+            <h1 class="post-inspector-title">
+              {% if post.title %}{{ post.title }}{% else %}{{ ftl_get_message("post-no-title") }}{% endif %}
+            </h1>
+            {% if post.content %}
+              <div class="post-inspector-description ds-selectable">{{ post.content|markdown|safe }}</div>
+            {% endif %}
+            {% if hashtags %}
+              <div class="post-inspector-tags">
+                {% for hashtag in hashtags %}
+                  <a href="/hashtags/{{ hashtag.name|urlencode }}" class="profile-chip">#{{ hashtag.display_name }}</a>
                 {% endfor %}
               </div>
             {% endif %}
           </div>
+        {% endblock post_edit_block %}
 
-          {# Metadata #}
-          <div class="post-metadata">
-            <p>{{ ftl_get_message("post-published-at") }}: {{ post.published_at }}</p>
-            <p>
-              {{ ftl_get_message("post-duration") }}: {{ post.paint_duration }}
-              {# A replay the author has closed is still linked for the author
-                 themselves and for staff, labelled either way so whoever is
-                 looking can tell the link is not one the public gets. #}
-              {% if post.replay_filename and (post.allow_replay == "true" or current_user.id == post.author_id or current_user.role == "admin") %}
-                · <a href="/@{{ post.login_name }}/{{ post_id }}/replay">{{ ftl_get_message("post-replay") }}</a>
-                {% if post.allow_replay != "true" %}
-                  <span class="muted">({{ ftl_get_message("replay-private" if current_user.id == post.author_id else "replay-private-staff") }})</span>
-                {% endif %}
-              {% endif %}
-            </p>
-            {% if post.community_slug %}
-              <p>{{ ftl_get_message("community") }}: <a href="/communities/@{{ post.community_slug }}">{{ post.community_name }}</a>
-                {% if current_user.id == post.author_id and (not post_community or post_community.visibility != "private") and not post.parent_post_id and not (post_community and post_community.background_color and post_community.foreground_color) %}
-                  (<a href="/@{{ post.login_name }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit") }}</a>)
-                {% endif %}
-              </p>
-            {% else %}
-              {# Personal post - show edit link #}
-              {% if current_user.id == post.author_id and not post.parent_post_id %}
-                <p>(<a href="/@{{ post.login_name }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit-community-button") }}</a>)</p>
+        <dl class="post-inspector-facts">
+          {% if post.published_at %}
+            <dt>{{ ftl_get_message("post-published-at") }}</dt>
+            <dd title="{{ post.published_at }}">{{ post.published_at_utc|ago if post.published_at_utc else post.published_at }}</dd>
+          {% endif %}
+          <dt>{{ ftl_get_message("post-duration") }}</dt>
+          <dd>
+            {{ post.paint_duration }}
+            {# A replay the author has closed is still linked for the author
+               themselves and for staff, labelled either way so whoever is
+               looking can tell the link is not one the public gets. #}
+            {% if post.replay_filename and (post.allow_replay == "true" or current_user.id == post.author_id or current_user.role == "admin") %}
+              <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/replay">{{ ftl_get_message("post-replay") }}</a>
+              {% if post.allow_replay != "true" %}
+                <span class="muted">({{ ftl_get_message("replay-private" if current_user.id == post.author_id else "replay-private-staff") }})</span>
               {% endif %}
             {% endif %}
-            <p>HIT: {{ post.viewer_count }}</p>
-          </div>
-
-          {# Header: Title, Hashtags, and Description #}
-          {% block post_edit_block %}
-            <div id="post-edit-container" hx-target="this" hx-swap="outerHTML">
-              <div class="post-header">
-                <h1 class="post-title">
-                  {% if post.title %}
-                    {{ post.title }}
-                  {% else %}
-                    {{ ftl_get_message("post-no-title") }}
-                  {% endif %}
-                </h1>
-                {% if hashtags %}
-                  <div class="post-hashtags">
-                    {% for hashtag in hashtags %}
-                      <a href="/hashtags/{{ hashtag.name|urlencode }}" class="hashtag-link">#{{ hashtag.display_name }}</a>
-                    {% endfor %}
-                  </div>
+          </dd>
+          {% if post.community_slug or (current_user.id == post.author_id and not post.parent_post_id) %}
+            <dt>{{ ftl_get_message("community") }}</dt>
+            <dd>
+              {% if post.community_slug %}
+                <a href="/communities/@{{ post.community_slug }}">{{ post.community_name }}</a>
+                {% if current_user.id == post.author_id and (not post_community or post_community.visibility != "private") and not post.parent_post_id and not two_tone %}
+                  <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit") }}</a>
                 {% endif %}
-              </div>
-
-              {# Description #}
-              {% if post.content %}
-                <div class="post-content">{{ post.content|markdown|safe }}</div>
+              {% else %}
+                <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit-community-button") }}</a>
               {% endif %}
-            </div>
-          {% endblock post_edit_block %}
+            </dd>
+          {% endif %}
+          <dt>HIT</dt>
+          <dd>{{ post.viewer_count }}</dd>
+        </dl>
 
-          {# Actions #}
-          <div class="post-actions">
-            {% if current_user %}
-              <div class="post-action-buttons">
-                {% if post.image_tool in ["neo", "neo-cucumber", "cucumber"] and post.allow_relay == "true" %}
-                  <button type="button" onclick="window.location.href='/@{{ post.login_name }}/{{ post_id }}/relay'">{{ ftl_get_message("post-relay") }}</button>
-                {% endif %}
-                <button type="button" onclick="document.getElementById('reply-form-{{ post_id }}').style.display = document.getElementById('reply-form-{{ post_id }}').style.display === 'none' ? 'block' : 'none'">{{ ftl_get_message("post-reply-with-drawing") }}</button>
-                <button type="button" onclick="
-                  const url = '{{ base_url|safe }}/@{{ post.login_name }}/{{ post_id }}';
-                  if (navigator.share) {
-                    navigator.share({ title: '{{ post.title|default(ftl_get_message("post-no-title"))|safe }}', url: url });
-                  } else {
-                    navigator.clipboard.writeText(url).then(() => alert('{{ ftl_get_message("post-share-copied") }}'));
-                  }
-                ">{{ ftl_get_message("post-share") }}</button>
-                {% if current_user.id != post.author_id %}
-                  <button type="button" onclick="showReportModal()">{{ ftl_get_message("post-report") }}</button>
-                {% endif %}
-                {% if current_user.id == post.author_id %}
-                  <button hx-get="/posts/{{ post_id }}/edit" hx-target="#post-edit-container" hx-swap="outerHTML">{{ ftl_get_message("edit") }}</button>
-                  <form hx-delete="/posts/{{ post_id }}"
-                        hx-confirm="{{ ftl_get_message('post-delete-confirm') }}"
-                        hx-target="body"
-                        style="display: inline;"
-                        hx-disable="find button">
-                    <button type="submit">{{ ftl_get_message("delete") }}</button>
-                  </form>
-                {% endif %}
-              </div>
-              <fieldset id="reply-form-{{ post_id }}" style="display: none;">
-                <legend>{{ ftl_get_message("post-reply-select-tool") }}</legend>
-                {% if post_community and post_community.background_color and post_community.foreground_color %}
-                  <form action="/draw" method="post" onsubmit="setOrientationDimensions(event, this)">
-                    <input type="hidden" name="tool" value="neo" />
-                    <input type="hidden" name="community_id" value="{{ post.community_id }}" />
-                    <input type="hidden" name="parent_post_id" value="{{ post_id }}" />
-                    <input type="hidden" name="width" value="640" />
-                    <input type="hidden" name="height" value="480" />
-                    <label>
-                      <input type="radio" name="orientation" value="landscape" checked />
-                      {{ ftl_get_message('community-drawing-landscape') }} (640 × 480)
-                    </label>
-                    <label>
-                      <input type="radio" name="orientation" value="portrait" />
-                      {{ ftl_get_message('community-drawing-portrait') }} (480 × 640)
-                    </label>
-                    <input type="submit" value="Start Drawing" />
-                  </form>
-                  <script>
-                    function setOrientationDimensions(event, form) {
-                      const orientation = form.querySelector('input[name="orientation"]:checked').value;
-                      if (orientation === 'landscape') {
-                        form.querySelector('input[name="width"]').value = '640';
-                        form.querySelector('input[name="height"]').value = '480';
-                      } else if (orientation === 'portrait') {
-                        form.querySelector('input[name="width"]').value = '480';
-                        form.querySelector('input[name="height"]').value = '640';
-                      }
-                    }
-                  </script>
-                {% else %}
-                  <form action="/draw" method="post">
-                    <input type="hidden" name="parent_post_id" value="{{ post_id }}" />
-                    {% if post.community_id %}
-                    <input type="hidden" name="community_id" value="{{ post.community_id }}" />
-                    {% endif %}
-                    <select name="tool">
-                      <option value="neo" selected>Neo Cucumber</option>
-                      <option value="tegaki">Tegaki</option>
-                      <option value="cucumber">Cucumber</option>
-                    </select>
-                    <select name="width">
-                      <option value="300" selected>300</option>
-                      <option value="350">350</option>
-                      <option value="400">400</option>
-                      <option value="450">450</option>
-                      <option value="500">500</option>
-                      <option value="550">550</option>
-                      <option value="600">600</option>
-                      <option value="650">650</option>
-                      <option value="700">700</option>
-                      <option value="750">750</option>
-                      <option value="800">800</option>
-                      <option value="850">850</option>
-                      <option value="900">900</option>
-                      <option value="950">950</option>
-                      <option value="1000">1000</option>
-                      <option value="1024">1024</option>
-                    </select>
-                    X
-                    <select name="height">
-                      <option value="300" selected>300</option>
-                      <option value="350">350</option>
-                      <option value="400">400</option>
-                      <option value="450">450</option>
-                      <option value="500">500</option>
-                      <option value="550">550</option>
-                      <option value="600">600</option>
-                      <option value="650">650</option>
-                      <option value="700">700</option>
-                      <option value="750">750</option>
-                      <option value="768">768</option>
-                      <option value="800">800</option>
-                    </select>
-                    <input type="submit" value="Start Drawing" />
-                  </form>
-                {% endif %}
-              </fieldset>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      {# Full-width sections below #}
-      <div class="post-full-width-section">
         <div class="post-reactions-container">{% include "post_reactions.jinja" %}</div>
-      </div>
 
-      <div class="post-comments">
-        <h2>{{ ftl_get_message("post-comments") }}</h2>
-        <div id="comments">
+        <div class="post-inspector-actions">
+          {% if current_user %}
+            <button type="button" class="ds-button ds-button-primary" onclick="showPostDrawModal()">{{ ftl_get_message("post-reply-with-drawing") }}</button>
+            {% if can_relay %}
+              <a class="ds-button" href="/@{{ post.login_name }}/{{ post_id }}/relay">{{ ftl_get_message("post-relay") }}</a>
+            {% endif %}
+          {% endif %}
+          <button type="button" class="ds-button" data-share-url="{{ base_url|safe }}/@{{ post.login_name }}/{{ post_id }}"
+                  data-share-title="{{ post.title or ftl_get_message('post-no-title') }}"
+                  data-share-copied="{{ ftl_get_message('post-share-copied') }}"
+                  onclick="sharePost(this)">{{ ftl_get_message("post-share") }}</button>
+          {% if current_user and current_user.id == post.author_id %}
+            <button type="button" class="ds-button" hx-get="/posts/{{ post_id }}/edit" hx-target="#post-edit-container" hx-swap="outerHTML">{{ ftl_get_message("edit") }}</button>
+            <form hx-delete="/posts/{{ post_id }}"
+                  hx-confirm="{{ ftl_get_message('post-delete-confirm') }}"
+                  hx-target="body"
+                  hx-disable="find button">
+              <button type="submit" class="ds-button ds-button-danger">{{ ftl_get_message("delete") }}</button>
+            </form>
+          {% elif current_user %}
+            <button type="button" class="ds-button" onclick="showReportModal()">{{ ftl_get_message("post-report") }}</button>
+          {% endif %}
+        </div>
+      </section>
+
+      {% if child_posts %}
+        <section class="post-thread">
+          <div class="profile-section-label">{{ ftl_get_message("post-child-posts") }}</div>
+          {% for child in child_posts %}
+            {{ render_post_card(child, 0) }}
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="ds-card post-comments" aria-labelledby="post-comments-heading">
+        <h2 id="post-comments-heading" class="profile-section-label">{{ ftl_get_message("post-comments") }}</h2>
+        {# The list alone is what posting a comment replaces; the form stays.
+           It used to be inside the replaced element, so after one comment
+           there was nowhere to write the next without reloading. #}
+        <div id="comments" class="ds-selectable">
           {% if comments %}
             {{ comments_macro.comments(comments, current_user) }}
           {% else %}
-            <p>
+            <p class="profile-empty">
               {{ ftl_get_message("post-no-comments") }}
               {% if not current_user %}{{ ftl_get_message("post-no-comments-signin") }}{% endif %}
             </p>
           {% endif %}
-          {% if current_user %}
-            <form id="comment-form" hx-post="/comments" hx-swap="outerHTML" hx-target="#comments"
-                  hx-disable="find button">
-              <input type="hidden" name="post_id" value="{{ post_id }}">
-              <input type="hidden" id="parent_comment_id" name="parent_comment_id" value="">
-              <div id="reply-info" style="display: none; margin-bottom: 10px; padding: 8px; background: var(--secondary-bg-color); border-left: 3px solid var(--main-border-color);">
-                <span id="reply-to-text"></span>
-                <button type="button"
-                        hx-on:click="document.getElementById('parent_comment_id').value = ''; document.getElementById('reply-info').style.display = 'none';"
-                        style="margin-left: 10px;">Cancel</button>
-              </div>
-              <textarea id="comment-content" name="content"></textarea>
-              <button type="submit">{{ ftl_get_message("post-comment") }}</button>
-            </form>
-          {% endif %}
         </div>
+        {% if current_user %}
+          <form id="comment-form" class="post-comment-form" hx-post="/comments" hx-target="#comments" hx-swap="innerHTML"
+                hx-disable="find button">
+            <input type="hidden" name="post_id" value="{{ post_id }}">
+            <input type="hidden" id="parent_comment_id" name="parent_comment_id" value="">
+            <div id="reply-info" class="post-comment-replying" style="display: none;">
+              <span id="reply-to-text"></span>
+              <button type="button" class="ds-button ds-button-quiet ds-button-small"
+                      hx-on:click="document.getElementById('parent_comment_id').value = ''; document.getElementById('reply-info').style.display = 'none';">{{ ftl_get_message("cancel") }}</button>
+            </div>
+            <textarea id="comment-content" class="ds-textarea" name="content" rows="3" required
+                      aria-label="{{ ftl_get_message('post-comment') }}"></textarea>
+            <div class="post-comment-actions">
+              <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-comment") }}</button>
+            </div>
+          </form>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+
+  {% if current_user %}
+    {# Reply with a drawing: the painter's choices, asked for when they are
+       needed, as on a community's page. #}
+    <div id="post-draw-modal" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="post-draw-title">
+      <div class="ds-modal-panel">
+        <h2 id="post-draw-title">{{ ftl_get_message("post-reply-with-drawing") }}</h2>
+        {% if two_tone %}
+          <form action="/draw" method="post" onsubmit="setOrientationDimensions(this)">
+            <input type="hidden" name="tool" value="neo" />
+            <input type="hidden" name="community_id" value="{{ post.community_id }}" />
+            <input type="hidden" name="parent_post_id" value="{{ post_id }}" />
+            <input type="hidden" name="width" value="640" />
+            <input type="hidden" name="height" value="480" />
+            <div class="form-field">
+              <span class="ds-label">{{ ftl_get_message('community-drawing-orientation') }}</span>
+              <label class="community-draw-choice">
+                <input type="radio" name="orientation" value="landscape" checked />
+                {{ ftl_get_message('community-drawing-landscape') }} <span class="ds-help">640 × 480</span>
+              </label>
+              <label class="community-draw-choice">
+                <input type="radio" name="orientation" value="portrait" />
+                {{ ftl_get_message('community-drawing-portrait') }} <span class="ds-help">480 × 640</span>
+              </label>
+            </div>
+            <div class="form-actions community-draw-actions">
+              <button type="button" class="ds-button" onclick="hidePostDrawModal()">{{ ftl_get_message("cancel") }}</button>
+              <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-reply-with-drawing") }}</button>
+            </div>
+          </form>
+        {% else %}
+          <form action="/draw" method="post">
+            <input type="hidden" name="parent_post_id" value="{{ post_id }}" />
+            {% if post.community_id %}
+              <input type="hidden" name="community_id" value="{{ post.community_id }}" />
+            {% endif %}
+            <div class="form-field">
+              <label class="ds-label" for="post-draw-tool">{{ ftl_get_message('community-drawing-tool') }}</label>
+              <select id="post-draw-tool" name="tool" class="ds-select">
+                <option value="neo" selected>Neo Cucumber</option>
+                <option value="tegaki">Tegaki</option>
+                <option value="cucumber">Cucumber</option>
+              </select>
+            </div>
+            <div class="form-field community-draw-size">
+              <label>
+                <span class="ds-label">{{ ftl_get_message('community-drawing-width') }}</span>
+                <select name="width" class="ds-select">
+                  {% for w in reply_widths %}
+                    <option value="{{ w }}" {% if w == 300 %}selected{% endif %}>{{ w }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <span class="community-draw-times" aria-hidden="true">×</span>
+              <label>
+                <span class="ds-label">{{ ftl_get_message('community-drawing-height') }}</span>
+                <select name="height" class="ds-select">
+                  {% for h in reply_heights %}
+                    <option value="{{ h }}" {% if h == 300 %}selected{% endif %}>{{ h }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+            <div class="form-actions community-draw-actions">
+              <button type="button" class="ds-button" onclick="hidePostDrawModal()">{{ ftl_get_message("cancel") }}</button>
+              <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-reply-with-drawing") }}</button>
+            </div>
+          </form>
+        {% endif %}
       </div>
-
-      {% if child_posts %}
-        <div class="post-child-posts">
-          <h2>{{ ftl_get_message("post-child-posts") }}</h2>
-          {% for child in child_posts %}
-            {{ render_post_card(child, 0) }}
-          {% endfor %}
-        </div>
-      {% endif %}
     </div>
-  </div>
+  {% endif %}
 
-  {# Report Modal #}
-  <div id="report-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: var(--main-bg-color); padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
-      <h2>{{ ftl_get_message("post-report-title") }}</h2>
-      {# `required` on the textarea is the empty-description check: htmx runs
-         HTML5 validation before it will issue a request for a form, so the
-         hand-written length test this replaces had nothing left to do. #}
-      <form id="report-form"
-            hx-post="/posts/{{ post_id }}/report"
-            hx-target="this"
-            hx-swap="outerHTML"
-            hx-disable="find button">
-        <label for="report-description">{{ ftl_get_message("post-report-description-label") }}</label>
-        <textarea id="report-description"
-                  name="description"
-                  required
-                  rows="5"
-                  style="width: 100%; margin-top: 8px; padding: 8px;"
-                  placeholder="{{ ftl_get_message('post-report-description-placeholder') }}"></textarea>
-        <div style="margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;">
-          <button type="button" onclick="hideReportModal()">{{ ftl_get_message("cancel") }}</button>
-          <button type="submit">{{ ftl_get_message("post-report-submit") }}</button>
-        </div>
-      </form>
+  {% if current_user and current_user.id != post.author_id %}
+    <div id="report-modal" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="report-title">
+      <div class="ds-modal-panel">
+        <h2 id="report-title">{{ ftl_get_message("post-report-title") }}</h2>
+        {# `required` on the textarea is the empty-description check: htmx runs
+           HTML5 validation before it will issue a request for a form. #}
+        <form id="report-form"
+              hx-post="/posts/{{ post_id }}/report"
+              hx-target="this"
+              hx-swap="outerHTML"
+              hx-disable="find button">
+          <label class="ds-label" for="report-description">{{ ftl_get_message("post-report-description-label") }}</label>
+          <textarea id="report-description"
+                    class="ds-textarea"
+                    name="description"
+                    required
+                    rows="5"
+                    style="width: 100%"
+                    placeholder="{{ ftl_get_message('post-report-description-placeholder') }}"></textarea>
+          <div class="form-actions community-draw-actions">
+            <button type="button" class="ds-button" onclick="hideReportModal()">{{ ftl_get_message("cancel") }}</button>
+            <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-report-submit") }}</button>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
+  {% endif %}
 
   <script>
-    function showReportModal() {
-      const modal = document.getElementById('report-modal');
-      modal.style.display = 'flex';
-      document.getElementById('report-description').value = '';
-      document.getElementById('report-description').focus();
-    }
-
-    function hideReportModal() {
-      document.getElementById('report-modal').style.display = 'none';
-    }
-
-    // Close modal when clicking outside
-    document.getElementById('report-modal').addEventListener('click', function(e) {
-      if (e.target === this) {
-        hideReportModal();
+    (function () {
+      // Whole steps up to what fits, as the painter zooms; smaller than
+      // one step, the browser scales it down to fit (max-width).
+      function fitStage() {
+        var frame = document.querySelector("[data-post-stage]");
+        if (!frame) return;
+        var img = frame.querySelector("img");
+        var width = parseInt(frame.getAttribute("data-width"), 10);
+        var height = parseInt(frame.getAttribute("data-height"), 10);
+        var stage = frame.parentNode;
+        var room = stage.clientWidth;
+        // The stage's height is the window's, less the toolbar, on a wide
+        // screen; a phone scrolls, so only the width counts there.
+        var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 140, height) : Infinity;
+        var zoom = Math.max(1, Math.min(Math.floor(room / width), Math.floor(tall / height), 4));
+        if (width * zoom > room) zoom = 1;
+        img.style.width = zoom > 1 ? (width * zoom) + "px" : "";
+        img.classList.toggle("is-zoomed", zoom > 1);
       }
-    });
+      fitStage();
+      window.addEventListener("resize", fitStage);
+    })();
+
+    function modalToggle(id, open) {
+      var modal = document.getElementById(id);
+      if (!modal) return;
+      modal.style.display = open ? "flex" : "none";
+      if (open) {
+        var first = modal.querySelector("textarea, select, input[type=radio]:checked");
+        if (first) first.focus();
+      }
+    }
+    function showPostDrawModal() { modalToggle("post-draw-modal", true); }
+    function hidePostDrawModal() { modalToggle("post-draw-modal", false); }
+    function showReportModal() {
+      var text = document.getElementById("report-description");
+      if (text) text.value = "";
+      modalToggle("report-modal", true);
+    }
+    function hideReportModal() { modalToggle("report-modal", false); }
+    function setOrientationDimensions(form) {
+      var portrait = form.querySelector('input[name="orientation"]:checked').value === "portrait";
+      form.querySelector('input[name="width"]').value = portrait ? "480" : "640";
+      form.querySelector('input[name="height"]').value = portrait ? "640" : "480";
+    }
+    function sharePost(button) {
+      var url = button.getAttribute("data-share-url");
+      if (navigator.share) {
+        navigator.share({ title: button.getAttribute("data-share-title"), url: url }).catch(function () {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function () {
+          alert(button.getAttribute("data-share-copied"));
+        });
+      }
+    }
+    (function () {
+      var modals = ["post-draw-modal", "report-modal"];
+      for (var i = 0; i < modals.length; i++) {
+        var modal = document.getElementById(modals[i]);
+        if (!modal) continue;
+        modal.addEventListener("click", function (e) {
+          if (e.target === this) this.style.display = "none";
+        });
+      }
+      document.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape") return;
+        for (var j = 0; j < modals.length; j++) modalToggle(modals[j], false);
+      });
+      // Once the list has taken the new comment, the form is emptied and
+      // no longer replying to anyone.
+      function afterSwap(e) {
+        if (!e.target || e.target.id !== "comments") return;
+        var form = document.getElementById("comment-form");
+        if (!form) return;
+        form.reset();
+        document.getElementById("parent_comment_id").value = "";
+        document.getElementById("reply-info").style.display = "none";
+      }
+      document.addEventListener("htmx:after:swap", afterSwap);
+      document.addEventListener("htmx:afterSwap", afterSwap);
+    })();
   </script>
 {% endblock content %}
