@@ -356,22 +356,33 @@ html {
   padding: 0 12px;
 }
 
-/* The wordmark: a 20px image in a box the buttons' 30px height, so the
-   flex row centres the two on one line. */
+/* The mark and the name: a 22px image and a line of type in a box the
+   buttons' 30px height, so the flex row centres all of them on one line. */
 .toolbar-name,
 .toolbar-name:visited {
-  display: block;
+  display: flex;
   flex: none;
+  align-items: center;
+  height: 30px;
   margin-right: var(--ds-space-4);
-  padding: 5px 0;
-  line-height: 0;
+  color: var(--ds-ink);
   text-decoration: none;
+  white-space: nowrap;
 }
 
-.toolbar-logo {
+.toolbar-mark {
   display: block;
-  height: 20px;
-  width: auto;
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.toolbar-name-text {
+  margin-left: 8px;
+  font-size: var(--ds-text-l);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 20px;
 }
 
 /* Each group stays on one line; when the bar is too narrow for them, the
@@ -787,7 +798,8 @@ html {
 
 /* Too narrow for the name and the account on one line even stacked: Draw
    keeps its pencil and loses its word, and the buttons close up. Narrower
-   still, the name steps aside (toolbar.jinja, oeeeFitToolbar). */
+   still, the name steps aside and the mark stays (toolbar.jinja,
+   oeeeFitToolbar). */
 .nav-bar.is-compact .toolbar-draw span {
   display: none;
 }
@@ -807,14 +819,14 @@ html {
   padding-left: 8px;
 }
 
-.nav-bar.is-bare .toolbar-name {
+.nav-bar.is-bare .toolbar-name-text {
   display: none;
 }
 
 /* In the desktop app on macOS the window's controls take the first 96px of
    the bar (the app pads it), which only the first row needs to clear: the
    sections' row reaches back to the usual 16px. */
-html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
+html[data-desktop="macos"]:not([data-fullscreen]) .nav-bar.is-stacked .toolbar-links {
   width: calc(100% + 80px);
   margin-left: -80px;
 }
