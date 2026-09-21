@@ -99,8 +99,15 @@ export class NeoPainter {
   private readonly roundData: Uint8Array[] = [];
   private readonly toneData: Uint8Array[] = [];
 
-  /** Clipboard for copy/paste, NEO's `temp`. */
-  private temp: Uint32Array | null = null;
+  /**
+   * The clipboard copy fills and paste empties, NEO's `temp`.
+   *
+   * There used to be two fields, and `getClipboard`/`setClipboard` served the
+   * one copy and paste never touched. A collaborative session keeps one
+   * clipboard per participant by swapping it in and out around each
+   * operation, so that swap was moving an empty box while everyone shared the
+   * real one: one person's copy became the next person's paste.
+   */
   private clipboard: ImageData | null = null;
 
   /** Scratch surface used to rasterise text before compositing. */
@@ -1088,10 +1095,12 @@ export class NeoPainter {
 
   copy(layer: number, x: number, y: number, width: number, height: number): void {
     const imageData = this.surfaces[layer].getImageData(x, y, width, height);
-    const buf32 = new Uint32Array(imageData.data.buffer);
-    const temp = new Uint32Array(buf32.length);
-    for (let i = 0; i < buf32.length; i++) temp[i] = buf32[i];
-    this.temp = temp;
+    // Its own bytes, not a view of the surface's: the layer goes on changing.
+    this.clipboard = new ImageData(
+      new Uint8ClampedArray(imageData.data),
+      imageData.width,
+      imageData.height
+    );
   }
 
   paste(
@@ -1107,11 +1116,18 @@ export class NeoPainter {
     const imageData = ctx.getImageData(x + dx, y + dy, width, height);
     const buf32 = new Uint32Array(imageData.data.buffer);
 
-    if (this.temp) {
-      for (let i = 0; i < buf32.length; i++) buf32[i] = this.temp[i];
+    if (this.clipboard) {
+      const { data } = this.clipboard;
+      const temp = new Uint32Array(data.buffer, data.byteOffset, data.length / 4);
+      // NEO's loop, stride and all: it walks the destination rectangle and
+      // indexes the clipboard with the same counter, so the two had better
+      // be the same size. Copy hands paste its own width and height for
+      // exactly that reason; a replay that says otherwise gets what NEO
+      // gives it.
+      for (let i = 0; i < buf32.length; i++) buf32[i] = temp[i];
       ctx.putImageData(imageData, x + dx, y + dy);
     }
-    this.temp = null;
+    this.clipboard = null;
   }
 
   turn(layer: number, x: number, y: number, width: number, height: number): void {

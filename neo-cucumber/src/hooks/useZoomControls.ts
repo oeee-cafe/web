@@ -3,39 +3,70 @@ import { type DrawingState } from "../types/drawing";
 
 // Zoom constants
 const zoomMin = 0.5;
-const zoomMax = 4.0;
+/**
+ * NEO goes to 12. Ours stops at 4 because the cursor and preview overlays are
+ * allocated at canvas size times zoom, and a 1024x800 drawing at 12x would
+ * ask for two canvases of 118 million pixels each.
+ */
+const zoomMax = 4;
 let cachedZoomLevels: number[] = [];
 
-const getZoomLevels = (): number[] => {
+/**
+ * The zoom steps: whole numbers from 1x up, as NEO has them, and a finer
+ * ladder below 1x for fitting a large drawing on a small screen.
+ *
+ * Above 1x a step has to be a whole number, because the canvas is scaled
+ * with nearest-neighbour sampling so that its pixels stay hard. At 2x every
+ * artwork pixel is exactly two screen pixels; at 1.19x -- a rung this ladder
+ * used to have -- most are one and some are two, so a straight line is
+ * alternately thin and thick along its length and a diagonal staggers. That
+ * was the wobble. NEO never had it because `ZoomPlusCommand` only ever adds
+ * one.
+ *
+ * Below 1x no step is clean: at 0.5x nearest-neighbour keeps every other
+ * row, so a one pixel line on an odd row is not thinned, it is gone. There
+ * the canvas is drawn smoothed instead (see `PainterCanvas`), which is how
+ * any image looks zoomed out, and the steps can be as fine as fitting wants.
+ * NEO has no zoom out at all; this exists for phones.
+ */
+export const getZoomLevels = (): number[] => {
   if (cachedZoomLevels.length === 0) {
-    // Eight steps per doubling makes wheel zoom feel continuous while still
-    // keeping the full 50%–400% range practical to traverse with buttons.
-    const steps = 8;
-    const k = steps / Math.LN2;
+    const whole: number[] = [];
+    for (let z = 1; z <= zoomMax; z++) whole.push(z);
+    cachedZoomLevels = [...fractionalLevelsBelowOne(), ...whole];
+  }
+  return cachedZoomLevels;
+};
 
-    const first = Math.ceil(Math.log(zoomMin) * k);
-    const size = Math.floor(Math.log(zoomMax) * k) - first + 1;
-    cachedZoomLevels = new Array(size);
+/** The rungs from `zoomMin` up to, but not including, 1x. */
+const fractionalLevelsBelowOne = (): number[] => {
+  // Eight steps per doubling makes wheel zoom feel continuous while still
+  // keeping the range practical to traverse with buttons.
+  const steps = 8;
+  const k = steps / Math.LN2;
 
-    // enforce zoom levels relating to thirds (33.33%, 66.67%, ...)
-    const snap = new Array(steps).fill(0);
-    if (steps > 1) {
-      const third = Math.log(4.0 / 3.0) * k;
-      const i = Math.round(third);
-      snap[(i - first) % steps] = third - i;
-    }
+  const first = Math.ceil(Math.log(zoomMin) * k);
+  const size = Math.floor(Math.log(1) * k) - first + 1;
+  const levels: number[] = new Array(size);
 
-    const kInverse = 1.0 / k;
-    for (let i = 0; i < steps; i++) {
-      let f = Math.exp((i + first + snap[i]) * kInverse);
-      f = Math.floor(f * Math.pow(2, 48) + 0.5) / Math.pow(2, 48); // round off inaccuracies
-      for (let j = i; j < size; j += steps, f *= 2.0) {
-        cachedZoomLevels[j] = f;
-      }
+  // enforce zoom levels relating to thirds (33.33%, 66.67%, ...)
+  const snap = new Array(steps).fill(0);
+  if (steps > 1) {
+    const third = Math.log(4.0 / 3.0) * k;
+    const i = Math.round(third);
+    snap[(i - first) % steps] = third - i;
+  }
+
+  const kInverse = 1.0 / k;
+  for (let i = 0; i < steps; i++) {
+    let f = Math.exp((i + first + snap[i]) * kInverse);
+    f = Math.floor(f * Math.pow(2, 48) + 0.5) / Math.pow(2, 48); // round off inaccuracies
+    for (let j = i; j < size; j += steps, f *= 2.0) {
+      levels[j] = f;
     }
   }
 
-  return cachedZoomLevels;
+  return levels.filter((level) => level < 1);
 };
 
 /**
@@ -174,8 +205,9 @@ export const useZoomControls = ({
    * A pinch asks for any scale at all, and the answer is still one of the
    * ladder's steps: the overlays are sized in whole zoomed pixels and the
    * brush cursor is rasterised at the zoom, so a truly continuous scale would
-   * mean reallocating both on every touch sample. Eight steps to a doubling
-   * is fine enough that a pinch reads as smooth.
+   * mean reallocating both on every touch sample. Below 1x the steps are
+   * fine enough that a pinch reads as smooth; above it the pinch clicks
+   * between whole numbers, which is the price of pixels that stay square.
    */
   const zoomToScale = useCallback(
     (scale: number, pointerX?: number, pointerY?: number) => {

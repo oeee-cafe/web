@@ -120,6 +120,21 @@ checked against NEO itself rather than against a description of it:
 - `src/utils/replayRoundTrip.browser.test.ts` — recorded replays re-rendered by NEO.
 - `src/hooks/offlineDrawing.browser.test.tsx` — real pointer events through the
   offline hook, then the resulting replay re-rendered by NEO.
+- `src/neo/shapeReplay.browser.test.tsx` and `src/neo/copyPaste.browser.test.tsx`
+  — the same, for the region tools and for copy and paste.
+
+Test a tool through the gesture, not only through the recorder. For six weeks
+every rectangle and ellipse drawn here replayed as blank, in NEO and in our
+own viewer, because the drag left the shape type off the `fill` frame; the
+round-trip suite passed throughout, since it called the recorder itself and
+supplied the type. The frames worth checking are the ones a drag produces.
+
+Two NEO behaviours that look like bugs and are load-bearing: zoom above 1x
+only ever moves in whole steps (a fractional step makes some pixels one
+screen pixel wide and some two, and one pixel lines wobble), and paste
+*replaces* its rectangle, transparent pixels included — a copy of empty
+canvas cuts a hole. Copy hands over to paste by itself; there is no paste
+button in NEO and there is none here.
 
 A replay that renders differently from the canvas it was recorded on is the
 worst failure this codebase can produce. Prefer matching NEO's behaviour, quirks

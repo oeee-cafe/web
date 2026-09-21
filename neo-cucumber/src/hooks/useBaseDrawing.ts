@@ -8,6 +8,7 @@ import {
   isRegionTool,
   isTextTool,
   type RegionTool,
+  type ToolId,
 } from "../neo/tools";
 import { RegionDrag, type RegionRect } from "../neo/regionDrag";
 import { StrokeSmoother, strokeSmootherSizeFor } from "../neo/strokeSmoother";
@@ -21,6 +22,39 @@ import { notePointerType, penPreferred } from "../utils/penPreference";
  */
 function bezierPreviewPoints(points: number[]): number[] {
   return points.slice();
+}
+
+/**
+ * The pixels of `rect` in a layer buffer, for showing a copy while it is
+ * placed. Read here rather than from the engine's clipboard because in a
+ * shared session that clipboard is swapped per participant around every
+ * operation, and whose it holds at any moment is not necessarily ours.
+ */
+function cropLayer(
+  buffer: Uint8ClampedArray,
+  canvasWidth: number,
+  rect: RegionRect
+): ImageData {
+  const out = new ImageData(rect.width, rect.height);
+  const span = rect.width * 4;
+  for (let row = 0; row < rect.height; row++) {
+    const from = ((rect.y + row) * canvasWidth + rect.x) * 4;
+    out.data.set(buffer.subarray(from, from + span), row * span);
+  }
+  return out;
+}
+
+/** A copy being placed, as the preview draws it. */
+export interface PastePlacement {
+  image: ImageData;
+  /** Where its top-left would land if it were dropped now. */
+  x: number;
+  y: number;
+  /**
+   * Whether it has moved yet. NEO outlines the copy from the moment the
+   * press lands and only draws its pixels once it is dragged.
+   */
+  dragging: boolean;
 }
 
 /**
@@ -125,6 +159,24 @@ interface DrawingEventCallbacks {
   onHoverMove?: (at: { x: number; y: number } | null) => void;
   /** A tool that acts on click was used; record it. */
   onEraseAll?: (layer: "foreground" | "background") => void;
+  /**
+   * The painter changed tool by itself: a finished copy hands over to paste,
+   * and a paste that is dropped or abandoned hands back, as NEO's CopyTool
+   * and PasteTool do.
+   */
+  onToolChange?: (tool: ToolId) => void;
+  /** The copy being placed, or null when placing ends. */
+  onPastePreview?: (placement: PastePlacement | null) => void;
+  /**
+   * A copy was dropped, in NEO's own terms: the rectangle it was copied
+   * from and how far it was dragged from there.
+   */
+  onPaste?: (
+    layer: "foreground" | "background",
+    source: RegionRect,
+    dx: number,
+    dy: number
+  ) => void;
   /** A region tool was released over `rect`; record it. */
   onRegionCommit?: (
     tool: RegionTool,
@@ -187,7 +239,11 @@ export const useBaseDrawing = (
     if (!ctx) return;
 
     ctx.imageSmoothingEnabled = false;
-    canvas.style.imageRendering = "pixelated";
+    // How the canvas is scaled on screen is the stylesheet's to say, not an
+    // inline style's: `.canvas-container canvas` asks for hard pixels, and
+    // `.canvas-downscaled` lifts that below 1x. An inline `pixelated` here
+    // outranked both, and gave Firefox 56 -- which has no `pixelated` -- no
+    // fallback, since only the stylesheet gets `-moz-crisp-edges` added.
     contextRef.current = ctx;
 
     // Create and initialize drawing engine
@@ -293,6 +349,49 @@ export const useBaseDrawing = (
   const strokeParamsRef = useRef<DrawingState | null>(null);
   /** Live rectangle drag for the region tools. */
   const regionDragRef = useRef<RegionDrag | null>(null);
+  /**
+   * The copy waiting to be placed, NEO's PasteTool state: where it was
+   * copied from, its pixels, and -- while a press is down -- where that press
+   * began and how far it has been dragged. Null when not in paste mode.
+   */
+  const pasteRef = useRef<{
+    source: RegionRect;
+    image: ImageData;
+    start: { x: number; y: number } | null;
+    dx: number;
+    dy: number;
+  } | null>(null);
+
+  /*
+   * Leaving paste mode by choosing another tool abandons the copy, as
+   * NEO's PasteTool.kill does. Only a move *away* from paste counts: the
+   * copy that starts placing is itself a change from copy to paste, and
+   * reacting to the tool merely being something else would throw the copy
+   * away in the render before the switch lands.
+   */
+  const previousToolRef = useRef(drawingState.brushType);
+  useEffect(() => {
+    const previous = previousToolRef.current;
+    previousToolRef.current = drawingState.brushType;
+    if (previous === "paste" && drawingState.brushType !== "paste") {
+      if (pasteRef.current) {
+        pasteRef.current = null;
+        callbacks?.onPastePreview?.(null);
+      }
+    }
+  }, [drawingState.brushType, callbacks]);
+
+  /** Escape puts the copy down without pasting it, PasteTool.keyDownHandler. */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !pasteRef.current) return;
+      pasteRef.current = null;
+      callbacks?.onPastePreview?.(null);
+      callbacks?.onToolChange?.("copy");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [callbacks]);
   /** Press point while a straight line is being dragged out. */
   // A bezier is built across three separate press/release cycles, so unlike
   // every other gesture its state has to survive pointer-up. NEO's step
@@ -674,6 +773,28 @@ export const useBaseDrawing = (
             return;
           }
 
+          // Paste is NEO's PasteTool, not a rectangle to drag out: the press
+          // marks where the drag is measured from, wherever on the canvas it
+          // lands, so the copy moves by the drag and never jumps to the
+          // pointer. Its size is the size it was copied at, always.
+          if (strokeParamsRef.current.brushType === "paste") {
+            const placing = pasteRef.current;
+            if (!placing) {
+              cleanupPointerState(e.pointerId);
+              return;
+            }
+            placing.start = coords;
+            placing.dx = 0;
+            placing.dy = 0;
+            callbacks?.onPastePreview?.({
+              image: placing.image,
+              x: placing.source.x,
+              y: placing.source.y,
+              dragging: false,
+            });
+            return;
+          }
+
           // Region tools drag out a rectangle and act on release, so they take
           // none of the stroke path below.
           if (isRegionTool(strokeParamsRef.current.brushType)) {
@@ -749,6 +870,21 @@ export const useBaseDrawing = (
           regionDragRef.current.cancel();
           regionDragRef.current = null;
           callbacks?.onRegionPreview?.(null);
+        }
+        // A paste drag cut short -- the pointer cancelled, a second finger --
+        // puts the copy back where it was taken from, still waiting to be
+        // placed, rather than dropping it wherever the drag had reached.
+        const placing = pasteRef.current;
+        if (placing?.start) {
+          placing.start = null;
+          placing.dx = 0;
+          placing.dy = 0;
+          callbacks?.onPastePreview?.({
+            image: placing.image,
+            x: placing.source.x,
+            y: placing.source.y,
+            dragging: false,
+          });
         }
 
         // Canonical Neo clears the joint-dedup state at the end of every
@@ -865,6 +1001,45 @@ export const useBaseDrawing = (
         return;
       }
 
+      // Dropping a copy. NEO's PasteTool.upHandler pastes wherever the drag
+      // left it and hands the painter back to copy; the clipboard goes with
+      // it, so one copy is one paste, as it is there.
+      if (strokeParamsRef.current?.brushType === "paste") {
+        const params = strokeParamsRef.current;
+        const placing = pasteRef.current;
+        if (placing?.start) {
+          const { source, dx, dy } = placing;
+          const layer = params.layerType;
+          pasteRef.current = null;
+          callbacks?.onPastePreview?.(null);
+          if (!remoteSyncRef.current && drawingEngineRef.current) {
+            drawingEngineRef.current.applyRegionTool(
+              "paste",
+              layer,
+              {
+                x: source.x + dx,
+                y: source.y + dy,
+                width: source.width,
+                height: source.height,
+              },
+              {
+                r: parseInt(params.color.slice(1, 3), 16),
+                g: parseInt(params.color.slice(3, 5), 16),
+                b: parseInt(params.color.slice(5, 7), 16),
+                a: params.opacity,
+              },
+              params.brushSize
+            );
+            saveToHistory();
+          }
+          callbacks?.onPaste?.(layer, source, dx, dy);
+          onDrawingChangeRef.current?.();
+          callbacks?.onToolChange?.("copy");
+        }
+        cleanupPointerState(e.pointerId);
+        return;
+      }
+
       const drag = regionDragRef.current;
       if (drag?.active) {
         const rect = drag.commit(getCanvasCoordinates(e.clientX, e.clientY));
@@ -898,6 +1073,26 @@ export const useBaseDrawing = (
             params.brushSize
           );
           onDrawingChangeRef.current?.();
+
+          // NEO's CopyTool.doEffect ends by switching the painter to paste,
+          // holding on to the rectangle it copied. There is no paste button
+          // to find; finishing the copy is how you get there.
+          const engine = drawingEngineRef.current;
+          if (params.brushType === "copy" && engine) {
+            const image = cropLayer(
+              engine.layers[params.layerType],
+              engine.imageWidth,
+              rect
+            );
+            pasteRef.current = { source: rect, image, start: null, dx: 0, dy: 0 };
+            callbacks?.onPastePreview?.({
+              image,
+              x: rect.x,
+              y: rect.y,
+              dragging: false,
+            });
+            callbacks?.onToolChange?.("paste");
+          }
         }
         cleanupPointerState(e.pointerId);
         return;
@@ -1073,6 +1268,24 @@ export const useBaseDrawing = (
           lineStartRef.current,
           getCanvasCoordinates(e.clientX, e.clientY)
         );
+        return;
+      }
+
+      // NEO's PasteTool.moveHandler: the offset is the floored distance from
+      // the press, so the copy follows the drag rather than the pointer.
+      if (strokeParamsRef.current?.brushType === "paste") {
+        const placing = pasteRef.current;
+        if (placing?.start) {
+          const at = getCanvasCoordinates(e.clientX, e.clientY);
+          placing.dx = Math.floor(at.x - placing.start.x);
+          placing.dy = Math.floor(at.y - placing.start.y);
+          callbacks?.onPastePreview?.({
+            image: placing.image,
+            x: placing.source.x + placing.dx,
+            y: placing.source.y + placing.dy,
+            dragging: true,
+          });
+        }
         return;
       }
 

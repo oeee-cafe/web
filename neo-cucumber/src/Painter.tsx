@@ -33,7 +33,9 @@ import {
   type BezierPreviewStyle,
   drawBezierPreview,
   drawLinePreview,
+  drawPastePreview,
   drawRegionPreview,
+  type PastePreview,
 } from "./neo/regionPreview";
 import type { DrawingEngine } from "./DrawingEngine";
 import type { RegionRect } from "./neo/regionDrag";
@@ -337,6 +339,10 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     const ctx = previewCanvasRef.current?.getContext("2d");
     if (ctx) drawRegionPreview(ctx, rect, previewBackdrop(), drawingState.brushType);
   }, [previewBackdrop, drawingState.brushType]);
+  const handlePastePreview = useCallback((placement: PastePreview | null) => {
+    const ctx = previewCanvasRef.current?.getContext("2d");
+    if (ctx) drawPastePreview(ctx, placement, previewBackdrop());
+  }, [previewBackdrop]);
   /**
    * Where the text tool was clicked, if an editor is open there. NEO puts an
    * editable box straight on the canvas rather than in a dialog: you type in
@@ -456,6 +462,14 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     domCanvasUpdateRef.current();
   }, []);
 
+  // A finished copy switches the painter to paste and a paste switches it
+  // back, NEO's CopyTool/PasteTool hand-off; the preview shows the copy while
+  // it is being placed.
+  const placement = useMemo(
+    () => ({ onToolChange: updateBrushType, onPastePreview: handlePastePreview }),
+    [updateBrushType, handlePastePreview]
+  );
+
   // Use the offline drawing hook
   const {
     undo,
@@ -493,6 +507,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     isVirtualRight,
     releaseVirtualRight,
     config.recordReplay ?? true,
+    placement,
   );
   previewEngineRef.current = drawingEngine ?? null;
   strokeActiveRef.current = isDrawingRef;

@@ -23,7 +23,6 @@ import type { ToolId } from "../neo/tools";
  */
 const NON_NEO_TOOL_ICONS: Record<string, string> = {
   fill: "material-symbols:format-color-fill",
-  paste: "material-symbols:content-paste",
   pan: "material-symbols:pan-tool",
 };
 import type { DrawingState } from "../types/drawing";
@@ -264,10 +263,15 @@ export const ToolboxPanel = ({
               </button>
             )}
 
-            {/* Canvas editing tools NEO keeps outside its own column. */}
+            {/*
+              Canvas editing tools NEO keeps outside its own column. Pan has
+              its own button above; paste has none at all, because in NEO
+              there is no choosing it -- finishing a copy switches to it, and
+              a button for it only ever offered a paste with nothing to paste.
+            */}
             <div className="grid grid-cols-2 gap-[2px]">
               {NON_NEO_TOOLS.filter(
-                (tool) => tool !== "pan" && tools.includes(tool)
+                (tool) => tool !== "pan" && tool !== "paste" && tools.includes(tool)
               ).map((tool) => (
                 <button
                   key={tool}

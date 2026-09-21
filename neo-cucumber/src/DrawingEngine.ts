@@ -728,6 +728,55 @@ export class DrawingEngine {
       canvasContent.style.transformOrigin = "center";
       canvasContent.style.transform = this.isFlippedHorizontal ? "scaleX(-1)" : "";
     }
+
+    this.snapToDevicePixels(actualContainer, zoomScale ?? 1, scaleTransform);
+  }
+
+  /**
+   * Land the artwork's top-left corner on a whole device pixel.
+   *
+   * A whole-number zoom only keeps pixels square if they also start on a
+   * pixel boundary. Put the canvas half a pixel off and every artwork pixel
+   * straddles two screen pixels, which nearest-neighbour sampling resolves
+   * one way for some and the other way for the rest -- the same thin-thick
+   * wobble a fractional zoom gives, at 2x. NEO rounds its view position in
+   * `setZoomPosition` for exactly this.
+   *
+   * Here the half pixel has several sources that are awkward to predict
+   * together: flex centring puts the frame at `(viewport - width) / 2`, the
+   * centre origin shifts an odd-sized canvas by half a pixel per zoom step,
+   * and a zoom anchored under the pointer produces a fractional pan. So
+   * rather than rounding any one of them, this measures where the canvas
+   * actually ended up and moves it the rest of the way. The correction is
+   * applied to the transform only, never stored in the pan, so repeated
+   * adjustments do not drift.
+   */
+  private snapToDevicePixels(
+    container: HTMLElement,
+    zoom: number,
+    scaleTransform: string
+  ) {
+    const artwork =
+      container.querySelector<HTMLElement>(".canvas-content canvas") ??
+      container.querySelector<HTMLElement>(".canvas-content");
+    if (!artwork || zoom <= 0) return;
+
+    const box = artwork.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const nudge = (edge: number) =>
+      (Math.round(edge * ratio) - edge * ratio) / ratio;
+    const dx = nudge(box.left);
+    const dy = nudge(box.top);
+    if (dx === 0 && dy === 0) return;
+
+    // The translate sits inside the scale, so a screen distance is divided
+    // by the zoom to become a translate distance.
+    container.style.transform = [
+      scaleTransform,
+      `translate(${this.panOffsetX + dx / zoom}px, ${this.panOffsetY + dy / zoom}px)`,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   /**
@@ -1058,8 +1107,10 @@ export class DrawingEngine {
           this.neo.copy(index, x, y, width, height);
           break;
         case "paste":
-          // Dropped at the dragged rectangle rather than offset from the
-          // source, so the destination is the drag and dx/dy are zero.
+          // `rect` is where the copy lands -- the source moved by however far
+          // it was dragged, at the size it was copied -- so the offset NEO
+          // takes separately is already folded in. The recorded `.pch` frame
+          // keeps NEO's own form, source and offset; see useOfflineDrawing.
           this.neo.paste(index, x, y, width, height, 0, 0);
           break;
       }

@@ -213,6 +213,16 @@ body {
   image-rendering: pixelated;
 }
 
+/*
+ * Zoomed out, the canvas is resampled rather than pixel-picked. Keeping
+ * `pixelated` below 1x does not keep pixels hard, it throws some of them
+ * away: at 0.5x every other row goes, and a one pixel line on one of those
+ * rows vanishes. Smoothed, it is a fainter line that is still there.
+ */
+.canvas-container.canvas-downscaled canvas {
+  image-rendering: auto;
+}
+
 
 /* Animation keyframes */
 @keyframes spin {

@@ -63,12 +63,21 @@ export function NeoToolSet({
     // but the fixed tips carry settings rather than tools and always stay.
     .filter((tip) => tip.fixed || tip.tools.length > 0);
 
+  /*
+   * Paste is on no tip, and NEO does not pretend otherwise: its
+   * getToolButton returns nothing for PasteTool, so updateUI leaves alone
+   * whichever tip was lit -- the copy tip, since only a finished copy gets
+   * there. The column goes on showing copy, selected, while the copy is
+   * being placed.
+   */
+  const heldTool: ToolId = brushType === "paste" ? "copy" : brushType;
+
   const cycle = (
     name: string,
     groupTools: readonly ToolId[],
     backwards: boolean
   ) => {
-    const held = groupTools.indexOf(brushType);
+    const held = groupTools.indexOf(heldTool);
     const length = groupTools.length;
     let next: number;
     if (held === -1) {
@@ -128,7 +137,7 @@ export function NeoToolSet({
           );
         }
 
-        const held = tip.tools.indexOf(brushType);
+        const held = tip.tools.indexOf(heldTool);
         const selected = held !== -1;
         // Show the tool this group holds, or the one it would return to
         const shown =
