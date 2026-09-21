@@ -14,7 +14,7 @@
     <a class="post-card-image"
        href="{% if admin %}/admin/posts/{{ post.id }}{% else %}/@{{ handle }}/{{ post.id }}{% endif %}"
        aria-label="{{ title }} by {{ handle }}">
-      <img width="{{ post.image_width }}"
+      <img draggable="false" width="{{ post.image_width }}"
            height="{{ post.image_height }}"
            alt="{{ post.title }}"
            src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"

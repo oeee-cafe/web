@@ -301,7 +301,6 @@ nav a:visited,
   width: 100%;
   height: 100%;
   object-fit: contain;
-  cursor: pointer;
   image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
 }
@@ -417,7 +416,6 @@ nav a:visited,
 }
 
 .banners-grid-item img {
-  cursor: pointer;
   max-width: 100%;
   height: auto;
   vertical-align: bottom;
@@ -470,7 +468,6 @@ nav a:visited,
   text-decoration: none;
   color: inherit;
   display: block;
-  cursor: pointer;
   margin-bottom: var(--space-2);
 }
 
@@ -885,7 +882,6 @@ nav a:visited,
   color: var(--main-text-color);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--main-border-color);
-  cursor: pointer;
   font-size: var(--text-sm);
 }
 
@@ -1097,7 +1093,6 @@ nav a:visited,
   border: 1px solid var(--main-border-color);
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-sm);
-  cursor: pointer;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -1238,7 +1233,6 @@ nav a:visited,
 
 .hashtag-autocomplete-item {
   padding: var(--space-2) var(--space-3);
-  cursor: pointer;
   border-bottom: 1px solid var(--main-border-color);
 }
 
@@ -1298,7 +1292,6 @@ nav a:visited,
   background-color: var(--main-nav-bg-color);
   border: 1px solid var(--main-border-color);
   color: var(--main-text-color);
-  cursor: pointer;
   font-size: var(--text-sm);
 }
 
@@ -1675,7 +1668,6 @@ nav a:visited,
   color: var(--main-text-color);
   font-size: var(--text-sm);
   font-weight: 600;
-  cursor: pointer;
   margin-left: auto;
 }
 
@@ -1724,7 +1716,6 @@ nav a:visited,
   gap: var(--space-5);
   align-items: center;
   background-color: var(--main-bg-color);
-  cursor: pointer;
 }
 
 .post-move-preview-image {
@@ -2231,7 +2222,6 @@ nav a:visited,
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
-  cursor: pointer;
 }
 
 /* One highlight for both the pointer and the arrow keys, so the two never
@@ -2358,7 +2348,6 @@ nav a:visited,
   padding: var(--space-1) var(--space-2);
   text-decoration: none;
   display: inline-block;
-  cursor: pointer;
 }
 
 .session-actions input[type="submit"]:hover,
@@ -2460,7 +2449,6 @@ nav a:visited,
 }
 .neo-cucumber-replay-seek {
   width: 100%;
-  cursor: pointer;
 }
 .neo-cucumber-replay-buttons {
   display: flex;
@@ -2476,7 +2464,6 @@ nav a:visited,
 .neo-cucumber-replay-button,
 .neo-cucumber-replay-speed {
   padding: 0.2em 0.6em;
-  cursor: pointer;
 }
 .neo-cucumber-replay-speed[aria-pressed="true"] {
   font-weight: bold;

@@ -25,6 +25,10 @@
     <a href="/admin/banners">Banners</a>
     <a href="/">← Back to site</a>
   </nav>
-  {% block admin_content %}
-  {% endblock admin_content %}
+  {# Staff copy ids, handles and reasons out of these pages, so their
+     content stays selectable where the rest of the site's chrome is not. #}
+  <div class="ds-selectable">
+    {% block admin_content %}
+    {% endblock admin_content %}
+  </div>
 {% endblock content %}
