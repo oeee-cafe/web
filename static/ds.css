@@ -658,6 +658,155 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Forms
+
+   The site's forms already share a small vocabulary, and the system draws
+   it rather than asking every form to be rewritten:
+
+   - a `fieldset` is a card, and its `legend` the card's title;
+   - a field is a label above its control -- a `<p>` in a fieldset, or a
+     `.form-group` or `.form-field` -- with optional `.ds-help` below;
+   - a checkbox or radio sits beside its label instead (`.form-group-checkbox`,
+     or a label that follows the box);
+   - `.form-actions` is the row of buttons at the end;
+   - a form's submit button is its primary action, so it is the lime one.
+     A destructive submit says so with `.ds-button-danger`.
+
+   The legend floats because a legend otherwise sits on its fieldset's
+   border; floated, it is the first line inside the card.
+   --------------------------------------------------------------------------- */
+.ds-fieldset,
+.ds-page fieldset:not([class]) {
+  min-width: 0;
+  margin: 0 0 var(--ds-space-4);
+  padding: 20px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+}
+
+.ds-fieldset > legend,
+.ds-page fieldset:not([class]) > legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 var(--ds-space-4);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-l);
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.ds-fieldset > legend + *,
+.ds-page fieldset:not([class]) > legend + * {
+  clear: both;
+}
+
+.ds-page fieldset:not([class]) > p {
+  margin: 0 0 var(--ds-space-4);
+}
+
+.ds-page fieldset:not([class]) > p:last-child {
+  margin-bottom: 0;
+}
+
+/* A field's label, above its control. */
+.ds-page fieldset label[for]:not([class]),
+.form-group > label,
+.form-field > label {
+  display: block;
+  margin-bottom: var(--ds-space-1);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+}
+
+/* A checkbox's or radio's label, beside it. */
+.ds-page fieldset input[type="checkbox"] + label[for],
+.ds-page fieldset input[type="radio"] + label[for] {
+  display: inline;
+  margin: 0 0 0 var(--ds-space-2);
+  font-weight: 400;
+}
+
+/* Controls in a field run the width of the card; a one-line field stops
+   where a line of text would. */
+.ds-page fieldset input:not([type]):not([class]),
+.ds-page fieldset input[type="text"]:not([class]),
+.ds-page fieldset input[type="email"]:not([class]),
+.ds-page fieldset input[type="password"]:not([class]),
+.ds-page fieldset input[type="url"]:not([class]),
+.ds-page fieldset input[type="search"]:not([class]),
+.ds-page fieldset select:not([class]),
+.form-group input[type="text"],
+.form-group select,
+.form-field input[type="text"],
+.form-field select {
+  width: 100%;
+  max-width: 420px;
+}
+
+.ds-page fieldset textarea:not([class]),
+.form-group textarea,
+.form-field textarea {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* `.form-field` is the same thing under the name the community forms use. */
+.form-group,
+.form-field {
+  margin-bottom: var(--ds-space-4);
+}
+
+.form-group-checkbox {
+  display: flex;
+  align-items: center;
+}
+
+.form-group-checkbox > label {
+  display: inline;
+  margin: 0 0 0 var(--ds-space-2);
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.form-actions,
+.ds-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--ds-space-5);
+}
+
+.form-actions > * + *,
+.ds-actions > * + * {
+  margin-left: var(--ds-space-2);
+}
+
+/* The submit is the form's primary action. More specific than an unclassed
+   button's default, so it wins; a page's own contextual rule for its
+   submit, where one survives, still outranks both. */
+.ds-page form input[type="submit"]:not([class]),
+.ds-page form button[type="submit"]:not([class]),
+.ds-page form button:not([type]):not([class]) {
+  border-color: var(--ds-accent-line);
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+  font-weight: 600;
+}
+
+.ds-page form input[type="submit"]:not([class]):hover,
+.ds-page form button[type="submit"]:not([class]):hover,
+.ds-page form button:not([type]):not([class]):hover {
+  background-color: var(--ds-accent-hover);
+}
+
+/* ---------------------------------------------------------------------------
    Grouping
    --------------------------------------------------------------------------- */
 
