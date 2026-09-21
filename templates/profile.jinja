@@ -1,4 +1,5 @@
 {% from "follow_macro.jinja" import follow_button, unfollow_button %} {% extends "base.jinja" %}
+{% from "user_pill_macro.jinja" import user_pill %}
 {% block title %}
   {{ super() }} | {{ user.display_name }} (@{{ user.login_name }})
 {% endblock title %}
@@ -36,19 +37,17 @@
   {% include "post_feed_head.jinja" %}
   <div class="profile">
     <section class="profile-card ds-card">
-      {% if banner %}
-        {% if user.id == current_user.id %}<a href="/banners/draw" class="profile-banner">{% else %}<span class="profile-banner">{% endif %}
-          <img draggable="false"
-               width="{{ banner.width }}"
-               height="{{ banner.height }}"
-               alt="{{ user.display_name }} (@{{ user.login_name }}) {{ ftl_get_message('profile-banner') }}"
-               class="banner"
-               src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
-        {% if user.id == current_user.id %}</a>{% else %}</span>{% endif %}
-      {% endif %}
       <div class="profile-identity">
-        <h1 class="profile-name">{{ user.display_name }}</h1>
-        <div class="profile-handle">@{{ user.login_name }}@{{ domain }}</div>
+        {% if banner %}
+          {# Their banner and their name, as one: who they are here. On your
+             own profile the pill leads to redrawing the banner. #}
+          <h1 class="profile-name-pill">
+            {{ user_pill("/banners/draw" if user.id == current_user.id else none, banner.image_filename, banner.width, banner.height, user.display_name, "@" ~ user.login_name ~ "@" ~ domain, r2_public_endpoint_url, "large") }}
+          </h1>
+        {% else %}
+          <h1 class="profile-name">{{ user.display_name }}</h1>
+          <div class="profile-handle">@{{ user.login_name }}@{{ domain }}</div>
+        {% endif %}
         <div class="profile-chips">
           <a class="profile-chip" href="/@{{ user.login_name }}/guestbook">{{ ftl_get_message("profile-guestbook") }}</a>
           {% for link, target in links %}
@@ -76,16 +75,7 @@
         <div class="profile-section-label">{{ ftl_get_message("profile-following") }}</div>
         <div class="profile-allies">
           {% for following in followings|selectattr("banner_image_filename") %}
-            <a class="profile-ally-banner"
-               href="/@{{ following.login_name }}"
-               title="{{ following.display_name }} (@{{ following.login_name }})">
-              <img draggable="false"
-                   width="{{ following.banner_image_width }}"
-                   height="{{ following.banner_image_height }}"
-                   alt="{{ following.display_name }} (@{{ following.login_name }})"
-                   class="banner"
-                   src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
-            </a>
+            {{ user_pill("/@" ~ following.login_name, following.banner_image_filename, following.banner_image_width, following.banner_image_height, following.display_name, "@" ~ following.login_name, r2_public_endpoint_url) }}
           {% endfor %}
           {% for following in followings|rejectattr("banner_image_filename") %}
             <a class="profile-chip" href="/@{{ following.login_name }}" title="@{{ following.login_name }}">{{ following.display_name }}</a>

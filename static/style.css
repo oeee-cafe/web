@@ -2488,16 +2488,6 @@ nav a:visited,
   margin-bottom: var(--ds-space-5);
 }
 
-.profile-banner {
-  flex: 0 0 auto;
-  margin-right: var(--ds-space-4);
-}
-
-.profile-banner img {
-  display: block;
-  box-shadow: 0 0 0 1px var(--ds-frame);
-}
-
 .profile-identity {
   flex: 1 1 240px;
   min-width: 0;
@@ -2571,11 +2561,6 @@ nav a:visited,
   font-size: var(--ds-text-s);
 }
 
-.profile-ally-banner img {
-  display: block;
-  box-shadow: 0 0 0 1px var(--ds-frame);
-}
-
 .profile-section {
   margin-bottom: var(--ds-space-5);
 }
@@ -2601,4 +2586,79 @@ nav a:visited,
     width: 100%;
     margin: var(--ds-space-3) 0 0;
   }
+}
+
+/* A person as one chip: their banner, then their name over their handle
+   (user_pill_macro.jinja). A rounded rectangle rather than a capsule, so the
+   banner -- drawn as a rectangle -- sits whole inside it, corners and all.
+   It stays at its own 40px: a banner is pixel art, and a fraction of its
+   size would smear it. */
+.user-pill,
+.user-pill:visited {
+  display: -webkit-inline-box;
+  display: inline-flex;
+  -webkit-box-align: center;
+  align-items: center;
+  max-width: 100%;
+  padding: 4px 14px 4px 4px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 8px;
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+  color: var(--ds-ink);
+  vertical-align: middle;
+}
+
+a.user-pill:hover {
+  background-color: var(--ds-ground);
+}
+
+.user-pill-banner {
+  display: block;
+  flex: 0 0 auto;
+  height: 40px;
+  width: auto;
+  border-radius: 3px;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
+}
+
+.user-pill-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-left: 10px;
+  line-height: 1.25;
+}
+
+.user-pill-name {
+  overflow: hidden;
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-pill-handle {
+  overflow: hidden;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The person a page is about. */
+.user-pill.large .user-pill-name {
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+}
+
+.user-pill.large .user-pill-handle {
+  font-size: var(--ds-text-m);
+}
+
+.profile-name-pill {
+  margin: 0;
+  font-size: inherit;
 }
