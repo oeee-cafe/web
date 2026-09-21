@@ -10,6 +10,10 @@ about = Oeee Cafe is an oekaki board.
 user-contributors = Users who made Oeee Cafe together
 
 feed-columns = Per row
+theme = Theme
+theme-light = Light
+theme-dark = Dark
+theme-system = System
 nav-recent = Recent
 timeline = Timeline
 timeline-my = My timeline

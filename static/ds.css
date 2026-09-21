@@ -46,27 +46,28 @@
   --ds-radius-s: 6px;
   --ds-radius-m: 10px;
   --ds-control-height: 30px;
-  /* Ground: the window, which is the system's own grey, and NEO's 14px
-     grid drawn faintly over it. */
-  --ds-ground: #ececec;
-  --ds-grid: rgba(0, 0, 0, 0.05);
+  /* Ground: NEO's own -- the lavender the painter has always stood on, and
+     its 14px grid -- so the site and the painter are one surface. Dark is
+     NEO's night blue. */
+  --ds-ground: #ccccff;
+  --ds-grid: #bbbbff;
   /* The grid line as a solid colour, for grounds drawn by the painter. */
-  --ds-grid-solid: #e0e0e0;
+  --ds-grid-solid: #bbbbff;
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
-  --ds-surface: #ffffff;
+  --ds-surface: #f2f2ff;
   --ds-field: #ffffff;
-  /* Ink, in three strengths. Muted is 6.1:1 on the ground; faint is for
+  /* Ink, in three strengths. Muted is 5.4:1 on the ground; faint is for
      placeholders and disabled text only. */
-  --ds-ink: #1d1d1f;
-  --ds-muted: #55555a;
-  --ds-faint: #8a8a8f;
+  --ds-ink: #22223a;
+  --ds-muted: #4a4a78;
+  --ds-faint: #7777a3;
   /* Lines. */
-  --ds-line: rgba(0, 0, 0, 0.1);
-  --ds-line-strong: rgba(0, 0, 0, 0.22);
-  --ds-frame: rgba(0, 0, 0, 0.55);
+  --ds-line: rgba(60, 60, 130, 0.18);
+  --ds-line-strong: rgba(60, 60, 130, 0.35);
+  --ds-frame: #666699;
   /* States, laid over whatever is beneath. */
-  --ds-hover: rgba(0, 0, 0, 0.06);
-  --ds-selected: rgba(0, 0, 0, 0.1);
+  --ds-hover: rgba(60, 60, 150, 0.08);
+  --ds-selected: rgba(60, 60, 150, 0.15);
   --ds-focus: #4f8a10;
   /* The cucumber: the one colour that means "do this". Dark ink on it in
      both themes -- white on lime is under 2:1. */
@@ -80,25 +81,25 @@
   --ds-danger-hover: #b91c1c;
   --ds-danger-ink: #ffffff;
   /* Depth. */
-  --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.08);
-  --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --ds-shadow-raise: 0 1px 2px rgba(40, 40, 90, 0.12);
+  --ds-shadow-menu: 0 8px 24px rgba(40, 40, 90, 0.22);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ds-ground: #1e1e1e;
-    --ds-grid: rgba(255, 255, 255, 0.05);
-    --ds-grid-solid: #2a2a2a;
-    --ds-surface: #2c2c2c;
-    --ds-field: #262626;
-    --ds-ink: #e8e8ea;
-    --ds-muted: #a8a8ad;
-    --ds-faint: #77777c;
-    --ds-line: rgba(255, 255, 255, 0.12);
-    --ds-line-strong: rgba(255, 255, 255, 0.24);
-    --ds-frame: rgba(255, 255, 255, 0.4);
-    --ds-hover: rgba(255, 255, 255, 0.08);
-    --ds-selected: rgba(255, 255, 255, 0.14);
+    --ds-ground: #17172b;
+    --ds-grid: #22223f;
+    --ds-grid-solid: #22223f;
+    --ds-surface: #23233c;
+    --ds-field: #1d1d33;
+    --ds-ink: #dcdcea;
+    --ds-muted: #a3a3bd;
+    --ds-faint: #77779a;
+    --ds-line: rgba(200, 200, 255, 0.14);
+    --ds-line-strong: rgba(200, 200, 255, 0.28);
+    --ds-frame: #9595a7;
+    --ds-hover: rgba(200, 200, 255, 0.08);
+    --ds-selected: rgba(200, 200, 255, 0.15);
     --ds-focus: #c4ee62;
     --ds-badge: #ff8c00;
     --ds-danger: #ef4444;
@@ -109,19 +110,19 @@
 }
 
 :root[data-theme="dark"] {
-  --ds-ground: #1e1e1e;
-  --ds-grid: rgba(255, 255, 255, 0.05);
-  --ds-grid-solid: #2a2a2a;
-  --ds-surface: #2c2c2c;
-  --ds-field: #262626;
-  --ds-ink: #e8e8ea;
-  --ds-muted: #a8a8ad;
-  --ds-faint: #77777c;
-  --ds-line: rgba(255, 255, 255, 0.12);
-  --ds-line-strong: rgba(255, 255, 255, 0.24);
-  --ds-frame: rgba(255, 255, 255, 0.4);
-  --ds-hover: rgba(255, 255, 255, 0.08);
-  --ds-selected: rgba(255, 255, 255, 0.14);
+  --ds-ground: #17172b;
+  --ds-grid: #22223f;
+  --ds-grid-solid: #22223f;
+  --ds-surface: #23233c;
+  --ds-field: #1d1d33;
+  --ds-ink: #dcdcea;
+  --ds-muted: #a3a3bd;
+  --ds-faint: #77779a;
+  --ds-line: rgba(200, 200, 255, 0.14);
+  --ds-line-strong: rgba(200, 200, 255, 0.28);
+  --ds-frame: #9595a7;
+  --ds-hover: rgba(200, 200, 255, 0.08);
+  --ds-selected: rgba(200, 200, 255, 0.15);
   --ds-focus: #c4ee62;
   --ds-badge: #ff8c00;
   --ds-danger: #ef4444;
@@ -142,14 +143,14 @@
      and every field. Content opts in with `.ds-selectable`, or by being one
      of the containers named below.
    - The cursor is the arrow. A hyperlink keeps its hand; controls do not.
-   - Links are not underlined, except in what people wrote, where a link is
-     text among text and needs telling apart.
+   - Links are never underlined; in what people wrote, where a link is text
+     among text, the accent's green tells it apart.
    - Images and links do not drag out of the window.
    - The page does not rubber-band, and the document's own ground is the
      window's, so nothing white shows at its edges or between pages.
    --------------------------------------------------------------------------- */
 :root {
-  --ds-link: #3d6b12;
+  --ds-link: #2f5410;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -200,21 +201,19 @@ html {
   cursor: text;
 }
 
-.ds-page a {
+.ds-page a,
+.ds-page a:hover {
   text-decoration: none;
   cursor: pointer;
 }
 
-.ds-page a:hover {
-  text-decoration: underline;
-}
-
+/* In what people wrote, a link is told apart from the text around it by
+   colour alone. */
 .ds-selectable a,
 .ds-page .post-content a,
 .ds-page .comment-content a,
 .ds-page .community-description a {
   color: var(--ds-link);
-  text-decoration: underline;
 }
 
 .ds-page img,
@@ -247,14 +246,6 @@ html {
 .ds-page .posts-grid a,
 .ds-page .posts-grid img {
   cursor: default;
-}
-
-.ds-page .posts-grid a:hover {
-  text-decoration: none;
-}
-
-.ds-page .post-card-byline a:hover {
-  text-decoration: underline;
 }
 
 /* ---------------------------------------------------------------------------
@@ -601,6 +592,34 @@ html {
   background-color: var(--ds-hover);
 }
 
+/* The theme choice, at the foot of a toolbar menu. */
+.toolbar-theme {
+  margin-top: 4px;
+  padding: 8px 10px 6px;
+  border-top: 1px solid var(--ds-line);
+}
+
+.toolbar-menu-items .toolbar-theme:first-child {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.toolbar-theme-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.toolbar-theme .ds-segmented {
+  display: block;
+  text-align: center;
+}
+
+.toolbar-menu summary svg {
+  vertical-align: middle;
+}
+
 /* A phone keeps the account on the first line and gives the sections a line
    of their own, scrolled sideways rather than wrapped. */
 @media (max-width: 600px) {
@@ -645,17 +664,17 @@ html {
 /* The drop-down arrow, drawn in each theme's muted ink. A custom property can
    carry a url(), which is how one rule gets two colours of arrow. */
 :root {
-  --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2355555a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%234a4a78' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23a8a8ad' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23a3a3bd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 }
 
 :root[data-theme="dark"] {
-  --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23a8a8ad' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23a3a3bd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 /* Buttons. Secondary is the default; primary is the one thing a view asks you

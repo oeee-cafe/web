@@ -14,15 +14,6 @@
     <link rel="stylesheet"
           href="{{ '/static/ds.css' | cachebuster | safe }}" />
     <style>
-      /* The ground behind the painter is the window's: the system grey and
-         its grid, the same surface as the toolbar above, in either theme.
-         NEO's own lavender ground belongs to a page that is nothing but the
-         painter. Three :roots outrank every theme selector in the painter's
-         sheet, which uses two. */
-      :root:root:root {
-        --neo-bk: var(--ds-ground);
-        --neo-bk2: var(--ds-grid-solid);
-      }
       html, body { width: 100%; height: 100%; margin: 0; }
       body { overflow: hidden; }
       /* The page is the header and the painter, stacked. The painter fills

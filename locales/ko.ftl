@@ -12,6 +12,10 @@ about = 오에카키는 그림을 그릴 수 있는 게시판입니다.
 user-contributors = 오이카페를 함께 만든 사람들
 
 feed-columns = 한 줄에
+theme = 테마
+theme-light = 라이트
+theme-dark = 다크
+theme-system = 시스템
 nav-recent = 최신
 timeline = 동맹
 timeline-my = 내 동맹

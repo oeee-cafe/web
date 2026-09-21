@@ -12,6 +12,10 @@ about = 黄瓜画板是一个可以画画的留言板。
 user-contributors = 一起创建黄瓜咖啡馆的人们
 
 feed-columns = 每行
+theme = 主题
+theme-light = 浅色
+theme-dark = 深色
+theme-system = 跟随系统
 nav-recent = 最新
 timeline = 时间线
 timeline-my = 我的时间线
