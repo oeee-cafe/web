@@ -80,6 +80,9 @@
   --ds-danger: #dc2626;
   --ds-danger-hover: #b91c1c;
   --ds-danger-ink: #ffffff;
+  /* Skeletons: text blocks, and where a drawing will be. */
+  --ds-skeleton: rgba(60, 60, 150, 0.2);
+  --ds-skeleton-drawing: #e6e6fa;
   /* Depth. */
   --ds-shadow-raise: 0 1px 2px rgba(40, 40, 90, 0.12);
   --ds-shadow-menu: 0 8px 24px rgba(40, 40, 90, 0.22);
@@ -106,6 +109,8 @@
     --ds-danger-hover: #dc2626;
     --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
     --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --ds-skeleton: rgba(200, 200, 255, 0.16);
+    --ds-skeleton-drawing: #2a2a46;
   }
 }
 
@@ -129,6 +134,8 @@
   --ds-danger-hover: #dc2626;
   --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
   --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --ds-skeleton: rgba(200, 200, 255, 0.16);
+  --ds-skeleton-drawing: #2a2a46;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1524,58 +1531,105 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   padding-top: 2px;
 }
 
+/* Blocks are drawn in their own ink, strong enough to read on the grid
+   ground and on a card alike: the hover wash they used vanished into the
+   lavender. Where a drawing will be, a drawing's shape -- a pale square in
+   the same 1px frame. */
 .ds-skeleton-bar,
-.ds-skeleton-square {
-  border-radius: 4px;
-  background-color: var(--ds-hover);
+.ds-skeleton-square,
+.ds-skeleton-fill {
   -webkit-animation: ds-breathe 1.4s ease-in-out infinite;
   animation: ds-breathe 1.4s ease-in-out infinite;
 }
 
-.ds-skeleton-heading {
-  width: 180px;
-  height: 22px;
-  margin-bottom: var(--ds-space-4);
+.ds-skeleton-bar {
+  display: block;
+  max-width: 100%;
+  border-radius: 4px;
+  background-color: var(--ds-skeleton);
 }
 
-.ds-skeleton-square {
-  border-radius: 0;
-  padding-top: 100%;
-}
-
-.ds-skeleton-caption {
-  height: 12px;
-  margin-top: 10px;
-  width: 70%;
-}
-
-.ds-skeleton-caption.short {
-  width: 40%;
+.ds-skeleton-gap {
   margin-top: 6px;
 }
 
-.ds-skeleton-line {
-  height: 14px;
-  margin-bottom: 14px;
+.ds-skeleton-gap-l {
+  margin-top: 12px;
 }
 
-.ds-skeleton-line.short {
-  width: 60%;
+.ds-skeleton-chip {
+  border-radius: 13px;
+}
+
+.ds-skeleton-button {
+  border-radius: var(--ds-radius-s);
+}
+
+.ds-skeleton-row {
+  display: flex;
+  margin-top: 12px;
+}
+
+.ds-skeleton-row > * + *,
+.ds-skeleton .profile-actions > * + *,
+.ds-skeleton .communities-bar > * + *,
+.ds-skeleton .post-inspector-actions > * + * {
+  margin-left: 8px;
+}
+
+.ds-skeleton-square {
+  padding-top: 100%;
+  background-color: var(--ds-skeleton-drawing);
+  box-shadow: 0 0 0 1px var(--ds-line-strong);
+}
+
+.ds-skeleton-fill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: var(--ds-skeleton-drawing);
+}
+
+/* A post's drawing: its size is unknown until it arrives, so the common
+   one, 300px, standing where the drawing will. */
+.ds-skeleton-stage {
+  width: 300px;
+  max-width: 100%;
+}
+
+.ds-skeleton .posts-grid-item .post-card-meta {
+  padding-top: 10px;
+}
+
+.ds-skeleton .feed-header,
+.ds-skeleton .grid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--ds-space-4);
+}
+
+.ds-skeleton .community-card:hover {
+  -webkit-transform: none;
+  transform: none;
 }
 
 @-webkit-keyframes ds-breathe {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  50% { opacity: 0.6; }
 }
 
 @keyframes ds-breathe {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  50% { opacity: 0.6; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ds-skeleton-bar,
-  .ds-skeleton-square {
+  .ds-skeleton-square,
+  .ds-skeleton-fill {
     -webkit-animation: none;
     animation: none;
   }
