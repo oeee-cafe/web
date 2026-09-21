@@ -435,6 +435,69 @@ pub async fn browse_hashtags(
     Ok(hashtags)
 }
 
+/// A drawing on a tag's card in the directory.
+#[derive(Clone, Debug, Serialize)]
+pub struct HashtagCover {
+    pub hashtag_id: Uuid,
+    pub image_filename: String,
+    pub width: i32,
+    pub height: i32,
+}
+
+/// The latest drawings behind each of `hashtag_ids`, up to three a tag, for
+/// the directory's cards: a tag is a set of drawings, and its name alone
+/// says little about them.
+///
+/// The tag page's rules for what shows -- published, not deleted, in a
+/// public community or none -- and never a sensitive drawing: a cover is
+/// seen before anyone has chosen to open anything, so it is not the viewer's
+/// setting that decides but the drawing's.
+pub async fn hashtag_covers(
+    tx: &mut Transaction<'_, Postgres>,
+    hashtag_ids: &[Uuid],
+) -> Result<Vec<HashtagCover>> {
+    if hashtag_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let covers = sqlx::query_as!(
+        HashtagCover,
+        r#"
+        SELECT
+            hashtag_id AS "hashtag_id!",
+            image_filename AS "image_filename!",
+            width AS "width!",
+            height AS "height!"
+        FROM (
+            SELECT
+                ph.hashtag_id,
+                images.image_filename,
+                images.width,
+                images.height,
+                row_number() OVER (
+                    PARTITION BY ph.hashtag_id
+                    ORDER BY posts.published_at DESC
+                ) AS rank
+            FROM post_hashtags ph
+            JOIN posts ON posts.id = ph.post_id
+            JOIN images ON images.id = posts.image_id
+            LEFT JOIN communities ON communities.id = posts.community_id
+            WHERE ph.hashtag_id = ANY($1)
+            AND posts.published_at IS NOT NULL
+            AND posts.deleted_at IS NULL
+            AND (communities.visibility = 'public' OR posts.community_id IS NULL)
+            AND posts.is_sensitive = false
+            AND posts.is_explicit = false
+        ) latest
+        WHERE rank <= 3
+        ORDER BY hashtag_id, rank
+        "#,
+        hashtag_ids
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(covers)
+}
+
 /// One tag by its normalized name. Tags with no visible posts still resolve:
 /// the page says so rather than 404ing on a link a post is still displaying.
 pub async fn find_hashtag_by_name(

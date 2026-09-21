@@ -2,9 +2,6 @@
 {% block title %}
   {{ super() }} | #{{ hashtag.display_name }}
 {% endblock title %}
-{% block head %}
-  {% include "post_feed_head.jinja" %}
-{% endblock head %}
 {% block social_meta %}
   <meta property="og:site_name" content="{{ ftl_get_message('brand') }}" />
   <meta property="og:type" content="website" />
@@ -28,32 +25,39 @@
   <meta name="twitter:site" content="@oeee_cafe" />
 {% endblock social_meta %}
 {% block content %}
-  <div class="center-wide">
-    <div class="hashtag-view-header">
-      <h2>#{{ hashtag.display_name }}</h2>
-      {# Counted over the same filter the grid below is drawn from, so this is
-         the number of drawings on the page rather than a stored counter that
-         had drifted from it. #}
-      <p class="hashtag-view-count">{{ ftl_format_pattern("hashtag-post-count", {"count": post_count}) }}</p>
-    </div>
+  {# In the body, not the head: a boosted visit keeps nothing of the head but
+     the title, so from there it stopped applying the reader's count a row. #}
+  {% include "post_feed_head.jinja" %}
+  {# A tag's page as a community's is laid out: the card saying what it is,
+     then its drawings. #}
+  <div class="profile hashtag-page">
+    <section class="profile-card ds-card">
+      <div class="profile-identity">
+        <h1 class="profile-name">#{{ hashtag.display_name }}</h1>
+        {# Counted over the same filter the grid below is drawn from, so this
+           is the number of drawings on the page rather than a stored counter
+           that had drifted from it. #}
+        <div class="profile-handle">{{ ftl_format_pattern("hashtag-post-count", {"count": post_count}) }}</div>
+      </div>
+      <div class="profile-actions">
+        <a class="ds-button" href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
+      </div>
+    </section>
 
-    {# The shared feed: same cards, same sensitive blur, same column control and
-       same infinite scroll as / and a community page. This page used to write
-       its own <img> tags, which is how sensitive drawings ended up unblurred
-       here and nowhere else, and how it came to load fifty full-size images at
-       once with no way to reach the fifty-first. #}
-    {% if feed.posts %}
-      <section role="region" aria-labelledby="post-feed-heading">
-        <div class="feed-header">
-          <h2 id="post-feed-heading" class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
+    {# The shared feed: same cards, same sensitive blur, same column control
+       and same infinite scroll as / and a community page. #}
+    <section class="profile-section" role="region" aria-labelledby="post-feed-heading">
+      {% if feed.posts %}
+        <div class="grid-header">
+          <div id="post-feed-heading" class="profile-section-label">{{ ftl_get_message("recent-drawings") }}</div>
           {% include "post_feed_controls.jinja" %}
         </div>
         <div class="posts-grid" id="post-feed-grid">
           {% include "post_feed_fragment.jinja" %}
         </div>
-      </section>
-    {% else %}
-      <p>{{ ftl_get_message("hashtag-no-posts") }}</p>
-    {% endif %}
+      {% else %}
+        <p class="profile-empty">{{ ftl_get_message("hashtag-no-posts") }}</p>
+      {% endif %}
+    </section>
   </div>
 {% endblock content %}

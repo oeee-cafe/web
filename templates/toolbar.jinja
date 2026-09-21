@@ -473,9 +473,19 @@
           return '<div class="center-wide"><div class="feed-header">' + bar("180px", 22) +
             (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + postGrid() + "</div>";
         }],
+        // A tag: the card saying what it is, then its drawings -- and the
+        // tag directory, whose cards are the community directory's.
         [/^\/hashtags\/[^/]+$/, function () {
-          return '<div class="center-wide"><div class="hashtag-view-header">' + bar("200px", 28) + bar("110px", 13, "ds-skeleton-gap") +
-            '</div><div class="feed-header">' + bar("150px", 20) + "</div>" + postGrid() + "</div>";
+          return '<div class="profile">' + identityCard(false) + '<section class="profile-section">' + gridHeader("120px") + postGrid(2) + "</section></div>";
+        }],
+        [/^\/hashtags$/, function () {
+          var html = '<div class="center-wide communities-page">' + bar("200px", 26) + '<div class="communities-bar ds-skeleton-gap-l">' +
+            bar("300px", 30, "ds-skeleton-button") + bar("240px", 30, "ds-skeleton-button") + "</div><div class=\"community-grid\">";
+          for (var i = 0; i < 8; i++) {
+            html += '<div class="community-card"><span class="community-card-cover"><span class="ds-skeleton-fill"></span></span>' +
+              '<span class="community-card-body">' + bar("55%", 15) + bar("35%", 12, "ds-skeleton-gap") + "</span></div>";
+          }
+          return html + "</div></div>";
         }],
         // The community directory: its bar, then cards with a cover strip.
         [/^\/communities$/, function () {

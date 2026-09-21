@@ -1435,117 +1435,6 @@ nav a:visited,
   padding: 0;
 }
 
-/* The heading above a tag's drawings. The count used to carry its colour and
-   size in a style attribute on the element itself. */
-.hashtag-view-header {
-  margin-bottom: var(--space-4);
-}
-
-.hashtag-view-count {
-  color: var(--main-text-muted-color);
-  font-size: var(--text-sm);
-  margin: var(--space-1) 0;
-}
-
-/* Hashtag Discovery Page */
-
-.hashtag-discovery-controls {
-  margin: var(--space-4) 0;
-}
-
-.hashtag-search-form {
-  display: flex;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.hashtag-search-input {
-  flex-grow: 1;
-  padding: var(--space-2);
-  border: 1px solid var(--main-border-color);
-  background-color: var(--main-bg-color);
-  color: var(--main-text-color);
-  font-size: var(--text-sm);
-}
-
-.hashtag-search-form button {
-  padding: var(--space-2) var(--space-4);
-  background-color: var(--main-nav-bg-color);
-  border: 1px solid var(--main-border-color);
-  color: var(--main-text-color);
-  font-size: var(--text-sm);
-}
-
-.hashtag-search-form button:hover {
-  background-color: var(--main-border-color);
-}
-
-.hashtag-sort-controls {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.hashtag-sort-controls a {
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--main-border-color);
-  text-decoration: none;
-  font-size: var(--text-sm);
-}
-
-.hashtag-sort-controls a:hover {
-  background-color: var(--main-nav-bg-color);
-}
-
-.hashtag-sort-controls a.active {
-  background-color: var(--main-highlight-color);
-  border-color: var(--main-highlight-color);
-  font-weight: bold;
-}
-
-.hashtag-search-info {
-  font-size: var(--text-sm);
-  color: var(--main-text-color);
-  opacity: 0.8;
-  margin: var(--space-4) 0;
-}
-
-.hashtag-discovery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
-.hashtag-discovery-item {
-  border: 1px solid var(--main-border-color);
-}
-
-.hashtag-discovery-item:hover {
-  background-color: var(--main-nav-bg-color);
-}
-
-.hashtag-discovery-item a {
-  display: block;
-  padding: var(--space-4);
-  text-decoration: none;
-  color: var(--main-text-color);
-}
-
-.hashtag-discovery-item .hashtag-name {
-  display: block;
-  font-size: var(--text-base);
-  font-weight: bold;
-  margin-bottom: var(--space-1);
-}
-
-.hashtag-discovery-item .hashtag-count {
-  display: block;
-  font-size: var(--text-xs);
-  opacity: 0.7;
-}
-
 /* Empty State Styling */
 
 .empty-state {
@@ -2400,6 +2289,29 @@ nav a:visited,
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   grid-gap: 20px;
   gap: 20px;
+}
+
+/* The tag directory borrows the community directory's bar and cards; only
+   its title and the tag's glyph on an empty cover are its own. */
+.hashtag-directory-title {
+  margin-bottom: var(--ds-space-4);
+}
+
+.hashtag-card .community-card-empty {
+  color: var(--ds-faint);
+  font-size: var(--ds-text-2xl);
+  font-weight: 700;
+}
+
+.hashtag-search-info {
+  margin: 0 0 var(--ds-space-3);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.communities-bar .ds-segmented {
+  overflow-x: auto;
+  max-width: 100%;
 }
 
 /* Two rooms across a phone, like the community cards: one a row is a list
