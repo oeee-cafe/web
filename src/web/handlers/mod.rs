@@ -793,6 +793,40 @@ mod community_page_tests {
         assert!(!rendered.contains("/collaborate?community=open"));
     }
 
+    /// Cancel and Save swap the edit card back out for the header. The
+    /// delete area was a sibling of the form, so it outlived the swap and
+    /// stayed on the page under the restored header; now the one element
+    /// that is swapped holds all of it.
+    #[test]
+    fn the_edit_card_is_one_swappable_element() {
+        let env = test_support::env();
+        for visibility in ["public", "private"] {
+            let rendered = env
+                .get_template("community_edit.jinja")
+                .expect("edit template loads")
+                .render(context! {
+                    community => json!({
+                        "name": "Open Studio",
+                        "slug": "open",
+                        "description": "Draw with us",
+                        "visibility": visibility,
+                    }),
+                    community_id => "00000000-0000-0000-0000-000000000001",
+                    ftl_lang => "en",
+                })
+                .expect("edit form renders");
+            let rendered = rendered.trim();
+            assert!(rendered.ends_with("</section>"), "something follows the card");
+            assert_eq!(rendered.matches("<section").count(), 1);
+            assert!(rendered.contains("hx-target:inherited=\"this\""));
+            assert!(rendered.contains("delete-community-btn"));
+            assert_eq!(
+                rendered.contains("name=\"visibility\" value=\"private\""),
+                visibility == "private"
+            );
+        }
+    }
+
     /// The grid is the shared feed fragment, so its sentinel points wherever
     /// the handler said — and it must be this community's endpoint rather than
     /// the home feed's, or scrolling a community page loads the front page.
