@@ -29,132 +29,145 @@
         href="https://{{ domain }}/ap/users/{{ user.id }}" />
 {% endblock head %}
 {% block content %}
-  <div class="center">
-    <div class="profile-header">
-      <h2>
-        {{ user.display_name }}
-        <span class="muted fediverse-handle">@{{ user.login_name }}@{{ domain }}</span>
-        {% if user.id == current_user.id %}<a href="/@{{ user.login_name }}/settings">{{ ftl_get_message("profile-manage") }}</a>{% endif %}
-      </h2>
-      <div class="banner-controls">
-        {% if current_user %}
-          {% if is_following %}
-            {{ unfollow_button() }} {%
-            else %} {{ follow_button() }}
-          {% endif %}
-          {% if user.id != current_user.id %}
-            <button type="button" onclick="showProfileReportModal()">{{ ftl_get_message("profile-report") }}</button>
-          {% endif %}
-        {% endif %}
-        {% if banner %}
-          {%
-          if user.id == current_user.id %}<a href="/banners/draw">
-          <img draggable="false" width="{{ banner.width }}"
+  {# A profile, laid out as an application lays out a person: a card with
+     who they are and what you can do about them, their links as chips under
+     their name, their allies as one strip, and their drawings -- with no
+     headings over bulleted lists, which is what made it read as a page. #}
+  {% include "post_feed_head.jinja" %}
+  <div class="profile">
+    <section class="profile-card ds-card">
+      {% if banner %}
+        {% if user.id == current_user.id %}<a href="/banners/draw" class="profile-banner">{% else %}<span class="profile-banner">{% endif %}
+          <img draggable="false"
+               width="{{ banner.width }}"
                height="{{ banner.height }}"
-               alt="{{ current_user.display_name }} (@{{ current_user.login_name }}) 동맹 배너"
+               alt="{{ user.display_name }} (@{{ user.login_name }}) {{ ftl_get_message('profile-banner') }}"
                class="banner"
                src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
-        </a>
-      {% else %}
-        <img draggable="false" width="{{ banner.width }}"
-             height="{{ banner.height }}"
-             alt="{{ user.display_name }} (@{{ user.login_name }}) 동맹 배너"
-             class="banner"
-             src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
+        {% if user.id == current_user.id %}</a>{% else %}</span>{% endif %}
       {% endif %}
-    {% else %}
-      {% if user.id == current_user.id %}<a href="/banners/draw" class="button">{{ ftl_get_message("profile-draw-banner") }}</a>{% endif %}
-    {% endif %}
-  </div>
-</div>
-<div class="flex-inline">
-  <h3>{{ ftl_get_message("profile-link") }}</h3>
-</div>
-<ul class="links">
-  <li>
-    <a href="/@{{ user.login_name }}/guestbook">{{ ftl_get_message("profile-guestbook") }}</a>
-  </li>
-  {% for link, target in links %}
-    <li>
-      <a href="{{ link.url }}" target="{{ target }}">{{ link.description }}</a>
-    </li>
-  {% endfor %}
-</ul>
-{% if followings|length > 0 %}
-  {% if
-    followings|selectattr("banner_image_filename")|length > 0 %}
-    <h3>{{ ftl_get_message("profile-banner") }}</h3>
-    <div class="banners-grid">
-      {% for following in followings|selectattr("banner_image_filename") %}
-        <div class="banners-grid-item">
-          <a href="/@{{ following.login_name }}"
-             alt="{{ following.display_name }} (@{{ following.login_name }})">
-            <img draggable="false" width="{{ following.banner_image_width }}"
-                 height="{{ following.banner_image_height }}"
-                 alt="{{ following.display_name }} (@{{ following.login_name }}) 동맹 배너"
-                 class="banner"
-                 src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
-          </a>
+      <div class="profile-identity">
+        <h1 class="profile-name">{{ user.display_name }}</h1>
+        <div class="profile-handle">@{{ user.login_name }}@{{ domain }}</div>
+        <div class="profile-chips">
+          <a class="profile-chip" href="/@{{ user.login_name }}/guestbook">{{ ftl_get_message("profile-guestbook") }}</a>
+          {% for link, target in links %}
+            <a class="profile-chip" href="{{ link.url }}" target="{{ target }}" rel="noopener">{{ link.description }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+          {% endfor %}
         </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-  {% if followings|rejectattr("banner_image_filename")|length > 0 %}
-    <h3>{{ ftl_get_message("profile-following") }}</h3>
-    <ul class="followings-list">
-      {% for following in followings|rejectattr("banner_image_filename") %}
-        <li>
-          <a href="/@{{ following.login_name }}">{{ following.display_name }}</a>
-          <br />
-          <span class="muted">@{{ following.login_name }}</span>
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-{% endif %}
-<h3>{{ ftl_get_message("profile-public-community-posts") }}</h3>
-{% if public_community_posts %}
-  <div class="posts-grid">
-    {% for post in public_community_posts %}
-      <div class="posts-grid-item">
-        <a href="/@{{ user.login_name }}/{{ post.id }}">
-          <img draggable="false" class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
-               width="{{ post.image_width }}"
-               height="{{ post.image_height }}"
-               alt="{{ post.title }}"
-               src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-        </a>
       </div>
-    {% endfor %}
-  </div>
-{% else %}
-  <p>{{ ftl_get_message("profile-public-community-posts-nil") }}</p>
-{% endif %}
-{% if user.id == current_user.id %}
-  <h3>{{ ftl_get_message("profile-private-community-posts") }}</h3>
-  {% if private_community_posts %}
-    <div class="posts-grid">
-      {% for post in private_community_posts %}
-        <div class="posts-grid-item">
-          <a href="/@{{ user.login_name }}/{{ post.id }}">
-            <img draggable="false" class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
-                 width="{{ post.image_width }}"
-                 height="{{ post.image_height }}"
-                 alt="{{ post.title }}"
-                 src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-          </a>
+      <div class="profile-actions">
+        {% if current_user %}
+          {% if user.id == current_user.id %}
+            {% if not banner %}
+              <a href="/banners/draw" class="ds-button">{{ ftl_get_message("profile-draw-banner") }}</a>
+            {% endif %}
+            <a href="/@{{ user.login_name }}/settings" class="ds-button">{{ ftl_get_message("profile-manage") }}</a>
+          {% else %}
+            {% if is_following %}{{ unfollow_button() }}{% else %}{{ follow_button() }}{% endif %}
+            <button type="button" class="ds-button ds-button-quiet" onclick="showProfileReportModal()">{{ ftl_get_message("profile-report") }}</button>
+          {% endif %}
+        {% endif %}
+      </div>
+    </section>
+
+    {% if followings|length > 0 %}
+      <section class="profile-section">
+        <div class="profile-section-label">{{ ftl_get_message("profile-following") }}</div>
+        <div class="profile-allies">
+          {% for following in followings|selectattr("banner_image_filename") %}
+            <a class="profile-ally-banner"
+               href="/@{{ following.login_name }}"
+               title="{{ following.display_name }} (@{{ following.login_name }})">
+              <img draggable="false"
+                   width="{{ following.banner_image_width }}"
+                   height="{{ following.banner_image_height }}"
+                   alt="{{ following.display_name }} (@{{ following.login_name }})"
+                   class="banner"
+                   src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
+            </a>
+          {% endfor %}
+          {% for following in followings|rejectattr("banner_image_filename") %}
+            <a class="profile-chip" href="/@{{ following.login_name }}" title="@{{ following.login_name }}">{{ following.display_name }}</a>
+          {% endfor %}
         </div>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p>{{ ftl_get_message("profile-private-community-posts-nil") }}</p>
-  {% endif %}
-{% endif %}
+      </section>
+    {% endif %}
+
+    <section class="profile-section">
+      {% if user.id == current_user.id %}
+        {# Their own profile holds both: what everyone sees, and what only
+           they do. One grid at a time, chosen like any other view. #}
+        <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-public-community-posts') }}">
+          <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-public-community-posts") }}</button>
+          <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-private-community-posts") }}</button>
+        </div>
+      {% else %}
+        <div class="profile-section-label">{{ ftl_get_message("profile-public-community-posts") }}</div>
+      {% endif %}
+      <div data-profile-panel="public">
+        {% if public_community_posts %}
+          <div class="posts-grid">
+            {% for post in public_community_posts %}
+              <div class="posts-grid-item">
+                <a href="/@{{ user.login_name }}/{{ post.id }}">
+                  <img draggable="false" class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
+                       width="{{ post.image_width }}"
+                       height="{{ post.image_height }}"
+                       alt="{{ post.title }}"
+                       src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
+                </a>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="profile-empty">{{ ftl_get_message("profile-public-community-posts-nil") }}</p>
+        {% endif %}
+      </div>
+      {% if user.id == current_user.id %}
+        <div data-profile-panel="private" hidden>
+          {% if private_community_posts %}
+            <div class="posts-grid">
+              {% for post in private_community_posts %}
+                <div class="posts-grid-item">
+                  <a href="/@{{ user.login_name }}/{{ post.id }}">
+                    <img draggable="false" class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
+                         width="{{ post.image_width }}"
+                         height="{{ post.image_height }}"
+                         alt="{{ post.title }}"
+                         src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
+                  </a>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="profile-empty">{{ ftl_get_message("profile-private-community-posts-nil") }}</p>
+          {% endif %}
+        </div>
+        <script>
+          (function () {
+            var tabs = document.querySelectorAll("[data-profile-tab]");
+            for (var i = 0; i < tabs.length; i++) {
+              tabs[i].addEventListener("click", function () {
+                var chosen = this.getAttribute("data-profile-tab");
+                for (var j = 0; j < tabs.length; j++) {
+                  tabs[j].setAttribute("aria-pressed", String(tabs[j] === this));
+                }
+                var panels = document.querySelectorAll("[data-profile-panel]");
+                for (var k = 0; k < panels.length; k++) {
+                  panels[k].hidden = panels[k].getAttribute("data-profile-panel") !== chosen;
+                }
+              });
+            }
+          })();
+        </script>
+      {% endif %}
+    </section>
 
 {# Profile Report Modal #}
 {% if current_user and user.id != current_user.id %}
-  <div id="profile-report-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: var(--main-bg-color); padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
+  <div id="profile-report-modal" class="ds-modal" style="display: none;">
+    <div class="ds-modal-panel">
       <h2>{{ ftl_get_message("profile-report-title") }}</h2>
       {# `required` on the textarea is the empty-description check: htmx runs
          HTML5 validation before it will issue a request for a form. The login
@@ -165,16 +178,17 @@
             hx-target="this"
             hx-swap="outerHTML"
             hx-disable="find button">
-        <label for="profile-report-description">{{ ftl_get_message("profile-report-description-label") }}</label>
+        <label class="ds-label" for="profile-report-description">{{ ftl_get_message("profile-report-description-label") }}</label>
         <textarea id="profile-report-description"
+                  class="ds-textarea"
                   name="description"
                   required
                   rows="5"
-                  style="width: 100%; margin-top: 8px; padding: 8px;"
+                  style="width: 100%"
                   placeholder="{{ ftl_get_message('profile-report-description-placeholder') }}"></textarea>
-        <div style="margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;">
-          <button type="button" onclick="hideProfileReportModal()">{{ ftl_get_message("cancel") }}</button>
-          <button type="submit">{{ ftl_get_message("profile-report-submit") }}</button>
+        <div class="ds-actions" style="justify-content: flex-end">
+          <button type="button" class="ds-button" onclick="hideProfileReportModal()">{{ ftl_get_message("cancel") }}</button>
+          <button type="submit" class="ds-button ds-button-danger">{{ ftl_get_message("profile-report-submit") }}</button>
         </div>
       </form>
     </div>

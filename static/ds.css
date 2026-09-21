@@ -1358,3 +1358,39 @@ html {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Modal dialogs
+
+   A panel over a dimmed page -- a report, a confirmation. The page shows and
+   hides it by its `display`, so this only lays it out.
+   --------------------------------------------------------------------------- */
+.ds-modal {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 200;
+  -webkit-box-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  justify-content: center;
+  background-color: rgba(20, 20, 50, 0.35);
+}
+
+.ds-modal-panel {
+  width: 480px;
+  max-width: calc(100% - 32px);
+  padding: 16px 20px 20px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-menu);
+  color: var(--ds-ink);
+}
+
+.ds-modal-panel h2 {
+  margin: 0 0 var(--ds-space-3);
+  font-size: var(--ds-text-l);
+}

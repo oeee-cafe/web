@@ -747,23 +747,8 @@ nav a:visited,
   align-items: center;
 }
 
-.followings-list {
-  columns: 3;
-  column-gap: var(--space-1);
-  list-style: none;
-  padding-left: 0;
-}
 
-.followings-list li {
-  break-inside: avoid-column;
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-2);
-  margin: var(--space-1) 0;
-}
 
-.followings-list li:first-of-type {
-  margin-top: 0;
-}
 
 .dangerous {
   color: red;
@@ -785,16 +770,7 @@ nav a:visited,
   margin: var(--space-2) 0;
 }
 
-.flex-inline {
-  display: flex;
-  flex-direction: row;
-  gap: var(--space-2);
-  align-items: center;
-}
 
-.links {
-  margin-top: 0;
-}
 
 .post-sidebar {
   display: flex;
@@ -2492,4 +2468,137 @@ nav a:visited,
   font-size: 0.875rem;
   color: var(--main-text-muted-color);
   white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Profile
+
+   A card with who they are and what you can do about them; their links and
+   allies as chips; their drawings. Flex without `gap`, for Firefox 56.
+   --------------------------------------------------------------------------- */
+.profile {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.profile-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-bottom: var(--ds-space-5);
+}
+
+.profile-banner {
+  flex: 0 0 auto;
+  margin-right: var(--ds-space-4);
+}
+
+.profile-banner img {
+  display: block;
+  box-shadow: 0 0 0 1px var(--ds-frame);
+}
+
+.profile-identity {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.profile-name {
+  margin: 0;
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.profile-handle {
+  margin-top: 2px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: auto;
+}
+
+.profile-actions > * + *,
+.profile-actions form + * {
+  margin-left: var(--ds-space-2);
+}
+
+.profile-actions form {
+  margin: 0;
+}
+
+.profile-chips,
+.profile-allies {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.profile-chips {
+  margin-top: var(--ds-space-3);
+}
+
+.profile-chips > *,
+.profile-allies > * {
+  margin: 0 6px 6px 0;
+}
+
+.profile-chip,
+.profile-chip:visited {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 13px;
+  background-color: var(--ds-surface);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-m);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.profile-chip:hover {
+  background-color: var(--ds-ground);
+}
+
+.profile-chip-out {
+  margin-left: 4px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.profile-ally-banner img {
+  display: block;
+  box-shadow: 0 0 0 1px var(--ds-frame);
+}
+
+.profile-section {
+  margin-bottom: var(--ds-space-5);
+}
+
+.profile-section-label {
+  margin-bottom: var(--ds-space-2);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+  font-weight: 600;
+}
+
+.profile-tabs {
+  margin-bottom: var(--ds-space-1);
+}
+
+.profile-empty {
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+@media (max-width: 600px) {
+  .profile-actions {
+    width: 100%;
+    margin: var(--ds-space-3) 0 0;
+  }
 }
