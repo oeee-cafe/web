@@ -836,319 +836,330 @@ nav a:visited,
   gap: var(--space-6);
 }
 
-.post-card:hover {
-  background-color: rgba(128, 128, 128, 0.05);
-  border-color: var(--main-highlight-color);
-}
+/* ---------------------------------------------------------------------------
+   A post
 
-.post-detail-container {
+   The drawing on the ground at the left, as the painter shows it, and a
+   column at the right: the inspector card (what it is, who drew it, the
+   facts, what you can do), the drawings in its thread, the comments. The
+   drawing stays in view while the column scrolls. On a phone, one column.
+   Firefox 56: flex without `gap`, so the spacing is margins.
+   --------------------------------------------------------------------------- */
+.post-page {
   display: flex;
-  flex-direction: row;
-  gap: var(--space-5);
-  padding: var(--space-5);
-  border: 1px solid var(--main-border-color);
+  align-items: flex-start;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
-.post-detail-left {
-  flex: 1;
+.post-stage {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
-}
-
-.post-detail-right {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.post-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.post-author-info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--main-border-color);
-  border-bottom: 1px solid var(--main-border-color);
-}
-
-.post-metadata {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--main-text-muted-color);
-}
-
-.post-metadata p {
-  margin: var(--space-1) 0;
-}
-
-.post-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--main-border-color);
-}
-
-.post-action-buttons {
-  display: flex;
-  flex-direction: row;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.post-action-buttons button {
-  background-color: var(--main-bg-color);
-  color: var(--main-text-color);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--main-border-color);
-  font-size: var(--text-sm);
-}
-
-.post-action-buttons button:hover {
-  background-color: var(--main-nav-bg-color);
-  border-color: var(--main-highlight-color);
-}
-
-.post-full-width-section {
-  width: 100%;
-}
-
-.post-main {
-  flex-grow: 1;
-}
-
-.post-comments {
-  flex-grow: 1;
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-5);
-}
-
-.post-comments h2 {
-  margin-top: 0;
-  margin-bottom: var(--space-4);
-  font-size: var(--text-xl);
-}
-
-.post-child-posts {
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-5);
-}
-
-.post-child-posts h2 {
-  margin-top: 0;
-  margin-bottom: var(--space-4);
-  font-size: var(--text-xl);
-}
-
-.post-content {
-  white-space: pre-wrap;
-  line-height: 1.6;
-}
-
-.post-menu {
-  display: flex;
-  flex-direction: row;
-  gap: var(--space-2);
-}
-
-/* Responsive: Stack on mobile */
-@media (max-width: 768px) {
-  .post-detail-container {
-    flex-direction: column;
-  }
-
-  /* Comments section responsive */
-  .post-comments {
-    padding: var(--space-3);
-  }
-
-  .post-comments h2 {
-    font-size: var(--text-lg);
-  }
-
-  .comment {
-    padding: var(--space-3);
-    gap: var(--space-3);
-  }
-
-  .comment-header {
-    flex-wrap: wrap;
-    gap: var(--space-1);
-  }
-
-  .comment-timestamp {
-    margin-left: 0;
-    width: 100%;
-    order: 3;
-  }
-
-  .comment-handle {
-    flex-shrink: 0;
-  }
-
-  #comments form {
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  #comments button[type="submit"] {
-    width: 100%;
-  }
-}
-
-.post-share {
-  padding: var(--space-2) 0;
-}
-
-.sensitive {
-  filter: blur(1rem);
-}
-
-/* Heading and density control share one line. The heading lost its box: a
-   bordered, filled heading sitting next to a bare control read as two
-   unrelated elements. Only the two feed pages use this class. */
-.feed-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin: var(--space-5) 0 var(--space-3) 0;
-}
-
-.community-badges {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
-  margin: var(--space-4) 0;
-}
-
-.community-badge {
-  padding: var(--space-3);
-  border: solid 1px var(--main-border-color);
-  line-height: 1.4;
-}
-
-.community-badge a {
-  font-weight: 500;
-}
-
-.community-badge:hover {
-  background-color: var(--main-nav-bg-color);
-  border-color: var(--main-highlight-color);
-}
-
-.fediverse-handle {
-  user-select: all;
-}
-
-/* Cucumber */
-
-#cucumber-container {
   display: flex;
   justify-content: center;
-  flex-direction: row;
-  gap: var(--space-3);
+  position: -webkit-sticky;
+  position: sticky;
+  top: var(--ds-space-4);
+  padding: var(--ds-space-4) 0;
 }
 
-#cucumber-canvas {
-  border: 1px solid var(--main-border-color);
+.post-stage-frame {
+  max-width: 100%;
+  line-height: 0;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--ds-frame), 0 8px 24px rgba(40, 40, 90, 0.18);
 }
 
-#cucumber-canvas-safe {
-  padding: 50px;
+.post-stage-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
-#cucumber-controls-container {
-  padding-top: 50px;
-  padding-right: 50px;
-  padding-bottom: 50px;
-  width: 160px;
+.post-stage-image.is-zoomed {
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
+}
+
+.post-side {
+  flex: 0 0 380px;
+  width: 380px;
+  margin-left: var(--ds-space-5);
+}
+
+.post-side > * + * {
+  margin-top: var(--ds-space-4);
+}
+
+.post-inspector-title {
+  margin: 0;
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+  line-height: 1.25;
+  word-wrap: break-word;
+}
+
+.post-inspector-description {
+  margin-top: var(--ds-space-2);
+  font-size: var(--ds-text-base);
+  line-height: 1.55;
+  word-wrap: break-word;
+}
+
+.post-inspector-description p {
+  margin: 0 0 var(--ds-space-2);
+}
+
+.post-inspector-description p:last-child {
+  margin-bottom: 0;
+}
+
+.post-inspector-byline {
+  margin-bottom: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--ds-text-m);
+}
+
+.post-inspector-byline > * + * {
+  margin-left: 4px;
+}
+
+.post-inspector-author,
+.post-inspector-author:visited {
+  color: var(--ds-ink);
+  font-weight: 600;
+}
+
+.post-inspector-handle {
+  color: var(--ds-faint);
+}
+
+.post-inspector-tags {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-top: var(--ds-space-3);
 }
 
-#cucumber-controls-drawing {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+.post-inspector-tags > * {
+  margin: 0 6px 6px 0;
 }
 
-#cucumber-color-picker-container {
+/* The facts as an inspector lists them: a label column and a value. */
+.post-inspector-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-gap: 6px 16px;
+  gap: 6px 16px;
+  margin: var(--ds-space-3) 0 0;
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--ds-line);
+  font-size: var(--ds-text-m);
+}
+
+.post-inspector-facts dt {
+  color: var(--ds-muted);
+}
+
+.post-inspector-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--ds-ink);
+  word-wrap: break-word;
+}
+
+.post-inspector-inline {
+  margin-left: 6px;
+  font-weight: 600;
+}
+
+.post-inspector-actions {
   display: flex;
-  flex-direction: row;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--ds-line);
+}
+
+.post-inspector-actions > * {
+  margin: 0 var(--ds-space-2) var(--ds-space-2) 0;
+}
+
+.post-inspector-actions form {
+  display: inline-block;
+}
+
+/* A drawing in the thread: a framed square and what it is, as one row. */
+.post-thread .profile-section-label {
+  margin-bottom: var(--ds-space-2);
+}
+
+.post-thread-item + .post-thread-item,
+.post-thread-item > .post-thread-item {
+  margin-top: 6px;
+}
+
+.post-thread-card,
+.post-thread-card:visited {
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
+  color: var(--ds-ink);
+}
+
+.post-thread-card:hover {
+  box-shadow: 0 0 0 0.5px var(--ds-frame), 0 4px 12px rgba(40, 40, 90, 0.14);
+}
+
+.post-thread-thumb {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--ds-frame);
+}
+
+.post-thread-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
+}
+
+.post-thread-text {
+  min-width: 0;
+  margin-left: 10px;
+}
+
+.post-thread-title,
+.post-thread-meta {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.post-thread-title {
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+}
+
+.post-thread-meta {
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.post-comments .profile-section-label {
+  margin: 0 0 var(--ds-space-3);
+}
+
+.post-comment-form {
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--ds-line);
+}
+
+.post-comment-form .ds-textarea {
+  width: 100%;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.post-comment-replying {
+  margin-bottom: var(--ds-space-2);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.post-comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--ds-space-2);
+}
+
+@media (max-width: 900px) {
+  .post-page {
+    display: block;
+  }
+
+  .post-stage {
+    position: static;
+    padding-top: 0;
+  }
+
+  .post-side {
+    width: auto;
+    max-width: 640px;
+    margin: var(--ds-space-4) auto 0;
+  }
 }
 
 /* Post Reactions */
 
+/* Reactions: a row of chips, the ones you gave filled in the cucumber. */
 .post-reactions-container {
-  padding: var(--space-5);
-  border: 1px solid var(--main-border-color);
+  margin-top: var(--ds-space-3);
 }
 
 .post-reactions {
   display: flex;
-  flex-direction: row;
   flex-wrap: wrap;
-  gap: var(--space-2);
   align-items: center;
+}
+
+.post-reactions > * {
+  margin: 0 6px 6px 0;
 }
 
 .reaction-total {
-  color: var(--main-text-color);
-  font-size: var(--text-sm);
-  font-weight: bold;
-  padding: var(--space-2) var(--space-3);
-  margin-right: var(--space-1);
-  border: 1px solid var(--main-border-color);
-  display: inline-block;
+  margin-right: 10px;
+  font-size: var(--ds-text-m);
+  font-weight: 600;
 }
 
-.reaction-button {
-  background-color: var(--main-bg-color);
-  color: var(--main-text-color);
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 50px;
-  justify-content: center;
+.reaction-button,
+.reaction-button-readonly {
+  display: inline-block;
+  min-width: 44px;
+  padding: 2px 10px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 14px;
+  background-color: var(--ds-surface);
+  color: var(--ds-ink);
+  font: inherit;
+  font-size: var(--ds-text-m);
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .reaction-button:hover {
-  background-color: var(--main-nav-bg-color);
+  background-color: var(--ds-ground);
 }
 
 .reaction-button.reacted {
-  background-color: var(--main-highlight-color);
-  border-color: var(--main-highlight-color);
-  font-weight: bold;
+  border-color: var(--ds-accent-line);
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+  font-weight: 600;
+}
+
+.reaction-button.reacted:hover {
+  background-color: var(--ds-accent-hover);
 }
 
 .reaction-button-readonly {
-  background-color: var(--main-bg-color);
-  color: var(--main-text-color);
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 50px;
-  justify-content: center;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 /* Hashtags */
@@ -1158,19 +1169,6 @@ nav a:visited,
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-}
-
-.hashtag-link {
-  background-color: var(--main-bg-color);
-  color: var(--main-text-color);
-  border: 1px solid var(--main-highlight-color);
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-sm);
-  text-decoration: none;
-}
-
-.hashtag-link:hover {
-  background-color: var(--main-nav-bg-color);
 }
 
 .trending-hashtags {
@@ -2959,4 +2957,59 @@ a.user-pill:hover {
 
 .community-form-danger-row > * + * {
   margin-left: var(--ds-space-2);
+}
+
+/* Comments under a post: a conversation, not a stack of boxes. Each is
+   set off by a hairline, replies step in along a thread line. Scoped to
+   the post page; the comment lists elsewhere keep their cards. */
+.post-comments .comment {
+  padding: 10px 0;
+  border: 0;
+  background: none;
+}
+
+.post-comments .comment-wrapper {
+  margin-bottom: 0;
+}
+
+.post-comments #comments > .comment-wrapper + .comment-wrapper {
+  border-top: 1px solid var(--ds-line);
+}
+
+.post-comments .comment-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: var(--ds-text-m);
+}
+
+.post-comments .comment-header > * + * {
+  margin-left: 6px;
+}
+
+.post-comments .comment-author {
+  font-weight: 600;
+}
+
+.post-comments .comment-handle,
+.post-comments .comment-timestamp {
+  color: var(--ds-faint);
+  font-size: var(--ds-text-s);
+}
+
+.post-comments .comment-content {
+  margin-top: 2px;
+  font-size: var(--ds-text-base);
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.post-comments .comment-actions {
+  margin-top: 4px;
+}
+
+.post-comments .comment-replies {
+  margin: 0 0 4px 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--ds-line);
 }

@@ -1144,6 +1144,22 @@ mod template_tests {
             .unwrap_or_else(|e| panic!("post_view.jinja renders: {e:#}"))
     }
 
+    /// Posting a comment swaps the list for the one the server sends back.
+    /// The form used to sit inside the swapped element, so it went with it
+    /// and a second comment needed a reload; it has to sit outside it.
+    #[test]
+    fn the_comment_form_survives_posting_a_comment() {
+        let author = "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d";
+        let viewer = json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "user", "login_name": "viewer"});
+        let rendered = render_post_page("true", author, viewer);
+        let list = rendered.find("id=\"comments\"").expect("comment list");
+        let form = rendered.find("id=\"comment-form\"").expect("comment form");
+        assert!(form > list, "the form comes after the list");
+        let list_end = rendered[list..].find("</div>").map(|i| list + i).unwrap();
+        assert!(form > list_end, "the form is inside the swapped list");
+        assert!(rendered.contains("hx-target=\"#comments\" hx-swap=\"innerHTML\""));
+    }
+
     /// The replay switch is enforced in the handler; this is the other half of
     /// it -- the link a stranger is not supposed to be offered.
     #[test]
