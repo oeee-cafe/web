@@ -450,3 +450,6 @@ community-guidelines-content = { brand } is committed to providing a safe, welco
   By using { brand }, you agree to abide by these community guidelines. We reserve the right to update these guidelines at any time.
 
 personal-post = Personal post
+communities-tab-public = Public
+communities-tab-official = Official
+communities-tab-yours = Yours

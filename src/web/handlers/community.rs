@@ -3242,14 +3242,14 @@ mod tests {
             .render(directory_context(Vec::new(), json!(null)))
             .expect("communities.jinja renders");
         assert!(
-            rendered.contains("class=\"community-grid-item\""),
+            rendered.contains("class=\"community-card\""),
             "first batch did not render inside the page"
         );
         assert!(rendered.contains("Open Studio"));
         assert!(rendered.contains("infinite-scroll-sentinel"));
         // The directory is a grid in the wide container, like the home feed.
         // At .center it fit exactly one community per row.
-        assert!(rendered.contains("class=\"center-wide\""));
+        assert!(rendered.contains("class=\"center-wide communities-page\""));
         assert!(rendered.contains("class=\"community-grid\""));
     }
 
@@ -3295,11 +3295,11 @@ mod tests {
             ))
             .expect("renders");
         assert!(rendered.contains("Nothing Yet"));
-        assert!(rendered.contains("community-strip-empty"));
+        assert!(rendered.contains("community-card-empty"));
     }
 
     #[test]
-    fn yours_band_sits_above_the_directory() {
+    fn yours_is_a_view_beside_the_directory() {
         let env = test_support::env();
         let template = env
             .get_template("communities.jinja")
@@ -3310,20 +3310,26 @@ mod tests {
                 json!({"login_name": "someone"}),
             ))
             .expect("renders");
-        let yours = rendered.find("my-communities").expect("yours band");
-        let directory = rendered
-            .find("latest-active-public-community")
-            .expect("directory");
-        assert!(yours < directory, "yours band fell below the directory");
-        // One band, not two: the participating section was a second copy of
+        // One view at a time: the public directory shows first and the
+        // others wait behind their tabs.
+        assert!(rendered.contains("data-communities-tab=\"yours\""));
+        assert!(rendered.contains("data-communities-panel=\"yours\" hidden"));
+        assert!(rendered.contains("data-communities-panel=\"public\">"));
+        // One list, not two: the participating section was a second copy of
         // every community you both own and are a member of.
         assert!(!rendered.contains("participating-community"));
+        // Signed out, there is no Yours and nothing to create.
+        let rendered = template
+            .render(directory_context(Vec::new(), json!(null)))
+            .expect("renders");
+        assert!(!rendered.contains("data-communities-tab=\"yours\""));
+        assert!(!rendered.contains("/communities/new"));
     }
 
     #[test]
-    fn search_sits_with_the_list_it_actually_filters() {
-        // Its hx-target has always been the public list alone. At the top of
-        // the page that read as a page-wide search that quietly was not one.
+    fn search_belongs_to_the_list_it_actually_filters() {
+        // Its hx-target has always been the public list alone, so it is shown
+        // with that list and hidden with it.
         let env = test_support::env();
         let template = env
             .get_template("communities.jinja")
@@ -3334,13 +3340,17 @@ mod tests {
                 json!({"login_name": "someone"}),
             ))
             .expect("renders");
+        let filters = rendered
+            .find("data-communities-for=\"public\"")
+            .expect("filters");
         let search = rendered
             .find("id=\"community-search\"")
             .expect("search box");
-        let heading = rendered
-            .find("latest-active-public-community")
-            .expect("directory heading");
-        assert!(search > heading, "search box drifted back above the page");
+        let sort = rendered.find("name=\"sort\"").expect("sort");
+        let panel = rendered
+            .find("data-communities-panel=")
+            .expect("panels");
+        assert!(filters < search && search < sort && sort < panel);
     }
 
     #[test]

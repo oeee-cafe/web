@@ -448,3 +448,6 @@ community-guidelines-content = { brand }는 모든 사용자에게 안전하고 
   { brand }를 사용함으로써 귀하는 이러한 커뮤니티 가이드라인을 준수하는 데 동의합니다. 우리는 언제든지 이러한 가이드라인을 업데이트할 권리를 보유합니다.
 
 personal-post = 개인 게시물
+communities-tab-public = 공개
+communities-tab-official = 공식
+communities-tab-yours = 내 커뮤니티

@@ -4,20 +4,82 @@
   {{ super() }} | {{ ftl_get_message("community") }}
 {% endblock title %}
 {% block content %}
-  {# .center-wide, not .center: this is a directory of image-led cards, the same
-     kind of content the home grid shows, and the 829px text column fit exactly
-     one community per row. Every section below is a grid for the same reason. #}
-  <div class="center-wide">
-    <h2>{{ ftl_get_message("community") }}</h2>
-    {# Yours: owned and joined in one band. They were two stacked sections that
-       both matched for any community you own and are a member of, so the same
-       card appeared twice before you reached anything new. #}
-    {% if current_user %}
-      <section class="community-section">
-        <div class="community-directory-header">
-          <h3>{{ ftl_get_message("my-communities") }}</h3>
-          <a href="/communities/new" class="ds-button ds-button-primary">{{ ftl_get_message("create-community") }}</a>
+  {# One view at a time, chosen in the bar at the top, the way an application
+     shows one list of a thing and lets you switch which. This was three
+     headed sections stacked down the page, so the directory -- the only part
+     that changes -- started below everything you already knew. #}
+  <div class="center-wide communities-page">
+    <div class="communities-bar">
+      <div class="ds-segmented" role="group" aria-label="{{ ftl_get_message('community') }}">
+        <button type="button" aria-pressed="true" data-communities-tab="public">{{ ftl_get_message("communities-tab-public") }}</button>
+        {% if official_communities %}
+          <button type="button" aria-pressed="false" data-communities-tab="official">{{ ftl_get_message("communities-tab-official") }}</button>
+        {% endif %}
+        {% if current_user %}
+          <button type="button" aria-pressed="false" data-communities-tab="yours">{{ ftl_get_message("communities-tab-yours") }}</button>
+        {% endif %}
+      </div>
+      {# Search and sort belong to the public list: their hx-target has always
+         been that list alone, so they are only there while it is. #}
+      <div class="communities-filters" data-communities-for="public">
+        <input type="search"
+               id="community-search"
+               name="q"
+               class="ds-input communities-search"
+               placeholder="{{ ftl_get_message('post-move-search-placeholder') }}"
+               aria-label="{{ ftl_get_message('post-move-search-placeholder') }}"
+               autocomplete="off"
+               hx-get="/api/communities/cards"
+               hx-trigger="input changed delay:300ms, search"
+               hx-target="#public-communities-list"
+               hx-swap="innerHTML"
+               hx-include="[name='sort']"
+               hx-indicator="#community-search-indicator" />
+        <select name="sort"
+                class="ds-select"
+                aria-label="{{ ftl_get_message('community-sort') }}"
+                hx-get="/api/communities/cards"
+                hx-target="#public-communities-list"
+                hx-swap="innerHTML"
+                hx-include="#community-search">
+          <option value="active" {% if sort == "active" %}selected{% endif %}>{{ ftl_get_message("community-sort-active") }}</option>
+          <option value="posts" {% if sort == "posts" %}selected{% endif %}>{{ ftl_get_message("community-sort-posts") }}</option>
+          <option value="newest" {% if sort == "newest" %}selected{% endif %}>{{ ftl_get_message("community-sort-newest") }}</option>
+          <option value="name" {% if sort == "name" %}selected{% endif %}>{{ ftl_get_message("community-sort-name") }}</option>
+        </select>
+        {# The one control on this page that cannot say it is working by
+           disabling itself -- doing that mid-keystroke would drop what was
+           being typed. htmx puts .htmx-request straight onto the element
+           hx-indicator names, and its own stylesheet reveals it. #}
+        <span id="community-search-indicator"
+              class="htmx-indicator search-indicator"
+              role="status">{{ ftl_get_message("searching") }}</span>
+      </div>
+      {% if current_user %}
+        <a href="/communities/new" class="ds-button ds-button-primary communities-create">{{ ftl_get_message("create-community") }}</a>
+      {% endif %}
+    </div>
+
+    {# Cards live in community_cards_fragment.jinja so the first batch, search
+       results and every scrolled batch share one definition. #}
+    <div data-communities-panel="public">
+      <div class="community-grid" id="public-communities-list">
+        {% include "community_cards_fragment.jinja" %}
+      </div>
+    </div>
+    {% if official_communities %}
+      <div data-communities-panel="official" hidden>
+        <div class="community-grid">
+          {% for community in official_communities %}
+            {{ card.community_card(community, r2_public_endpoint_url) }}
+          {% endfor %}
         </div>
+      </div>
+    {% endif %}
+    {# Yours: owned and joined in one list. They were two, and both matched
+       for any community you own and are a member of. #}
+    {% if current_user %}
+      <div data-communities-panel="yours" hidden>
         {% if your_communities %}
           <div class="community-grid">
             {% for community in your_communities %}
@@ -25,70 +87,41 @@
             {% endfor %}
           </div>
         {% else %}
-          <p class="muted">{{ ftl_get_message("my-communities-nil") }}</p>
+          <p class="communities-empty">{{ ftl_get_message("my-communities-nil") }}</p>
         {% endif %}
-      </section>
-    {% endif %}
-    {# Official #}
-    {% if official_communities %}
-      <section class="community-section">
-        <h3>{{ ftl_get_message("official-communities") }}</h3>
-        <div class="community-grid">
-          {% for community in official_communities %}
-            {{ card.community_card(community, r2_public_endpoint_url) }}
-          {% endfor %}
-        </div>
-      </section>
-    {% else %}
-      <p class="muted">{{ ftl_get_message("official-communities-nil") }}</p>
-    {% endif %}
-    {# Latest active public communities. Cards live in
-       community_cards_fragment.jinja so the first batch, search results and
-       every scrolled batch share one definition. #}
-    <section class="community-section">
-      <div class="community-directory-header">
-        <h3>{{ ftl_get_message("latest-active-public-community") }}</h3>
-        {# Search sits in this header rather than at the top of the page. Its
-           hx-target has always been this list alone, so at the top it looked
-           like it searched everything and quietly did not. #}
-        <div class="community-directory-controls">
-          <input type="text"
-                 id="community-search"
-                 name="q"
-                 class="community-move-search community-directory-search"
-                 placeholder="{{ ftl_get_message('post-move-search-placeholder') }}"
-                 autocomplete="off"
-                 hx-get="/api/communities/cards"
-                 hx-trigger="input changed delay:300ms, search"
-                 hx-target="#public-communities-list"
-                 hx-swap="innerHTML"
-                 hx-include="[name='sort']"
-                 hx-indicator="#community-search-indicator" />
-          {# The one control on this page that cannot say it is working by
-             disabling itself — doing that mid-keystroke would drop what was
-             being typed. htmx puts .htmx-request straight onto the element
-             hx-indicator names, and its own stylesheet reveals it. #}
-          <span id="community-search-indicator"
-                class="htmx-indicator search-indicator"
-                role="status">{{ ftl_get_message("searching") }}</span>
-          <label class="community-sort">
-            {{ ftl_get_message("community-sort") }}
-            <select name="sort"
-                    hx-get="/api/communities/cards"
-                    hx-target="#public-communities-list"
-                    hx-swap="innerHTML"
-                    hx-include="#community-search">
-              <option value="active" {% if sort == "active" %}selected{% endif %}>{{ ftl_get_message("community-sort-active") }}</option>
-              <option value="posts" {% if sort == "posts" %}selected{% endif %}>{{ ftl_get_message("community-sort-posts") }}</option>
-              <option value="newest" {% if sort == "newest" %}selected{% endif %}>{{ ftl_get_message("community-sort-newest") }}</option>
-              <option value="name" {% if sort == "name" %}selected{% endif %}>{{ ftl_get_message("community-sort-name") }}</option>
-            </select>
-          </label>
-        </div>
       </div>
-      <div class="community-grid" id="public-communities-list">
-        {% include "community_cards_fragment.jinja" %}
-      </div>
-    </section>
+    {% endif %}
+    {# Runs where it stands, before the page is painted, so a remembered view
+       arrives as itself rather than flashing the public list first. #}
+    <script>
+      (function () {
+        var tabs = document.querySelectorAll("[data-communities-tab]");
+        function show(chosen) {
+          var found = false;
+          for (var i = 0; i < tabs.length; i++) {
+            if (tabs[i].getAttribute("data-communities-tab") === chosen) found = true;
+          }
+          if (!found) chosen = "public";
+          for (var j = 0; j < tabs.length; j++) {
+            tabs[j].setAttribute("aria-pressed", String(tabs[j].getAttribute("data-communities-tab") === chosen));
+          }
+          var parts = document.querySelectorAll("[data-communities-panel], [data-communities-for]");
+          for (var k = 0; k < parts.length; k++) {
+            var owner = parts[k].getAttribute("data-communities-panel") || parts[k].getAttribute("data-communities-for");
+            parts[k].hidden = owner !== chosen;
+          }
+        }
+        var saved = null;
+        try { saved = localStorage.getItem("communitiesTab"); } catch (e) {}
+        if (saved) show(saved);
+        for (var i = 0; i < tabs.length; i++) {
+          tabs[i].addEventListener("click", function () {
+            var chosen = this.getAttribute("data-communities-tab");
+            show(chosen);
+            try { localStorage.setItem("communitiesTab", chosen); } catch (e) {}
+          });
+        }
+      })();
+    </script>
   </div>
 {% endblock content %}
