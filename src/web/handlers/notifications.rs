@@ -722,8 +722,10 @@ mod tests {
         }
         assert!(rendered.contains("@someone"));
         assert!(rendered.contains("Open Studio"));
-        assert!(rendered.contains("btn-accept"));
-        assert!(rendered.contains("btn-reject"));
+        // Both answers are offered. The test environment prints message ids,
+        // so these are the buttons' labels.
+        assert!(rendered.contains(">invitation-accept<"));
+        assert!(rendered.contains(">invitation-reject<"));
     }
 
     /// Sixteen reactions on one drawing are one row saying so, not sixteen

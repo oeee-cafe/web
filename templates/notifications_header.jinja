@@ -7,7 +7,7 @@
 <div class="notifications-header" id="notifications-header">
   <h2 class="notifications-title">{{ ftl_get_message("notifications") }}</h2>
   {% if unread_notification_count > 0 %}
-    <button class="notification-mark-all-button"
+    <button class="ds-button ds-button-small"
             hx-post="/notifications/mark-all-read"
             hx-target="#notification-list"
             hx-swap="innerHTML"

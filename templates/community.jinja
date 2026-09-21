@@ -54,13 +54,13 @@
              and the session would silently save with no community. They have
              their own drawing card below. #}
           {% if current_user and not community.background_color %}
-            <a href="/collaborate?community={{ community.slug }}" class="btn">
+            <a href="/collaborate?community={{ community.slug }}" class="ds-button">
               {{ ftl_get_message("community-draw-together") }}
             </a>
           {% endif %}
-          <a href="/communities/@{{ community.slug }}/comments" class="btn">{{ ftl_get_message("recent-comments") }}</a>
+          <a href="/communities/@{{ community.slug }}/comments" class="ds-button">{{ ftl_get_message("recent-comments") }}</a>
           {% if current_user and community.visibility == "private" %}
-            <a href="/communities/@{{ community.slug }}/members" class="btn">{{ ftl_get_message("community-members") }}</a>
+            <a href="/communities/@{{ community.slug }}/members" class="ds-button">{{ ftl_get_message("community-members") }}</a>
           {% endif %}
         </div>
       </div>

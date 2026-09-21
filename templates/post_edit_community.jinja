@@ -31,7 +31,7 @@
     <div class="post-sidebar">
       <div class="post-move-header">
         <h2>{{ ftl_get_message("post-move-community-title") }}</h2>
-        <a href="/@{{ post.login_name }}/{{ post_id }}" class="btn">{{ ftl_get_message("cancel") }}</a>
+        <a href="/@{{ post.login_name }}/{{ post_id }}" class="ds-button">{{ ftl_get_message("cancel") }}</a>
       </div>
 
       <div class="post-move-preview">
@@ -121,7 +121,7 @@
                         onsubmit="return confirm('{{ ftl_get_message("post-move-confirm-personal") }}');"
                         class="community-move-form">
                     <input type="hidden" name="community_id" value="" />
-                    <button type="submit" class="btn btn-move">{{ ftl_get_message("post-move-to-personal") }}</button>
+                    <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-move-to-personal") }}</button>
                   </form>
                 </div>
               </div>
@@ -151,7 +151,7 @@
                           onsubmit="return confirm('{{ ftl_format_pattern("post-move-confirm", {"communityName": community.name}) }}');"
                           class="community-move-form">
                       <input type="hidden" name="community_id" value="{{ community.id }}" />
-                      <button type="submit" class="btn btn-move">{{ ftl_get_message("post-move-community") }}</button>
+                      <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-move-community") }}</button>
                     </form>
                   </div>
                   <div class="community-move-card-thumbnails">
@@ -202,7 +202,7 @@
                           onsubmit="return confirm('{{ ftl_format_pattern("post-move-confirm", {"communityName": community.name}) }}');"
                           class="community-move-form">
                       <input type="hidden" name="community_id" value="{{ community.id }}" />
-                      <button type="submit" class="btn btn-move">{{ ftl_get_message("post-move-community") }}</button>
+                      <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-move-community") }}</button>
                     </form>
                   </div>
                   <div class="community-move-card-thumbnails">
@@ -253,7 +253,7 @@
                           onsubmit="return confirm('{{ ftl_format_pattern("post-move-confirm", {"communityName": community.name}) }}');"
                           class="community-move-form">
                       <input type="hidden" name="community_id" value="{{ community.id }}" />
-                      <button type="submit" class="btn btn-move">{{ ftl_get_message("post-move-community") }}</button>
+                      <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-move-community") }}</button>
                     </form>
                   </div>
                   <div class="community-move-card-thumbnails">
