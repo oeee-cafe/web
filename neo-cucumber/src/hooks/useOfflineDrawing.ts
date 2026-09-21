@@ -1,9 +1,5 @@
 import { useRef, useCallback } from "react";
-import {
-  useBaseDrawing,
-  type DrawingState,
-  type PastePlacement,
-} from "./useBaseDrawing";
+import { useBaseDrawing, type DrawingState } from "./useBaseDrawing";
 import { ActionRecorder } from "../utils/ActionRecorder";
 import { deflateCoverage } from "../utils/rasterCodec";
 import { maskFrom, NO_MASK, type Mask } from "../neo/mask";
@@ -16,7 +12,7 @@ import {
   type ToolId,
 } from "../neo/tools";
 import type { RegionRect } from "../neo/regionDrag";
-import type { BezierPreviewStyle } from "../neo/regionPreview";
+import type { BezierPreviewStyle, PasteDisplay } from "../neo/regionPreview";
 
 // Constants matching Neo's LINETYPE values
 const LINETYPE_PEN = 1;
@@ -111,7 +107,7 @@ export const useOfflineDrawing = (
    */
   placement?: {
     onToolChange?: (tool: ToolId) => void;
-    onPastePreview?: (placement: PastePlacement | null) => void;
+    onPastePreview?: (display: PasteDisplay | null) => void;
   },
 ) => {
   // Initialize replay recording

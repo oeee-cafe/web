@@ -51,48 +51,52 @@ export function drawRegionPreview(
   overlay.commit();
 }
 
-/** A copy being placed; the same shape useBaseDrawing reports. */
-export interface PastePreview {
-  image: ImageData;
-  x: number;
-  y: number;
-  dragging: boolean;
-}
+/** What paste mode has on screen; the same shape useBaseDrawing reports. */
+export type PasteDisplay =
+  | { kind: "marks"; rects: RegionRect[] }
+  | { kind: "floating"; image: ImageData; x: number; y: number };
 
 /**
- * The copy on its way to being pasted: PasteTool.drawCursor over NEO's
- * `tempCanvas`.
+ * Paste mode as NEO shows it.
  *
- * Until it moves NEO outlines it and nothing more. Once it moves NEO draws
- * the copy itself, and draws it opaque: every pixel at full alpha, and every
- * empty one *white* rather than see-through. That is honest about what paste
- * does -- it replaces the rectangle outright, transparent pixels included,
- * so what shows through a gap now is not what will be there after.
+ * `marks` are the XOR outlines NEO has left on its display. They are drawn
+ * together, by parity, because that is how they combine in NEO: the copy's
+ * selection rectangle and the outline PasteTool draws on the press land in
+ * the same place, and the second erases the first.
+ *
+ * `floating` is the copy in mid-drag, and nothing else: NEO shows it by
+ * redrawing the display with its `tempCanvas` on top, which wipes every
+ * outline. It is drawn opaque -- every pixel at full alpha, every empty one
+ * *white* rather than see-through -- which is honest about what paste does:
+ * it replaces the rectangle outright, transparent pixels included.
  */
 export function drawPastePreview(
   ctx: CanvasRenderingContext2D,
-  placement: PastePreview | null,
+  display: PasteDisplay | null,
   backdrop: Backdrop | null
 ): void {
   clear(ctx);
-  if (!placement || !backdrop) return;
+  if (!display || !backdrop) return;
+  const scale = backdrop.scale ?? 1;
 
-  const { image, x, y, dragging } = placement;
-  if (!dragging) {
-    drawRegionPreview(
-      ctx,
-      { x, y, width: image.width, height: image.height },
-      backdrop
-    );
+  if (display.kind === "marks") {
+    const overlay = new XorOverlay(ctx, backdrop);
+    for (const r of display.rects) {
+      overlay.rect(r.x * scale, r.y * scale, r.width * scale, r.height * scale);
+    }
+    overlay.commit();
     return;
   }
 
-  const scale = backdrop.scale ?? 1;
-  ctx.drawImage(floatingTile(image, scale), Math.round(x * scale), Math.round(y * scale));
+  ctx.drawImage(
+    floatingTile(display.image, scale),
+    Math.round(display.x * scale),
+    Math.round(display.y * scale)
+  );
 }
 
 /**
- * The moving copy rendered once, at display size, outline included.
+ * The moving copy rendered once, at display size.
  *
  * Only its position changes during a drag, so it is built when the drag
  * starts rather than on every pointer move -- at 4x a large copy is a lot of
@@ -124,31 +128,12 @@ function floatingTile(image: ImageData, scale: number): HTMLCanvasElement {
   source.height = image.height;
   source.getContext("2d")!.putImageData(opaque, 0, 0);
 
-  const width = Math.max(1, Math.round(image.width * scale));
-  const height = Math.max(1, Math.round(image.height * scale));
   const tile = document.createElement("canvas");
-  tile.width = width;
-  tile.height = height;
+  tile.width = Math.max(1, Math.round(image.width * scale));
+  tile.height = Math.max(1, Math.round(image.height * scale));
   const tileCtx = tile.getContext("2d")!;
   tileCtx.imageSmoothingEnabled = false;
-  tileCtx.drawImage(source, 0, 0, width, height);
-
-  // NEO XORs the outline into the destination after the copy is drawn
-  // there, so it inverts the copy's own edge pixels. The overlay commits a
-  // whole bounding box, transparent inside, so it is drawn on its own
-  // canvas and composited rather than written over the copy.
-  const outline = document.createElement("canvas");
-  outline.width = width;
-  outline.height = height;
-  const xor = new XorOverlay(outline.getContext("2d")!, {
-    width: image.width,
-    height: image.height,
-    scale,
-    layers: [to],
-  });
-  xor.rect(0, 0, width, height, false);
-  xor.commit();
-  tileCtx.drawImage(outline, 0, 0);
+  tileCtx.drawImage(source, 0, 0, tile.width, tile.height);
 
   floatingTiles.set(image, { scale, canvas: tile });
   return tile;

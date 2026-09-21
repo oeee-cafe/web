@@ -1,9 +1,10 @@
 import { act, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { useOfflineDrawing } from "../hooks/useOfflineDrawing";
-import type { PastePlacement } from "../hooks/useBaseDrawing";
+import type { PasteDisplay } from "../neo/regionPreview";
 import type { DrawingState } from "../types/drawing";
 import type { ToolId } from "../neo/tools";
+import type { RegionRect } from "../neo/regionDrag";
 import {
   LAYER,
   createCanonicalPainter,
@@ -23,23 +24,27 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function mountPainter(initialTool: ToolId) {
   const tools: ToolId[] = [];
-  const previews: (PastePlacement | null)[] = [];
+  const previews: (PasteDisplay | null)[] = [];
+  const regionPreviews: (RegionRect | null)[] = [];
+  type Layer = DrawingState["layerType"];
   const handle: {
     api: ReturnType<typeof useOfflineDrawing> | null;
     setTool: (tool: ToolId) => void;
+    setLayer: (layer: Layer) => void;
     tool: ToolId;
-  } = { api: null, setTool: () => {}, tool: initialTool };
+  } = { api: null, setTool: () => {}, setLayer: () => {}, tool: initialTool };
 
   function Harness() {
     const appRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [brushType, setBrushType] = useState<ToolId>(initialTool);
+    const [layerType, setLayerType] = useState<Layer>("background");
     const state: DrawingState = {
       brushSize: 1,
       opacity: 255,
       color: "#1e2864",
       brushType,
-      layerType: "background",
+      layerType,
       zoomLevel: 100,
       fgVisible: true,
       bgVisible: true,
@@ -51,19 +56,22 @@ export async function mountPainter(initialTool: ToolId) {
           tools.push(tool);
           setBrushType(tool);
         },
-        onPastePreview: (p: PastePlacement | null) => previews.push(p),
+        onPastePreview: (p: PasteDisplay | null) => previews.push(p),
       }),
       []
     );
     const api = useOfflineDrawing(
       canvasRef, appRef, state, undefined, 100, W, H,
-      undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined,
+      (rect: RegionRect | null) => regionPreviews.push(rect),
+      undefined, undefined, undefined,
       undefined, false, undefined, undefined, undefined, undefined,
       undefined, true, placement
     );
     useEffect(() => {
       handle.api = api;
       handle.setTool = setBrushType;
+      handle.setLayer = setLayerType;
       handle.tool = brushType;
     }, [api, brushType]);
     return (
@@ -104,12 +112,18 @@ export async function mountPainter(initialTool: ToolId) {
   const selectTool = async (tool: ToolId) => {
     await act(async () => { handle.setTool(tool); });
   };
+  const selectLayer = async (layer: Layer) => {
+    await act(async () => { handle.setLayer(layer); });
+  };
   const layer = () => handle.api!.drawingEngine!.layers.background;
   const alphaAt = (x: number, y: number) => layer()[(y * W + x) * 4 + 3];
   const frames = async () =>
     (await decodePCH(handle.api!.getReplayBlob())).items;
 
-  return { handle, tools, previews, send, drag, selectTool, layer, alphaAt, frames };
+  return {
+    handle, tools, previews, regionPreviews, send, drag,
+    selectTool, selectLayer, layer, alphaAt, frames,
+  };
 }
 
 /** The recording, re-rendered by NEO itself, background layer. */

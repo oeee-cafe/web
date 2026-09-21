@@ -12,7 +12,7 @@ import {
 } from "../neo/tools";
 import { RegionDrag, type RegionRect } from "../neo/regionDrag";
 import { StrokeSmoother, strokeSmootherSizeFor } from "../neo/strokeSmoother";
-import type { BezierPreviewStyle } from "../neo/regionPreview";
+import type { BezierPreviewStyle, PasteDisplay } from "../neo/regionPreview";
 import { screenToArtwork } from "../neo/canvasTransform";
 import { notePointerType, penPreferred } from "../utils/penPreference";
 
@@ -44,17 +44,27 @@ function cropLayer(
   return out;
 }
 
-/** A copy being placed, as the preview draws it. */
-export interface PastePlacement {
-  image: ImageData;
-  /** Where its top-left would land if it were dropped now. */
-  x: number;
-  y: number;
-  /**
-   * Whether it has moved yet. NEO outlines the copy from the moment the
-   * press lands and only draws its pixels once it is dragged.
-   */
-  dragging: boolean;
+/** What paste mode has on screen; declared beside the code that draws it. */
+export type { PasteDisplay } from "../neo/regionPreview";
+
+/**
+ * XOR an outline onto the display: drawn once it shows, drawn again over
+ * itself it is gone. NEO relies on exactly this, whether it means to or not.
+ */
+function toggleMark(marks: RegionRect[], rect: RegionRect): void {
+  const at = marks.findIndex(
+    (m) =>
+      m.x === rect.x &&
+      m.y === rect.y &&
+      m.width === rect.width &&
+      m.height === rect.height
+  );
+  if (at === -1) marks.push(rect);
+  else marks.splice(at, 1);
+}
+
+function marksDisplay(marks: RegionRect[]): PasteDisplay | null {
+  return marks.length ? { kind: "marks", rects: marks.slice() } : null;
 }
 
 /**
@@ -165,8 +175,8 @@ interface DrawingEventCallbacks {
    * and PasteTool do.
    */
   onToolChange?: (tool: ToolId) => void;
-  /** The copy being placed, or null when placing ends. */
-  onPastePreview?: (placement: PastePlacement | null) => void;
+  /** What paste mode has on screen, or null for nothing. */
+  onPastePreview?: (display: PasteDisplay | null) => void;
   /**
    * A copy was dropped, in NEO's own terms: the rectangle it was copied
    * from and how far it was dragged from there.
@@ -360,7 +370,11 @@ export const useBaseDrawing = (
     start: { x: number; y: number } | null;
     dx: number;
     dy: number;
+    /** The XOR outlines NEO would still have on its display. */
+    marks: RegionRect[];
   } | null>(null);
+  /** Whether the region drag in progress has moved since its press. */
+  const regionMovedRef = useRef(false);
 
   /*
    * Leaving paste mode by choosing another tool abandons the copy, as
@@ -392,6 +406,21 @@ export const useBaseDrawing = (
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [callbacks]);
+
+  /*
+   * Switching layer while a copy waits. NEO's LayerControl redraws the whole
+   * display, which wipes whatever outlines were on it, and then -- in paste
+   * mode only -- draws the paste outline afresh where the copy would land.
+   */
+  const previousLayerRef = useRef(drawingState.layerType);
+  useEffect(() => {
+    const previous = previousLayerRef.current;
+    previousLayerRef.current = drawingState.layerType;
+    const placing = pasteRef.current;
+    if (previous === drawingState.layerType || !placing || placing.start) return;
+    placing.marks = [placing.source];
+    callbacks?.onPastePreview?.(marksDisplay(placing.marks));
+  }, [drawingState.layerType, callbacks]);
   /** Press point while a straight line is being dragged out. */
   // A bezier is built across three separate press/release cycles, so unlike
   // every other gesture its state has to survive pointer-up. NEO's step
@@ -448,6 +477,27 @@ export const useBaseDrawing = (
       canvas.height,
       currentDrawingStateRef.current.isFlippedHorizontal
     );
+  }, [canvasRef]);
+
+  /**
+   * The pointer in artwork coordinates, unrounded: NEO's mouseX. Paste
+   * measures its offset as floor(now - start) on these, and rounding both
+   * ends first can land a pixel away from where NEO puts it.
+   */
+  const getCanvasPoint = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+
+    const x = ((clientX - rect.left) / rect.width) * canvas.width;
+    const y = ((clientY - rect.top) / rect.height) * canvas.height;
+    // Mirrored, a drag to the right moves the copy left. Only differences
+    // are taken, so the constant in the mirror does not matter.
+    return {
+      x: currentDrawingStateRef.current.isFlippedHorizontal ? canvas.width - x : x,
+      y,
+    };
   }, [canvasRef]);
 
   // Perform drawing operation on engine
@@ -783,15 +833,15 @@ export const useBaseDrawing = (
               cleanupPointerState(e.pointerId);
               return;
             }
-            placing.start = coords;
+            placing.start = getCanvasPoint(e.clientX, e.clientY);
             placing.dx = 0;
             placing.dy = 0;
-            callbacks?.onPastePreview?.({
-              image: placing.image,
-              x: placing.source.x,
-              y: placing.source.y,
-              dragging: false,
-            });
+            // PasteTool.downHandler XORs its outline where the copy sits.
+            // Straight after a copy the copy's own selection rectangle is
+            // still on screen in that very place, so the second XOR erases
+            // it: in NEO the press shows nothing at all.
+            toggleMark(placing.marks, placing.source);
+            callbacks?.onPastePreview?.(marksDisplay(placing.marks));
             return;
           }
 
@@ -804,7 +854,9 @@ export const useBaseDrawing = (
             );
             drag.begin(coords);
             regionDragRef.current = drag;
-            callbacks?.onRegionPreview?.(drag.current());
+            // No outline yet: EffectToolBase.downHandler draws nothing, and
+            // the rectangle first appears when moveHandler runs.
+            regionMovedRef.current = false;
             return;
           }
 
@@ -879,12 +931,8 @@ export const useBaseDrawing = (
           placing.start = null;
           placing.dx = 0;
           placing.dy = 0;
-          callbacks?.onPastePreview?.({
-            image: placing.image,
-            x: placing.source.x,
-            y: placing.source.y,
-            dragging: false,
-          });
+          placing.marks = [];
+          callbacks?.onPastePreview?.(null);
         }
 
         // Canonical Neo clears the joint-dedup state at the end of every
@@ -1042,6 +1090,7 @@ export const useBaseDrawing = (
 
       const drag = regionDragRef.current;
       if (drag?.active) {
+        const moved = regionMovedRef.current;
         const rect = drag.commit(getCanvasCoordinates(e.clientX, e.clientY));
         regionDragRef.current = null;
         callbacks?.onRegionPreview?.(null);
@@ -1084,13 +1133,13 @@ export const useBaseDrawing = (
               engine.imageWidth,
               rect
             );
-            pasteRef.current = { source: rect, image, start: null, dx: 0, dy: 0 };
-            callbacks?.onPastePreview?.({
-              image,
-              x: rect.x,
-              y: rect.y,
-              dragging: false,
-            });
+            // EffectToolBase.upHandler redraws the display for every tool
+            // but one: when the tool it leaves behind is paste. So the
+            // selection rectangle the drag drew stays on screen. A copy that
+            // was only clicked never drew one, and leaves nothing.
+            const marks = moved ? [rect] : [];
+            pasteRef.current = { source: rect, image, start: null, dx: 0, dy: 0, marks };
+            callbacks?.onPastePreview?.(marksDisplay(marks));
             callbacks?.onToolChange?.("paste");
           }
         }
@@ -1276,14 +1325,18 @@ export const useBaseDrawing = (
       if (strokeParamsRef.current?.brushType === "paste") {
         const placing = pasteRef.current;
         if (placing?.start) {
-          const at = getCanvasCoordinates(e.clientX, e.clientY);
+          const at = getCanvasPoint(e.clientX, e.clientY);
           placing.dx = Math.floor(at.x - placing.start.x);
           placing.dy = Math.floor(at.y - placing.start.y);
+          // PasteTool.moveHandler redraws the display with the copy on top,
+          // which takes every outline with it. Nothing is drawn around the
+          // copy while it moves.
+          placing.marks = [];
           callbacks?.onPastePreview?.({
+            kind: "floating",
             image: placing.image,
             x: placing.source.x + placing.dx,
             y: placing.source.y + placing.dy,
-            dragging: true,
           });
         }
         return;
@@ -1292,6 +1345,7 @@ export const useBaseDrawing = (
       const drag = regionDragRef.current;
       if (drag?.active) {
         drag.move(getCanvasCoordinates(e.clientX, e.clientY));
+        regionMovedRef.current = true;
         callbacks?.onRegionPreview?.(drag.current());
         return;
       }
@@ -1360,6 +1414,7 @@ export const useBaseDrawing = (
     containerRef,
     zoomLevel,
     getCanvasCoordinates,
+    getCanvasPoint,
     performDrawing,
     saveToHistory,
     callbacks,
@@ -1382,6 +1437,18 @@ export const useBaseDrawing = (
   }, [setupDrawingEvents]);
 
   // Undo function
+  /**
+   * NEO's undo and redo redraw the display, which wipes any outline left on
+   * it. Paste mode and the copy itself are untouched: the next press still
+   * places it.
+   */
+  const clearPasteMarks = useCallback(() => {
+    const placing = pasteRef.current;
+    if (!placing || placing.start || placing.marks.length === 0) return;
+    placing.marks = [];
+    callbacks?.onPastePreview?.(null);
+  }, [callbacks]);
+
   const handleUndo = useCallback(() => {
     const previousState = history.undo();
     if (previousState && contextRef.current && drawingEngineRef.current) {
@@ -1397,7 +1464,8 @@ export const useBaseDrawing = (
       onDrawingChange?.();
       onHistoryChangeRef.current?.(history.canUndo(), history.canRedo());
     }
-  }, [history, onDrawingChange]);
+    clearPasteMarks();
+  }, [history, onDrawingChange, clearPasteMarks]);
 
   // Redo function
   const handleRedo = useCallback(() => {
@@ -1415,7 +1483,8 @@ export const useBaseDrawing = (
       onDrawingChange?.();
       onHistoryChangeRef.current?.(history.canUndo(), history.canRedo());
     }
-  }, [history, onDrawingChange]);
+    clearPasteMarks();
+  }, [history, onDrawingChange, clearPasteMarks]);
 
   // Update canvas zoom
   useEffect(() => {

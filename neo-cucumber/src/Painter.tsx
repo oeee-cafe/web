@@ -35,7 +35,7 @@ import {
   drawLinePreview,
   drawPastePreview,
   drawRegionPreview,
-  type PastePreview,
+  type PasteDisplay,
 } from "./neo/regionPreview";
 import type { DrawingEngine } from "./DrawingEngine";
 import type { RegionRect } from "./neo/regionDrag";
@@ -339,9 +339,9 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     const ctx = previewCanvasRef.current?.getContext("2d");
     if (ctx) drawRegionPreview(ctx, rect, previewBackdrop(), drawingState.brushType);
   }, [previewBackdrop, drawingState.brushType]);
-  const handlePastePreview = useCallback((placement: PastePreview | null) => {
+  const handlePastePreview = useCallback((display: PasteDisplay | null) => {
     const ctx = previewCanvasRef.current?.getContext("2d");
-    if (ctx) drawPastePreview(ctx, placement, previewBackdrop());
+    if (ctx) drawPastePreview(ctx, display, previewBackdrop());
   }, [previewBackdrop]);
   /**
    * Where the text tool was clicked, if an editor is open there. NEO puts an

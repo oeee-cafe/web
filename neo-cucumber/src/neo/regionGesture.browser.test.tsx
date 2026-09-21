@@ -76,9 +76,10 @@ describe("dragging out a region tool", () => {
     await act(async () => { await sleep(20); });
     await send("pointerup", 34, 26);
 
-    // Grew while dragging, then cleared on release
+    // Nothing on the press -- EffectToolBase.downHandler draws no cursor --
+    // then the rectangle once it moves, cleared on release
     expect(previews.length).toBeGreaterThan(1);
-    expect(previews[0]).toEqual({ x: 10, y: 8, width: 1, height: 1 });
+    expect(previews[0]).toEqual({ x: 10, y: 8, width: 25, height: 19 });
     expect(previews.at(-1)).toBeNull();
 
     // A pixel inside the dragged rectangle is now painted
