@@ -604,8 +604,27 @@ html {
   vertical-align: middle;
 }
 
-/* A phone keeps the account on the first line and gives the sections a line
-   of their own, scrolled sideways rather than wrapped. */
+/* The guest's menu wears the avatar's shape, so the bar ends the same way
+   signed in or out. */
+.toolbar-avatar-guest {
+  background-color: var(--ds-hover);
+  color: var(--ds-ink);
+  box-shadow: inset 0 0 0 1px var(--ds-line);
+}
+
+.toolbar-avatar-guest svg {
+  vertical-align: middle;
+}
+
+/* Drawn only in the phone's tab bar, below. Scoped to the nav so it
+   outranks `.nav-bar svg`. */
+.nav-bar .toolbar-tab-icon {
+  display: none;
+}
+
+/* A phone keeps the name and the account on the first line. The painter
+   and collaboration pages, which own the whole screen, give the sections a
+   line of their own there, scrolled sideways rather than wrapped. */
 @media (max-width: 600px) {
   .toolbar-links {
     order: 3;
@@ -618,6 +637,85 @@ html {
 
   .toolbar-links::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Every other page: the sections are a tab bar along the bottom, an icon
+     over a label, each an equal share of the width -- which is where a
+     phone's own apps put them, and where a thumb is. */
+  .ds-page {
+    padding-bottom: 58px;
+    padding-bottom: calc(58px + env(safe-area-inset-bottom));
+  }
+
+  .ds-page .toolbar-links {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    width: auto;
+    overflow: visible;
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid var(--ds-line);
+    border-radius: 0;
+    background-color: var(--ds-ground);
+  }
+
+  .ds-page .toolbar-links > * + * {
+    margin-left: 0;
+  }
+
+  .ds-page .toolbar-links a {
+    -webkit-box-flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 7px 2px 6px;
+    border-radius: 0;
+    color: var(--ds-muted);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 13px;
+    text-align: center;
+  }
+
+  .ds-page .toolbar-links a span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ds-page .nav-bar .toolbar-tab-icon {
+    display: block;
+    margin: 0 auto 3px;
+  }
+
+  .ds-page .nav-bar .toolbar-links a:hover {
+    background: none;
+  }
+
+  .ds-page .nav-bar .toolbar-links a[aria-current="page"],
+  .ds-page .nav-bar .toolbar-links a[aria-current="page"]:hover {
+    background: none;
+    box-shadow: none;
+    color: var(--ds-link);
+    font-weight: 600;
+  }
+
+  /* The first line is the name and the account alone now, so it can be
+     the height of a phone's own title bar. */
+  .ds-page #menubar {
+    min-height: 48px;
+  }
+
+  .toolbar-end > * + * {
+    margin-left: 4px;
+  }
+
+  .toolbar-end > a,
+  .toolbar-draw {
+    padding-right: 9px;
+    padding-left: 9px;
   }
 }
 

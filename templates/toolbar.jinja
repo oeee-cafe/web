@@ -46,18 +46,21 @@
        controls the wordmark's four round letters read as a second, crooked
        row of them. #}
     <a class="toolbar-name" href="/">{{ ftl_get_message("brand") }}</a>
-    {# The sections, as a window's title bar holds its tabs. #}
+    {# The sections, as a window's title bar holds its tabs. On a phone
+       they are the tab bar along the bottom, as a phone's apps put them,
+       and each carries an icon there; the icons are not drawn above it. #}
+    {% macro tab_icon(d) %}<svg class="toolbar-tab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ d|safe }}</svg>{% endmacro %}
     <div class="toolbar-links">
-      <a href="/">{{ ftl_get_message("nav-recent") }}</a>
+      <a href="/">{{ tab_icon('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>') }}<span>{{ ftl_get_message("nav-recent") }}</span></a>
       {% if current_user %}
-        <a href="/home">{{ ftl_get_message("timeline") }}</a>
+        <a href="/home">{{ tab_icon('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.2c2.1.7 3.5 2.7 3.5 5.8"/>') }}<span>{{ ftl_get_message("timeline") }}</span></a>
       {% endif %}
-      <a href="/communities">{{ ftl_get_message("community") }}</a>
+      <a href="/communities">{{ tab_icon('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>') }}<span>{{ ftl_get_message("community") }}</span></a>
       {# Shown signed out too: the lobby is a public gallery of finished
          collaborative drawings, and only creating a session needs an
          account. #}
-      <a href="/collaborate">{{ ftl_get_message("collaborate") }}</a>
-      <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
+      <a href="/collaborate">{{ tab_icon('<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.9-.8-1.4-.8-2.3 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.7 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1" fill="currentColor"/><circle cx="10" cy="7" r="1" fill="currentColor"/><circle cx="14.5" cy="7" r="1" fill="currentColor"/>') }}<span>{{ ftl_get_message("collaborate") }}</span></a>
+      <a href="/hashtags">{{ tab_icon('<path d="M5 9h14M5 15h14M10.5 4 8.5 20M15.5 4l-2 16"/>') }}<span>{{ ftl_get_message("hashtag-discovery") }}</span></a>
     </div>
     <div class="toolbar-end">
       {% if current_user %}
@@ -97,17 +100,22 @@
           </div>
         </details>
       {% else %}
+        {# The same three places as signed in, so the bar keeps its shape
+           when you sign in: where the bell is, signing in; where Draw is,
+           the one filled button; where your initial is, the menu. #}
+        <a class="toolbar-signin" href="/login">{{ ftl_get_message("sign-in") }}</a>
+        <a class="toolbar-draw" href="/signup">{{ ftl_get_message("sign-up") }}</a>
         <details class="toolbar-menu">
-          <summary title="{{ ftl_get_message("theme") }}" aria-label="{{ ftl_get_message("theme") }}">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
+          <summary aria-label="{{ ftl_get_message("toolbar-menu") }}" title="{{ ftl_get_message("toolbar-menu") }}">
+            <span class="toolbar-avatar toolbar-avatar-guest" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c.8-3.7 3.9-6 7.5-6s6.7 2.3 7.5 6"/></svg></span>
           </summary>
           <div class="toolbar-menu-items">
+            <a href="/login">{{ ftl_get_message("sign-in") }}</a>
+            <a href="/signup">{{ ftl_get_message("sign-up") }}</a>
+            <a href="/about">{{ ftl_get_message('brand') }}?</a>
             {{ theme_choices() }}
           </div>
         </details>
-        <a href="/about">{{ ftl_get_message('brand') }}?</a>
-        <a href="/login">{{ ftl_get_message("sign-in") }}</a>
-        <a class="toolbar-draw" href="/signup">{{ ftl_get_message("sign-up") }}</a>
       {% endif %}
     </div>
   </div>

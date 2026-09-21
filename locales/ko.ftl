@@ -451,3 +451,4 @@ personal-post = 개인 게시물
 communities-tab-public = 공개
 communities-tab-official = 공식
 communities-tab-yours = 내 커뮤니티
+toolbar-menu = 메뉴
