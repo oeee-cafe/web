@@ -95,21 +95,6 @@
   padding: 0 12px;
 }
 
-.toolbar-brand {
-  display: flex;
-  align-items: center;
-  margin-right: 12px;
-  padding: 4px 6px;
-}
-
-.toolbar-brand img {
-  display: block;
-}
-
-.toolbar-brand .toolbar-mark {
-  margin-right: 8px;
-}
-
 .toolbar-links,
 .toolbar-end {
   display: flex;
@@ -308,13 +293,9 @@
   background-color: var(--toolbar-hover-bg);
 }
 
-/* A phone keeps the brand and the account on the first line and gives the
-   sections a line of their own, scrolled sideways rather than wrapped. */
+/* A phone keeps the account on the first line and gives the sections a line
+   of their own, scrolled sideways rather than wrapped. */
 @media (max-width: 600px) {
-  .toolbar-brand > img + img {
-    display: none;
-  }
-
   .toolbar-links {
     order: 3;
     width: 100%;
