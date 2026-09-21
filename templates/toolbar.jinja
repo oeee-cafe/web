@@ -177,6 +177,30 @@
         }
       };
       window.oeeeMarkCurrent(location.pathname);
+
+      // One row, or two: try the name, the sections and the account on one
+      // line, and if the account or the sections wrapped below the name --
+      // or would sit closer than 16px to the sections -- give the sections a
+      // row of their own (ds.css, .is-stacked). Measured rather than set at
+      // a width, because the width that fits depends on the language and,
+      // in the desktop app, on the window's own controls.
+      window.oeeeFitToolbar = function () {
+        var nav = document.querySelector(".nav-bar");
+        var bar = document.getElementById("menubar");
+        if (!nav || !bar) return;
+        var name = bar.querySelector(".toolbar-name");
+        var links = bar.querySelector(".toolbar-links");
+        var end = bar.querySelector(".toolbar-end");
+        if (!name || !links || !end) return;
+        nav.classList.remove("is-stacked");
+        var line = name.getBoundingClientRect();
+        var sections = links.getBoundingClientRect();
+        var account = end.getBoundingClientRect();
+        var oneRow = sections.top < line.bottom && account.top < line.bottom &&
+          account.left - sections.right >= 16;
+        if (!oneRow) nav.classList.add("is-stacked");
+      };
+      window.oeeeFitToolbar();
       // The content area scrolls, not the window, and browsers only restore
       // the window's own scroll when you go back -- so where you were is
       // kept here, per page, and put back on a return to it: a full load
@@ -242,6 +266,21 @@
 
       if (window.oeeeToolbarMenu) return;
       window.oeeeToolbarMenu = true;
+
+      // Refitted as the window changes size, and once the page's fonts have
+      // arrived, since a fallback face measures differently.
+      var fitPending = false;
+      window.addEventListener("resize", function () {
+        if (fitPending) return;
+        fitPending = true;
+        (window.requestAnimationFrame || setTimeout)(function () {
+          fitPending = false;
+          window.oeeeFitToolbar();
+        });
+      });
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { window.oeeeFitToolbar(); });
+      }
 
       // Commands, by name: what the keyboard shortcuts below do, and what the
       // desktop app's menu bar asks for (it calls window.oeeeCommand). Going

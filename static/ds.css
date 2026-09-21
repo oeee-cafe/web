@@ -354,10 +354,13 @@ html {
   white-space: nowrap;
 }
 
+/* Each group stays on one line; when the bar is too narrow for them, the
+   bar wraps a whole group rather than a group wrapping inside itself, which
+   is what the toolbar's fit check looks for. */
 .toolbar-links,
 .toolbar-end {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
 }
 
@@ -648,75 +651,88 @@ html {
   display: inline-block;
 }
 
-/* A phone keeps the name and the account on the first line and gives the
-   sections a second row of their own, all of them in view at once rather
-   than scrolled off the edge. Each grows from its own label's width rather
-   than taking an equal share, so a long label is not cut to fit beside a
-   short one; the ellipsis is only for a language that still overflows. */
-@media (max-width: 600px) {
-  .toolbar-links {
-    order: 3;
-    width: 100%;
-    flex-wrap: nowrap;
-  }
+/* When one row will not hold the name, the sections and the account --
+   on a phone, and on any window too narrow for them in its language -- the
+   name and the account keep the first line and the sections get a second
+   row of their own, all of them in view at once rather than scrolled off
+   the edge. The toolbar's script decides, by trying one row and seeing
+   whether it wrapped (toolbar.jinja, fitToolbar): a fixed breakpoint was
+   right for one language, and wrong in the desktop app, whose window
+   controls take 96px of the row.
 
-  .toolbar-links a {
-    -webkit-box-flex: 1;
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    padding-right: 3px;
-    padding-left: 3px;
-    font-size: 12px;
-    text-align: center;
-    text-overflow: ellipsis;
-  }
+   Each section grows from its own label's width rather than taking an
+   equal share, so a long label is not cut to fit beside a short one; the
+   ellipsis is only for a language that still overflows. */
+.nav-bar.is-stacked .toolbar-links {
+  order: 3;
+  width: 100%;
+  flex-wrap: nowrap;
+}
 
-  /* Room around both rows: the first is the height of a phone's own title
-     bar, and the sections sit clear of it and of the page below. */
-  .nav-bar #menubar {
-    padding: 0 16px;
-  }
+.nav-bar.is-stacked .toolbar-links a {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding-right: 3px;
+  padding-left: 3px;
+  font-size: 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+}
 
-  .toolbar-name,
-  .toolbar-end {
-    margin-top: 10px;
-    margin-bottom: 10px;
-  }
+/* Room around both rows: the first is the height of a phone's own title
+   bar, and the sections sit clear of it and of the page below. */
+.nav-bar.is-stacked #menubar {
+  padding: 0 16px;
+}
 
-  .toolbar-name {
-    margin-right: 8px;
-    padding-left: 0;
-  }
+.nav-bar.is-stacked .toolbar-name,
+.nav-bar.is-stacked .toolbar-end {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
 
-  .toolbar-links {
-    margin-bottom: 12px;
-  }
+.nav-bar.is-stacked .toolbar-name {
+  margin-right: 8px;
+  padding-left: 0;
+}
 
-  .toolbar-end > * + * {
-    margin-left: 6px;
-  }
+.nav-bar.is-stacked .toolbar-links {
+  margin-bottom: 12px;
+}
 
-  .toolbar-end > a,
-  .toolbar-draw {
-    padding-right: 10px;
-    padding-left: 10px;
-  }
+.nav-bar.is-stacked .toolbar-end > * + * {
+  margin-left: 6px;
+}
+
+.nav-bar.is-stacked .toolbar-end > a,
+.nav-bar.is-stacked .toolbar-draw {
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+/* In the desktop app on macOS the window's controls take the first 96px of
+   the bar (the app pads it), which only the first row needs to clear: the
+   sections' row reaches back to the usual 16px. */
+html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
+  width: calc(100% + 80px);
+  margin-left: -80px;
 }
 
 /* The narrowest phones (360px): the same rows, a little closer, so the
    first line still holds the name and four controls. */
 @media (max-width: 374px) {
-  .nav-bar #menubar {
+  .nav-bar.is-stacked #menubar {
     padding: 0 12px;
   }
 
-  .toolbar-end > * + * {
+  .nav-bar.is-stacked .toolbar-end > * + * {
     margin-left: 4px;
   }
 
-  .toolbar-end > a,
-  .toolbar-draw {
+  .nav-bar.is-stacked .toolbar-end > a,
+  .nav-bar.is-stacked .toolbar-draw {
     padding-right: 8px;
     padding-left: 8px;
   }
