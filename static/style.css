@@ -3460,8 +3460,12 @@ a.user-pill:hover {
 }
 
 .about-banner {
+  position: relative;
   display: block;
   min-width: 0;
+  height: 0;
+  padding-top: 20%;
+  background-color: #ffffff;
   line-height: 0;
   box-shadow: 0 0 0 1px var(--ds-frame);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
@@ -3473,9 +3477,13 @@ a.user-pill:hover {
 }
 
 .about-banner img {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
 }

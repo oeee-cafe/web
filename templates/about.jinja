@@ -49,8 +49,10 @@
         <div class="about-banners">
           {% for user in users_with_public_posts_and_banner %}
             <a class="about-banner" href="/@{{ user.login_name }}" title="{{ user.display_name }} (@{{ user.login_name }})">
-              <img width="{{ user.banner_image_width }}"
-                   height="{{ user.banner_image_height }}"
+              {# Banners are drawn at 200 by 40; the query behind this page does
+                 not return their size, and the frame keeps that shape itself. #}
+              <img width="200"
+                   height="40"
                    alt="{{ user.display_name }} (@{{ user.login_name }})"
                    loading="lazy"
                    decoding="async"
