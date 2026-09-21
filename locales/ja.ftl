@@ -12,6 +12,10 @@ about = お絵かきの発音はOEEEカフェに似ています。
 user-contributors = OEEEカフェを一緒に作った人たち
 
 feed-columns = 1行あたり
+theme = テーマ
+theme-light = ライト
+theme-dark = ダーク
+theme-system = システム
 nav-recent = 新着
 timeline = タイムライン
 timeline-my = 私のタイムライン

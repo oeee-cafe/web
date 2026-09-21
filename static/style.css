@@ -29,21 +29,18 @@
   --leading-normal: 1.5;
 }
 
-/* Light unless the system is dark and nothing says otherwise, or the painter's
-   theme switch -- `neo-cucumber-theme`, applied as `data-theme` on the root
-   by theme_head.jinja before the page paints -- says dark. The painter's own
-   tokens follow the same rule, so the page and the painter never disagree. */
+/* The site's older names for its colours, now the design system's: NEO's
+   palette, light and dark by the one rule ds.css follows. Only the
+   highlight and danger colours differ by theme here, as nothing in ds.css
+   stands for them yet. */
 :root {
-  --main-bg-color: white;
-  --main-text-color: black;
-  --main-nav-bg-color: #c4ee62;
-  --main-border-color: #3c6712;
+  --main-bg-color: var(--ds-surface);
+  --main-text-color: var(--ds-ink);
+  --main-nav-bg-color: var(--ds-ground);
+  --main-border-color: var(--ds-frame);
+  --main-anchor-color: var(--ds-ink);
+  --main-text-muted-color: var(--ds-muted);
   --main-highlight-color: #ef842d;
-  --main-anchor-color: black;
-  /* Darker than the `gray` and `#666` it replaces, both of which failed
-     contrast against white (3.9:1 and — in dark mode — 2.4:1). This is
-     7:1. */
-  --main-text-muted-color: #595959;
   --main-highlight-hover-color: #d97826;
   --danger-color: #dc2626;
   --danger-hover-color: #b91c1c;
@@ -53,14 +50,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --main-bg-color: #2c2c2c;
-    --main-text-color: #e0e0e0;
-    --main-nav-bg-color: #2c2c2c;
-    --main-border-color: #5a5a5a;
     --main-highlight-color: #ff8c00;
-    --main-anchor-color: #e0e0e0;
-    /* 5.3:1 on the dark background. */
-    --main-text-muted-color: #a0a0a0;
     --main-highlight-hover-color: #ffa333;
     --danger-color: #ef4444;
     --danger-hover-color: #dc2626;
@@ -70,14 +60,7 @@
 }
 
 :root[data-theme="dark"] {
-  --main-bg-color: #2c2c2c;
-  --main-text-color: #e0e0e0;
-  --main-nav-bg-color: #2c2c2c;
-  --main-border-color: #5a5a5a;
   --main-highlight-color: #ff8c00;
-  --main-anchor-color: #e0e0e0;
-  /* 5.3:1 on the dark background. */
-  --main-text-muted-color: #a0a0a0;
   --main-highlight-hover-color: #ffa333;
   --danger-color: #ef4444;
   --danger-hover-color: #dc2626;
@@ -339,10 +322,6 @@ nav a:visited,
 .post-card-byline a:visited {
   color: var(--main-text-muted-color);
   text-decoration: none;
-}
-
-.post-card-byline a:hover {
-  text-decoration: underline;
 }
 
 /* How many a row. Beside the feed's heading. */
@@ -1482,10 +1461,6 @@ nav a:visited,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.draft-community:hover {
-  text-decoration: underline;
 }
 
 .draft-date {

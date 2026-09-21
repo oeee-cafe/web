@@ -9,15 +9,6 @@
      toolbar because that is the window's title bar on every page, the
      painter's included. #}
   <style>
-    /* The ground behind the painter is the window's: the system grey and
-       its grid, the same surface as the toolbar above, in either theme.
-       NEO's own lavender ground belongs to a page that is nothing but the
-       painter. Three :roots outrank every theme selector in the painter's
-       sheet, which uses two. */
-    :root:root:root {
-      --neo-bk: var(--ds-ground);
-      --neo-bk2: var(--ds-grid-solid);
-    }
     #neo-cucumber-root {
       position: fixed;
       top: 53px; left: 0; right: 0; bottom: 0;

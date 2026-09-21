@@ -5,6 +5,19 @@
    is in ds.css, which each of them loads; it reads current_user,
    draft_post_count, unread_notification_count and ftl_lang, and nothing
    else, so a page can show it by passing those four. #}
+{# Light, dark or the system's: the same switch as the painter's Dark button,
+   stored under the same name, so the two never disagree. Chosen here, it
+   applies at once and to every page after (theme_head.jinja). #}
+{% macro theme_choices() %}
+  <div class="toolbar-theme">
+    <span class="toolbar-theme-label">{{ ftl_get_message("theme") }}</span>
+    <div class="ds-segmented" role="group" aria-label="{{ ftl_get_message("theme") }}">
+      <button type="button" data-theme-choice="light" aria-pressed="false">{{ ftl_get_message("theme-light") }}</button>
+      <button type="button" data-theme-choice="dark" aria-pressed="false">{{ ftl_get_message("theme-dark") }}</button>
+      <button type="button" data-theme-choice="system" aria-pressed="false">{{ ftl_get_message("theme-system") }}</button>
+    </div>
+  </div>
+{% endmacro %}
 {# Boost scoped to the nav, not the body.
    A boosted response has its whole <head> discarded except the title,
    and htmx re-runs swapped scripts by cloning the tag — which does not
@@ -80,9 +93,18 @@
               {% endif %}
             </a>
             <a href="/about">{{ ftl_get_message('brand') }}?</a>
+            {{ theme_choices() }}
           </div>
         </details>
       {% else %}
+        <details class="toolbar-menu">
+          <summary title="{{ ftl_get_message("theme") }}" aria-label="{{ ftl_get_message("theme") }}">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
+          </summary>
+          <div class="toolbar-menu-items">
+            {{ theme_choices() }}
+          </div>
+        </details>
         <a href="/about">{{ ftl_get_message('brand') }}?</a>
         <a href="/login">{{ ftl_get_message("sign-in") }}</a>
         <a class="toolbar-draw" href="/signup">{{ ftl_get_message("sign-up") }}</a>
@@ -147,6 +169,19 @@
           }
         }
       }
+      function showThemeChoice() {
+        var chosen = "system";
+        try {
+          var stored = localStorage.getItem("neo-cucumber-theme");
+          if (stored === "light" || stored === "dark") chosen = stored;
+        } catch (error) {}
+        var buttons = document.querySelectorAll("[data-theme-choice]");
+        for (var k = 0; k < buttons.length; k++) {
+          buttons[k].setAttribute("aria-pressed", String(buttons[k].getAttribute("data-theme-choice") === chosen));
+        }
+      }
+      showThemeChoice();
+
       if (document.querySelector("main.ds-content")) settleContent();
       else document.addEventListener("DOMContentLoaded", settleContent);
 
@@ -154,6 +189,18 @@
       window.oeeeToolbarMenu = true;
       window.addEventListener("popstate", function () {
         window.oeeeHistoryStep = true;
+      });
+      document.addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("[data-theme-choice]") : null;
+        if (!button) return;
+        var choice = button.getAttribute("data-theme-choice");
+        try {
+          if (choice === "system") localStorage.removeItem("neo-cucumber-theme");
+          else localStorage.setItem("neo-cucumber-theme", choice);
+        } catch (error) {}
+        if (choice === "system") document.documentElement.removeAttribute("data-theme");
+        else document.documentElement.setAttribute("data-theme", choice);
+        showThemeChoice();
       });
       function closeMenus(except) {
         var open = document.querySelectorAll(".toolbar-menu[open]");
