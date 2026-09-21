@@ -882,7 +882,8 @@ mod tests {
 
     #[test]
     fn lobby_gallery_is_the_shared_drawing_grid() {
-        // The same grid as / and /home: equal squares, no column control.
+        // The same grid and per-row control as / and /home, so the number a
+        // reader chose applies here too.
         let env = test_support::env();
         let template = env
             .get_template("collaborate_lobby.jinja")
@@ -890,7 +891,7 @@ mod tests {
         let rendered = template
             .render(lobby_context(false, vec![sample_post()]))
             .expect("renders");
-        assert!(!rendered.contains("id=\"post-cols\""));
+        assert!(rendered.contains("id=\"post-cols\""));
         assert!(rendered.contains("id=\"post-feed-grid\""));
         assert!(rendered.contains("class=\"center-wide\""));
         assert!(rendered.contains("class=\"feed-header\""));

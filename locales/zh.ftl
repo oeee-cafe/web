@@ -11,6 +11,7 @@ about = 黄瓜画板是一个可以画画的留言板。
   这里是削黄瓜的咖啡馆，黄瓜咖啡馆。
 user-contributors = 一起创建黄瓜咖啡馆的人们
 
+feed-columns = 每行
 nav-recent = 最新
 timeline = 时间线
 timeline-my = 我的时间线

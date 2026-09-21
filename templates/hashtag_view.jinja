@@ -3,6 +3,7 @@
   {{ super() }} | #{{ hashtag.display_name }}
 {% endblock title %}
 {% block head %}
+  {% include "post_feed_head.jinja" %}
 {% endblock head %}
 {% block social_meta %}
   <meta property="og:site_name" content="{{ ftl_get_message('brand') }}" />
@@ -45,6 +46,7 @@
       <section role="region" aria-labelledby="post-feed-heading">
         <div class="feed-header">
           <h2 id="post-feed-heading" class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
+          {% include "post_feed_controls.jinja" %}
         </div>
         <div class="posts-grid" id="post-feed-grid">
           {% include "post_feed_fragment.jinja" %}

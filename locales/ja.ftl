@@ -11,6 +11,7 @@ about = お絵かきの発音はOEEEカフェに似ています。
   お絵かきができるOEEEカフェです。
 user-contributors = OEEEカフェを一緒に作った人たち
 
+feed-columns = 1行あたり
 nav-recent = 新着
 timeline = タイムライン
 timeline-my = 私のタイムライン

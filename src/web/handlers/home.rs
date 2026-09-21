@@ -1385,7 +1385,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_home_as_a_grid_of_equal_squares() {
+    fn renders_home_with_the_per_row_control() {
         let env = test_support::env();
         let template = env.get_template("home.jinja").expect("template loads");
         let rendered = template
@@ -1393,9 +1393,13 @@ mod tests {
             .expect("home.jinja renders");
         assert!(rendered.contains("id=\"post-feed-grid\""));
         assert!(rendered.contains("class=\"feed-header\""));
-        // Every drawing is the same 300px square now, so there is no column
-        // count left to choose and no slider to choose it with.
-        assert!(!rendered.contains("id=\"post-cols\""));
+        // The reader chooses how many a row, as /admin/posts does, and the
+        // grid keeps that number at every width.
+        assert!(rendered.contains("id=\"post-cols\""));
+        // The readout is what tells the reader the control did something.
+        assert!(rendered.contains("id=\"post-cols-value\""));
+        // Applied before the grid paints, from the one stored value.
+        assert!(rendered.contains("homeCols"));
         // The grid opts into the wide container; the page — and so the header
         // above it — keeps the one width every other page uses.
         assert!(rendered.contains("class=\"center-wide\""));
@@ -1510,7 +1514,7 @@ mod tests {
             .expect("timeline.jinja renders");
         assert!(rendered.contains("class=\"center-wide\""));
         assert!(!rendered.contains("--page-width"));
-        assert!(!rendered.contains("id=\"post-cols\""));
+        assert!(rendered.contains("id=\"post-cols\""));
         assert!(rendered.contains("id=\"post-feed-grid\""));
         assert!(rendered.contains("class=\"feed-header\""));
         assert!(rendered.contains("post-card-byline"));
