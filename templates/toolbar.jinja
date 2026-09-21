@@ -29,14 +29,11 @@
    <details>, so it opens with no script at all. #}
 <nav class="nav-bar" hx-boost:inherited="true">
   <div id="menubar">
-    <a class="toolbar-brand" href="/">
-      <img class="toolbar-mark" src="/static/favicon.png" alt="" width="22" height="22" />
-      <img src="{%- if ftl_lang == "zh" -%}/static/logo/en.svg{%- else -%}/static/logo/{{ ftl_lang }}.svg{%- endif -%}"
-           alt="{{ ftl_get_message('brand') }}"
-           height="18"
-           width="{%- if ftl_lang == "ja" -%} 83 {%- else -%} 65 {%- endif -%}" />
-    </a>
-    {# The sections, as a window's title bar holds its tabs. #}
+    {# The sections, as a window's title bar holds its tabs. There is no logo:
+       beside a window's own controls the wordmark's four round letters read
+       as a second, crooked row of them, and no application puts its name in
+       its title bar -- the page title and the icon say whose window this is.
+       Recent, first, is home. #}
     <div class="toolbar-links">
       <a href="/">{{ ftl_get_message("nav-recent") }}</a>
       {% if current_user %}
