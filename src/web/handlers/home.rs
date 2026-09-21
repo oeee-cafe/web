@@ -1406,8 +1406,9 @@ mod tests {
         assert!(!rendered.contains("--page-width"));
     }
 
-    /// A drawing larger than its square is scaled down smoothly; one drawn at
-    /// 300 or smaller keeps hard pixels, which only work upward.
+    /// A drawing fills its square, cropped from its longer side, so it is
+    /// scaled down -- smoothly -- only when its shorter side is larger than
+    /// the square; anything else keeps hard pixels, which only work upward.
     #[test]
     fn only_drawings_larger_than_the_square_scale_smoothly() {
         let env = test_support::env();
@@ -1423,6 +1424,13 @@ mod tests {
             .render(home_context(vec![large], false))
             .expect("renders at 550");
         assert!(rendered.contains("drawing-downscaled"));
+        // Wide but no taller than the square: it fills the square at 1x.
+        let mut wide = sample_post();
+        wide["image_width"] = json!(550);
+        let rendered = template
+            .render(home_context(vec![wide], false))
+            .expect("renders at 550x300");
+        assert!(!rendered.contains("drawing-downscaled"));
     }
 
     #[test]

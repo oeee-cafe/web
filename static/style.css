@@ -255,7 +255,9 @@ nav a:visited,
    rounded. The reader chooses how many a row (post_feed_controls.jinja, as
    /admin/posts does it) and the grid keeps that number at every window
    width -- the squares grow and shrink, the count and the gaps do not.
-   Drawings larger than their square are scaled down smoothly
+   A drawing that is not square fills its square all the same, cropped
+   evenly from its longer side, so no square has empty bars. One whose
+   shorter side is larger than the square is scaled down smoothly
    (`.drawing-downscaled`); the rest keep hard pixels.
 
    The square is a padding-ratio box rather than `aspect-ratio`, which
@@ -295,7 +297,7 @@ nav a:visited,
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
 }
