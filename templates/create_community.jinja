@@ -3,50 +3,49 @@
   {{ super() }} | {{ ftl_get_message("create-community") }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <h2>{{ ftl_get_message("create-community") }}</h2>
-    <form method="post" action="/communities" class="create-community-form">
+  {# The same form as editing a community (community_edit.jinja), in the same
+     card, so the two read as one thing: what a community is, asked once. #}
+  <div class="community-create">
+    <h1 class="community-create-title">{{ ftl_get_message("create-community") }}</h1>
+    <form method="post" action="/communities" class="ds-card community-edit">
       <div class="form-field">
-        <label for="name">{{ ftl_get_message("community-name") }}:</label>
-        <input type="text" name="name" id="name" required />
+        <label class="ds-label" for="community-form-name">{{ ftl_get_message("community-name") }}</label>
+        <input class="ds-input" type="text" name="name" id="community-form-name" required autofocus />
       </div>
       <div class="form-field">
-        <label for="slug">ID:</label>
-        <input type="text" name="slug" id="slug" required />
+        <label class="ds-label" for="community-form-slug">ID</label>
+        <input class="ds-input" type="text" name="slug" id="community-form-slug" required
+               autocomplete="off" autocapitalize="off" spellcheck="false"
+               oninput="document.getElementById('community-form-slug-path').textContent = '/communities/@' + this.value" />
+        {# Where the community will live, as it is typed. #}
+        <span class="ds-help" id="community-form-slug-path">/communities/@</span>
       </div>
       <div class="form-field">
-        <label for="description">{{ ftl_get_message("community-description") }}:</label>
-        <textarea name="description" id="description" rows="4"></textarea>
+        <label class="ds-label" for="community-form-description">{{ ftl_get_message("community-description") }}</label>
+        <textarea class="ds-textarea" name="description" id="community-form-description" rows="3"></textarea>
       </div>
-      <fieldset>
-        <legend>{{ ftl_get_message("community-visibility") }}:</legend>
-        <p>
-          <label>
-            <input type="radio" name="visibility" value="public" checked />
-            {{ ftl_get_message("visibility-public") }}
-            <br />
-            <small>{{ ftl_get_message("visibility-public-description") }}</small>
-          </label>
-        </p>
-        <p>
-          <label>
-            <input type="radio" name="visibility" value="unlisted" />
-            {{ ftl_get_message("visibility-unlisted") }}
-            <br />
-            <small>{{ ftl_get_message("visibility-unlisted-description") }}</small>
-          </label>
-        </p>
-        <p>
-          <label>
-            <input type="radio" name="visibility" value="private" />
-            {{ ftl_get_message("visibility-private") }}
-            <br />
-            <small>{{ ftl_get_message("visibility-private-description") }}</small>
-          </label>
-        </p>
-      </fieldset>
-      <input type="submit" value="{{ ftl_get_message("create-community") }}" />
+      <div class="form-field" role="radiogroup" aria-labelledby="community-form-visibility">
+        <span class="ds-label" id="community-form-visibility">{{ ftl_get_message("community-visibility") }}</span>
+        <div class="community-form-choices">
+          {% for value in ["public", "unlisted", "private"] %}
+            <label class="community-form-choice">
+              <input type="radio" name="visibility" value="{{ value }}" {% if value == "public" %}checked{% endif %} />
+              <span>
+                <span class="community-form-choice-name">{{ ftl_get_message("visibility-" ~ value) }}</span>
+                <span class="ds-help">{{ ftl_get_message("visibility-" ~ value ~ "-description") }}</span>
+                {# Said here because it cannot be undone later. #}
+                {% if value == "private" %}
+                  <span class="ds-help">{{ ftl_get_message("visibility-cannot-change") }}</span>
+                {% endif %}
+              </span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-actions community-form-actions">
+        <a href="/communities" class="ds-button">{{ ftl_get_message("cancel") }}</a>
+        <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("create-community") }}</button>
+      </div>
     </form>
   </div>
-
 {% endblock content %}

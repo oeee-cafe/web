@@ -2469,8 +2469,17 @@ nav a:visited,
 
 /* The community create/edit forms: their fields are the design system's
    (`.form-field`, in ds.css); this only keeps them to a readable width. */
-.create-community-form {
+/* Creating a community: the edit card's form, alone on its page. */
+.community-create {
   max-width: 600px;
+  margin: 0 auto;
+}
+
+.community-create-title {
+  margin: 0 0 var(--ds-space-4);
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 /* "and N others" after the linked actor name. Muted so the sentence still
@@ -2894,7 +2903,7 @@ a.user-pill:hover {
   margin-bottom: var(--ds-space-5);
 }
 
-.community-edit-form {
+.community-form-form {
   max-width: 560px;
 }
 
@@ -2909,7 +2918,7 @@ a.user-pill:hover {
   box-sizing: border-box;
 }
 
-.community-edit-error {
+.community-form-error {
   margin: 0 0 var(--ds-space-4);
   padding: var(--ds-space-2) var(--ds-space-3);
   border-radius: var(--ds-radius-s);
@@ -2920,84 +2929,84 @@ a.user-pill:hover {
 
 /* The choices as one grouped list, a row each, as a settings pane draws
    them: the whole row is the target, and the chosen one is tinted. */
-.community-edit-choices {
+.community-form-choices {
   overflow: hidden;
   border: 1px solid var(--ds-line-strong);
   border-radius: var(--ds-radius-s);
   background-color: var(--ds-field);
 }
 
-.community-edit-choice {
+.community-form-choice {
   display: flex;
   align-items: flex-start;
   padding: 10px 12px;
 }
 
-.community-edit-choice + .community-edit-choice {
+.community-form-choice + .community-form-choice {
   border-top: 1px solid var(--ds-line);
 }
 
-.community-edit-choice:hover {
+.community-form-choice:hover {
   background-color: var(--ds-hover);
 }
 
-.community-edit-choice.is-fixed:hover {
+.community-form-choice.is-fixed:hover {
   background-color: transparent;
 }
 
-.community-edit-choice input {
+.community-form-choice input {
   flex: none;
   margin: 2px 10px 0 0;
 }
 
-.community-edit-choice-name {
+.community-form-choice-name {
   display: block;
   color: var(--ds-ink);
   font-size: var(--ds-text-base);
   font-weight: 500;
 }
 
-.community-edit-choice .ds-help {
+.community-form-choice .ds-help {
   margin-top: 0;
 }
 
-.community-edit-actions {
+.community-form-actions {
   margin-top: var(--ds-space-4);
 }
 
-.community-edit-danger {
+.community-form-danger {
   max-width: 560px;
   margin-top: var(--ds-space-5);
   padding-top: var(--ds-space-4);
   border-top: 1px solid var(--ds-line);
 }
 
-.community-edit-danger-title {
+.community-form-danger-title {
   color: var(--ds-danger);
   font-size: var(--ds-text-m);
   font-weight: 600;
 }
 
-.community-edit-danger > .ds-help {
+.community-form-danger > .ds-help {
   margin: var(--ds-space-1) 0 var(--ds-space-3);
 }
 
-.community-edit-danger code {
+.community-form-danger code {
   -webkit-user-select: text;
   -moz-user-select: text;
   user-select: text;
 }
 
-.community-edit-danger-row {
+.community-form-danger-row {
   display: flex;
   align-items: center;
 }
 
-.community-edit-danger-row .ds-input {
+.community-form-danger-row .ds-input {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.community-edit-danger-row > * + * {
+.community-form-danger-row > * + * {
   margin-left: var(--ds-space-2);
 }

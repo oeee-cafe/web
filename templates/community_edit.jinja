@@ -8,47 +8,47 @@
 <section class="ds-card community-edit"
          hx-target:inherited="this"
          hx-swap:inherited="outerHTML">
-  <form class="community-edit-form"
+  <form class="community-form-form"
         hx-put="/communities/{{ community_id }}"
         hx-disable="find button">
     {% if error_message %}
-      <p class="community-edit-error" role="alert">{{ error_message }}</p>
+      <p class="community-form-error" role="alert">{{ error_message }}</p>
     {% endif %}
     <div class="form-field">
-      <label class="ds-label" for="community-edit-name">{{ ftl_get_message("community-name") }}</label>
-      <input class="ds-input" type="text" id="community-edit-name" name="name" value="{{ community.name }}" required />
+      <label class="ds-label" for="community-form-name">{{ ftl_get_message("community-name") }}</label>
+      <input class="ds-input" type="text" id="community-form-name" name="name" value="{{ community.name }}" required />
     </div>
     <div class="form-field">
-      <label class="ds-label" for="community-edit-slug">ID</label>
-      <input class="ds-input" type="text" id="community-edit-slug" name="slug" value="{{ community.slug }}" required
+      <label class="ds-label" for="community-form-slug">ID</label>
+      <input class="ds-input" type="text" id="community-form-slug" name="slug" value="{{ community.slug }}" required
              autocomplete="off" autocapitalize="off" spellcheck="false" />
       <span class="ds-help">/communities/@{{ community.slug }}</span>
     </div>
     <div class="form-field">
-      <label class="ds-label" for="community-edit-description">{{ ftl_get_message("community-description") }}</label>
-      <textarea class="ds-textarea" id="community-edit-description" name="description" rows="3">{{ community.description }}</textarea>
+      <label class="ds-label" for="community-form-description">{{ ftl_get_message("community-description") }}</label>
+      <textarea class="ds-textarea" id="community-form-description" name="description" rows="3">{{ community.description }}</textarea>
     </div>
-    <div class="form-field" role="radiogroup" aria-labelledby="community-edit-visibility">
-      <span class="ds-label" id="community-edit-visibility">{{ ftl_get_message("community-visibility") }}</span>
+    <div class="form-field" role="radiogroup" aria-labelledby="community-form-visibility">
+      <span class="ds-label" id="community-form-visibility">{{ ftl_get_message("community-visibility") }}</span>
       {% if community.visibility == "private" %}
         {# Private is for good: its members joined on that understanding. #}
         <input type="hidden" name="visibility" value="private" />
-        <div class="community-edit-choices">
-          <label class="community-edit-choice is-fixed">
+        <div class="community-form-choices">
+          <label class="community-form-choice is-fixed">
             <input type="radio" checked disabled />
             <span>
-              <span class="community-edit-choice-name">{{ ftl_get_message("visibility-private") }}</span>
+              <span class="community-form-choice-name">{{ ftl_get_message("visibility-private") }}</span>
               <span class="ds-help">{{ ftl_get_message("visibility-cannot-change") }}</span>
             </span>
           </label>
         </div>
       {% else %}
-        <div class="community-edit-choices">
+        <div class="community-form-choices">
           {% for value in ["public", "unlisted"] %}
-            <label class="community-edit-choice">
+            <label class="community-form-choice">
               <input type="radio" name="visibility" value="{{ value }}" {% if community.visibility == value %}checked{% endif %} />
               <span>
-                <span class="community-edit-choice-name">{{ ftl_get_message("visibility-" ~ value) }}</span>
+                <span class="community-form-choice-name">{{ ftl_get_message("visibility-" ~ value) }}</span>
                 <span class="ds-help">{{ ftl_get_message("visibility-" ~ value ~ "-description") }}</span>
               </span>
             </label>
@@ -56,7 +56,7 @@
         </div>
       {% endif %}
     </div>
-    <div class="form-actions community-edit-actions">
+    <div class="form-actions community-form-actions">
       <button type="button" class="ds-button" hx-get="/communities/{{ community_id }}">{{ ftl_get_message("cancel") }}</button>
       <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("save") }}</button>
     </div>
@@ -64,13 +64,13 @@
 
   {# Deleting is set apart and asks for the ID typed out, so it is never
      one slip from Save. #}
-  <div class="community-edit-danger">
-    <div class="community-edit-danger-title">{{ ftl_get_message("community-delete-danger-zone") }}</div>
+  <div class="community-form-danger">
+    <div class="community-form-danger-title">{{ ftl_get_message("community-delete-danger-zone") }}</div>
     <p class="ds-help">{{ ftl_get_message("community-delete-warning") }}</p>
     <label class="ds-label" for="confirm-slug">
       {{ ftl_get_message("community-delete-confirm-prompt") }}: <code>{{ community.slug }}</code>
     </label>
-    <div class="community-edit-danger-row">
+    <div class="community-form-danger-row">
       <input class="ds-input"
              type="text"
              id="confirm-slug"
