@@ -17,7 +17,7 @@ msgstr ""
 msgid "Authentication Failed"
 msgstr "인증 실패"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:56
+#: ../frontend/collaborate/components/SessionHeader.tsx:86
 msgid "by"
 msgstr "작성자:"
 
@@ -25,11 +25,11 @@ msgstr "작성자:"
 msgid "Cancel"
 msgstr "취소"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:71
+#: ../frontend/collaborate/components/SessionHeader.tsx:64
 msgid "Connected"
 msgstr "연결됨"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:77
+#: ../frontend/collaborate/components/SessionHeader.tsx:70
 msgid "Connecting"
 msgstr "연결 중"
 
@@ -43,7 +43,7 @@ msgid "Connection lost. Your work is saved locally."
 msgstr "연결이 끊어졌습니다. 작업이 로컬에 저장되었습니다."
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:83
+#: ../frontend/collaborate/components/SessionHeader.tsx:76
 msgid "Disconnected"
 msgstr "연결 끊어짐"
 
@@ -74,7 +74,7 @@ msgstr "초기화 실패"
 msgid "Initializing collaboration session..."
 msgstr "협업 세션 초기화 중..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:89
+#: ../frontend/collaborate/components/SessionHeader.tsx:82
 msgid "Loading"
 msgstr "로딩 중"
 
@@ -119,7 +119,7 @@ msgid "Save this drawing to the gallery? The session ends for everyone and nobod
 msgstr "이 그림을 갤러리에 저장할까요? 저장하면 모두의 세션이 끝나고 아무도 이어서 그릴 수 없습니다."
 
 #: ../frontend/collaborate/App.tsx:1036
-#: ../frontend/collaborate/App.tsx:1080
+#: ../frontend/collaborate/App.tsx:1085
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:110
@@ -127,7 +127,7 @@ msgid "Save to Gallery"
 msgstr "갤러리에 저장"
 
 #: ../frontend/collaborate/App.tsx:1036
-#: ../frontend/collaborate/App.tsx:1080
+#: ../frontend/collaborate/App.tsx:1085
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
 msgid "Saving..."
@@ -149,11 +149,11 @@ msgstr "세션 만석"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "세션이 종료됩니다. 그림을 갤러리에 저장 중..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:66
+#: ../frontend/collaborate/components/SessionHeader.tsx:95
 msgid "Share"
 msgstr "공유"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:63
+#: ../frontend/collaborate/components/SessionHeader.tsx:92
 msgid "Share this session"
 msgstr "이 세션 공유"
 

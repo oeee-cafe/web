@@ -1138,29 +1138,24 @@ mod template_tests {
                 .unwrap_or_else(|e| panic!("draw_post_cucumber.jinja renders: {e:#}"))
         };
 
-        let in_a_community = render(json!("Tegaki"), json!("tegaki"));
+        // The painter has no bar of its own under the toolbar any more, so
+        // the page title is what names the community a relay lands in.
+        let title = |rendered: &str| {
+            let start = rendered.find("<title>").expect("a title") + "<title>".len();
+            let end = rendered.find("</title>").expect("a closed title");
+            rendered[start..end].split_whitespace().collect::<Vec<_>>().join(" ")
+        };
+        let in_a_community = title(&render(json!("Tegaki"), json!("tegaki")));
         assert!(
-            in_a_community.contains("data-home=\"/communities/@tegaki\""),
-            "a relay in a community should lead back to it"
-        );
-        assert!(
-            in_a_community.contains("@ Tegaki"),
-            "a relay in a community should be labelled with it"
+            in_a_community.contains("Re: Tandemaus") && in_a_community.contains("@ Tegaki"),
+            "a relay in a community should be titled with both, got: {in_a_community}"
         );
 
-        let personal = render(json!(null), json!(null));
+        let personal = title(&render(json!(null), json!(null)));
+        assert!(personal.contains("Re: Tandemaus"), "got: {personal}");
         assert!(
-            personal.contains("data-home=\"/\""),
-            "a personal relay has nowhere but home to lead back to, got: {}",
-            personal
-                .lines()
-                .filter(|l| l.contains("data-home"))
-                .collect::<Vec<_>>()
-                .join(" | ")
-        );
-        assert!(
-            !personal.contains("data-subtitle=\"@"),
-            "a personal relay should name no community"
+            !personal.contains(" @ "),
+            "a personal relay should name no community, got: {personal}"
         );
     }
 

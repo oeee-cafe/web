@@ -40,24 +40,16 @@
          in the document before the painter mounts, so the area the painter
          measures is already the one it will keep. */
       #oeee-painter-page > .nav-bar { flex: 0 0 auto; position: relative; }
-      #oeee-painter-header { flex: 0 0 auto; }
       #neo-cucumber-root { flex: 1 1 auto; min-height: 0; }
     </style>
   </head>
   <body>
-    {#
-      The bar the painter's windows sit under. Its chrome is the painter's own,
-      applied by the adapter from the class names neo-cucumber exports, so this
-      only has to say what goes in it -- a drawing page with no way off it is a
-      page you have to use the back button to leave.
-    #}
+    {# No bar of the painter's own under the toolbar: the toolbar is the way
+       off this page, and what the bar said -- the drawing's title, its
+       community, its size -- is in the page title. The phone painter, which
+       has no toolbar, keeps its bar. #}
     <div id="oeee-painter-page">
       {% include "toolbar.jinja" %}
-      <div id="oeee-painter-header"
-           data-home="{% if community_slug %}/communities/@{{ community_slug }}{% else %}/{% endif %}"
-           data-title="{% if parent_post %}Re: {{ parent_post.title }}{% else %}{{ ftl_get_message("community-drawing-new") }}{% endif %}"
-           data-subtitle="{% if community_name %}@ {{ community_name }}{% endif %}"
-           data-size="{{ width }} × {{ height }}"></div>
       <div id="neo-cucumber-root"></div>
     </div>
     <button id="oeee-painter-save" type="button" disabled
