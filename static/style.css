@@ -1498,6 +1498,44 @@ nav a:visited,
 
 /* Draft Management Styles */
 
+/* Drafts: the header's tools side by side, and under each drawing what is
+   left to do with it. */
+.drafts-tools {
+  display: flex;
+  align-items: center;
+}
+
+.drafts-tools > * + * {
+  margin-left: var(--ds-space-4);
+}
+
+.drafts-page .post-card-title.is-untitled {
+  color: var(--ds-faint);
+  font-weight: 500;
+}
+
+.draft-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+:root[data-homecols-density="bare"] .draft-item .post-card-meta {
+  display: block;
+}
+
+:root[data-homecols-density="bare"] .draft-item .post-card-title,
+:root[data-homecols-density="bare"] .draft-item .post-card-byline {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .drafts-page .ds-per-row {
+    display: none;
+  }
+}
+
 /* Nothing drafted: what to do about it, in the card the rest of the site
    uses for a thing on its own. */
 .drafts-empty {

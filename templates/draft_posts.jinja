@@ -4,25 +4,30 @@
   {{ super() }} | {{ ftl_get_message("drafts") }}
 {% endblock title %}
 {% block content %}
-  {# The same grid as every other page of drawings, and the same Per row: a
-     draft is a drawing that has not been posted yet, and the only difference
-     worth drawing is where it leads -- to publishing it. #}
+  {# Drafts as a queue of work: the same grid as every other page of
+     drawings, and on each drawing what is left to do with it -- publish it,
+     or throw it away -- rather than a card that only led somewhere. A new
+     drawing is the other thing this page is for, so it is the header's
+     button. #}
   {% include "post_feed_head.jinja" %}
-  <div class="profile">
+  <div class="profile drafts-page">
     <section class="profile-section" aria-labelledby="drafts-heading">
-      <div class="grid-header">
+      <div class="grid-header drafts-header">
         <div>
           <h1 id="drafts-heading" class="profile-name">{{ ftl_get_message("drafts") }}</h1>
-          <div class="profile-handle">{{ posts|length }} {{ ftl_get_message("draft-posts-count") }}</div>
+          <div class="profile-handle"><span data-drafts-count>{{ posts|length }}</span> {{ ftl_get_message("draft-posts-count") }}</div>
         </div>
-        {% if posts %}{{ per_row() }}{% endif %}
+        <div class="drafts-tools">
+          {% if posts %}{{ per_row() }}{% endif %}
+          <button type="button" class="ds-button ds-button-primary" onclick="window.oeeeCommand && window.oeeeCommand('new-drawing')">{{ ftl_get_message("draw") }}</button>
+        </div>
       </div>
       {% if posts %}
         <div class="posts-grid" id="post-feed-grid">
           {% for post in posts %}
-            {% set title = post.title or ftl_get_message("post-no-title") %}
-            <div class="posts-grid-item" data-post-id="{{ post.id }}">
-              <a href="/posts/{{ post.id }}/publish" aria-label="{{ title }}">
+            {% set title = post.title or ftl_get_message("post-untitled") %}
+            <div class="posts-grid-item draft-item" data-post-id="{{ post.id }}">
+              <a href="/posts/{{ post.id }}/publish" aria-label="{{ ftl_get_message('post-publish') }}: {{ title }}">
                 <img draggable="false"
                      width="{{ post.image_width }}"
                      height="{{ post.image_height }}"
@@ -33,21 +38,55 @@
                      class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}" />
               </a>
               <div class="post-card-meta">
-                <div class="post-card-title" title="{{ post.content or title }}">{{ title }}</div>
+                <div class="post-card-title{% if not post.title %} is-untitled{% endif %}" title="{{ post.content or title }}">{{ title }}</div>
                 <div class="post-card-byline">
                   <span class="post-card-who">{{ post.community_name if post.community_id else ftl_get_message("personal-post") }}</span>
                   <span class="post-card-when" title="{{ post.updated_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ post.updated_at|ago }}</span>
+                </div>
+                <div class="draft-actions">
+                  <a class="ds-button ds-button-primary ds-button-small" href="/posts/{{ post.id }}/publish">{{ ftl_get_message("post-publish") }}</a>
+                  {# Taken off the page where it stands (?in_place), rather than
+                     sending the reader to wherever the draft would have lived. #}
+                  <button type="button"
+                          class="notification-icon-button"
+                          title="{{ ftl_get_message('delete') }}"
+                          aria-label="{{ ftl_get_message('delete') }}: {{ title }}"
+                          hx-delete="/posts/{{ post.id }}?in_place=1"
+                          hx-confirm="{{ ftl_get_message('post-delete-confirm') }}"
+                          hx-target="closest .draft-item"
+                          hx-swap="outerHTML swapEmpty:true"
+                          hx-disable="this">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10.5 10.5v6M13.5 10.5v6"/></svg>
+                  </button>
                 </div>
               </div>
             </div>
           {% endfor %}
         </div>
-      {% else %}
-        <div class="ds-card drafts-empty">
-          <p class="profile-empty">{{ ftl_get_message("draft-empty") }}</p>
-          <a href="/draw" class="ds-button ds-button-primary">{{ ftl_get_message("draw") }}</a>
-        </div>
       {% endif %}
+      <div class="ds-card drafts-empty" data-drafts-empty {% if posts %}hidden{% endif %}>
+        <p class="profile-empty">{{ ftl_get_message("draft-empty") }}</p>
+        <button type="button" class="ds-button ds-button-primary" onclick="window.oeeeCommand && window.oeeeCommand('new-drawing')">{{ ftl_get_message("draw") }}</button>
+      </div>
     </section>
   </div>
+  {# The count follows the grid as drafts are thrown away, and the last one
+     going leaves the empty state rather than an empty grid. #}
+  <script>
+    (function () {
+      var grid = document.getElementById("post-feed-grid");
+      if (!grid || !window.MutationObserver) return;
+      new MutationObserver(function () {
+        var left = grid.querySelectorAll(".draft-item").length;
+        var count = document.querySelector("[data-drafts-count]");
+        if (count) count.textContent = left;
+        if (!left) {
+          grid.hidden = true;
+          var tools = document.querySelector(".drafts-tools .ds-per-row");
+          if (tools) tools.hidden = true;
+          document.querySelector("[data-drafts-empty]").hidden = false;
+        }
+      }).observe(grid, { childList: true });
+    })();
+  </script>
 {% endblock content %}

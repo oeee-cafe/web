@@ -440,16 +440,40 @@ html {
   font-weight: 600;
 }
 
-/* A plain link at the toolbar's end -- signing in, the site's about page --
-   is drawn as a button, since that is what it is there. */
-.toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon) {
+/* A plain link at the toolbar's end -- notifications, drafts, signing in,
+   the site's about page -- is drawn as a button, since that is what it is
+   there. */
+.toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon),
+.toolbar-end .toolbar-button {
   border: 1px solid var(--ds-line-strong);
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-raise);
 }
 
-.toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon):hover {
+.toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon):hover,
+.toolbar-end .toolbar-button:hover {
   background-color: var(--ds-ground);
+}
+
+.toolbar-end .toolbar-button {
+  display: inline-block;
+  padding: 4px 11px;
+  border-radius: 6px;
+  color: var(--ds-ink);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.toolbar-end .toolbar-button:visited {
+  color: var(--ds-ink);
+}
+
+.toolbar-end .toolbar-button .toolbar-badge {
+  margin-left: 4px;
+  vertical-align: 1px;
 }
 
 .toolbar-end .toolbar-icon {
@@ -513,17 +537,43 @@ html {
   box-sizing: border-box;
 }
 
+/* The account menu's button, and the guest's theme button in its place:
+   a square with the same border, fill and corners as every other button in
+   the bar, holding your initial or the theme's icon. */
 .toolbar-avatar {
   display: inline-block;
-  width: 28px;
-  height: 28px;
-  border-radius: 14px;
-  background-color: var(--ds-accent);
-  color: var(--ds-accent-ink);
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 6px;
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+  color: var(--ds-ink);
   font-size: 13px;
   font-weight: 700;
   line-height: 28px;
   text-align: center;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+/* The square is the button: no padded hover area around it. */
+.nav-bar .toolbar-menu summary,
+.nav-bar .toolbar-end .toolbar-theme-button {
+  padding: 0;
+  line-height: 0;
+}
+
+.nav-bar .toolbar-menu summary:hover,
+.nav-bar .toolbar-menu[open] summary,
+.nav-bar .toolbar-end .toolbar-theme-button:hover {
+  background: none;
+}
+
+.toolbar-menu summary:hover .toolbar-avatar,
+.toolbar-menu[open] .toolbar-avatar,
+.toolbar-theme-button:hover .toolbar-avatar {
+  background-color: var(--ds-ground);
 }
 
 .toolbar-dot {
@@ -624,11 +674,7 @@ html {
 
 /* The guest's menu wears the avatar's shape, so the bar ends the same way
    signed in or out. */
-.toolbar-avatar-guest {
-  background-color: var(--ds-hover);
-  color: var(--ds-ink);
-  box-shadow: inset 0 0 0 1px var(--ds-line);
-}
+
 
 .toolbar-avatar-guest svg {
   vertical-align: middle;
@@ -725,6 +771,32 @@ html {
 .nav-bar.is-stacked .toolbar-draw {
   padding-right: 10px;
   padding-left: 10px;
+}
+
+/* Too narrow for the name and the account on one line even stacked: Draw
+   keeps its pencil and loses its word, and the buttons close up. Narrower
+   still, the name steps aside (toolbar.jinja, oeeeFitToolbar). */
+.nav-bar.is-compact .toolbar-draw span {
+  display: none;
+}
+
+.nav-bar.is-compact .toolbar-draw svg {
+  margin-right: 0;
+}
+
+.nav-bar.is-compact .toolbar-end > * + * {
+  margin-left: 4px;
+}
+
+.nav-bar.is-compact .toolbar-end > a,
+.nav-bar.is-compact .toolbar-end .toolbar-button,
+.nav-bar.is-compact .toolbar-draw {
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.nav-bar.is-bare .toolbar-name {
+  display: none;
 }
 
 /* In the desktop app on macOS the window's controls take the first 96px of
