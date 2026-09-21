@@ -244,50 +244,6 @@ export const ToolboxPanel = ({
               className={NEO_COLOR_INPUT}
             />
 
-            {/*
-              NEO's Right Click button. A right press takes the colour under
-              the pointer instead of drawing, and a tablet or trackpad may have
-              no way to make one -- so this says the next press is a right
-              press, and releases itself once that press has happened.
-            */}
-            {onToggleVirtualRight && (
-              <button
-                type="button"
-                onClick={onToggleVirtualRight}
-                aria-pressed={virtualRight ?? false}
-                title={t`Pick a colour from the drawing with the next click`}
-                aria-label={t`Right click`}
-                className={`${NEO_ICON_BUTTON} ${virtualRight ? NEO_BUTTON_ON : ""} flex items-center justify-center`}
-              >
-                <Icon icon="material-symbols:colorize" width={14} height={14} />
-              </button>
-            )}
-
-            {/*
-              Canvas editing tools NEO keeps outside its own column. Pan has
-              its own button above; paste has none at all, because in NEO
-              there is no choosing it -- finishing a copy switches to it, and
-              a button for it only ever offered a paste with nothing to paste.
-            */}
-            <div className="grid grid-cols-2 gap-[2px]">
-              {NON_NEO_TOOLS.filter(
-                (tool) => tool !== "pan" && tool !== "paste" && tools.includes(tool)
-              ).map((tool) => (
-                <button
-                  key={tool}
-                  type="button"
-                  onClick={() => onUpdateBrushType(tool)}
-                  aria-pressed={drawingState.brushType === tool}
-                  title={labels.tools[tool] ?? tool}
-                  className={`${NEO_ICON_BUTTON} ${
-                    drawingState.brushType === tool ? NEO_BUTTON_ON : ""
-                  } flex items-center justify-center`}
-                >
-                  <Icon icon={NON_NEO_TOOL_ICONS[tool]} width={14} height={14} />
-                </button>
-              ))}
-            </div>
-
             {/* Undo and redo. NEO puts these in the bar above the canvas. */}
             <div className="grid grid-cols-2 gap-[2px]">
               <button
@@ -309,6 +265,66 @@ export const ToolboxPanel = ({
                 <Icon icon="material-symbols:redo" width={14} height={14} />
               </button>
             </div>
+
+            {/*
+              Fill and NEO's Right Click button, under undo and redo: the four
+              buttons NEO keeps together in the bar above its canvas
+              (container.js: redo, undo, fill, right). Right Click says the
+              next press is a right press -- which takes the colour under the
+              pointer instead of drawing -- for a tablet or trackpad with no
+              way to make one, and releases itself once that press happens.
+
+              Paste used to sit beside fill. NEO has no paste button, so it
+              went, and the space it left is filled with a neighbour NEO
+              actually gives fill rather than with something new. A tool
+              alone in this row takes the whole row, so a host that offers
+              no Right Click does not get the gap back.
+            */}
+            {(() => {
+              const cells = [
+                ...NON_NEO_TOOLS.filter(
+                  (tool) => tool !== "pan" && tool !== "paste" && tools.includes(tool)
+                ).map((tool) => (
+                  <button
+                    key={tool}
+                    type="button"
+                    onClick={() => onUpdateBrushType(tool)}
+                    aria-pressed={drawingState.brushType === tool}
+                    title={labels.tools[tool] ?? tool}
+                    className={`${NEO_ICON_BUTTON} ${
+                      drawingState.brushType === tool ? NEO_BUTTON_ON : ""
+                    } flex items-center justify-center`}
+                  >
+                    <Icon icon={NON_NEO_TOOL_ICONS[tool]} width={14} height={14} />
+                  </button>
+                )),
+                ...(onToggleVirtualRight
+                  ? [
+                      <button
+                        key="right"
+                        type="button"
+                        onClick={onToggleVirtualRight}
+                        aria-pressed={virtualRight ?? false}
+                        title={t`Pick a colour from the drawing with the next click`}
+                        aria-label={t`Right click`}
+                        className={`${NEO_ICON_BUTTON} ${virtualRight ? NEO_BUTTON_ON : ""} flex items-center justify-center`}
+                      >
+                        <Icon icon="material-symbols:colorize" width={14} height={14} />
+                      </button>,
+                    ]
+                  : []),
+              ];
+              if (cells.length === 0) return null;
+              return (
+                <div className="grid grid-cols-2 gap-[2px]">
+                  {cells.length === 1 ? (
+                    <div className="col-span-2 grid">{cells[0]}</div>
+                  ) : (
+                    cells
+                  )}
+                </div>
+              );
+            })()}
 
             {/*
               Light and dark. The palette follows the OS on its own, so this
