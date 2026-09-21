@@ -1,4 +1,5 @@
 {% extends "admin/base.jinja" %}
+{% from "per_row_macro.jinja" import per_row %}
 {% block admin_content %}
   {# Applied before first paint so the grid does not flash at the default width. #}
   <script>
@@ -9,13 +10,7 @@
   </script>
 
   <div class="admin-density">
-    <label for="admin-cols">Per row</label>
-    <input type="range"
-           id="admin-cols"
-           min="1"
-           max="12"
-           step="1" />
-    <output id="admin-cols-value"></output>
+    {{ per_row(id="admin-cols", var="--admin-cols", key="adminPostCols", default=6) }}
   </div>
 
   <h2>
@@ -70,27 +65,4 @@
     <p>No posts match this filter.</p>
   {% endif %}
 
-  <script>
-    (function () {
-      var DEFAULT_COLS = 6;
-      var slider = document.getElementById("admin-cols");
-      var readout = document.getElementById("admin-cols-value");
-      var root = document.documentElement;
-
-      var current = parseInt(localStorage.getItem("adminPostCols"), 10);
-      if (!current || current < 1 || current > 12) current = DEFAULT_COLS;
-
-      function apply(cols) {
-        root.style.setProperty("--admin-cols", cols);
-        readout.textContent = cols;
-        localStorage.setItem("adminPostCols", cols);
-      }
-
-      slider.value = current;
-      apply(current);
-      slider.addEventListener("input", function () {
-        apply(parseInt(slider.value, 10));
-      });
-    })();
-  </script>
 {% endblock admin_content %}

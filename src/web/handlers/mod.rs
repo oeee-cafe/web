@@ -478,6 +478,8 @@ pub(crate) mod test_support {
         minijinja_contrib::add_to_environment(&mut env);
         env.add_filter("cachebuster", |value: String| value);
         env.add_filter("markdown", |value: String| value);
+        // The real filter: it is pure, so tests render what production does.
+        env.add_filter("ago", crate::relative_time::ago_filter);
         env.add_function("ftl_get_message", |_state: &State, id: String| id);
         // The real function interpolates the arguments into the locale's
         // pattern. This stub has no bundle to interpolate into, so it appends
@@ -825,6 +827,43 @@ mod community_page_tests {
                 visibility == "private"
             );
         }
+    }
+
+    /// Drafts are drawn in the same grid, with the same Per row, as every
+    /// other page of drawings; each leads to publishing it, and says how
+    /// long ago it was last touched rather than printing a timestamp.
+    #[test]
+    fn drafts_share_the_grid_and_its_control() {
+        let env = test_support::env();
+        let updated = (chrono::Utc::now() - chrono::Duration::hours(3)).to_rfc3339();
+        let rendered = env
+            .get_template("draft_posts.jinja")
+            .expect("drafts template loads")
+            .render(context! {
+                current_user => json!({"login_name": "someone"}),
+                messages => Vec::<serde_json::Value>::new(),
+                draft_post_count => 1,
+                unread_notification_count => 0,
+                ftl_lang => "en",
+                r2_public_endpoint_url => "https://example.test",
+                posts => vec![json!({
+                    "id": "00000000-0000-0000-0000-000000000001",
+                    "title": null,
+                    "content": null,
+                    "community_id": null,
+                    "community_name": null,
+                    "image_filename": "abcdef.png",
+                    "image_width": 300,
+                    "image_height": 300,
+                    "updated_at": updated,
+                })],
+            })
+            .expect("drafts render");
+        assert!(rendered.contains("class=\"posts-grid\" id=\"post-feed-grid\""));
+        assert!(rendered.contains("data-per-row"));
+        assert!(rendered.contains("&#x2f;posts&#x2f;00000000-0000-0000-0000-000000000001&#x2f;publish")
+            || rendered.contains("/posts/00000000-0000-0000-0000-000000000001/publish"));
+        assert!(rendered.contains(">3h<"), "not a relative time");
     }
 
     /// The grid is the shared feed fragment, so its sentinel points wherever

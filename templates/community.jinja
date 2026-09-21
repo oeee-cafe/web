@@ -101,7 +101,7 @@
        that block alone, and minijinja still walks the rest to reach it. #}
     {% set feed_posts = feed.posts if feed is defined else [] %}
     <section class="profile-section" role="region" aria-labelledby="post-feed-heading">
-      <div class="community-feed-header">
+      <div class="grid-header">
         <div id="post-feed-heading" class="profile-section-label">{{ ftl_get_message("recent-drawings") }}</div>
         {# Only with posts to arrange: an empty feed has no columns to set. #}
         {% if feed_posts %}

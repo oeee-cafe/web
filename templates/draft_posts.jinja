@@ -1,67 +1,53 @@
 {% extends "base.jinja" %}
+{% from "per_row_macro.jinja" import per_row %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("drafts") }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <div class="drafts-header">
-      <h2>{{ ftl_get_message("drafts") }}</h2>
-      <p class="drafts-count">{{ posts|length }} {{ ftl_get_message("draft-posts-count") }}</p>
-    </div>
-
-    {# Draft posts grid #}
-    {% if posts|length > 0 %}
-      <div class="drafts-grid">
-        {% for post in posts %}
-          <div class="draft-card" data-post-id="{{ post.id }}">
-            <div class="draft-card-header">
-              <div class="draft-metadata">
-                {% if post.community_id %}
-                <a href="/communities/{{ post.community_id }}" class="draft-community">
-                  {{ post.community_name }}
-                </a>
-                {% else %}
-                <span class="draft-community">{{ ftl_get_message("personal-post") }}</span>
-                {% endif %}
-                <span class="draft-date">
-                  {{ post.updated_at|dateformat(format="short", tz="Asia/Seoul") }}
-                </span>
+  {# The same grid as every other page of drawings, and the same Per row: a
+     draft is a drawing that has not been posted yet, and the only difference
+     worth drawing is where it leads -- to publishing it. #}
+  {% include "post_feed_head.jinja" %}
+  <div class="profile">
+    <section class="profile-section" aria-labelledby="drafts-heading">
+      <div class="grid-header">
+        <div>
+          <h1 id="drafts-heading" class="profile-name">{{ ftl_get_message("drafts") }}</h1>
+          <div class="profile-handle">{{ posts|length }} {{ ftl_get_message("draft-posts-count") }}</div>
+        </div>
+        {% if posts %}{{ per_row() }}{% endif %}
+      </div>
+      {% if posts %}
+        <div class="posts-grid" id="post-feed-grid">
+          {% for post in posts %}
+            {% set title = post.title or ftl_get_message("post-no-title") %}
+            <div class="posts-grid-item" data-post-id="{{ post.id }}">
+              <a href="/posts/{{ post.id }}/publish" aria-label="{{ title }}">
+                <img draggable="false"
+                     width="{{ post.image_width }}"
+                     height="{{ post.image_height }}"
+                     alt="{{ title }}"
+                     src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
+                     loading="lazy"
+                     decoding="async"
+                     class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}" />
+              </a>
+              <div class="post-card-meta">
+                <div class="post-card-title" title="{{ post.content or title }}">{{ title }}</div>
+                <div class="post-card-byline">
+                  <span class="post-card-who">{{ post.community_name if post.community_id else ftl_get_message("personal-post") }}</span>
+                  <span class="post-card-when" title="{{ post.updated_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ post.updated_at|ago }}</span>
+                </div>
               </div>
             </div>
-
-            <a href="/posts/{{ post.id }}/publish" class="draft-image-link">
-              <img width="{{ post.image_width }}"
-                   height="{{ post.image_height }}"
-                   alt="{{ post.title or ftl_get_message("post-no-title") }}"
-                   src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
-                   loading="lazy"
-                   decoding="async"
-                   class="draft-image" />
-            </a>
-
-            <a href="/posts/{{ post.id }}/publish" class="draft-card-content-link">
-              <div class="draft-card-content">
-                <h3 class="draft-title">
-                  {{ post.title or ftl_get_message("post-no-title") }}
-                </h3>
-                {% if post.content %}
-                  <p class="draft-description">{{ post.content[:100] }}{% if post.content|length > 100 %}...{% endif %}</p>
-                {% endif %}
-              </div>
-            </a>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      {# Empty state #}
-      <div class="drafts-empty">
-        <p class="drafts-empty-message">
-          {{ ftl_get_message("draft-empty") }}
-        </p>
-        <a href="/draw" class="drafts-empty-cta">
-          {{ ftl_get_message("draw") }}
-        </a>
-      </div>
-    {% endif %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="ds-card drafts-empty">
+          <p class="profile-empty">{{ ftl_get_message("draft-empty") }}</p>
+          <a href="/draw" class="ds-button ds-button-primary">{{ ftl_get_message("draw") }}</a>
+        </div>
+      {% endif %}
+    </section>
   </div>
 {% endblock content %}

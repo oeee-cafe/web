@@ -170,7 +170,6 @@ main > .center-wide > :first-child > :first-child {
 }
 
 /* Card titles: sized by the card's own context, so only weight is set here. */
-.draft-title,
 .post-card-title {
   margin: 0;
   font-weight: 600;
@@ -268,8 +267,8 @@ nav a:visited,
 .posts-grid {
   display: grid;
   grid-template-columns: repeat(var(--home-cols, 4), minmax(0, 1fr));
-  grid-gap: 32px 24px;
-  gap: 32px 24px;
+  grid-gap: 28px 20px;
+  gap: 28px 20px;
   margin: var(--space-4) 0;
 }
 
@@ -277,6 +276,9 @@ nav a:visited,
   min-width: 0;
 }
 
+/* The drawing in a hard 1px frame, as the painter frames its canvas, and
+   no rounded corners: a drawing is not a control. It lifts a little under
+   the pointer. */
 .posts-grid .posts-grid-item > a:first-child {
   position: relative;
   display: block;
@@ -284,10 +286,22 @@ nav a:visited,
   padding-top: 100%;
   background-color: #ffffff;
   box-shadow: 0 0 0 1px var(--ds-frame);
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
 }
 
 .posts-grid .posts-grid-item > a:first-child:hover {
-  box-shadow: 0 0 0 2px var(--main-highlight-color);
+  box-shadow: 0 0 0 1px var(--ds-frame), 0 6px 16px rgba(40, 40, 90, 0.18);
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .posts-grid .posts-grid-item > a:first-child {
+    transition: none;
+  }
+
+  .posts-grid .posts-grid-item > a:first-child:hover {
+    transform: none;
+  }
 }
 
 .posts-grid .posts-grid-item img {
@@ -307,54 +321,87 @@ nav a:visited,
 }
 
 /* Attribution under the drawing, never over it: it is the artist's credit,
-   and hover does not exist on touch. Each line clips rather than wraps so
-   the rows stay level. */
+   and hover does not exist on touch. Two lines -- the title, then who,
+   where and how long ago -- each clipping rather than wrapping so the rows
+   stay level. */
 .post-card-meta {
-  padding: var(--space-2) 1px 0;
-  font-size: 12px;
+  padding: 8px 1px 0;
+  font-size: var(--ds-text-s);
   line-height: 16px;
-  color: var(--main-text-muted-color);
+  color: var(--ds-muted);
 }
 
 .post-card-meta .post-card-title {
-  margin-bottom: 2px;
-  color: var(--main-text-color);
-  font-size: 14px;
+  margin-bottom: 1px;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-m);
   font-weight: 600;
-  line-height: 19px;
+  line-height: 18px;
 }
 
 .post-card-title,
-.post-card-byline,
 .post-card-date {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Who never shrinks away, when never at all; where gives up its room
+   first, so a long community name costs its own ending and nothing else. */
+.post-card-byline {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.post-card-who,
+.post-card-where {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Not shrinking but capped: a shrinkable name loses a fraction of a pixel
+   to rounding beside a long community, and a fraction is enough for an
+   ellipsis. Only a name longer than the cap is cut. */
+.post-card-who {
+  flex: 0 0 auto;
+  max-width: 70%;
+}
+
+.post-card-where {
+  flex: 0 1000 auto;
+}
+
+.post-card-when {
+  flex: none;
+  color: var(--ds-faint);
+}
+
+.post-card-where::before,
+.post-card-when::before {
+  content: "\00b7";
+  margin: 0 4px;
+  color: var(--ds-faint);
+}
+
 .post-card-byline a,
 .post-card-byline a:visited {
-  color: var(--main-text-muted-color);
+  color: var(--ds-muted);
   text-decoration: none;
 }
 
-/* How many a row. Beside the feed's heading. */
-.thumbnail-size {
-  display: flex;
-  align-items: center;
-  color: var(--ds-muted);
-  font-size: var(--ds-text-m);
-}
-
-.thumbnail-size > * + * {
-  margin-left: var(--ds-space-2);
-}
-
-.thumbnail-size output {
-  min-width: 1.5em;
+.post-card-byline a:hover {
   color: var(--ds-ink);
-  font-weight: 600;
-  text-align: right;
+}
+
+/* The captions say less as the squares narrow: past six a row only who
+   drew it, past nine nothing -- a title cut to three letters is noise. */
+:root[data-homecols-density="dense"] .posts-grid .post-card-title,
+:root[data-homecols-density="dense"] .posts-grid .post-card-where,
+:root[data-homecols-density="dense"] .posts-grid .post-card-when,
+:root[data-homecols-density="bare"] .posts-grid .post-card-meta {
+  display: none;
 }
 
 /* The admin grid still draws its cards with the old box. */
@@ -384,7 +431,7 @@ nav a:visited,
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .thumbnail-size {
+  .ds-per-row:not([data-key="adminPostCols"]) {
     display: none;
   }
 }
@@ -1397,126 +1444,15 @@ nav a:visited,
 
 /* Draft Management Styles */
 
-.drafts-header {
-  margin-bottom: var(--space-5);
-  padding: var(--space-5);
-  border: 1px solid var(--main-border-color);
-  background-color: var(--secondary-bg-color);
-}
-
-.drafts-header h2 {
-  margin: 0 0 var(--space-2) 0;
-}
-
-.drafts-count {
-  color: var(--secondary-text-color);
-  font-size: var(--text-sm);
-  margin: 0;
-}
-
-.drafts-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-5);
-  margin-bottom: var(--space-6);
-}
-
-.draft-card {
-  border: 1px solid var(--main-border-color);
-  background-color: var(--secondary-bg-color);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.draft-card:hover {
-  border-color: var(--main-highlight-color);
-}
-
-.draft-card-header {
-  margin-bottom: var(--space-2);
-}
-
-.draft-metadata {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.draft-community {
-  font-weight: 600;
-  color: var(--link-color);
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.draft-date {
-  font-size: var(--text-sm);
-  color: var(--secondary-text-color);
-}
-
-.draft-image-link {
-  display: block;
-  position: relative;
-  overflow: hidden;
-}
-
-.draft-image {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.draft-card-content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.draft-description {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--secondary-text-color);
-  line-height: 1.4;
-}
-
-.draft-card-content-link {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-}
-
-.draft-card-content-link:hover .draft-title {
-  color: var(--link-color);
-}
-
+/* Nothing drafted: what to do about it, in the card the rest of the site
+   uses for a thing on its own. */
 .drafts-empty {
+  padding: var(--ds-space-6) var(--ds-space-5);
   text-align: center;
-  padding: 64px var(--space-6);
-  background-color: var(--secondary-bg-color);
-  border: 1px solid var(--main-border-color);
 }
 
-.drafts-empty-message {
-  font-size: var(--text-lg);
-  color: var(--secondary-text-color);
-  margin-bottom: var(--space-5);
-}
-
-.drafts-empty-cta {
-  display: inline-block;
-  padding: var(--space-3) var(--space-6);
-  background-color: var(--link-color);
-  color: var(--secondary-bg-color);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.drafts-empty-cta:hover {
-  opacity: 0.9;
+.drafts-empty .profile-empty {
+  margin: 0 0 var(--ds-space-4);
 }
 
 /* Form layout -- fieldsets, fields, checkboxes, actions -- is the design
@@ -2829,7 +2765,9 @@ a.user-pill:hover {
   margin-left: -6px;
 }
 
-.community-feed-header {
+/* A grid's own header row: what it is at the start, Per row at the end.
+   Used over every grid of drawings -- community, profile, drafts. */
+.grid-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2837,7 +2775,8 @@ a.user-pill:hover {
   margin-bottom: var(--ds-space-2);
 }
 
-.community-feed-header .profile-section-label {
+.grid-header .profile-section-label,
+.grid-header .profile-tabs {
   margin-bottom: 0;
 }
 
