@@ -452,3 +452,5 @@ communities-tab-public = 공개
 communities-tab-official = 공식
 communities-tab-yours = 내 커뮤니티
 nav-about = 소개
+post-move-to = { $communityName }(으)로 이동
+post-move-choose = 옮길 곳을 고르세요

@@ -1,4 +1,3 @@
-{% import "comments_macro.jinja" as comments_macro %}
 {% extends "base.jinja" %}
 {% block title %}
   {{ super() }} |
@@ -9,340 +8,185 @@
   {% endif %} | {{ ftl_get_message("post-move-community-title") }}
 {% endblock title %}
 {% block head %}
-  <meta property="og:title" content="{{ post.title }}" />
-  <meta property="og:description" content="{{ post.content }}" />
-  <meta property="og:type" content="website" />
-  <meta property="og:url"
-        content="{{ base_url|safe }}/posts/{{ post_id }}" />
-  <meta property="og:image"
-        content="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-  <meta property="twitter:site" content="@oeee_cafe">
-  <meta property="twitter:domain" content="oeee.cafe">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta property="twitter:url"
-        content="{{ base_url|safe }}/posts/{{ post_id }}">
-  <meta name="twitter:title" content="{{ post.title }}">
-  <meta name="twitter:description" content="{{ post.content }}">
-  <meta name="twitter:image"
-        content="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}">
+  <meta name="robots" content="noindex" />
 {% endblock head %}
-{% block content %}
-  <div class="center">
-    <div class="post-sidebar">
-      <div class="post-move-header">
-        <h2>{{ ftl_get_message("post-move-community-title") }}</h2>
-        <a href="/@{{ post.login_name }}/{{ post_id }}" class="ds-button">{{ ftl_get_message("cancel") }}</a>
-      </div>
 
-      <div class="post-move-preview">
-        <h3 class="section-heading">{{ ftl_get_message("post-move-post-to-move") }}</h3>
-        <a href="/@{{ post.login_name }}/{{ post_id }}" class="post-move-preview-link">
-          <div class="post-move-preview-content">
-            <img class="post-move-preview-image"
-                 width="{{ post.image_width }}"
-                 height="{{ post.image_height }}"
-                 alt="{{ post.title }}"
-                 src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-            <div class="post-move-preview-info">
-              <p class="post-move-preview-title">
-                {% if post.title %}
-                  {{ post.title }}
-                {% else %}
-                  {{ ftl_get_message("post-no-title") }}
-                {% endif %}
-              </p>
-            </div>
-          </div>
-        </a>
-      </div>
-
-      {% if current_community %}
-        <div class="community-current-section">
-          <h3 class="section-heading">{{ ftl_get_message("post-current-community") }}</h3>
-          <div class="community-move-card community-current-card">
-            <div class="community-move-card-content">
-              <div class="community-move-card-main">
-                <div class="community-move-card-header">
-                  <div>
-                    <a href="/communities/@{{ current_community.slug }}" class="community-name">{{ current_community.name }}</a>
-                    <span class="community-current-badge">{{ ftl_get_message("post-current-community") }}</span>
-                  </div>
-                  <p class="community-owner-handle muted">@{{ current_community.owner_login_name }}</p>
-                </div>
-                {% if current_community.description %}
-                  <p class="community-description">{{ current_community.description }}</p>
-                {% endif %}
-              </div>
-              <div class="community-move-card-thumbnails">
-                {% if current_community.recent_posts %}
-                  <div class="community-thumbnails">
-                    {% for post in current_community.recent_posts %}
-                      <a href="/@{{ post.author_login_name }}/{{ post.id }}" class="community-thumbnail-link">
-                        <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
-                             alt=""
-                             class="community-thumbnail"
-                             width="{{ post.image_width }}"
-                             height="{{ post.image_height }}" />
-                      </a>
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  <p class="community-no-posts-message muted">{{ ftl_get_message("community-no-posts") }}</p>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
+{# One place a drawing can go: a row in the list, the whole row the target.
+   Its three latest drawings say what the community is at a glance; the
+   radio beside them is what the form sends. `label` is what the Move
+   button will say once this row is chosen. #}
+{% macro destination(value, name, meta, label, badge, posts, search, group) %}
+  <label class="move-row" data-search="{{ search }}">
+    <input type="radio" name="community_id" value="{{ value }}" data-move-label="{{ label }}" />
+    <span class="move-row-cover" aria-hidden="true">
+      {% if posts %}
+        {% for p in posts[:3] %}
+          <span class="move-row-cell"><img src="{{ r2_public_endpoint_url }}/image/{{ p.image_filename[:2] }}/{{ p.image_filename }}" alt="" draggable="false" loading="lazy" decoding="async" /></span>
+        {% endfor %}
+      {% elif value == "" %}
+        <span class="move-row-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c.8-3.7 3.9-6 7.5-6s6.7 2.3 7.5 6"/></svg>
+        </span>
       {% endif %}
+    </span>
+    <span class="move-row-text">
+      <span class="move-row-name">
+        <span class="move-row-title">{{ name }}</span>
+        {% if badge %}<span class="community-card-badge">{{ badge }}</span>{% endif %}
+      </span>
+      {% if meta %}<span class="move-row-meta">{{ meta }}</span>{% endif %}
+    </span>
+    <svg class="move-row-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+  </label>
+{% endmacro %}
 
-      <div class="community-move-section">
-        <h3 class="section-heading">{{ ftl_get_message("post-move-available") }}</h3>
+{% macro community_row(community, badge) %}
+  {{ destination(
+       community.id,
+       community.name,
+       "@" ~ community.owner_login_name ~ ((" · " ~ community.posts_count ~ " " ~ ftl_get_message("community-stats-posts")) if community.posts_count else ""),
+       ftl_format_pattern("post-move-to", {"communityName": community.name}),
+       badge,
+       community.recent_posts,
+       (community.name ~ " " ~ community.slug ~ " " ~ (community.description or ""))|lower) }}
+{% endmacro %}
 
-        <input type="text"
-               id="community-search"
-               class="community-move-search"
-               placeholder="{{ ftl_get_message('post-move-search-placeholder') }}"
-               autocomplete="off" />
-
-        <div id="community-list" class="community-list">
-          {# Show "Personal Post" option only if post is currently in a community #}
+{% block content %}
+  {# Moving a drawing is choosing one place from a list and saying so once:
+     the list is a picker, the search narrows it, and a single button at
+     the foot names where the drawing will go. It used to be a column of
+     large cards with a Move button and a confirmation each, and a search
+     that found its section headings by looking for English words in them. #}
+  <div class="move-page">
+    <section class="ds-card move-subject">
+      <a class="move-subject-thumb" href="/@{{ post.login_name }}/{{ post_id }}">
+        <img src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
+             alt="{{ post.title }}" draggable="false" />
+      </a>
+      <div class="move-subject-text">
+        <h1 class="move-subject-title">{{ ftl_get_message("post-move-community-title") }}</h1>
+        <div class="move-subject-post">{% if post.title %}{{ post.title }}{% else %}{{ ftl_get_message("post-no-title") }}{% endif %}</div>
+        <div class="move-subject-where">
+          <span>{{ ftl_get_message("post-current-community") }}</span>
           {% if current_community %}
-            <div class="community-move-card" data-community-name="personal post" data-community-slug="personal" data-community-description="">
-              <div class="community-move-card-content">
-                <div class="community-move-card-main">
-                  <div class="community-move-card-header">
-                    <div>
-                      <span class="community-name">{{ ftl_get_message("post-personal-post") }}</span>
-                    </div>
-                  </div>
-                  <p class="community-description">{{ ftl_get_message("post-personal-post-description") }}</p>
-                  <form method="post"
-                        action="/@{{ post.login_name }}/{{ post_id }}/edit/community"
-                        onsubmit="return confirm('{{ ftl_get_message("post-move-confirm-personal") }}');"
-                        class="community-move-form">
-                    <input type="hidden" name="community_id" value="" />
-                    <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-move-to-personal") }}</button>
-                  </form>
-                </div>
-              </div>
-            </div>
-          {% endif %}
-
-
-          {# Unlisted Communities Section #}
-          {% if unlisted_communities %}
-            <h4 class="section-heading">{{ ftl_get_message("move-section-unlisted") }}</h4>
-            {% for community in unlisted_communities %}
-              <div class="community-move-card" data-community-name="{{ community.name|lower }}" data-community-slug="{{ community.slug|lower }}" data-community-description="{{ community.description|lower if community.description else '' }}" data-community-visibility="unlisted">
-                <div class="community-move-card-content">
-                  <div class="community-move-card-main">
-                    <div class="community-move-card-header">
-                      <div>
-                        <a href="/communities/@{{ community.slug }}" class="community-name">{{ community.name }}</a>
-                        <span class="community-private-badge">{{ ftl_get_message("community-badge-unlisted") }}</span>
-                      </div>
-                      <p class="community-owner-handle muted">@{{ community.owner_login_name }}</p>
-                    </div>
-                    {% if community.description %}
-                      <p class="community-description">{{ community.description }}</p>
-                    {% endif %}
-                    <form method="post"
-                          action="/@{{ post.login_name }}/{{ post_id }}/edit/community"
-                          onsubmit="return confirm('{{ ftl_format_pattern("post-move-confirm", {"communityName": community.name}) }}');"
-                          class="community-move-form">
-                      <input type="hidden" name="community_id" value="{{ community.id }}" />
-                      <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-move-community") }}</button>
-                    </form>
-                  </div>
-                  <div class="community-move-card-thumbnails">
-                    {% if community.recent_posts %}
-                      <div class="community-thumbnails">
-                        {% for post in community.recent_posts %}
-                          <a href="/@{{ post.author_login_name }}/{{ post.id }}" class="community-thumbnail-link">
-                            <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
-                                 alt=""
-                                 class="community-thumbnail"
-                                 width="{{ post.image_width }}"
-                                 height="{{ post.image_height }}" />
-                          </a>
-                        {% endfor %}
-                      </div>
-                    {% else %}
-                      <p class="community-no-posts-message muted">{{ ftl_get_message("community-no-posts") }}</p>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
-          {% endif %}
-
-          {# Public Communities (Participated) Section #}
-          {% if public_participated_communities %}
-            <h4 class="section-heading">{{ ftl_get_message("move-section-public-participated") }}</h4>
-            {% for community in public_participated_communities %}
-              <div class="community-move-card" data-community-name="{{ community.name|lower }}" data-community-slug="{{ community.slug|lower }}" data-community-description="{{ community.description|lower if community.description else '' }}" data-community-visibility="public-participated">
-                <div class="community-move-card-content">
-                  <div class="community-move-card-main">
-                    <div class="community-move-card-header">
-                      <div>
-                        <a href="/communities/@{{ community.slug }}" class="community-name">{{ community.name }}</a>
-                      </div>
-                      <p class="community-owner-handle muted">@{{ community.owner_login_name }}</p>
-                    </div>
-                    {% if community.description %}
-                      <p class="community-description">{{ community.description }}</p>
-                    {% endif %}
-                    {% if community.posts_count %}
-                      <p class="community-stats-inline muted">
-                        {{ community.posts_count }} {{ ftl_get_message("community-stats-posts") }}
-                      </p>
-                    {% endif %}
-                    <form method="post"
-                          action="/@{{ post.login_name }}/{{ post_id }}/edit/community"
-                          onsubmit="return confirm('{{ ftl_format_pattern("post-move-confirm", {"communityName": community.name}) }}');"
-                          class="community-move-form">
-                      <input type="hidden" name="community_id" value="{{ community.id }}" />
-                      <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-move-community") }}</button>
-                    </form>
-                  </div>
-                  <div class="community-move-card-thumbnails">
-                    {% if community.recent_posts %}
-                      <div class="community-thumbnails">
-                        {% for post in community.recent_posts %}
-                          <a href="/@{{ post.author_login_name }}/{{ post.id }}" class="community-thumbnail-link">
-                            <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
-                                 alt=""
-                                 class="community-thumbnail"
-                                 width="{{ post.image_width }}"
-                                 height="{{ post.image_height }}" />
-                          </a>
-                        {% endfor %}
-                      </div>
-                    {% else %}
-                      <p class="community-no-posts-message muted">{{ ftl_get_message("community-no-posts") }}</p>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
-          {% endif %}
-
-          {# Public Communities (Other) Section #}
-          {% if public_other_communities %}
-            <h4 class="section-heading">{{ ftl_get_message("move-section-public-other") }}</h4>
-            {% for community in public_other_communities %}
-              <div class="community-move-card" data-community-name="{{ community.name|lower }}" data-community-slug="{{ community.slug|lower }}" data-community-description="{{ community.description|lower if community.description else '' }}" data-community-visibility="public-other">
-                <div class="community-move-card-content">
-                  <div class="community-move-card-main">
-                    <div class="community-move-card-header">
-                      <div>
-                        <a href="/communities/@{{ community.slug }}" class="community-name">{{ community.name }}</a>
-                      </div>
-                      <p class="community-owner-handle muted">@{{ community.owner_login_name }}</p>
-                    </div>
-                    {% if community.description %}
-                      <p class="community-description">{{ community.description }}</p>
-                    {% endif %}
-                    {% if community.posts_count %}
-                      <p class="community-stats-inline muted">
-                        {{ community.posts_count }} {{ ftl_get_message("community-stats-posts") }}
-                      </p>
-                    {% endif %}
-                    <form method="post"
-                          action="/@{{ post.login_name }}/{{ post_id }}/edit/community"
-                          onsubmit="return confirm('{{ ftl_format_pattern("post-move-confirm", {"communityName": community.name}) }}');"
-                          class="community-move-form">
-                      <input type="hidden" name="community_id" value="{{ community.id }}" />
-                      <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-move-community") }}</button>
-                    </form>
-                  </div>
-                  <div class="community-move-card-thumbnails">
-                    {% if community.recent_posts %}
-                      <div class="community-thumbnails">
-                        {% for post in community.recent_posts %}
-                          <a href="/@{{ post.author_login_name }}/{{ post.id }}" class="community-thumbnail-link">
-                            <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
-                                 alt=""
-                                 class="community-thumbnail"
-                                 width="{{ post.image_width }}"
-                                 height="{{ post.image_height }}" />
-                          </a>
-                        {% endfor %}
-                      </div>
-                    {% else %}
-                      <p class="community-no-posts-message muted">{{ ftl_get_message("community-no-posts") }}</p>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
-          {% endif %}
-
-          {# No communities message #}
-          {% if not unlisted_communities and not public_participated_communities and not public_other_communities %}
-            <p class="community-move-no-results">{{ ftl_get_message("post-move-no-results") }}</p>
+            <a class="profile-chip" href="/communities/@{{ current_community.slug }}">{{ current_community.name }}</a>
+          {% else %}
+            <span class="profile-chip">{{ ftl_get_message("post-personal-post") }}</span>
           {% endif %}
         </div>
       </div>
-    </div>
+    </section>
+
+    <form method="post" action="/@{{ post.login_name }}/{{ post_id }}/edit/community" class="move-form" id="move-form">
+      <input type="search"
+             id="community-search"
+             class="ds-input move-search"
+             placeholder="{{ ftl_get_message('post-move-search-placeholder') }}"
+             aria-label="{{ ftl_get_message('post-move-search-placeholder') }}"
+             autocomplete="off" />
+
+      <div class="move-list" role="radiogroup" aria-label="{{ ftl_get_message('post-move-available') }}">
+        {% if current_community %}
+          <div class="move-group" data-move-group>
+            {{ destination("", ftl_get_message("post-personal-post"), ftl_get_message("post-personal-post-description"), ftl_get_message("post-move-to-personal"), none, none, (ftl_get_message("post-personal-post") ~ " personal")|lower, "personal") }}
+          </div>
+        {% endif %}
+        {% if unlisted_communities %}
+          <div class="move-group" data-move-group>
+            <div class="profile-section-label">{{ ftl_get_message("move-section-unlisted") }}</div>
+            {% for community in unlisted_communities %}
+              {{ community_row(community, ftl_get_message("community-badge-unlisted")) }}
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if public_participated_communities %}
+          <div class="move-group" data-move-group>
+            <div class="profile-section-label">{{ ftl_get_message("move-section-public-participated") }}</div>
+            {% for community in public_participated_communities %}
+              {{ community_row(community, none) }}
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if public_other_communities %}
+          <div class="move-group" data-move-group>
+            <div class="profile-section-label">{{ ftl_get_message("move-section-public-other") }}</div>
+            {% for community in public_other_communities %}
+              {{ community_row(community, none) }}
+            {% endfor %}
+          </div>
+        {% endif %}
+        <p class="profile-empty move-empty" {% if unlisted_communities or public_participated_communities or public_other_communities or current_community %}hidden{% endif %}>{{ ftl_get_message("post-move-no-results") }}</p>
+      </div>
+
+      {# The one decision, at the foot of the window while the list scrolls. #}
+      <div class="move-bar">
+        <a href="/@{{ post.login_name }}/{{ post_id }}" class="ds-button">{{ ftl_get_message("cancel") }}</a>
+        <button type="submit" class="ds-button ds-button-primary" id="move-submit" disabled
+                data-choose="{{ ftl_get_message('post-move-choose') }}">{{ ftl_get_message("post-move-choose") }}</button>
+      </div>
+    </form>
   </div>
 
   <script>
-    // Client-side search filtering for instant feedback
-    document.getElementById('community-search').addEventListener('input', function(e) {
-      const query = e.target.value.toLowerCase().trim();
-      const cards = document.querySelectorAll('.community-move-card');
-      const sections = document.querySelectorAll('.section-heading');
-      let visibleCount = 0;
-      let visibleBySection = { unlisted: 0, 'public-participated': 0, 'public-other': 0 };
+    (function () {
+      var form = document.getElementById("move-form");
+      var submit = document.getElementById("move-submit");
+      var search = document.getElementById("community-search");
+      var empty = form.querySelector(".move-empty");
 
-      cards.forEach(card => {
-        const name = card.getAttribute('data-community-name') || '';
-        const slug = card.getAttribute('data-community-slug') || '';
-        const description = card.getAttribute('data-community-description') || '';
-        const visibility = card.getAttribute('data-community-visibility');
+      // Choosing a row names it on the button.
+      form.addEventListener("change", function (event) {
+        var radio = event.target;
+        if (radio.name !== "community_id") return;
+        submit.disabled = false;
+        submit.textContent = radio.getAttribute("data-move-label");
+        var rows = form.querySelectorAll(".move-row");
+        for (var i = 0; i < rows.length; i++) {
+          rows[i].classList.toggle("is-chosen", rows[i].contains(radio));
+        }
+      });
+      // The radio is out of sight, so its row shows where the keyboard is.
+      form.addEventListener("focusin", function (event) {
+        var row = event.target.closest && event.target.closest(".move-row");
+        if (row) row.classList.add("has-focus");
+      });
+      form.addEventListener("focusout", function (event) {
+        var row = event.target.closest && event.target.closest(".move-row");
+        if (row) row.classList.remove("has-focus");
+      });
 
-        if (query === '' || name.includes(query) || slug.includes(query) || description.includes(query)) {
-          card.style.display = '';
-          visibleCount++;
-          if (visibility) {
-            visibleBySection[visibility] = (visibleBySection[visibility] || 0) + 1;
+      // Narrowing: rows by what they are called and described, groups by
+      // whether a row of theirs is left.
+      search.addEventListener("input", function () {
+        var query = search.value.toLowerCase().trim();
+        var groups = form.querySelectorAll("[data-move-group]");
+        var any = false;
+        for (var g = 0; g < groups.length; g++) {
+          var rows = groups[g].querySelectorAll(".move-row");
+          var shown = 0;
+          for (var r = 0; r < rows.length; r++) {
+            var hit = !query || rows[r].getAttribute("data-search").indexOf(query) !== -1;
+            rows[r].hidden = !hit;
+            if (hit) shown++;
           }
-        } else {
-          card.style.display = 'none';
+          groups[g].hidden = shown === 0;
+          if (shown) any = true;
         }
+        empty.hidden = any;
       });
 
-      // Hide/show section headers based on visible communities in each section
-      sections.forEach(section => {
-        const sectionText = section.textContent.toLowerCase();
-        let hasVisible = false;
-
-        if (sectionText.includes('unlisted') || sectionText.includes('posted')) {
-          hasVisible = visibleBySection.unlisted > 0;
-        } else if (sectionText.includes('participated')) {
-          hasVisible = visibleBySection['public-participated'] > 0;
-        } else if (sectionText.includes('other') || sectionText.includes('public')) {
-          hasVisible = visibleBySection['public-other'] > 0;
+      // Enter in the search box would send the form with whatever was
+      // chosen before; it picks the first row left instead.
+      search.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        var first = form.querySelector(".move-row:not([hidden]) input");
+        if (first) {
+          first.checked = true;
+          first.dispatchEvent(new Event("change", { bubbles: true }));
+          first.focus();
         }
-
-        section.style.display = hasVisible ? '' : 'none';
       });
-
-      // Show/hide no results message
-      const noResults = document.querySelector('.community-move-no-results');
-      const communityList = document.getElementById('community-list');
-
-      if (visibleCount === 0 && query !== '') {
-        if (!noResults) {
-          const msg = document.createElement('p');
-          msg.className = 'community-move-no-results';
-          msg.textContent = '{{ ftl_get_message("post-move-no-results") }}';
-          communityList.appendChild(msg);
-        }
-      } else if (noResults) {
-        noResults.remove();
-      }
-    });
+    })();
   </script>
 {% endblock content %}

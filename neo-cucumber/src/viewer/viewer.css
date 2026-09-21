@@ -23,6 +23,14 @@
   max-width: 100%;
   image-rendering: pixelated;
 }
+.neo-cucumber-replay-poster {
+  display: block;
+  border: 1px solid #888;
+  background: #fff;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
 .neo-cucumber-replay-controls {
   display: flex;
   flex-direction: column;

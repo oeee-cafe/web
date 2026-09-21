@@ -454,3 +454,5 @@ communities-tab-public = Public
 communities-tab-official = Official
 communities-tab-yours = Yours
 nav-about = About
+post-move-to = Move to { $communityName }
+post-move-choose = Choose where it goes

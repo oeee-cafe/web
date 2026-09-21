@@ -1160,13 +1160,32 @@ mod template_tests {
         assert!(rendered.contains("hx-target=\"#comments\" hx-swap=\"innerHTML\""));
     }
 
+    /// A NEO drawing's replay controls are under it from the start, and the
+    /// drawing itself no longer leads to relaying it -- the Relay button does.
+    #[test]
+    fn a_replay_is_on_the_stage_and_the_drawing_is_not_a_link() {
+        let author = "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d";
+        let rendered = render_post_page("true", author, json!(null));
+        assert!(rendered.contains("id=\"post-stage-replay\""));
+        assert!(rendered.contains("data-poster="));
+        let stage = rendered.find("class=\"post-stage\"").expect("stage");
+        let side = rendered.find("class=\"post-side\"").expect("side");
+        assert!(
+            !rendered[stage..side].contains("/relay"),
+            "the drawing links to relaying it again"
+        );
+    }
+
     /// The replay switch is enforced in the handler; this is the other half of
     /// it -- the link a stranger is not supposed to be offered.
     #[test]
     fn a_closed_replay_is_linked_for_its_author_only() {
         let author = "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d";
         let stranger = json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "user"});
-        let link = "/9c881320-2b43-4afa-b2bb-7128c8a3e985/replay";
+        // A NEO replay is not linked but played under the drawing: what a
+        // stranger must not be handed is the recording's address, which the
+        // stage carries for the viewer.
+        let link = "/replay/30/30ca3f590dda85e21dbc94250199a692b4fa5c7d626ea3445acef3bcf3c1338a.pch";
 
         let open = render_post_page("true", author, json!(null));
         assert!(

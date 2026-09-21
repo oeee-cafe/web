@@ -550,7 +550,7 @@
           var sw = parseInt(stage.getAttribute("data-width"), 10);
           var sh = parseInt(stage.getAttribute("data-height"), 10);
           var room = stage.parentNode.clientWidth;
-          var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 140, sh) : Infinity;
+          var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 190, sh) : Infinity;
           var zoom = Math.max(1, Math.min(Math.floor(room / sw), Math.floor(tall / sh), 4));
           if (sw * zoom > room) zoom = 1;
           stage.style.width = (sw * zoom) + "px";
