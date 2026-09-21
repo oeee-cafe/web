@@ -1,11 +1,9 @@
 import type React from "react";
 import { useLayoutEffect, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Icon } from "./Icon";
 import { CustomSlider } from "./CustomSlider";
 import { anchorBesideCanvas, minimumTop } from "./toolboxAnchor";
 import { TIMER_DURATIONS_MINUTES } from "../hooks/useDrawingTimer";
-import { useTheme } from "../hooks/useTheme";
 import { NeoWindow } from "./neo/NeoWindow";
 import {
   NEO_BUTTON,
@@ -77,7 +75,6 @@ export const SimplifiedToolbox = ({
       ),
     );
   }, [anchorRef, canvasRef]);
-  const { theme, toggle: toggleTheme } = useTheme();
   const backgroundColor = paletteColors[TWO_TONE_BACKGROUND_PEN_INDEX] || "#ffffff";
   const foregroundColor = paletteColors[TWO_TONE_FOREGROUND_PEN_INDEX] || "#000000";
 
@@ -202,24 +199,6 @@ export const SimplifiedToolbox = ({
           <Trans>Redo</Trans>
         </button>
       </div>
-
-      <button
-        type="button"
-        onClick={toggleTheme}
-        title={theme === "dark" ? t`Switch to light` : t`Switch to dark`}
-        className={`${NEO_BUTTON} flex w-full items-center justify-center gap-[4px]`}
-      >
-        <Icon
-          icon={
-            theme === "dark"
-              ? "material-symbols:light-mode"
-              : "material-symbols:dark-mode"
-          }
-          width={16}
-          height={16}
-        />
-        {theme === "dark" ? <Trans>Light</Trans> : <Trans>Dark</Trans>}
-      </button>
 
       {/* Keyboard Shortcuts */}
       <div className="flex flex-col gap-[2px] border-t border-t-(--neo-panel-shadow) pt-[5px]">

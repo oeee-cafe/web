@@ -10,7 +10,6 @@ import {
 } from "./neo/neoClasses";
 import { NeoWindow } from "./neo/NeoWindow";
 import { type ParticipantLayer } from "./neo/NeoParticipantLayers";
-import { useTheme } from "../hooks/useTheme";
 import { usePressRepeat } from "../hooks/usePressRepeat";
 
 import { NON_NEO_TOOLS } from "../constants/drawing";
@@ -117,7 +116,6 @@ export const ToolboxPanel = ({
 }: ToolboxPanelProps) => {
   const { t } = useLingui();
   const labels = usePainterLabels();
-  const { theme, toggle: toggleTheme } = useTheme();
   const zoomOutPress = usePressRepeat(onZoomOut);
   const zoomInPress = usePressRepeat(onZoomIn);
 
@@ -325,34 +323,6 @@ export const ToolboxPanel = ({
                 </div>
               );
             })()}
-
-            {/*
-              Light and dark. The palette follows the OS on its own, so this
-              is for wanting the painter dark on a light desktop or the other
-              way round -- and it is in this panel because NEO has no such
-              thing to reproduce.
-            */}
-            <button
-              type="button"
-              onClick={toggleTheme}
-              title={theme === "dark" ? t`Switch to light` : t`Switch to dark`}
-              className={NEO_PANEL_BUTTON}
-            >
-              <Icon
-                icon={
-                  theme === "dark"
-                    ? "material-symbols:light-mode"
-                    : "material-symbols:dark-mode"
-                }
-                width={12}
-                height={12}
-              />
-              {/* Labelled, not just an icon: as the ninth glyph in a stack of
-                  identical buttons it was effectively invisible. */}
-              <span className="text-[10px] leading-none">
-                {theme === "dark" ? <Trans>Light</Trans> : <Trans>Dark</Trans>}
-              </span>
-            </button>
 
             {isOwner && (
               <button

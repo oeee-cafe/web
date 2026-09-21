@@ -174,7 +174,7 @@ export function NeoWindow({
    *
    * Selecting is refused for the same reason, and it is the half you can
    * reproduce on a desktop: these panels were made selectable, so a drag that
-   * crosses the zoom readout and the theme label selects them both. A
+   * crosses the zoom readout selects it. A
    * selection is a mode, not an accident -- while one is up, the browser
    * spends the next press dismissing it, and on a touch screen it spends it
    * on the handles and the menu it has drawn as well. Every press after the

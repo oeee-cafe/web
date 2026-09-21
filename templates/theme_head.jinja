@@ -1,11 +1,11 @@
-{# The painter's light/dark switch, applied to every page before it paints.
+{# The site's light/dark choice, applied to every page before it paints.
 
-   The painter remembers a choice under `neo-cucumber-theme` and marks the
+   The toolbar's theme menu remembers a choice under `neo-cucumber-theme`
+   (the name dates from when the painter had its own switch) and marks the
    root `data-theme`; every token on the site and in the painter honours that
-   ahead of the system setting, so the painter's switch is the site's switch
-   too. It has to run here, in the head, rather than wait for the painter to
-   mount: a page that paints first and then turns dark flashes. Boosted
-   navigation keeps the root element, so the mark survives it. #}
+   ahead of the system setting. It has to run here, in the head: a page that
+   paints first and then turns dark flashes. Boosted navigation keeps the
+   root element, so the mark survives it. #}
 <script>
   try {
     var theme = localStorage.getItem("neo-cucumber-theme");

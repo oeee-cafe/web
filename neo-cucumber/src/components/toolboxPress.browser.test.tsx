@@ -97,21 +97,21 @@ describe("pressing a control in a floating panel", () => {
   });
 
   it("has no text to select, so a drag across it cannot arm one", async () => {
-    // The drag that broke it: from the theme label at the bottom of the extras
-    // column up across the zoom readout.
+    // The drag that broke it: from a label in the extras column across its
+    // neighbours. The zoom readout is the column's one run of text now.
     await mountPainter({ kind: "standard" });
     const extras = panel("extras");
-    const theme = [...extras.querySelectorAll("button")].find((b) =>
-      /Dark|Light/.test(b.textContent ?? ""),
-    )!;
     const readout = extras.querySelector<HTMLButtonElement>(
       'button[title="Reset zoom"]',
     )!;
+    const undo = extras.querySelector<HTMLButtonElement>(
+      'button[title="Undo"]',
+    )!;
 
     await act(async () => {
-      await userEvent.dragAndDrop(theme, readout, {
-        sourcePosition: { x: 30, y: 8 },
-        targetPosition: { x: 10, y: 8 },
+      await userEvent.dragAndDrop(readout, undo, {
+        sourcePosition: { x: 4, y: 7 },
+        targetPosition: { x: 20, y: 8 },
       });
     });
 
