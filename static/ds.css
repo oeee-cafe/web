@@ -402,11 +402,22 @@ html {
   align-items: center;
 }
 
+/* The sections read as one control at rest, not only under the pointer: a
+   segmented group, the current one raised out of it. */
+.toolbar-links {
+  padding: 2px;
+  border-radius: 8px;
+  background-color: var(--ds-hover);
+}
+
+.toolbar-links > * + * {
+  margin-left: 2px;
+}
+
 .toolbar-end {
   margin-left: auto;
 }
 
-.toolbar-links > * + *,
 .toolbar-end > * + * {
   margin-left: 6px;
 }
@@ -445,9 +456,23 @@ html {
   background-color: var(--ds-hover);
 }
 
-.nav-bar .toolbar-links a[aria-current="page"] {
-  background-color: var(--ds-selected);
+.nav-bar .toolbar-links a[aria-current="page"],
+.nav-bar .toolbar-links a[aria-current="page"]:hover {
+  background-color: var(--ds-surface);
+  box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
   font-weight: 600;
+}
+
+/* A plain link at the toolbar's end -- signing in, the site's about page --
+   is drawn as a button, since that is what it is there. */
+.toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon) {
+  border: 1px solid var(--ds-line-strong);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+}
+
+.toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon):hover {
+  background-color: var(--ds-ground);
 }
 
 .toolbar-end .toolbar-icon {
@@ -1220,4 +1245,88 @@ html {
 
 .ds-window-body {
   padding: var(--ds-space-3);
+}
+
+/* ---------------------------------------------------------------------------
+   The keyboard shortcuts list
+
+   A panel over the page, opened by `?` or the desktop app's Help menu. The
+   keys are drawn as keys.
+   --------------------------------------------------------------------------- */
+.ds-shortcuts {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 200;
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  justify-content: center;
+  background-color: rgba(20, 20, 50, 0.35);
+}
+
+.ds-shortcuts[hidden] {
+  display: none;
+}
+
+.ds-shortcuts-panel {
+  width: 360px;
+  max-width: calc(100% - 32px);
+  padding: 16px 20px 20px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-menu);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-m);
+}
+
+.ds-shortcuts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ds-shortcuts-head h2 {
+  margin: 0;
+  font-size: var(--ds-text-l);
+}
+
+.ds-shortcuts dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  grid-gap: 8px 16px;
+  gap: 8px 16px;
+  align-items: center;
+  margin: 0;
+}
+
+.ds-shortcuts dt {
+  color: var(--ds-muted);
+  white-space: nowrap;
+}
+
+.ds-shortcuts dd {
+  margin: 0;
+}
+
+.ds-shortcuts kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  border: 1px solid var(--ds-line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background-color: var(--ds-field);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-s);
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
 }

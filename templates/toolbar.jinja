@@ -111,6 +111,34 @@
       {% endif %}
     </div>
   </div>
+  {# The keyboard shortcuts, listed. Hidden until `?` or the desktop app's
+     Help menu asks for it; see oeeeCommand below. #}
+  <div class="ds-shortcuts" id="ds-shortcuts" hidden>
+    <div class="ds-shortcuts-panel" role="dialog" aria-modal="true" aria-labelledby="ds-shortcuts-title">
+      <div class="ds-shortcuts-head">
+        <h2 id="ds-shortcuts-title">{{ ftl_get_message("keyboard-shortcuts") }}</h2>
+        <button type="button" class="ds-button ds-button-quiet ds-button-small" data-shortcuts-close>{{ ftl_get_message("close") }}</button>
+      </div>
+      <dl>
+        {% if current_user %}
+          <dt><kbd>N</kbd></dt><dd>{{ ftl_get_message("draw") }}</dd>
+        {% endif %}
+        <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>R</kbd></dt><dd>{{ ftl_get_message("nav-recent") }}</dd>
+        {% if current_user %}
+          <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>F</kbd></dt><dd>{{ ftl_get_message("timeline") }}</dd>
+        {% endif %}
+        <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>C</kbd></dt><dd>{{ ftl_get_message("community") }}</dd>
+        <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>T</kbd></dt><dd>{{ ftl_get_message("collaborate") }}</dd>
+        <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>H</kbd></dt><dd>{{ ftl_get_message("hashtag-discovery") }}</dd>
+        {% if current_user %}
+          <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>N</kbd></dt><dd>{{ ftl_get_message("notifications") }}</dd>
+          <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>D</kbd></dt><dd>{{ ftl_get_message("drafts") }}</dd>
+          <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>P</kbd></dt><dd>{{ ftl_get_message("profile") }}</dd>
+        {% endif %}
+        <dt><kbd>?</kbd></dt><dd>{{ ftl_get_message("keyboard-shortcuts-show") }}</dd>
+      </dl>
+    </div>
+  </div>
   {# Which item is the page you are on: the server does not pass the
      request path to templates, so this reads it here. The boost swaps
      the whole body, this included, so it runs again on every visit;
@@ -187,13 +215,12 @@
 
       if (window.oeeeToolbarMenu) return;
       window.oeeeToolbarMenu = true;
-      window.addEventListener("popstate", function () {
-        window.oeeeHistoryStep = true;
-      });
-      document.addEventListener("click", function (event) {
-        var button = event.target && event.target.closest ? event.target.closest("[data-theme-choice]") : null;
-        if (!button) return;
-        var choice = button.getAttribute("data-theme-choice");
+
+      // Commands, by name: what the keyboard shortcuts below do, and what the
+      // desktop app's menu bar asks for (it calls window.oeeeCommand). Going
+      // somewhere is a plain page load, so a page that holds a drawing still
+      // asks before it is left.
+      function setTheme(choice) {
         try {
           if (choice === "system") localStorage.removeItem("neo-cucumber-theme");
           else localStorage.setItem("neo-cucumber-theme", choice);
@@ -201,6 +228,111 @@
         if (choice === "system") document.documentElement.removeAttribute("data-theme");
         else document.documentElement.setAttribute("data-theme", choice);
         showThemeChoice();
+      }
+      function go(path) {
+        loading();
+        location.href = path;
+      }
+      function profilePath() {
+        var link = document.querySelector('.toolbar-menu-items a[href^="/@"]');
+        return link ? link.getAttribute("href") : "/login";
+      }
+      function toggleShortcuts(open) {
+        var panel = document.getElementById("ds-shortcuts");
+        if (!panel) return;
+        panel.hidden = open === undefined ? !panel.hidden : !open;
+        if (!panel.hidden) {
+          var close = panel.querySelector("[data-shortcuts-close]");
+          if (close) close.focus();
+        }
+      }
+      var commands = {
+        "recent": function () { go("/"); },
+        "following": function () { go("/home"); },
+        "communities": function () { go("/communities"); },
+        "together": function () { go("/collaborate"); },
+        "hashtags": function () { go("/hashtags"); },
+        "notifications": function () { go("/notifications"); },
+        "drafts": function () { go("/posts/drafts"); },
+        "profile": function () { go(profilePath()); },
+        "account": function () { go("/account"); },
+        "about": function () { go("/about"); },
+        "new-drawing": function () {
+          var draw = document.getElementById("nav-draw-button");
+          if (draw && draw.form) {
+            loading();
+            draw.form.submit();
+          } else {
+            go("/login");
+          }
+        },
+        "theme-light": function () { setTheme("light"); },
+        "theme-dark": function () { setTheme("dark"); },
+        "theme-system": function () { setTheme("system"); },
+        "shortcuts": function () { toggleShortcuts(); },
+      };
+      window.oeeeCommand = function (name) {
+        var command = commands[name];
+        if (command) command();
+        return !!command;
+      };
+
+      // The keys. Only on the site's own pages -- the painter and the drawing
+      // app have keys of their own -- and never while typing, or with a
+      // modifier held, which belong to the browser and the system.
+      var awaitingGo = false;
+      var goTimer;
+      var goKeys = { r: "recent", f: "following", c: "communities", t: "together",
+                     h: "hashtags", n: "notifications", d: "drafts", p: "profile" };
+      document.addEventListener("keydown", function (event) {
+        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+        if (!document.body || !document.body.classList.contains("ds-page")) return;
+        var target = event.target;
+        if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+        var key = event.key;
+        var panel = document.getElementById("ds-shortcuts");
+        if (key === "Escape" && panel && !panel.hidden) {
+          toggleShortcuts(false);
+          return;
+        }
+        if (awaitingGo) {
+          awaitingGo = false;
+          clearTimeout(goTimer);
+          var name = goKeys[key.toLowerCase()];
+          if (name) {
+            event.preventDefault();
+            window.oeeeCommand(name);
+          }
+          return;
+        }
+        // `?` is shift and `/` on most layouts, and some report it as such.
+        if (key === "?" || (key === "/" && event.shiftKey)) {
+          event.preventDefault();
+          toggleShortcuts();
+        } else if (key === "g" || key === "G") {
+          awaitingGo = true;
+          goTimer = setTimeout(function () { awaitingGo = false; }, 1500);
+        } else if (key === "n" || key === "N") {
+          if (document.getElementById("nav-draw-button")) {
+            event.preventDefault();
+            window.oeeeCommand("new-drawing");
+          }
+        }
+      });
+      document.addEventListener("click", function (event) {
+        var target = event.target;
+        if (!target || !target.closest) return;
+        if (target.closest("[data-shortcuts-close]") || target.id === "ds-shortcuts") {
+          toggleShortcuts(false);
+        }
+      });
+      window.addEventListener("popstate", function () {
+        window.oeeeHistoryStep = true;
+      });
+      document.addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("[data-theme-choice]") : null;
+        if (!button) return;
+        setTheme(button.getAttribute("data-theme-choice"));
       });
       function closeMenus(except) {
         var open = document.querySelectorAll(".toolbar-menu[open]");

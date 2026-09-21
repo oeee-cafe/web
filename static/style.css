@@ -181,11 +181,23 @@ main > .center-wide > :first-child > :first-child {
   margin: 0 auto;
 }
 
+/* A link is the accent's green, so without an underline it is still plainly
+   something to press. What is a title first and a link second -- a heading,
+   a community's badge, the toolbar's own items -- keeps the text's colour. */
 a,
-a:visited,
+a:visited {
+  color: var(--ds-link);
+}
+
+h1 > a,
 h1 > a:visited,
+h2 > a,
 h2 > a:visited,
+h3 > a,
+h3 > a:visited,
+nav a,
 nav a:visited,
+.community-badge a,
 .community-badge a:visited {
   color: var(--main-text-color);
 }
