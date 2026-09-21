@@ -34,14 +34,6 @@
   </head>
   <body>
     <header>
-      <h1 class="logo center">
-        <a href="/">
-          <img src="{%- if ftl_lang == "zh" -%}/static/logo/en.svg{%- else -%}/static/logo/{{ ftl_lang }}.svg{%- endif -%}"
-               alt="{{ ftl_get_message('brand') }}"
-               height="75px"
-               width="{%- if ftl_lang == "ja" -%} 345px {%- else -%} 270px {%- endif -%}" />
-        </a>
-      </h1>
       {# Boost scoped to the nav, not the body.
          A boosted response has its whole <head> discarded except the title,
          and htmx re-runs swapped scripts by cloning the tag — which does not
@@ -54,65 +46,113 @@
          Scoping it here keeps every link that reaches a module bundle out of
          it: they all live in page bodies, outside this nav. The one exception
          is the draw form below, which says so itself. #}
+      {# One compact toolbar, where a 75px logo used to sit over a row of
+         underlined links: the site reads as an application rather than as a
+         page about one, in a browser and in the desktop app alike. There is
+         no separate "app mode" — what would look out of place in the app is
+         changed for everybody.
+
+         Written for Firefox 56 like the rest of static/style.css, which no
+         build step touches: flex without `gap`, and the account menu is a
+         <details>, so it opens with no script at all. #}
       <nav class="nav-bar" hx-boost:inherited="true">
-        <div id="menubar" class="center">
-          <div>
-            <a href="/about">{{ ftl_get_message('brand') }}?</a>
-          </div>
-          {% if current_user %}
-            {# The one control in this nav that loads a module bundle. Boosting
-               it would mount the painter once per session and never again. #}
-            <form action="/draw" method="post" hx-boost="false">
-              <input type="hidden" name="tool" value="neo" />
-              <input type="hidden" name="width" value="300" />
-              <input type="hidden" name="height" value="300" />
-              <input type="submit"
-                     id="nav-draw-button"
-                     value="{{ ftl_get_message('draw') }}" />
-            </form>
-          {% else %}
-            <div>
-              <a href="/login">{{ ftl_get_message('draw') }}</a>
-            </div>
-          {% endif %}
-          {# Shown signed out too: the lobby is a public gallery of finished
-             collaborative drawings, and only creating a session needs an
-             account. #}
-          <div>
-            <a href="/collaborate">{{ ftl_get_message("collaborate") }}</a>
-          </div>
-          <div>
-            <a href="/communities">{{ ftl_get_message("community") }}</a>
-          </div>
-          <div>
-            <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
-          </div>
-          {% if current_user %}
-            <div>
-              <a href="/home">{{ ftl_get_message("timeline") }}</a>
-            </div>
-            {% if draft_post_count > 0 %}
-              <div>
-                <a href="/posts/drafts">{{ ftl_get_message("drafts") }} ({{ draft_post_count }})</a>
-              </div>
+        <div id="menubar">
+          <a class="toolbar-brand" href="/">
+            <img src="{%- if ftl_lang == "zh" -%}/static/logo/en.svg{%- else -%}/static/logo/{{ ftl_lang }}.svg{%- endif -%}"
+                 alt="{{ ftl_get_message('brand') }}"
+                 height="28"
+                 width="{%- if ftl_lang == "ja" -%} 129 {%- else -%} 101 {%- endif -%}" />
+          </a>
+          <div class="toolbar-links">
+            {% if current_user %}
+              {# The one control in this nav that loads a module bundle.
+                 Boosting it would mount the painter once per session and never
+                 again. #}
+              <form action="/draw" method="post" hx-boost="false">
+                <input type="hidden" name="tool" value="neo" />
+                <input type="hidden" name="width" value="300" />
+                <input type="hidden" name="height" value="300" />
+                <input type="submit"
+                       id="nav-draw-button"
+                       class="toolbar-primary"
+                       value="{{ ftl_get_message('draw') }}" />
+              </form>
+            {% else %}
+              <a class="toolbar-primary" href="/login">{{ ftl_get_message('draw') }}</a>
             {% endif %}
-            <div>
+            {# Shown signed out too: the lobby is a public gallery of finished
+               collaborative drawings, and only creating a session needs an
+               account. #}
+            <a href="/collaborate">{{ ftl_get_message("collaborate") }}</a>
+            <a href="/communities">{{ ftl_get_message("community") }}</a>
+            <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
+            {% if current_user %}
+              <a href="/home">{{ ftl_get_message("timeline") }}</a>
+            {% endif %}
+          </div>
+          <div class="toolbar-end">
+            {% if current_user %}
               {% include "nav_notifications.jinja" %}
-            </div>
-            <div>
-              <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>
-            </div>
-            <div>
-              <a href="/account">{{ ftl_get_message("account") }}</a>
-              {% if not current_user.email_verified_at %}
-                <span class="dangerous">({{ ftl_get_message("email-not-verified") }})</span>
-              {% endif %}
-            </div>
-          {% else %}
-            <a href="/login">{{ ftl_get_message("sign-in") }}</a>
-            <a href="/signup">{{ ftl_get_message("sign-up") }}</a>
-          {% endif %}
+              <details class="toolbar-menu">
+                <summary>
+                  {{ current_user.display_name }}
+                  {% if not current_user.email_verified_at %}<span class="toolbar-dot" title="{{ ftl_get_message('email-not-verified') }}"></span>{% endif %}
+                </summary>
+                <div class="toolbar-menu-items">
+                  <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>
+                  {% if draft_post_count > 0 %}
+                    <a href="/posts/drafts">{{ ftl_get_message("drafts") }} <span class="toolbar-badge">{{ draft_post_count }}</span></a>
+                  {% endif %}
+                  <a href="/account">{{ ftl_get_message("account") }}
+                    {% if not current_user.email_verified_at %}
+                      <span class="dangerous">({{ ftl_get_message("email-not-verified") }})</span>
+                    {% endif %}
+                  </a>
+                  <a href="/about">{{ ftl_get_message('brand') }}?</a>
+                </div>
+              </details>
+            {% else %}
+              <a href="/about">{{ ftl_get_message('brand') }}?</a>
+              <a href="/login">{{ ftl_get_message("sign-in") }}</a>
+              <a class="toolbar-outline" href="/signup">{{ ftl_get_message("sign-up") }}</a>
+            {% endif %}
+          </div>
         </div>
+        {# Which item is the page you are on: the server does not pass the
+           request path to templates, so this reads it here. The boost swaps
+           the whole body, this included, so it runs again on every visit;
+           the document listeners, which outlive a swap, are added once.
+
+           And the account menu closes the way a menu does, on a click
+           anywhere else and on Escape, which <details> alone does not. #}
+        <script>
+          (function () {
+            var here = location.pathname;
+            var links = document.querySelectorAll("#menubar a[href]");
+            for (var i = 0; i < links.length; i++) {
+              var path = links[i].getAttribute("href");
+              if (path === "/" ? here === "/" : here === path || here.indexOf(path + "/") === 0) {
+                links[i].setAttribute("aria-current", "page");
+              }
+            }
+            if (window.oeeeToolbarMenu) return;
+            window.oeeeToolbarMenu = true;
+            function closeMenus(except) {
+              var open = document.querySelectorAll(".toolbar-menu[open]");
+              for (var j = 0; j < open.length; j++) {
+                if (open[j] !== except) open[j].removeAttribute("open");
+              }
+            }
+            document.addEventListener("click", function (event) {
+              var target = event.target;
+              var menu = target && target.closest ? target.closest(".toolbar-menu") : null;
+              closeMenus(menu);
+            });
+            document.addEventListener("keydown", function (event) {
+              if (event.key === "Escape") closeMenus(null);
+            });
+          })();
+        </script>
       </nav>
       <ul class="center">
         {% for message in messages %}

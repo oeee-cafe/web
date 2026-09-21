@@ -1305,6 +1305,8 @@ mod template_tests {
         // Every destination reachable from the nav, and why it is safe.
         // Add here only after checking the page does not mount a bundle.
         let allowed = [
+            // The toolbar's logo: home.jinja, which mounts nothing.
+            "/",
             "/about",
             "/collaborate",
             "/communities",
@@ -1555,12 +1557,12 @@ mod template_tests {
             .render(context! { unread_notification_count => 0, ftl_lang => "en" })
             .expect("nav renders at zero");
         assert!(
-            with_count.contains("(3)"),
+            with_count.contains("<span class=\"toolbar-badge\">3</span>"),
             "the badge should show the count"
         );
         assert!(
-            !without.contains('('),
-            "zero unread shows no parenthesised count"
+            !without.contains("toolbar-badge"),
+            "zero unread shows no badge"
         );
         assert!(
             with_count.contains("id=\"nav-notifications\""),

@@ -9,6 +9,6 @@
 <span id="nav-notifications">
   <a href="/notifications">
     {{- ftl_get_message("notifications") -}}
-    {%- if unread_notification_count is defined and unread_notification_count > 0 %} ({{ unread_notification_count }}){% endif -%}
+    {%- if unread_notification_count is defined and unread_notification_count > 0 %} <span class="toolbar-badge">{{ unread_notification_count }}</span>{% endif -%}
   </a>
 </span>
