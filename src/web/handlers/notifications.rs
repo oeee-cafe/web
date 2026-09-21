@@ -629,8 +629,11 @@ mod tests {
         let rendered = render(vec![sample_notification()], Vec::new());
         // ftl_get_message is stubbed to echo the id, so both headings would
         // render the literal key.
+        // The page's content only: the toolbar's shortcuts list names the
+        // page too, and that is not a second heading.
+        let content = rendered.split("<main class=").nth(1).expect("a <main>");
         assert_eq!(
-            rendered.matches(">notifications<").count(),
+            content.matches(">notifications<").count(),
             1,
             "notifications heading rendered more than once"
         );
@@ -643,7 +646,8 @@ mod tests {
     fn invitations_keep_their_own_heading() {
         let rendered = render(vec![sample_notification()], vec![sample_invitation()]);
         assert!(rendered.contains("invitations-pending"));
-        assert_eq!(rendered.matches(">notifications<").count(), 1);
+        let content = rendered.split("<main class=").nth(1).expect("a <main>");
+        assert_eq!(content.matches(">notifications<").count(), 1);
         assert!(rendered.contains("Open Studio"));
     }
 
