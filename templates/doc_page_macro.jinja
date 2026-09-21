@@ -1,0 +1,20 @@
+{# A document the site keeps -- the community guidelines, the privacy
+   policy: laid out to be read, not glanced at. A tab between the two, a
+   title, then the text in a card, selectable, in a measure the eye can
+   follow. The text is one message per language with its paragraphs as
+   blank lines, so it is set pre-line. #}
+{% macro doc_page(current, title_key, content_key) %}
+  <div class="doc-page">
+    <div class="doc-bar">
+      <nav class="ds-segmented" aria-label="{{ ftl_get_message('about-documents') }}">
+        <a href="/policy"{% if current == "policy" %} aria-current="page"{% endif %}>{{ ftl_get_message("community-guidelines") }}</a>
+        <a href="/privacy"{% if current == "privacy" %} aria-current="page"{% endif %}>{{ ftl_get_message("privacy-policy") }}</a>
+      </nav>
+      <a class="ds-button" href="/about">{{ ftl_get_message("nav-about") }}</a>
+    </div>
+    <article class="ds-card doc-card">
+      <h1 class="doc-title">{{ ftl_get_message(title_key) }}</h1>
+      <div class="doc-body ds-selectable">{{ ftl_get_message(content_key) }}</div>
+    </article>
+  </div>
+{% endmacro %}

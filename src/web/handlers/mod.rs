@@ -1200,6 +1200,29 @@ mod template_tests {
         assert!(card.contains("sensitive{% endif %}"), "the card no longer marks sensitive drawings");
     }
 
+    /// Signing up asks for agreement to the two pages it links, and the box
+    /// is required in the page as the handler requires it on the server.
+    #[test]
+    fn signup_asks_for_agreement_to_the_guidelines_and_privacy_policy() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("signup.jinja")
+            .expect("signup loads")
+            .render(context! {
+                current_user => json!(null),
+                messages => Vec::<serde_json::Value>::new(),
+                next => "/collaborate",
+                ftl_lang => "en",
+            })
+            .expect("signup renders");
+        assert!(rendered.contains(r#"<input type="checkbox" name="agree" value="1" required />"#));
+        assert!(rendered.contains(r#"href="/policy""#) || rendered.contains("&#x2f;policy"));
+        assert!(rendered.contains(r#"href="/privacy""#) || rendered.contains("&#x2f;privacy"));
+        assert!(rendered.contains("signup-agree"));
+        // Signing in instead keeps where the reader was going.
+        assert!(rendered.contains("/login?next="));
+    }
+
     /// The replay switch is enforced in the handler; this is the other half of
     /// it -- the link a stranger is not supposed to be offered.
     #[test]

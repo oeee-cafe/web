@@ -1,31 +1,49 @@
 {% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("sign-up") }}
+{% endblock title %}
 {% block content %}
-  <div class="center">
-    <form method="post">
-      <fieldset>
-        <legend>{{ ftl_get_message("sign-up") }}</legend>
-        <p>
-          <label for="login_name">{{ ftl_get_message("login-name") }}</label>
-          <input name="login_name" id="login_name" autocapitalize="none" required />
-        </p>
-        <p>
-          <label for="password">{{ ftl_get_message("password") }}</label>
-          <input name="password" id="password" type="password" required />
-        </p>
-        <p>
-          <label for="password_confirm">{{ ftl_get_message("password-repeat") }}</label>
-          <input name="password_confirm"
-                 id="password_confirm"
-                 type="password"
-                 required />
-        </p>
-        <p>
-          <label for="display_name">{{ ftl_get_message("display-name") }}</label>
-          <input name="display_name" id="display_name" required />
-        </p>
-      </fieldset>
-      <input type="submit" value="{{ ftl_get_message("sign-up") }}" />
+  {# Signing up as signing in is laid out: one card, the fields with the
+     hints a password manager needs, then the agreement -- a box to tick,
+     with the two pages it agrees to a click away in a new tab, so reading
+     them does not throw the form away -- and the button that does it. #}
+  <div class="auth-page">
+    <form method="post" class="ds-card auth-card">
+      <h1 class="auth-title">{{ ftl_get_message("sign-up") }}</h1>
+      <div class="form-field">
+        <label class="ds-label" for="login_name">{{ ftl_get_message("login-name") }}</label>
+        <input class="ds-input" name="login_name" id="login_name"
+               autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
+      </div>
+      <div class="form-field">
+        <label class="ds-label" for="display_name">{{ ftl_get_message("display-name") }}</label>
+        <input class="ds-input" name="display_name" id="display_name" autocomplete="nickname" required />
+      </div>
+      <div class="form-field">
+        <label class="ds-label" for="password">{{ ftl_get_message("password") }}</label>
+        <input class="ds-input" name="password" id="password" type="password" autocomplete="new-password" required />
+      </div>
+      <div class="form-field">
+        <label class="ds-label" for="password_confirm">{{ ftl_get_message("password-repeat") }}</label>
+        <input class="ds-input" name="password_confirm" id="password_confirm" type="password" autocomplete="new-password" required />
+      </div>
+
+      <div class="auth-agree">
+        <label class="auth-agree-check">
+          <input type="checkbox" name="agree" value="1" required />
+          <span>{{ ftl_get_message("signup-agree") }}</span>
+        </label>
+        <div class="auth-agree-links">
+          <a class="profile-chip" href="/policy" target="_blank" rel="noopener">{{ ftl_get_message("community-guidelines") }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+          <a class="profile-chip" href="/privacy" target="_blank" rel="noopener">{{ ftl_get_message("privacy-policy") }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+
       {% if next %}<input type="hidden" name="next" value="{{ next }}" />{% endif %}
+      <button type="submit" class="ds-button ds-button-primary auth-submit">{{ ftl_get_message("sign-up") }}</button>
+
+      <div class="auth-divider"><span>{{ ftl_get_message("sign-up-have-account") }}</span></div>
+      <a class="ds-button auth-secondary" href="/login{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in") }}</a>
     </form>
   </div>
 {% endblock content %}

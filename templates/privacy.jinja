@@ -1,12 +1,8 @@
 {% extends "base.jinja" %}
+{% from "doc_page_macro.jinja" import doc_page %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("privacy-policy") }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <h2>{{ ftl_get_message("privacy-policy") }}</h2>
-    <div style="text-align: left; max-width: 800px; margin: 0 auto;">
-      <p style="white-space: pre-line;">{{ ftl_get_message("privacy-content") }}</p>
-    </div>
-  </div>
+  {{ doc_page("privacy", "privacy-policy", "privacy-content") }}
 {% endblock content %}
