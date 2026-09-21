@@ -452,3 +452,4 @@ communities-tab-public = 公开
 communities-tab-official = 官方
 communities-tab-yours = 我的
 toolbar-menu = 菜单
+nav-about = 关于

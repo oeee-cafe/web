@@ -452,3 +452,4 @@ communities-tab-public = 공개
 communities-tab-official = 공식
 communities-tab-yours = 내 커뮤니티
 toolbar-menu = 메뉴
+nav-about = 소개
