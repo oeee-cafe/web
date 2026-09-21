@@ -735,6 +735,64 @@ mod community_page_tests {
         );
     }
 
+    /// The header says who keeps the community and how much is in it, and
+    /// drawing is its primary action: the painter's choices are asked for in
+    /// a dialog when it is pressed, rather than sitting open on the page.
+    #[test]
+    fn the_header_credits_the_owner_and_drawing_opens_a_dialog() {
+        let env = test_support::env();
+        let community = |background: serde_json::Value| {
+            json!({
+                "id": "00000000-0000-0000-0000-000000000001",
+                "name": "Open Studio",
+                "description": "Draw with us",
+                "slug": "open",
+                "visibility": "public",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "background_color": background,
+                "foreground_color": "#000000",
+            })
+        };
+        let render = |community: serde_json::Value| {
+            env.get_template("community.jinja")
+                .expect("community template loads")
+                .render(context! {
+                    current_user => json!({"id": "00000000-0000-0000-0000-000000000003"}),
+                    messages => Vec::<serde_json::Value>::new(),
+                    draft_post_count => 0,
+                    unread_notification_count => 0,
+                    community => community,
+                    header => json!({
+                        "owner": {"login_name": "keeper", "display_name": "The Keeper"},
+                        "posts_count": 12,
+                        "contributors_count": 4,
+                    }),
+                    community_id => "00000000-0000-0000-0000-000000000001",
+                    domain => "oeee.test",
+                    feed => json!({"posts": [], "has_more": false}),
+                    ftl_lang => "en",
+                })
+                .expect("community renders")
+        };
+
+        let rendered = render(community(json!(null)));
+        assert!(rendered.contains("The Keeper"));
+        assert!(rendered.contains("12 community-stats-posts"));
+        let dialog = rendered
+            .find("id=\"community-draw-modal\"")
+            .expect("the drawing dialog");
+        let tool = rendered.find("id=\"community-draw-tool\"").expect("tool choice");
+        assert!(tool > dialog, "the drawing form is back on the page");
+        assert!(rendered.contains("/collaborate?community=open"));
+
+        // Two-tone: the dialog asks for an orientation, and there is no
+        // drawing together to offer.
+        let rendered = render(community(json!("#ffffff")));
+        assert!(rendered.contains("name=\"orientation\""));
+        assert!(rendered.contains("community-colors"));
+        assert!(!rendered.contains("/collaborate?community=open"));
+    }
+
     /// The grid is the shared feed fragment, so its sentinel points wherever
     /// the handler said — and it must be this community's endpoint rather than
     /// the home feed's, or scrolling a community page loads the front page.

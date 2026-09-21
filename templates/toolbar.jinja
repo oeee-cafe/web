@@ -148,14 +148,21 @@
      anywhere else and on Escape, which <details> alone does not. #}
   <script>
     (function () {
-      var here = location.pathname;
-      var links = document.querySelectorAll("#menubar a[href]");
-      for (var i = 0; i < links.length; i++) {
-        var path = links[i].getAttribute("href");
-        if (path === "/" ? here === "/" : here === path || here.indexOf(path + "/") === 0) {
-          links[i].setAttribute("aria-current", "page");
+      // Also called with the path being gone to, the moment it is asked for,
+      // so the tab moves on the click rather than when the page arrives --
+      // and with the page's own path again if it never does.
+      window.oeeeMarkCurrent = function (here) {
+        var links = document.querySelectorAll("#menubar a[href]");
+        for (var i = 0; i < links.length; i++) {
+          var path = links[i].getAttribute("href");
+          if (path === "/" ? here === "/" : here === path || here.indexOf(path + "/") === 0) {
+            links[i].setAttribute("aria-current", "page");
+          } else {
+            links[i].removeAttribute("aria-current");
+          }
         }
-      }
+      };
+      window.oeeeMarkCurrent(location.pathname);
       // The content area scrolls, not the window, and browsers only restore
       // the window's own scroll when you go back -- so where you were is
       // kept here, per page, and put back on a return to it: a full load
@@ -387,6 +394,7 @@
         return skeleton;
       }
       function loading(path) {
+        window.oeeeMarkCurrent(path || location.pathname);
         var content = document.querySelector("main.ds-content");
         if (!content || content.querySelector(".ds-skeleton")) return;
         var kept = [];
@@ -401,6 +409,7 @@
         function restore() {
           if (!skeleton.parentNode) return;
           skeleton.parentNode.removeChild(skeleton);
+          window.oeeeMarkCurrent(location.pathname);
           for (var k = 0; k < kept.length; k++) kept[k][0].style.display = kept[k][1];
         }
         window.oeeeRestoreContent = restore;
