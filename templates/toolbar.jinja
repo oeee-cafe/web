@@ -434,36 +434,101 @@
       // the next page, or htmx's swap of the body, replaces it. What was
       // there is hidden, not removed: a page that stays after all (the
       // navigation cancelled, a request that failed) gets it back.
-      var FEEDS = /^\/(home|collaborate)?$|^\/(communities\/@|hashtags\/)[^/]+$/;
+      // Each skeleton is built from the page's own layout classes -- the
+      // same grid, card and column the page will arrive in -- with blocks
+      // where its words and drawings will be, so the page lands on the shape
+      // it was promised instead of rearranging itself. One builder a kind of
+      // page, chosen by path.
+      function bar(width, height, extra) {
+        return '<span class="ds-skeleton-bar' + (extra ? " " + extra : "") +
+          '" style="width:' + width + ';height:' + height + 'px"></span>';
+      }
+      function perRow() {
+        var cols = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--home-cols"), 10);
+        if (!(cols >= 1 && cols <= 12)) cols = 4;
+        return window.innerWidth <= 600 ? 3 : cols;
+      }
+      function postGrid(rows) {
+        var html = '<div class="posts-grid">';
+        for (var i = 0, n = perRow() * (rows || 3); i < n; i++) {
+          html += '<div class="posts-grid-item"><div class="ds-skeleton-square"></div>' +
+            '<div class="post-card-meta">' + bar("70%", 13) + bar("45%", 11, "ds-skeleton-gap") + "</div></div>";
+        }
+        return html + "</div>";
+      }
+      function gridHeader(label) {
+        return '<div class="grid-header">' + bar(label, 16) +
+          (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>";
+      }
+      function identityCard(chips) {
+        var html = '<section class="profile-card ds-card"><div class="profile-identity">' +
+          bar("220px", 26) + bar("160px", 13, "ds-skeleton-gap") +
+          (chips ? '<div class="ds-skeleton-row">' + bar("72px", 24, "ds-skeleton-chip") + bar("96px", 24, "ds-skeleton-chip") + "</div>" : bar("60%", 13, "ds-skeleton-gap-l")) +
+          '</div><div class="profile-actions">' + bar("96px", 30, "ds-skeleton-button") + bar("80px", 30, "ds-skeleton-button") + "</div></section>";
+        return html;
+      }
+      var SHAPES = [
+        // Recent, following: a heading, Per row, the grid.
+        [/^\/(home)?$/, function () {
+          return '<div class="center-wide"><div class="feed-header">' + bar("180px", 22) +
+            (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + postGrid() + "</div>";
+        }],
+        [/^\/hashtags\/[^/]+$/, function () {
+          return '<div class="center-wide"><div class="hashtag-view-header">' + bar("200px", 28) + bar("110px", 13, "ds-skeleton-gap") +
+            '</div><div class="feed-header">' + bar("150px", 20) + "</div>" + postGrid() + "</div>";
+        }],
+        // The community directory: its bar, then cards with a cover strip.
+        [/^\/communities$/, function () {
+          var html = '<div class="center-wide communities-page"><div class="communities-bar">' +
+            bar("220px", 30, "ds-skeleton-button") + bar("240px", 30, "ds-skeleton-button") + "</div><div class=\"community-grid\">";
+          for (var i = 0; i < 8; i++) {
+            html += '<div class="community-card"><span class="community-card-cover"><span class="ds-skeleton-fill"></span></span>' +
+              '<span class="community-card-body">' + bar("65%", 15) + bar("35%", 12, "ds-skeleton-gap") + bar("80%", 11, "ds-skeleton-gap") + "</span></div>";
+          }
+          return html + "</div></div>";
+        }],
+        // A community, a person, drafts: the identity card, then the grid.
+        [/^\/communities\/@[^/]+$/, function () {
+          return '<div class="profile">' + identityCard(false) + '<section class="profile-section">' + gridHeader("120px") + postGrid(2) + "</section></div>";
+        }],
+        [/^\/@[^/]+$/, function () {
+          return '<div class="profile">' + identityCard(true) + '<section class="profile-section">' + gridHeader("160px") + postGrid(2) + "</section></div>";
+        }],
+        [/^\/posts\/drafts$/, function () {
+          return '<div class="profile"><section class="profile-section"><div class="grid-header"><div>' + bar("120px", 26) + bar("80px", 13, "ds-skeleton-gap") +
+            "</div></div>" + postGrid(2) + "</section></div>";
+        }],
+        // A post: the drawing on the stage, the inspector card beside it.
+        [/^\/@[^/]+\/[0-9a-fA-F-]{8,}$/, function () {
+          // The drawing's own size, when the link that was followed showed
+          // it -- a card's thumbnail carries it -- so the stage is the shape
+          // it will be; sized to the page's zoom once it is in place.
+          var hint = window.oeeeSkeletonHint || {};
+          var w = hint.width || 300, h = hint.height || 300;
+          return '<div class="post-page"><div class="post-stage"><div class="ds-skeleton-stage" data-width="' + w + '" data-height="' + h + '">' +
+            '<div class="ds-skeleton-square" style="padding-top:' + (h / w * 100) + '%"></div></div></div>' +
+            '<div class="post-side"><section class="ds-card post-inspector">' +
+            bar("40%", 13) + bar("70%", 24, "ds-skeleton-gap") + bar("95%", 13, "ds-skeleton-gap-l") + bar("60%", 13, "ds-skeleton-gap") +
+            '<div class="ds-skeleton-row">' + bar("64px", 24, "ds-skeleton-chip") + bar("52px", 24, "ds-skeleton-chip") + "</div>" +
+            '<div class="post-inspector-facts">' + bar("70px", 12) + bar("60px", 12) + bar("70px", 12) + bar("90px", 12) + bar("70px", 12) + bar("140px", 12) + "</div>" +
+            '<div class="post-inspector-actions">' + bar("150px", 30, "ds-skeleton-button") + bar("70px", 30, "ds-skeleton-button") + bar("70px", 30, "ds-skeleton-button") + "</div>" +
+            '</section><section class="ds-card">' + bar("90px", 13) + bar("85%", 13, "ds-skeleton-gap-l") + bar("55%", 13, "ds-skeleton-gap") + "</section></div></div>";
+        }]
+      ];
       function skeletonFor(path) {
         var skeleton = document.createElement("div");
         skeleton.className = "ds-skeleton";
         skeleton.setAttribute("aria-busy", "true");
-        var heading = document.createElement("div");
-        heading.className = "ds-skeleton-bar ds-skeleton-heading";
-        skeleton.appendChild(heading);
-        if (FEEDS.test(path)) {
-          var grid = document.createElement("div");
-          grid.className = "posts-grid ds-skeleton-grid";
-          for (var i = 0; i < 12; i++) {
-            var item = document.createElement("div");
-            item.className = "posts-grid-item";
-            item.innerHTML = '<div class="ds-skeleton-square"></div>' +
-              '<div class="ds-skeleton-bar ds-skeleton-caption"></div>' +
-              '<div class="ds-skeleton-bar ds-skeleton-caption short"></div>';
-            grid.appendChild(item);
+        for (var i = 0; i < SHAPES.length; i++) {
+          if (SHAPES[i][0].test(path)) {
+            skeleton.innerHTML = SHAPES[i][1]();
+            return skeleton;
           }
-          skeleton.appendChild(grid);
-        } else {
-          var column = document.createElement("div");
-          column.className = "center";
-          for (var j = 0; j < 6; j++) {
-            var line = document.createElement("div");
-            line.className = "ds-skeleton-bar ds-skeleton-line" + (j % 3 === 2 ? " short" : "");
-            column.appendChild(line);
-          }
-          skeleton.appendChild(column);
         }
+        // Anything else is a column of text: a title and its lines.
+        var html = '<div class="center">' + bar("200px", 24);
+        for (var j = 0; j < 6; j++) html += bar(j % 3 === 2 ? "60%" : "100%", 14, "ds-skeleton-gap-l");
+        skeleton.innerHTML = html + "</div>";
         return skeleton;
       }
       function loading(path) {
@@ -477,7 +542,19 @@
           child.style.display = "none";
         }
         var skeleton = skeletonFor(path || location.pathname);
+        window.oeeeSkeletonHint = null;
         content.appendChild(skeleton);
+        // The same whole-step zoom post_view.jinja gives the drawing.
+        var stage = skeleton.querySelector(".ds-skeleton-stage");
+        if (stage) {
+          var sw = parseInt(stage.getAttribute("data-width"), 10);
+          var sh = parseInt(stage.getAttribute("data-height"), 10);
+          var room = stage.parentNode.clientWidth;
+          var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 140, sh) : Infinity;
+          var zoom = Math.max(1, Math.min(Math.floor(room / sw), Math.floor(tall / sh), 4));
+          if (sw * zoom > room) zoom = 1;
+          stage.style.width = (sw * zoom) + "px";
+        }
         content.scrollTop = 0;
         function restore() {
           if (!skeleton.parentNode) return;
@@ -488,6 +565,9 @@
         window.oeeeRestoreContent = restore;
         setTimeout(restore, 10000);
       }
+      // For looking at a page's skeleton from the console without leaving:
+      // oeeeShowSkeleton("/communities"), then oeeeRestoreContent().
+      window.oeeeShowSkeleton = loading;
       document.addEventListener("click", function (event) {
         if (event.button !== 0) return;
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -500,6 +580,11 @@
         if (event.defaultPrevented && !boosted) return;
         if (link.origin !== location.origin) return;
         if (link.pathname === location.pathname && link.search === location.search) return;
+        var thumb = link.querySelector("img[width][height]");
+        window.oeeeSkeletonHint = thumb ? {
+          width: parseInt(thumb.getAttribute("width"), 10),
+          height: parseInt(thumb.getAttribute("height"), 10)
+        } : null;
         loading(link.pathname);
       });
       document.addEventListener("submit", function (event) {
