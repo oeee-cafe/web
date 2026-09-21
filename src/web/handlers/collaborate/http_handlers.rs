@@ -596,10 +596,50 @@ pub async fn save_collaborative_session(
     }))
 }
 
-pub async fn serve_collaborative_app() -> Result<Response, AppError> {
+/// The collaborative drawing app: a page built by Vite and served as a file,
+/// with the site's toolbar put above it on the way out, so a drawing session
+/// has the same title bar as every other page.
+pub async fn serve_collaborative_app(
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    auth_session: AuthSession,
+) -> Result<Response, AppError> {
     let html = std::fs::read_to_string("neo-cucumber/dist/index.html")
         .map_err(|_| anyhow::anyhow!("Failed to load collaborative app"))?;
-    Ok(Html(html).into_response())
+
+    let mut tx = state.db_pool.begin().await?;
+    let common_ctx =
+        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|user| user.id)).await?;
+    tx.commit().await?;
+    let chrome = context! {
+        current_user => auth_session.user,
+        draft_post_count => common_ctx.draft_post_count,
+        unread_notification_count => common_ctx.unread_notification_count,
+        ftl_lang,
+    };
+    let head = state
+        .env
+        .get_template("collaborate_chrome_head.jinja")?
+        .render(&chrome)?;
+    let toolbar = state.env.get_template("toolbar.jinja")?.render(&chrome)?;
+
+    Ok(Html(with_site_chrome(&html, &head, &toolbar)).into_response())
+}
+
+/// `html` with `head` added at the end of its <head> and `toolbar` at the
+/// start of its <body>. A page missing either tag comes back without that
+/// part rather than with it somewhere else.
+fn with_site_chrome(html: &str, head: &str, toolbar: &str) -> String {
+    let mut out = html.to_string();
+    if let Some(at) = out.find("</head>") {
+        out.insert_str(at, head);
+    }
+    if let Some(body) = out.find("<body") {
+        if let Some(close) = out[body..].find('>') {
+            out.insert_str(body + close + 1, toolbar);
+        }
+    }
+    out
 }
 
 pub async fn get_active_sessions_json(
@@ -878,6 +918,18 @@ mod tests {
         ] {
             assert!(rendered.contains(&format!("id=\"{id}\"")), "{id} missing");
         }
+    }
+
+    /// The toolbar goes first in the body and the chrome's head at the end of
+    /// the head, whatever the built page's tags carry.
+    #[test]
+    fn the_drawing_app_is_sent_with_the_site_chrome() {
+        let page = "<!DOCTYPE html><html><head><title>x</title></head><body class=\"a\"><div id=\"root\"></div></body></html>";
+        let out = super::with_site_chrome(page, "<link rel=\"stylesheet\">", "<nav class=\"nav-bar\"></nav>");
+        assert!(out.contains("<link rel=\"stylesheet\"></head>"), "{out}");
+        assert!(out.contains("<body class=\"a\"><nav class=\"nav-bar\"></nav><div id=\"root\">"), "{out}");
+        // A page without the tags is left alone rather than mangled.
+        assert_eq!(super::with_site_chrome("<div></div>", "h", "t"), "<div></div>");
     }
 
     #[test]
