@@ -5,9 +5,9 @@
    `<hx-partial>` — the button has to remove itself, and it cannot do that from
    inside a swap it is not the target of. #}
 <div class="notifications-header" id="notifications-header">
-  <h2 class="notifications-title">{{ ftl_get_message("notifications") }}</h2>
+  <h1 class="notifications-title">{{ ftl_get_message("notifications") }}</h1>
   {% if unread_notification_count > 0 %}
-    <button class="ds-button ds-button-small"
+    <button class="ds-button"
             hx-post="/notifications/mark-all-read"
             hx-target="#notification-list"
             hx-swap="innerHTML"

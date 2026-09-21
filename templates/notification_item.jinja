@@ -12,27 +12,51 @@
    r2_public_endpoint_url is a global, not part of that context. #}
 {% set title = notification.post_title if notification.post_title else ftl_get_message("post-untitled") %}
 {% set post_url = "/@" ~ notification.post_author_login_name ~ "/" ~ notification.post_id %}
+{# What kind of thing happened, as a small badge on the row's picture --
+   the way an application's notification carries its source's icon -- so a
+   list can be scanned by kind before it is read. #}
+{% set kind_paths = {
+  "Comment": '<path d="M4 5.5h16v10H9l-5 4z"/>',
+  "CommentReply": '<path d="M10 8 5 12.5 10 17"/><path d="M5 12.5h9a5 5 0 0 1 5 5V19"/>',
+  "Mention": '<circle cx="12" cy="12" r="3.5"/><path d="M15.5 12v1.5a2.5 2.5 0 0 0 5 0V12a8.5 8.5 0 1 0-3.3 6.7"/>',
+  "Reaction": '<path d="M12 19.5s-7.5-4.4-7.5-9.6A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.5c0 5.2-7.5 9.6-7.5 9.6z"/>',
+  "PostReply": '<path d="M16.5 3.5a2 2 0 0 1 2.9 2.9L9.5 16.3l-3.8.9.9-3.8z"/>',
+  "CommunityPost": '<rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/>',
+  "Follow": '<circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.5 6.5-5.5s5.8 2.1 6.5 5.5"/><path d="M18.5 8v6M15.5 11h6"/>',
+  "GuestbookEntry": '<path d="M5 4.5h11.5a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z"/><path d="M5 17.5a2 2 0 0 1 2-2h11.5"/>',
+  "GuestbookReply": '<path d="M5 4.5h11.5a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z"/><path d="M5 17.5a2 2 0 0 1 2-2h11.5"/>',
+} %}
+{% set kind_path = kind_paths[notification.notification_type] %}
 <div class="notification{% if not notification.read_at %} unread{% endif %}">
   {# Shown for anything carrying a post rather than for a list of six named
-     types: 95% of notifications have one, and the old list left the rest of
-     them out for no reason anyone recorded. #}
-  {% if notification.post_image_filename %}
-    <a href="{{ post_url }}" class="notification-thumbnail">
-      <img class="notification-post-image"
-           width="{{ notification.post_image_width }}"
-           height="{{ notification.post_image_height }}"
-           alt="{{ notification.post_title }}"
-           loading="lazy"
-           decoding="async"
-           src="{{ r2_public_endpoint_url }}/image/{{ notification.post_image_filename[:2] }}/{{ notification.post_image_filename }}" />
-    </a>
-  {% else %}
-    {# Follows and guestbook entries have no post to show. They keep the space
-       anyway so every sentence in the list starts at the same x — one row
-       starting 60px to the left of the rest reads as broken, and with 95% of
-       notifications carrying an image it would always be the odd one out. #}
-    <span class="notification-thumbnail-placeholder" aria-hidden="true"></span>
-  {% endif %}
+     types: 95% of notifications have one. Follows and guestbook entries have
+     none, and show their kind's icon in the same place, so every sentence in
+     the list starts at the same x. #}
+  <span class="notification-figure">
+    {% if notification.post_image_filename %}
+      <a href="{{ post_url }}" class="notification-thumbnail">
+        <img class="notification-post-image"
+             width="{{ notification.post_image_width }}"
+             height="{{ notification.post_image_height }}"
+             alt="{{ notification.post_title }}"
+             draggable="false"
+             loading="lazy"
+             decoding="async"
+             src="{{ r2_public_endpoint_url }}/image/{{ notification.post_image_filename[:2] }}/{{ notification.post_image_filename }}" />
+      </a>
+    {% elif kind_path %}
+      <span class="notification-thumbnail-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{{ kind_path|safe }}</svg>
+      </span>
+    {% else %}
+      <span class="notification-thumbnail-icon" aria-hidden="true"></span>
+    {% endif %}
+    {% if kind_path and notification.post_image_filename %}
+      <span class="notification-kind" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">{{ kind_path|safe }}</svg>
+      </span>
+    {% endif %}
+  </span>
 
   <div class="notification-content">
     <p class="notification-line">
@@ -111,21 +135,22 @@
     {% endif %}
   </div>
 
-  {# Time and controls share the row rather than taking one of their own. The
-     buttons stay visible instead of appearing on hover: hover does not exist
-     on touch, which is the same reason the post cards credit their artist in
-     the open. #}
+  {# When, as how long ago, and the row's two controls as icons. They are
+     revealed with the row on a screen that has a pointer and always there
+     on a touch screen, which has no hover to reveal them with. #}
   <div class="notification-meta">
-    <time class="notification-time muted">{{ notification.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</time>
+    <time class="notification-time" datetime="{{ notification.created_at }}"
+          title="{{ notification.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ notification.created_at|ago }}</time>
     <div class="notification-actions">
       {% if not notification.read_at %}
-        <button class="ds-button ds-button-quiet ds-button-small"
+        <button class="notification-icon-button"
                 title="{{ ftl_get_message('notification-mark-read') }}"
+                aria-label="{{ ftl_get_message('notification-mark-read') }}"
                 hx-post="/notifications/{{ notification.id }}/mark-read"
                 hx-target="closest .notification"
                 hx-swap="outerHTML"
                 hx-disable="this">
-          {{ ftl_get_message("notification-mark-read") }}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </button>
       {% endif %}
       {# swapEmpty:true because the response is now nothing but an
@@ -133,14 +158,15 @@
          when a response is only partials, which would leave the row it was
          asked to delete sitting on the page. Verified in a browser: without
          this the badge updates and the row stays. #}
-      <button class="ds-button ds-button-quiet ds-button-small"
+      <button class="notification-icon-button"
               title="{{ ftl_get_message('notification-delete') }}"
+              aria-label="{{ ftl_get_message('notification-delete') }}"
               hx-delete="/notifications/{{ notification.id }}"
               hx-target="closest .notification"
               hx-swap="outerHTML swapEmpty:true"
               hx-confirm="{{ ftl_get_message('notification-delete-confirm') }}"
               hx-disable="this">
-        {{ ftl_get_message("notification-delete") }}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10.5 10.5v6M13.5 10.5v6"/></svg>
       </button>
     </div>
   </div>
