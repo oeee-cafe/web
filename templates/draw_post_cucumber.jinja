@@ -12,7 +12,7 @@
           href="{{ '/static/neo-cucumber/offline.css' | cachebuster | safe }}" />
     {# After the painter's own, so the toolbar is not restyled by its reset. #}
     <link rel="stylesheet"
-          href="{{ '/static/toolbar.css' | cachebuster | safe }}" />
+          href="{{ '/static/ds.css' | cachebuster | safe }}" />
     <style>
       /* The ground behind the painter is the window's: the system grey and
          its grid, the same surface as the toolbar above, in either theme.
@@ -20,8 +20,8 @@
          painter. Three :roots outrank every theme selector in the painter's
          sheet, which uses two. */
       :root:root:root {
-        --neo-bk: var(--ground-color);
-        --neo-bk2: var(--ground-grid-solid);
+        --neo-bk: var(--ds-ground);
+        --neo-bk2: var(--ds-grid-solid);
       }
       html, body { width: 100%; height: 100%; margin: 0; }
       body { overflow: hidden; }

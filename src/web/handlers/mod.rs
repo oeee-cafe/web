@@ -1164,6 +1164,21 @@ mod template_tests {
         );
     }
 
+    /// The design system's reference page draws every component, so it has
+    /// to render -- a broken one is the first place a change to ds.css shows.
+    #[test]
+    fn the_design_reference_renders_every_component() {
+        let rendered = test_support::env()
+            .get_template("design.jinja")
+            .expect("design.jinja loads")
+            .render(chrome())
+            .expect("design.jinja renders");
+        for class in ["ds-button-primary", "ds-select", "ds-input", "ds-segmented", "ds-window"] {
+            assert!(rendered.contains(class), "{class} missing from the reference");
+        }
+        assert!(rendered.contains("<body class=\"ds-page\">"));
+    }
+
     /// The painter pages carry the site's toolbar, so every window has the
     /// same title bar and the desktop app can seat its controls in it. It has
     /// to come before the painter's own header -- it is the page's first row
@@ -1191,14 +1206,14 @@ mod template_tests {
             let nav = rendered
                 .find("<nav class=\"nav-bar\"")
                 .unwrap_or_else(|| panic!("{name} has no toolbar"));
-            assert!(rendered.contains("/static/toolbar.css"), "{name}");
+            assert!(rendered.contains("/static/ds.css"), "{name}");
             assert!(rendered.contains("toolbar-badge\">3<"), "{name} unread count");
             if let Some(header) = rendered.find("id=\"oeee-painter-header\"") {
                 assert!(nav < header, "the toolbar is the painter page's first row");
             }
             if let Some(painter_css) = rendered.find("offline.css") {
-                let toolbar_css = rendered.find("toolbar.css").unwrap();
-                assert!(painter_css < toolbar_css, "toolbar.css loads after the painter's reset");
+                let ds_css = rendered.find("ds.css").unwrap();
+                assert!(painter_css < ds_css, "ds.css loads after the painter's reset");
             }
         }
     }
