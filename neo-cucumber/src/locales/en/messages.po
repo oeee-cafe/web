@@ -17,7 +17,7 @@ msgstr ""
 msgid " (you)"
 msgstr " (you)"
 
-#: src/components/SimplifiedToolbox.tsx:173
+#: src/components/SimplifiedToolbox.tsx:170
 msgid "{minutes} min"
 msgstr "{minutes} min"
 
@@ -33,9 +33,9 @@ msgctxt "painter tool"
 msgid "antiAlias"
 msgstr "antiAlias"
 
-#: src/components/SimplifiedToolbox.tsx:89
-#: src/components/SimplifiedToolbox.tsx:123
-#: src/components/SimplifiedToolbox.tsx:124
+#: src/components/SimplifiedToolbox.tsx:86
+#: src/components/SimplifiedToolbox.tsx:120
+#: src/components/SimplifiedToolbox.tsx:121
 msgid "Background pen"
 msgstr "Background pen"
 
@@ -57,7 +57,7 @@ msgctxt "painter tool"
 msgid "Clear"
 msgstr "Clear"
 
-#: src/components/SimplifiedToolbox.tsx:117
+#: src/components/SimplifiedToolbox.tsx:114
 msgid "Color"
 msgstr "Color"
 
@@ -75,8 +75,8 @@ msgstr "Dark"
 
 #: src/components/SimplifiedToolbox.tsx:221
 #: src/components/ToolboxPanel.tsx:333
-msgid "Dark"
-msgstr "Dark"
+#~ msgid "Dark"
+#~ msgstr "Dark"
 
 #. NEO 逆加算
 #: src/neo/labels.ts:93
@@ -99,8 +99,8 @@ msgctxt "painter tool"
 msgid "Fill"
 msgstr "Fill"
 
-#: src/components/ToolboxPanel.tsx:181
-#: src/components/ToolboxPanel.tsx:182
+#: src/components/ToolboxPanel.tsx:178
+#: src/components/ToolboxPanel.tsx:179
 msgid "Fit canvas"
 msgstr "Fit canvas"
 
@@ -116,9 +116,9 @@ msgctxt "painter tool"
 msgid "flipVertic"
 msgstr "flipVertic"
 
-#: src/components/SimplifiedToolbox.tsx:88
-#: src/components/SimplifiedToolbox.tsx:142
-#: src/components/SimplifiedToolbox.tsx:143
+#: src/components/SimplifiedToolbox.tsx:85
+#: src/components/SimplifiedToolbox.tsx:139
+#: src/components/SimplifiedToolbox.tsx:140
 msgid "Foreground pen"
 msgstr "Foreground pen"
 
@@ -169,8 +169,8 @@ msgstr "Light"
 
 #: src/components/SimplifiedToolbox.tsx:221
 #: src/components/ToolboxPanel.tsx:333
-msgid "Light"
-msgstr "Light"
+#~ msgid "Light"
+#~ msgstr "Light"
 
 #. NEO 直線
 #: src/neo/labels.ts:78
@@ -202,7 +202,7 @@ msgctxt "painter mask mode"
 msgid "Normal"
 msgstr "Normal"
 
-#: src/components/SimplifiedToolbox.tsx:173
+#: src/components/SimplifiedToolbox.tsx:170
 msgid "Off"
 msgstr "Off"
 
@@ -222,16 +222,16 @@ msgctxt "painter tool"
 msgid "Paste"
 msgstr "Paste"
 
-#: src/components/SimplifiedToolbox.tsx:90
+#: src/components/SimplifiedToolbox.tsx:87
 msgid "Pen size"
 msgstr "Pen size"
 
-#: src/components/ToolboxPanel.tsx:243
-#: src/components/ToolboxPanel.tsx:244
+#: src/components/ToolboxPanel.tsx:240
+#: src/components/ToolboxPanel.tsx:241
 msgid "Pick a colour"
 msgstr "Pick a colour"
 
-#: src/components/ToolboxPanel.tsx:259
+#: src/components/ToolboxPanel.tsx:306
 msgid "Pick a colour from the drawing with the next click"
 msgstr "Pick a colour from the drawing with the next click"
 
@@ -241,13 +241,13 @@ msgctxt "painter tool"
 msgid "Rect"
 msgstr "Rect"
 
-#: src/components/SimplifiedToolbox.tsx:92
-#: src/components/SimplifiedToolbox.tsx:202
-#: src/components/ToolboxPanel.tsx:302
+#: src/components/SimplifiedToolbox.tsx:89
+#: src/components/SimplifiedToolbox.tsx:199
+#: src/components/ToolboxPanel.tsx:260
 msgid "Redo"
 msgstr "Redo"
 
-#: src/components/SimplifiedToolbox.tsx:179
+#: src/components/SimplifiedToolbox.tsx:176
 msgid "Remaining: {remaining}"
 msgstr "Remaining: {remaining}"
 
@@ -257,11 +257,11 @@ msgctxt "painter mask mode"
 msgid "ReMask"
 msgstr "ReMask"
 
-#: src/components/ToolboxPanel.tsx:212
+#: src/components/ToolboxPanel.tsx:209
 msgid "Reset zoom"
 msgstr "Reset zoom"
 
-#: src/components/ToolboxPanel.tsx:260
+#: src/components/ToolboxPanel.tsx:307
 msgid "Right click"
 msgstr "Right click"
 
@@ -271,15 +271,15 @@ msgctxt "painter tool"
 msgid "rotate"
 msgstr "rotate"
 
-#: src/components/ToolboxPanel.tsx:354
+#: src/components/ToolboxPanel.tsx:344
 msgid "Save"
 msgstr "Save"
 
-#: src/components/ToolboxPanel.tsx:342
+#: src/components/ToolboxPanel.tsx:332
 msgid "Save drawing to gallery"
 msgstr "Save drawing to gallery"
 
-#: src/components/SimplifiedToolbox.tsx:227
+#: src/components/SimplifiedToolbox.tsx:206
 msgid "Shortcuts"
 msgstr "Shortcuts"
 
@@ -298,19 +298,19 @@ msgctxt "painter tool"
 msgid "Solid"
 msgstr "Solid"
 
-#: src/components/SimplifiedToolbox.tsx:87
+#: src/components/SimplifiedToolbox.tsx:84
 msgid "Swap pens"
 msgstr "Swap pens"
 
 #: src/components/SimplifiedToolbox.tsx:209
 #: src/components/ToolboxPanel.tsx:318
-msgid "Switch to dark"
-msgstr "Switch to dark"
+#~ msgid "Switch to dark"
+#~ msgstr "Switch to dark"
 
 #: src/components/SimplifiedToolbox.tsx:209
 #: src/components/ToolboxPanel.tsx:318
-msgid "Switch to light"
-msgstr "Switch to light"
+#~ msgid "Switch to light"
+#~ msgstr "Switch to light"
 
 #. NEO ﾃｷｽﾄ
 #: src/neo/labels.ts:54
@@ -318,25 +318,25 @@ msgctxt "painter tool"
 msgid "Text"
 msgstr "Text"
 
-#: src/Painter.tsx:915
+#: src/Painter.tsx:999
 msgid "Time's up."
 msgstr "Time's up."
 
-#: src/components/SimplifiedToolbox.tsx:163
+#: src/components/SimplifiedToolbox.tsx:160
 msgid "Timer"
 msgstr "Timer"
 
-#: src/components/SimplifiedToolbox.tsx:181
+#: src/components/SimplifiedToolbox.tsx:178
 msgid "Timer off"
 msgstr "Timer off"
 
-#: src/components/ToolboxPanel.tsx:225
+#: src/components/ToolboxPanel.tsx:222
 msgid "Toggle horizontal flip"
 msgstr "Toggle horizontal flip"
 
-#: src/components/SimplifiedToolbox.tsx:91
-#: src/components/SimplifiedToolbox.tsx:194
-#: src/components/ToolboxPanel.tsx:293
+#: src/components/SimplifiedToolbox.tsx:88
+#: src/components/SimplifiedToolbox.tsx:191
+#: src/components/ToolboxPanel.tsx:251
 msgid "Undo"
 msgstr "Undo"
 
@@ -358,10 +358,10 @@ msgctxt "painter tool"
 msgid "WhiteRe"
 msgstr "WhiteRe"
 
-#: src/components/ToolboxPanel.tsx:204
+#: src/components/ToolboxPanel.tsx:201
 msgid "Zoom in"
 msgstr "Zoom in"
 
-#: src/components/ToolboxPanel.tsx:196
+#: src/components/ToolboxPanel.tsx:193
 msgid "Zoom out"
 msgstr "Zoom out"

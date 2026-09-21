@@ -17,7 +17,7 @@ msgstr ""
 msgid " (you)"
 msgstr " (나)"
 
-#: src/components/SimplifiedToolbox.tsx:173
+#: src/components/SimplifiedToolbox.tsx:170
 msgid "{minutes} min"
 msgstr "{minutes}분"
 
@@ -33,9 +33,9 @@ msgctxt "painter tool"
 msgid "antiAlias"
 msgstr "각깎기"
 
-#: src/components/SimplifiedToolbox.tsx:89
-#: src/components/SimplifiedToolbox.tsx:123
-#: src/components/SimplifiedToolbox.tsx:124
+#: src/components/SimplifiedToolbox.tsx:86
+#: src/components/SimplifiedToolbox.tsx:120
+#: src/components/SimplifiedToolbox.tsx:121
 msgid "Background pen"
 msgstr "배경색 펜"
 
@@ -57,7 +57,7 @@ msgctxt "painter tool"
 msgid "Clear"
 msgstr "전체지움"
 
-#: src/components/SimplifiedToolbox.tsx:117
+#: src/components/SimplifiedToolbox.tsx:114
 msgid "Color"
 msgstr "색상"
 
@@ -75,8 +75,8 @@ msgstr "어둡게"
 
 #: src/components/SimplifiedToolbox.tsx:221
 #: src/components/ToolboxPanel.tsx:333
-msgid "Dark"
-msgstr "다크"
+#~ msgid "Dark"
+#~ msgstr "다크"
 
 #. NEO 逆加算
 #: src/neo/labels.ts:93
@@ -99,8 +99,8 @@ msgctxt "painter tool"
 msgid "Fill"
 msgstr "채우기"
 
-#: src/components/ToolboxPanel.tsx:181
-#: src/components/ToolboxPanel.tsx:182
+#: src/components/ToolboxPanel.tsx:178
+#: src/components/ToolboxPanel.tsx:179
 msgid "Fit canvas"
 msgstr "캔버스 맞추기"
 
@@ -116,9 +116,9 @@ msgctxt "painter tool"
 msgid "flipVertic"
 msgstr "상하반전"
 
-#: src/components/SimplifiedToolbox.tsx:88
-#: src/components/SimplifiedToolbox.tsx:142
-#: src/components/SimplifiedToolbox.tsx:143
+#: src/components/SimplifiedToolbox.tsx:85
+#: src/components/SimplifiedToolbox.tsx:139
+#: src/components/SimplifiedToolbox.tsx:140
 msgid "Foreground pen"
 msgstr "전경색 펜"
 
@@ -169,8 +169,8 @@ msgstr "밝게"
 
 #: src/components/SimplifiedToolbox.tsx:221
 #: src/components/ToolboxPanel.tsx:333
-msgid "Light"
-msgstr "라이트"
+#~ msgid "Light"
+#~ msgstr "라이트"
 
 #. NEO 直線
 #: src/neo/labels.ts:78
@@ -202,7 +202,7 @@ msgctxt "painter mask mode"
 msgid "Normal"
 msgstr "일반"
 
-#: src/components/SimplifiedToolbox.tsx:173
+#: src/components/SimplifiedToolbox.tsx:170
 msgid "Off"
 msgstr "끄기"
 
@@ -222,16 +222,16 @@ msgctxt "painter tool"
 msgid "Paste"
 msgstr "붙여넣기"
 
-#: src/components/SimplifiedToolbox.tsx:90
+#: src/components/SimplifiedToolbox.tsx:87
 msgid "Pen size"
 msgstr "펜 크기"
 
-#: src/components/ToolboxPanel.tsx:243
-#: src/components/ToolboxPanel.tsx:244
+#: src/components/ToolboxPanel.tsx:240
+#: src/components/ToolboxPanel.tsx:241
 msgid "Pick a colour"
 msgstr "색 선택"
 
-#: src/components/ToolboxPanel.tsx:259
+#: src/components/ToolboxPanel.tsx:306
 msgid "Pick a colour from the drawing with the next click"
 msgstr "다음 클릭으로 그림에서 색을 가져옵니다"
 
@@ -241,13 +241,13 @@ msgctxt "painter tool"
 msgid "Rect"
 msgstr "사각"
 
-#: src/components/SimplifiedToolbox.tsx:92
-#: src/components/SimplifiedToolbox.tsx:202
-#: src/components/ToolboxPanel.tsx:302
+#: src/components/SimplifiedToolbox.tsx:89
+#: src/components/SimplifiedToolbox.tsx:199
+#: src/components/ToolboxPanel.tsx:260
 msgid "Redo"
 msgstr "다시 실행"
 
-#: src/components/SimplifiedToolbox.tsx:179
+#: src/components/SimplifiedToolbox.tsx:176
 msgid "Remaining: {remaining}"
 msgstr "남은 시간: {remaining}"
 
@@ -257,11 +257,11 @@ msgctxt "painter mask mode"
 msgid "ReMask"
 msgstr "역마스크"
 
-#: src/components/ToolboxPanel.tsx:212
+#: src/components/ToolboxPanel.tsx:209
 msgid "Reset zoom"
 msgstr "확대 초기화"
 
-#: src/components/ToolboxPanel.tsx:260
+#: src/components/ToolboxPanel.tsx:307
 msgid "Right click"
 msgstr "오른쪽 클릭"
 
@@ -271,15 +271,15 @@ msgctxt "painter tool"
 msgid "rotate"
 msgstr "기울이기"
 
-#: src/components/ToolboxPanel.tsx:354
+#: src/components/ToolboxPanel.tsx:344
 msgid "Save"
 msgstr "저장"
 
-#: src/components/ToolboxPanel.tsx:342
+#: src/components/ToolboxPanel.tsx:332
 msgid "Save drawing to gallery"
 msgstr "그림을 갤러리에 저장"
 
-#: src/components/SimplifiedToolbox.tsx:227
+#: src/components/SimplifiedToolbox.tsx:206
 msgid "Shortcuts"
 msgstr "단축키"
 
@@ -298,19 +298,19 @@ msgctxt "painter tool"
 msgid "Solid"
 msgstr "연필"
 
-#: src/components/SimplifiedToolbox.tsx:87
+#: src/components/SimplifiedToolbox.tsx:84
 msgid "Swap pens"
 msgstr "펜 전환"
 
 #: src/components/SimplifiedToolbox.tsx:209
 #: src/components/ToolboxPanel.tsx:318
-msgid "Switch to dark"
-msgstr "다크 모드로 전환"
+#~ msgid "Switch to dark"
+#~ msgstr "다크 모드로 전환"
 
 #: src/components/SimplifiedToolbox.tsx:209
 #: src/components/ToolboxPanel.tsx:318
-msgid "Switch to light"
-msgstr "라이트 모드로 전환"
+#~ msgid "Switch to light"
+#~ msgstr "라이트 모드로 전환"
 
 #. NEO ﾃｷｽﾄ
 #: src/neo/labels.ts:54
@@ -318,25 +318,25 @@ msgctxt "painter tool"
 msgid "Text"
 msgstr "텍스트"
 
-#: src/Painter.tsx:915
+#: src/Painter.tsx:999
 msgid "Time's up."
 msgstr "설정한 시간이 지났습니다."
 
-#: src/components/SimplifiedToolbox.tsx:163
+#: src/components/SimplifiedToolbox.tsx:160
 msgid "Timer"
 msgstr "타이머"
 
-#: src/components/SimplifiedToolbox.tsx:181
+#: src/components/SimplifiedToolbox.tsx:178
 msgid "Timer off"
 msgstr "타이머 꺼짐"
 
-#: src/components/ToolboxPanel.tsx:225
+#: src/components/ToolboxPanel.tsx:222
 msgid "Toggle horizontal flip"
 msgstr "좌우 반전 전환"
 
-#: src/components/SimplifiedToolbox.tsx:91
-#: src/components/SimplifiedToolbox.tsx:194
-#: src/components/ToolboxPanel.tsx:293
+#: src/components/SimplifiedToolbox.tsx:88
+#: src/components/SimplifiedToolbox.tsx:191
+#: src/components/ToolboxPanel.tsx:251
 msgid "Undo"
 msgstr "실행 취소"
 
@@ -358,10 +358,10 @@ msgctxt "painter tool"
 msgid "WhiteRe"
 msgstr "사각지움"
 
-#: src/components/ToolboxPanel.tsx:204
+#: src/components/ToolboxPanel.tsx:201
 msgid "Zoom in"
 msgstr "확대"
 
-#: src/components/ToolboxPanel.tsx:196
+#: src/components/ToolboxPanel.tsx:193
 msgid "Zoom out"
 msgstr "축소"
