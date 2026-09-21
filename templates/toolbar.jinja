@@ -42,10 +42,16 @@
    <details>, so it opens with no script at all. #}
 <nav class="nav-bar" hx-boost:inherited="true">
   <div id="menubar">
-    {# The site's name, in type rather than the logo: beside a window's own
-       controls the wordmark's four round letters read as a second, crooked
-       row of them. #}
-    <a class="toolbar-name" href="/">{{ ftl_get_message("brand") }}</a>
+    {# The wordmark, in the page's language (Chinese has none of its own and
+       takes the English one), home. Its box is the buttons' height and it is
+       centred on their line -- which in the desktop app on macOS is the line
+       the window's own controls sit on, 26px down -- so the letters read as a
+       name beside them rather than as a second, crooked row of them. #}
+    {% set logo_lang = "en" if ftl_lang not in ["ko", "ja"] else ftl_lang %}
+    <a class="toolbar-name" href="/" title="{{ ftl_get_message("brand") }}">
+      <img class="toolbar-logo" src="/static/logo/{{ logo_lang }}.svg" alt="{{ ftl_get_message("brand") }}"
+           height="20" width="{% if logo_lang == "ja" %}92{% else %}72{% endif %}" draggable="false" />
+    </a>
     {# The sections, as a window's title bar holds its tabs. On a phone
        they take a second row of the bar, sharing its width. #}
     <div class="toolbar-links">

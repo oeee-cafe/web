@@ -1,5 +1,4 @@
 {% extends "base.jinja" %}
-{% from "user_pill_macro.jinja" import user_pill %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("nav-about") }}
 {% endblock title %}
@@ -42,13 +41,22 @@
     </section>
 
     {% if users_with_public_posts_and_banner|length > 0 %}
-      {# Everyone who draws here in the open and has a banner, as the same
-         pill a profile shows its allies in. #}
+      {# Everyone who draws here in the open and has a banner, as a wall of
+         their banners -- each drawn by its owner, so the wall says who they
+         are better than their names would. The name is the tooltip. #}
       <section class="profile-section">
         <div class="profile-section-label">{{ ftl_get_message("user-contributors") }}</div>
-        <div class="profile-allies">
+        <div class="about-banners">
           {% for user in users_with_public_posts_and_banner %}
-            {{ user_pill("/@" ~ user.login_name, user.banner_image_filename, user.banner_image_width, user.banner_image_height, user.display_name, "@" ~ user.login_name, r2_public_endpoint_url) }}
+            <a class="about-banner" href="/@{{ user.login_name }}" title="{{ user.display_name }} (@{{ user.login_name }})">
+              <img width="{{ user.banner_image_width }}"
+                   height="{{ user.banner_image_height }}"
+                   alt="{{ user.display_name }} (@{{ user.login_name }})"
+                   loading="lazy"
+                   decoding="async"
+                   draggable="false"
+                   src="{{ r2_public_endpoint_url }}/image/{{ user.banner_image_filename[:2] }}/{{ user.banner_image_filename }}" />
+            </a>
           {% endfor %}
         </div>
       </section>
