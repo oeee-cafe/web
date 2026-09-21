@@ -138,6 +138,14 @@
   --ds-skeleton-drawing: #2a2a46;
 }
 
+/* `hidden` means hidden, even on an element whose class gives it a
+   display of its own -- a button, a flex row. Without this the attribute
+   loses to any class that sets `display`, and a control a script hid stays
+   on screen. */
+[hidden] {
+  display: none !important;
+}
+
 /* ---------------------------------------------------------------------------
    Behaving like an application
 
