@@ -626,7 +626,6 @@ html {
     order: 3;
     width: 100%;
     flex-wrap: nowrap;
-    margin-bottom: 8px;
   }
 
   .toolbar-links a {
@@ -641,14 +640,53 @@ html {
     text-overflow: ellipsis;
   }
 
+  /* Room around both rows: the first is the height of a phone's own title
+     bar, and the sections sit clear of it and of the page below. */
+  .nav-bar #menubar {
+    padding: 0 16px;
+  }
+
+  .toolbar-name,
+  .toolbar-end {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  .toolbar-name {
+    margin-right: 8px;
+    padding-left: 0;
+  }
+
+  .toolbar-links {
+    margin-bottom: 12px;
+  }
+
+  .toolbar-end > * + * {
+    margin-left: 6px;
+  }
+
+  .toolbar-end > a,
+  .toolbar-draw {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+}
+
+/* The narrowest phones (360px): the same rows, a little closer, so the
+   first line still holds the name and four controls. */
+@media (max-width: 374px) {
+  .nav-bar #menubar {
+    padding: 0 12px;
+  }
+
   .toolbar-end > * + * {
     margin-left: 4px;
   }
 
   .toolbar-end > a,
   .toolbar-draw {
-    padding-right: 9px;
-    padding-left: 9px;
+    padding-right: 8px;
+    padding-left: 8px;
   }
 }
 
