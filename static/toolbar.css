@@ -1,0 +1,326 @@
+/* ---------------------------------------------------------------------------
+   The toolbar, on its own
+
+   Loaded by every page that shows the toolbar: the site's pages through
+   base.jinja, before style.css, and the painter pages, which do not load
+   style.css at all because its rules for the page as a whole -- the ground,
+   the type, links, headings -- would restyle the painter's NEO chrome. So
+   nothing here reaches past `.nav-bar`, and nothing here reads the site's
+   own colour variables: the painter redefines --main-* as NEO's.
+
+   The ground and type tokens live here too, since this file is the one both
+   kinds of page share; style.css draws the ground with them.
+   --------------------------------------------------------------------------- */
+:root {
+  --ground-color: #ececec;
+  --ground-grid: rgba(0, 0, 0, 0.05);
+  --bar-line: rgba(0, 0, 0, 0.1);
+  --toolbar-hover-bg: rgba(0, 0, 0, 0.06);
+  --toolbar-current-bg: rgba(0, 0, 0, 0.1);
+  --toolbar-menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --draw-color: #c4ee62;
+  --draw-hover-color: #b5e24c;
+  --draw-ink: #1c2811;
+  --tb-ink: #1d1d1f;
+  --tb-muted: #5d5d62;
+  --tb-surface: #ffffff;
+  --tb-badge: #ef842d;
+  --tb-danger: #dc2626;
+  --ui-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    "Apple SD Gothic Neo", "Malgun Gothic", "Hiragino Sans", "Yu Gothic UI", system-ui,
+    Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground-color: #1e1e1e;
+    --ground-grid: rgba(255, 255, 255, 0.05);
+    --bar-line: rgba(255, 255, 255, 0.12);
+    --toolbar-hover-bg: rgba(255, 255, 255, 0.08);
+    --toolbar-current-bg: rgba(255, 255, 255, 0.14);
+    --toolbar-menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --tb-ink: #e0e0e0;
+    --tb-muted: #a0a0a0;
+    --tb-surface: #2c2c2c;
+    --tb-badge: #ff8c00;
+    --tb-danger: #ef4444;
+  }
+}
+
+
+
+.nav-bar {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: var(--ground-color);
+  border-bottom: 1px solid var(--bar-line);
+  color: var(--tb-ink);
+  font-family: var(--ui-font);
+  font-size: 13px;
+  line-height: 1.5;
+  view-transition-name: toolbar;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#menubar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 52px;
+}
+
+.nav-bar #menubar {
+  padding: 0 12px;
+}
+
+.toolbar-brand {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+  padding: 4px 6px;
+}
+
+.toolbar-brand img {
+  display: block;
+}
+
+.toolbar-brand .toolbar-mark {
+  margin-right: 8px;
+}
+
+.toolbar-links,
+.toolbar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toolbar-end {
+  margin-left: auto;
+}
+
+.toolbar-links > * + *,
+.toolbar-end > * + * {
+  margin-left: 6px;
+}
+
+.toolbar-links a,
+.toolbar-end > a,
+.toolbar-end .toolbar-icon,
+.toolbar-menu summary,
+.toolbar-draw {
+  display: inline-block;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--tb-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toolbar-links a:visited,
+.toolbar-end a:visited {
+  color: var(--tb-ink);
+}
+
+.toolbar-links a:hover,
+.toolbar-end > a:hover,
+.toolbar-end .toolbar-icon:hover,
+.toolbar-menu summary:hover,
+.toolbar-menu[open] summary {
+  background-color: var(--toolbar-hover-bg);
+}
+
+.nav-bar .toolbar-links a[aria-current="page"] {
+  background-color: var(--toolbar-current-bg);
+  font-weight: 600;
+}
+
+.toolbar-end .toolbar-icon {
+  position: relative;
+  padding: 5px 8px 3px;
+}
+
+/* Tailwind's reset, on the painter pages, makes every svg and img a block;
+   the toolbar's icons sit in a line of text. */
+.nav-bar svg {
+  display: inline-block;
+}
+
+.toolbar-icon svg {
+  vertical-align: top;
+}
+
+.toolbar-end .toolbar-icon .toolbar-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  margin-left: 0;
+}
+
+/* Drawing is what the site is for, so it is the one filled control: the
+   cucumber's lime, with dark ink in both themes. */
+.toolbar-end .toolbar-draw,
+.toolbar-end a.toolbar-draw:visited {
+  background-color: var(--draw-color);
+  color: var(--draw-ink);
+  box-shadow: inset 0 0 0 1px rgba(60, 103, 18, 0.35);
+  font-weight: 600;
+}
+
+.toolbar-end .toolbar-draw:hover {
+  background-color: var(--draw-hover-color);
+}
+
+.toolbar-draw svg {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.toolbar-end form {
+  margin: 0;
+}
+
+.toolbar-badge {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background-color: var(--tb-badge);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.toolbar-avatar {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: var(--draw-color);
+  color: var(--draw-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 28px;
+  text-align: center;
+}
+
+.toolbar-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: -8px;
+  border-radius: 4px;
+  background-color: var(--tb-danger);
+  vertical-align: top;
+}
+
+.toolbar-menu {
+  position: relative;
+}
+
+.toolbar-menu summary {
+  display: block;
+  padding: 4px;
+  list-style: none;
+}
+
+.toolbar-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.toolbar-menu-items {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  min-width: 200px;
+  margin-top: 6px;
+  padding: 4px;
+  border: 1px solid var(--bar-line);
+  border-radius: 10px;
+  background-color: var(--tb-surface);
+  box-shadow: var(--toolbar-menu-shadow);
+}
+
+.toolbar-menu-who {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--bar-line);
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.toolbar-menu-who span {
+  display: block;
+  color: var(--tb-muted);
+}
+
+.toolbar-menu-items a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--tb-ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.toolbar-menu-items a:visited {
+  color: var(--tb-ink);
+}
+
+.toolbar-menu-items a:hover {
+  background-color: var(--toolbar-hover-bg);
+}
+
+/* A phone keeps the brand and the account on the first line and gives the
+   sections a line of their own, scrolled sideways rather than wrapped. */
+@media (max-width: 600px) {
+  .toolbar-brand > img + img {
+    display: none;
+  }
+
+  .toolbar-links {
+    order: 3;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+  }
+
+  .toolbar-links::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.post-image {
+  max-width: 100%;
+  display: flex;
+  object-fit: contain;
+}
+
+.post-image-full {
+  width: 100%;
+  height: auto;
+  display: flex;
+  object-fit: contain;
+}
+
