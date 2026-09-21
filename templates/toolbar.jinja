@@ -106,8 +106,55 @@
           links[i].setAttribute("aria-current", "page");
         }
       }
+      // The content area scrolls, not the window, and browsers only restore
+      // the window's own scroll when you go back -- so where you were is
+      // kept here, per page, and put back on a return to it: a full load
+      // that came from the history, or htmx restoring a boosted page after
+      // a popstate. And the content area takes the keyboard's focus when
+      // nothing else has it, so Page Down scrolls it without a click first.
+      // The toolbar comes before <main> in the page, so on a full load this
+      // waits for it; after a boosted swap it is already there.
+      function settleContent() {
+        var content = document.querySelector("main.ds-content");
+        if (!content) return;
+        var key = "oeee-scroll:" + location.pathname + location.search;
+        var entry = window.performance && performance.getEntriesByType
+          ? performance.getEntriesByType("navigation")[0] : null;
+        var returning = window.oeeeHistoryStep ||
+          (!window.oeeeSettledOnce && entry && entry.type === "back_forward");
+        window.oeeeHistoryStep = false;
+        window.oeeeSettledOnce = true;
+        if (returning) {
+          try {
+            var top = parseInt(sessionStorage.getItem(key), 10);
+            if (top > 0) content.scrollTop = top;
+          } catch (error) {}
+        }
+        var pending;
+        content.addEventListener("scroll", function () {
+          clearTimeout(pending);
+          pending = setTimeout(function () {
+            try {
+              sessionStorage.setItem(key, String(content.scrollTop));
+            } catch (error) {}
+          }, 100);
+        });
+        if (!document.activeElement || document.activeElement === document.body) {
+          try {
+            content.focus({ preventScroll: true });
+          } catch (error) {
+            content.focus();
+          }
+        }
+      }
+      if (document.querySelector("main.ds-content")) settleContent();
+      else document.addEventListener("DOMContentLoaded", settleContent);
+
       if (window.oeeeToolbarMenu) return;
       window.oeeeToolbarMenu = true;
+      window.addEventListener("popstate", function () {
+        window.oeeeHistoryStep = true;
+      });
       function closeMenus(except) {
         var open = document.querySelectorAll(".toolbar-menu[open]");
         for (var j = 0; j < open.length; j++) {

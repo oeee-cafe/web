@@ -52,7 +52,10 @@
          gives it no box of its own while it holds nothing. #}
       <div id="htmx-error" class="htmx-error center"></div>
     </header>
-    <main>
+    {# The content area: what scrolls, below the toolbar, on screens wider
+       than a phone (ds.css, "The content area"). Focusable from script only,
+       so the keyboard scrolls it without a click first. #}
+    <main class="ds-content" tabindex="-1">
       {% block content %}
       {% endblock content %}
     </main>
