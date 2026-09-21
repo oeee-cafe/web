@@ -1,0 +1,130 @@
+{% extends "base.jinja" %}
+{# The design system, drawn by itself: every token and component in ds.css,
+   rendered by the real stylesheet in whichever theme is on. It is where a
+   change to the system is looked at before it reaches a page, and where
+   Firefox 56 can be checked in one visit. Unlinked and unindexed; not
+   translated, because it is for the people who build the site. #}
+{% block title %}Design system | {{ ftl_get_message("brand") }}{% endblock title %}
+{% block head %}
+  <meta name="robots" content="noindex" />
+  <style>
+    .ds-ref section { margin: 0 0 40px; }
+    .ds-ref h2 { margin: 0 0 12px; font-size: var(--ds-text-xl); }
+    .ds-ref .row { display: flex; flex-wrap: wrap; align-items: center; }
+    .ds-ref .row > * { margin: 0 12px 12px 0; }
+    .ds-ref .swatch { width: 132px; }
+    .ds-ref .chip { height: 44px; border: 1px solid var(--ds-line); border-radius: var(--ds-radius-s); }
+    .ds-ref .swatch code { display: block; margin-top: 4px; font-size: var(--ds-text-s); color: var(--ds-muted); }
+    .ds-ref .field { width: 280px; }
+    .ds-ref .drawing { width: 150px; height: 150px; background: #fff; box-shadow: 0 0 0 1px var(--ds-frame); }
+  </style>
+{% endblock head %}
+{% block content %}
+  <div class="center ds-ref">
+    <h1>Design system</h1>
+    <p class="ds-help">Everything in <code>static/ds.css</code>, in the current theme. The painter's Dark button switches it.</p>
+
+    <section>
+      <h2>Colour</h2>
+      <div class="row">
+        {% for name in ["ground", "surface", "field", "ink", "muted", "faint", "line-strong", "frame", "accent", "accent-ink", "badge", "danger", "focus", "neo-panel"] %}
+          <div class="swatch">
+            <div class="chip" style="background: var(--ds-{{ name }})"></div>
+            <code>--ds-{{ name }}</code>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section>
+      <h2>Type</h2>
+      {% for size in ["2xl", "xl", "l", "base", "m", "s", "xs"] %}
+        <div style="font-size: var(--ds-text-{{ size }})">--ds-text-{{ size }} · 오이카페 OEEEカフェ Oeee Cafe</div>
+      {% endfor %}
+    </section>
+
+    <section>
+      <h2>Buttons</h2>
+      <div class="row">
+        <button class="ds-button ds-button-primary" type="button">Primary</button>
+        <button class="ds-button" type="button">Secondary</button>
+        <button class="ds-button ds-button-quiet" type="button">Quiet</button>
+        <button class="ds-button ds-button-danger" type="button">Delete</button>
+        <button class="ds-button" type="button" disabled>Disabled</button>
+        <button type="button">Unclassed</button>
+        <input type="submit" value="Unclassed submit" />
+      </div>
+    </section>
+
+    <section>
+      <h2>Fields</h2>
+      <div class="row">
+        <label class="field">
+          <span class="ds-label">Title</span>
+          <input class="ds-input" type="text" placeholder="Untitled" style="width: 100%" />
+          <span class="ds-help">Shown above the drawing.</span>
+        </label>
+        <label class="field">
+          <span class="ds-label">Unclassed</span>
+          <input type="text" value="A plain input" style="width: 100%" />
+        </label>
+      </div>
+      <label>
+        <span class="ds-label">Description</span>
+        <textarea class="ds-textarea" rows="3" style="width: 100%">날다람지</textarea>
+      </label>
+    </section>
+
+    <section>
+      <h2>Drop-downs</h2>
+      <div class="row">
+        <select class="ds-select" aria-label="Community">
+          <option>Pokémon</option>
+          <option>페르소나!!</option>
+          <option>오이카페 모에화</option>
+        </select>
+        <select aria-label="Visibility">
+          <option>Public</option>
+          <option>Unlisted</option>
+          <option>Private</option>
+        </select>
+        <select class="ds-select" aria-label="Disabled" disabled>
+          <option>Disabled</option>
+        </select>
+      </div>
+    </section>
+
+    <section>
+      <h2>Choices</h2>
+      <div class="row">
+        <label><input type="checkbox" checked /> Allow relays</label>
+        <label><input type="checkbox" /> Sensitive</label>
+        <label><input type="radio" name="ref-radio" checked /> Public</label>
+        <label><input type="radio" name="ref-radio" /> Private</label>
+        <label><input type="range" min="1" max="12" value="6" aria-label="Size" /></label>
+      </div>
+      <div class="row">
+        <div class="ds-segmented" role="group" aria-label="Whose drawings">
+          <button type="button" aria-pressed="true">Everyone</button>
+          <button type="button" aria-pressed="false">Following</button>
+        </div>
+        <span class="ds-badge">3</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Surfaces</h2>
+      <div class="row" style="align-items: flex-start">
+        <div class="ds-card" style="width: 280px">
+          <strong>A card</strong>
+          <p class="ds-help">Settings groups, forms, anything that is a box on the ground.</p>
+        </div>
+        <div class="ds-window" style="width: 280px">
+          <div class="ds-window-title">Replay</div>
+          <div class="ds-window-body">What belongs to drawing wears the painter's chrome.</div>
+        </div>
+        <div class="drawing" aria-label="A drawing's frame"></div>
+      </div>
+    </section>
+  </div>
+{% endblock content %}

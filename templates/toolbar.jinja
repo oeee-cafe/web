@@ -2,7 +2,7 @@
 
    Included by base.jinja and by the painter pages, which do not extend base
    because the painter owns the rest of their document. Everything it needs
-   is in toolbar.css, which each of them loads; it reads current_user,
+   is in ds.css, which each of them loads; it reads current_user,
    draft_post_count, unread_notification_count and ftl_lang, and nothing
    else, so a page can show it by passing those four. #}
 {# Boost scoped to the nav, not the body.
@@ -29,11 +29,11 @@
    <details>, so it opens with no script at all. #}
 <nav class="nav-bar" hx-boost:inherited="true">
   <div id="menubar">
-    {# The sections, as a window's title bar holds its tabs. There is no logo:
-       beside a window's own controls the wordmark's four round letters read
-       as a second, crooked row of them, and no application puts its name in
-       its title bar -- the page title and the icon say whose window this is.
-       Recent, first, is home. #}
+    {# The site's name, in type rather than the logo: beside a window's own
+       controls the wordmark's four round letters read as a second, crooked
+       row of them. #}
+    <a class="toolbar-name" href="/">{{ ftl_get_message("brand") }}</a>
+    {# The sections, as a window's title bar holds its tabs. #}
     <div class="toolbar-links">
       <a href="/">{{ ftl_get_message("nav-recent") }}</a>
       {% if current_user %}

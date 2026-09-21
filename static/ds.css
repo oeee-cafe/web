@@ -1,0 +1,824 @@
+/* ---------------------------------------------------------------------------
+   Oeee Cafe's design system
+
+   One file of tokens and components for every page, the painter pages
+   included. The site's pages load it through base.jinja, before style.css;
+   the painter and tegaki pages load it after their own sheet.
+
+   Three rules keep it safe to load anywhere:
+
+   - Components are classes (`.ds-button`, `.ds-select`). Nothing here styles
+     a bare element, except inside `.ds-page` -- the body class only
+     base.jinja sets -- where controls with no class of their own take the
+     system's look by default. The painter's controls all have classes, and
+     its pages are not `.ds-page`, so none of this reaches NEO's chrome.
+   - Nothing here reads the site's --main-* variables; the painter redefines
+     those as NEO's.
+   - Firefox 56 reads it unbuilt: no flex `gap`, no :is() or :where(),
+     prefixed `appearance` and `user-select`. What that engine cannot do
+     (accent-color, for one) is an enhancement, never the only styling.
+
+   Light and dark follow the site's one rule: the system decides unless the
+   painter's switch has chosen, in which case `data-theme` on the root says.
+   --------------------------------------------------------------------------- */
+:root {
+  /* Type: the system's own faces, with its Korean and Japanese ones named,
+     so a title in either sits in the same family as the chrome. */
+  --ds-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    "Apple SD Gothic Neo", "Malgun Gothic", "Hiragino Sans", "Yu Gothic UI", system-ui,
+    Arial, sans-serif;
+  --ds-text-xs: 11px;
+  --ds-text-s: 12px;
+  --ds-text-m: 13px;
+  --ds-text-base: 14px;
+  --ds-text-l: 16px;
+  --ds-text-xl: 20px;
+  --ds-text-2xl: 26px;
+  /* Space: a 4px scale. */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 24px;
+  --ds-space-6: 32px;
+  /* Corners: small for controls, medium for what floats. Drawings have
+     none -- they are framed the way the painter frames its canvas. */
+  --ds-radius-s: 6px;
+  --ds-radius-m: 10px;
+  --ds-control-height: 30px;
+  /* Ground: the window, which is the system's own grey, and NEO's 14px
+     grid drawn faintly over it. */
+  --ds-ground: #ececec;
+  --ds-grid: rgba(0, 0, 0, 0.05);
+  /* The grid line as a solid colour, for grounds drawn by the painter. */
+  --ds-grid-solid: #e0e0e0;
+  /* Surfaces: what sits on the ground -- fields, menus, cards. */
+  --ds-surface: #ffffff;
+  --ds-field: #ffffff;
+  /* Ink, in three strengths. Muted is 6.1:1 on the ground; faint is for
+     placeholders and disabled text only. */
+  --ds-ink: #1d1d1f;
+  --ds-muted: #55555a;
+  --ds-faint: #8a8a8f;
+  /* Lines. */
+  --ds-line: rgba(0, 0, 0, 0.1);
+  --ds-line-strong: rgba(0, 0, 0, 0.22);
+  --ds-frame: rgba(0, 0, 0, 0.55);
+  /* States, laid over whatever is beneath. */
+  --ds-hover: rgba(0, 0, 0, 0.06);
+  --ds-selected: rgba(0, 0, 0, 0.1);
+  --ds-focus: #4f8a10;
+  /* The cucumber: the one colour that means "do this". Dark ink on it in
+     both themes -- white on lime is under 2:1. */
+  --ds-accent: #c4ee62;
+  --ds-accent-hover: #b5e24c;
+  --ds-accent-ink: #1c2811;
+  --ds-accent-line: rgba(60, 103, 18, 0.35);
+  /* Signals. */
+  --ds-badge: #ef842d;
+  --ds-danger: #dc2626;
+  --ds-danger-hover: #b91c1c;
+  --ds-danger-ink: #ffffff;
+  /* Depth. */
+  --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ds-ground: #1e1e1e;
+    --ds-grid: rgba(255, 255, 255, 0.05);
+    --ds-grid-solid: #2a2a2a;
+    --ds-surface: #2c2c2c;
+    --ds-field: #262626;
+    --ds-ink: #e8e8ea;
+    --ds-muted: #a8a8ad;
+    --ds-faint: #77777c;
+    --ds-line: rgba(255, 255, 255, 0.12);
+    --ds-line-strong: rgba(255, 255, 255, 0.24);
+    --ds-frame: rgba(255, 255, 255, 0.4);
+    --ds-hover: rgba(255, 255, 255, 0.08);
+    --ds-selected: rgba(255, 255, 255, 0.14);
+    --ds-focus: #c4ee62;
+    --ds-badge: #ff8c00;
+    --ds-danger: #ef4444;
+    --ds-danger-hover: #dc2626;
+    --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ds-ground: #1e1e1e;
+  --ds-grid: rgba(255, 255, 255, 0.05);
+  --ds-grid-solid: #2a2a2a;
+  --ds-surface: #2c2c2c;
+  --ds-field: #262626;
+  --ds-ink: #e8e8ea;
+  --ds-muted: #a8a8ad;
+  --ds-faint: #77777c;
+  --ds-line: rgba(255, 255, 255, 0.12);
+  --ds-line-strong: rgba(255, 255, 255, 0.24);
+  --ds-frame: rgba(255, 255, 255, 0.4);
+  --ds-hover: rgba(255, 255, 255, 0.08);
+  --ds-selected: rgba(255, 255, 255, 0.14);
+  --ds-focus: #c4ee62;
+  --ds-badge: #ff8c00;
+  --ds-danger: #ef4444;
+  --ds-danger-hover: #dc2626;
+  --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------------------------------------------------------------------------
+   The toolbar
+
+   The window's title bar: the site's name, the sections as tabs, and at the
+   end the notifications bell, Draw and the account. In the desktop app the
+   window's own controls sit over its left end.
+   --------------------------------------------------------------------------- */
+.nav-bar {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: var(--ds-ground);
+  border-bottom: 1px solid var(--ds-line);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: 13px;
+  line-height: 1.5;
+  view-transition-name: toolbar;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#menubar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 52px;
+}
+
+.nav-bar #menubar {
+  padding: 0 12px;
+}
+
+.toolbar-name,
+.toolbar-name:visited {
+  margin-right: var(--ds-space-3);
+  padding: 4px 6px;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-l);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.toolbar-links,
+.toolbar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toolbar-end {
+  margin-left: auto;
+}
+
+.toolbar-links > * + *,
+.toolbar-end > * + * {
+  margin-left: 6px;
+}
+
+.toolbar-links a,
+.toolbar-end > a,
+.toolbar-end .toolbar-icon,
+.toolbar-menu summary,
+.toolbar-draw {
+  display: inline-block;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ds-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toolbar-links a:visited,
+.toolbar-end a:visited {
+  color: var(--ds-ink);
+}
+
+.toolbar-links a:hover,
+.toolbar-end > a:hover,
+.toolbar-end .toolbar-icon:hover,
+.toolbar-menu summary:hover,
+.toolbar-menu[open] summary {
+  background-color: var(--ds-hover);
+}
+
+.nav-bar .toolbar-links a[aria-current="page"] {
+  background-color: var(--ds-selected);
+  font-weight: 600;
+}
+
+.toolbar-end .toolbar-icon {
+  position: relative;
+  padding: 5px 8px 3px;
+}
+
+/* Tailwind's reset, on the painter pages, makes every svg and img a block;
+   the toolbar's icons sit in a line of text. */
+.nav-bar svg {
+  display: inline-block;
+}
+
+.toolbar-icon svg {
+  vertical-align: top;
+}
+
+.toolbar-end .toolbar-icon .toolbar-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  margin-left: 0;
+}
+
+/* Drawing is what the site is for, so it is the one filled control: the
+   cucumber's lime, with dark ink in both themes. */
+.toolbar-end .toolbar-draw,
+.toolbar-end a.toolbar-draw:visited {
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+  box-shadow: inset 0 0 0 1px rgba(60, 103, 18, 0.35);
+  font-weight: 600;
+}
+
+.toolbar-end .toolbar-draw:hover {
+  background-color: var(--ds-accent-hover);
+}
+
+.toolbar-draw svg {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.toolbar-end form {
+  margin: 0;
+}
+
+.toolbar-badge {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background-color: var(--ds-badge);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.toolbar-avatar {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 28px;
+  text-align: center;
+}
+
+.toolbar-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: -8px;
+  border-radius: 4px;
+  background-color: var(--ds-danger);
+  vertical-align: top;
+}
+
+.toolbar-menu {
+  position: relative;
+}
+
+.toolbar-menu summary {
+  display: block;
+  padding: 4px;
+  list-style: none;
+}
+
+.toolbar-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.toolbar-menu-items {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  min-width: 200px;
+  margin-top: 6px;
+  padding: 4px;
+  border: 1px solid var(--ds-line);
+  border-radius: 10px;
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-menu);
+}
+
+.toolbar-menu-who {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ds-line);
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.toolbar-menu-who span {
+  display: block;
+  color: var(--ds-muted);
+}
+
+.toolbar-menu-items a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--ds-ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.toolbar-menu-items a:visited {
+  color: var(--ds-ink);
+}
+
+.toolbar-menu-items a:hover {
+  background-color: var(--ds-hover);
+}
+
+/* A phone keeps the account on the first line and gives the sections a line
+   of their own, scrolled sideways rather than wrapped. */
+@media (max-width: 600px) {
+  .toolbar-links {
+    order: 3;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+  }
+
+  .toolbar-links::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.post-image {
+  max-width: 100%;
+  display: flex;
+  object-fit: contain;
+}
+
+.post-image-full {
+  width: 100%;
+  height: auto;
+  display: flex;
+  object-fit: contain;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Controls
+
+   Each component is a class, and inside `.ds-page` the same look is the
+   default for a control that has no class of its own -- so a form written
+   plainly comes out right, and a control that already carries a component
+   of its own is left alone until it is converted. The defaults sit before
+   style.css in the cascade, so a page's own contextual rule still wins a tie.
+   --------------------------------------------------------------------------- */
+
+/* The drop-down arrow, drawn in each theme's muted ink. A custom property can
+   carry a url(), which is how one rule gets two colours of arrow. */
+:root {
+  --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2355555a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23a8a8ad' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+}
+
+:root[data-theme="dark"] {
+  --ds-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23a8a8ad' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* Buttons. Secondary is the default; primary is the one thing a view asks you
+   to do, and there should be one of it.
+
+   No component here sets a margin. The defaults for unclassed controls are
+   more specific than a page's own spacing rules (`.actions > * { ... }`),
+   so a margin set here would quietly undo the page's layout. */
+.ds-button,
+.ds-page button:not([class]),
+.ds-page input[type="submit"]:not([class]),
+.ds-page input[type="button"]:not([class]),
+.ds-page input[type="reset"]:not([class]) {
+  display: inline-block;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  min-height: var(--ds-control-height);
+  padding: 5px 14px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-m);
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: middle;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.ds-button:hover,
+.ds-page button:not([class]):hover,
+.ds-page input[type="submit"]:not([class]):hover,
+.ds-page input[type="button"]:not([class]):hover,
+.ds-page input[type="reset"]:not([class]):hover {
+  background-color: var(--ds-ground);
+}
+
+.ds-button-primary,
+.ds-button-primary:visited {
+  border-color: var(--ds-accent-line);
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+  font-weight: 600;
+}
+
+.ds-button-primary:hover {
+  background-color: var(--ds-accent-hover);
+}
+
+.ds-button-quiet,
+.ds-button-quiet:visited {
+  border-color: transparent;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.ds-button-quiet:hover {
+  background-color: var(--ds-hover);
+}
+
+.ds-button-danger,
+.ds-button-danger:visited {
+  border-color: transparent;
+  background-color: var(--ds-danger);
+  color: var(--ds-danger-ink);
+  font-weight: 600;
+}
+
+.ds-button-danger:hover {
+  background-color: var(--ds-danger-hover);
+}
+
+.ds-button[disabled],
+.ds-page button:not([class])[disabled],
+.ds-page input[type="submit"]:not([class])[disabled] {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Text fields and text areas. */
+.ds-input,
+.ds-textarea,
+.ds-page input[type="text"]:not([class]),
+.ds-page input[type="email"]:not([class]),
+.ds-page input[type="password"]:not([class]),
+.ds-page input[type="url"]:not([class]),
+.ds-page input[type="search"]:not([class]),
+.ds-page input[type="number"]:not([class]),
+.ds-page input:not([type]):not([class]),
+.ds-page textarea:not([class]) {
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  min-height: var(--ds-control-height);
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-field);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-base);
+  line-height: 18px;
+}
+
+.ds-textarea,
+.ds-page textarea:not([class]) {
+  padding: 8px 10px;
+  line-height: 20px;
+}
+
+/* Native drop-downs, drawn to match: the closed control is ours, the open
+   list is the system's own -- which is what a window's list should be, and
+   is keyboard- and screen-reader-complete without a line of script. */
+.ds-select,
+.ds-page select:not([class]) {
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  min-height: var(--ds-control-height);
+  max-width: 100%;
+  padding: 5px 32px 5px 10px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-surface);
+  background-image: var(--ds-select-arrow);
+  background-position: right 10px center;
+  background-repeat: no-repeat;
+  box-shadow: var(--ds-shadow-raise);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-m);
+  line-height: 18px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Firefox before 64 draws its own arrow through `appearance: none` unless
+   the text is indented out from under it. */
+.ds-select,
+.ds-page select:not([class]) {
+  text-indent: 0.01px;
+  text-overflow: "";
+}
+
+.ds-select::-ms-expand,
+.ds-page select:not([class])::-ms-expand {
+  display: none;
+}
+
+.ds-select:hover,
+.ds-page select:not([class]):hover {
+  background-color: var(--ds-ground);
+}
+
+.ds-select option,
+.ds-page select:not([class]) option {
+  background-color: var(--ds-surface);
+  color: var(--ds-ink);
+}
+
+/* Checkboxes, radios and sliders stay the system's own, tinted with the
+   cucumber where the engine can. */
+.ds-page input[type="checkbox"],
+.ds-page input[type="radio"],
+.ds-page input[type="range"],
+.ds-check {
+  accent-color: #6fa22b;
+}
+
+/* One focus ring for everything you can type into or press. */
+.ds-button:focus,
+.ds-input:focus,
+.ds-textarea:focus,
+.ds-select:focus,
+.ds-page button:not([class]):focus,
+.ds-page input:not([class]):focus,
+.ds-page textarea:not([class]):focus,
+.ds-page select:not([class]):focus {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 1px;
+}
+
+.ds-input::-webkit-input-placeholder,
+.ds-page input:not([class])::-webkit-input-placeholder,
+.ds-page textarea:not([class])::-webkit-input-placeholder {
+  color: var(--ds-faint);
+}
+
+.ds-input::-moz-placeholder,
+.ds-page input:not([class])::-moz-placeholder,
+.ds-page textarea:not([class])::-moz-placeholder {
+  color: var(--ds-faint);
+  opacity: 1;
+}
+
+.ds-input::placeholder,
+.ds-page input:not([class])::placeholder,
+.ds-page textarea:not([class])::placeholder {
+  color: var(--ds-faint);
+}
+
+.ds-label {
+  display: block;
+  margin-bottom: var(--ds-space-1);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+}
+
+.ds-help {
+  display: block;
+  margin-top: var(--ds-space-1);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+/* ---------------------------------------------------------------------------
+   Grouping
+   --------------------------------------------------------------------------- */
+
+/* A segmented control: two to five choices of one thing. The chosen one is
+   marked by aria-pressed, aria-current or `.is-selected`. */
+.ds-segmented {
+  display: inline-block;
+  padding: 2px;
+  border-radius: 7px;
+  background-color: var(--ds-hover);
+  white-space: nowrap;
+}
+
+/* Written against `.ds-page .ds-segmented > button` as well, because an
+   unclassed button's default is exactly that specific and comes earlier. */
+.ds-segmented > *,
+.ds-page .ds-segmented > button {
+  display: inline-block;
+  margin: 0;
+  padding: 3px 12px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-m);
+  font-weight: 500;
+  line-height: 20px;
+  min-height: 0;
+  box-shadow: none;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ds-page .ds-segmented > button:hover,
+.ds-segmented > *:hover {
+  background-color: var(--ds-hover);
+}
+
+.ds-segmented > * + *,
+.ds-page .ds-segmented > button + button {
+  margin-left: 2px;
+}
+
+.ds-segmented > [aria-pressed="true"],
+.ds-segmented > [aria-current="page"],
+.ds-segmented > .is-selected,
+.ds-page .ds-segmented > button[aria-pressed="true"],
+.ds-page .ds-segmented > button[aria-pressed="true"]:hover {
+  background-color: var(--ds-surface);
+  box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
+  font-weight: 600;
+}
+
+.ds-badge {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 5px;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background-color: var(--ds-badge);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* A surface on the ground: settings groups, forms, anything that is a box. */
+.ds-card {
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+}
+
+/* ---------------------------------------------------------------------------
+   The painter's window
+
+   What belongs to drawing -- a replay, a drawing's details, its comments --
+   sits in NEO's chrome: its lavender panel, its bevel, its title bar with
+   the three grab dots. Written out here rather than borrowed from the
+   painter's sheet, which these pages do not load.
+   --------------------------------------------------------------------------- */
+:root {
+  --ds-neo-panel: #ccccff;
+  --ds-neo-ink: #2a2a44;
+  --ds-neo-text: #4a4a78;
+  --ds-neo-light: #ffffff;
+  --ds-neo-shadow: #8f8fb3;
+  --ds-neo-title-from: #9397b2;
+  --ds-neo-title-to: #b1d6fd;
+  --ds-neo-title-ink: #ffffff;
+  --ds-neo-well: #e9e9ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ds-neo-panel: #30304b;
+    --ds-neo-ink: #dcdcea;
+    --ds-neo-text: #c1c1cd;
+    --ds-neo-light: #63637e;
+    --ds-neo-shadow: #1c1c21;
+    --ds-neo-title-from: #24243a;
+    --ds-neo-title-to: #3d4f70;
+    --ds-neo-title-ink: #d7d7e4;
+    --ds-neo-well: #20203a;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ds-neo-panel: #30304b;
+  --ds-neo-ink: #dcdcea;
+  --ds-neo-text: #c1c1cd;
+  --ds-neo-light: #63637e;
+  --ds-neo-shadow: #1c1c21;
+  --ds-neo-title-from: #24243a;
+  --ds-neo-title-to: #3d4f70;
+  --ds-neo-title-ink: #d7d7e4;
+  --ds-neo-well: #20203a;
+}
+
+.ds-window {
+  border-style: solid;
+  border-width: 1px;
+  border-color: var(--ds-neo-light) var(--ds-neo-shadow) var(--ds-neo-shadow) var(--ds-neo-light);
+  background-color: var(--ds-neo-panel);
+  box-shadow: 0 0 0 1px #000000;
+  color: var(--ds-neo-ink);
+}
+
+.ds-window-title {
+  height: 18px;
+  padding: 0 4px;
+  background: -webkit-linear-gradient(left, var(--ds-neo-title-from), var(--ds-neo-title-to));
+  background: linear-gradient(to right, var(--ds-neo-title-from), var(--ds-neo-title-to));
+  color: var(--ds-neo-title-ink);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The three grab dots, drawn by the title bar itself so markup stays one
+   element. */
+.ds-window-title::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  margin: 0 12px 0 1px;
+  border-radius: 2px;
+  background-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 5px 0 0 rgba(255, 255, 255, 0.7), 10px 0 0 rgba(255, 255, 255, 0.7);
+  vertical-align: middle;
+}
+
+.ds-window-body {
+  padding: var(--ds-space-3);
+}

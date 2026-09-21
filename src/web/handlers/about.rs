@@ -34,3 +34,24 @@ pub async fn about(
 
     Ok(Html(rendered))
 }
+
+/// The design system's reference page: every token and component in
+/// `static/ds.css`, drawn by the real stylesheet. Unlinked; see design.jinja.
+pub async fn design(
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    auth_session: AuthSession,
+) -> Result<Html<String>, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let common_ctx =
+        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let template: minijinja::Template<'_, '_> = state.env.get_template("design.jinja")?;
+    let rendered = template.render(context! {
+        current_user => auth_session.user,
+        draft_post_count => common_ctx.draft_post_count,
+        unread_notification_count => common_ctx.unread_notification_count,
+        messages => Vec::<String>::new(),
+        ftl_lang,
+    })?;
+    Ok(Html(rendered))
+}

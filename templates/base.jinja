@@ -5,7 +5,7 @@
     {% include "theme_head.jinja" %}
     <title>{%- block title -%} {{ ftl_get_message("brand") }} {%- endblock title -%}</title>
     <link rel="stylesheet"
-          href="{{ '/static/toolbar.css' | cachebuster | safe }}"
+          href="{{ '/static/ds.css' | cachebuster | safe }}"
           type="text/css" />
     <link rel="stylesheet"
           href="{{ '/static/style.css' | cachebuster | safe }}"
@@ -36,7 +36,7 @@
     {% block head %}
     {% endblock head %}
   </head>
-  <body>
+  <body class="ds-page">
     <header>
       {% include "toolbar.jinja" %}
       <ul class="center">
