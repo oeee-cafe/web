@@ -262,6 +262,26 @@ nav a:visited,
    else's. The admin grid keeps its own layout; everything here is scoped to
    `.posts-grid`.
    --------------------------------------------------------------------------- */
+/* A drawing its artist marked sensitive, blurred in every grid until it is
+   opened. post_card.jinja puts the class on the image. */
+.sensitive {
+  filter: blur(1rem);
+}
+
+/* A feed's own header row: what it is at the start, Per row at the end.
+   Firefox 56: no flex gap, so the label keeps its distance by margin. */
+.feed-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin: var(--space-5) 0 var(--space-3) 0;
+}
+
+.feed-header > :first-child {
+  margin-right: var(--ds-space-4);
+}
+
 .posts-grid {
   display: grid;
   grid-template-columns: repeat(var(--home-cols, 4), minmax(0, 1fr));

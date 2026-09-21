@@ -1176,6 +1176,30 @@ mod template_tests {
         );
     }
 
+    /// The blur on sensitive drawings is one CSS rule, and a stylesheet
+    /// edit elsewhere once took it out with the rules around it: for a
+    /// day every sensitive drawing showed in the grids unblurred, and
+    /// nothing failed. The card puts the class on the image; this holds the
+    /// rule that makes it mean something.
+    #[test]
+    fn sensitive_drawings_stay_blurred() {
+        let css = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("static/style.css"),
+        )
+        .expect("style.css reads");
+        let rule = css
+            .split(".sensitive {")
+            .nth(1)
+            .and_then(|rest| rest.split('}').next())
+            .expect("a .sensitive rule");
+        assert!(rule.contains("filter: blur("), "the .sensitive rule no longer blurs");
+        let card = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/post_card.jinja"),
+        )
+        .expect("post_card.jinja reads");
+        assert!(card.contains("sensitive{% endif %}"), "the card no longer marks sensitive drawings");
+    }
+
     /// The replay switch is enforced in the handler; this is the other half of
     /// it -- the link a stranger is not supposed to be offered.
     #[test]
