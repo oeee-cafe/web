@@ -451,3 +451,4 @@ personal-post = 個人投稿
 communities-tab-public = 公開
 communities-tab-official = 公式
 communities-tab-yours = 参加中
+toolbar-menu = メニュー

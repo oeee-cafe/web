@@ -453,3 +453,4 @@ personal-post = Personal post
 communities-tab-public = Public
 communities-tab-official = Official
 communities-tab-yours = Yours
+toolbar-menu = Menu
