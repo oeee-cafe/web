@@ -1769,21 +1769,6 @@ nav a:visited,
   box-shadow: 0 0 0 3px rgba(239, 132, 45, 0.08);
 }
 
-.community-directory-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.community-sort {
-  font-size: var(--text-sm);
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
 .community-list {
   display: flex;
   flex-direction: column;
@@ -1955,136 +1940,242 @@ nav a:visited,
 }
 
 /* ---------------------------------------------------------------------------
-   The /communities directory grid
+   /communities
+
+   One bar across the top -- which list, then that list's own search and
+   sort, then Create at the far end -- and a grid of cards below it.
 
    The stacked .community-list above is still what post_edit_community.jinja
    renders, where one wide row per community is right: you are picking a
-   destination and there are only a handful of candidates. The directory is the
-   opposite problem — 90-odd public communities to browse — so it uses the grid
-   below, built to the same proportions as .posts-grid on the home feed.
+   destination from a handful. The directory is 90-odd communities to browse.
+
+   Firefox 56: no flex `gap` (sibling margins instead), no `aspect-ratio`
+   (padding-ratio boxes, as .posts-grid), and `grid-gap` beside `gap`.
    --------------------------------------------------------------------------- */
+
+.communities-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: var(--ds-space-4);
+}
+
+.communities-bar > * {
+  margin: 0 var(--ds-space-3) var(--ds-space-2) 0;
+}
+
+.communities-filters {
+  display: flex;
+  align-items: center;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.communities-filters[hidden] {
+  display: none;
+}
+
+.communities-filters > * + * {
+  margin-left: var(--ds-space-2);
+}
+
+.communities-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.communities-create {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+/* On a phone each part takes its own row, and the choice of list scrolls
+   sideways rather than pushing the page wider. */
+@media (max-width: 600px) {
+  .communities-bar > .ds-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+    margin-right: 0;
+  }
+
+  .communities-filters {
+    flex-basis: 100%;
+    margin-right: 0;
+  }
+
+  .communities-search {
+    max-width: none;
+  }
+}
+
+.communities-empty {
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
 
 .community-grid {
   display: grid;
-  gap: var(--space-2);
-  margin: var(--space-4) 0;
-  grid-template-columns: repeat(auto-fill, minmax(var(--community-card-min, 260px), 1fr));
+  grid-gap: 24px 20px;
+  gap: 24px 20px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
 
 /* Search-came-back-empty and the load-more sentinel are children of the grid;
    without this they would sit in the first column as a card-width sliver. */
-.community-grid > p {
+.community-grid > p,
+.community-grid > .infinite-scroll-sentinel {
   grid-column: 1 / -1;
 }
 
-/* Two columns on a phone rather than the one a 260px minimum would force, for
-   the same reason the post grid pins three: the cards are legible smaller than
-   the desktop minimum, and one per row is the density this page just left. */
+/* Two across on a phone: the cards are legible smaller than the desktop
+   minimum, and one per row is a list. */
 @media (max-width: 600px) {
   .community-grid {
+    grid-gap: 16px 12px;
+    gap: 16px 12px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.community-grid-item {
-  overflow: hidden;
-  border: 1px solid var(--main-border-color);
-}
-
-.community-grid-item:hover {
-  border-color: var(--main-highlight-color);
-}
-
-/* Three cells wide always, and each cell square, so the strip is a third of the
-   card tall whatever a community has in it. A community with one drawing leaves
-   two cells of empty space rather than stretching one image across the card —
-   that keeps every card in the grid exactly the same height, which is what lets
-   the rows stay flush. */
-/* The gap shows the card's own background, not the border colour. Painting the
-   grid border-coloured and letting it show through the gaps would also paint
-   the cells a community has not filled — a two-thirds-wide bar of border on
-   every card with one drawing in it, which is a third of the directory. */
-.community-card-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background-color: var(--main-bg-color);
-  border-bottom: 1px solid var(--main-border-color);
-}
-
-.community-strip-cell {
+.community-card {
   display: block;
-  aspect-ratio: 1 / 1;
+  min-width: 0;
   overflow: hidden;
-  background-color: var(--main-bg-color);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
+  color: var(--ds-ink);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
-.community-strip-cell img {
+.ds-page a.community-card,
+.ds-page a.community-card:hover {
+  color: var(--ds-ink);
+}
+
+.community-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 0.5px var(--ds-frame), 0 6px 16px rgba(40, 40, 90, 0.16);
+}
+
+.community-card:active {
+  transform: none;
+}
+
+/* Three squares edge to edge: a third of the card tall whatever a community
+   has in it. A community with fewer drawings leaves its cells blank rather
+   than stretching one across, so every cover is the same height. */
+.community-card-cover {
+  position: relative;
+  display: block;
+  height: 0;
+  padding-top: 33.3333%;
+  background-color: var(--ds-hover);
+}
+
+.community-card-cell {
+  position: absolute;
+  top: 0;
+  width: 33.3333%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+.community-card-cell:nth-child(1) { left: 0; }
+.community-card-cell:nth-child(2) { left: 33.3333%; }
+.community-card-cell:nth-child(3) { left: 66.6667%; }
+
+.community-card-cell img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
-  display: block;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
-/* Matches the height of a row of cells: three squares across means the strip is
-   a third as tall as the card is wide. */
-.community-strip-empty {
-  grid-column: 1 / -1;
-  aspect-ratio: 3 / 1;
-  margin: 0;
+.community-card-cell img.drawing-downscaled {
+  image-rendering: auto;
+}
+
+/* The separator sits over the image, so it is drawn on top of it. */
+.community-card-cell + .community-card-cell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background-color: var(--ds-surface);
+}
+
+.community-card-empty {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--text-sm);
-  font-style: italic;
-  background-color: var(--main-bg-color);
+  color: var(--ds-faint);
+  font-size: var(--ds-text-s);
 }
 
-/* Three fixed lines that clip rather than wrap, exactly as .post-card-meta
-   does. Wrapping would make card heights depend on how long a community's name
-   is, and the grid would go ragged. */
-.community-card-meta {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
-  line-height: 1.35;
+.community-card-body {
+  display: block;
+  padding: 10px 12px 12px;
+  line-height: 18px;
 }
 
 .community-card-name,
-.community-card-byline,
+.community-card-owner,
 .community-card-stats {
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .community-card-name {
-  font-weight: 700;
-}
-
-.community-card-name a {
-  color: var(--main-text-color);
-  text-decoration: none;
-}
-
-.community-card-name a:hover {
-  color: var(--main-highlight-color);
-}
-
-.community-directory-controls {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  font-size: var(--ds-text-base);
+  font-weight: 600;
 }
 
-/* The page-wide search box was 600px in a 829px column. Here it shares a header
-   row with the sort control, so it takes what is left rather than a fixed width. */
-.community-directory-search {
-  margin-bottom: 0;
-  width: auto;
-  min-width: 200px;
-  flex: 1;
+.community-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.community-card-badge {
+  flex: 0 0 auto;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background-color: var(--ds-hover);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-xs);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.community-card-owner {
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.community-card-stats {
+  margin-top: 2px;
+  color: var(--ds-faint);
+  font-size: var(--ds-text-s);
 }
 
 /* ---------------------------------------------------------------------------

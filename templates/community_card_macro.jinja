@@ -1,58 +1,54 @@
-{# The community card, shared by every section of /communities and by the
+{# The community card, shared by every list on /communities and by the
    infinite-scroll fragment, so a community looks the same however it arrived.
-   It used to be defined here and in four other places; only this copy is real.
 
-   Deliberately the same anatomy as post_card.jinja: image area on top, then a
-   fixed three-line meta block that clips rather than wraps. Uniform card
-   heights are what let the directory be a grid instead of a stack, and the two
-   pages read as one system.
+   The whole card is one target, the community, as a tile in an application
+   is. Its three latest drawings are its cover, edge to edge; the drawings and
+   the owner are a click further in, on the community's own page. Name, owner
+   and stats each keep to one line that clips rather than wraps, so every card
+   in a row is the same height.
 
-   The description is a title attribute rather than a line of its own — it
+   The description is a title attribute rather than a line of its own -- it
    averages a dozen characters across the site and half of all communities have
-   none, so it never earned the vertical space it was costing. #}
+   none. #}
 {% macro community_card(community, r2_public_endpoint_url) %}
-  <div class="community-grid-item">
-    <div class="community-card-strip">
-      {% if community.recent_posts %}
-        {% for post in community.recent_posts %}
-          <a href="/@{{ post.author_login_name }}/{{ post.id }}" class="community-strip-cell">
-            <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
-                 alt=""
-                 width="{{ post.image_width }}"
-                 height="{{ post.image_height }}"
-                 loading="lazy"
-                 decoding="async" />
-          </a>
-        {% endfor %}
-      {% else %}
-        <p class="community-strip-empty muted">{{ ftl_get_message("community-no-posts") }}</p>
+  <a class="community-card" href="/communities/@{{ community.slug }}" title="{{ community.description if community.description else community.name }}">
+    <span class="community-card-cover">
+      {% for post in community.recent_posts %}
+        <span class="community-card-cell">
+          <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
+               alt=""
+               draggable="false"
+               class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
+               width="{{ post.image_width }}"
+               height="{{ post.image_height }}"
+               loading="lazy"
+               decoding="async" />
+        </span>
+      {% endfor %}
+      {% if not community.recent_posts %}
+        <span class="community-card-empty">{{ ftl_get_message("community-no-posts") }}</span>
       {% endif %}
-    </div>
-    <div class="community-card-meta">
-      <div class="community-card-name" title="{{ community.description if community.description else community.name }}">
-        <a href="/communities/@{{ community.slug }}">{{ community.name }}</a>
+    </span>
+    <span class="community-card-body">
+      <span class="community-card-name">
+        <span class="community-card-title">{{ community.name }}</span>
         {% if community.visibility == "unlisted" %}
-          <span class="community-private-badge">{{ ftl_get_message("community-badge-unlisted") }}</span>
+          <span class="community-card-badge">{{ ftl_get_message("community-badge-unlisted") }}</span>
         {% elif community.visibility == "private" %}
-          <span class="community-private-badge">{{ ftl_get_message("community-badge-private") }}</span>
+          <span class="community-card-badge">{{ ftl_get_message("community-badge-private") }}</span>
         {% endif %}
-      </div>
-      {# The slug is not shown. It links to the same place the name does, and
-         for three quarters of communities it is a raw UUID. #}
-      <div class="community-card-byline">
-        <a href="/@{{ community.owner_login_name }}">@{{ community.owner_login_name }}</a>
-      </div>
-      <div class="community-card-stats muted">
+      </span>
+      {# The slug is not shown: for three quarters of communities it is a raw
+         UUID. #}
+      <span class="community-card-owner">@{{ community.owner_login_name }}</span>
+      <span class="community-card-stats">
         {{ community.posts_count if community.posts_count else 0 }} {{ ftl_get_message("community-stats-posts") }}
         · {{ community.members_count if community.members_count else 0 }} {{ ftl_get_message("community-stats-contributors") }}
-        {# The directory defaults to sorting on this and never used to show it,
-           so a community last drawn in two years ago looked as live as one
-           from this morning. It shares the stats line so the meta block is
-           three lines whether or not a community has ever been posted in. #}
+        {# The directory sorts on this by default, so the card shows it. #}
         {% if community.last_post_at %}
           · {{ community.last_post_at|dateformat(format="short", tz="Asia/Seoul") }}
         {% endif %}
-      </div>
-    </div>
-  </div>
+      </span>
+    </span>
+  </a>
 {% endmacro %}

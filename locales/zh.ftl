@@ -448,3 +448,6 @@ community-guidelines-content = { brand }致力于为所有用户提供安全、�
   使用{ brand }即表示您同意遵守这些社区准则。我们保留随时更新这些准则的权利。
 
 personal-post = 个人帖子
+communities-tab-public = 公开
+communities-tab-official = 官方
+communities-tab-yours = 我的
