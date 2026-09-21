@@ -9,6 +9,7 @@ htmx-error-server = Something went wrong on our side. Please try again in a mome
 about = Oeee Cafe is an oekaki board.
 user-contributors = Users who made Oeee Cafe together
 
+nav-recent = Recent
 timeline = Timeline
 timeline-my = My timeline
 timeline-empty = Your timeline is empty. Discover and follow other people from <a href="/communities">communities</a>!
@@ -245,7 +246,6 @@ official-communities = Official communities
 official-communities-nil = There are no official communities.
 active-communities-nil = There are no active communities.
 loading-more-posts = Loading more posts...
-feed-columns = Per row
 post-untitled = Untitled
 community-sort = Sort
 community-sort-active = Recently active

@@ -25,7 +25,6 @@
         href="https://{{ domain }}/ap/communities/{{ community.id }}" />
 {% endblock head %}
 {% block content %}
-  {% include "post_feed_head.jinja" %}
   <div class="center">
     {% block community_edit_block %}
       {# :inherited so the edit button below still swaps this header out.
@@ -162,7 +161,6 @@
         <h2 id="post-feed-heading" class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
         {# Only with posts to arrange: an empty feed has no columns to set. #}
         {% if feed_posts %}
-          {% include "post_feed_controls.jinja" %}
         {% endif %}
       </div>
       {% if feed_posts %}

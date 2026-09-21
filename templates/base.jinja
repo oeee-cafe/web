@@ -46,10 +46,11 @@
          Scoping it here keeps every link that reaches a module bundle out of
          it: they all live in page bodies, outside this nav. The one exception
          is the draw form below, which says so itself. #}
-      {# One compact toolbar, where a 75px logo used to sit over a row of
-         underlined links: the site reads as an application rather than as a
-         page about one, in a browser and in the desktop app alike. There is
-         no separate "app mode" — what would look out of place in the app is
+      {# The window's title bar: the sections as its tabs, Draw and the
+         account at its end. The desktop app draws its window controls over
+         this bar rather than above it, so the site and the window read as one
+         surface; in a browser it is simply the top of the page. There is no
+         separate "app mode" -- what would look out of place in the app is
          changed for everybody.
 
          Written for Firefox 56 like the rest of static/style.css, which no
@@ -58,13 +59,28 @@
       <nav class="nav-bar" hx-boost:inherited="true">
         <div id="menubar">
           <a class="toolbar-brand" href="/">
+            <img class="toolbar-mark" src="/static/favicon.png" alt="" width="22" height="22" />
             <img src="{%- if ftl_lang == "zh" -%}/static/logo/en.svg{%- else -%}/static/logo/{{ ftl_lang }}.svg{%- endif -%}"
                  alt="{{ ftl_get_message('brand') }}"
-                 height="28"
-                 width="{%- if ftl_lang == "ja" -%} 129 {%- else -%} 101 {%- endif -%}" />
+                 height="18"
+                 width="{%- if ftl_lang == "ja" -%} 83 {%- else -%} 65 {%- endif -%}" />
           </a>
+          {# The sections, as a window's title bar holds its tabs. #}
           <div class="toolbar-links">
+            <a href="/">{{ ftl_get_message("nav-recent") }}</a>
             {% if current_user %}
+              <a href="/home">{{ ftl_get_message("timeline") }}</a>
+            {% endif %}
+            <a href="/communities">{{ ftl_get_message("community") }}</a>
+            {# Shown signed out too: the lobby is a public gallery of finished
+               collaborative drawings, and only creating a session needs an
+               account. #}
+            <a href="/collaborate">{{ ftl_get_message("collaborate") }}</a>
+            <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
+          </div>
+          <div class="toolbar-end">
+            {% if current_user %}
+              {% include "nav_notifications.jinja" %}
               {# The one control in this nav that loads a module bundle.
                  Boosting it would mount the painter once per session and never
                  again. #}
@@ -72,33 +88,20 @@
                 <input type="hidden" name="tool" value="neo" />
                 <input type="hidden" name="width" value="300" />
                 <input type="hidden" name="height" value="300" />
-                <input type="submit"
-                       id="nav-draw-button"
-                       class="toolbar-primary"
-                       value="{{ ftl_get_message('draw') }}" />
+                <button type="submit" id="nav-draw-button" class="toolbar-draw">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 2.6a2 2 0 0 1 2.9 2.9L11 15.8l-3.6.8.8-3.6Z"/><path d="M7 17c-2 0-3 1.2-3 3 0 .6-.4 1-1 1 1.5 1 3 1 4.5 1 1.9 0 3.5-1.6 3.5-3.5"/></svg><span>{{ ftl_get_message('draw') }}</span>
+                </button>
               </form>
-            {% else %}
-              <a class="toolbar-primary" href="/login">{{ ftl_get_message('draw') }}</a>
-            {% endif %}
-            {# Shown signed out too: the lobby is a public gallery of finished
-               collaborative drawings, and only creating a session needs an
-               account. #}
-            <a href="/collaborate">{{ ftl_get_message("collaborate") }}</a>
-            <a href="/communities">{{ ftl_get_message("community") }}</a>
-            <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
-            {% if current_user %}
-              <a href="/home">{{ ftl_get_message("timeline") }}</a>
-            {% endif %}
-          </div>
-          <div class="toolbar-end">
-            {% if current_user %}
-              {% include "nav_notifications.jinja" %}
               <details class="toolbar-menu">
-                <summary>
-                  {{ current_user.display_name }}
+                <summary aria-label="{{ current_user.display_name or current_user.login_name }}">
+                  <span class="toolbar-avatar" aria-hidden="true">{{ (current_user.display_name or current_user.login_name or "?")[:1]|upper }}</span>
                   {% if not current_user.email_verified_at %}<span class="toolbar-dot" title="{{ ftl_get_message('email-not-verified') }}"></span>{% endif %}
                 </summary>
                 <div class="toolbar-menu-items">
+                  <div class="toolbar-menu-who">
+                    <strong>{{ current_user.display_name }}</strong>
+                    <span>@{{ current_user.login_name }}</span>
+                  </div>
                   <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>
                   {% if draft_post_count > 0 %}
                     <a href="/posts/drafts">{{ ftl_get_message("drafts") }} <span class="toolbar-badge">{{ draft_post_count }}</span></a>
@@ -114,7 +117,7 @@
             {% else %}
               <a href="/about">{{ ftl_get_message('brand') }}?</a>
               <a href="/login">{{ ftl_get_message("sign-in") }}</a>
-              <a class="toolbar-outline" href="/signup">{{ ftl_get_message("sign-up") }}</a>
+              <a class="toolbar-draw" href="/signup">{{ ftl_get_message("sign-up") }}</a>
             {% endif %}
           </div>
         </div>

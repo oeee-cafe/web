@@ -11,6 +11,7 @@ about = 오에카키는 그림을 그릴 수 있는 게시판입니다.
   오이를 깎을 수 있는 카페 오이카페입니다.
 user-contributors = 오이카페를 함께 만든 사람들
 
+nav-recent = 최신
 timeline = 동맹
 timeline-my = 내 동맹
 timeline-empty = 동맹이 비어 있습니다. <a href="/communities">커뮤니티</a>에서 다른 사람과 동맹을 맺어 보세요!
@@ -243,7 +244,6 @@ official-communities = 공식 커뮤니티
 official-communities-nil = 공식 커뮤니티가 없습니다.
 active-communities-nil = 활동 중인 공개 커뮤니티가 없습니다.
 loading-more-posts = 더 많은 그림 불러오는 중...
-feed-columns = 한 줄에
 post-untitled = 제목 없음
 community-sort = 정렬
 community-sort-active = 최근 활동순

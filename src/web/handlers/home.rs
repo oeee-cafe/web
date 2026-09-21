@@ -1385,22 +1385,40 @@ mod tests {
     }
 
     #[test]
-    fn renders_home_with_size_control() {
+    fn renders_home_as_a_grid_of_equal_squares() {
         let env = test_support::env();
         let template = env.get_template("home.jinja").expect("template loads");
         let rendered = template
             .render(home_context(vec![sample_post()], false))
             .expect("home.jinja renders");
-        assert!(rendered.contains("id=\"post-cols\""));
-        // The readout is what tells the user the slider did something; without
-        // it a step that cannot change the layout looks like a broken control.
-        assert!(rendered.contains("id=\"post-cols-value\""));
+        assert!(rendered.contains("id=\"post-feed-grid\""));
         assert!(rendered.contains("class=\"feed-header\""));
-        assert!(rendered.contains("DOMContentLoaded"));
+        // Every drawing is the same 300px square now, so there is no column
+        // count left to choose and no slider to choose it with.
+        assert!(!rendered.contains("id=\"post-cols\""));
         // The grid opts into the wide container; the page — and so the header
         // above it — keeps the one width every other page uses.
         assert!(rendered.contains("class=\"center-wide\""));
         assert!(!rendered.contains("--page-width"));
+    }
+
+    /// A drawing larger than its square is scaled down smoothly; one drawn at
+    /// 300 or smaller keeps hard pixels, which only work upward.
+    #[test]
+    fn only_drawings_larger_than_the_square_scale_smoothly() {
+        let env = test_support::env();
+        let template = env.get_template("home.jinja").expect("template loads");
+        let mut large = sample_post();
+        large["image_width"] = json!(550);
+        large["image_height"] = json!(550);
+        let rendered = template
+            .render(home_context(vec![sample_post()], false))
+            .expect("renders at 300");
+        assert!(!rendered.contains("drawing-downscaled"));
+        let rendered = template
+            .render(home_context(vec![large], false))
+            .expect("renders at 550");
+        assert!(rendered.contains("drawing-downscaled"));
     }
 
     #[test]
@@ -1492,13 +1510,9 @@ mod tests {
             .expect("timeline.jinja renders");
         assert!(rendered.contains("class=\"center-wide\""));
         assert!(!rendered.contains("--page-width"));
-        assert!(rendered.contains("id=\"post-cols\""));
+        assert!(!rendered.contains("id=\"post-cols\""));
         assert!(rendered.contains("id=\"post-feed-grid\""));
-        // Heading and control share one row.
         assert!(rendered.contains("class=\"feed-header\""));
-        // The control partial renders above the grid it drives, so its script
-        // must wait for parse; running inline it finds no grid and dies quietly.
-        assert!(rendered.contains("DOMContentLoaded"));
         assert!(rendered.contains("post-card-byline"));
         // Sentinel must target the timeline endpoint, not the public feed.
         assert!(rendered.contains("&#x2f;api&#x2f;timeline&#x2f;posts"));

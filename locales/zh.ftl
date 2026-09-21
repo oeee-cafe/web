@@ -11,6 +11,7 @@ about = 黄瓜画板是一个可以画画的留言板。
   这里是削黄瓜的咖啡馆，黄瓜咖啡馆。
 user-contributors = 一起创建黄瓜咖啡馆的人们
 
+nav-recent = 最新
 timeline = 时间线
 timeline-my = 我的时间线
 timeline-empty = 时间线是空的。在<a href="/communities">社区</a>中与其他用户建立联系吧！
@@ -243,7 +244,6 @@ official-communities = 官方社区
 official-communities-nil = 暂无官方社区
 active-communities-nil = 暂无活跃的公开社区
 loading-more-posts = 加载更多作品...
-feed-columns = 每行
 post-untitled = 无标题
 community-sort = 排序
 community-sort-active = 最近活跃

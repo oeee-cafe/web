@@ -7,8 +7,11 @@
    was only ever right on a fresh page load, and sat there overstating the
    unread count for the rest of the visit. #}
 <span id="nav-notifications">
-  <a href="/notifications">
-    {{- ftl_get_message("notifications") -}}
+  <a href="/notifications"
+     class="toolbar-icon"
+     aria-label="{{ ftl_get_message("notifications") }}"
+     title="{{ ftl_get_message("notifications") }}">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
     {%- if unread_notification_count is defined and unread_notification_count > 0 %} <span class="toolbar-badge">{{ unread_notification_count }}</span>{% endif -%}
   </a>
 </span>

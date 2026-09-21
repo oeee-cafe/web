@@ -5,7 +5,6 @@
 {% block head %}
 {% endblock head %}
 {% block content %}
-  {% include "post_feed_head.jinja" %}
   <div class="center-wide">
     {# The public post grid is the whole page: communities and recent comments
        moved off home. Cards, controls and page chrome are shared with /home so
@@ -17,7 +16,6 @@
            above their drawing grids. #}
         <div class="feed-header">
           <h2 id="post-feed-heading" class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
-          {% include "post_feed_controls.jinja" %}
         </div>
         <div class="posts-grid" id="post-feed-grid">
           {% include "post_feed_fragment.jinja" %}
