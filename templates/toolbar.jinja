@@ -63,6 +63,12 @@
     <div class="toolbar-end">
       {% if current_user %}
         {% include "nav_notifications.jinja" %}
+        {# Drafts in the bar while there are any: something left to finish
+           is worth seeing without opening a menu, and nothing is when there
+           is not. #}
+        {% if draft_post_count > 0 %}
+          <a class="toolbar-button" href="/posts/drafts">{{ ftl_get_message("drafts") }} <span class="toolbar-badge">{{ draft_post_count }}</span></a>
+        {% endif %}
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
            again. #}
@@ -70,7 +76,7 @@
           <input type="hidden" name="tool" value="neo" />
           <input type="hidden" name="width" value="300" />
           <input type="hidden" name="height" value="300" />
-          <button type="submit" id="nav-draw-button" class="toolbar-draw">
+          <button type="submit" id="nav-draw-button" class="toolbar-draw" title="{{ ftl_get_message('draw') }}" aria-label="{{ ftl_get_message('draw') }}">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 2.6a2 2 0 0 1 2.9 2.9L11 15.8l-3.6.8.8-3.6Z"/><path d="M7 17c-2 0-3 1.2-3 3 0 .6-.4 1-1 1 1.5 1 3 1 4.5 1 1.9 0 3.5-1.6 3.5-3.5"/></svg><span>{{ ftl_get_message('draw') }}</span>
           </button>
         </form>
@@ -85,9 +91,6 @@
               <span>@{{ current_user.login_name }}</span>
             </div>
             <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>
-            {% if draft_post_count > 0 %}
-              <a href="/posts/drafts">{{ ftl_get_message("drafts") }} <span class="toolbar-badge">{{ draft_post_count }}</span></a>
-            {% endif %}
             <a href="/account">{{ ftl_get_message("account") }}
               {% if not current_user.email_verified_at %}
                 <span class="dangerous">({{ ftl_get_message("email-not-verified") }})</span>
@@ -192,13 +195,25 @@
         var links = bar.querySelector(".toolbar-links");
         var end = bar.querySelector(".toolbar-end");
         if (!name || !links || !end) return;
-        nav.classList.remove("is-stacked");
+        nav.classList.remove("is-stacked", "is-compact", "is-bare");
         var line = name.getBoundingClientRect();
         var sections = links.getBoundingClientRect();
         var account = end.getBoundingClientRect();
         var oneRow = sections.top < line.bottom && account.top < line.bottom &&
           account.left - sections.right >= 16;
-        if (!oneRow) nav.classList.add("is-stacked");
+        if (oneRow) return;
+        nav.classList.add("is-stacked");
+        // Stacked, the first line still has to hold the name and the
+        // account. If it does not, first Draw keeps only its pencil and the
+        // buttons close up; then, if even that wraps, the name steps aside --
+        // Recent is home, a tab away. Each step only where it is needed.
+        function wrapped() {
+          return end.getBoundingClientRect().top >= name.getBoundingClientRect().bottom;
+        }
+        if (!wrapped()) return;
+        nav.classList.add("is-compact");
+        if (!wrapped()) return;
+        nav.classList.add("is-bare");
       };
       window.oeeeFitToolbar();
       // The content area scrolls, not the window, and browsers only restore

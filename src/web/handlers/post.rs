@@ -2408,10 +2408,18 @@ pub async fn hx_do_edit_post(
     Ok(Html(rendered).into_response())
 }
 
+/// `?in_place=1`: the page asking stays where it is -- the drafts list takes
+/// the card away itself -- instead of being sent to where the post lived.
+#[derive(Deserialize, Default)]
+pub struct DeletePostQuery {
+    in_place: Option<String>,
+}
+
 pub async fn hx_delete_post(
     auth_session: AuthSession,
     State(state): State<AppState>,
     Path(id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<DeletePostQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     let post_uuid = Uuid::parse_str(&id)?;
 
@@ -2538,9 +2546,15 @@ pub async fn hx_delete_post(
     // The tags stay on the post. Deletion here is soft, and a tag counts and
     // lists only undeleted posts, so there is nothing to decrement and a post
     // that comes back comes back tagged.
-    delete_post_with_activity(&mut tx, post_uuid, Some(&state)).await?;
+    // A draft was never announced, so there is nothing for followers to
+    // take back: a Delete for it would only tell them it had existed.
+    let was_published = post.get("published_at").and_then(|v| v.as_ref()).is_some();
+    delete_post_with_activity(&mut tx, post_uuid, was_published.then_some(&state)).await?;
     tx.commit().await?;
 
+    if query.in_place.is_some() {
+        return Ok(Html(String::new()).into_response());
+    }
     Ok(([("HX-Redirect", &redirect_url)],).into_response())
 }
 
