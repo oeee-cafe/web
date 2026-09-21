@@ -1,11 +1,20 @@
 import { useRef, useCallback } from "react";
-import { useBaseDrawing, type DrawingState } from "./useBaseDrawing";
+import {
+  useBaseDrawing,
+  type DrawingState,
+  type PastePlacement,
+} from "./useBaseDrawing";
 import { ActionRecorder } from "../utils/ActionRecorder";
 import { deflateCoverage } from "../utils/rasterCodec";
 import { maskFrom, NO_MASK, type Mask } from "../neo/mask";
 import type { BrushType } from "../types/drawing";
 import type { PainterBrush, PainterOperation } from "../operations";
-import { frameShapeFor, type RegionTool } from "../neo/tools";
+import {
+  fillToolTypeFor,
+  frameShapeFor,
+  type RegionTool,
+  type ToolId,
+} from "../neo/tools";
 import type { RegionRect } from "../neo/regionDrag";
 import type { BezierPreviewStyle } from "../neo/regionPreview";
 
@@ -96,6 +105,14 @@ export const useOfflineDrawing = (
   onVirtualRightUsed?: () => void,
   /** Whether to keep a `.pch` replay; a collaborative host does not. */
   recordReplay: boolean = true,
+  /**
+   * Copy and paste as NEO does them: the painter switches itself from copy
+   * to paste and back, and shows the copy while it is being placed.
+   */
+  placement?: {
+    onToolChange?: (tool: ToolId) => void;
+    onPastePreview?: (placement: PastePlacement | null) => void;
+  },
 ) => {
   // Initialize replay recording
   const actionRecorderRef = useRef<ActionRecorder>(
@@ -468,6 +485,59 @@ export const useOfflineDrawing = (
     ),
 
     onRegionPreview,
+    onToolChange: placement?.onToolChange,
+    onPastePreview: placement?.onPastePreview,
+
+    /*
+     * A dropped copy, recorded the way NEO records one: the rectangle it
+     * was copied from and the offset it was dragged by, so a `.pch` from
+     * here reads exactly like one from NEO. The wire carries the rectangle
+     * it landed on instead, which a peer's engine pastes at directly --
+     * the same pixels, with the offset already applied.
+     */
+    onPaste: useCallback(
+      (
+        layer: "foreground" | "background",
+        source: RegionRect,
+        dx: number,
+        dy: number
+      ) => {
+        const shape = frameShapeFor("paste");
+        if (!shape) return;
+        const color = {
+          r: parseInt(drawingState.color.slice(1, 3), 16),
+          g: parseInt(drawingState.color.slice(3, 5), 16),
+          b: parseInt(drawingState.color.slice(5, 7), 16),
+          a: drawingState.opacity,
+        };
+        actionRecorderRef.current.pushRegion(
+          shape.verb,
+          shape.carriesDrawingState,
+          layer === "foreground" ? 1 : 0,
+          source,
+          color,
+          drawingState.brushSize,
+          [dx, dy],
+          strokeMaskRef.current
+        );
+        emitOperation({
+          kind: "region",
+          layer,
+          tool: "paste",
+          rect: {
+            x: source.x + dx,
+            y: source.y + dy,
+            width: source.width,
+            height: source.height,
+          },
+          color,
+          brushSize: drawingState.brushSize,
+          mask: strokeMaskRef.current,
+        });
+      },
+      [drawingState.color, drawingState.opacity, drawingState.brushSize, emitOperation]
+    ),
+
     onLinePreview,
     onTextPlace,
     onBezierPreview,
@@ -551,6 +621,7 @@ export const useOfflineDrawing = (
       ) => {
         const shape = frameShapeFor(tool);
         if (!shape) return;
+        const fillType = fillToolTypeFor(tool);
         actionRecorderRef.current.pushRegion(
           shape.verb,
           shape.carriesDrawingState,
@@ -558,9 +629,13 @@ export const useOfflineDrawing = (
           rect,
           color,
           brushSize,
-          // paste's frame ends with the offset it was dropped at; we drop it
-          // where it was dragged, so that offset is zero.
-          tool === "paste" ? [0, 0] : [],
+          // A `fill` frame ends with which shape it is: NEO's fill action
+          // reads it from item[15] and hands it to doFill, whose getMaskFunc
+          // draws nothing for a type it does not know. This was left off,
+          // so every rectangle and ellipse drawn here replayed as blank --
+          // in NEO and in our own viewer alike -- while the canvas it was
+          // recorded on showed it.
+          fillType !== null ? [fillType] : [],
           strokeMaskRef.current
         );
         emitOperation({

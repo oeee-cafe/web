@@ -135,6 +135,33 @@ export function useCanvasView({
     canvasContainerRef,
   ]);
 
+  /*
+   * Put the canvas back on whole pixels when the window changes size.
+   *
+   * The frame is flex-centred, so resizing the viewport by an odd number of
+   * pixels moves it by half of one, and nothing else re-applies the transform
+   * until the next pan or zoom -- leaving the wobble a whole-number zoom is
+   * meant to rule out. A zero pan re-runs the clamp and the snap. The visual
+   * viewport is watched too, because a phone's URL bar and keyboard change it
+   * without resizing the window.
+   */
+  useEffect(() => {
+    if (!drawingEngine) return;
+    const resettle = () =>
+      drawingEngine.updatePanOffset(
+        0,
+        0,
+        canvasContainerRef.current || undefined,
+        currentZoom
+      );
+    window.addEventListener("resize", resettle);
+    window.visualViewport?.addEventListener("resize", resettle);
+    return () => {
+      window.removeEventListener("resize", resettle);
+      window.visualViewport?.removeEventListener("resize", resettle);
+    };
+  }, [drawingEngine, currentZoom, canvasContainerRef]);
+
   return { cursorCanvasRef, paintCursor };
 }
 

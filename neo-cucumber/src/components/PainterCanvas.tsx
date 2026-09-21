@@ -55,6 +55,10 @@ export function PainterCanvas({
     <div
       ref={containerRef}
       className={`relative mx-auto border border-main bg-white touch-none select-none canvas-container ${
+        // Hard pixels only hold at 1x and above; below it nearest-neighbour
+        // drops whole rows. See getZoomLevels.
+        zoom < 1 ? "canvas-downscaled" : ""
+      } ${
         brushType === "pan"
           ? "cursor-grab active:cursor-grabbing"
           : "cursor-crosshair"

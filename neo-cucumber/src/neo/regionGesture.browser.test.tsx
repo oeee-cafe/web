@@ -390,20 +390,8 @@ describe("copy and paste", () => {
     expect(at(40, 26)).toBeGreaterThan(0);
   });
 
-  it("records paste with the offset slots NEO reads", async () => {
-    const { api, send } = await mountWithTool("paste");
-    await send("pointerdown", 5, 5);
-    await act(async () => { await sleep(20); });
-    await send("pointermove", 20, 18);
-    await send("pointerup", 20, 18);
-
-    const { decodePCH } = await import("./NeoReplay");
-    const frame = decodePCH(
-      new Uint8Array(await api.getReplayBlob().arrayBuffer())
-    )!.items.at(-1)!;
-    // ["paste", layer, x, y, w, h, dx, dy]
-    expect(frame).toEqual(["paste", 0, 5, 5, 16, 14, 0, 0]);
-  });
+  // The gesture -- copy handing over to paste, the drag, the frames NEO
+  // reads -- is covered in copyPaste.browser.test.tsx.
 });
 
 describe("the text tool", () => {
