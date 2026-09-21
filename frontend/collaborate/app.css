@@ -65,3 +65,19 @@ textarea,
   -webkit-user-select: text;
   -webkit-touch-callout: default;
 }
+
+/*
+ * Room above the app for the site's toolbar.
+ *
+ * The server puts the toolbar at the top of this page and sets
+ * --oeee-chrome-top to its height; the app starts below it, and the painter's
+ * area, which the chat measures its ceiling from, starts there too, so no
+ * window can be dragged under the toolbar. Unset -- the app on its own -- it
+ * is 0 and the app takes the whole viewport as it always did. Doubled class
+ * to outrank the package's own `.app-container` whichever sheet loads last.
+ */
+.app-container.app-container {
+  top: var(--oeee-chrome-top, 0px);
+  height: calc(100vh - var(--oeee-chrome-top, 0px));
+  height: calc(100dvh - var(--oeee-chrome-top, 0px));
+}

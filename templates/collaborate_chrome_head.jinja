@@ -1,0 +1,12 @@
+{# What the server adds to the collaborative drawing app's <head> as it sends
+   it: the design system, for the toolbar it puts above the app, and the
+   painter's light/dark choice, applied before anything paints. The app is a
+   built page served as a file, so it cannot include these itself.
+   --oeee-chrome-top tells the app how far below the top of the window it
+   starts (frontend/collaborate/app.css). #}
+{% include "theme_head.jinja" %}
+<link rel="stylesheet" href="{{ '/static/ds.css' | cachebuster | safe }}" />
+<style>
+  :root { --oeee-chrome-top: 53px; }
+  body { margin: 0; }
+</style>
