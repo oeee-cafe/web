@@ -30,9 +30,19 @@ export interface MountOptions {
   height?: number;
   /** BCP-47 language tag; defaults to the document's. */
   lang?: string;
+  /**
+   * The finished drawing, shown until the replay is wanted. With a poster
+   * the controls are there from the start and nothing is fetched until one
+   * of them is used: a page that shows a drawing with its replay under it
+   * does not download every recording for everyone who only looks. Without
+   * one, the replay loads and plays at once, as it always has.
+   */
+  poster?: string;
 }
 
 export interface MountedViewer {
+  /** Loads the replay if it has not been, and plays it from the start. */
+  play(): void;
   dispose(): void;
 }
 
@@ -94,7 +104,9 @@ export function mount(
   controls.append(seek, buttons);
 
   let player: ReplayPlayer | null = null;
+  let loading: Promise<ReplayPlayer | null> | null = null;
   let disposed = false;
+  let speedIndex = DEFAULT_SPEED_INDEX;
 
   const onState = (state: PlayerState) => {
     seek.max = String(Math.max(1, state.total));
@@ -102,52 +114,107 @@ export function mount(
     playButton.textContent = state.playing ? labels.pause : labels.play;
   };
 
-  (async () => {
-    try {
-      const response = await fetch(options.replay);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const decoded = decodePCH(await response.arrayBuffer());
-      if (!decoded) throw new Error("not a PCH file");
-      if (disposed) return;
+  // With a poster, the drawing stands where the canvas will, the controls
+  // under it, and the seek bar at its end -- the drawing is finished.
+  let poster: HTMLImageElement | null = null;
+  if (options.poster) {
+    poster = el("img", "neo-cucumber-replay-poster");
+    poster.src = options.poster;
+    poster.alt = "";
+    poster.draggable = false;
+    poster.width = options.width ?? 300;
+    poster.height = options.height ?? 300;
+    // Fine enough to let go of anywhere, until the step count is known.
+    seek.max = "1000";
+    seek.value = "1000";
+    status.remove();
+    container.append(poster, controls);
+  }
 
-      canvas.width = decoded.width;
-      canvas.height = decoded.height;
-      canvas.style.width = `${decoded.width}px`;
-      canvas.style.height = `${decoded.height}px`;
+  const load = (): Promise<ReplayPlayer | null> => {
+    if (loading) return loading;
+    if (poster) container.classList.add("is-loading");
+    loading = (async () => {
+      try {
+        const response = await fetch(options.replay);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const decoded = decodePCH(await response.arrayBuffer());
+        if (!decoded) throw new Error("not a PCH file");
+        if (disposed) return null;
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("no 2d context");
+        canvas.width = decoded.width;
+        canvas.height = decoded.height;
+        canvas.style.width = `${decoded.width}px`;
+        canvas.style.height = `${decoded.height}px`;
 
-      status.remove();
-      container.append(canvas, controls);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("no 2d context");
 
-      player = new ReplayPlayer(
-        decoded.items,
-        decoded.width,
-        decoded.height,
-        ctx,
-        onState
-      );
-      player.play();
-    } catch (error) {
-      if (disposed) return;
-      status.textContent = `${labels.failed} (${
-        error instanceof Error ? error.message : String(error)
-      })`;
-    }
-  })();
+        status.remove();
+        container.classList.remove("is-loading");
+        if (poster) {
+          poster.replaceWith(canvas);
+          poster = null;
+        } else {
+          container.append(canvas, controls);
+        }
+
+        player = new ReplayPlayer(
+          decoded.items,
+          decoded.width,
+          decoded.height,
+          ctx,
+          onState
+        );
+        player.setSpeed(SPEEDS[speedIndex].rate);
+        return player;
+      } catch (error) {
+        if (disposed) return null;
+        container.classList.remove("is-loading");
+        status.textContent = `${labels.failed} (${
+          error instanceof Error ? error.message : String(error)
+        })`;
+        container.appendChild(status);
+        return null;
+      }
+    })();
+    return loading;
+  };
+
+  const play = () => {
+    void load().then((loaded) => {
+      if (!loaded) return;
+      // Loaded paused, or finished: from the start, as NEO plays.
+      if (!loaded.getState().playing) loaded.play();
+    });
+  };
+
+  if (!options.poster) play();
 
   playButton.addEventListener("click", () => {
-    if (!player) return;
+    if (!player) return play();
     if (player.getState().playing) player.pause();
     else player.play();
   });
-  rewindButton.addEventListener("click", () => void player?.rewind());
-  skipButton.addEventListener("click", () => void player?.skipToEnd());
-  seek.addEventListener("input", () => void player?.seekTo(Number(seek.value)));
+  rewindButton.addEventListener("click", () => {
+    void load().then((loaded) => loaded?.rewind());
+  });
+  skipButton.addEventListener("click", () => {
+    void load().then((loaded) => loaded?.skipToEnd());
+  });
+  seek.addEventListener("input", () => {
+    if (player) return void player.seekTo(Number(seek.value));
+    // Before the file is here the bar measures the drawing, not its steps:
+    // where it was let go is a fraction of the way through.
+    const fraction = Number(seek.value) / Math.max(1, Number(seek.max));
+    void load().then((loaded) => {
+      if (loaded) void loaded.seekTo(fraction * loaded.getState().total);
+    });
+  });
 
   speedButtons.forEach((button, index) => {
     button.addEventListener("click", () => {
+      speedIndex = index;
       player?.setSpeed(SPEEDS[index].rate);
       speedButtons.forEach((other, i) =>
         other.setAttribute("aria-pressed", String(i === index))
@@ -156,6 +223,7 @@ export function mount(
   });
 
   return {
+    play,
     dispose() {
       disposed = true;
       player?.dispose();

@@ -149,10 +149,8 @@ main > .center-wide > :first-child > :first-child {
    different sizes — 1.2em, 1.2em, 1.3em, 1.2em and whatever h2 happened to be —
    for one job. The names stay, because they are spread across a dozen
    templates and renaming them buys nothing; they now resolve to one rule. */
-.section-heading,
 .home-section-title,
 .community-section-title,
-.post-move-preview-title,
 .notifications-title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-lg);
@@ -830,12 +828,6 @@ nav a:visited,
 
 
 
-.post-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
 /* ---------------------------------------------------------------------------
    A post
 
@@ -873,11 +865,14 @@ nav a:visited,
 
 .post-stage-image {
   display: block;
+  width: var(--post-stage-shown, auto);
   max-width: 100%;
   height: auto;
 }
 
-.post-stage-image.is-zoomed {
+.is-zoomed .post-stage-image,
+.is-zoomed .neo-cucumber-replay-poster,
+.is-zoomed .neo-cucumber-replay-canvas {
   image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
 }
@@ -1586,302 +1581,239 @@ nav a:visited,
   border-color: var(--main-highlight-color);
 }
 
-/* Post Move Community Page */
+/* ---------------------------------------------------------------------------
+   Moving a post to a community
 
-.post-move-header {
+   A picker: the drawing and where it is now, a search, one grouped list
+   of rows to choose from, and a bar at the window's foot with the one
+   button. The list is a radio group, so the arrow keys move through it.
+   --------------------------------------------------------------------------- */
+.move-page {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.move-subject {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-6);
-  padding-bottom: var(--space-5);
-  border-bottom: 1px solid var(--main-border-color);
+  margin-bottom: var(--ds-space-4);
 }
 
-.post-move-header h2 {
-  margin: 0;
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  color: var(--main-text-color);
-}
-
-.post-move-preview {
-  margin-bottom: var(--space-6);
-}
-
-.post-move-preview-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-}
-
-.post-move-preview-link:hover .post-move-preview-content {
-  border-color: var(--main-highlight-color);
-  background-color: rgba(239, 132, 45, 0.02);
-}
-
-.post-move-preview-content {
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-5);
-  display: flex;
-  gap: var(--space-5);
-  align-items: center;
-  background-color: var(--main-bg-color);
-}
-
-.post-move-preview-image {
-  max-width: 200px;
-  max-height: 200px;
-  height: auto;
-  border: 1px solid var(--main-border-color);
-  display: block;
-  flex-shrink: 0;
-}
-
-.post-move-preview-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.community-current-section {
-  margin-bottom: var(--space-6);
-}
-
-.community-current-card {
-  border: 2px solid var(--main-highlight-color);
-  background-color: rgba(239, 132, 45, 0.03);
-}
-
-.community-current-card:hover {
-  border-color: var(--main-highlight-color);
-  background-color: rgba(239, 132, 45, 0.05);
-}
-
-.community-current-badge {
-  display: inline-block;
-  padding: var(--space-1) var(--space-3);
-  background-color: var(--main-highlight-color);
-  color: white;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  margin-left: var(--space-2);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.community-private-badge {
-  display: inline-block;
-  padding: var(--space-1) var(--space-3);
-  background-color: var(--main-text-muted-color);
-  color: white;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  margin-left: var(--space-2);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.community-known-badge {
-  display: inline-block;
-  padding: var(--space-1) var(--space-3);
-  background-color: #4a90e2;
-  color: white;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  margin-left: var(--space-2);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.community-move-section {
-  margin-bottom: var(--space-6);
-}
-
-.community-move-search {
-  width: 100%;
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--text-base);
-  border: 1px solid var(--main-border-color);
-  background-color: var(--main-bg-color);
-  color: var(--main-text-color);
-  margin-bottom: var(--space-5);
-  box-sizing: border-box;
-  font-family: inherit;
-}
-
-.community-move-search:focus {
-  outline: none;
-  border-color: var(--main-highlight-color);
-  box-shadow: 0 0 0 3px rgba(239, 132, 45, 0.08);
-}
-
-.community-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.community-move-card {
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-5);
-  background-color: var(--main-bg-color);
-}
-
-.community-move-card:hover {
-  border-color: var(--main-highlight-color);
-  background-color: rgba(239, 132, 45, 0.01);
-}
-
-.community-move-card-content {
-  display: flex;
-  gap: var(--space-5);
-  align-items: flex-start;
-}
-
-.community-move-card-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.community-move-card-thumbnails {
-  flex-shrink: 0;
-  width: 280px;
-}
-
-.community-move-card-header {
-  margin-bottom: var(--space-3);
-}
-
-/* Responsive: Stack on mobile */
-@media (max-width: 768px) {
-  .post-move-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-4);
-  }
-
-  .post-move-header h2 {
-    font-size: var(--text-xl);
-  }
-
-  .post-move-preview-content {
-    flex-direction: column;
-    padding: var(--space-4);
-    gap: var(--space-4);
-  }
-
-  .post-move-preview-image {
-    max-width: 100%;
-  }
-
-  .community-move-card {
-    padding: var(--space-4);
-  }
-
-  .community-move-card-content {
-    flex-direction: column;
-  }
-
-  .community-move-card-thumbnails {
-    width: 100%;
-  }
-}
-
-.community-name {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  text-decoration: none;
-  color: var(--main-text-color);
-  line-height: 1.3;
-}
-
-.community-name:hover {
-  color: var(--main-highlight-color);
-  text-decoration: none;
-}
-
-.community-owner-handle {
-  font-size: var(--text-sm);
-  margin: var(--space-2) 0 0 0;
-  font-weight: 500;
-}
-
-/* Was declared twice, 350 lines apart, with different margins and line
-   heights; this one won every property, so the other was dead weight. */
-.community-description {
-  margin: var(--space-3) 0 0 0;
-  line-height: var(--leading-normal);
-  color: var(--main-text-muted-color);
-  font-size: var(--text-sm);
-}
-
-.community-stats-inline {
-  margin: var(--space-3) 0 0 0;
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-.community-move-form {
-  margin-top: var(--space-4);
-}
-
-
-
-
-
-.community-move-no-results {
-  text-align: center;
-  padding: var(--space-6);
-  color: var(--main-text-color);
-  opacity: 0.7;
-  font-style: italic;
-}
-
-.community-thumbnails {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
-}
-
-/* Responsive: 2 columns on small tablets */
-@media (max-width: 768px) {
-  .community-thumbnails {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  }
-}
-
-.community-thumbnail-link {
-  display: block;
-  flex-shrink: 0;
-  width: 80px;
-  height: 80px;
+.move-subject-thumb {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  margin-right: var(--ds-space-4);
   overflow: hidden;
-  border: 1px solid var(--main-border-color);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--ds-frame);
 }
 
-.community-thumbnail-link:hover {
-  border-color: var(--main-highlight-color);
-}
-
-.community-thumbnail {
+.move-subject-thumb img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
-  display: block;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
-.community-no-posts-message {
-  font-size: var(--text-sm);
-  font-style: italic;
+.move-subject-text {
+  min-width: 0;
+}
+
+.move-subject-title {
   margin: 0;
-  padding: var(--space-6) var(--space-3);
-  background-color: rgba(128, 128, 128, 0.05);
-  border: 1px dashed var(--main-border-color);
-  text-align: center;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+}
+
+.move-subject-post {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--ds-text-l);
+  font-weight: 700;
+}
+
+.move-subject-where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.move-subject-where > * + * {
+  margin-left: 8px;
+}
+
+.move-form .move-search {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--ds-space-4);
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.move-group {
+  margin-bottom: var(--ds-space-4);
+}
+
+.move-group .profile-section-label {
+  margin-bottom: 6px;
+}
+
+/* The rows of a group as one grouped list, as a settings pane draws one:
+   a hairline between rows, the chosen one tinted and ticked. */
+.move-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--ds-line);
+  background-color: var(--ds-surface);
+  cursor: default;
+}
+
+.move-row + .move-row {
+  border-top: 0;
+}
+
+.move-group .move-row:first-of-type,
+.move-group > .move-row:first-child {
+  border-top-left-radius: var(--ds-radius-m);
+  border-top-right-radius: var(--ds-radius-m);
+}
+
+.move-group .move-row:last-of-type {
+  border-bottom-left-radius: var(--ds-radius-m);
+  border-bottom-right-radius: var(--ds-radius-m);
+}
+
+.move-row:hover {
+  background-color: var(--ds-field);
+}
+
+/* The radio is the row's state; the row shows it. It stays in the page,
+   off to one side, so the keyboard and a screen reader still reach it. */
+.move-row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.move-row-cover {
+  display: flex;
+  flex: none;
+  width: 108px;
+  height: 36px;
+  margin-right: 12px;
+  overflow: hidden;
+  border-radius: 4px;
+  background-color: var(--ds-hover);
+}
+
+.move-row-cell {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  background-color: #ffffff;
+}
+
+.move-row-cell + .move-row-cell {
+  border-left: 1px solid var(--ds-surface);
+}
+
+.move-row-cell img {
+  display: block;
+  width: 100%;
   height: 100%;
+  object-fit: cover;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
+}
+
+.move-row-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  color: var(--ds-muted);
+}
+
+.move-row-text {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.move-row-name {
+  display: flex;
+  align-items: center;
+  font-size: var(--ds-text-base);
+  font-weight: 600;
+}
+
+.move-row-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.move-row-meta {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.move-row-check {
+  flex: none;
+  margin-left: 8px;
+  color: var(--ds-focus);
+  visibility: hidden;
+}
+
+.move-row.is-chosen {
+  background-color: var(--ds-selected);
+}
+
+.move-row.is-chosen .move-row-check {
+  visibility: visible;
+}
+
+.move-row.has-focus {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: -2px;
+}
+
+/* At the window's foot while the list scrolls under it. */
+.move-bar {
+  position: -webkit-sticky;
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 -8px;
+  padding: 12px 8px;
+  border-top: 1px solid var(--ds-line);
+  background-color: var(--ds-ground);
+}
+
+.move-bar > * + * {
+  margin-left: var(--ds-space-2);
+}
+
+.move-bar .ds-button-primary {
+  max-width: 70%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* ---------------------------------------------------------------------------
@@ -3029,34 +2961,31 @@ a.user-pill:hover {
   max-width: 100%;
 }
 
-.post-stage-bar {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--ds-space-3);
-}
-
-.post-stage-bar > * + * {
-  margin-left: var(--ds-space-2);
-}
-
-.post-stage-bar svg {
-  margin-right: 4px;
-  vertical-align: -1px;
-}
-
-.post-stage-replay.neo-cucumber-replay {
+/* The drawing, the poster the viewer shows in its place, and the canvas
+   the replay plays on: one size, one frame. */
+.post-stage-replay {
   display: flex;
   flex-direction: column;
-  width: var(--post-stage-shown, 300px);
+  width: var(--post-stage-shown, auto);
   max-width: 100%;
 }
 
+.post-stage-replay .post-stage-image,
+.post-stage-replay .neo-cucumber-replay-poster,
 .post-stage-replay .neo-cucumber-replay-canvas {
-  width: 100% !important;
+  display: block;
+  width: var(--post-stage-shown, auto) !important;
+  max-width: 100%;
   height: auto !important;
   border: 0;
   background-color: #ffffff;
   box-shadow: 0 0 0 1px var(--ds-frame), 0 8px 24px rgba(40, 40, 90, 0.18);
+}
+
+/* While the recording is fetched the poster dims a little, so the press
+   visibly did something. */
+.post-stage-replay.is-loading .neo-cucumber-replay-poster {
+  opacity: 0.6;
 }
 
 .post-stage-replay .neo-cucumber-replay-status {

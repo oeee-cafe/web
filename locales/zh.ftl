@@ -452,3 +452,5 @@ communities-tab-public = 公开
 communities-tab-official = 官方
 communities-tab-yours = 我的
 nav-about = 关于
+post-move-to = 移动到{ $communityName }
+post-move-choose = 请选择移动到哪里
