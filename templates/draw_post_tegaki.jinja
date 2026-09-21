@@ -2,6 +2,7 @@
 <html lang="{{ ftl_lang }}">
   <head>
     <meta charset="utf-8" />
+    {% include "theme_head.jinja" %}
     <title>{{ ftl_get_message("brand") }} | {{ ftl_get_message("community-drawing-new") }}{% if community_name %} ({{ community_name }}){% endif %}</title>
     <meta name="keywords" content="오이카페, 오에카키, 커뮤니티, お絵かき" />
     <meta name="description" content="오이카페는 오에카키 커뮤니티입니다. お絵かできるOEEEカフェです。" />

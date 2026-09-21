@@ -2,6 +2,7 @@
 <html lang="{{ ftl_lang }}">
   <head>
     <meta charset="utf-8" />
+    {% include "theme_head.jinja" %}
     <title>{%- block title -%} {{ ftl_get_message("brand") }} {%- endblock title -%}</title>
     <link rel="stylesheet"
           href="{{ '/static/toolbar.css' | cachebuster | safe }}"

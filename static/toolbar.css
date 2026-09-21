@@ -14,6 +14,8 @@
 :root {
   --ground-color: #ececec;
   --ground-grid: rgba(0, 0, 0, 0.05);
+  /* The grid line as a solid colour, for grounds drawn by the painter. */
+  --ground-grid-solid: #e0e0e0;
   --bar-line: rgba(0, 0, 0, 0.1);
   --toolbar-hover-bg: rgba(0, 0, 0, 0.06);
   --toolbar-current-bg: rgba(0, 0, 0, 0.1);
@@ -32,9 +34,10 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --ground-color: #1e1e1e;
     --ground-grid: rgba(255, 255, 255, 0.05);
+    --ground-grid-solid: #2a2a2a;
     --bar-line: rgba(255, 255, 255, 0.12);
     --toolbar-hover-bg: rgba(255, 255, 255, 0.08);
     --toolbar-current-bg: rgba(255, 255, 255, 0.14);
@@ -45,6 +48,21 @@
     --tb-badge: #ff8c00;
     --tb-danger: #ef4444;
   }
+}
+
+:root[data-theme="dark"] {
+  --ground-color: #1e1e1e;
+  --ground-grid: rgba(255, 255, 255, 0.05);
+  --ground-grid-solid: #2a2a2a;
+  --bar-line: rgba(255, 255, 255, 0.12);
+  --toolbar-hover-bg: rgba(255, 255, 255, 0.08);
+  --toolbar-current-bg: rgba(255, 255, 255, 0.14);
+  --toolbar-menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --tb-ink: #e0e0e0;
+  --tb-muted: #a0a0a0;
+  --tb-surface: #2c2c2c;
+  --tb-badge: #ff8c00;
+  --tb-danger: #ef4444;
 }
 
 
