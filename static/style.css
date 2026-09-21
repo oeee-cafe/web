@@ -267,8 +267,8 @@ nav a:visited,
 .posts-grid {
   display: grid;
   grid-template-columns: repeat(var(--home-cols, 4), minmax(0, 1fr));
-  grid-gap: 28px 20px;
-  gap: 28px 20px;
+  grid-gap: 20px 12px;
+  gap: 20px 12px;
   margin: var(--space-4) 0;
 }
 
@@ -351,6 +351,7 @@ nav a:visited,
 .post-card-byline {
   display: flex;
   min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
 }
 
@@ -361,12 +362,14 @@ nav a:visited,
   text-overflow: ellipsis;
 }
 
-/* Not shrinking but capped: a shrinkable name loses a fraction of a pixel
-   to rounding beside a long community, and a fraction is enough for an
-   ellipsis. Only a name longer than the cap is cut. */
+/* The name gives way only once the community has given all of its room.
+   Its shrink factor is tiny rather than zero: flex shares an overflow out
+   in proportion to it, and at 1 the name took a fiftieth of a pixel beside
+   a long community -- enough for an ellipsis on a name that fits -- while
+   at 0 a narrow phone column could not hold the name and the time, and the
+   line pushed the page wider than the screen. */
 .post-card-who {
-  flex: 0 0 auto;
-  max-width: 70%;
+  flex: 0 0.0001 auto;
 }
 
 .post-card-where {
@@ -425,10 +428,18 @@ nav a:visited,
 
 /* A phone keeps three a row whatever was chosen on a wider screen -- eight
    squares across a phone are too small to see -- so the control has nothing
-   to do there. The gaps are the same as at every other width. */
+   to do there. Its gaps are closer, in step with its narrower columns. */
 @media (max-width: 600px) {
   .posts-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-gap: 16px 8px;
+    gap: 16px 8px;
+  }
+
+  /* A third of a phone holds who and when; the community would only ever
+     be its own separator and an ellipsis. */
+  .posts-grid .post-card-where {
+    display: none;
   }
 
   .ds-per-row:not([data-key="adminPostCols"]) {
