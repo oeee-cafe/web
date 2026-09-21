@@ -2210,14 +2210,16 @@ nav a:visited,
 .session-form {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
+  grid-gap: var(--space-3) var(--space-3);
   gap: var(--space-3) var(--space-3);
   align-items: baseline;
   max-width: 520px;
 }
 
 .session-form > label {
-  font-weight: normal;
-  color: var(--main-text-muted-color);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+  font-weight: 500;
 }
 
 .field {
@@ -2241,8 +2243,8 @@ nav a:visited,
    under the form as two unattached <small> paragraphs. */
 .field-help {
   margin: var(--space-1) 0 0 0;
-  font-size: var(--text-sm);
-  color: var(--main-text-muted-color);
+  font-size: var(--ds-text-s);
+  color: var(--ds-muted);
   line-height: 1.4;
 }
 
@@ -2276,157 +2278,272 @@ nav a:visited,
   right: 0;
   z-index: 10;
   max-height: 280px;
+  margin-top: 4px;
+  padding: 4px;
   overflow-y: auto;
-  background-color: var(--main-bg-color);
-  border: 1px solid var(--main-border-color);
-  border-top: none;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-menu);
 }
 
 .combobox-group-label {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
-  color: var(--main-text-muted-color);
-  background-color: var(--main-nav-bg-color);
-  border-bottom: 1px solid var(--main-border-color);
+  padding: 6px 8px 2px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-xs);
+  font-weight: 600;
 }
 
 .combobox-option {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
+  padding: 5px 8px;
+  border-radius: var(--ds-radius-s);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-m);
+}
+
+.combobox-option > * + * {
+  margin-left: 8px;
 }
 
 /* One highlight for both the pointer and the arrow keys, so the two never
    disagree about which row Enter would take. */
 .combobox-option:hover,
 .combobox-option[data-active] {
-  background-color: var(--main-nav-bg-color);
+  background-color: var(--ds-hover);
 }
 
 .combobox-option[aria-selected="true"] .combobox-option-name {
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .combobox-option-meta {
-  font-size: var(--text-sm);
-  color: var(--main-text-muted-color);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
   white-space: nowrap;
 }
 
 .combobox-empty {
-  padding: var(--space-1) var(--space-2);
-  color: var(--main-text-muted-color);
+  padding: 6px 8px;
+  color: var(--ds-muted);
 }
 
-/* Collaborative session cards */
+/* ---------------------------------------------------------------------------
+   The /collaborate lobby
 
-.create-session-section {
-  background-color: var(--main-nav-bg-color);
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-2);
-  margin-bottom: var(--space-2);
-  /* The feed pages widen --page-width to 1600px so the grid has room; a form
-     of short controls stretched that far reads as an empty box. */
-  max-width: 829px;
+   A title with New session beside it; the rooms open now as cards with the
+   canvas on the front and who is in it over its corner, the whole card the
+   way in; then the gallery of what was drawn together. The card is built
+   like a community's: the design system's surface, a cover, a body.
+   --------------------------------------------------------------------------- */
+.collaborate-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--ds-space-5);
 }
 
-.session-community {
-  margin: var(--space-1) 0 0 0;
-  font-size: var(--text-sm);
+.collaborate-title {
+  margin: 0 var(--ds-space-3) var(--ds-space-2) 0;
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
 }
 
-/* A full session stays listed rather than disappearing, so its card has to say
-   why there is no join link. */
-.session-join-disabled {
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-1) var(--space-2);
-  display: inline-block;
-  color: var(--main-text-muted-color);
+.create-session-panel {
+  width: 560px;
+}
+
+.session-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--ds-space-2);
+}
+
+.session-form-actions > * + * {
+  margin-left: var(--ds-space-2);
 }
 
 .active-sessions-section {
-  margin-top: var(--space-2);
+  margin-bottom: var(--ds-space-6);
 }
 
-.active-sessions-section h3 {
-  padding: var(--space-2);
-  background-color: var(--main-nav-bg-color);
-  border: 1px solid var(--main-border-color);
-  margin: 0 0 var(--space-2) 0;
+.active-sessions-section .profile-section-label,
+.collaborate-lobby .feed-header .profile-section-label {
+  margin: 0 0 var(--ds-space-2);
 }
 
 .sessions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-gap: 20px;
+  gap: 20px;
+}
+
+/* Two rooms across a phone, like the community cards: one a row is a list
+   of posters. */
+@media (max-width: 600px) {
+  .sessions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-gap: 12px;
+    gap: 12px;
+  }
+
+  .session-live {
+    top: 6px;
+    left: 6px;
+    padding: 1px 6px;
+    font-size: var(--ds-text-xs);
+  }
 }
 
 .session-card {
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-2);
-  background-color: var(--main-bg-color);
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
-.session-header h4 {
-  margin: 0 0 var(--space-1) 0;
+.session-card:not(.is-full):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 0.5px var(--ds-frame), 0 6px 16px rgba(40, 40, 90, 0.16);
 }
 
-.session-header small {
-  color: var(--main-text-muted-color);
+.session-card.is-full {
+  opacity: 0.7;
 }
 
-/* The live canvas on a lobby card. The intrinsic width/height attributes are
-   the canvas's own, so the box is reserved at the right shape before the image
-   arrives and the card never jumps; this only has to scale it into the
-   column. */
+/* The canvas, whole, on a white ground in a 4:3 window: a padding-ratio box,
+   since Firefox 56 has no aspect-ratio. */
+.session-cover {
+  position: relative;
+  height: 0;
+  padding-top: 75%;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--ds-line);
+}
+
+.session-preview,
+.session-cover-empty {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .session-preview {
   display: block;
-  width: 100%;
-  height: auto;
-  margin: var(--space-2) 0 0 0;
-  border: 1px solid var(--main-border-color);
-  background-color: var(--main-bg-color);
   object-fit: contain;
-  image-rendering: auto;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
-.session-info {
-  margin: var(--space-2) 0;
+.session-cover-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-faint);
+  font-size: var(--ds-text-m);
+  background-color: var(--ds-hover);
+}
+
+/* Who is in the room, over the canvas's corner, with a live dot. */
+.session-live {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background-color: rgba(20, 20, 40, 0.72);
+  color: #ffffff;
+  font-size: var(--ds-text-s);
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.session-live-dot {
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 4px;
+  background-color: #7ddf64;
+}
+
+.is-full .session-live-dot {
+  background-color: #ff8a80;
+}
+
+.session-body {
+  padding: 10px 12px 12px;
+}
+
+.session-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--ds-text-base);
+  font-weight: 600;
+}
+
+.session-title a,
+.session-title a:visited {
+  color: var(--ds-ink);
+}
+
+/* The whole card is the way in; the links inside it sit above the stretch. */
+.session-card-link::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
 }
 
 .session-meta {
   display: flex;
-  gap: var(--space-2);
-  margin-bottom: var(--space-1);
   flex-wrap: wrap;
+  margin-top: 2px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
 }
 
-.session-meta span {
-  background-color: var(--main-nav-bg-color);
-  border: 1px solid var(--main-border-color);
-  padding: 2px var(--space-1);
-  font-size: var(--text-sm);
+.session-meta > * + *::before {
+  content: "\00b7";
+  margin: 0 5px;
+  color: var(--ds-faint);
 }
 
-.session-actions {
-  text-align: right;
+.session-owner,
+.session-owner:visited,
+.session-community a {
+  position: relative;
+  z-index: 1;
 }
 
-.session-actions input[type="submit"],
-.session-actions a {
-  background-color: var(--main-nav-bg-color);
-  border: 1px solid var(--main-border-color);
-  color: var(--main-text-color);
-  padding: var(--space-1) var(--space-2);
-  text-decoration: none;
-  display: inline-block;
+.session-owner,
+.session-owner:visited {
+  color: var(--ds-muted);
 }
 
-.session-actions input[type="submit"]:hover,
-.session-actions a:hover {
-  background-color: var(--main-border-color);
+.session-community {
+  margin: 8px 0 0;
+}
+
+.session-badges {
+  margin-top: 8px;
+}
+
+.session-badges .community-card-badge {
+  margin: 0 6px 0 0;
 }
 
 /* Data table. Was inline in community_members.jinja; nothing else could use

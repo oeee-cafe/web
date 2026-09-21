@@ -20,103 +20,110 @@
 {% endmacro %}
 {% block content %}
   {% include "post_feed_head.jinja" %}
-  <div class="center-wide">
-    <h2>{{ ftl_get_message("collaborate-title") }}</h2>
-    {# Signed-out visitors can browse the gallery below; only creating a
-       session needs an account. #}
+  {# A lobby, as an application shows rooms: the title with New session
+     beside it, the rooms open now as cards with their canvas on the front,
+     then what was drawn together before. Starting a session is a dialog
+     rather than a form standing open over the rooms -- it is one choice of
+     four fields, made now and then, above a list people come back to. #}
+  <div class="center-wide collaborate-lobby">
+    <div class="collaborate-header">
+      <h1 class="collaborate-title">{{ ftl_get_message("collaborate-title") }}</h1>
+      {# Signed-out visitors can browse the rooms and the gallery; only
+         starting a session needs an account. #}
+      {% if current_user %}
+        <button type="button" class="ds-button ds-button-primary" onclick="toggleSessionDialog(true)">{{ ftl_get_message("collaborate-create-session") }}</button>
+      {% else %}
+        <a class="ds-button ds-button-primary" href="/login?next=/collaborate">{{ ftl_get_message("collaborate-sign-in-to-create") }}</a>
+      {% endif %}
+    </div>
     {% if current_user %}
-      <div class="create-session-section">
-        <h3>{{ ftl_get_message("collaborate-create-session") }}</h3>
-      {# Failure messages ride on the form rather than being interpolated into
-         the script below: they are translated text, and an attribute is the
-         only context minijinja escapes correctly for. #}
-      {# A label column and a control column, so the eye follows one edge down
-         the form instead of four. Every field stays visible: the form is short
-         enough that folding half of it behind a disclosure would trade clutter
-         for a click. #}
-      <form id="create-session-form"
-            class="session-form"
-            method="post"
-            action="/collaborate"
-            data-error="{{ ftl_get_message("collaborate-create-error") }}"
-            data-network-error="{{ ftl_get_message("collaborate-create-network-error") }}">
-        <label for="canvas-size">{{ ftl_get_message("collaborate-canvas-size-label") }}</label>
-        <div class="field">
-          <select id="canvas-size" name="canvas-size" required>
-            {% for size_value, size_label in canvas_sizes %}<option value="{{ size_value }}">{{ size_label }}</option>{% endfor %}
-          </select>
-        </div>
-
-        <label for="session-title">{{ ftl_get_message("collaborate-session-title-label") }}</label>
-        <div class="field">
-          <input type="text"
-                 id="session-title"
-                 name="title"
-                 maxlength="100"
-                 placeholder="{{ ftl_get_message("collaborate-session-title-placeholder") }}">
-        </div>
-
-        <label for="max-participants">{{ ftl_get_message("collaborate-max-participants-label") }}</label>
-        <div class="field">
-          <select id="max-participants" name="max_participants" required>
-            {% for seats in participant_choices %}<option value="{{ seats }}" {% if seats == 4 %}selected{% endif %}>{{ seats }} {{ ftl_get_message("collaborate-participants") }}</option>{% endfor %}
-          </select>
-        </div>
-
-        {% if has_postable_communities %}
-          <label for="community-input" id="community-label">{{ ftl_get_message("collaborate-community-label") }}</label>
-          <div class="field">
-            {# One control, not two. The select stays the form's value holder —
-               so there is no second community_id and a visitor without JS gets
-               the plain select with its tiers intact — and the script builds a
-               type-ahead facade over it. #}
-            <div class="combobox" id="community-combobox">
-              <input type="text"
-                     id="community-input"
-                     class="combobox-input"
-                     role="combobox"
-                     aria-expanded="false"
-                     aria-controls="community-listbox"
-                     aria-autocomplete="list"
-                     aria-labelledby="community-label"
-                     autocomplete="off"
-                     hidden
-                     data-no-matches="{{ ftl_get_message("collaborate-community-no-matches") }}"
-                     placeholder="{{ ftl_get_message("collaborate-community-search-placeholder") }}">
-              <div id="community-listbox"
-                   class="combobox-list"
-                   role="listbox"
-                   aria-labelledby="community-label"
-                   hidden></div>
+      <div id="create-session-dialog" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="create-session-title">
+        <div class="ds-modal-panel create-session-panel">
+          <h2 id="create-session-title">{{ ftl_get_message("collaborate-create-session") }}</h2>
+          {# Failure messages ride on the form rather than being interpolated
+             into the script below: they are translated text, and an attribute
+             is the only context minijinja escapes correctly for. A label
+             column and a control column, so the eye follows one edge down. #}
+          <form id="create-session-form"
+                class="session-form"
+                method="post"
+                action="/collaborate"
+                data-error="{{ ftl_get_message("collaborate-create-error") }}"
+                data-network-error="{{ ftl_get_message("collaborate-create-network-error") }}">
+            <label for="canvas-size">{{ ftl_get_message("collaborate-canvas-size-label") }}</label>
+            <div class="field">
+              <select id="canvas-size" name="canvas-size" class="ds-select" required>
+                {% for size_value, size_label in canvas_sizes %}<option value="{{ size_value }}">{{ size_label }}</option>{% endfor %}
+              </select>
             </div>
-            <select id="session-community" name="community_id">
-              <option value="">{{ ftl_get_message("collaborate-community-none") }}</option>
-              {{ community_options(member_communities, ftl_get_message("collaborate-community-group-yours"), selected_community_slug) }}
-              {{ community_options(participated_communities, ftl_get_message("collaborate-community-group-participated"), selected_community_slug) }}
-              {{ community_options(other_communities, ftl_get_message("collaborate-community-group-public"), selected_community_slug) }}
-            </select>
-            <p class="field-help">{{ ftl_get_message("collaborate-community-hint") }}</p>
-          </div>
-        {% endif %}
 
-        <div class="field field-wide">
-          <label class="checkbox-label" for="is-public">
-            <input type="checkbox" id="is-public" name="is_public" checked>
-            {{ ftl_get_message("collaborate-public-session-label") }}
-          </label>
-          <p class="field-help">{{ ftl_get_message("collaborate-public-session-description") }}</p>
-        </div>
+            <label for="session-title">{{ ftl_get_message("collaborate-session-title-label") }}</label>
+            <div class="field">
+              <input type="text"
+                     class="ds-input"
+                     id="session-title"
+                     name="title"
+                     maxlength="100"
+                     placeholder="{{ ftl_get_message("collaborate-session-title-placeholder") }}">
+            </div>
 
-        <div class="field field-wide form-actions">
-          <input type="submit" value="{{ ftl_get_message("collaborate-create-button") }}">
+            <label for="max-participants">{{ ftl_get_message("collaborate-max-participants-label") }}</label>
+            <div class="field">
+              <select id="max-participants" name="max_participants" class="ds-select" required>
+                {% for seats in participant_choices %}<option value="{{ seats }}" {% if seats == 4 %}selected{% endif %}>{{ seats }} {{ ftl_get_message("collaborate-participants") }}</option>{% endfor %}
+              </select>
+            </div>
+
+            {% if has_postable_communities %}
+              <label for="community-input" id="community-label">{{ ftl_get_message("collaborate-community-label") }}</label>
+              <div class="field">
+                {# One control, not two. The select stays the form's value holder —
+                   so there is no second community_id and a visitor without JS gets
+                   the plain select with its tiers intact — and the script builds a
+                   type-ahead facade over it. #}
+                <div class="combobox" id="community-combobox">
+                  <input type="text"
+                         id="community-input"
+                         class="ds-input combobox-input"
+                         role="combobox"
+                         aria-expanded="false"
+                         aria-controls="community-listbox"
+                         aria-autocomplete="list"
+                         aria-labelledby="community-label"
+                         autocomplete="off"
+                         hidden
+                         data-no-matches="{{ ftl_get_message("collaborate-community-no-matches") }}"
+                         placeholder="{{ ftl_get_message("collaborate-community-search-placeholder") }}">
+                  <div id="community-listbox"
+                       class="combobox-list"
+                       role="listbox"
+                       aria-labelledby="community-label"
+                       hidden></div>
+                </div>
+                <select id="session-community" name="community_id" class="ds-select">
+                  <option value="">{{ ftl_get_message("collaborate-community-none") }}</option>
+                  {{ community_options(member_communities, ftl_get_message("collaborate-community-group-yours"), selected_community_slug) }}
+                  {{ community_options(participated_communities, ftl_get_message("collaborate-community-group-participated"), selected_community_slug) }}
+                  {{ community_options(other_communities, ftl_get_message("collaborate-community-group-public"), selected_community_slug) }}
+                </select>
+                <p class="field-help">{{ ftl_get_message("collaborate-community-hint") }}</p>
+              </div>
+            {% endif %}
+
+            <div class="field field-wide">
+              <label class="checkbox-label" for="is-public">
+                <input type="checkbox" id="is-public" name="is_public" checked>
+                {{ ftl_get_message("collaborate-public-session-label") }}
+              </label>
+              <p class="field-help">{{ ftl_get_message("collaborate-public-session-description") }}</p>
+            </div>
+
+            <div class="field field-wide form-actions session-form-actions">
+              <button type="button" class="ds-button" onclick="toggleSessionDialog(false)">{{ ftl_get_message("cancel") }}</button>
+              <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("collaborate-create-button") }}</button>
+            </div>
+          </form>
         </div>
-      </form>
-      </div>
-    {% else %}
-      <div class="create-session-section">
-        <p>
-          <a href="/login?next=/collaborate">{{ ftl_get_message("collaborate-sign-in-to-create") }}</a>
-        </p>
       </div>
     {% endif %}
     {% include "collaborate_sessions_fragment.jinja" %}
@@ -125,7 +132,7 @@
     {% if feed.posts and feed.posts|length > 0 %}
       <section role="region" aria-labelledby="collab-gallery-heading">
         <div class="feed-header">
-          <h3 id="collab-gallery-heading" class="home-section-title">{{ ftl_get_message("collaborate-finished-drawings") }}</h3>
+          <h2 id="collab-gallery-heading" class="profile-section-label">{{ ftl_get_message("collaborate-finished-drawings") }}</h2>
           {% include "post_feed_controls.jinja" %}
         </div>
         <div class="posts-grid" id="post-feed-grid">
@@ -137,6 +144,29 @@
   {# Only ship with the form: getElementById would be null signed out and
      the TypeError would break any later script on the page. #}
   {% if current_user %}
+  <script>
+    function toggleSessionDialog(open) {
+      var dialog = document.getElementById("create-session-dialog");
+      dialog.style.display = open ? "flex" : "none";
+      if (open) document.getElementById("canvas-size").focus();
+    }
+    (function () {
+      var dialog = document.getElementById("create-session-dialog");
+      dialog.addEventListener("click", function (e) {
+        if (e.target === dialog) toggleSessionDialog(false);
+      });
+      document.addEventListener("keydown", function (e) {
+        // The community list closes itself on Escape first.
+        if (e.key === "Escape" && dialog.style.display !== "none" &&
+            document.getElementById("community-listbox") &&
+            !document.getElementById("community-listbox").hidden) return;
+        if (e.key === "Escape") toggleSessionDialog(false);
+      });
+      // Arriving from a community's Draw together, the dialog is what was
+      // asked for: open it with that community chosen.
+      {% if selected_community_slug %}toggleSessionDialog(true);{% endif %}
+    })();
+  </script>
   <script>
     document.getElementById('create-session-form').addEventListener('submit', async function(e) {
       e.preventDefault();
