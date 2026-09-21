@@ -122,6 +122,48 @@
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") closeMenus(null);
       });
+
+      // The page that was asked for is on its way: the toolbar says so
+      // (`.is-loading`, drawn in ds.css) until the next page -- or htmx's swap
+      // of the body -- replaces it with a fresh one. Only for leaving the
+      // page: a link to elsewhere on the site, or a form that is not htmx's.
+      // A page that stays -- the painter asking whether to leave, a request
+      // that fails -- clears it after a while rather than leaving it running.
+      function loading() {
+        var bar = document.querySelector(".nav-bar");
+        if (!bar) return;
+        bar.classList.add("is-loading");
+        setTimeout(function () {
+          bar.classList.remove("is-loading");
+        }, 10000);
+      }
+      document.addEventListener("click", function (event) {
+        if (event.button !== 0) return;
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+        if (!link || link.target || link.hasAttribute("download")) return;
+        // htmx takes a boosted link's click for itself, which cancels it; that
+        // is still a trip to another page. Any other cancelled click is a
+        // script that kept the page where it is.
+        var boosted = link.closest('[hx-boost\\:inherited="true"]') && !link.closest('[hx-boost="false"]');
+        if (event.defaultPrevented && !boosted) return;
+        if (link.origin !== location.origin) return;
+        if (link.pathname === location.pathname && link.search === location.search) return;
+        loading();
+      });
+      document.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (event.defaultPrevented || !form || !form.getAttribute) return;
+        if (form.hasAttribute("hx-post") || form.hasAttribute("hx-get") ||
+            form.hasAttribute("hx-put") || form.hasAttribute("hx-delete")) return;
+        loading();
+      });
+      window.addEventListener("pageshow", function (event) {
+        // Back to a page kept in memory: it is shown as it was left.
+        if (!event.persisted) return;
+        var bar = document.querySelector(".nav-bar");
+        if (bar) bar.classList.remove("is-loading");
+      });
     })();
   </script>
 </nav>

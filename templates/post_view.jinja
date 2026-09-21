@@ -92,14 +92,14 @@
         <div class="post-detail-left">
           {% if post.image_tool in ["neo", "neo-cucumber", "cucumber"] and post.allow_relay == "true" %}
             <a href="/@{{ post.login_name }}/{{ post_id }}/relay">
-              <img class="post-image-full"
+              <img draggable="false" class="post-image-full"
                    width="{{ post.image_width }}"
                    height="{{ post.image_height }}"
                    alt="{{ post.title }}"
                    src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
             </a>
           {% else %}
-            <img class="post-image-full"
+            <img draggable="false" class="post-image-full"
                  width="{{ post.image_width }}"
                  height="{{ post.image_height }}"
                  alt="{{ post.title }}"

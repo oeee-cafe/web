@@ -49,14 +49,14 @@
         {% if banner %}
           {%
           if user.id == current_user.id %}<a href="/banners/draw">
-          <img width="{{ banner.width }}"
+          <img draggable="false" width="{{ banner.width }}"
                height="{{ banner.height }}"
                alt="{{ current_user.display_name }} (@{{ current_user.login_name }}) 동맹 배너"
                class="banner"
                src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
         </a>
       {% else %}
-        <img width="{{ banner.width }}"
+        <img draggable="false" width="{{ banner.width }}"
              height="{{ banner.height }}"
              alt="{{ user.display_name }} (@{{ user.login_name }}) 동맹 배너"
              class="banner"
@@ -89,7 +89,7 @@
         <div class="banners-grid-item">
           <a href="/@{{ following.login_name }}"
              alt="{{ following.display_name }} (@{{ following.login_name }})">
-            <img width="{{ following.banner_image_width }}"
+            <img draggable="false" width="{{ following.banner_image_width }}"
                  height="{{ following.banner_image_height }}"
                  alt="{{ following.display_name }} (@{{ following.login_name }}) 동맹 배너"
                  class="banner"
@@ -118,7 +118,7 @@
     {% for post in public_community_posts %}
       <div class="posts-grid-item">
         <a href="/@{{ user.login_name }}/{{ post.id }}">
-          <img class="{% if post.image_width > 300 or post.image_height > 300 %}drawing-downscaled{% endif %}"
+          <img draggable="false" class="{% if post.image_width > 300 or post.image_height > 300 %}drawing-downscaled{% endif %}"
                width="{{ post.image_width }}"
                height="{{ post.image_height }}"
                alt="{{ post.title }}"
@@ -137,7 +137,7 @@
       {% for post in private_community_posts %}
         <div class="posts-grid-item">
           <a href="/@{{ user.login_name }}/{{ post.id }}">
-            <img class="{% if post.image_width > 300 or post.image_height > 300 %}drawing-downscaled{% endif %}"
+            <img draggable="false" class="{% if post.image_width > 300 or post.image_height > 300 %}drawing-downscaled{% endif %}"
                  width="{{ post.image_width }}"
                  height="{{ post.image_height }}"
                  alt="{{ post.title }}"
