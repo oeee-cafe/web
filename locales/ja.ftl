@@ -454,3 +454,4 @@ communities-tab-yours = 参加中
 nav-about = 概要
 post-move-to = { $communityName }に移動
 post-move-choose = 移動先を選んでください
+sign-in-no-account = アカウントをお持ちでない方

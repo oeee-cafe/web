@@ -1,21 +1,34 @@
 {% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("sign-in") }}
+{% endblock title %}
 {% block content %}
-  <div class="center">
-    <form method="post">
-      <fieldset>
-        <legend>{{ ftl_get_message("sign-in") }}</legend>
-        <p>
-          <label for="login_name">{{ ftl_get_message("login-name") }}</label>
-          <input name="login_name" id="login_name" />
-        </p>
-        <p>
-          <label for="password">{{ ftl_get_message("password") }}</label>
-          <input name="password" id="password" type="password" />
-        </p>
-      </fieldset>
-      <input type="submit" value="{{ ftl_get_message("sign-in") }}" />
+  {# Signing in as an application's sheet asks for it: one card, the two
+     fields, the one button that does it, and the two other things a person
+     at this door may need -- a password they have forgotten, or an account
+     they do not have yet -- as buttons of their own rather than a line of
+     small print under the form. #}
+  <div class="auth-page">
+    <form method="post" class="ds-card auth-card">
+      <h1 class="auth-title">{{ ftl_get_message("sign-in") }}</h1>
+      <div class="form-field">
+        <label class="ds-label" for="login_name">{{ ftl_get_message("login-name") }}</label>
+        <input class="ds-input" name="login_name" id="login_name"
+               autocomplete="username" autocapitalize="off" spellcheck="false" required autofocus />
+      </div>
+      <div class="form-field">
+        <label class="ds-label" for="password">{{ ftl_get_message("password") }}</label>
+        <input class="ds-input" name="password" id="password" type="password"
+               autocomplete="current-password" required />
+      </div>
       {% if next %}<input type="hidden" name="next" value="{{ next }}" />{% endif %}
+      <button type="submit" class="ds-button ds-button-primary auth-submit">{{ ftl_get_message("sign-in") }}</button>
+      <a class="ds-button auth-secondary" href="/password-reset">{{ ftl_get_message("forgot-password") }}</a>
+
+      <div class="auth-divider"><span>{{ ftl_get_message("sign-in-no-account") }}</span></div>
+      {# Carries where the reader was going, so signing up from here ends
+         where signing in would have. #}
+      <a class="ds-button auth-secondary" href="/signup{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-up") }}</a>
     </form>
-    <p><a href="/password-reset">{{ ftl_get_message("forgot-password") }}</a></p>
   </div>
 {% endblock content %}
