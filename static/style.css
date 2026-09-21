@@ -3449,16 +3449,19 @@ a.user-pill:hover {
   line-height: 1.5;
 }
 
-/* The banners at their own size, 200 by 40, in hard pixels and a frame,
-   lifting a little under the pointer. */
+/* Four banners a row at every width, each scaled to a quarter of it in
+   hard pixels, framed, lifting a little under the pointer. Banners are
+   200 by 40, so the row keeps their shape. */
 .about-banners {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-gap: 8px;
+  gap: 8px;
 }
 
 .about-banner {
   display: block;
-  margin: 0 8px 8px 0;
+  min-width: 0;
   line-height: 0;
   box-shadow: 0 0 0 1px var(--ds-frame);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
@@ -3471,8 +3474,7 @@ a.user-pill:hover {
 
 .about-banner img {
   display: block;
-  width: 200px;
-  max-width: 100%;
+  width: 100%;
   height: auto;
   image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
