@@ -632,99 +632,185 @@ nav a:visited,
   flex-direction: row;
 }
 
-/* Notifications */
+/* ---------------------------------------------------------------------------
+   Notifications
+
+   An application's inbox: a title with Mark all read beside it, then one
+   grouped list -- rows joined by hairlines in a single rounded card. Each
+   row is the drawing (or its kind's icon) with a badge saying what kind of
+   thing happened, the sentence and whatever was said, and at the end how
+   long ago with the row's two controls. Unread rows carry a dot and a
+   tint. Invitations are a list of their own above it, the same rows.
+   Firefox 56: flex without `gap`, so the spacing is margins.
+   --------------------------------------------------------------------------- */
+.notifications-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
 
 .notifications-header {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  margin-bottom: 1rem;
+  justify-content: space-between;
+  margin-bottom: var(--ds-space-4);
 }
 
+.notifications-header .notifications-title {
+  margin: 0;
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+}
 
+.invitations-section {
+  margin-bottom: var(--ds-space-5);
+}
 
-/* One row per notification: thumbnail, sentence, then time and controls.
+.invitations-section .profile-section-label {
+  margin: 0 0 6px;
+}
 
-   This was a stack — a button bar, a type label, the actor, the action — each
-   with its own margin, adding up to ~175px per notification and five of them on
-   a screen. The row below is ~64px, so a screen holds thirteen. Rows are
-   separated by a single shared border rather than each carrying its own box and
-   a 1rem gap, which is most of the difference. */
+.notification-list,
+.invitations-section {
+  border-radius: var(--ds-radius-m);
+}
+
+/* The rows of one list as one card: the first and last round its corners. */
 .notification {
+  position: relative;
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--main-border-color);
-  border-bottom: none;
-  background-color: var(--main-bg-color);
+  padding: 12px 14px 12px 22px;
+  border: 1px solid var(--ds-line);
+  border-top: 0;
+  background-color: var(--ds-surface);
 }
 
-/* The list is a set of rows, so only the last one closes the box. */
-.notification:last-child {
-  border-bottom: 1px solid var(--main-border-color);
+.notification-list > .notification:first-child,
+.invitations-section > .notification:first-of-type {
+  border-top: 1px solid var(--ds-line);
+  border-top-left-radius: var(--ds-radius-m);
+  border-top-right-radius: var(--ds-radius-m);
+}
+
+.notification-list > .notification:last-of-type,
+.invitations-section > .notification:last-of-type {
+  border-bottom-left-radius: var(--ds-radius-m);
+  border-bottom-right-radius: var(--ds-radius-m);
+  box-shadow: var(--ds-shadow-raise);
 }
 
 .notification:hover {
-  background-color: var(--main-nav-bg-color);
+  background-color: var(--ds-field);
 }
 
-/* The accent replaces the left border rather than adding to it, so an unread
-   row is not 3px wider than the read one below it. */
+/* Unread: a dot in the margin, and the row a shade toward the accent. */
 .notification.unread {
-  background-color: var(--main-nav-bg-color);
-  border-left: 3px solid var(--main-highlight-color);
-  padding-left: calc(var(--space-3) - 2px);
+  background-color: var(--ds-hover);
+}
+
+.notification.unread::before {
+  content: "";
+  position: absolute;
+  top: 29px;
+  left: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background-color: var(--ds-focus);
+}
+
+.notification-figure {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin-right: 12px;
 }
 
 .notification-thumbnail {
-  flex-shrink: 0;
   display: block;
-  line-height: 0;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--ds-frame);
 }
 
-/* 48px, not 100: at the old size the image, not the sentence, set the height of
-   every row that had one — and 95% of notifications carry a post. */
 .notification-post-image {
-  width: 48px;
-  height: 48px;
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  object-position: center;
-  border: 1px solid var(--main-border-color);
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
-/* Holds the column open for rows with nothing to show in it. */
-.notification-thumbnail-placeholder {
-  flex-shrink: 0;
-  display: block;
-  width: 48px;
+.notification-thumbnail-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: var(--ds-hover);
+  color: var(--ds-muted);
+}
+
+.notification-kind {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background-color: var(--ds-surface);
+  box-shadow: 0 0 0 1px var(--ds-line-strong);
+  color: var(--ds-ink);
 }
 
 .notification-content {
-  flex: 1;
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-/* Actor and verb are one sentence on one line. They were two paragraphs. */
 .notification-line {
   margin: 0;
-  line-height: var(--leading-normal);
+  font-size: var(--ds-text-base);
+  line-height: 1.45;
+  word-wrap: break-word;
 }
 
-.notification-actor {
+.notification-actor,
+.notification-actor:visited {
+  color: var(--ds-ink);
   font-weight: 600;
 }
 
-.notification-action {
-  color: var(--main-text-color);
+.notification-action,
+.notification-action:visited {
+  color: var(--ds-ink);
 }
 
+/* "and N others" after the linked actor name. Muted so the sentence still
+   leads with the person, not the arithmetic. */
+.notification-others {
+  color: var(--ds-muted);
+}
+
+/* What was said, as a quote under the sentence -- clamped to two lines:
+   it is a hint that there is something to read, not the reading. */
 .notification-preview {
-  margin: var(--space-1) 0 0 0;
-  font-size: var(--text-sm);
-  color: var(--main-text-muted-color);
-  /* Clamped: a long comment used to set the height of the row it arrived in.
-     The preview is a hint that there is something to read, not the reading. */
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--ds-line-strong);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -742,46 +828,101 @@ nav a:visited,
 }
 
 .notification-meta {
-  flex-shrink: 0;
+  flex: none;
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: 12px;
 }
 
 .notification-time {
-  font-size: var(--text-xs);
+  color: var(--ds-faint);
+  font-size: var(--ds-text-s);
   white-space: nowrap;
 }
 
 .notification-actions {
   display: flex;
-  gap: var(--space-1);
+  margin-top: 4px;
 }
 
-
-
-
-.invitations-section {
-  margin-bottom: var(--space-6);
+.notification-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 0 0 2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ds-radius-s);
+  background: none;
+  color: var(--ds-muted);
+  cursor: default;
 }
 
+.notification-icon-button:hover {
+  background-color: var(--ds-hover);
+  color: var(--ds-ink);
+}
 
+/* Revealed with the row where there is a pointer to hover with. */
+@media (hover: hover) {
+  .notification .notification-actions {
+    opacity: 0;
+  }
 
+  .notification:hover .notification-actions,
+  .notification:focus-within .notification-actions {
+    opacity: 1;
+  }
+}
 
-/* On a phone the sentence needs the whole width, so time and controls drop
-   under it rather than squeezing the thing the row exists to say. */
+.invitation-actions {
+  display: flex;
+  margin-top: 6px;
+}
+
+.invitation-actions form {
+  margin: 0 0 0 6px;
+}
+
+.notifications-empty {
+  padding: var(--ds-space-6) var(--ds-space-5);
+  color: var(--ds-muted);
+  text-align: center;
+}
+
+.notifications-empty p {
+  margin: var(--ds-space-2) 0 0;
+}
+
+/* On a phone the sentence needs the width: the invitation's buttons drop
+   under it rather than squeezing it. */
 @media (max-width: 600px) {
-  .notification {
+  .invitation-item {
     flex-wrap: wrap;
   }
 
-  .notification-content {
-    flex-basis: calc(100% - 48px - var(--space-3));
+  .invitation-item .notification-content {
+    flex: 1 1 0;
   }
 
-  .notification-meta {
-    width: 100%;
+  .invitation-item .invitation-actions {
+    flex-wrap: wrap;
     justify-content: flex-end;
+  }
+
+  .invitation-item .notification-meta {
+    width: 100%;
+    margin: 8px 0 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .invitation-item .invitation-actions {
+    margin-top: 0;
   }
 }
 
@@ -2359,11 +2500,6 @@ nav a:visited,
   line-height: 1.2;
 }
 
-/* "and N others" after the linked actor name. Muted so the sentence still
-   leads with the person, not the arithmetic. */
-.notification-others {
-  color: var(--main-text-muted-color);
-}
 
 /* Replay viewer */
 .neo-cucumber-replay {

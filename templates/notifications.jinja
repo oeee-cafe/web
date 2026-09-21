@@ -1,9 +1,9 @@
 {% extends "base.jinja" %}
 {% block title %}
-  {{ ftl_get_message("brand") }}
+  {{ super() }} | {{ ftl_get_message("notifications") }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
+  <div class="notifications-page">
     {% include "notifications_header.jinja" %}
 
     {# Invitations use the notification row's proportions — one line, time and
@@ -11,9 +11,14 @@
        two unrelated components stacked on each other. #}
     {% if invitations %}
       <div class="invitations-section">
-        <h3 class="notifications-title">{{ ftl_get_message("invitations-pending") }}</h3>
+        <h2 class="profile-section-label">{{ ftl_get_message("invitations-pending") }}</h2>
         {% for invitation in invitations %}
           <div class="notification invitation-item">
+            <span class="notification-figure">
+              <span class="notification-thumbnail-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
+              </span>
+            </span>
             <div class="notification-content">
               {# Same four pieces in the same order as before: the locales
                  write these as one sentence frame — "Invitation from" @who
@@ -27,8 +32,8 @@
               </p>
             </div>
             <div class="notification-meta">
-              <time class="notification-time muted">{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</time>
-              <div class="notification-actions">
+              <time class="notification-time" title="{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ invitation.created_at|ago }}</time>
+              <div class="invitation-actions">
                 <form method="post" action="/invitations/{{ invitation.id }}/accept">
                   <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("invitation-accept") }}</button>
                 </form>
@@ -52,7 +57,10 @@
         {% include "notifications_fragment.jinja" %}
       </div>
     {% elif not invitations %}
-      <p>{{ ftl_get_message("no-notifications") }}</p>
+      <div class="ds-card notifications-empty">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
+        <p>{{ ftl_get_message("no-notifications") }}</p>
+      </div>
     {% endif %}
   </div>
 {% endblock content %}
