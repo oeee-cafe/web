@@ -41,7 +41,7 @@
             <td>{{ invitation.invitee_display_name }}</td>
             <td class="muted">{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
             <td>
-              <button class="btn-danger"
+              <button class="ds-button ds-button-danger ds-button-small"
                       hx-delete="/communities/@{{ community.slug }}/invitations/{{ invitation.id }}"
                       hx-confirm="{{ ftl_get_message("community-retract-invitation-confirm") }}"
                       hx-target="closest tr"
@@ -90,7 +90,7 @@
             {% if can_remove %}
             <td>
               {% if member.role != "Owner" %}
-              <button class="btn-danger"
+              <button class="ds-button ds-button-danger ds-button-small"
                       hx-delete="/communities/@{{ community.slug }}/members/{{ member.user_id }}"
                       hx-confirm="{{ ftl_get_message("community-remove-member-confirm") }}"
                       hx-target="closest tr"
@@ -102,7 +102,7 @@
             </td>
             {% elif current_user and current_user.id == member.user_id and member.role != "Owner" %}
             <td>
-              <button class="btn-danger"
+              <button class="ds-button ds-button-danger ds-button-small"
                       hx-post="/communities/@{{ community.slug }}/leave"
                       hx-confirm="{{ ftl_get_message("community-leave-confirm") }}"
                       hx-target="body"

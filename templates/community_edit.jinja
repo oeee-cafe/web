@@ -54,8 +54,8 @@
     </fieldset>
     {% endif %}
     <div class="post-menu">
-        <button class="btn" hx-get="/communities/{{ community_id }}">{{ ftl_get_message("cancel") }}</button>
-        <button class="btn">{{ ftl_get_message("save") }}</button>
+        <button class="ds-button" hx-get="/communities/{{ community_id }}">{{ ftl_get_message("cancel") }}</button>
+        <button class="ds-button ds-button-primary">{{ ftl_get_message("save") }}</button>
     </div>
 </form>
 
@@ -80,13 +80,12 @@
         <button
             type="button"
             id="delete-community-btn"
-            class="btn"
+            class="ds-button ds-button-danger"
             disabled
             hx-delete="/communities/{{ community_id }}/delete"
             hx-confirm="{{ ftl_get_message("community-delete-final-confirm") }}"
             hx-target="body"
             hx-swap="innerHTML"
-            style="background-color: var(--danger-color, #dc2626); color: white; cursor: not-allowed; border: none;"
         
         hx-disable="this">
             {{ ftl_get_message("community-delete-button") }}
@@ -105,12 +104,8 @@
         confirmInput.addEventListener('input', function(e) {
             if (e.target.value === communitySlug) {
                 deleteBtn.disabled = false;
-                deleteBtn.style.cursor = 'pointer';
-                deleteBtn.style.backgroundColor = 'var(--danger-color, #dc2626)';
             } else {
                 deleteBtn.disabled = true;
-                deleteBtn.style.cursor = 'not-allowed';
-                deleteBtn.style.backgroundColor = '#9ca3af';
             }
         });
     }

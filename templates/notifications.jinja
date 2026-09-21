@@ -30,10 +30,10 @@
               <time class="notification-time muted">{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</time>
               <div class="notification-actions">
                 <form method="post" action="/invitations/{{ invitation.id }}/accept">
-                  <button type="submit" class="btn-accept">{{ ftl_get_message("invitation-accept") }}</button>
+                  <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("invitation-accept") }}</button>
                 </form>
                 <form method="post" action="/invitations/{{ invitation.id }}/reject">
-                  <button type="submit" class="btn-reject">{{ ftl_get_message("invitation-reject") }}</button>
+                  <button type="submit" class="ds-button">{{ ftl_get_message("invitation-reject") }}</button>
                 </form>
               </div>
             </div>

@@ -511,6 +511,16 @@
   background-color: var(--ds-danger-hover);
 }
 
+/* For a row of actions inside a list -- a comment's, a notification's --
+   where a full-size button would outweigh what it acts on. */
+.ds-button-small,
+.ds-page .ds-button-small {
+  min-height: 24px;
+  padding: 2px 9px;
+  font-size: var(--ds-text-s);
+  line-height: 18px;
+}
+
 .ds-button[disabled],
 .ds-page button:not([class])[disabled],
 .ds-page input[type="submit"]:not([class])[disabled] {

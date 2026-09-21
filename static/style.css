@@ -540,19 +540,7 @@ nav a:visited,
   gap: var(--space-2);
 }
 
-.comment-reply-btn {
-  font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-2);
-  background: none;
-  border: 1px solid var(--main-border-color);
-  color: var(--main-text-color);
-  cursor: pointer;
-  border-radius: 3px;
-}
 
-.comment-reply-btn:hover {
-  background: var(--main-border-color);
-}
 
 .comment-replies {
   margin-left: var(--space-5);
@@ -570,39 +558,18 @@ nav a:visited,
   align-items: flex-start;
 }
 
+/* The comment box's layout only; the field and its button are the design
+   system's. */
 #comments textarea {
   flex: 1;
   min-height: 40px;
   max-height: 200px;
-  padding: var(--space-3) var(--space-3);
-  border: 1px solid var(--main-border-color);
-  font-family: inherit;
-  font-size: var(--text-sm);
   resize: vertical;
-  box-sizing: border-box;
-}
-
-#comments textarea:focus {
-  outline: none;
-  border-color: var(--main-highlight-color);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 #comments button[type="submit"] {
-  background-color: var(--main-highlight-color);
-  color: white;
-  border: none;
-  padding: var(--space-3) var(--space-5);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-#comments button[type="submit"]:hover {
-  background-color: var(--main-highlight-hover-color);
 }
 
 .comment-list {
@@ -628,17 +595,7 @@ nav a:visited,
   margin-bottom: 1rem;
 }
 
-.notification-mark-all-button {
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  background-color: var(--main-bg-color);
-  border: 1px solid var(--main-border-color);
-  color: var(--main-text-color);
-}
 
-.notification-mark-all-button:hover {
-  background-color: var(--main-nav-bg-color);
-}
 
 /* One row per notification: thumbnail, sentence, then time and controls.
 
@@ -755,57 +712,15 @@ nav a:visited,
   gap: var(--space-1);
 }
 
-/* Text buttons rather than boxes. As bordered controls they read as the most
-   important thing in a row whose point is the sentence to their left. */
-.notification-mark-read,
-.notification-delete {
-  padding: var(--space-1);
-  font-size: var(--text-xs);
-  font-family: inherit;
-  cursor: pointer;
-  background: none;
-  border: none;
-  color: var(--main-text-muted-color);
-  text-decoration: underline;
-}
 
-.notification-mark-read:hover {
-  color: var(--main-highlight-color);
-}
 
-.notification-delete:hover {
-  color: var(--danger-color);
-}
 
 .invitations-section {
   margin-bottom: var(--space-6);
 }
 
-/* Accept and reject stay real buttons where mark-read and delete became text:
-   these commit you to joining something, and they are the reason the row is
-   on the page. The section had no styles of its own at all — it rendered as
-   bare divs and default browser buttons. */
-.btn-accept,
-.btn-reject {
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-xs);
-  font-family: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  background-color: var(--main-bg-color);
-  border: 1px solid var(--main-border-color);
-  color: var(--main-text-color);
-}
 
-.btn-accept:hover {
-  border-color: var(--main-highlight-color);
-  color: var(--main-highlight-color);
-}
 
-.btn-reject:hover {
-  border-color: var(--danger-color);
-  color: var(--danger-color);
-}
 
 /* On a phone the sentence needs the whole width, so time and controls drop
    under it rather than squeezing the thing the row exists to say. */
@@ -831,31 +746,9 @@ nav a:visited,
   color: var(--main-text-muted-color);
 }
 
-.button-follow {
-  background-color: var(--main-nav-bg-color);
-  color: white;
-  padding: var(--space-2);
-  border: solid 1px var(--main-border-color);
-  cursor: pointer;
-  height: 42px;
-}
 
-.button-follow:hover {
-  background-color: var(--main-border-color);
-}
 
-.button-unfollow {
-  background-color: red;
-  color: white;
-  padding: var(--space-2);
-  border: solid 1px var(--main-border-color);
-  cursor: pointer;
-  height: 42px;
-}
 
-.button-unfollow:hover {
-  background-color: darkred;
-}
 
 .profile-header {
   display: flex;
@@ -1085,7 +978,6 @@ nav a:visited,
 
   #comments button[type="submit"] {
     width: 100%;
-    padding: var(--space-3) var(--space-5);
   }
 }
 
@@ -1719,26 +1611,8 @@ nav a:visited,
   border-top: 1px solid var(--main-border-color);
 }
 
-.delete-button {
-  padding: var(--space-2) var(--space-5);
-  background-color: var(--danger-color);
-  border: 1px solid var(--danger-color);
-  color: white;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-}
 
-.delete-button:hover {
-  background-color: var(--danger-hover-color);
-  border-color: var(--danger-hover-color);
-}
 
-.delete-button:focus {
-  outline: 2px solid var(--danger-color);
-  outline-offset: 2px;
-}
 
 /* Community Page */
 
@@ -2064,38 +1938,9 @@ nav a:visited,
   margin-top: var(--space-4);
 }
 
-.btn {
-  display: inline-block;
-  padding: var(--space-3) var(--space-5);
-  background-color: var(--main-bg-color);
-  border: 1px solid var(--main-border-color);
-  color: var(--main-text-color);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  font-family: inherit;
-  line-height: 1.4;
-}
 
-.btn:hover {
-  background-color: var(--main-nav-bg-color);
-  border-color: var(--main-highlight-color);
-  color: var(--main-text-color);
-}
 
-.btn-move {
-  background-color: var(--main-highlight-color);
-  border-color: var(--main-highlight-color);
-  color: white;
-  font-weight: 700;
-}
 
-.btn-move:hover {
-  background-color: #d97826;
-  border-color: #d97826;
-  color: white;
-}
 
 .community-move-no-results {
   text-align: center;
@@ -2556,19 +2401,7 @@ nav a:visited,
   margin-bottom: var(--space-6);
 }
 
-.btn-danger {
-  background-color: var(--danger-color);
-  color: white;
-  border: 1px solid var(--danger-color);
-  padding: var(--space-2) var(--space-4);
-  cursor: pointer;
-  font-size: var(--text-sm);
-}
 
-.btn-danger:hover {
-  background-color: var(--danger-hover-color);
-  border-color: var(--danger-hover-color);
-}
 
 /* Destructive area on the community edit form. The tokens it reads used to be
    defined only in that template's dark-mode block, so light mode fell through
