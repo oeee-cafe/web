@@ -6,7 +6,6 @@ import type { DrawingState } from "../types/drawing";
 interface CanvasViewOptions {
   drawingEngine: DrawingEngine | null | undefined;
   drawingState: DrawingState;
-  setDrawingState: React.Dispatch<React.SetStateAction<DrawingState>>;
   canvasContainerRef: React.RefObject<HTMLDivElement | null>;
   currentZoom: number;
   canvasWidth?: number;
@@ -26,7 +25,6 @@ interface CanvasViewOptions {
 export function useCanvasView({
   drawingEngine,
   drawingState,
-  setDrawingState,
   canvasContainerRef,
   currentZoom,
   canvasWidth,
@@ -101,37 +99,6 @@ export function useCanvasView({
     drawingState.isFlippedHorizontal,
     drawingEngine,
     currentZoom,
-    canvasContainerRef,
-  ]);
-
-  // Apply pending pan adjustments after zoom level changes
-  useEffect(() => {
-    if (
-      drawingState.pendingPanDeltaX === undefined &&
-      drawingState.pendingPanDeltaY === undefined
-    ) {
-      return;
-    }
-    requestAnimationFrame(() => {
-      drawingEngine?.adjustPanForZoom(
-        drawingState.pendingPanDeltaX || 0,
-        drawingState.pendingPanDeltaY || 0,
-        canvasContainerRef.current || undefined,
-        currentZoom
-      );
-      setDrawingState((prev) => ({
-        ...prev,
-        pendingPanDeltaX: undefined,
-        pendingPanDeltaY: undefined,
-      }));
-    });
-  }, [
-    drawingState.pendingPanDeltaX,
-    drawingState.pendingPanDeltaY,
-    drawingState.zoomLevel,
-    drawingEngine,
-    currentZoom,
-    setDrawingState,
     canvasContainerRef,
   ]);
 

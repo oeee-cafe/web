@@ -665,7 +665,6 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     canvasWidth,
     canvasHeight,
     drawingEngine,
-    currentZoom,
     hiddenOwners,
     bgVisible: drawingState.bgVisible,
     fgVisible: drawingState.fgVisible,
@@ -674,7 +673,6 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
   const { cursorCanvasRef, paintCursor } = useCanvasView({
     drawingEngine,
     drawingState,
-    setDrawingState,
     canvasContainerRef,
     currentZoom,
     canvasWidth,

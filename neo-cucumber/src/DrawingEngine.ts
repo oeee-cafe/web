@@ -192,6 +192,14 @@ export class DrawingEngine {
   }
   private panOffsetX = 0;
   private panOffsetY = 0;
+  /**
+   * The scale the frame was last given, and the translate it was actually
+   * given with it -- the pan plus whatever `snapToDevicePixels` added.
+   * Anchoring a zoom needs both to find where the frame sits untransformed.
+   */
+  private viewZoom = 1;
+  private appliedPanX = 0;
+  private appliedPanY = 0;
   private isFlippedHorizontal = false;
 
   // Alpha calculation constants
@@ -662,15 +670,48 @@ export class DrawingEngine {
     this.updateCanvasPan(container, zoomScale);
   }
 
-  public adjustPanForZoom(
-    deltaX: number,
-    deltaY: number,
-    container?: HTMLCanvasElement | HTMLDivElement,
-    zoomScale?: number
+  /** The zoom the frame is showing right now, as a scale. */
+  public get zoom(): number {
+    return this.viewZoom;
+  }
+
+  /**
+   * Change the zoom, keeping the artwork under (`clientX`, `clientY`) where it
+   * is on screen, and apply the scale and the compensating pan in one write.
+   *
+   * They used to land separately -- the scale when React re-rendered, the pan
+   * on an animation frame after that -- and the frame in between drew the
+   * canvas scaled about its centre, which is the jump away from the pointer.
+   *
+   * The frame is `scale(z) translate(p)` about its centre, so a point `a`
+   * pixels from the untransformed centre is at `z * (a/z_local + p)`; holding
+   * it still across `z -> z'` moves the pan by `a * (1/z' - 1/z)`.
+   */
+  public zoomAround(
+    newZoom: number,
+    container: HTMLCanvasElement | HTMLDivElement | undefined,
+    clientX?: number,
+    clientY?: number
   ) {
-    this.panOffsetX += deltaX;
-    this.panOffsetY += deltaY;
-    this.updateCanvasPan(container, zoomScale);
+    const oldZoom = this.viewZoom;
+    const frame = container ? this.frameFor(container) : null;
+    if (
+      frame &&
+      clientX !== undefined &&
+      clientY !== undefined &&
+      oldZoom > 0 &&
+      newZoom > 0
+    ) {
+      const rect = frame.getBoundingClientRect();
+      // Scaling about the centre leaves the centre where the translate put
+      // it, so taking the translate back out finds the layout centre.
+      const centreX = rect.left + rect.width / 2 - this.appliedPanX * oldZoom;
+      const centreY = rect.top + rect.height / 2 - this.appliedPanY * oldZoom;
+      const factor = 1 / newZoom - 1 / oldZoom;
+      this.panOffsetX += (clientX - centreX) * factor;
+      this.panOffsetY += (clientY - centreY) * factor;
+    }
+    this.updateCanvasPan(container, newZoom);
   }
 
   public resetPan(container?: HTMLCanvasElement | HTMLDivElement, zoomScale?: number) {
@@ -684,33 +725,28 @@ export class DrawingEngine {
     this.updateCanvasPan(container, zoomScale);
   }
 
+  /** The `.canvas-container` frame for whatever element a caller holds. */
+  private frameFor(container: HTMLCanvasElement | HTMLDivElement): HTMLElement | null {
+    const frame =
+      container.tagName === "CANVAS"
+        ? container.closest<HTMLElement>(".canvas-container")
+        : container;
+    return frame ?? document.querySelector<HTMLElement>(".canvas-container");
+  }
+
   private updateCanvasPan(container?: HTMLCanvasElement | HTMLDivElement, zoomScale?: number) {
+    if (zoomScale) this.viewZoom = zoomScale;
     if (!container) return;
-    
-    // Find the actual canvas container
-    let actualContainer: HTMLElement | null = null;
-    
-    if (container.tagName === 'CANVAS') {
-      // If we got a canvas, find its parent container
-      actualContainer = container.closest('.canvas-container');
-    } else {
-      // If we got a div, use it directly
-      actualContainer = container;
-    }
-    
-    if (!actualContainer) {
-      // Fallback: find container in document
-      actualContainer = document.querySelector<HTMLElement>(".canvas-container");
-    }
+    const actualContainer = this.frameFor(container);
     if (!actualContainer) return;
 
-    this.clampPanToViewport(actualContainer, zoomScale ?? 1);
+    this.clampPanToViewport(actualContainer, this.viewZoom);
 
     // Transform around the canvas centre, matching the flex-centred painter
     // area. Keeping the transform origin explicit makes the pan bounds below
     // independent of browser defaults.
     actualContainer.style.transformOrigin = "center";
-    const scaleTransform = zoomScale ? `scale(${zoomScale})` : "";
+    const scaleTransform = `scale(${this.viewZoom})`;
     const translateTransform = `translate(${this.panOffsetX}px, ${this.panOffsetY}px)`;
     const transform = [scaleTransform, translateTransform]
       .filter(Boolean)
@@ -729,7 +765,9 @@ export class DrawingEngine {
       canvasContent.style.transform = this.isFlippedHorizontal ? "scaleX(-1)" : "";
     }
 
-    this.snapToDevicePixels(actualContainer, zoomScale ?? 1, scaleTransform);
+    this.appliedPanX = this.panOffsetX;
+    this.appliedPanY = this.panOffsetY;
+    this.snapToDevicePixels(actualContainer, this.viewZoom, scaleTransform);
   }
 
   /**
@@ -771,18 +809,24 @@ export class DrawingEngine {
 
     // The translate sits inside the scale, so a screen distance is divided
     // by the zoom to become a translate distance.
+    this.appliedPanX = this.panOffsetX + dx / zoom;
+    this.appliedPanY = this.panOffsetY + dy / zoom;
     container.style.transform = [
       scaleTransform,
-      `translate(${this.panOffsetX + dx / zoom}px, ${this.panOffsetY + dy / zoom}px)`,
+      `translate(${this.appliedPanX}px, ${this.appliedPanY}px)`,
     ]
       .filter(Boolean)
       .join(" ");
   }
 
   /**
-   * Bound pan to the painter viewport. A canvas that fits stays fully visible;
-   * a larger one can travel, but always leaves a generous recovery strip in
-   * view so it cannot be lost beyond an edge.
+   * Bound pan to the painter viewport: the canvas can travel, but always
+   * leaves a recovery strip in view so it cannot be lost beyond an edge.
+   *
+   * This used to hold a canvas that fits entirely inside the viewport, which
+   * fought every zoom anchored near an edge -- the pointer asked for a pan
+   * the clamp refused, and the drawing slid out from under it as it crossed
+   * from fitting to not.
    */
   private clampPanToViewport(container: HTMLElement, zoom: number) {
     const viewport = container.parentElement?.getBoundingClientRect();
@@ -792,9 +836,10 @@ export class DrawingEngine {
     const scaledWidth = container.offsetWidth * zoom;
     const scaledHeight = container.offsetHeight * zoom;
     const maxScreenPan = (scaledSize: number, viewportSize: number) =>
-      scaledSize <= viewportSize
-        ? (viewportSize - scaledSize) / 2
-        : Math.max(0, (viewportSize + scaledSize) / 2 - visibleStrip);
+      Math.max(
+        (viewportSize - scaledSize) / 2,
+        (viewportSize + scaledSize) / 2 - visibleStrip
+      );
 
     const maxPanX = maxScreenPan(scaledWidth, viewport.width) / zoom;
     const maxPanY = maxScreenPan(scaledHeight, viewport.height) / zoom;

@@ -126,7 +126,7 @@ export const useCanvas = ({
   // Update canvas transform when zoom changes
   useEffect(() => {
     if (drawingEngine && canvasContainerRef.current) {
-      drawingEngine.adjustPanForZoom(
+      drawingEngine.updatePanOffset(
         0,
         0,
         canvasContainerRef.current,

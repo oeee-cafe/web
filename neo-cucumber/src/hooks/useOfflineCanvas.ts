@@ -10,7 +10,6 @@ interface UseOfflineCanvasParams {
   canvasWidth: number;
   canvasHeight: number;
   drawingEngine: DrawingEngine | null;
-  currentZoom: number;
   /**
    * Participants whose layers are hidden from this viewer.
    *
@@ -31,7 +30,6 @@ export const useOfflineCanvas = ({
   canvasWidth,
   canvasHeight,
   drawingEngine,
-  currentZoom,
   hiddenOwners,
   bgVisible = true,
   fgVisible = true,
@@ -117,14 +115,6 @@ export const useOfflineCanvas = ({
     }
     // `shownFor` reads the refs this effect has just set.
   }, [hiddenOwners, bgVisible, fgVisible]);
-
-  // Update canvas zoom
-  useEffect(() => {
-    if (canvasContainerRef.current) {
-      const container = canvasContainerRef.current;
-      container.style.transform = `scale(${currentZoom})`;
-    }
-  }, [currentZoom]);
 
   /**
    * Flattens the whole stack, everyone included.

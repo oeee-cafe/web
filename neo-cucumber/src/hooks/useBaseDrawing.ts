@@ -1274,17 +1274,17 @@ export const useBaseDrawing = (
         const rawDeltaX = e.clientX - drawingStateRef.current.panLastX;
         const rawDeltaY = e.clientY - drawingStateRef.current.panLastY;
 
-        const currentZoomScale = zoomLevel ? zoomLevel / 100 : 1;
-        const deltaX = rawDeltaX / currentZoomScale;
-        const deltaY = rawDeltaY / currentZoomScale;
-
-        if (drawingEngineRef.current) {
+        // The engine's own scale: `zoomLevel` is rounded to a percentage,
+        // and re-applying 0.59 to a frame at 0.5946 made it twitch.
+        const engine = drawingEngineRef.current;
+        if (engine) {
+          const zoom = engine.zoom;
           const container = containerRef?.current || canvasRef.current || undefined;
-          drawingEngineRef.current.updatePanOffset(
-            deltaX,
-            deltaY,
+          engine.updatePanOffset(
+            rawDeltaX / zoom,
+            rawDeltaY / zoom,
             container,
-            zoomLevel ? zoomLevel / 100 : undefined
+            zoom
           );
         }
 
@@ -1412,7 +1412,6 @@ export const useBaseDrawing = (
     appRef,
     canvasRef,
     containerRef,
-    zoomLevel,
     getCanvasCoordinates,
     getCanvasPoint,
     performDrawing,

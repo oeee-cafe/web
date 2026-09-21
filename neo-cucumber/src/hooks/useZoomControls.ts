@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, startTransition } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { type DrawingState } from "../types/drawing";
 
 // Zoom constants
@@ -90,51 +90,32 @@ export const nearestZoomIndex = (levels: number[], scale: number): number => {
 };
 
 /**
- * How far to shift the canvas so the point under (`pointerX`, `pointerY`)
- * stays under it across a zoom change.
+ * How much of a trackpad's wheel stream makes one doubling of the zoom.
  *
- * Shared by the buttons, the wheel and the pinch. It was written out twice
- * before -- once for zoom in and once for zoom out, identically -- which is
- * two chances for the anchor point to drift apart between the directions.
+ * A mouse wheel sends one event per notch and a notch is one rung; a trackpad
+ * sends a stream of small deltas, and taking each as a rung raced the zoom
+ * from one end of the ladder to the other in a flick. Those are summed into a
+ * continuous scale instead and the nearest rung shown.
  */
-const panDeltaForZoom = (
-  canvas: HTMLDivElement | null,
-  oldZoom: number,
-  newZoom: number,
-  pointerX?: number,
-  pointerY?: number
-): { x: number; y: number } => {
-  if (pointerX === undefined || pointerY === undefined || !canvas) {
-    return { x: 0, y: 0 };
-  }
-
-  const rect = canvas.getBoundingClientRect();
-
-  // Get current pan offset from transform
-  const transform = window.getComputedStyle(canvas).transform;
-  let currentPanX = 0;
-  let currentPanY = 0;
-  if (transform && transform !== "none") {
-    const matrix = new DOMMatrix(transform);
-    currentPanX = matrix.m41;
-    currentPanY = matrix.m42;
-  }
-
-  // Where the pointer is over the canvas, with the pan already taken out
-  const canvasX = pointerX - rect.left - currentPanX;
-  const canvasY = pointerY - rect.top - currentPanY;
-
-  // How far that point would travel under the zoom, and so how far back the
-  // canvas has to be moved to leave it where it was
-  const zoomScale = newZoom / oldZoom;
-  return { x: canvasX * (1 - zoomScale), y: canvasY * (1 - zoomScale) };
-};
+const trackpadPixelsPerDoubling = 160;
+/** A pinch on a trackpad (a ctrl-wheel) arrives in much smaller deltas. */
+const pinchPixelsPerDoubling = 60;
+/** A delta this large in one event is a mouse notch, not a trackpad. */
+const notchPixels = 50;
+/** After this long without a wheel event the next one starts afresh. */
+const wheelIdleMs = 250;
 
 interface UseZoomControlsProps {
   canvasContainerRef: React.RefObject<HTMLDivElement | null>;
   appRef: React.RefObject<HTMLDivElement | null>;
   drawingEngine?: {
     resetPan: (container: HTMLDivElement | undefined, zoom: number) => void;
+    zoomAround: (
+      zoom: number,
+      container: HTMLDivElement | undefined,
+      clientX?: number,
+      clientY?: number
+    ) => void;
   } | null;
   setDrawingState: (updater: (prev: DrawingState) => DrawingState) => void;
 }
@@ -152,51 +133,66 @@ export const useZoomControls = ({
   );
   const currentZoom = zoomLevels[currentZoomIndex];
 
+  /*
+   * The rung in force, read and written synchronously.
+   *
+   * Wheel and pinch events arrive faster than React commits, and each one
+   * steps from wherever the last one left the zoom. Reading the index from
+   * state stepped from the last *render* instead, so a quick flick of the
+   * wheel repeated the same step and dropped the rest.
+   */
+  const zoomIndexRef = useRef(currentZoomIndex);
+  const engineRef = useRef(drawingEngine);
+  useEffect(() => {
+    engineRef.current = drawingEngine;
+  }, [drawingEngine]);
+
+  const commitZoomIndex = useCallback(
+    (index: number) => {
+      zoomIndexRef.current = index;
+      setCurrentZoomIndex(index);
+      setDrawingState((prev: DrawingState) => ({
+        ...prev,
+        zoomLevel: Math.round(zoomLevels[index] * 100),
+      }));
+    },
+    [setDrawingState, zoomLevels]
+  );
+
   /**
    * Move to a rung of the ladder, keeping the point under the pointer still.
    *
-   * The pan the zoom needs is left in `pendingPanDelta*` for `useCanvasView`
-   * to apply on the next frame, so the scale and the shift that compensates
-   * for it land together rather than a frame apart.
+   * The engine applies the scale and the pan that compensates for it in one
+   * write, here, rather than waiting for React: the overlays catch up on the
+   * next render, but the canvas never shows a frame at the new scale and the
+   * old pan.
    */
   const applyZoomIndex = useCallback(
     (newIndex: number, pointerX?: number, pointerY?: number) => {
       if (newIndex < 0 || newIndex >= zoomLevels.length) return;
-      if (newIndex === currentZoomIndex) return;
+      if (newIndex === zoomIndexRef.current) return;
 
-      const newZoom = zoomLevels[newIndex];
-      const delta = panDeltaForZoom(
-        canvasContainerRef.current,
-        zoomLevels[currentZoomIndex],
-        newZoom,
+      engineRef.current?.zoomAround(
+        zoomLevels[newIndex],
+        canvasContainerRef.current ?? undefined,
         pointerX,
         pointerY
       );
-
-      // Batch state updates to prevent flicker
-      startTransition(() => {
-        setCurrentZoomIndex(newIndex);
-        setDrawingState((prev: DrawingState) => ({
-          ...prev,
-          zoomLevel: Math.round(newZoom * 100),
-          pendingPanDeltaX: delta.x !== 0 ? delta.x : undefined,
-          pendingPanDeltaY: delta.y !== 0 ? delta.y : undefined,
-        }));
-      });
+      commitZoomIndex(newIndex);
     },
-    [currentZoomIndex, zoomLevels, canvasContainerRef, setDrawingState]
+    [zoomLevels, canvasContainerRef, commitZoomIndex]
   );
 
   const handleZoomIn = useCallback(
     (pointerX?: number, pointerY?: number) =>
-      applyZoomIndex(currentZoomIndex + 1, pointerX, pointerY),
-    [applyZoomIndex, currentZoomIndex]
+      applyZoomIndex(zoomIndexRef.current + 1, pointerX, pointerY),
+    [applyZoomIndex]
   );
 
   const handleZoomOut = useCallback(
     (pointerX?: number, pointerY?: number) =>
-      applyZoomIndex(currentZoomIndex - 1, pointerX, pointerY),
-    [applyZoomIndex, currentZoomIndex]
+      applyZoomIndex(zoomIndexRef.current - 1, pointerX, pointerY),
+    [applyZoomIndex]
   );
 
   /**
@@ -222,14 +218,13 @@ export const useZoomControls = ({
 
   const handleZoomReset = useCallback(() => {
     const resetIndex = zoomLevels.findIndex((level) => level >= 1.0);
-    setCurrentZoomIndex(resetIndex);
-    setDrawingState((prev: DrawingState) => ({ ...prev, zoomLevel: 100 }));
+    commitZoomIndex(resetIndex);
 
     // Reset pan offset as well
     if (drawingEngine) {
       drawingEngine.resetPan(canvasContainerRef.current || undefined, 1.0);
     }
-  }, [zoomLevels, drawingEngine, canvasContainerRef, setDrawingState]);
+  }, [zoomLevels, drawingEngine, canvasContainerRef, commitZoomIndex]);
 
   /**
    * Zoom so the whole drawing is on screen.
@@ -261,46 +256,73 @@ export const useZoomControls = ({
     );
     const fitZoom = zoomLevels[fitIndex];
 
-    setCurrentZoomIndex(fitIndex);
-    setDrawingState((prev: DrawingState) => ({
-      ...prev,
-      zoomLevel: Math.round(fitZoom * 100),
-      pendingPanDeltaX: undefined,
-      pendingPanDeltaY: undefined,
-    }));
+    commitZoomIndex(fitIndex);
     drawingEngine?.resetPan(canvas, fitZoom);
     },
-    [appRef, canvasContainerRef, drawingEngine, setDrawingState, zoomLevels]
+    [appRef, canvasContainerRef, drawingEngine, commitZoomIndex, zoomLevels]
   );
 
   const handleZoomFit = useCallback(() => zoomToFit(), [zoomToFit]);
 
-  // Add scroll wheel zoom functionality
+  // Scroll wheel and trackpad zoom. Registered once; everything it moves is
+  // read through refs, so a zoom step does not tear the listener down.
+  const handleZoomInRef = useRef(handleZoomIn);
+  const handleZoomOutRef = useRef(handleZoomOut);
+  const zoomToScaleRef = useRef(zoomToScale);
   useEffect(() => {
+    handleZoomInRef.current = handleZoomIn;
+    handleZoomOutRef.current = handleZoomOut;
+    zoomToScaleRef.current = zoomToScale;
+  }, [handleZoomIn, handleZoomOut, zoomToScale]);
+
+  useEffect(() => {
+    const appElement = appRef.current;
+    if (!appElement) return;
+
+    // The continuous scale a trackpad stream has reached, which the shown
+    // rung is the nearest to; null when no stream is running.
+    let wheelScale: number | null = null;
+    let lastWheelAt = 0;
+
     const handleWheel = (e: WheelEvent) => {
       // Only zoom when cursor is over the canvas or app area
       const target = e.target as Element;
       const isOverCanvas = target.id === "canvas" || target.closest("#app");
+      if (!isOverCanvas) return;
+      e.preventDefault();
+      if (e.deltaY === 0) return;
 
-      if (isOverCanvas) {
-        e.preventDefault();
+      const now = e.timeStamp || Date.now();
+      if (now - lastWheelAt > wheelIdleMs) wheelScale = null;
+      lastWheelAt = now;
 
-        if (e.deltaY < 0) {
-          // Scroll up follows the common map/canvas convention: zoom in.
-          handleZoomIn(e.clientX, e.clientY);
-        } else if (e.deltaY > 0) {
-          handleZoomOut(e.clientX, e.clientY);
-        }
+      // Lines and pages (Firefox's mouse wheel) and large pixel jumps (a
+      // Chromium mouse notch) are notches: one rung each, as NEO's buttons.
+      const isNotch =
+        !e.ctrlKey &&
+        (e.deltaMode !== 0 || Math.abs(e.deltaY) >= notchPixels);
+      if (isNotch) {
+        wheelScale = null;
+        // Scroll up follows the common map/canvas convention: zoom in.
+        if (e.deltaY < 0) handleZoomInRef.current(e.clientX, e.clientY);
+        else handleZoomOutRef.current(e.clientX, e.clientY);
+        return;
       }
+
+      const perDoubling = e.ctrlKey
+        ? pinchPixelsPerDoubling
+        : trackpadPixelsPerDoubling;
+      const base = wheelScale ?? zoomLevels[zoomIndexRef.current];
+      wheelScale = Math.min(
+        Math.max(base * Math.pow(2, -e.deltaY / perDoubling), zoomLevels[0]),
+        zoomLevels[zoomLevels.length - 1]
+      );
+      zoomToScaleRef.current(wheelScale, e.clientX, e.clientY);
     };
 
-    // Add event listener to the app container
-    const appElement = appRef.current;
-    if (appElement) {
-      appElement.addEventListener("wheel", handleWheel, { passive: false });
-      return () => appElement.removeEventListener("wheel", handleWheel);
-    }
-  }, [handleZoomIn, handleZoomOut, appRef]);
+    appElement.addEventListener("wheel", handleWheel, { passive: false });
+    return () => appElement.removeEventListener("wheel", handleWheel);
+  }, [appRef, zoomLevels]);
 
   return {
     // State
