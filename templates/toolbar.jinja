@@ -230,7 +230,7 @@
         showThemeChoice();
       }
       function go(path) {
-        loading();
+        loading(path);
         location.href = path;
       }
       function profilePath() {
@@ -260,7 +260,6 @@
         "new-drawing": function () {
           var draw = document.getElementById("nav-draw-button");
           if (draw && draw.form) {
-            loading();
             draw.form.submit();
           } else {
             go("/login");
@@ -349,19 +348,63 @@
         if (event.key === "Escape") closeMenus(null);
       });
 
-      // The page that was asked for is on its way: the toolbar says so
-      // (`.is-loading`, drawn in ds.css) until the next page -- or htmx's swap
-      // of the body -- replaces it with a fresh one. Only for leaving the
-      // page: a link to elsewhere on the site, or a form that is not htmx's.
-      // A page that stays -- the painter asking whether to leave, a request
-      // that fails -- clears it after a while rather than leaving it running.
-      function loading() {
-        var bar = document.querySelector(".nav-bar");
-        if (!bar) return;
-        bar.classList.add("is-loading");
-        setTimeout(function () {
-          bar.classList.remove("is-loading");
-        }, 10000);
+      // The page that was asked for is drawn at once, before it arrives: the
+      // content area swaps to a skeleton of it -- a grid of empty squares
+      // for the drawing feeds, a title and lines for anything else -- and
+      // the next page, or htmx's swap of the body, replaces it. What was
+      // there is hidden, not removed: a page that stays after all (the
+      // navigation cancelled, a request that failed) gets it back.
+      var FEEDS = /^\/(home|collaborate)?$|^\/(communities\/@|hashtags\/)[^/]+$/;
+      function skeletonFor(path) {
+        var skeleton = document.createElement("div");
+        skeleton.className = "ds-skeleton";
+        skeleton.setAttribute("aria-busy", "true");
+        var heading = document.createElement("div");
+        heading.className = "ds-skeleton-bar ds-skeleton-heading";
+        skeleton.appendChild(heading);
+        if (FEEDS.test(path)) {
+          var grid = document.createElement("div");
+          grid.className = "posts-grid ds-skeleton-grid";
+          for (var i = 0; i < 12; i++) {
+            var item = document.createElement("div");
+            item.className = "posts-grid-item";
+            item.innerHTML = '<div class="ds-skeleton-square"></div>' +
+              '<div class="ds-skeleton-bar ds-skeleton-caption"></div>' +
+              '<div class="ds-skeleton-bar ds-skeleton-caption short"></div>';
+            grid.appendChild(item);
+          }
+          skeleton.appendChild(grid);
+        } else {
+          var column = document.createElement("div");
+          column.className = "center";
+          for (var j = 0; j < 6; j++) {
+            var line = document.createElement("div");
+            line.className = "ds-skeleton-bar ds-skeleton-line" + (j % 3 === 2 ? " short" : "");
+            column.appendChild(line);
+          }
+          skeleton.appendChild(column);
+        }
+        return skeleton;
+      }
+      function loading(path) {
+        var content = document.querySelector("main.ds-content");
+        if (!content || content.querySelector(".ds-skeleton")) return;
+        var kept = [];
+        for (var c = 0; c < content.children.length; c++) {
+          var child = content.children[c];
+          kept.push([child, child.style.display]);
+          child.style.display = "none";
+        }
+        var skeleton = skeletonFor(path || location.pathname);
+        content.appendChild(skeleton);
+        content.scrollTop = 0;
+        function restore() {
+          if (!skeleton.parentNode) return;
+          skeleton.parentNode.removeChild(skeleton);
+          for (var k = 0; k < kept.length; k++) kept[k][0].style.display = kept[k][1];
+        }
+        window.oeeeRestoreContent = restore;
+        setTimeout(restore, 10000);
       }
       document.addEventListener("click", function (event) {
         if (event.button !== 0) return;
@@ -375,20 +418,19 @@
         if (event.defaultPrevented && !boosted) return;
         if (link.origin !== location.origin) return;
         if (link.pathname === location.pathname && link.search === location.search) return;
-        loading();
+        loading(link.pathname);
       });
       document.addEventListener("submit", function (event) {
         var form = event.target;
         if (event.defaultPrevented || !form || !form.getAttribute) return;
         if (form.hasAttribute("hx-post") || form.hasAttribute("hx-get") ||
             form.hasAttribute("hx-put") || form.hasAttribute("hx-delete")) return;
-        loading();
+        var action = form.getAttribute("action");
+        loading(action && action.charAt(0) === "/" ? action.split("?")[0] : location.pathname);
       });
       window.addEventListener("pageshow", function (event) {
         // Back to a page kept in memory: it is shown as it was left.
-        if (!event.persisted) return;
-        var bar = document.querySelector(".nav-bar");
-        if (bar) bar.classList.remove("is-loading");
+        if (event.persisted && window.oeeeRestoreContent) window.oeeeRestoreContent();
       });
     })();
   </script>

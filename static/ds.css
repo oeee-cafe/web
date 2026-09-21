@@ -330,47 +330,6 @@ html {
   user-select: none;
 }
 
-/* The page that was asked for is on its way: a lime line runs along the
-   toolbar's bottom edge. It waits 150ms before showing, so a quick load
-   passes without a flicker. The class is set by toolbar.jinja and needs no
-   clearing: the next page, or htmx's swap of the body, brings a fresh bar. */
-.nav-bar::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -1px;
-  width: 30%;
-  height: 2px;
-  background-color: var(--ds-accent);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.nav-bar.is-loading::after {
-  -webkit-animation: ds-loading 1.1s ease-in-out 150ms infinite;
-  animation: ds-loading 1.1s ease-in-out 150ms infinite;
-}
-
-@-webkit-keyframes ds-loading {
-  0% { left: -30%; opacity: 1; }
-  100% { left: 100%; opacity: 1; }
-}
-
-@keyframes ds-loading {
-  0% { left: -30%; opacity: 1; }
-  100% { left: 100%; opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nav-bar.is-loading::after {
-    left: 0;
-    width: 100%;
-    opacity: 1;
-    -webkit-animation: none;
-    animation: none;
-  }
-}
-
 #menubar {
   display: flex;
   flex-wrap: wrap;
@@ -1329,4 +1288,73 @@ html {
   font-weight: 600;
   line-height: 18px;
   text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+   Skeletons
+
+   What the content area shows the moment a page is asked for, drawn by
+   toolbar.jinja in the shape of the page to come: a feed's grid of squares
+   at the reader's own count a row, or a title and lines. It breathes rather
+   than spins, and holds still for reduced motion.
+   --------------------------------------------------------------------------- */
+.ds-skeleton {
+  padding-top: 2px;
+}
+
+.ds-skeleton-bar,
+.ds-skeleton-square {
+  border-radius: 4px;
+  background-color: var(--ds-hover);
+  -webkit-animation: ds-breathe 1.4s ease-in-out infinite;
+  animation: ds-breathe 1.4s ease-in-out infinite;
+}
+
+.ds-skeleton-heading {
+  width: 180px;
+  height: 22px;
+  margin-bottom: var(--ds-space-4);
+}
+
+.ds-skeleton-square {
+  border-radius: 0;
+  padding-top: 100%;
+}
+
+.ds-skeleton-caption {
+  height: 12px;
+  margin-top: 10px;
+  width: 70%;
+}
+
+.ds-skeleton-caption.short {
+  width: 40%;
+  margin-top: 6px;
+}
+
+.ds-skeleton-line {
+  height: 14px;
+  margin-bottom: 14px;
+}
+
+.ds-skeleton-line.short {
+  width: 60%;
+}
+
+@-webkit-keyframes ds-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes ds-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-skeleton-bar,
+  .ds-skeleton-square {
+    -webkit-animation: none;
+    animation: none;
+  }
 }
