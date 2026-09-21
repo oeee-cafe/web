@@ -452,3 +452,4 @@ communities-tab-public = 公開
 communities-tab-official = 公式
 communities-tab-yours = 参加中
 toolbar-menu = メニュー
+nav-about = 概要
