@@ -9,6 +9,9 @@
     </title>
     <link rel="stylesheet"
           href="{{ '/static/neo-cucumber/offline.css' | cachebuster | safe }}" />
+    {# After the painter's own, so the toolbar is not restyled by its reset. #}
+    <link rel="stylesheet"
+          href="{{ '/static/toolbar.css' | cachebuster | safe }}" />
     <style>
       html, body { width: 100%; height: 100%; margin: 0; }
       body { overflow: hidden; }
@@ -23,6 +26,10 @@
         display: flex;
         flex-direction: column;
       }
+      /* The toolbar is the page's first row, as on every other page; it is
+         in the document before the painter mounts, so the area the painter
+         measures is already the one it will keep. */
+      #oeee-painter-page > .nav-bar { flex: 0 0 auto; position: relative; }
       #oeee-painter-header { flex: 0 0 auto; }
       #neo-cucumber-root { flex: 1 1 auto; min-height: 0; }
     </style>
@@ -35,6 +42,7 @@
       page you have to use the back button to leave.
     #}
     <div id="oeee-painter-page">
+      {% include "toolbar.jinja" %}
       <div id="oeee-painter-header"
            data-home="{% if community_slug %}/communities/@{{ community_slug }}{% else %}/{% endif %}"
            data-title="{% if parent_post %}Re: {{ parent_post.title }}{% else %}{{ ftl_get_message("community-drawing-new") }}{% endif %}"
@@ -45,7 +53,7 @@
     <button id="oeee-painter-save" type="button" disabled
             data-confirm="{{ ftl_get_message("draw-save-confirm") }}"
             data-cancel="{{ ftl_get_message("cancel") }}"
-            style="position:fixed;top:8px;right:8px;z-index:80">{{ ftl_get_message("save") }}</button>
+            style="position:fixed;top:61px;right:8px;z-index:80">{{ ftl_get_message("save") }}</button>
     <script id="neo-cucumber-config" type="application/json">{{ painter_config | safe }}</script>
     <script type="module"
             src="{{ '/static/neo-cucumber/offline.js' | cachebuster | safe }}"></script>

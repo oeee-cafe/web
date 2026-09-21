@@ -1164,6 +1164,45 @@ mod template_tests {
         );
     }
 
+    /// The painter pages carry the site's toolbar, so every window has the
+    /// same title bar and the desktop app can seat its controls in it. It has
+    /// to come before the painter's own header -- it is the page's first row
+    /// -- and its stylesheet after the painter's, whose reset would otherwise
+    /// restyle it.
+    #[test]
+    fn the_painter_pages_carry_the_toolbar() {
+        let env = test_support::env();
+        for name in ["draw_post_cucumber.jinja", "draw_post_tegaki.jinja"] {
+            let rendered = env
+                .get_template(name)
+                .unwrap_or_else(|e| panic!("{name} loads: {e:#}"))
+                .render(context! {
+                    width => 300,
+                    height => 300,
+                    community_id => json!(null),
+                    painter_config => "{}",
+                    current_user => json!({"login_name": "someone", "display_name": "Someone"}),
+                    messages => Vec::<serde_json::Value>::new(),
+                    draft_post_count => 2,
+                    unread_notification_count => 3,
+                    ftl_lang => "en",
+                })
+                .unwrap_or_else(|e| panic!("{name} renders: {e:#}"));
+            let nav = rendered
+                .find("<nav class=\"nav-bar\"")
+                .unwrap_or_else(|| panic!("{name} has no toolbar"));
+            assert!(rendered.contains("/static/toolbar.css"), "{name}");
+            assert!(rendered.contains("toolbar-badge\">3<"), "{name} unread count");
+            if let Some(header) = rendered.find("id=\"oeee-painter-header\"") {
+                assert!(nav < header, "the toolbar is the painter page's first row");
+            }
+            if let Some(painter_css) = rendered.find("offline.css") {
+                let toolbar_css = rendered.find("toolbar.css").unwrap();
+                assert!(painter_css < toolbar_css, "toolbar.css loads after the painter's reset");
+            }
+        }
+    }
+
     #[test]
     fn replay_pages_do_not_load_the_retired_applet() {
         for template in [

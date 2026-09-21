@@ -7,6 +7,14 @@
     <meta name="description" content="오이카페는 오에카키 커뮤니티입니다. お絵かできるOEEEカフェです。" />
     <link rel="stylesheet"
           href="{{ '/static/tegaki/css/tegaki.css' | cachebuster | safe }}" />
+    <link rel="stylesheet"
+          href="{{ '/static/toolbar.css' | cachebuster | safe }}" />
+    <style>
+      body { margin: 0; }
+      /* Tegaki fills the viewport from the top; it starts under the toolbar
+         instead, so the page has the same title bar as every other. */
+      #tegaki { top: 53px; height: calc(100% - 53px); }
+    </style>
     <script src="{{ '/static/tegaki/js/strings/en.js' | cachebuster | safe }}"></script>
     <script src="{{ '/static/tegaki/js/tools/tool.js' | cachebuster | safe }}"></script>
     <script src="{{ '/static/tegaki/js/tools/brush.js' | cachebuster | safe }}"></script>
@@ -33,6 +41,7 @@
     <script src="{{ '/static/tegaki/lib/UZIP/UZIP.js' | cachebuster | safe }}"></script>
   </head>
   <body>
+    {% include "toolbar.jinja" %}
     <script type="text/javascript">
       function onTegakiDone() {
         Tegaki.replayRecorder.stop();
