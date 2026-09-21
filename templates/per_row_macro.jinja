@@ -1,0 +1,66 @@
+{# How many drawings a row: the one control for it, on every grid of
+   drawings. A slider from big tiles to many small ones, the count beside it.
+   The reader's choice is remembered in this browser under `key`, and set on
+   the root as `var`, which the grid reads -- so the page's own head script
+   (post_feed_head.jinja for the feeds) can apply it before the grid paints.
+
+   The count is also written to the root as `data-{{ key }}-density`:
+   "dense" past six a row, "bare" past nine, which the grid's captions use to
+   say less as the squares get narrower. Several controls for the same key on
+   one page -- the profile's two tabs -- stay in step.
+
+   Hidden on a phone, which keeps three a row whatever was chosen (style.css). #}
+{% macro per_row(id="post-cols", var="--home-cols", key="homeCols", default=4) %}
+  <div class="ds-per-row" data-per-row data-var="{{ var }}" data-key="{{ key }}" data-default="{{ default }}">
+    <svg class="ds-per-row-few" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+    <input class="ds-range" type="range" id="{{ id }}" min="1" max="12" step="1" aria-label="{{ ftl_get_message('feed-columns') }}" title="{{ ftl_get_message('feed-columns') }}" />
+    <svg class="ds-per-row-many" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="1" y="1" width="3.6" height="3.6" rx=".6"/><rect x="6.2" y="1" width="3.6" height="3.6" rx=".6"/><rect x="11.4" y="1" width="3.6" height="3.6" rx=".6"/><rect x="1" y="6.2" width="3.6" height="3.6" rx=".6"/><rect x="6.2" y="6.2" width="3.6" height="3.6" rx=".6"/><rect x="11.4" y="6.2" width="3.6" height="3.6" rx=".6"/><rect x="1" y="11.4" width="3.6" height="3.6" rx=".6"/><rect x="6.2" y="11.4" width="3.6" height="3.6" rx=".6"/><rect x="11.4" y="11.4" width="3.6" height="3.6" rx=".6"/></g></svg>
+    <output class="ds-per-row-value" for="{{ id }}"></output>
+  </div>
+  <script>
+    (function () {
+      function density(cols) {
+        return cols > 9 ? "bare" : cols > 6 ? "dense" : "";
+      }
+      function show(control, cols) {
+        var slider = control.querySelector("input");
+        slider.value = cols;
+        control.querySelector("output").textContent = cols;
+        // The filled part of the track, for engines that have no
+        // ::-moz-range-progress of their own.
+        slider.style.setProperty("--ds-range-fill", ((cols - 1) / 11 * 100) + "%");
+      }
+      function init() {
+        var controls = document.querySelectorAll("[data-per-row]:not([data-ready])");
+        for (var i = 0; i < controls.length; i++) {
+          (function (control) {
+            control.setAttribute("data-ready", "");
+            var key = control.getAttribute("data-key");
+            var cssVar = control.getAttribute("data-var");
+            var cols = parseInt(control.getAttribute("data-default"), 10);
+            try {
+              var saved = parseInt(localStorage.getItem(key), 10);
+              if (saved >= 1 && saved <= 12) cols = saved;
+            } catch (error) {}
+            show(control, cols);
+            control.querySelector("input").addEventListener("input", function () {
+              var value = parseInt(this.value, 10);
+              var root = document.documentElement;
+              root.style.setProperty(cssVar, value);
+              root.setAttribute("data-" + key + "-density", density(value));
+              var same = document.querySelectorAll('[data-per-row][data-key="' + key + '"]');
+              for (var j = 0; j < same.length; j++) show(same[j], value);
+              try {
+                localStorage.setItem(key, value);
+              } catch (error) {
+                // Not remembering it is not a reason to refuse the change.
+              }
+            });
+          })(controls[i]);
+        }
+      }
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+      else init();
+    })();
+  </script>
+{% endmacro %}

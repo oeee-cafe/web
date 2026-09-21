@@ -1397,7 +1397,7 @@ mod tests {
         // grid keeps that number at every width.
         assert!(rendered.contains("id=\"post-cols\""));
         // The readout is what tells the reader the control did something.
-        assert!(rendered.contains("id=\"post-cols-value\""));
+        assert!(rendered.contains("<output class=\"ds-per-row-value\" for=\"post-cols\">"));
         // Applied before the grid paints, from the one stored value.
         assert!(rendered.contains("homeCols"));
         // The grid opts into the wide container; the page — and so the header
@@ -1477,7 +1477,8 @@ mod tests {
         // community — the point is that attribution is visible, not implied.
         assert!(rendered.contains("A drawing"));
         assert!(rendered.contains("@someone"));
-        assert!(rendered.contains("post-card-date"));
+        // When is how long ago, with the full date as its tooltip.
+        assert!(rendered.contains("post-card-when"));
     }
 
     #[test]

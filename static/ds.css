@@ -1143,6 +1143,111 @@ html {
 }
 
 /* ---------------------------------------------------------------------------
+   Slider
+
+   A thin track, filled in the cucumber's line colour up to a framed white
+   knob. Engines draw a range from their own parts, so each is named for
+   each: WebKit fills the track from `--ds-range-fill`, which the page sets;
+   Gecko has a progress part of its own.
+   --------------------------------------------------------------------------- */
+.ds-range {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.ds-range:focus {
+  outline: none;
+}
+
+.ds-range:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.ds-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--ds-accent-line) 0, var(--ds-accent-line) var(--ds-range-fill, 30%), var(--ds-line-strong) var(--ds-range-fill, 30%));
+}
+
+.ds-range::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--ds-line-strong);
+}
+
+.ds-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ds-accent-line);
+}
+
+.ds-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--ds-field);
+  box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
+}
+
+.ds-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ds-field);
+  box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
+}
+
+.ds-range::-moz-focus-outer {
+  border: 0;
+}
+
+/* How many a row: the slider between a big tile and many small ones, and
+   the count. See per_row_macro.jinja. */
+.ds-per-row {
+  display: flex;
+  align-items: center;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.ds-per-row > * + * {
+  margin-left: var(--ds-space-2);
+}
+
+.ds-per-row svg {
+  display: block;
+  flex: none;
+}
+
+.ds-per-row-value {
+  min-width: 26px;
+  padding: 0 6px;
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-surface);
+  box-shadow: 0 0 0 1px var(--ds-line);
+  color: var(--ds-ink);
+  font-weight: 600;
+  line-height: 22px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------------------------
    Grouping
    --------------------------------------------------------------------------- */
 

@@ -118,6 +118,7 @@ fn main() {
                 oeee_cafe::markdown_utils::process_markdown_content(&value)
             }
             env.add_filter("markdown", markdown_to_html);
+            env.add_filter("ago", oeee_cafe::relative_time::ago_filter);
 
             fn ftl_get_message(state: &State, message_id: String) -> String {
                 // Get the current language from template context

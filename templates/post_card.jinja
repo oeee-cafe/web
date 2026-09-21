@@ -43,19 +43,20 @@
         </div>
       {% endif %}
       <div class="post-card-title" title="{{ post.title }}">{{ title }}</div>
+      {# One line for who, where and when. When is how long ago -- "3h",
+         "2d" -- since the only question it answers here is how recent;
+         the full date is its tooltip. Admin keeps the full date on a line
+         of its own, and drafts, which were never published, fall back to
+         when they were drawn. #}
       <div class="post-card-byline">
-        <a href="{% if admin %}/admin/users/{{ handle }}/posts{% else %}/@{{ handle }}{% endif %}">@{{ handle }}</a>
-        {% if post.community_slug %}
-          <span class="muted">·</span>
-          <a href="{% if admin %}/admin/communities/{{ post.community_slug }}/posts{% else %}/communities/@{{ post.community_slug }}{% endif %}"
-             title="{{ post.community_name }}">{{ post.community_name }}</a>
-        {% elif admin %}
-          <span class="muted">· no community</span>
-        {% endif %}
+        <a class="post-card-who" href="{% if admin %}/admin/users/{{ handle }}/posts{% else %}/@{{ handle }}{% endif %}">@{{ handle }}</a>
+        {%- if post.community_slug %}<span class="post-card-where"><a href="{% if admin %}/admin/communities/{{ post.community_slug }}/posts{% else %}/communities/@{{ post.community_slug }}{% endif %}"
+             title="{{ post.community_name }}">{{ post.community_name }}</a></span>
+        {%- elif admin %}<span class="post-card-where muted">no community</span>{% endif %}
+        {%- if post.published_at and not admin %}<span class="post-card-when" title="{{ post.published_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ post.published_at|ago }}</span>{% endif %}
       </div>
-      {# Drafts have no published_at, so admin falls back to when it was drawn. #}
-      {% set stamp = post.published_at if post.published_at else (post.created_at if admin else none) %}
-      {% if stamp %}
+      {% set stamp = post.published_at if post.published_at else post.created_at %}
+      {% if admin and stamp %}
         <div class="post-card-date muted">{{ stamp|datetimeformat(format="short", tz="Asia/Seoul") }}</div>
       {% endif %}
     </div>

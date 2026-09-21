@@ -1,5 +1,6 @@
 {% from "follow_macro.jinja" import follow_button, unfollow_button %} {% extends "base.jinja" %}
 {% from "user_pill_macro.jinja" import user_pill %}
+{% from "per_row_macro.jinja" import per_row %}
 {% block title %}
   {{ super() }} | {{ user.display_name }} (@{{ user.login_name }})
 {% endblock title %}
@@ -88,12 +89,18 @@
       {% if user.id == current_user.id %}
         {# Their own profile holds both: what everyone sees, and what only
            they do. One grid at a time, chosen like any other view. #}
-        <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-public-community-posts') }}">
-          <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-public-community-posts") }}</button>
-          <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-private-community-posts") }}</button>
+        <div class="grid-header">
+          <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-public-community-posts') }}">
+            <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-public-community-posts") }}</button>
+            <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-private-community-posts") }}</button>
+          </div>
+          {{ per_row() }}
         </div>
       {% else %}
-        <div class="profile-section-label">{{ ftl_get_message("profile-public-community-posts") }}</div>
+        <div class="grid-header">
+          <div class="profile-section-label">{{ ftl_get_message("profile-public-community-posts") }}</div>
+          {% if public_community_posts %}{{ per_row() }}{% endif %}
+        </div>
       {% endif %}
       <div data-profile-panel="public">
         {% if public_community_posts %}

@@ -34,22 +34,18 @@
 .admin-grid.adjustable .admin-sentinel { grid-column: 1 / -1; }
 /* Fixed to the viewport so it stays reachable while scrolling an
    infinitely-scrolling list. Offset from the edges so it does not sit flush
-   against the window chrome. */
+   against the window chrome, and below the toolbar. */
 .admin-density {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
+  top: 64px;
+  right: 16px;
   z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .4rem .6rem;
-  font-size: .8rem;
-  background: var(--main-bg-color, #fff);
-  border: 1px solid var(--main-border-color, #ccc);
-  border-radius: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-menu);
 }
-.admin-density output { min-width: 1.5em; text-align: right; font-weight: bold; }
 .admin-card img { width: 100%; height: auto; display: block; border: 1px solid #ccc; }
 .admin-card.deleted img { opacity: .4; }
 .banner-card { width: 260px; }

@@ -1,4 +1,4 @@
-{# Shared by the /, /home, /communities/@x, /hashtags/x and /collaborate feeds:
+{# Shared by every grid of drawings -- the feeds, the profile and drafts:
    the reader's chosen number of drawings a row, applied before the grid
    paints so it does not flash at the default.
 
@@ -9,9 +9,15 @@
    parsed, and htmx re-executes it on every boosted swap. #}
 <script>
   (function () {
-    var saved = parseInt(localStorage.getItem("homeCols"), 10);
+    var saved = null;
+    try {
+      saved = parseInt(localStorage.getItem("homeCols"), 10);
+    } catch (error) {}
     if (saved >= 1 && saved <= 12) {
-      document.documentElement.style.setProperty("--home-cols", saved);
+      var root = document.documentElement;
+      root.style.setProperty("--home-cols", saved);
+      // Kept in step with per_row_macro.jinja, which sets it on a change.
+      root.setAttribute("data-homeCols-density", saved > 9 ? "bare" : saved > 6 ? "dense" : "");
     }
   })();
 </script>
