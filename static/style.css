@@ -1470,21 +1470,15 @@ nav a:visited,
   grid-column: 1 / -1;
   padding: var(--space-6);
   text-align: center;
-  color: var(--main-text-color);
-  opacity: 0;
 }
 
-.infinite-scroll-sentinel.htmx-request {
-  opacity: 1;
-}
-
+/* The sentinel shows its spinner (ds.css) only while it is fetching. */
 .loading-indicator {
-  display: none;
-  animation: pulse 1.5s ease-in-out infinite;
+  visibility: hidden;
 }
 
 .htmx-request .loading-indicator {
-  display: inline-block;
+  visibility: visible;
 }
 
 @keyframes pulse {
@@ -2665,9 +2659,6 @@ nav a:visited,
    hiding via .htmx-indicator; this only places it. */
 .search-indicator {
   margin-left: var(--space-2);
-  font-size: 0.875rem;
-  color: var(--main-text-muted-color);
-  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------------
@@ -3456,6 +3447,35 @@ a.user-pill:hover {
   color: var(--ds-ink);
   font-size: var(--ds-text-l);
   line-height: 1.5;
+}
+
+/* The banners at their own size, 200 by 40, in hard pixels and a frame,
+   lifting a little under the pointer. */
+.about-banners {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.about-banner {
+  display: block;
+  margin: 0 8px 8px 0;
+  line-height: 0;
+  box-shadow: 0 0 0 1px var(--ds-frame);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.about-banner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 1px var(--ds-frame), 0 6px 16px rgba(40, 40, 90, 0.18);
+}
+
+.about-banner img {
+  display: block;
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
 .about-buttons {
