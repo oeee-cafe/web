@@ -99,20 +99,100 @@ describe("copy and paste, NEO's way", () => {
     expect(firstPixelDifference(ours, neo), describeDifference(ours, neo, W)).toBe(-1);
   });
 
-  it("outlines the copy, then shows it moving, then clears", async () => {
+  /*
+   * What is on screen at each step, as NEO has it.
+   *
+   * EffectToolBase draws nothing on the press and the selection rectangle
+   * on each move. Its upHandler redraws the display for every tool but
+   * paste, so after a copy that rectangle stays up. PasteTool.downHandler
+   * then XORs its own outline in the same place, which erases it: the press
+   * shows nothing. moveHandler redraws with the copy on top, and nothing is
+   * drawn around the copy while it moves.
+   */
+  it("shows what NEO shows, when NEO shows it", async () => {
     const p = await mountPainter("copy");
-    await p.drag(4, 4, 16, 16);
-    // Straight after the copy: outlined where it was taken from, not drawn
-    expect(p.previews.at(-1)).toMatchObject({ x: 4, y: 4, dragging: false });
+    const rect = { x: 4, y: 4, width: 13, height: 13 };
+
+    await p.send("pointerdown", 4, 4);
+    expect(p.regionPreviews.filter(Boolean)).toEqual([]);
+
+    await act(async () => { await sleep(20); });
+    await p.send("pointermove", 16, 16);
+    expect(p.regionPreviews.at(-1)).toEqual(rect);
+
+    await p.send("pointerup", 16, 16);
+    expect(p.previews.at(-1)).toEqual({ kind: "marks", rects: [rect] });
 
     await p.send("pointerdown", 30, 30);
+    expect(p.previews.at(-1)).toBeNull();
+
     await act(async () => { await sleep(20); });
     await p.send("pointermove", 37, 33);
-    expect(p.previews.at(-1)).toMatchObject({ x: 11, y: 7, dragging: true });
-    expect(p.previews.at(-1)!.image.width).toBe(13);
+    const moving = p.previews.at(-1);
+    expect(moving).toMatchObject({ kind: "floating", x: 11, y: 7 });
+    expect(moving?.kind === "floating" && moving.image.width).toBe(13);
 
     await p.send("pointerup", 37, 33);
     expect(p.previews.at(-1)).toBeNull();
+  });
+
+  it("leaves no outline after a copy that was only clicked, and draws one on the press", async () => {
+    const p = await mountPainter("copy");
+    await p.send("pointerdown", 8, 8);
+    await p.send("pointerup", 8, 8);
+    expect(p.handle.tool).toBe("paste");
+    expect(p.previews.at(-1)).toBeNull();
+
+    // With nothing left over to cancel, PasteTool's XOR is simply drawn.
+    await p.send("pointerdown", 20, 20);
+    expect(p.previews.at(-1)).toEqual({
+      kind: "marks",
+      rects: [{ x: 8, y: 8, width: 1, height: 1 }],
+    });
+  });
+
+  /*
+   * NEO measures the drag on its unrounded mouse position and floors the
+   * difference. Rounding each end first -- the old way -- would put this
+   * 1.2 pixel drag two pixels over instead of one.
+   */
+  it("floors the offset on the unrounded pointer, as NEO does", async () => {
+    const p = await mountPainter("copy");
+    await p.drag(4, 4, 16, 16);
+
+    await p.send("pointerdown", 30.4, 30);
+    await act(async () => { await sleep(20); });
+    await p.send("pointermove", 31.6, 30);
+    expect(p.previews.at(-1)).toMatchObject({ kind: "floating", x: 5, y: 4 });
+    await p.send("pointerup", 31.6, 30);
+
+    expect((await p.frames()).at(-1)).toEqual(["paste", 0, 4, 4, 13, 13, 1, 0]);
+  });
+
+  it("outlines the copy afresh when the layer changes while it waits", async () => {
+    const p = await mountPainter("copy");
+    await p.send("pointerdown", 8, 8);
+    await p.send("pointerup", 8, 8);
+    expect(p.previews.at(-1)).toBeNull();
+
+    // LayerControl redraws the display, then PasteTool.drawCursor.
+    await p.selectLayer("foreground");
+    expect(p.previews.at(-1)).toEqual({
+      kind: "marks",
+      rects: [{ x: 8, y: 8, width: 1, height: 1 }],
+    });
+  });
+
+  it("wipes the outline on undo but keeps the copy to paste", async () => {
+    const p = await mountPainter("rectFill");
+    await p.drag(4, 4, 16, 16);
+    await p.selectTool("copy");
+    await p.drag(4, 4, 16, 16);
+    expect(p.previews.at(-1)).toMatchObject({ kind: "marks" });
+
+    await act(async () => { p.handle.api!.undo(); });
+    expect(p.previews.at(-1)).toBeNull();
+    expect(p.handle.tool).toBe("paste");
   });
 
   it("puts the copy down unpasted on Escape", async () => {
@@ -184,5 +264,65 @@ describe("the clipboard a shared session swaps", () => {
     engine.setClipboard(mine);
     engine.applyRegionTool("paste", "background", dest, black, 1);
     expect(p.alphaAt(36, 26)).toBeGreaterThan(0);
+  });
+});
+
+describe("drawing paste mode", () => {
+  const SIZE = 10;
+  const backdrop = {
+    width: SIZE,
+    height: SIZE,
+    scale: 1,
+    layers: [new Uint8ClampedArray(SIZE * SIZE * 4)],
+  };
+  const overlay = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    return canvas.getContext("2d")!;
+  };
+  const pixel = (ctx: CanvasRenderingContext2D, x: number, y: number) =>
+    Array.from(ctx.getImageData(x, y, 1, 1).data);
+
+  /*
+   * The report that started this: ours drew a border round the copy while
+   * it moved, and NEO draws the copy alone. Its edge pixels are the copy's
+   * own colour, not an inverted outline.
+   */
+  it("draws the moving copy with no border round it", async () => {
+    const { drawPastePreview } = await import("./regionPreview");
+    const image = new ImageData(3, 3);
+    for (let i = 0; i < image.data.length; i += 4) image.data.set([200, 0, 0, 255], i);
+
+    const ctx = overlay();
+    drawPastePreview(ctx, { kind: "floating", image, x: 2, y: 2 }, backdrop);
+
+    expect(pixel(ctx, 2, 2)).toEqual([200, 0, 0, 255]);
+    expect(pixel(ctx, 4, 4)).toEqual([200, 0, 0, 255]);
+    expect(pixel(ctx, 5, 5)).toEqual([0, 0, 0, 0]);
+  });
+
+  it("shows an empty pixel of the copy as white, as NEO's tempCanvas does", async () => {
+    const { drawPastePreview } = await import("./regionPreview");
+    const image = new ImageData(2, 1);
+    image.data.set([10, 20, 30, 255], 0); // the second pixel is left empty
+
+    const ctx = overlay();
+    drawPastePreview(ctx, { kind: "floating", image, x: 0, y: 0 }, backdrop);
+    expect(pixel(ctx, 0, 0)).toEqual([10, 20, 30, 255]);
+    expect(pixel(ctx, 1, 0)).toEqual([255, 255, 255, 255]);
+  });
+
+  it("erases an outline drawn twice in the same place, as a second XOR does", async () => {
+    const { drawPastePreview } = await import("./regionPreview");
+    const rect = { x: 2, y: 2, width: 4, height: 4 };
+
+    const once = overlay();
+    drawPastePreview(once, { kind: "marks", rects: [rect] }, backdrop);
+    expect(pixel(once, 2, 2)[3]).toBe(255);
+
+    const twice = overlay();
+    drawPastePreview(twice, { kind: "marks", rects: [rect, rect] }, backdrop);
+    expect(pixel(twice, 2, 2)).toEqual([0, 0, 0, 0]);
   });
 });

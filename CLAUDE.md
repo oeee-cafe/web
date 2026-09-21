@@ -136,6 +136,16 @@ screen pixel wide and some two, and one pixel lines wobble), and paste
 canvas cuts a hole. Copy hands over to paste by itself; there is no paste
 button in NEO and there is none here.
 
+When matching what NEO *shows*, remember it has no preview layer. It XORs
+outlines straight into its display and leaves them until something redraws
+it, so what is on screen depends on which handlers redraw and which do not.
+After a copy the selection rectangle stays up (`EffectToolBase.upHandler`
+skips its redraw when the new tool is paste); the paste press XORs the same
+rectangle again and erases it; the drag redraws with the copy on top and no
+outline. `PasteDisplay` models that as marks combined by XOR parity rather
+than as a preview drawn fresh each frame — read the handlers, not the
+screenshots, and it comes out the same.
+
 A replay that renders differently from the canvas it was recorded on is the
 worst failure this codebase can produce. Prefer matching NEO's behaviour, quirks
 included, over "fixing" it — a divergence breaks every file we have already
