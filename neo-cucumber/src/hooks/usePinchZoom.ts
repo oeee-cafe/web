@@ -13,6 +13,8 @@ interface UsePinchZoomOptions {
       container?: HTMLCanvasElement | HTMLDivElement,
       zoomScale?: number
     ) => void;
+    /** The scale the frame shows now, ahead of any render still to come. */
+    readonly zoom: number;
   } | null;
   /** The zoom in force, as a scale rather than a percentage. */
   currentZoom: number;
@@ -74,6 +76,10 @@ export function usePinchZoom({
     const app = appRef.current;
     if (!app) return;
     const gesture = gestureRef.current;
+    // The engine's scale rather than the rendered one: touch samples come
+    // faster than React commits, and panning by a stale zoom slides the
+    // drawing out from under the fingers.
+    const zoomNow = () => engineRef.current?.zoom ?? currentZoomRef.current;
 
     /**
      * Whether a touch belongs to the view rather than to a control.
@@ -98,7 +104,7 @@ export function usePinchZoom({
       // the pinch: a third finger landing would otherwise start a stroke of
       // its own in the middle of the gesture.
       suspendRef.current(true);
-      if (change === "seeded") baseZoomRef.current = currentZoomRef.current;
+      if (change === "seeded") baseZoomRef.current = zoomNow();
     };
 
     const handlePointerMove = (e: PointerEvent) => {
@@ -111,7 +117,7 @@ export function usePinchZoom({
       // Pan first, in the canvas's own units the way the one-finger pan does,
       // then zoom -- the zoom measures the pointer against the container as
       // it stands, and it should stand where this sample put it.
-      const zoom = currentZoomRef.current;
+      const zoom = zoomNow();
       if ((sample.panX !== 0 || sample.panY !== 0) && zoom > 0) {
         engineRef.current?.updatePanOffset(
           sample.panX / zoom,
@@ -131,7 +137,7 @@ export function usePinchZoom({
     const handlePointerUp = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       const change = gesture.up(e.pointerId);
-      if (change === "seeded") baseZoomRef.current = currentZoomRef.current;
+      if (change === "seeded") baseZoomRef.current = zoomNow();
       // Not when the pinch ends but when the hand leaves: a finger still down
       // after its partner lifted is the tail of the gesture, and letting it
       // draw would put a stroke wherever the pinch happened to finish.

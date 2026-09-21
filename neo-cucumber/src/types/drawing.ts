@@ -51,6 +51,4 @@ export interface DrawingState {
   fgVisible: boolean;
   bgVisible: boolean;
   isFlippedHorizontal: boolean;
-  pendingPanDeltaX?: number;
-  pendingPanDeltaY?: number;
 }
