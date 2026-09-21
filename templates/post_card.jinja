@@ -21,7 +21,7 @@
            loading="lazy"
            decoding="async"
            {# Staff reviewing content need to see it; the blur is for readers. #}
-           class="{% if post.is_sensitive and not admin %}sensitive{% endif %}"
+           class="{% if post.is_sensitive and not admin %}sensitive{% endif %}{% if post.image_width > 300 or post.image_height > 300 %} drawing-downscaled{% endif %}"
            {% if post.is_sensitive and not admin %}aria-label="Sensitive content: {{ post.title }}"{% endif %} />
     </a>
     {# Attribution stays visible rather than appearing on hover: it is the

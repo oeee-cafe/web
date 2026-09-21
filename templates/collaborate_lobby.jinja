@@ -19,7 +19,6 @@
   {% endif %}
 {% endmacro %}
 {% block content %}
-  {% include "post_feed_head.jinja" %}
   <div class="center-wide">
     <h2>{{ ftl_get_message("collaborate-title") }}</h2>
     {# Signed-out visitors can browse the gallery below; only creating a
@@ -126,7 +125,6 @@
       <section role="region" aria-labelledby="collab-gallery-heading">
         <div class="feed-header">
           <h3 id="collab-gallery-heading" class="home-section-title">{{ ftl_get_message("collaborate-finished-drawings") }}</h3>
-          {% include "post_feed_controls.jinja" %}
         </div>
         <div class="posts-grid" id="post-feed-grid">
           {% include "post_feed_fragment.jinja" %}

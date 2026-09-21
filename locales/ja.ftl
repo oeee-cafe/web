@@ -11,6 +11,7 @@ about = お絵かきの発音はOEEEカフェに似ています。
   お絵かきができるOEEEカフェです。
 user-contributors = OEEEカフェを一緒に作った人たち
 
+nav-recent = 新着
 timeline = タイムライン
 timeline-my = 私のタイムライン
 timeline-empty = タイムラインが空です。 <a href="/communities">コミュニティ</a>で他の人と同盟を結びましょう！
@@ -243,7 +244,6 @@ official-communities = 公式コミュニティ
 official-communities-nil = 公式コミュニティはありません。
 active-communities-nil = アクティブなパブリックコミュニティはありません。
 loading-more-posts = さらに読み込み中...
-feed-columns = 1行あたり
 post-untitled = 無題
 community-sort = 並び替え
 community-sort-active = 最近の活動順

@@ -9,7 +9,8 @@
         {% for post in posts %}
           <div class="posts-grid-item">
             <a href="/@{{ user.login_name }}/{{ post.id }}">
-              <img width="{{ post.image_width }}"
+              <img class="{% if post.image_width > 300 or post.image_height > 300 %}drawing-downscaled{% endif %}"
+                   width="{{ post.image_width }}"
                    height="{{ post.image_height }}"
                    alt="{{ post.title }}"
                    src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />

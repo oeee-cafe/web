@@ -77,10 +77,15 @@
   --link-color: var(--main-anchor-color);
 }
 
+/* The ground and the type are the window's; see "The window" below. */
 body {
-  background-color: var(--main-bg-color);
+  margin: 0;
+  background-color: var(--ground-color);
+  background-image: linear-gradient(var(--ground-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ground-grid) 1px, transparent 1px);
+  background-size: 14px 14px;
   color: var(--main-text-color);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--ui-font);
   /* Stated explicitly so the em-based sizes elsewhere have a known base. */
   font-size: var(--text-base);
   line-height: var(--leading-normal);
@@ -129,7 +134,7 @@ h6 {
    whether the heading sat inside .center or was .center — 0px on /draw against
    20px on /collaborate, which is exactly the inconsistency this file grew. */
 main {
-  padding: var(--space-5) 0 var(--space-6);
+  padding: var(--space-5) var(--space-3) var(--space-6);
 }
 
 main > .center > :first-child,
@@ -211,11 +216,14 @@ nav a:visited,
 }
 
 /* ---------------------------------------------------------------------------
-   The toolbar
+   The window
 
-   One compact bar where a 75px logo used to sit over a row of underlined
-   links. It spans the window and stays at the top while the page scrolls
-   under it.
+   The page is a window's surface: a quiet ground in the system's own greys,
+   with NEO's 14px grid drawn faintly over it -- the painter's desk, coloured
+   by the operating system rather than by us. The toolbar is its title bar:
+   the sections as tabs, Draw and the account at the end. In the desktop app
+   the window's own controls sit over this bar; in a browser it is the top of
+   the page. Drawings are the only bright things on it.
 
    Firefox 56 reads this file as written -- nothing builds it -- so there is
    no flex `gap` here (Firefox 63): items are spaced by the margin on every
@@ -223,17 +231,40 @@ nav a:visited,
    its -moz- spelling for the same reason.
    --------------------------------------------------------------------------- */
 :root {
-  --toolbar-hover-bg: rgba(0, 0, 0, 0.08);
-  --toolbar-current-bg: rgba(0, 0, 0, 0.12);
-  --toolbar-menu-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  --ground-color: #ececec;
+  --ground-grid: rgba(0, 0, 0, 0.05);
+  --bar-line: rgba(0, 0, 0, 0.1);
+  --toolbar-hover-bg: rgba(0, 0, 0, 0.06);
+  --toolbar-current-bg: rgba(0, 0, 0, 0.1);
+  --toolbar-menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --drawing-frame: rgba(0, 0, 0, 0.55);
+  --draw-color: #c4ee62;
+  --draw-hover-color: #b5e24c;
+  --draw-ink: #1c2811;
+  --ui-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    "Apple SD Gothic Neo", "Malgun Gothic", "Hiragino Sans", "Yu Gothic UI", system-ui,
+    Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --ground-color: #1e1e1e;
+    --ground-grid: rgba(255, 255, 255, 0.05);
+    --bar-line: rgba(255, 255, 255, 0.12);
     --toolbar-hover-bg: rgba(255, 255, 255, 0.08);
     --toolbar-current-bg: rgba(255, 255, 255, 0.14);
-    --toolbar-menu-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    --toolbar-menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --drawing-frame: rgba(255, 255, 255, 0.4);
   }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* Page changes cross-fade instead of blanking, and the toolbar, named, holds
@@ -248,8 +279,8 @@ nav a:visited,
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: var(--main-nav-bg-color);
-  border-bottom: 1px solid var(--main-border-color);
+  background-color: var(--ground-color);
+  border-bottom: 1px solid var(--bar-line);
   color: var(--main-text-color);
   view-transition-name: toolbar;
   -moz-user-select: none;
@@ -261,13 +292,9 @@ nav a:visited,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  min-height: 44px;
+  min-height: 52px;
 }
 
-/* Edge to edge, not in the page column: an application's toolbar holds its
-   ends to the window's, and the page column is narrower than the post grids,
-   which left the logo and the account menu floating in the middle of the
-   bar. It is the same width on every page, so nothing moves as you go. */
 .nav-bar #menubar {
   padding: 0 var(--space-3);
 }
@@ -276,11 +303,15 @@ nav a:visited,
   display: flex;
   align-items: center;
   margin-right: var(--space-3);
-  padding: 4px 0;
+  padding: 4px 6px;
 }
 
 .toolbar-brand img {
   display: block;
+}
+
+.toolbar-brand .toolbar-mark {
+  margin-right: 8px;
 }
 
 .toolbar-links,
@@ -296,23 +327,25 @@ nav a:visited,
 
 .toolbar-links > * + *,
 .toolbar-end > * + * {
-  margin-left: 2px;
+  margin-left: 6px;
 }
 
 .toolbar-links a,
-.toolbar-end a,
+.toolbar-end > a,
+.toolbar-end .toolbar-icon,
 .toolbar-menu summary,
-#nav-draw-button {
+.toolbar-draw {
   display: inline-block;
   margin-top: 0;
   margin-bottom: 0;
-  padding: 5px 10px;
+  padding: 4px 11px;
   border: 0;
   border-radius: 6px;
   background: none;
   color: var(--main-text-color);
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: 13px;
+  font-weight: 500;
   line-height: 20px;
   text-decoration: none;
   white-space: nowrap;
@@ -325,65 +358,94 @@ nav a:visited,
 }
 
 .toolbar-links a:hover,
-.toolbar-end a:hover,
+.toolbar-end > a:hover,
+.toolbar-end .toolbar-icon:hover,
 .toolbar-menu summary:hover,
 .toolbar-menu[open] summary {
   background-color: var(--toolbar-hover-bg);
 }
 
-.nav-bar a[aria-current="page"] {
+.nav-bar .toolbar-links a[aria-current="page"] {
   background-color: var(--toolbar-current-bg);
   font-weight: 600;
 }
 
-/* Drawing is what the site is for, so it is the one filled button. Dark
-   text in both themes: white on this orange is under 3:1. */
-.toolbar-links .toolbar-primary,
-.toolbar-links .toolbar-primary:visited,
-#nav-draw-button {
-  margin-right: var(--space-2);
-  background-color: var(--main-highlight-color);
-  color: #000;
+.toolbar-end .toolbar-icon {
+  position: relative;
+  padding: 5px 8px 3px;
+}
+
+.toolbar-icon svg {
+  vertical-align: top;
+}
+
+.toolbar-end .toolbar-icon .toolbar-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  margin-left: 0;
+}
+
+/* Drawing is what the site is for, so it is the one filled control: the
+   cucumber's lime, with dark ink in both themes. */
+.toolbar-end .toolbar-draw,
+.toolbar-end a.toolbar-draw:visited {
+  background-color: var(--draw-color);
+  color: var(--draw-ink);
+  box-shadow: inset 0 0 0 1px rgba(60, 103, 18, 0.35);
   font-weight: 600;
 }
 
-.toolbar-links .toolbar-primary:hover,
-#nav-draw-button:hover {
-  background-color: var(--main-highlight-hover-color);
+.toolbar-end .toolbar-draw:hover {
+  background-color: var(--draw-hover-color);
 }
 
-.toolbar-links form {
+.toolbar-draw svg {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.toolbar-end form {
   margin: 0;
-}
-
-.toolbar-end .toolbar-outline {
-  box-shadow: inset 0 0 0 1px var(--main-border-color);
 }
 
 .toolbar-badge {
   display: inline-block;
-  min-width: 18px;
+  min-width: 16px;
   margin-left: 4px;
-  padding: 0 5px;
-  border-radius: 9px;
+  padding: 0 4px;
+  border-radius: 8px;
   background-color: var(--main-highlight-color);
   color: #000;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  line-height: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
   text-align: center;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
+}
+
+.toolbar-avatar {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: var(--draw-color);
+  color: var(--draw-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 28px;
+  text-align: center;
 }
 
 .toolbar-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
-  margin-left: 4px;
+  margin-left: -8px;
   border-radius: 4px;
   background-color: var(--danger-color);
-  vertical-align: middle;
+  vertical-align: top;
 }
 
 .toolbar-menu {
@@ -392,6 +454,7 @@ nav a:visited,
 
 .toolbar-menu summary {
   display: block;
+  padding: 4px;
   list-style: none;
 }
 
@@ -399,40 +462,63 @@ nav a:visited,
   display: none;
 }
 
-.toolbar-menu summary::after {
-  content: "\25BE";
-  margin-left: 4px;
-  opacity: 0.6;
-}
-
 .toolbar-menu-items {
   position: absolute;
   top: 100%;
   right: 0;
   z-index: 60;
-  min-width: 180px;
-  margin-top: 4px;
+  min-width: 200px;
+  margin-top: 6px;
   padding: 4px;
-  border: 1px solid var(--main-border-color);
-  border-radius: 8px;
+  border: 1px solid var(--bar-line);
+  border-radius: 10px;
   background-color: var(--main-bg-color);
   box-shadow: var(--toolbar-menu-shadow);
 }
 
-.toolbar-end .toolbar-menu-items a {
+.toolbar-menu-who {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--bar-line);
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.toolbar-menu-who span {
   display: block;
-  margin-left: 0;
+  color: var(--main-text-muted-color);
+}
+
+.toolbar-menu-items a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--main-text-color);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.toolbar-menu-items a:visited {
+  color: var(--main-text-color);
+}
+
+.toolbar-menu-items a:hover {
+  background-color: var(--toolbar-hover-bg);
 }
 
 /* A phone keeps the brand and the account on the first line and gives the
-   links a line of their own, scrolled sideways rather than wrapped. */
+   sections a line of their own, scrolled sideways rather than wrapped. */
 @media (max-width: 600px) {
+  .toolbar-brand > img + img {
+    display: none;
+  }
+
   .toolbar-links {
     order: 3;
     width: 100%;
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding-bottom: 6px;
     scrollbar-width: none;
   }
 
@@ -454,30 +540,80 @@ nav a:visited,
   object-fit: contain;
 }
 
-/* The no-JS / first-visit column count lives here too. It used to sit a
-   thousand lines away in a "Grid Layout" section, so which half of .posts-grid
-   you found depended on where you looked. */
+/* ---------------------------------------------------------------------------
+   Drawings
+
+   Every drawing in a public grid is the same 300x300 square, framed the way
+   the painter frames its canvas: a 1px line and nothing rounded. 300 is the
+   size most oekaki is drawn at, so most drawings show at exactly 1x; smaller
+   ones are doubled up with hard pixels, larger ones scaled down to fit --
+   smoothly, because pixel doubling only works upward (`.drawing-downscaled`).
+   The admin grid keeps its own layout; everything here is scoped to
+   `.posts-grid`.
+
+   `grid-gap` is Firefox 56's spelling; `gap` is everyone else's.
+   --------------------------------------------------------------------------- */
 .posts-grid {
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, 300px);
+  grid-gap: 32px 24px;
+  gap: 32px 24px;
   margin: var(--space-4) 0;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card-min, 170px), 1fr));
 }
 
-.posts-grid-item {
-  overflow: hidden;
-  border: 1px solid var(--main-border-color);
+/* The wide feeds spread their squares edge to edge. In the text column only
+   two fit, and spreading two leaves a hole the width of a third between
+   them, so there they line up from the left. */
+.center-wide .posts-grid {
+  justify-content: space-between;
 }
 
-/* Attribution below the artwork: title, author, community, date. Always
-   visible — it is the artist's credit, and a hover-only overlay hid it
-   entirely on touch. Each line clips rather than wraps so card heights stay
-   uniform across the grid at any column count. */
+.posts-grid .posts-grid-item {
+  min-width: 0;
+}
+
+.posts-grid .posts-grid-item > a:first-child {
+  display: block;
+  width: 300px;
+  height: 300px;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--drawing-frame);
+}
+
+.posts-grid .posts-grid-item > a:first-child:hover {
+  box-shadow: 0 0 0 2px var(--main-highlight-color);
+}
+
+.posts-grid .posts-grid-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: pointer;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
+}
+
+.posts-grid .posts-grid-item img.drawing-downscaled {
+  image-rendering: auto;
+}
+
+/* Attribution under the drawing, never over it: it is the artist's credit,
+   and hover does not exist on touch. Each line clips rather than wraps so
+   the rows stay level. */
 .post-card-meta {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
-  line-height: 1.35;
-  border-top: 1px solid var(--main-border-color);
+  padding: var(--space-2) 1px 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--main-text-muted-color);
+}
+
+.post-card-meta .post-card-title {
+  margin-bottom: 2px;
+  color: var(--main-text-color);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 19px;
 }
 
 .post-card-title,
@@ -488,30 +624,48 @@ nav a:visited,
   text-overflow: ellipsis;
 }
 
-.post-card-date {
-  font-size: var(--text-xs);
+.post-card-byline a,
+.post-card-byline a:visited {
+  color: var(--main-text-muted-color);
+  text-decoration: none;
 }
 
-.post-card-image {
-  display: block;
+.post-card-byline a:hover {
+  text-decoration: underline;
 }
 
-.posts-grid-item:hover {
-  border-color: var(--main-highlight-color);
+/* The admin grid still draws its cards with the old box. */
+.admin-grid .posts-grid-item {
+  overflow: hidden;
+  border: 1px solid var(--main-border-color);
 }
 
-.posts-grid-item img {
-  cursor: pointer;
-  object-fit: cover;
-  object-position: center;
-  /* width, not max-width: max-width caps the image at its natural size, so
-     anything smaller than the cell left the rest of the square blank. Most
-     drawings here are 300px wide while a cell can be much wider at low column
-     counts, so that was the common case rather than the exception. */
+.admin-grid .post-card-meta {
+  padding: var(--space-1) var(--space-2);
+  border-top: 1px solid var(--main-border-color);
+}
+
+.admin-grid .posts-grid-item img {
   width: 100%;
   height: auto;
   vertical-align: bottom;
   aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+/* A phone gets two squares a row, sized to the screen. */
+@media (max-width: 660px) {
+  .posts-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-gap: 20px 12px;
+    gap: 20px 12px;
+  }
+
+  .posts-grid .posts-grid-item > a:first-child {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
 }
 
 .banner-controls {
@@ -1626,28 +1780,6 @@ nav a:visited,
 
 /* Grid Layout */
 
-/* Once the size control has a value, the column count is explicit.
-   auto-fill + minmax made the control feel broken on narrow screens: column
-   count is floor((width + gap) / (card-min + gap)), so on a 390px phone the
-   twelve slider steps collapsed to three distinct layouts and seven of them
-   changed nothing at all. Driving columns directly makes every step move the
-   grid by exactly one column. The attribute is set on :root before first
-   paint, so there is no flash. */
-:root[data-cols] .posts-grid {
-  grid-template-columns: repeat(var(--home-cols), minmax(0, 1fr));
-}
-
-/* Phones get a fixed three columns and no control. The useful range there was
-   only 1-4 to begin with, so a slider bought almost nothing in exchange for
-   occupying a row and being fiddly to drag. Repeats the [data-cols] selector so
-   it also overrides a count stored from a wider screen. */
-@media (max-width: 600px) {
-  .posts-grid,
-  :root[data-cols] .posts-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 /* Infinite Scroll Loading Indicator */
 
 .infinite-scroll-sentinel {
@@ -2543,35 +2675,6 @@ legend {
    collaborate_lobby.jinja alone — where nothing else could reach them, so the
    next page needing a form or a card grid wrote its own.
    --------------------------------------------------------------------------- */
-
-/* Feed density control. Shared by /, /home and the collaborate gallery, so it
-   cannot live in any one of their templates. The width those pages want comes
-   from .center-wide on the grid section itself. */
-.thumbnail-size {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin: var(--space-2) 0;
-  font-size: var(--text-sm);
-}
-
-.thumbnail-size input[type="range"] {
-  max-width: 200px;
-}
-
-.thumbnail-size output {
-  min-width: 1.5em;
-  text-align: right;
-  font-weight: bold;
-}
-
-/* Phones use a fixed three-column grid, so the control has nothing to do. */
-@media (max-width: 600px) {
-  .thumbnail-size {
-    display: none;
-  }
-}
 
 /* Label column sized to the longest label, control column takes the rest.
    Capped so controls stay a readable length rather than running the width of
