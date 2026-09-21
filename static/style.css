@@ -255,37 +255,36 @@ nav a:visited,
 /* ---------------------------------------------------------------------------
    Drawings
 
-   Every drawing in a public grid is the same 300x300 square, framed the way
-   the painter frames its canvas: a 1px line and nothing rounded. 300 is the
-   size most oekaki is drawn at, so most drawings show at exactly 1x; smaller
-   ones are doubled up with hard pixels, larger ones scaled down to fit --
-   smoothly, because pixel doubling only works upward (`.drawing-downscaled`).
-   The admin grid keeps its own layout; everything here is scoped to
-   `.posts-grid`.
+   Every drawing in a public grid is a square, all of them the same size,
+   framed the way the painter frames its canvas: a 1px line and nothing
+   rounded. The reader chooses how many a row (post_feed_controls.jinja, as
+   /admin/posts does it) and the grid keeps that number at every window
+   width -- the squares grow and shrink, the count and the gaps do not.
+   Drawings larger than their square are scaled down smoothly
+   (`.drawing-downscaled`); the rest keep hard pixels.
 
-   `grid-gap` is Firefox 56's spelling; `gap` is everyone else's.
+   The square is a padding-ratio box rather than `aspect-ratio`, which
+   Firefox 56 does not have. `grid-gap` is its spelling; `gap` is everyone
+   else's. The admin grid keeps its own layout; everything here is scoped to
+   `.posts-grid`.
    --------------------------------------------------------------------------- */
 .posts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 300px);
+  grid-template-columns: repeat(var(--home-cols, 4), minmax(0, 1fr));
   grid-gap: 32px 24px;
   gap: 32px 24px;
   margin: var(--space-4) 0;
 }
-
-/* The gaps are fixed at every window size: squares line up from the left
-   and whatever width is left over stays at the right end, as a window of
-   icons does. Spreading them edge to edge made the gap a function of the
-   window's width. */
 
 .posts-grid .posts-grid-item {
   min-width: 0;
 }
 
 .posts-grid .posts-grid-item > a:first-child {
+  position: relative;
   display: block;
-  width: 300px;
-  height: 300px;
+  height: 0;
+  padding-top: 100%;
   background-color: #ffffff;
   box-shadow: 0 0 0 1px var(--ds-frame);
 }
@@ -295,6 +294,9 @@ nav a:visited,
 }
 
 .posts-grid .posts-grid-item img {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -344,6 +346,25 @@ nav a:visited,
   text-decoration: underline;
 }
 
+/* How many a row. Beside the feed's heading. */
+.thumbnail-size {
+  display: flex;
+  align-items: center;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.thumbnail-size > * + * {
+  margin-left: var(--ds-space-2);
+}
+
+.thumbnail-size output {
+  min-width: 1.5em;
+  color: var(--ds-ink);
+  font-weight: 600;
+  text-align: right;
+}
+
 /* The admin grid still draws its cards with the old box. */
 .admin-grid .posts-grid-item {
   overflow: hidden;
@@ -363,17 +384,16 @@ nav a:visited,
   object-fit: cover;
 }
 
-/* A phone gets two squares a row, sized to the screen, with the same gaps
-   as every other width. */
-@media (max-width: 660px) {
+/* A phone keeps three a row whatever was chosen on a wider screen -- eight
+   squares across a phone are too small to see -- so the control has nothing
+   to do there. The gaps are the same as at every other width. */
+@media (max-width: 600px) {
   .posts-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .posts-grid .posts-grid-item > a:first-child {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 1 / 1;
+  .thumbnail-size {
+    display: none;
   }
 }
 

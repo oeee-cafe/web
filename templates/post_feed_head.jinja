@@ -1,0 +1,17 @@
+{# Shared by the /, /home, /communities/@x, /hashtags/x and /collaborate feeds:
+   the reader's chosen number of drawings a row, applied before the grid
+   paints so it does not flash at the default.
+
+   It sits in the body rather than the head because the nav is boosted, and a
+   boosted response has its entire <head> thrown away bar the title -- left up
+   there it would stop running the moment anyone reached a feed through the
+   nav. At the top of the content it still runs before the grid below it is
+   parsed, and htmx re-executes it on every boosted swap. #}
+<script>
+  (function () {
+    var saved = parseInt(localStorage.getItem("homeCols"), 10);
+    if (saved >= 1 && saved <= 12) {
+      document.documentElement.style.setProperty("--home-cols", saved);
+    }
+  })();
+</script>

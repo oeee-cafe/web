@@ -9,6 +9,7 @@ htmx-error-server = Something went wrong on our side. Please try again in a mome
 about = Oeee Cafe is an oekaki board.
 user-contributors = Users who made Oeee Cafe together
 
+feed-columns = Per row
 nav-recent = Recent
 timeline = Timeline
 timeline-my = My timeline

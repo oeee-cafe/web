@@ -5,6 +5,7 @@
 {% block head %}
 {% endblock head %}
 {% block content %}
+  {% include "post_feed_head.jinja" %}
   <div class="center-wide">
     {# Same chrome as /: shared head, controls, grid and card fragment. The two
        feeds differ only in which query fills them and where the sentinel
@@ -14,6 +15,7 @@
         <h2 id="post-feed-heading" class="home-section-title">{{ ftl_get_message("timeline-my") }}</h2>
         {# Only with posts to arrange: an empty feed has no columns to set. #}
         {% if feed.posts and feed.posts|length > 0 %}
+          {% include "post_feed_controls.jinja" %}
         {% endif %}
       </div>
       {% if feed.posts and feed.posts|length > 0 %}
