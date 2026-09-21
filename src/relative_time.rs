@@ -57,10 +57,22 @@ pub fn ago_filter(state: &minijinja::State, value: String) -> String {
         .lookup("ftl_lang")
         .and_then(|v| v.as_str().map(str::to_string))
         .unwrap_or_else(|| "ko".to_string());
-    match DateTime::parse_from_rfc3339(&value) {
-        Ok(then) => ago(then.with_timezone(&Utc), Utc::now(), &lang),
-        Err(_) => value,
+    match parse(&value) {
+        Some(then) => ago(then, Utc::now(), &lang),
+        None => value,
     }
+}
+
+/// A timestamp with its offset, or one without -- a `timestamp` column
+/// comes out of chrono as a NaiveDateTime -- read as UTC, as the rest of
+/// the site's templates read those.
+fn parse(value: &str) -> Option<DateTime<Utc>> {
+    if let Ok(then) = DateTime::parse_from_rfc3339(value) {
+        return Some(then.with_timezone(&Utc));
+    }
+    chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f")
+        .ok()
+        .map(|naive| naive.and_utc())
 }
 
 #[cfg(test)]
@@ -96,6 +108,19 @@ mod tests {
         assert_eq!(ago(n - Duration::hours(3), n, "ko"), "3시간");
         assert_eq!(ago(n - Duration::days(2), n, "ja"), "2日");
         assert_eq!(ago(n - Duration::days(14), n, "zh-CN"), "2周");
+    }
+
+    #[test]
+    fn a_timestamp_without_an_offset_is_utc() {
+        assert_eq!(
+            parse("2026-01-02T03:04:05"),
+            Some(Utc.with_ymd_and_hms(2026, 1, 2, 3, 4, 5).unwrap())
+        );
+        assert_eq!(
+            parse("2026-01-02T03:04:05.123456"),
+            parse("2026-01-02T03:04:05.123456Z")
+        );
+        assert_eq!(parse("not a time"), None);
     }
 
     #[test]
