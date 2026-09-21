@@ -42,15 +42,13 @@
    <details>, so it opens with no script at all. #}
 <nav class="nav-bar" hx-boost:inherited="true">
   <div id="menubar">
-    {# The wordmark, in the page's language (Chinese has none of its own and
-       takes the English one), home. Its box is the buttons' height and it is
-       centred on their line -- which in the desktop app on macOS is the line
-       the window's own controls sit on, 26px down -- so the letters read as a
-       name beside them rather than as a second, crooked row of them. #}
-    {% set logo_lang = "en" if ftl_lang not in ["ko", "ja"] else ftl_lang %}
-    <a class="toolbar-name" href="/" title="{{ ftl_get_message("brand") }}">
-      <img class="toolbar-logo" src="/static/logo/{{ logo_lang }}.svg" alt="{{ ftl_get_message("brand") }}"
-           height="20" width="{% if logo_lang == "ja" %}92{% else %}72{% endif %}" draggable="false" />
+    {# The mark -- the cucumber slice the site's icon is -- and the site's
+       name beside it, in the page's language: home. Its box is the buttons'
+       height and it is centred on their line, which in the desktop app on
+       macOS is the line the window's own controls sit on, 26px down. #}
+    <a class="toolbar-name" href="/">
+      <img class="toolbar-mark" src="/static/favicon.png" alt="" width="22" height="22" draggable="false" />
+      <span class="toolbar-name-text">{{ ftl_get_message("brand") }}</span>
     </a>
     {# The sections, as a window's title bar holds its tabs. On a phone
        they take a second row of the bar, sharing its width. #}
@@ -211,8 +209,8 @@
         nav.classList.add("is-stacked");
         // Stacked, the first line still has to hold the name and the
         // account. If it does not, first Draw keeps only its pencil and the
-        // buttons close up; then, if even that wraps, the name steps aside --
-        // Recent is home, a tab away. Each step only where it is needed.
+        // buttons close up; then, if even that wraps, the name steps aside and
+        // the mark stays, still the way home. Each step only where it is needed.
         function wrapped() {
           return end.getBoundingClientRect().top >= name.getBoundingClientRect().bottom;
         }
