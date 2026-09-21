@@ -1669,119 +1669,8 @@ nav a:visited,
   opacity: 0.9;
 }
 
-/* Form Styling */
-
-fieldset {
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-5);
-  margin: var(--space-4) 0;
-  background-color: var(--main-bg-color);
-}
-
-legend {
-  padding: var(--space-1) var(--space-3);
-  font-weight: 600;
-  font-size: var(--text-lg);
-  color: var(--main-text-color);
-  background-color: var(--main-nav-bg-color);
-  border: 1px solid var(--main-border-color);
-}
-
-.form-group {
-  margin-bottom: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.form-group label {
-  font-weight: 500;
-  font-size: var(--text-sm);
-  color: var(--main-text-color);
-}
-
-.form-group input[type="text"],
-.form-group textarea {
-  padding: var(--space-2);
-  border: 1px solid var(--main-border-color);
-  background-color: var(--main-bg-color);
-  color: var(--main-text-color);
-  font-size: var(--text-sm);
-  font-family: inherit;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.form-group input[type="text"]:focus,
-.form-group textarea:focus {
-  outline: 2px solid var(--main-highlight-color);
-  outline-offset: 2px;
-  border-color: var(--main-highlight-color);
-}
-
-.form-group input[type="text"]:invalid,
-.form-group textarea:invalid {
-  border-color: var(--main-border-color);
-}
-
-.form-group input[type="text"]:invalid:focus,
-.form-group textarea:invalid:focus {
-  border-color: var(--danger-color);
-  outline-color: var(--danger-color);
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 100px;
-}
-
-.form-group-checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.form-group-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.form-group-checkbox label {
-  cursor: pointer;
-  margin: 0;
-  font-weight: 400;
-}
-
-.form-actions {
-  margin-top: var(--space-5);
-  display: flex;
-  gap: var(--space-3);
-}
-
-.form-actions input[type="submit"],
-.form-actions button {
-  padding: var(--space-3) var(--space-5);
-  background-color: var(--main-nav-bg-color);
-  border: 1px solid var(--main-border-color);
-  color: var(--main-text-color);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.form-actions input[type="submit"]:hover,
-.form-actions button:hover {
-  background-color: var(--main-highlight-color);
-  border-color: var(--main-highlight-color);
-}
-
-.form-actions input[type="submit"]:focus,
-.form-actions button:focus {
-  outline: 2px solid var(--main-highlight-color);
-  outline-offset: 2px;
-}
+/* Form layout -- fieldsets, fields, checkboxes, actions -- is the design
+   system's; see "Forms" in ds.css. */
 
 /* Post Preview Section */
 
@@ -2700,65 +2589,10 @@ legend {
   margin-top: 0;
 }
 
-/* Stacked-label form. Same shape as .session-form's fields but full width,
-   used by the community create/edit forms. */
+/* The community create/edit forms: their fields are the design system's
+   (`.form-field`, in ds.css); this only keeps them to a readable width. */
 .create-community-form {
   max-width: 600px;
-}
-
-.create-community-form .form-field {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: var(--space-4);
-}
-
-.create-community-form .form-field label {
-  margin-bottom: var(--space-1);
-  font-weight: 500;
-}
-
-.create-community-form .form-field input[type="text"],
-.create-community-form .form-field textarea {
-  width: 100%;
-  padding: var(--space-2);
-  border: 1px solid var(--main-border-color);
-  font-family: inherit;
-  font-size: var(--text-base);
-  box-sizing: border-box;
-}
-
-.create-community-form .form-field textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
-.create-community-form fieldset {
-  margin: var(--space-5) 0;
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-4);
-}
-
-.create-community-form fieldset legend {
-  font-weight: 600;
-  padding: 0 var(--space-2);
-}
-
-.create-community-form fieldset p {
-  margin: var(--space-3) 0;
-}
-
-.create-community-form fieldset p:first-of-type {
-  margin-top: var(--space-2);
-}
-
-.create-community-form fieldset p:last-of-type {
-  margin-bottom: var(--space-2);
-}
-
-.create-community-form input[type="submit"] {
-  padding: var(--space-3) var(--space-5);
-  font-size: var(--text-base);
-  cursor: pointer;
 }
 
 /* "and N others" after the linked actor name. Muted so the sentence still
