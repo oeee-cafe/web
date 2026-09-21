@@ -616,6 +616,38 @@ html {
   vertical-align: middle;
 }
 
+/* The round theme button, signed out: shaped like the avatar it stands in
+   for, showing the theme in use. */
+.toolbar-end .toolbar-theme-button {
+  display: block;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ds-ink);
+  cursor: default;
+  font: inherit;
+  line-height: 0;
+  box-shadow: none;
+  min-height: 0;
+}
+
+.toolbar-end .toolbar-theme-button:hover {
+  background-color: var(--ds-hover);
+}
+
+.nav-bar .toolbar-theme-button svg {
+  display: none;
+}
+
+:root[data-theme="light"] .nav-bar .toolbar-theme-button .toolbar-theme-light,
+:root[data-theme="dark"] .nav-bar .toolbar-theme-button .toolbar-theme-dark,
+:root:not([data-theme]) .nav-bar .toolbar-theme-button .toolbar-theme-system {
+  display: inline-block;
+}
+
 /* A phone keeps the name and the account on the first line and gives the
    sections a second row of their own, all of them in view at once rather
    than scrolled off the edge. Each grows from its own label's width rather
