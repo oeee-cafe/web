@@ -1,7 +1,7 @@
 use crate::app_error::AppError;
 use crate::models::hashtag::{
-    browse_hashtags, find_hashtag_by_name, find_posts_by_hashtag, normalize_hashtag,
-    search_hashtags, Hashtag, HashtagSort,
+    browse_hashtags, find_hashtag_by_name, find_posts_by_hashtag, hashtag_covers,
+    normalize_hashtag, search_hashtags, Hashtag, HashtagCover, HashtagSort,
 };
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
@@ -12,7 +12,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use minijinja::context;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction};
 
 /// Tags listed on the directory, and matches returned by a search.
@@ -221,10 +221,18 @@ pub struct HashtagDiscoveryQuery {
 /// about what a given URL means: an empty box is browsing, not a search for the
 /// empty string, on both. It used to be browsing on one and a `LIKE '%'` dump
 /// titled `Search results for ""` on the other.
+/// A tag as the directory shows it: the tag, and the drawings on its card.
+#[derive(Serialize)]
+struct HashtagCard {
+    #[serde(flatten)]
+    hashtag: Hashtag,
+    covers: Vec<HashtagCover>,
+}
+
 async fn requested_hashtags(
     state: &AppState,
     params: &HashtagDiscoveryQuery,
-) -> Result<(Vec<Hashtag>, Option<String>, HashtagSort), AppError> {
+) -> Result<(Vec<HashtagCard>, Option<String>, HashtagSort), AppError> {
     let sort = HashtagSort::from_param(params.sort.as_deref());
     let query = params
         .q
@@ -238,9 +246,21 @@ async fn requested_hashtags(
         Some(query) => search_hashtags(&mut tx, query, HASHTAG_LIST_LIMIT).await?,
         None => browse_hashtags(&mut tx, sort, HASHTAG_LIST_LIMIT).await?,
     };
+    let ids: Vec<_> = hashtags.iter().map(|h| h.id).collect();
+    let mut covers = hashtag_covers(&mut tx, &ids).await?;
     tx.commit().await?;
 
-    Ok((hashtags, query, sort))
+    let cards = hashtags
+        .into_iter()
+        .map(|hashtag| {
+            let (mine, rest): (Vec<_>, Vec<_>) =
+                covers.drain(..).partition(|c| c.hashtag_id == hashtag.id);
+            covers = rest;
+            HashtagCard { hashtag, covers: mine }
+        })
+        .collect();
+
+    Ok((cards, query, sort))
 }
 
 /// GET /api/hashtags/cards — the tag list alone, for the search box.

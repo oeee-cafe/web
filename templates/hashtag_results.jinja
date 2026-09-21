@@ -3,7 +3,11 @@
    Rendered inline by hashtag_discovery.jinja for the first paint and
    standalone by GET /api/hashtags/cards as the reader types, so it must not
    depend on anything that handler does not pass. Same split, and the same
-   reason for it, as community_cards_fragment.jinja. #}
+   reason for it, as community_cards_fragment.jinja.
+
+   Each tag is a card built like a community's: its latest drawings across
+   the top, then the tag and how many drawings carry it. A tag is a set of
+   drawings, and its name alone says little about what is in it. #}
 {% if search_query %}
   <p class="hashtag-search-info">
     {{ ftl_get_message("search-results-for") }} "<strong>{{ search_query }}</strong>"
@@ -11,16 +15,33 @@
 {% endif %}
 
 {% if hashtags %}
-  <div class="hashtag-discovery-grid">
+  <div class="community-grid hashtag-grid">
     {% for hashtag in hashtags %}
-      <div class="hashtag-discovery-item">
-        <a href="/hashtags/{{ hashtag.name|urlencode }}">
-          <span class="hashtag-name">#{{ hashtag.display_name }}</span>
-          <span class="hashtag-count">{{ ftl_format_pattern("hashtag-post-count", {"count": hashtag.post_count}) }}</span>
-        </a>
-      </div>
+      <a class="community-card hashtag-card" href="/hashtags/{{ hashtag.name|urlencode }}">
+        <span class="community-card-cover">
+          {% for cover in hashtag.covers %}
+            <span class="community-card-cell">
+              <img src="{{ r2_public_endpoint_url }}/image/{{ cover.image_filename[:2] }}/{{ cover.image_filename }}"
+                   alt=""
+                   draggable="false"
+                   class="{% if cover.width > 300 and cover.height > 300 %}drawing-downscaled{% endif %}"
+                   width="{{ cover.width }}"
+                   height="{{ cover.height }}"
+                   loading="lazy"
+                   decoding="async" />
+            </span>
+          {% endfor %}
+          {% if not hashtag.covers %}
+            <span class="community-card-empty">#</span>
+          {% endif %}
+        </span>
+        <span class="community-card-body">
+          <span class="community-card-name"><span class="community-card-title">#{{ hashtag.display_name }}</span></span>
+          <span class="community-card-stats">{{ ftl_format_pattern("hashtag-post-count", {"count": hashtag.post_count}) }}</span>
+        </span>
+      </a>
     {% endfor %}
   </div>
 {% else %}
-  <p>{{ ftl_get_message("no-hashtags-found") }}</p>
+  <p class="communities-empty">{{ ftl_get_message("no-hashtags-found") }}</p>
 {% endif %}
