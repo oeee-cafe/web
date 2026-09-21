@@ -1042,7 +1042,6 @@ export default function App() {
       <LoadingModal isOpen={!canvasMeta && !initializationError} />
       <AuthErrorModal isOpen={authError} onGoToLobby={() => { location.href = "/collaborate"; }} />
       <RoomFullModal isOpen={!!roomFullError} currentUserCount={roomFullError?.currentUserCount ?? 0} maxUsers={roomFullError?.maxUsers ?? 0} onGoToLobby={() => { location.href = "/collaborate"; }} onRetry={() => location.reload()} />
-      {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={connectionState} isCatchingUp={isCatchingUp} />}
       <div className="relative flex-1 overflow-hidden">
         {/*
           The chat is the toolbox's neighbour, so it is one of the painter's
@@ -1065,11 +1064,17 @@ export default function App() {
             height: `${chatSize.height}px`,
           }}
         >
+          {/* The session's title rides in the chat window's title bar, and
+              who owns it, whether you are connected and Share sit just below
+              it: the bar across the page that used to hold them duplicated
+              the site's toolbar. */}
           <div ref={chatHandleRef} className={NEO_TITLEBAR_HANDLE}>
             <span className={NEO_TITLEBAR_DOT} />
             <span className={NEO_TITLEBAR_DOT} />
             <span className={NEO_TITLEBAR_DOT} />
+            {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[12px] leading-[18px]">{canvasMeta.title}</span>}
           </div>
+          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={connectionState} isCatchingUp={isCatchingUp} />}
           <Chat wsRef={wsRef} userId={userIdRef.current} participants={participants} connectionState={connectionState} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} />
           <div ref={chatResizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
             <span className={NEO_RESIZE_GRIP} />

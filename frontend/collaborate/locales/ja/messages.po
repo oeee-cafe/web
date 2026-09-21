@@ -17,7 +17,7 @@ msgstr ""
 msgid "Authentication Failed"
 msgstr "認証に失敗しました"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:56
+#: ../frontend/collaborate/components/SessionHeader.tsx:86
 msgid "by"
 msgstr "作成者:"
 
@@ -25,11 +25,11 @@ msgstr "作成者:"
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:71
+#: ../frontend/collaborate/components/SessionHeader.tsx:64
 msgid "Connected"
 msgstr "接続済み"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:77
+#: ../frontend/collaborate/components/SessionHeader.tsx:70
 msgid "Connecting"
 msgstr "接続中"
 
@@ -43,7 +43,7 @@ msgid "Connection lost. Your work is saved locally."
 msgstr "接続が失われました。作業はローカルに保存されました。"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:83
+#: ../frontend/collaborate/components/SessionHeader.tsx:76
 msgid "Disconnected"
 msgstr "切断済み"
 
@@ -74,7 +74,7 @@ msgstr "初期化に失敗しました"
 msgid "Initializing collaboration session..."
 msgstr "コラボレーションセッションを初期化中..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:89
+#: ../frontend/collaborate/components/SessionHeader.tsx:82
 msgid "Loading"
 msgstr "読み込み中"
 
@@ -119,7 +119,7 @@ msgid "Save this drawing to the gallery? The session ends for everyone and nobod
 msgstr "この絵をギャラリーに保存しますか？保存すると全員のセッションが終了し、誰も続きを描けなくなります。"
 
 #: ../frontend/collaborate/App.tsx:1036
-#: ../frontend/collaborate/App.tsx:1080
+#: ../frontend/collaborate/App.tsx:1085
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:110
@@ -127,7 +127,7 @@ msgid "Save to Gallery"
 msgstr "ギャラリーに保存"
 
 #: ../frontend/collaborate/App.tsx:1036
-#: ../frontend/collaborate/App.tsx:1080
+#: ../frontend/collaborate/App.tsx:1085
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
 msgid "Saving..."
@@ -149,11 +149,11 @@ msgstr "セッション満員"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "セッションが終了します。描画をギャラリーに保存中..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:66
+#: ../frontend/collaborate/components/SessionHeader.tsx:95
 msgid "Share"
 msgstr "共有"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:63
+#: ../frontend/collaborate/components/SessionHeader.tsx:92
 msgid "Share this session"
 msgstr "このセッションを共有"
 
