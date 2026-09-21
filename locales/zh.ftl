@@ -454,3 +454,4 @@ communities-tab-yours = 我的
 nav-about = 关于
 post-move-to = 移动到{ $communityName }
 post-move-choose = 请选择移动到哪里
+sign-in-no-account = 还没有账号？

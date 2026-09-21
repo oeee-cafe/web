@@ -454,3 +454,4 @@ communities-tab-yours = 내 커뮤니티
 nav-about = 소개
 post-move-to = { $communityName }(으)로 이동
 post-move-choose = 옮길 곳을 고르세요
+sign-in-no-account = 아직 계정이 없나요?

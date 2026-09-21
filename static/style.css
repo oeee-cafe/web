@@ -3340,3 +3340,74 @@ a.user-pill:hover {
   box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
   font-weight: 600;
 }
+
+/* ---------------------------------------------------------------------------
+   Signing in
+
+   One card in the middle of the window: the fields, the button that does
+   it full width, and the other ways out as buttons of their own.
+   --------------------------------------------------------------------------- */
+.auth-page {
+  max-width: 380px;
+  margin: var(--ds-space-6) auto 0;
+}
+
+.auth-card {
+  padding: var(--ds-space-5);
+}
+
+.auth-title {
+  margin: 0 0 var(--ds-space-4);
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+}
+
+.auth-card .ds-input {
+  width: 100%;
+  max-width: none;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.auth-card .form-field input.ds-input {
+  max-width: none;
+}
+
+.auth-submit,
+.auth-secondary {
+  display: block;
+  width: 100%;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.auth-submit {
+  margin-top: var(--ds-space-2);
+}
+
+.auth-secondary {
+  margin-top: var(--ds-space-2);
+}
+
+/* A rule with a question on it, between signing in and signing up. */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  margin: var(--ds-space-5) 0 var(--ds-space-1);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  height: 1px;
+  background-color: var(--ds-line);
+}
+
+.auth-divider span {
+  padding: 0 var(--ds-space-3);
+}
