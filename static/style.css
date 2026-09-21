@@ -2753,3 +2753,135 @@ a.user-pill:hover {
   margin: 0;
   font-size: inherit;
 }
+
+/* ---------------------------------------------------------------------------
+   A community's page
+
+   Built from the profile's pieces (.profile, .profile-card, .profile-chip,
+   .profile-section) so a person and a community read as the same kind of
+   thing. What is here is only what a community has and a person does not.
+   --------------------------------------------------------------------------- */
+
+.community-header .profile-name .community-card-badge {
+  vertical-align: middle;
+  font-size: var(--ds-text-s);
+  line-height: 20px;
+  padding: 0 8px;
+}
+
+.community-header-description {
+  margin: var(--ds-space-3) 0 0;
+  max-width: 640px;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-base);
+  line-height: 1.5;
+  white-space: pre-line;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+
+.community-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--ds-space-3);
+}
+
+.community-header-meta > * {
+  margin: 0 var(--ds-space-2) 6px 0;
+}
+
+.community-header-stats {
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+/* The two colours of a two-tone community, as two swatches in one pill. */
+.community-colors {
+  display: inline-block;
+  padding: 3px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 13px;
+  background-color: var(--ds-surface);
+  line-height: 0;
+  white-space: nowrap;
+}
+
+.community-colors > span {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.community-colors > span + span {
+  margin-left: -6px;
+}
+
+.community-feed-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--ds-space-2);
+}
+
+.community-feed-header .profile-section-label {
+  margin-bottom: 0;
+}
+
+.community-draw-choice {
+  display: block;
+  margin-top: var(--ds-space-2);
+}
+
+.community-draw-size {
+  display: flex;
+  align-items: flex-end;
+}
+
+.community-draw-size > label {
+  -webkit-box-flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.community-draw-size .ds-select {
+  width: 100%;
+}
+
+.community-draw-times {
+  padding: 0 var(--ds-space-2) 8px;
+  color: var(--ds-muted);
+}
+
+.community-draw-actions {
+  justify-content: flex-end;
+}
+
+.community-draw-choice .ds-help {
+  display: inline;
+  margin-left: 4px;
+}
+
+/* Up to four actions, so the name gets room before they share its row;
+   past that they go underneath rather than squeezing it to a column. */
+.community-header .profile-identity {
+  flex-basis: 360px;
+}
+
+/* Spaced from the right and below rather than from the left, so a row the
+   actions wrap onto starts flush instead of indented. */
+.community-header .profile-actions > *,
+.community-header .profile-actions > * + * {
+  margin: 0 0 var(--ds-space-2) var(--ds-space-2);
+}
+
+@media (max-width: 600px) {
+  .community-header .profile-actions > *,
+  .community-header .profile-actions > * + * {
+    margin: 0 var(--ds-space-2) var(--ds-space-2) 0;
+  }
+}

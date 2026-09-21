@@ -17,7 +17,7 @@ use crate::models::community::{
 };
 use crate::models::notification::{format_community_invitation_message, get_user_language_preference};
 use crate::models::post::{find_published_posts_by_community_id, find_recent_posts_by_communities};
-use crate::models::user::{find_user_by_login_name, AuthSession};
+use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession};
 use crate::web::handlers::home::{feed_context, LoadMoreQuery, HOME_POSTS_PER_BATCH};
 use crate::web::handlers::{parse_id_with_legacy_support, ParsedId};
 use crate::web::responses::{
@@ -102,6 +102,25 @@ pub async fn community(
     .await
 }
 
+/// Who keeps a community and how much has been drawn in it, for the header's
+/// meta line. Every render of the header needs it -- the page, cancelling an
+/// edit and saving one -- or the line would vanish after an edit.
+async fn community_header_context(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    community: &Community,
+) -> Result<minijinja::Value, AppError> {
+    let owner = find_user_by_id(tx, community.owner_id).await?;
+    let stats = get_community_stats(tx, community.id).await?;
+    Ok(context! {
+        owner => owner.map(|u| context! {
+            login_name => u.login_name,
+            display_name => u.display_name,
+        }),
+        posts_count => stats.total_posts,
+        contributors_count => stats.total_contributors,
+    })
+}
+
 /// Renders the community page: header, drawing form and the community's own
 /// post feed.
 ///
@@ -153,11 +172,13 @@ pub(crate) async fn render_community_page(
     // Cancelling the edit form swaps the header back in on its own; the feed
     // below it is untouched, so it is not worth a query. The template renders
     // its grid from whatever `feed` holds, and copes with it being absent.
+    let header = community_header_context(tx, &community).await?;
     if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
         let rendered = template
             .eval_to_state(context! {
                 current_user => auth_session.user,
                 community => Some(&community),
+                header => header,
                 community_id => community_uuid.to_string(),
                 domain => state.config.domain.clone(),
                 ftl_lang
@@ -186,6 +207,7 @@ pub(crate) async fn render_community_page(
     let rendered = template.render(context! {
         current_user => auth_session.user,
         community => Some(&community),
+        header => header,
         community_id => community_uuid.to_string(),
         domain => state.config.domain.clone(),
         unread_notification_count => common_ctx.unread_notification_count,
@@ -992,9 +1014,13 @@ pub async fn hx_do_edit_community(
                     .map(|l| l.to_string())
                     .unwrap_or_else(|| "en".to_string())
                     .to_string();
+                let mut header_tx = state.db_pool.begin().await?;
+                let header = community_header_context(&mut header_tx, &updated_community).await?;
+                header_tx.commit().await?;
                 let rendered = template
                     .eval_to_state(context! {
                         current_user => auth_session.user,
+                        header => header,
                         community => updated_community,
                         community_id => updated_community.id.to_string(),
                         domain => state.config.domain.clone(),
