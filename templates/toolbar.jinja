@@ -53,16 +53,20 @@
     {# The sections, as a window's title bar holds its tabs. On a phone
        they take a second row of the bar, sharing its width. #}
     <div class="toolbar-links">
-      <a href="/">{{ ftl_get_message("nav-recent") }}</a>
-      {% if current_user %}
-        <a href="/home">{{ ftl_get_message("timeline") }}</a>
-      {% endif %}
-      <a href="/communities">{{ ftl_get_message("community") }}</a>
-      {# Shown signed out too: the lobby is a public gallery of finished
-         collaborative drawings, and only creating a session needs an
-         account. #}
-      <a href="/collaborate">{{ ftl_get_message("collaborate") }}</a>
-      <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
+      <div class="toolbar-sections">
+        <a href="/">{{ ftl_get_message("nav-recent") }}</a>
+        {% if current_user %}
+          <a href="/home">{{ ftl_get_message("timeline") }}</a>
+        {% endif %}
+        <a href="/communities">{{ ftl_get_message("community") }}</a>
+        <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
+      </div>
+      {# Drawing together, live: its own pill beside the sections rather
+         than one of them, with a recording light, since what is behind it
+         is happening now. Shown signed out too: the lobby is a public
+         gallery of finished collaborative drawings, and only creating a
+         session needs an account. #}
+      <a class="toolbar-live" href="/collaborate"><span class="toolbar-live-dot" aria-hidden="true"></span>{{ ftl_get_message("collaborate") }}</a>
     </div>
     <div class="toolbar-end">
       {# Search, signed in or out: a button like its neighbours, holding a

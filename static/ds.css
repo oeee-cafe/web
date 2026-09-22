@@ -544,14 +544,107 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
 
 /* The sections read as one control at rest, not only under the pointer: a
    segmented group, the current one raised out of it. */
-.toolbar-links {
+.toolbar-sections {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
   padding: 2px;
   border-radius: 8px;
   background-color: var(--ds-hover);
 }
 
-.toolbar-links > * + * {
+.toolbar-sections > * + * {
   margin-left: 2px;
+}
+
+.toolbar-links > * + * {
+  margin-left: 8px;
+}
+
+/* Drawing together, live: a pill of its own beside the sections, raised
+   off the bar as the current section is raised out of its group, with a
+   recording light. It is the sections' 30px tall -- 4px of padding, 20px
+   of line and its border, as the section group's 2px of padding and 26px
+   of button make. */
+.nav-bar .toolbar-links a.toolbar-live,
+.nav-bar .toolbar-links a.toolbar-live:visited {
+  flex: none;
+  padding: 4px 12px 4px 10px;
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  border-radius: 999px;
+  background-color: var(--ds-surface);
+  background-image: linear-gradient(rgba(220, 38, 38, 0.1), rgba(220, 38, 38, 0.1));
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08), var(--ds-shadow-raise);
+  color: var(--ds-ink);
+  font-weight: 700;
+}
+
+.nav-bar .toolbar-links a.toolbar-live:hover {
+  background-image: linear-gradient(rgba(220, 38, 38, 0.18), rgba(220, 38, 38, 0.18));
+}
+
+.nav-bar .toolbar-links a.toolbar-live[aria-current="page"] {
+  border-color: var(--ds-danger);
+  box-shadow: 0 0 0 0.5px var(--ds-danger), var(--ds-shadow-raise);
+}
+
+.toolbar-live-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background-color: var(--ds-danger);
+  vertical-align: 1px;
+  -webkit-animation: toolbar-live-pulse 1.6s ease-in-out infinite;
+  animation: toolbar-live-pulse 1.6s ease-in-out infinite;
+}
+
+/* The ring that spreads from it and fades, as a recording light's glow. */
+.toolbar-live-dot::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--ds-danger);
+  -webkit-animation: toolbar-live-ring 1.6s ease-out infinite;
+  animation: toolbar-live-ring 1.6s ease-out infinite;
+}
+
+@-webkit-keyframes toolbar-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes toolbar-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@-webkit-keyframes toolbar-live-ring {
+  0% { opacity: 0.6; -webkit-transform: scale(1); transform: scale(1); }
+  100% { opacity: 0; -webkit-transform: scale(2.6); transform: scale(2.6); }
+}
+
+@keyframes toolbar-live-ring {
+  0% { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-live-dot,
+  .toolbar-live-dot::after {
+    -webkit-animation: none;
+    animation: none;
+  }
+
+  .toolbar-live-dot::after {
+    display: none;
+  }
 }
 
 .toolbar-end {
@@ -916,7 +1009,13 @@ html[data-app] .toolbar-search {
   flex-wrap: nowrap;
 }
 
-.nav-bar.is-stacked .toolbar-links a {
+.nav-bar.is-stacked .toolbar-sections {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nav-bar.is-stacked .toolbar-sections a {
   -webkit-box-flex: 1;
   flex: 1 1 auto;
   min-width: 0;
