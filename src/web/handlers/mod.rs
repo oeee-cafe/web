@@ -1910,4 +1910,63 @@ mod template_tests {
             }
         }
     }
+
+    /// Rendered from the handler's own row types, so the fixture cannot drift
+    /// from what `search_page` actually hands the template.
+    fn render_search(
+        search_query: Option<&str>,
+        users: Vec<crate::web::handlers::search::SearchUserRow>,
+        posts: Vec<crate::web::handlers::search::SearchPostRow>,
+    ) -> String {
+        test_support::env()
+            .get_template("search.jinja")
+            .unwrap_or_else(|e| panic!("search.jinja loads: {e:#}"))
+            .render(context! {
+                search_query,
+                users,
+                posts,
+                ..chrome()
+            })
+            .unwrap_or_else(|e| panic!("search.jinja renders: {e:#}"))
+    }
+
+    #[test]
+    fn search_page_renders_form_empty_state_and_results() {
+        use crate::web::handlers::search::{SearchPostRow, SearchUserRow};
+
+        // Nothing asked yet: the form alone.
+        let blank = render_search(None, vec![], vec![]);
+        assert!(blank.contains(r#"action="/search""#) && blank.contains(r#"name="q""#));
+        assert!(!blank.contains("search-no-results"));
+
+        // Asked, and nothing matched.
+        let none = render_search(Some("zzz"), vec![], vec![]);
+        assert!(none.contains("search-no-results"));
+        assert!(none.contains(r#"value="zzz""#));
+
+        let found = render_search(
+            Some("그림"),
+            vec![SearchUserRow {
+                id: uuid::Uuid::nil(),
+                login_name: "someone".into(),
+                display_name: "그림쟁이".into(),
+            }],
+            vec![SearchPostRow {
+                id: uuid::Uuid::nil(),
+                title: Some("그림".into()),
+                user_login_name: "someone".into(),
+                image_filename: Some("abcdef0123.png".into()),
+                image_width: Some(640),
+                image_height: Some(480),
+                is_sensitive: false,
+                community_slug: None,
+                community_name: None,
+                published_at: Some(chrono::Utc::now()),
+            }],
+        );
+        assert!(found.contains(r#"href="/@someone""#));
+        assert!(found.contains(r#"href="/@someone/00000000-0000-0000-0000-000000000000""#));
+        assert!(found.contains("/image/ab/abcdef0123.png"));
+        assert!(!found.contains("search-no-results"));
+    }
 }

@@ -87,7 +87,7 @@ use crate::web::handlers::profile::{
 use crate::web::handlers::report::{
     hx_report_post, hx_report_profile, report_post_api, report_profile_api,
 };
-use crate::web::handlers::search::search_json;
+use crate::web::handlers::search::{search_json, search_page};
 use crate::web::handlers::well_known::{
     android_assetlinks, apple_app_site_association, robots_txt, sitemap_xml,
 };
@@ -519,6 +519,7 @@ impl App {
             .route("/communities/:id/edit", get(hx_edit_community))
             .route("/communities/:id/comments", get(community_comments))
             .route("/communities/:id/embed", get(community_iframe))
+            .route("/search", get(search_page))
             .route("/hashtags", get(hashtag_discovery))
             .route("/hashtags/:hashtag_name", get(hashtag_view))
             .route("/hashtags/:hashtag_name/posts", get(load_more_hashtag_posts))
