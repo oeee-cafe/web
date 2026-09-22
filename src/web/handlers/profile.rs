@@ -1,4 +1,5 @@
 use crate::app_error::AppError;
+use crate::models::achievement::list_achievements;
 use crate::models::actor::Actor;
 use crate::models::banner::{
     activate_banner, delete_banner, find_banner_by_id, list_user_banners,
@@ -230,6 +231,7 @@ pub async fn profile(
         None => None,
     };
 
+    let achievements = list_achievements(&mut tx, user.id).await?;
     let links = find_links_by_user_id(&mut tx, user.id).await?;
     let links = links
         .iter()
@@ -250,6 +252,7 @@ pub async fn profile(
         banner,
         is_following => is_current_user_following,
         followings,
+        achievements,
         user => Some(user),
         domain => state.config.domain.clone(),
         public_community_posts,
@@ -307,6 +310,7 @@ pub async fn profile_or_community(
             None => None,
         };
 
+        let achievements = list_achievements(&mut tx, user.id).await?;
         let links = find_links_by_user_id(&mut tx, user.id).await?;
         let links = links
             .iter()
@@ -327,6 +331,7 @@ pub async fn profile_or_community(
             banner,
             is_following => is_current_user_following,
             followings,
+            achievements,
             user => Some(user),
             domain => state.config.domain.clone(),
             public_community_posts,

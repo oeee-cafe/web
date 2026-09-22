@@ -2767,6 +2767,43 @@ nav a:visited,
   margin-bottom: var(--ds-space-1);
 }
 
+/* Achievements: a card each, name over what it was for, and when. A grid,
+   so they line up however many there are; grid-gap for Firefox 56. */
+.profile-achievements {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-gap: 8px;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-achievement {
+  display: flex;
+  flex-direction: column;
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-surface);
+}
+
+.profile-achievement-name {
+  font-weight: 700;
+}
+
+.profile-achievement-description {
+  margin-top: 2px;
+  font-size: var(--ds-text-m);
+  line-height: 1.4;
+}
+
+.profile-achievement-date {
+  margin-top: var(--ds-space-2);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
 .profile-empty {
   color: var(--ds-muted);
   font-size: var(--ds-text-m);

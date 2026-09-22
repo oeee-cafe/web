@@ -1561,6 +1561,43 @@ mod template_tests {
         }
     }
 
+    /// Achievements under the profile card, each named, explained and dated;
+    /// no section at all for someone with none.
+    #[test]
+    fn the_profile_shows_what_its_owner_has_achieved() {
+        let env = test_support::env();
+        let render = |achievements: serde_json::Value| {
+            env.get_template("profile.jinja")
+                .expect("profile loads")
+                .render(context! {
+                    user => json!({
+                        "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
+                        "login_name": "oeee",
+                        "display_name": "오이",
+                    }),
+                    banner => json!(null),
+                    links => Vec::<serde_json::Value>::new(),
+                    followings => Vec::<serde_json::Value>::new(),
+                    achievements,
+                    public_community_posts => Vec::<serde_json::Value>::new(),
+                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    domain => "oeee.cafe",
+                    is_following => false,
+                    ..chrome()
+                })
+                .expect("profile renders")
+        };
+        let with = render(json!([
+            {"achievement": "FIRST_DRAWING", "key": "first-drawing", "earned_at": "2026-09-22T00:00:00Z"},
+            {"achievement": "STEAM_SUPPORTER", "key": "steam-supporter", "earned_at": "2026-09-22T01:00:00Z"},
+        ]));
+        assert!(with.contains("profile-achievements"));
+        assert!(with.contains("achievement-first-drawing-description"));
+        assert!(with.contains("achievement-steam-supporter"));
+        assert!(with.contains(r#"datetime="2026-09-22T00:00:00Z""#));
+        assert!(!render(json!([])).contains("profile-achievements"));
+    }
+
     /// What the Steam app reads to tell friends what someone is doing: the
     /// painters, the collaborative room's head and any page on the base
     /// layout carry it when the handler passes one, and none of them when it
