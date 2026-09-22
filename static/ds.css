@@ -972,8 +972,8 @@ html[data-app] .toolbar-search {
   display: inline-block;
 }
 
-/* The switch first, then a rule, then About. */
-.toolbar-theme-menu .toolbar-theme {
+/* The switch, then a rule, then what the site is. */
+.toolbar-menu-items .toolbar-theme {
   margin-bottom: 4px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--ds-line);
