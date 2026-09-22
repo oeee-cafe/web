@@ -3364,7 +3364,7 @@ a.user-pill:hover {
 
 .auth-agree-check input {
   flex: none;
-  margin: 2px 8px 0 0;
+  margin: 1px 8px 0 0;
 }
 
 .auth-agree-links {
@@ -3500,10 +3500,6 @@ a.user-pill:hover {
 
 .publish-switches {
   margin-bottom: var(--ds-space-4);
-}
-
-.publish-switches .community-form-choice input {
-  margin-top: 3px;
 }
 
 .publish-foot {
