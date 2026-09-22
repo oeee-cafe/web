@@ -68,6 +68,8 @@
   /* States, laid over whatever is beneath. */
   --ds-hover: rgba(60, 60, 150, 0.08);
   --ds-selected: rgba(60, 60, 150, 0.15);
+  /* Laid over a control while it is held down, whatever its colour. */
+  --ds-press: rgba(20, 20, 70, 0.1);
   --ds-focus: #4f8a10;
   /* The cucumber: the one colour that means "do this". Dark ink on it in
      both themes -- white on lime is under 2:1. */
@@ -103,6 +105,7 @@
     --ds-frame: #9595a7;
     --ds-hover: rgba(200, 200, 255, 0.08);
     --ds-selected: rgba(200, 200, 255, 0.15);
+    --ds-press: rgba(255, 255, 255, 0.1);
     --ds-focus: #c4ee62;
     --ds-badge: #ff8c00;
     --ds-danger: #ef4444;
@@ -128,6 +131,7 @@
   --ds-frame: #9595a7;
   --ds-hover: rgba(200, 200, 255, 0.08);
   --ds-selected: rgba(200, 200, 255, 0.15);
+  --ds-press: rgba(255, 255, 255, 0.1);
   --ds-focus: #c4ee62;
   --ds-badge: #ff8c00;
   --ds-danger: #ef4444;
@@ -234,6 +238,39 @@ html {
 .ds-page img,
 .ds-page a {
   -webkit-user-drag: none;
+}
+
+/* On a touch screen: no grey flash over whatever was tapped -- the pressed
+   states below answer instead -- no waiting to see whether a tap on a
+   control was the first of a double-tap zoom, and no text grown behind the
+   page's back when a phone turns sideways. */
+.ds-page {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.ds-page a,
+.ds-page button,
+.ds-page summary,
+.ds-page label,
+.ds-page input,
+.ds-page select,
+.ds-page textarea {
+  touch-action: manipulation;
+}
+
+/* The page runs under a phone's notch and home indicator (viewport-fit in
+   base.jinja), so what would be covered moves in by the inset. The ground
+   and its grid still reach the edge; the content does not. The foot of
+   the page is style.css's `main`, which already has padding there. */
+.ds-page {
+  padding-right: env(safe-area-inset-right);
+  padding-left: env(safe-area-inset-left);
+}
+
+.nav-bar {
+  padding-top: env(safe-area-inset-top);
 }
 
 /* Controls answer to the arrow, as a window's controls do. */
@@ -1258,6 +1295,71 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   outline-offset: 1px;
 }
 
+/* ...but a control you press shows it only when the keyboard got it there,
+   as a window's controls do; a field you type into keeps it however it was
+   reached, since that is where the typing will go. An engine without
+   :focus-visible drops this whole rule and keeps the ring, which is the
+   safe way round. */
+.ds-button:focus:not(:focus-visible),
+.ds-select:focus:not(:focus-visible),
+.ds-check:focus:not(:focus-visible),
+.ds-page button:not([class]):focus:not(:focus-visible),
+.ds-page select:not([class]):focus:not(:focus-visible),
+.ds-page input[type="submit"]:not([class]):focus:not(:focus-visible),
+.ds-page input[type="button"]:not([class]):focus:not(:focus-visible),
+.ds-page input[type="reset"]:not([class]):focus:not(:focus-visible),
+.ds-page input[type="checkbox"]:focus:not(:focus-visible),
+.ds-page input[type="radio"]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Pressed
+
+   A control darkens the moment it is pressed and stays dark while held,
+   before anything it does has happened -- which is most of what makes a
+   click feel like a control and not a link. One overlay, --ds-press, laid
+   over whatever colour the control already is, so secondary, primary and
+   danger buttons, tabs and rows all press alike. It is an image rather than
+   a colour so it never replaces the one beneath it; each selector is as
+   specific as the rule that gave the control `background: none`, or more.
+   A select opens a menu instead, and its arrow is its background image.
+   --------------------------------------------------------------------------- */
+.ds-button:active,
+.ds-page button:not([class]):active,
+.ds-page input[type="submit"]:not([class]):active,
+.ds-page input[type="button"]:not([class]):active,
+.ds-page input[type="reset"]:not([class]):active,
+.ds-segmented > *:active,
+.ds-page .ds-segmented > button:active,
+.toolbar-links a:active,
+.toolbar-end > a:active,
+.toolbar-end .toolbar-icon:active,
+.toolbar-end .toolbar-button:active,
+.toolbar-menu summary:active,
+.toolbar-draw:active,
+.toolbar-menu-items a:active {
+  background-image: linear-gradient(var(--ds-press), var(--ds-press));
+}
+
+/* A checkbox's mark is already its background image, so it dims instead. */
+.ds-page input[type="checkbox"]:active,
+.ds-page input[type="radio"]:active,
+.ds-check:active {
+  filter: brightness(0.9);
+}
+
+/* A raised button sits down into the page while held. */
+.ds-button:not(.ds-button-quiet):active,
+.ds-page button:not([class]):active,
+.ds-page input[type="submit"]:not([class]):active,
+.ds-page input[type="button"]:not([class]):active,
+.ds-page input[type="reset"]:not([class]):active,
+.toolbar-end > a:not(.toolbar-icon):active,
+.toolbar-end .toolbar-button:active {
+  box-shadow: none;
+}
+
 .ds-input::-webkit-input-placeholder,
 .ds-page input:not([class])::-webkit-input-placeholder,
 .ds-page textarea:not([class])::-webkit-input-placeholder {
@@ -2019,4 +2121,43 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
 .ds-modal-panel h2 {
   margin: 0 0 var(--ds-space-3);
   font-size: var(--ds-text-l);
+}
+
+/* An alert: one question, Cancel, and the action named for what it does
+   (confirm_dialog.jinja). Narrower than a dialog, since it holds a sentence
+   and two buttons, and the buttons sit at its foot on the right, the
+   action last. */
+.ds-alert-panel {
+  width: 360px;
+  padding: 20px;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.ds-alert-message {
+  margin: 0 0 20px;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-base);
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.ds-alert-actions {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-pack: end;
+  justify-content: flex-end;
+}
+
+.ds-alert-actions > * + * {
+  margin-left: var(--ds-space-2);
+}
+
+/* On a phone the two share the width, as an alert's buttons do there. */
+@media (max-width: 600px) {
+  .ds-alert-actions > * {
+    -webkit-box-flex: 1;
+    flex: 1 1 0;
+  }
 }

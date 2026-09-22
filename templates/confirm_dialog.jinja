@@ -1,0 +1,87 @@
+{# The alert every `hx-confirm` asks through, in place of the browser's
+   confirm(): that one is titled with the site's address, drawn by the
+   browser, and worded in the browser's language, and nothing else on a
+   page gave it away as a web page so plainly.
+
+   htmx fires `htmx:confirm` before a confirmed request; cancelling that
+   event hands the decision to us, and `issueRequest` / `dropRequest` give
+   it back. The action button is named for what it does -- the control's
+   own words, "Delete" or "Remove member" -- rather than OK, and Cancel is
+   the one that has focus, so Return never destroys anything by itself.
+
+   Written for Firefox 56, which reads this script as written: no arrow
+   functions, no `let`. #}
+<div id="ds-confirm" class="ds-modal ds-alert" style="display: none;" role="alertdialog" aria-modal="true" aria-describedby="ds-confirm-message">
+  <div class="ds-modal-panel ds-alert-panel">
+    <p id="ds-confirm-message" class="ds-alert-message"></p>
+    <div class="ds-alert-actions">
+      <button type="button" class="ds-button" data-confirm-cancel>{{ ftl_get_message("cancel") }}</button>
+      <button type="button" class="ds-button ds-button-danger" data-confirm-ok>{{ ftl_get_message("delete") }}</button>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var dialog = document.getElementById("ds-confirm");
+    var message = document.getElementById("ds-confirm-message");
+    var cancel = dialog.querySelector("[data-confirm-cancel]");
+    var ok = dialog.querySelector("[data-confirm-ok]");
+    var fallbackLabel = ok.textContent;
+    var pending = null;
+    var opener = null;
+
+    // What the control says it does. A form speaks through its submit
+    // button; an icon button through its label.
+    function labelFor(elt) {
+      var control = elt.tagName === "FORM"
+        ? elt.querySelector('button[type="submit"], button:not([type]), input[type="submit"]')
+        : elt;
+      if (!control) return fallbackLabel;
+      var text = control.tagName === "INPUT" ? control.value : control.textContent;
+      text = (text || "").replace(/\s+/g, " ").trim();
+      return text || control.getAttribute("aria-label") || control.getAttribute("title") || fallbackLabel;
+    }
+
+    function close(confirmed) {
+      var decide = pending;
+      pending = null;
+      dialog.style.display = "none";
+      if (opener && document.body.contains(opener)) opener.focus();
+      opener = null;
+      if (decide) decide(confirmed);
+    }
+
+    document.addEventListener("htmx:confirm", function (event) {
+      var detail = event.detail;
+      if (!detail || !detail.ctx || !detail.issueRequest) return;
+      event.preventDefault();
+      if (pending) pending(false);
+      pending = function (confirmed) {
+        if (confirmed) detail.issueRequest();
+        else detail.dropRequest();
+      };
+      opener = document.activeElement;
+      message.textContent = detail.ctx.confirm;
+      ok.textContent = labelFor(event.target);
+      dialog.style.display = "flex";
+      cancel.focus();
+    });
+
+    cancel.addEventListener("click", function () { close(false); });
+    ok.addEventListener("click", function () { close(true); });
+    dialog.addEventListener("mousedown", function (event) {
+      // Pressing the dimmed page is a Cancel, as it is for a sheet.
+      if (event.target === dialog) close(false);
+    });
+    dialog.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" || event.key === "Esc") {
+        event.preventDefault();
+        close(false);
+      } else if (event.key === "Tab") {
+        // Two buttons, and the keyboard stays between them.
+        event.preventDefault();
+        (document.activeElement === cancel ? ok : cancel).focus();
+      }
+    });
+  })();
+</script>

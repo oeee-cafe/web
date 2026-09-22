@@ -165,6 +165,7 @@ move-section-unlisted = 참여한 커뮤니티
 move-section-public-participated = 참여한 공개 커뮤니티
 move-section-public-other = 다른 공개 커뮤니티
 post-delete-confirm = 정말 이 그림을 삭제하시겠습니까?
+comment-delete-confirm = 정말 이 댓글을 삭제하시겠습니까?
 post-relay = 이어그리기
 post-reply-with-drawing = 그림으로 답글
 post-reply-select-tool = 도구와 캔버스 크기 선택

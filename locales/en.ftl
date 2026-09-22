@@ -163,6 +163,7 @@ move-section-unlisted = Communities You've Posted In
 move-section-public-participated = Public Communities You've Posted In
 move-section-public-other = Other Public Communities
 post-delete-confirm = Are you sure you want to delete this post?
+comment-delete-confirm = Are you sure you want to delete this comment?
 post-relay = Relay
 post-reply-with-drawing = Reply with Drawing
 post-reply-select-tool = Select tool and canvas size
