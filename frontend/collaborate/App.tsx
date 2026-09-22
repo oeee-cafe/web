@@ -20,6 +20,7 @@ import {
   type PainterCheckpointLayers,
   type PainterHandle,
 } from "neo-cucumber";
+import { offerPainterToApp } from "../painter/iosApp";
 import "./app.css";
 import { Chat } from "./components/Chat";
 import { SessionExpiredModal } from "./components/SessionExpiredModal";
@@ -414,11 +415,14 @@ export default function App() {
       },
     });
     painterRef.current = painter;
+    let withdraw = () => {};
     void painter.ready.then(() => {
       painter.setInteractionEnabled(false);
       setPainterReady(true);
+      withdraw = offerPainterToApp(painter);
     });
     return () => {
+      withdraw();
       painter.unmount();
       if (painterRef.current === painter) painterRef.current = null;
     };

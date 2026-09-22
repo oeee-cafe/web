@@ -21,6 +21,7 @@ import { useDrawingState } from "./hooks/useDrawingState";
 import { useDrawingTimer } from "./hooks/useDrawingTimer";
 import { useTwoToneShortcuts } from "./hooks/useTwoToneShortcuts";
 import { usePainterShortcuts } from "./hooks/usePainterShortcuts";
+import { preferPen } from "./utils/penPreference";
 import { ShortcutHelp } from "./components/ShortcutHelp";
 import type { ShortcutAction } from "./constants/shortcuts";
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from "./constants/drawing";
@@ -39,7 +40,7 @@ import {
 } from "./neo/regionPreview";
 import type { DrawingEngine } from "./DrawingEngine";
 import type { RegionRect } from "./neo/regionDrag";
-import { TEXT_FONT_FAMILY, fontSizeForBrush } from "./neo/tools";
+import { TEXT_FONT_FAMILY, fontSizeForBrush, type ToolId } from "./neo/tools";
 import { previewBackdrop as backdropFromCanvasStack } from "./neo/previewBackdrop";
 import { inJoinOrder } from "./neo/canvasStack";
 import { PainterWorkspace } from "./components/PainterWorkspace";
@@ -49,6 +50,7 @@ import type {
   PainterCheckpoint,
   PainterExport,
   PainterError,
+  PainterCommand,
   PainterHandle,
   PainterOptions,
   PainterSessionArchive,
@@ -868,6 +870,32 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     !isDrawingRef.current && !(synchronizationHistoryRef.current?.hasPendingLocal ?? false),
   [isDrawingRef]);
 
+  /**
+   * The tool before the one in hand, for a pen's "switch to previous" and for
+   * leaving the eraser. Only ever a different tool from the current one.
+   */
+  const previousToolRef = useRef<ToolId | null>(null);
+  const currentToolRef = useRef<ToolId>(drawingState.brushType);
+  useEffect(() => {
+    if (drawingState.brushType === currentToolRef.current) return;
+    previousToolRef.current = currentToolRef.current;
+    currentToolRef.current = drawingState.brushType;
+  }, [drawingState.brushType]);
+
+  const command = useCallback(
+    (name: PainterCommand) => {
+      if (twoToneConfig !== null) return;
+      const current = currentToolRef.current;
+      const previous = previousToolRef.current;
+      if (name === "toggle-eraser") {
+        updateBrushType(current === "eraser" ? previous ?? "solid" : "eraser");
+      } else if (name === "previous-tool" && previous) {
+        updateBrushType(previous);
+      }
+    },
+    [twoToneConfig, updateBrushType]
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -878,6 +906,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       loadImage,
       undo,
       redo,
+      command,
+      preferPen,
       setInteractionEnabled,
       setLocalActorId,
       setParticipants,
@@ -892,7 +922,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       // The owning mount adapter replaces this with its React-root teardown.
       unmount: () => {},
     }),
-    [save, exportPng, exportReplay, loadImage, undo, redo, setLocalActorId, setParticipants, setLayersOrigin, applyCanonicalOperation, exportCheckpoint, applyCheckpoint, exportSessionArchive, compactCanonicalHistory, isSynchronizationSettled, synchronizationTrace],
+    [save, exportPng, exportReplay, loadImage, undo, redo, command, setLocalActorId, setParticipants, setLayersOrigin, applyCanonicalOperation, exportCheckpoint, applyCheckpoint, exportSessionArchive, compactCanonicalHistory, isSynchronizationSettled, synchronizationTrace],
   );
 
   // Point the engine, the history and the emitter at the selected participant
@@ -1073,6 +1103,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     enabled: twoToneConfig === null,
     onAction: handleShortcut,
   });
+
 
   // Tegaki-style pen shortcuts, two-tone mode only
   useTwoToneShortcuts({

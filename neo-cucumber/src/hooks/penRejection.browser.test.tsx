@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { act, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { useOfflineDrawing } from "./useOfflineDrawing";
-import { resetPenPreference } from "../utils/penPreference";
+import { preferPen, resetPenPreference } from "../utils/penPreference";
 import type { DrawingState } from "../types/drawing";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -205,6 +205,27 @@ describe("a session that has seen a pen stops taking fingers", () => {
       [32, 32],
     ]);
 
+    expect(anyPixelChanged(before, painter.canvasBytes())).toBe(true);
+    painter.cleanup();
+  });
+
+  it("ignores even the first finger when the host prefers the pen", async () => {
+    // The iOS app with "Only Draw with Apple Pencil" on: no pen has touched
+    // the glass yet, and a resting hand still must not draw.
+    preferPen();
+    const painter = await mountPainter();
+    const before = painter.canvasBytes();
+
+    await painter.strokeWith("touch", 7, [
+      [10, 10],
+      [30, 30],
+    ]);
+    expect(anyPixelChanged(before, painter.canvasBytes())).toBe(false);
+
+    await painter.strokeWith("pen", 8, [
+      [40, 40],
+      [50, 45],
+    ]);
     expect(anyPixelChanged(before, painter.canvasBytes())).toBe(true);
     painter.cleanup();
   });

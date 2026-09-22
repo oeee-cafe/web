@@ -108,6 +108,12 @@ export function mountOfflinePainter(
     redo() {
       synchronousController().redo();
     },
+    command(command) {
+      synchronousController().command(command);
+    },
+    preferPen() {
+      synchronousController().preferPen();
+    },
     setInteractionEnabled(enabled: boolean) {
       synchronousController().setInteractionEnabled(enabled);
     },
