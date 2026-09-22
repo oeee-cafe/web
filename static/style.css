@@ -258,6 +258,44 @@ nav a:visited,
   navigation: auto;
 }
 
+/* In the iOS app, a page opened from the one showing is pushed onto it
+   (toolbar.jinja, push): it slides in from the right edge while the page it
+   came from gives way a third of its width and dims, and the toolbar -- the
+   app's navigation bar -- holds still. Over each other rather than blended,
+   as a cross-fade's two pictures are. */
+html[data-push]::view-transition-old(root),
+html[data-push]::view-transition-new(root) {
+  mix-blend-mode: normal;
+  animation-duration: 0.4s;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1);
+  animation-fill-mode: both;
+}
+
+html[data-push="whole"] .nav-bar {
+  view-transition-name: none;
+}
+
+html[data-push]::view-transition-old(root) {
+  animation-name: oeee-push-away;
+}
+
+html[data-push]::view-transition-new(root) {
+  animation-name: oeee-push-in;
+}
+
+@keyframes oeee-push-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes oeee-push-away {
+  to {
+    transform: translateX(-30%);
+    filter: brightness(0.9);
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Drawings
 

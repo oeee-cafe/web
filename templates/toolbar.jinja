@@ -583,18 +583,31 @@
         skeleton.innerHTML = html + "</div>";
         return skeleton;
       }
-      function loading(path) {
+      function loading(path, over) {
         window.oeeeMarkCurrent(path || location.pathname);
         var content = document.querySelector("main.ds-content");
         if (!content || content.querySelector(".ds-skeleton")) return;
+        // Pushed (below), the skeleton is laid over the page where the reader
+        // is, and the page is hidden rather than taken out, so nothing is
+        // scrolled: coming back finds the page where it was left, which is
+        // also where the web view remembers it.
+        var property = over ? "visibility" : "display";
         var kept = [];
         for (var c = 0; c < content.children.length; c++) {
           var child = content.children[c];
-          kept.push([child, child.style.display]);
-          child.style.display = "none";
+          kept.push([child, child.style[property]]);
+          child.style[property] = over ? "hidden" : "none";
         }
         var skeleton = skeletonFor(path || location.pathname);
         window.oeeeSkeletonHint = null;
+        var position = content.style.position;
+        if (over) {
+          content.style.position = "relative";
+          skeleton.style.position = "absolute";
+          skeleton.style.top = Math.max(0, -content.getBoundingClientRect().top) + "px";
+          skeleton.style.right = "0";
+          skeleton.style.left = "0";
+        }
         content.appendChild(skeleton);
         // The same whole-step zoom post_view.jinja gives the drawing.
         var stage = skeleton.querySelector(".ds-skeleton-stage");
@@ -612,7 +625,8 @@
           if (!skeleton.parentNode) return;
           skeleton.parentNode.removeChild(skeleton);
           window.oeeeMarkCurrent(location.pathname);
-          for (var k = 0; k < kept.length; k++) kept[k][0].style.display = kept[k][1];
+          for (var k = 0; k < kept.length; k++) kept[k][0].style[property] = kept[k][1];
+          content.style.position = position;
         }
         window.oeeeRestoreContent = restore;
         setTimeout(restore, 10000);
@@ -637,8 +651,33 @@
           width: parseInt(thumb.getAttribute("width"), 10),
           height: parseInt(thumb.getAttribute("height"), 10)
         } : null;
-        loading(link.pathname);
+        // The toolbar's sections are the app's tabs, and a page's own
+        // variations -- a filter, a sort, the next page -- are the same
+        // screen; anything else is a new screen.
+        if (!link.closest(".nav-bar") && link.pathname !== location.pathname) push(link.pathname);
+        else loading(link.pathname);
       });
+      // In the iOS app a page opened from the one showing is pushed, as a
+      // screen is onto a navigation stack: its skeleton slides in from the
+      // right edge over the page it came from (style.css), at the tap, while
+      // the page itself loads. Going back is the web view's own edge swipe.
+      function push(path) {
+        var root = document.documentElement;
+        var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (root.getAttribute("data-app") !== "ios" || !document.startViewTransition || reduced) {
+          loading(path);
+          return;
+        }
+        // On a phone the toolbar scrolls away with the page; pushed from
+        // further down, it is not on either screen, and must not be held
+        // still as if it were.
+        var bar = document.querySelector(".nav-bar");
+        var shown = bar && bar.getBoundingClientRect().bottom > 0;
+        root.setAttribute("data-push", shown ? "" : "whole");
+        var transition = document.startViewTransition(function () { loading(path, true); });
+        transition.finished.then(done, done);
+        function done() { root.removeAttribute("data-push"); }
+      }
       document.addEventListener("submit", function (event) {
         var form = event.target;
         if (event.defaultPrevented || !form || !form.getAttribute) return;
