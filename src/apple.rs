@@ -6,6 +6,11 @@
 //! nonce. The site checks the signature against Apple's published keys, that
 //! the token was made for this site (`aud`) and for this sign-in (`nonce`),
 //! and takes nothing else Apple's post says on its word.
+//!
+//! The iOS app signs in natively instead (`ASAuthorizationAppleIDProvider`),
+//! with a state and nonce it asks the site for from inside its web view, and
+//! posts the token it gets to the same place. Its token names the app's
+//! bundle ID as audience; the rest is checked the same way.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -206,7 +211,10 @@ pub async fn verify_id_token(
 
     let mut validation = Validation::new(Algorithm::RS256);
     validation.set_issuer(&[ISSUER]);
-    validation.set_audience(&[&config.client_id]);
+    let audiences: Vec<&str> = std::iter::once(config.client_id.as_str())
+        .chain(config.app_ids.iter().map(String::as_str))
+        .collect();
+    validation.set_audience(&audiences);
     validation.set_required_spec_claims(&["exp", "iss", "aud", "sub"]);
     let claims = match decode::<Claims>(id_token, &key, &validation) {
         Ok(data) => data.claims,
@@ -252,6 +260,7 @@ mod tests {
     const MODULUS: &str = include_str!("testdata/apple_test_key.n");
     const KID: &str = "test-key";
     const CLIENT_ID: &str = "cafe.oeee.web";
+    const APP_ID: &str = "cafe.oeee";
 
     async fn fake_apple() -> AppleConfig {
         let app = Router::new().route(
@@ -272,6 +281,7 @@ mod tests {
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         AppleConfig {
             client_id: CLIENT_ID.to_string(),
+            app_ids: vec![APP_ID.to_string()],
             keys_url: format!("http://{addr}/auth/keys"),
         }
     }
@@ -327,6 +337,22 @@ mod tests {
             Some("oeee@privaterelay.appleid.com")
         );
         assert!(!identity.purchased);
+    }
+
+    #[tokio::test]
+    async fn the_ios_apps_token_names_the_app_and_is_accepted() {
+        let config = fake_apple().await;
+        let identity = verify_id_token(
+            &config,
+            &token(with(claims(), "aud", json!(APP_ID))),
+            "the-nonce",
+            Some(r#"{"name":{"firstName":"지혁","lastName":"서"}}"#),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(identity.subject, "001234.abcdef.0123");
+        assert_eq!(identity.name.as_deref(), Some("서지혁"));
     }
 
     #[tokio::test]
@@ -424,6 +450,7 @@ mod tests {
     fn the_browser_is_sent_to_apple_with_what_comes_back() {
         let config = AppleConfig {
             client_id: CLIENT_ID.to_string(),
+            app_ids: Vec::new(),
             keys_url: String::new(),
         };
         let url = url::Url::parse(&authorize_url(

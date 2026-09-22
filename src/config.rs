@@ -90,6 +90,11 @@ pub struct AppleConfig {
     /// is `{base_url}/auth/apple/callback`. Apple's ID tokens name it as
     /// their audience.
     pub client_id: String,
+    /// Bundle IDs of the apps that sign in with Apple natively (the iOS app
+    /// is `cafe.oeee`). Their ID tokens name the bundle ID as audience rather
+    /// than the Services ID.
+    #[serde(default)]
+    pub app_ids: Vec<String>,
     /// Where Apple publishes the keys it signs ID tokens with. Only a test
     /// changes it.
     #[serde(default = "default_apple_keys_url")]

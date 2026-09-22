@@ -77,7 +77,7 @@
           <a class="ds-button auth-steam" href="/auth/steam/app?next=/account">{{ ftl_get_message("account-link-steam") }}</a>
         {% endif %}
         {% if apple_enabled and not apple_linked %}
-          {# Not inside the apps; see login.jinja. #}
+          {# Not inside most of the apps; see login.jinja. #}
           <a class="ds-button auth-apple" href="/auth/apple?next=/account">{{ ftl_get_message("account-link-apple") }}</a>
         {% endif %}
       </div>

@@ -3543,7 +3543,9 @@ html[data-steam-app] .auth-steam {
 
 /* Signing in with Apple goes to Apple's page and back, which the apps'
    web views would open in a browser of their own, away from the session
-   the answer has to come back to. So it is a browser's only. Black on
+   the answer has to come back to. So it is a browser's only -- and the iOS
+   app's, which signs in natively and says so in its user agent
+   (theme_head.jinja). Black on
    light and white on dark, as Apple asks of its sign-in buttons. */
 .ds-button.auth-apple,
 .ds-button.auth-apple:visited {
@@ -3583,7 +3585,7 @@ html[data-steam-app] .auth-steam {
   background-color: #e5e5e5;
 }
 
-html[data-app] .auth-apple,
+html[data-app]:not([data-native-apple-sign-in]) .auth-apple,
 html[data-desktop] .auth-apple,
 html[data-steam-app] .auth-apple {
   display: none;

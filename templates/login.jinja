@@ -38,7 +38,8 @@
       {% if apple_enabled and not linking_provider %}
         {# Apple's sign-in page, and back. Not offered inside the apps,
            which open another site's pages in a browser of their own, where
-           the answer would arrive without this sign-in's session. #}
+           the answer would arrive without this sign-in's session -- except
+           the iOS app, which stops the navigation and signs in natively. #}
         <a class="ds-button auth-secondary auth-apple" href="/auth/apple{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-apple") }}</a>
       {% endif %}
       {% if linking_provider %}
