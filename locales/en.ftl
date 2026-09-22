@@ -24,7 +24,6 @@ timeline-empty = Your timeline is empty. Discover and follow other people from <
 
 draw = Draw!
 collaborate = Collaborate
-draw-alone = Draw solo
 drafts = Drafts
 profile = Profile
 community = Community

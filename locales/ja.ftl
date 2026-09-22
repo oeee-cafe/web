@@ -26,7 +26,6 @@ timeline-empty = タイムラインが空です。 <a href="/communities">コミ
 
 draw = 描きましょう！
 collaborate = 一緒に描く
-draw-alone = ひとりで描く
 drafts = 一時保管箱
 profile = プロフィール
 community = コミュニティ
