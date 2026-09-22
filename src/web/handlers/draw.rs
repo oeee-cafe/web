@@ -29,6 +29,7 @@ use minijinja::context;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha256::digest;
+use crate::web::presence::{Activity, Presence};
 use sqlx::postgres::types::PgInterval;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -115,7 +116,14 @@ pub async fn start_draw(
         "locale": ftl_lang.clone(),
         "mode": painter_mode,
     }))?;
+    let presence = Presence::new(if parent_post.is_some() {
+        Activity::Relaying
+    } else {
+        Activity::Drawing
+    })
+    .in_community(community.as_ref());
     let rendered = template.render(context! {
+        presence,
         current_user => auth_session.user,
         community_name => community.as_ref().map(|c| c.name.clone()),
         tool => input.tool,
@@ -649,6 +657,7 @@ pub async fn start_banner_draw(
         "mode": { "kind": "standard" },
     }))?;
     let rendered = template.render(context! {
+        presence => Presence::new(Activity::DrawingBanner),
         width => 200,
         height => 40,
         current_user => auth_session.user,

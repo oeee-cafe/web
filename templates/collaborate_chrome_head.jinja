@@ -5,6 +5,7 @@
    --oeee-chrome-top tells the app how far below the top of the window it
    starts (frontend/collaborate/app.css). #}
 {% include "theme_head.jinja" %}
+{% include "presence_meta.jinja" %}
 <link rel="stylesheet" href="{{ '/static/ds.css' | cachebuster | safe }}" />
 <style>
   :root { --oeee-chrome-top: 53px; }

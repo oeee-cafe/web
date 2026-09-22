@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     {% include "theme_head.jinja" %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% include "presence_meta.jinja" %}
     <title>
       {% if parent_post %}Re: {{ parent_post.title }}{% else %}{{ ftl_get_message("community-drawing-new") }}{% endif %}
       {% if community_name %} @ {{ community_name }}{% endif %}

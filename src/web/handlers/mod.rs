@@ -1561,6 +1561,55 @@ mod template_tests {
         }
     }
 
+    /// What the Steam app reads to tell friends what someone is doing: the
+    /// painters, the collaborative room's head and any page on the base
+    /// layout carry it when the handler passes one, and none of them when it
+    /// does not.
+    #[test]
+    fn pages_say_what_their_reader_is_doing_for_steam() {
+        let env = test_support::env();
+        let presence = json!({
+            "activity": "drawing",
+            "community": "오이카페 \"모에화\" <b>",
+            "group": null,
+        });
+        for template_name in [
+            "draw_post_cucumber.jinja",
+            "collaborate_chrome_head.jinja",
+            "post_replay_view_pch.jinja",
+        ] {
+            let render = |presence: serde_json::Value| {
+                env.get_template(template_name)
+                    .unwrap_or_else(|e| panic!("{template_name} loads: {e:#}"))
+                    .render(context! {
+                        presence,
+                        painter_config => "{}",
+                        parent_post => json!(null),
+                        post => replay_post(),
+                        post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                        community_id => json!(null),
+                        ..chrome()
+                    })
+                    .unwrap_or_else(|e| panic!("{template_name} renders: {e:#}"))
+            };
+            let with = render(presence.clone());
+            assert!(
+                with.contains(r#"<meta name="oeee-presence" content="drawing" data-community="오이카페 &quot;모에화&quot; &lt;b&gt;" />"#),
+                "{template_name} should carry the presence tag, escaped"
+            );
+            assert!(!render(json!(null)).contains("oeee-presence"), "{template_name}");
+        }
+
+        let room = env
+            .get_template("presence_meta.jinja")
+            .unwrap()
+            .render(context! {
+                presence => json!({"activity": "collaborating", "community": null, "group": "0123abcd"}),
+            })
+            .unwrap();
+        assert!(room.contains(r#"content="collaborating" data-group="0123abcd" />"#));
+    }
+
     #[test]
     fn drawing_pages_mount_the_offline_painter() {
         let env = test_support::env();
