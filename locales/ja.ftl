@@ -456,6 +456,7 @@ communities-tab-public = 公開
 communities-tab-official = 公式
 communities-tab-yours = 参加中
 nav-about = 概要
+nav-about-menu = OEEEカフェ？
 post-move-to = { $communityName }に移動
 post-move-choose = 移動先を選んでください
 sign-in-no-account = アカウントをお持ちでない方

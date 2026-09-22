@@ -96,23 +96,6 @@
         <a class="toolbar-signin" href="/login">{{ ftl_get_message("sign-in") }}</a>
         <a class="toolbar-draw" href="/signup">{{ ftl_get_message("sign-up") }}</a>
       {% endif %}
-      {# The theme and what the site is, for everyone: a square showing the
-         theme in use, opening onto the three-way switch and the About page.
-         Signed in it sits before your initial, so the account menu holds
-         only the account. #}
-      <details class="toolbar-menu toolbar-theme-menu">
-        <summary aria-label="{{ ftl_get_message("theme") }}" title="{{ ftl_get_message("theme") }}">
-          <span class="toolbar-avatar toolbar-avatar-guest" aria-hidden="true">
-            <svg class="toolbar-theme-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>
-            <svg class="toolbar-theme-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></svg>
-            <svg class="toolbar-theme-system" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
-          </span>
-        </summary>
-        <div class="toolbar-menu-items">
-          {{ theme_choices() }}
-          <a class="toolbar-menu-about" href="/about">{{ ftl_get_message("nav-about") }}</a>
-        </div>
-      </details>
       {% if current_user %}
         <details class="toolbar-menu">
           <summary aria-label="{{ current_user.display_name or current_user.login_name }}">
@@ -139,6 +122,27 @@
                 <span class="dangerous">({{ ftl_get_message("email-not-verified") }})</span>
               {% endif %}
             </a>
+            {# The menu's foot, the same signed in or out: the theme, then
+               a rule, then what the site is. #}
+            {{ theme_choices() }}
+            <a class="toolbar-menu-about" href="/about">{{ ftl_get_message("nav-about-menu") }}</a>
+          </div>
+        </details>
+      {% else %}
+        {# Where your initial would be, the theme in use, opening onto the
+           same foot as the account menu: the three-way switch, then what
+           the site is. #}
+        <details class="toolbar-menu toolbar-theme-menu">
+          <summary aria-label="{{ ftl_get_message("theme") }}" title="{{ ftl_get_message("theme") }}">
+            <span class="toolbar-avatar toolbar-avatar-guest" aria-hidden="true">
+              <svg class="toolbar-theme-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>
+              <svg class="toolbar-theme-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></svg>
+              <svg class="toolbar-theme-system" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
+            </span>
+          </summary>
+          <div class="toolbar-menu-items">
+            {{ theme_choices() }}
+            <a class="toolbar-menu-about" href="/about">{{ ftl_get_message("nav-about-menu") }}</a>
           </div>
         </details>
       {% endif %}
