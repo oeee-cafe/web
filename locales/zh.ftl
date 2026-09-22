@@ -461,3 +461,4 @@ sign-up-have-account = 已有账号？
 about-apps = 应用
 about-elsewhere = 其他平台
 about-documents = 文档
+post-no-reactions = 还没有回应。

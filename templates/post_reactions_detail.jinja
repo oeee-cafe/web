@@ -1,34 +1,40 @@
 {% extends "base.jinja" %}
 {% block title %}
-  {{ super() }} | Reactions | {{ post_title }}
+  {{ super() }} | {{ ftl_get_message("post-reactions") }} | {{ post_title }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <h1>Reactions</h1>
-    <p>
-      <a href="/@{{ login_name }}/{{ post_id }}">← Back to post: {{ post_title }}</a>
-    </p>
+  {# Who reacted to a drawing, grouped by what they reacted with: each emoji
+     a list of people, as the members page lists them. #}
+  <div class="settings-page reactions-page">
+    <div class="members-header">
+      <div>
+        <a class="profile-chip" href="/@{{ login_name }}/{{ post_id }}">← {{ post_title }}</a>
+        <h1 class="settings-title">{{ ftl_get_message("post-reactions") }}</h1>
+      </div>
+    </div>
     {% if grouped_reactions %}
       {% for group in grouped_reactions %}
-        <div class="reaction-group">
-          <h2>{{ group.emoji }} ({{ group.reactions | length }})</h2>
-          <ul class="reaction-list">
+        <section class="settings-group">
+          <div class="profile-section-label reaction-group-label"><span class="reaction-group-emoji">{{ group.emoji }}</span> {{ group.reactions|length }}</div>
+          <div class="member-list">
             {% for reaction in group.reactions %}
-              <li>
-                {% if reaction.is_local %}
-                  <a href="{{ reaction.actor_url }}">{{ reaction.actor_name }}</a>
-                {% else %}
-                  <a href="{{ reaction.actor_url }}" target="_blank" rel="noopener noreferrer">{{ reaction.actor_name }}</a>
-                {% endif %}
-                <span class="muted">{{ reaction.actor_handle }}</span>
-                <span class="muted">- {{ reaction.created_at }}</span>
-              </li>
+              <div class="member-row">
+                <span class="member-initial" aria-hidden="true">{{ reaction.actor_name[:1]|upper }}</span>
+                <span class="member-text">
+                  {% if reaction.is_local %}
+                    <a class="member-name" href="{{ reaction.actor_url }}">{{ reaction.actor_name }}</a>
+                  {% else %}
+                    <a class="member-name" href="{{ reaction.actor_url }}" target="_blank" rel="noopener noreferrer">{{ reaction.actor_name }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+                  {% endif %}
+                  <span class="member-meta">{{ reaction.actor_handle }} · {{ reaction.created_at|ago }}</span>
+                </span>
+              </div>
             {% endfor %}
-          </ul>
-        </div>
+          </div>
+        </section>
       {% endfor %}
     {% else %}
-      <p>No reactions yet.</p>
+      <div class="ds-card notifications-empty"><p>{{ ftl_get_message("post-no-reactions") }}</p></div>
     {% endif %}
   </div>
 {% endblock content %}

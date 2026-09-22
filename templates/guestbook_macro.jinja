@@ -1,48 +1,51 @@
+{# A guestbook entry as a row of a conversation: who wrote it and how long
+   ago, what they wrote, and the owner's reply quoted under it. The owner
+   answers through a Reply button that opens its field in place, rather than
+   a field standing open under every entry. Rendered by the page and alone by
+   the handlers (guestbook_entry.jinja), with `user` and `current_user`. #}
 {% macro guestbook_entry(entry) %}
   <div class="guestbook-entry">
-    <div>
-      <a href="/@{{ entry.author_login_name }}">{{ entry.author_display_name }}</a>
-      <span class="muted">@{{ entry.author_login_name }}</span>
+    <div class="guestbook-head">
+      <a class="member-name" href="/@{{ entry.author_login_name }}">{{ entry.author_display_name }}</a>
+      <span class="member-meta">@{{ entry.author_login_name }} · <span title="{{ entry.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ entry.created_at|ago }}</span></span>
     </div>
-    <span class="muted">{{ entry.created_at|dateformat(format="short", tz="Asia/Seoul") }}</span>
-    <div>
-      <pre>{{ entry.content }}</pre>
-    </div>
+    <div class="guestbook-content ds-selectable">{{ entry.content }}</div>
     {% if entry.reply %}
       {{ guestbook_entry_reply(entry) }}
-    {% else %}
-      {% if
-        current_user and current_user.id == entry.recipient_id %}
+    {% elif current_user and current_user.id == entry.recipient_id %}
+      <details class="guestbook-reply-form">
+        <summary class="ds-button ds-button-small">{{ ftl_get_message("guestbook-reply") }}</summary>
+        {# The reply takes this whole disclosure's place once it is sent. #}
         <form hx-post="/@{{ user.login_name }}/guestbook/{{ entry.id }}/reply"
+              hx-target="closest .guestbook-reply-form"
               hx-swap="outerHTML"
               hx-disable="find button">
-          <textarea name="content" title="{{ ftl_get_message("guestbook-reply") }}"></textarea>
-          <input type="submit" value="{{ ftl_get_message("guestbook-reply-write") }}" />
+          <textarea class="ds-textarea" name="content" rows="2" required
+                    aria-label="{{ ftl_get_message("guestbook-reply") }}"></textarea>
+          <div class="guestbook-form-actions">
+            <button type="submit" class="ds-button ds-button-primary ds-button-small">{{ ftl_get_message("guestbook-reply-write") }}</button>
+          </div>
         </form>
-      {% endif %}
+      </details>
     {% endif %}
-    {% if current_user and (current_user.id ==
-      entry.author_id and not entry.reply) or (current_user.id ==
-      entry.recipient_id) %}
-      <form hx-delete="/@{{ user.login_name }}/guestbook/{{ entry.id }}"
+    {% if current_user and ((current_user.id == entry.author_id and not entry.reply) or current_user.id == entry.recipient_id) %}
+      <form class="guestbook-delete"
+            hx-delete="/@{{ user.login_name }}/guestbook/{{ entry.id }}"
             hx-swap="outerHTML"
             hx-target="closest .guestbook-entry"
             hx-confirm="{{ ftl_get_message("guestbook-delete-confirm") }}"
             hx-disable="find button">
-        <input type="submit" value="{{ ftl_get_message("guestbook-delete") }}" />
+        <button type="submit" class="ds-button ds-button-small">{{ ftl_get_message("guestbook-delete") }}</button>
       </form>
     {% endif %}
   </div>
 {% endmacro %}
 {% macro guestbook_entry_reply(entry) %}
   <div class="guestbook-reply">
-    <div>
-      <a href="/@{{ entry.recipient_login_name }}">{{ entry.recipient_display_name }}</a>
-      <span class="muted">@{{ entry.recipient_login_name }}</span>
+    <div class="guestbook-head">
+      <a class="member-name" href="/@{{ entry.recipient_login_name }}">{{ entry.recipient_display_name }}</a>
+      <span class="member-meta">@{{ entry.recipient_login_name }} · <span title="{{ entry.replied_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ entry.replied_at|ago }}</span></span>
     </div>
-    <span class="muted">{{ entry.replied_at|dateformat(format="short", tz="Asia/Seoul") }}</span>
-    <div>
-      <pre>{{ entry.reply }}</pre>
-    </div>
+    <div class="guestbook-content ds-selectable">{{ entry.reply }}</div>
   </div>
 {% endmacro %}

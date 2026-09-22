@@ -1,22 +1,28 @@
 {% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("banner-management-title") }}
+{% endblock title %}
 {% block content %}
-    <div class="center">
-        <h2>{{ ftl_get_message("banner-management-title") }}</h2>
-        <p>{{ ftl_get_message("banner-management-description") }}</p>
-
-        {% if banners|length == 0 %}
-            <p>{{ ftl_get_message("banner-management-no-banners") }}</p>
-            <a href="/banners/draw">{{ ftl_get_message("banner-management-create-first") }}</a>
-        {% else %}
-            {% include "banner_grid.jinja" %}
-
-            <div style="margin-top: 2rem;">
-                <a href="/banners/draw">{{ ftl_get_message("banner-management-create-new") }}</a>
-            </div>
-        {% endif %}
-
-        <div style="margin-top: 2rem;">
-            <a href="/@{{ user.login_name }}/settings">{{ ftl_get_message("banner-management-back-to-settings") }}</a>
-        </div>
+  {# A person's banners as a gallery of them: each in its frame at a
+     banner's shape, the one in use marked, the others with Use and Delete.
+     Drawing a new one is the header's button. #}
+  <div class="settings-page banners-page">
+    <div class="members-header grid-header">
+      <div>
+        <a class="profile-chip" href="/@{{ user.login_name }}/settings">← {{ ftl_get_message("banner-management-back-to-settings") }}</a>
+        <h1 class="settings-title">{{ ftl_get_message("banner-management-title") }}</h1>
+      </div>
+      <a class="ds-button ds-button-primary" href="/banners/draw">{{ ftl_get_message("banner-management-create-new") }}</a>
     </div>
+    <p class="auth-lede">{{ ftl_get_message("banner-management-description") }}</p>
+
+    {% if banners|length == 0 %}
+      <div class="ds-card notifications-empty">
+        <p>{{ ftl_get_message("banner-management-no-banners") }}</p>
+        <p><a class="ds-button ds-button-primary" href="/banners/draw">{{ ftl_get_message("banner-management-create-first") }}</a></p>
+      </div>
+    {% else %}
+      {% include "banner_grid.jinja" %}
+    {% endif %}
+  </div>
 {% endblock content %}

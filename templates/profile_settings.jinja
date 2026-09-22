@@ -1,49 +1,89 @@
 {% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("profile-settings") }}
+{% endblock title %}
 {% block content %}
-    <div class="center">
-        <h2>{{ ftl_get_message("profile-settings") }}</h2>
-
-        <h3>{{ ftl_get_message("banner-management-title") }}</h3>
-        <p><a href="/@{{ user.login_name }}/settings/banners">{{ ftl_get_message("banner-management-link") }}</a></p>
-
-        <h3>{{ ftl_get_message("profile-link-management") }}</h3>
-        {% block links %}
-            {% if not user.email_verified_at %}
-                <p>{{ ftl_get_message("profile-link-requires-verified-email") }}</p>
-            {% else %}
-                <div id="links">
-                    <ul>
-                        {% for link in links %}
-                            <li>
-                                <a href="{{ link.url }}" target="_blank">{{ link.description }}</a> ({{ ftl_get_message("profile-link-order") }}: {{ link.index }})
-                                <button hx-post="/@{{ user.login_name }}/settings/links/{{ link.id }}/up"
-                                        hx-target="#links"
-                                       hx-disable="this">{{ ftl_get_message("profile-link-move-up") }}</button>
-                                <button hx-post="/@{{ user.login_name }}/settings/links/{{ link.id }}/down"
-                                        hx-target="#links"
-                                       hx-disable="this">{{ ftl_get_message("profile-link-move-down") }}</button>
-                                <button hx-delete="/@{{ user.login_name }}/settings/links/{{ link.id }}"
-                                        hx-target="#links"
-                                        hx-confirm="{{ ftl_get_message("profile-link-delete-confirm") }}"
-                                        hx-disable="this">
-                                    {{ ftl_get_message("profile-link-delete") }}
-                                </button>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                    <form hx-post="/@{{ user.login_name }}/settings/links" hx-target="#links"
-                          hx-disable="find button">
-                        <fieldset>
-                            <legend>{{ ftl_get_message("profile-link-add") }}</legend>
-                            <input type="url" name="url" placeholder="https://example.com">
-                            <input type="text"
-                                   name="description"
-                                   placeholder="{{ ftl_get_message("profile-link-description") }}">
-                            <input type="submit" value="{{ ftl_get_message("profile-link-add") }}">
-                        </fieldset>
-                    </form>
-                </div>
-            {% endif %}
-        {% endblock links %}
+  {# Profile settings as the account settings are laid out: the banner a row
+     that leads to its own page, and the links a grouped list -- each with
+     up, down and delete at its end -- with the field to add one under it. #}
+  <div class="settings-page">
+    <div class="members-header">
+      <div>
+        <a class="profile-chip" href="/@{{ user.login_name }}">← {{ user.display_name }}</a>
+        <h1 class="settings-title">{{ ftl_get_message("profile-settings") }}</h1>
+      </div>
     </div>
+
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("banner-management-title") }}</div>
+      <div class="ds-card settings-card settings-row">
+        <span class="settings-row-text">{{ ftl_get_message("banner-management-title") }}</span>
+        <a class="ds-button" href="/@{{ user.login_name }}/settings/banners">{{ ftl_get_message("banner-management-link") }}</a>
+      </div>
+    </section>
+
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("profile-link-management") }}</div>
+      {% block links %}
+        {% if not user.email_verified_at %}
+          <p class="settings-status is-warning">{{ ftl_get_message("profile-link-requires-verified-email") }}</p>
+        {% else %}
+          {# Each control swaps this whole block for the one the server sends
+             back, outerHTML: the block is #links itself, and swapping it
+             inside #links nested a copy of the list in the list every time. #}
+          <div id="links">
+            {% if links %}
+              <div class="member-list">
+                {% for link in links %}
+                  <div class="member-row">
+                    <span class="member-text">
+                      <a class="member-name" href="{{ link.url }}" target="_blank" rel="noopener">{{ link.description }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+                      <span class="member-meta">{{ link.url }}</span>
+                    </span>
+                    <span class="link-actions">
+                      <button class="ds-button ds-button-small"
+                              title="{{ ftl_get_message("profile-link-move-up") }}"
+                              aria-label="{{ ftl_get_message("profile-link-move-up") }}"
+                              hx-post="/@{{ user.login_name }}/settings/links/{{ link.id }}/up"
+                              hx-target="#links"
+                              hx-swap="outerHTML"
+                              hx-disable="this">↑</button>
+                      <button class="ds-button ds-button-small"
+                              title="{{ ftl_get_message("profile-link-move-down") }}"
+                              aria-label="{{ ftl_get_message("profile-link-move-down") }}"
+                              hx-post="/@{{ user.login_name }}/settings/links/{{ link.id }}/down"
+                              hx-target="#links"
+                              hx-swap="outerHTML"
+                              hx-disable="this">↓</button>
+                      <button class="ds-button ds-button-small"
+                              hx-delete="/@{{ user.login_name }}/settings/links/{{ link.id }}"
+                              hx-target="#links"
+                              hx-swap="outerHTML"
+                              hx-confirm="{{ ftl_get_message("profile-link-delete-confirm") }}"
+                              hx-disable="this">{{ ftl_get_message("profile-link-delete") }}</button>
+                    </span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <form class="ds-card settings-card link-add"
+                  hx-post="/@{{ user.login_name }}/settings/links"
+                  hx-target="#links"
+                  hx-swap="outerHTML"
+                  hx-disable="find button">
+              <div class="profile-section-label">{{ ftl_get_message("profile-link-add") }}</div>
+              <input class="ds-input" type="url" name="url" placeholder="https://example.com" aria-label="URL" required />
+              <input class="ds-input" type="text" name="description"
+                     placeholder="{{ ftl_get_message("profile-link-description") }}"
+                     aria-label="{{ ftl_get_message("profile-link-description") }}" />
+              <div class="settings-foot">
+                <span></span>
+                <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("profile-link-add") }}</button>
+              </div>
+            </form>
+          </div>
+        {% endif %}
+      {% endblock links %}
+    </section>
+  </div>
 {% endblock content %}
