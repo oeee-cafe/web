@@ -34,12 +34,21 @@
         event.viewTransition.skipTransition();
       }
     });
-    // Controls are felt as well as seen, as the app's own are (Haptics in
-    // DrawingMenu.swift, oeee-cafe/ios): "light", "medium", "selection",
-    // "success", "warning", "error".
+  } else if (/OeeeCafeAndroid/.test(navigator.userAgent)) {
+    document.documentElement.setAttribute("data-app", "android");
+  }
+  if (document.documentElement.hasAttribute("data-app")) {
+    // Controls are felt as well as seen, as the apps' own are: "light",
+    // "medium", "selection", "success", "warning", "error". iOS hears them
+    // as a message handler (Haptics in DrawingMenu.swift, oeee-cafe-ios);
+    // Android as a web message listener of the same name, which is how its
+    // app already takes oeeeLogout and oeeeEdgeColors (WebTab.kt,
+    // oeee-cafe-android). An app that has neither feels nothing.
     function feel(name) {
-      var app = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.oeeeHaptic;
-      if (app && name) app.postMessage(name);
+      if (!name) return;
+      var ios = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.oeeeHaptic;
+      var app = ios || window.oeeeHaptic;
+      if (app && app.postMessage) app.postMessage(name);
     }
     document.addEventListener("click", function (event) {
       var target = event.target;
@@ -86,8 +95,6 @@
     document.addEventListener("htmx:error", function (event) {
       if (pressed(event.detail && event.detail.ctx)) feel("error");
     });
-  } else if (/OeeeCafeAndroid/.test(navigator.userAgent)) {
-    document.documentElement.setAttribute("data-app", "android");
   }
   try {
     var theme = localStorage.getItem("neo-cucumber-theme");
