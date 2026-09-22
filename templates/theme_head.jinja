@@ -7,6 +7,12 @@
    paints first and then turns dark flashes. Boosted navigation keeps the
    root element, so the mark survives it. #}
 <script>
+  // The iOS app's web view names itself in the user agent (WebTab.swift).
+  // Marked here, before paint, so the toolbar's search button -- which the
+  // app's native search tab stands in for -- never flashes up and away.
+  if (/OeeeCafeiOS/.test(navigator.userAgent)) {
+    document.documentElement.setAttribute("data-app", "ios");
+  }
   try {
     var theme = localStorage.getItem("neo-cucumber-theme");
     if (theme === "light" || theme === "dark") {
