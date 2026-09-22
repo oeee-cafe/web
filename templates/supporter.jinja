@@ -1,0 +1,148 @@
+{% extends "base.jinja" %}
+{% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("supporter-pack") }}
+{% endblock title %}
+{% block content %}
+  {# The Supporter Pack, laid out as /about lays the site out: what it is
+     first, then this year's pack and the one button that buys it, then the
+     years already bought.
+
+     Only an app can take the money, and only the app this page is being
+     read in front of: the buttons are marked with the store they belong to
+     and hidden by `html[data-store]` in style.css, so a browser sees the
+     page and no button rather than a button that would do nothing. #}
+  <div class="profile about-page">
+    <section class="profile-card ds-card about-card">
+      <div class="profile-identity">
+        <h1 class="profile-name">{{ ftl_get_message("supporter-pack") }}</h1>
+        <p class="about-lede">{{ ftl_get_message("supporter-pack-lede") }}</p>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="profile-section-label">{{ ftl_format_pattern("supporter-pack-year", {"year": this_year}) }}</div>
+      <div class="ds-card settings-card supporter-pack-card">
+        {% if supports_this_year %}
+          <p class="ds-help supporter-thanks">
+            {{ supporter_mark(worn_mark) }}{{ ftl_format_pattern("supporter-pack-have", {"year": this_year}) }}
+          </p>
+        {% else %}
+          <p class="ds-help">{{ ftl_get_message("supporter-pack-what") }}</p>
+        {% endif %}
+
+        {% if not current_user %}
+          <div class="supporter-actions">
+            <a class="ds-button ds-button-primary" href="/login?next=/supporter">{{ ftl_get_message("sign-in") }}</a>
+          </div>
+          <p class="ds-help">{{ ftl_get_message("supporter-pack-sign-in") }}</p>
+          <p class="ds-help supporter-elsewhere">{{ ftl_get_message("supporter-pack-elsewhere") }}</p>
+        {% else %}
+          <div class="supporter-actions">
+            {% if apple_pack and "apple" not in (bought_in or []) %}
+              <button type="button"
+                      class="ds-button ds-button-primary supporter-buy"
+                      data-store="apple"
+                      data-product="{{ apple_pack }}"
+                      data-year="{{ this_year }}"
+                      data-haptic="medium">{{ ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ apple_pack }}"></span></button>
+            {% endif %}
+            {% if steam_pack and "steam" not in (bought_in or []) %}
+              <button type="button"
+                      class="ds-button ds-button-primary supporter-buy"
+                      data-store="steam"
+                      data-product="{{ steam_pack }}"
+                      data-year="{{ this_year }}"
+                      data-haptic="medium">{{ ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ steam_pack }}"></span></button>
+            {% endif %}
+            {# Restoring is the App Store's word for it: the same purchase
+               handed over again, which gives a pack back to whoever is
+               signed in without ever making a second one. Steam has no such
+               thing -- it says what an account owns every time it is
+               asked. #}
+            <button type="button" class="ds-button supporter-restore">{{ ftl_get_message("supporter-pack-restore") }}</button>
+          </div>
+          {% if not apple_pack and not steam_pack %}
+            <p class="ds-help">{{ ftl_format_pattern("supporter-pack-none", {"year": this_year}) }}</p>
+          {% endif %}
+          <p class="ds-help supporter-elsewhere">{{ ftl_get_message("supporter-pack-elsewhere") }}</p>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if supporter_standings|length > 0 %}
+      <section class="profile-section">
+        <div class="profile-section-label">{{ ftl_get_message("supporter-pack-years") }}</div>
+        <div class="profile-chips">
+          {% for standing in supporter_standings %}
+            <span class="profile-chip supporter-chip"
+                  title="{{ supporter_mark_name(standing.provider) }}">{{ supporter_mark(standing.provider) }}{{ standing.year }}</span>
+          {% endfor %}
+        </div>
+        <p class="ds-help">{{ ftl_get_message("supporter-pack-years-help") }}</p>
+      </section>
+    {% endif %}
+
+    <section class="profile-section">
+      <div class="about-buttons">
+        <a class="ds-button" href="/about#supporters">{{ ftl_get_message("account-supporter-see-credits") }}</a>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Buying happens in the app: the page asks, the app sells, and the app
+    // hands what it got back to the site (/auth/apple/purchase,
+    // /auth/steam/refresh) before reloading this page. Nothing here records
+    // anything -- a page cannot be trusted about a purchase, and is not.
+    //
+    // The price is the store's to say, in the reader's own currency and
+    // formatted its way, so the button leaves room for it and the app fills
+    // it in (app_bridge.jinja). A button with no price is a button whose
+    // app has not answered; it still buys the pack, and the sheet the store
+    // opens says the price either way.
+    (function () {
+      function ask(type, data) {
+        var app = window.oeeeApp;
+        if (!app || !app.post) return false;
+        return app.post(type, data, true);
+      }
+
+      // Defined before the asking, so an app that answers at once is heard.
+      // Called again whenever the app knows better -- a currency that
+      // arrived late, a price that changed while the page was open.
+      window.oeeeStorePrices = function (prices) {
+        if (!prices) return;
+        var spans = document.querySelectorAll(".supporter-price");
+        for (var i = 0; i < spans.length; i++) {
+          var price = prices[spans[i].getAttribute("data-product")];
+          spans[i].textContent = price == null ? "" : String(price);
+        }
+      };
+
+      var buttons = document.querySelectorAll(".supporter-buy");
+      if (buttons.length) {
+        var wanted = {};
+        for (var i = 0; i < buttons.length; i++) {
+          var store = buttons[i].getAttribute("data-store");
+          (wanted[store] = wanted[store] || []).push(buttons[i].getAttribute("data-product"));
+        }
+        for (var which in wanted) ask("prices", { store: which, products: wanted[which] });
+      }
+
+      document.addEventListener("click", function (event) {
+        var buy = event.target.closest && event.target.closest(".supporter-buy");
+        if (buy) {
+          ask("purchase", {
+            store: buy.getAttribute("data-store"),
+            product: buy.getAttribute("data-product"),
+            year: Number(buy.getAttribute("data-year"))
+          });
+          return;
+        }
+        var restore = event.target.closest && event.target.closest(".supporter-restore");
+        if (restore) ask("restore", {});
+      });
+    })();
+  </script>
+{% endblock content %}

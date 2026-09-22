@@ -51,9 +51,45 @@
    painter  {state: "ready"}
             The painter can be driven: window.oeeePainter.command(name) and
             .preferPen() (frontend/painter/iosApp.ts).
+   prices   {store, products}
+            What these cost, asked as /supporter opens: `products` are the
+            App Store product ids or Steam app ids on the page. The app
+            answers by calling window.oeeeStorePrices({product: price}) with
+            the store's own formatted strings -- StoreKit's `displayPrice`,
+            Steam's `price_overview.final_formatted` -- in the reader's
+            currency, which only the store knows. It may call it again when
+            it knows better, and a page whose app never answers shows the
+            button without a price.
+   purchase {store, product, year}
+            Sell this year's Supporter Pack, pressed on /supporter:
+            `store` is "apple" or "steam", `product` the App Store product
+            id or the Steam app id of that year's pack. The app sells it and
+            posts what it got back to the site --
+            /auth/apple/purchase with the StoreKit transaction id, or
+            /auth/steam/refresh with a Web API ticket -- and reloads the
+            page when the site answers. Nothing the page says records a
+            purchase; the site asks the store itself (src/app_store.rs,
+            src/steam.rs).
+   restore  {}
+            The same, for a purchase already made: StoreKit hands the
+            transaction over again and the app posts it to the same place.
+            It gives a pack back to whoever is signed in and never makes a
+            second one. Steam needs none of this -- it says what an account
+            owns every time it is asked.
+
+   A build that can sell says so by marking the root element
+   `data-store="apple"` or `data-store="steam"` before the page paints --
+   the same way the Steam app already marks it `data-steam-app` for the
+   Steam sign-in button, and early enough that the heart in the toolbar and
+   the buttons on /supporter are never drawn in a build that would do
+   nothing with them. It is the build that says so, not the platform: an
+   older iOS app has no StoreKit in it, and the Microsoft Store build of the
+   desktop app is not the Steam one. A build that says nothing is offered
+   nothing to press.
 
    The other way, the apps call the page: window.oeeeCommand(name)
-   (toolbar.jinja), window.oeeePainter, and --oeee-text-scale on the root.
+   (toolbar.jinja), window.oeeeStorePrices(prices) (supporter.jinja),
+   window.oeeePainter, and --oeee-text-scale on the root.
 
    Builds of the apps from before this contract listen on channels of their
    own (oeeeHaptic, oeeePainter), and the site keeps talking to those when

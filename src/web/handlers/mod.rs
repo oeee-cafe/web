@@ -1443,6 +1443,118 @@ mod template_tests {
             .expect("account renders")
     }
 
+    /// The Supporter Pack's page: what there is to press depends on who is
+    /// reading and on what this deployment sells. Which store the reader is
+    /// in front of is the stylesheet's business, so every button that could
+    /// be pressed is in the markup, each marked with the store it belongs
+    /// to.
+    #[test]
+    fn the_supporter_page_offers_what_there_is_to_buy() {
+        let env = test_support::env();
+        let render = |current_user: serde_json::Value,
+                      apple_pack: serde_json::Value,
+                      steam_pack: serde_json::Value,
+                      bought_in: serde_json::Value,
+                      supporter_standings: serde_json::Value| {
+            env.get_template("supporter.jinja")
+                .expect("supporter loads")
+                .render(context! {
+                    this_year => 2026,
+                    apple_pack,
+                    steam_pack,
+                    supports_this_year => !bought_in.as_array().is_some_and(|in_| in_.is_empty()),
+                    bought_in,
+                    supporter_standings,
+                    worn_mark => json!("steam"),
+                    ..context! { current_user, ..chrome() }
+                })
+                .expect("supporter renders")
+        };
+        let signed_in = json!({"login_name": "oeee", "display_name": "오이"});
+        let none = json!(null);
+
+        // Signed out: somewhere to sign in, and nothing to buy with.
+        let out = render(
+            none.clone(),
+            json!("cafe.oeee.supporter.2026"),
+            none.clone(),
+            json!([]),
+            json!([]),
+        );
+        assert!(out.contains(r#"href="/login?next=/supporter""#));
+        // The buttons themselves, not the script that listens for them.
+        assert!(!out.contains(r#"data-product="#));
+
+        // Both stores selling: a button apiece, each naming its own.
+        let both = render(
+            signed_in.clone(),
+            json!("cafe.oeee.supporter.2026"),
+            json!(481),
+            json!([]),
+            json!([]),
+        );
+        let squashed = both.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(squashed.contains(r#"data-store="apple" data-product="cafe.oeee.supporter.2026""#));
+        assert!(squashed.contains(r#"data-store="steam" data-product="481""#));
+        assert!(both.contains("supporter-restore"));
+        assert!(both.contains("supporter-pack-buy(year=2026)"));
+        // Room for the price the app will fill in, keyed by the product it
+        // belongs to, and empty until then.
+        assert!(squashed
+            .contains(r#"<span class="supporter-price" data-product="cafe.oeee.supporter.2026"></span>"#));
+        assert!(squashed.contains(r#"<span class="supporter-price" data-product="481"></span>"#));
+        assert!(both.contains("window.oeeeStorePrices"));
+
+        // Nothing for this year yet: the page says so instead.
+        let nothing = render(
+            signed_in.clone(),
+            none.clone(),
+            none.clone(),
+            json!([]),
+            json!([]),
+        );
+        assert!(!nothing.contains(r#"data-product="#));
+        assert!(nothing.contains("supporter-pack-none(year=2026)"));
+
+        // Already bought, and the years before it.
+        let owned = render(
+            signed_in,
+            json!("cafe.oeee.supporter.2026"),
+            json!(481),
+            json!(["apple"]),
+            json!([
+                {"provider": "steam", "year": 2025, "since": "2025-03-02T00:00:00Z"},
+                {"provider": "apple", "year": 2026, "since": "2026-01-08T00:00:00Z"},
+            ]),
+        );
+        assert!(owned.contains("supporter-pack-have(year=2026)"));
+        // Bought in the App Store already: that button goes, and Steam's --
+        // a second pack for the same year, supporting twice -- stays.
+        assert!(!owned.contains(r#"data-store="apple""#));
+        assert!(owned.contains(r#"data-store="steam""#));
+        assert_eq!(owned.matches("supporter-chip").count(), 2, "one per year");
+        assert!(owned.contains("🎮</span>2025"));
+        assert!(owned.contains("🍎</span>2026"));
+    }
+
+    /// The heart in the toolbar is there when this deployment sells a pack
+    /// at all; which store the reader is in front of hides or shows it
+    /// before paint, and is not the template's business.
+    #[test]
+    fn the_toolbar_has_a_heart_only_where_a_pack_is_sold() {
+        let env = test_support::env();
+        let render = |on_sale: serde_json::Value| {
+            env.get_template("toolbar.jinja")
+                .expect("toolbar loads")
+                .render(context! { supporter_packs_on_sale => on_sale, ..chrome() })
+                .expect("toolbar renders")
+        };
+        let selling = render(json!(true));
+        assert!(selling.contains(r#"class="toolbar-button toolbar-supporter" href="/supporter""#));
+        assert!(!render(json!(false)).contains("toolbar-supporter"));
+        assert!(!render(json!(null)).contains("toolbar-supporter"));
+    }
+
     /// Which platform's mark to wear is only a question for someone who
     /// supports on more than one, and the answer they gave is the one
     /// selected.

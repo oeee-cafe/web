@@ -222,6 +222,20 @@ fn main() {
             // every page. Handlers that pass their own `base_url` still win,
             // since context takes precedence over globals.
             env.add_global("base_url", cfg.base_url.trim_end_matches('/').to_string());
+            // Whether any store here sells a Supporter Pack, which is what
+            // decides if the toolbar has a heart in it at all. Which store
+            // the reader is in front of is the page's own business
+            // (theme_head.jinja).
+            let packs_on_sale = cfg.steam.as_ref().is_some_and(|steam| {
+                steam
+                    .supporter_apps
+                    .iter()
+                    .any(|pack| pack.app_id != steam.app_id)
+            }) || cfg
+                .app_store
+                .as_ref()
+                .is_some_and(|store| !store.supporter_products.is_empty());
+            env.add_global("supporter_packs_on_sale", packs_on_sale);
 
             env.set_loader(path_loader(&template_path));
 
