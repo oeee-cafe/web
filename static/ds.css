@@ -1092,13 +1092,136 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
 }
 
-/* Checkboxes, radios and sliders stay the system's own, tinted with the
-   cucumber where the engine can. */
+/* ---------------------------------------------------------------------------
+   Checkboxes and radios
+
+   Drawn by the system rather than the engine, so an empty box is a field
+   like any other -- white, framed -- and a chosen one is the cucumber with
+   dark ink on it, as the primary button is. Every checkbox and radio on a
+   `.ds-page` page takes this with no class; `.ds-check` gives it to one
+   elsewhere. The margin is left to the engine, as it was, so a label that
+   leaned on it keeps its spacing.
+
+   The marks are pictures, not generated content: Gecko before 80 draws no
+   ::before on an input. They are drawn in --ds-accent-ink, which is the
+   same in both themes, since a picture cannot read a variable.
+   --------------------------------------------------------------------------- */
 .ds-page input[type="checkbox"],
 .ds-page input[type="radio"],
-.ds-page input[type="range"],
 .ds-check {
-  accent-color: #6fa22b;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  display: inline-block;
+  -webkit-box-flex: 0;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  border: 1px solid var(--ds-frame);
+  border-radius: 4px;
+  background-color: var(--ds-field);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 12px 12px;
+  vertical-align: -3px;
+  cursor: default;
+}
+
+.ds-page input[type="radio"],
+.ds-check[type="radio"] {
+  border-radius: 50%;
+}
+
+.ds-page input[type="checkbox"]:hover,
+.ds-page input[type="radio"]:hover,
+.ds-check:hover {
+  border-color: var(--ds-ink);
+}
+
+.ds-page input[type="checkbox"]:checked,
+.ds-page input[type="checkbox"]:indeterminate,
+.ds-page input[type="radio"]:checked,
+.ds-check:checked,
+.ds-check:indeterminate {
+  border-color: var(--ds-accent-line);
+  background-color: var(--ds-accent);
+}
+
+.ds-page input[type="checkbox"]:checked:hover,
+.ds-page input[type="radio"]:checked:hover,
+.ds-check:checked:hover {
+  background-color: var(--ds-accent-hover);
+}
+
+.ds-page input[type="checkbox"]:checked,
+.ds-check[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' fill='none' stroke='%231c2811' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.ds-page input[type="checkbox"]:indeterminate,
+.ds-check[type="checkbox"]:indeterminate {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6h6' fill='none' stroke='%231c2811' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.ds-page input[type="radio"]:checked,
+.ds-check[type="radio"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='2.5' fill='%231c2811'/%3E%3C/svg%3E");
+}
+
+.ds-page input[type="checkbox"]:disabled,
+.ds-page input[type="radio"]:disabled,
+.ds-check:disabled {
+  opacity: 0.45;
+}
+
+.ds-page input[type="checkbox"]:disabled:hover,
+.ds-page input[type="radio"]:disabled:hover,
+.ds-check:disabled:hover {
+  border-color: var(--ds-frame);
+}
+
+.ds-page input[type="checkbox"]:disabled:checked:hover,
+.ds-page input[type="radio"]:disabled:checked:hover,
+.ds-check:disabled:checked:hover {
+  border-color: var(--ds-accent-line);
+  background-color: var(--ds-accent);
+}
+
+.ds-check:focus {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 1px;
+}
+
+/* High contrast replaces every colour here with the system's, which would
+   leave a mark drawn in fixed ink on whatever ground it chose. The
+   engine's own control is drawn in its colours, so it comes back. */
+@media (forced-colors: active) {
+  .ds-page input[type="checkbox"],
+  .ds-page input[type="radio"],
+  .ds-check {
+    -webkit-appearance: auto;
+    -moz-appearance: auto;
+    appearance: auto;
+  }
+}
+
+/* What the engine still draws itself -- a select's open list, a date
+   picker, a scrollbar outside the Windows app -- in the page's theme. */
+.ds-page {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ds-page {
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] .ds-page {
+  color-scheme: dark;
 }
 
 /* One focus ring for everything you can type into or press. */
@@ -1301,10 +1424,15 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
 
    A thin track, filled in the cucumber's line colour up to a framed white
    knob. Engines draw a range from their own parts, so each is named for
-   each: WebKit fills the track from `--ds-range-fill`, which the page sets;
-   Gecko has a progress part of its own.
+   each: WebKit fills the track from `--ds-range-fill`, which a page that
+   keeps it in step sets, and is a plain line where none does; Gecko has a
+   progress part of its own. A range on a `.ds-page` page takes this with
+   no class, and so does the replay viewer's seek bar, which the post page
+   sizes to its stage.
    --------------------------------------------------------------------------- */
-.ds-range {
+.ds-range,
+.ds-page input[type="range"]:not([class]),
+.post-stage-replay .neo-cucumber-replay-seek {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -1316,36 +1444,48 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   cursor: default;
 }
 
-.ds-range:focus {
+.ds-range:focus,
+.ds-page input[type="range"]:not([class]):focus,
+.post-stage-replay .neo-cucumber-replay-seek:focus {
   outline: none;
 }
 
-.ds-range:focus-visible {
+.ds-range:focus-visible,
+.ds-page input[type="range"]:not([class]):focus-visible,
+.post-stage-replay .neo-cucumber-replay-seek:focus-visible {
   outline: 2px solid var(--ds-focus);
   outline-offset: 3px;
   border-radius: 4px;
 }
 
-.ds-range::-webkit-slider-runnable-track {
+.ds-range::-webkit-slider-runnable-track,
+.ds-page input[type="range"]:not([class])::-webkit-slider-runnable-track,
+.post-stage-replay .neo-cucumber-replay-seek::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: linear-gradient(to right, var(--ds-accent-line) 0, var(--ds-accent-line) var(--ds-range-fill, 30%), var(--ds-line-strong) var(--ds-range-fill, 30%));
+  background: linear-gradient(to right, var(--ds-accent-line) 0, var(--ds-accent-line) var(--ds-range-fill, 0%), var(--ds-line-strong) var(--ds-range-fill, 0%));
 }
 
-.ds-range::-moz-range-track {
+.ds-range::-moz-range-track,
+.ds-page input[type="range"]:not([class])::-moz-range-track,
+.post-stage-replay .neo-cucumber-replay-seek::-moz-range-track {
   height: 4px;
   border: 0;
   border-radius: 2px;
   background: var(--ds-line-strong);
 }
 
-.ds-range::-moz-range-progress {
+.ds-range::-moz-range-progress,
+.ds-page input[type="range"]:not([class])::-moz-range-progress,
+.post-stage-replay .neo-cucumber-replay-seek::-moz-range-progress {
   height: 4px;
   border-radius: 2px;
   background: var(--ds-accent-line);
 }
 
-.ds-range::-webkit-slider-thumb {
+.ds-range::-webkit-slider-thumb,
+.ds-page input[type="range"]:not([class])::-webkit-slider-thumb,
+.post-stage-replay .neo-cucumber-replay-seek::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 16px;
   height: 16px;
@@ -1355,7 +1495,9 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
 }
 
-.ds-range::-moz-range-thumb {
+.ds-range::-moz-range-thumb,
+.ds-page input[type="range"]:not([class])::-moz-range-thumb,
+.post-stage-replay .neo-cucumber-replay-seek::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border: 0;
@@ -1364,7 +1506,9 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
 }
 
-.ds-range::-moz-focus-outer {
+.ds-range::-moz-focus-outer,
+.ds-page input[type="range"]:not([class])::-moz-focus-outer,
+.post-stage-replay .neo-cucumber-replay-seek::-moz-focus-outer {
   border: 0;
 }
 
