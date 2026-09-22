@@ -1577,7 +1577,11 @@ mod template_tests {
                     }),
                     banner => json!(null),
                     links => Vec::<serde_json::Value>::new(),
-                    followings => Vec::<serde_json::Value>::new(),
+                    followings => json!([{
+                        "login_name": "a", "display_name": "에이",
+                        "banner_image_filename": "abcdef.png",
+                        "banner_image_width": 200, "banner_image_height": 40,
+                    }]),
                     achievements,
                     public_community_posts => Vec::<serde_json::Value>::new(),
                     private_community_posts => Vec::<serde_json::Value>::new(),
@@ -1596,6 +1600,10 @@ mod template_tests {
         assert!(with.contains("achievement-steam-supporter"));
         assert!(with.contains(r#"datetime="2026-09-22T00:00:00Z""#));
         assert!(!render(json!([])).contains("profile-achievements"));
+        // Under the banners of those they follow, over their drawings.
+        let at = |needle: &str| with.find(needle).unwrap_or_else(|| panic!("no {needle}"));
+        assert!(at("profile-ally-banners") < at("profile-achievements"));
+        assert!(at("profile-achievements") < at("data-profile-panel=\"public\""));
     }
 
     /// Following: those with a banner framed as /about frames them, the rest

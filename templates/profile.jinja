@@ -71,24 +71,6 @@
       </div>
     </section>
 
-    {% if achievements %}
-      {# What they have done here: a first drawing, a first relay, a first
-         collaboration, buying the Steam app. The same achievements as on
-         Steam, earned on the site whatever they drew in. #}
-      <section class="profile-section">
-        <div class="profile-section-label">{{ ftl_get_message("profile-achievements") }}</div>
-        <ul class="profile-achievements">
-          {% for earned in achievements %}
-            <li class="profile-achievement">
-              <span class="profile-achievement-name">{{ ftl_get_message("achievement-" ~ earned.key) }}</span>
-              <span class="profile-achievement-description">{{ ftl_get_message("achievement-" ~ earned.key ~ "-description") }}</span>
-              <time class="profile-achievement-date" datetime="{{ earned.earned_at }}">{{ earned.earned_at|dateformat(format="short", tz="Asia/Seoul") }}</time>
-            </li>
-          {% endfor %}
-        </ul>
-      </section>
-    {% endif %}
-
     {% if followings|length > 0 %}
       <section class="profile-section">
         <div class="profile-section-label">{{ ftl_get_message("profile-following") }}</div>
@@ -119,6 +101,24 @@
             {% endfor %}
           </div>
         {% endif %}
+      </section>
+    {% endif %}
+
+    {% if achievements %}
+      {# What they have done here: a first drawing, a first relay, a first
+         collaboration, buying the Steam app. The same achievements as on
+         Steam, earned on the site whatever they drew in. #}
+      <section class="profile-section">
+        <div class="profile-section-label">{{ ftl_get_message("profile-achievements") }}</div>
+        <ul class="profile-achievements">
+          {% for earned in achievements %}
+            <li class="profile-achievement">
+              <span class="profile-achievement-name">{{ ftl_get_message("achievement-" ~ earned.key) }}</span>
+              <span class="profile-achievement-description">{{ ftl_get_message("achievement-" ~ earned.key ~ "-description") }}</span>
+              <time class="profile-achievement-date" datetime="{{ earned.earned_at }}">{{ earned.earned_at|dateformat(format="short", tz="Asia/Seoul") }}</time>
+            </li>
+          {% endfor %}
+        </ul>
       </section>
     {% endif %}
 
