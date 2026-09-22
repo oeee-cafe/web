@@ -785,28 +785,26 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   vertical-align: top;
 }
 
-/* Square, and the buttons' 30px tall: 16px of icon, 2px of margin, 4px of
-   padding and the border, the same on every side -- compact included,
-   where the worded buttons only lose width they have to spare. */
-.toolbar-end .toolbar-search,
-.nav-bar.is-compact .toolbar-end > a.toolbar-search {
+/* Search and notifications: square, and the buttons' 30px tall -- 16px of
+   icon, 2px of margin, 4px of padding and the border, the same on every
+   side at every width, where the worded buttons only lose width they have
+   to spare.
+
+   Each layout's step trims the worded buttons' side padding with a rule
+   of its own (.is-stacked, .is-compact, the narrowest phones), and each of
+   those outranked a plain `.toolbar-end .toolbar-search`: search came out
+   42px wide on a phone, the bell 38px once compact. So this is written to
+   outrank all of them, rather than listing every layout and missing the
+   next one added. Unread fills the bell in the badge's orange: the shape
+   changes as well as the colour, and the width does not
+   (nav_notifications.jinja). */
+.nav-bar .toolbar-end a.toolbar-button.toolbar-search,
+.nav-bar .toolbar-end a.toolbar-button.toolbar-bell {
   padding: 4px;
   line-height: 0;
 }
 
-.toolbar-end .toolbar-search svg {
-  margin: 2px;
-}
-
-/* Notifications, the same square as search. Unread fills the bell in the
-   badge's orange: the shape changes as well as the colour, and the button's
-   width does not (nav_notifications.jinja). */
-.toolbar-end .toolbar-bell,
-.nav-bar.is-compact .toolbar-end .toolbar-bell {
-  padding: 4px;
-  line-height: 0;
-}
-
+.toolbar-end .toolbar-search svg,
 .toolbar-end .toolbar-bell svg {
   margin: 2px;
 }
