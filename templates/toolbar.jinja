@@ -59,6 +59,9 @@
           <a href="/home">{{ ftl_get_message("timeline") }}</a>
         {% endif %}
         <a href="/communities">{{ ftl_get_message("community") }}</a>
+        {% if current_user %}
+          <a href="/notifications">{% include "nav_notifications.jinja" %}</a>
+        {% endif %}
       </div>
       {# Drawing together, live: its own button beside the sections rather
          than one of them, with a pulsing light in the mark's green, since what is behind it
@@ -78,7 +81,6 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
       </a>
       {% if current_user %}
-        {% include "nav_notifications.jinja" %}
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
            again. #}
@@ -91,7 +93,7 @@
           </button>
         </form>
       {% else %}
-        {# The same places as signed in: where the bell is, signing in;
+        {# The same places as signed in: beside search, signing in;
            where Draw is, the one filled button. #}
         <a class="toolbar-signin" href="/login">{{ ftl_get_message("sign-in") }}</a>
         <a class="toolbar-draw" href="/signup">{{ ftl_get_message("sign-up") }}</a>
