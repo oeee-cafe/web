@@ -1,5 +1,6 @@
 {% from "follow_macro.jinja" import follow_button, unfollow_button %} {% extends "base.jinja" %}
 {% from "user_pill_macro.jinja" import user_pill %}
+{% from "achievement_icon_macro.jinja" import achievement_icon %}
 {% from "per_row_macro.jinja" import per_row %}
 {% block title %}
   {{ super() }} | {{ user.display_name }} (@{{ user.login_name }})
@@ -113,9 +114,12 @@
         <ul class="profile-achievements">
           {% for earned in achievements %}
             <li class="profile-achievement">
-              <span class="profile-achievement-name">{{ ftl_get_message("achievement-" ~ earned.key) }}</span>
-              <span class="profile-achievement-description">{{ ftl_get_message("achievement-" ~ earned.key ~ "-description") }}</span>
-              <time class="profile-achievement-date" datetime="{{ earned.earned_at }}">{{ earned.earned_at|dateformat(format="short", tz="Asia/Seoul") }}</time>
+              {{ achievement_icon(earned.key) }}
+              <span class="profile-achievement-text">
+                <span class="profile-achievement-name">{{ ftl_get_message("achievement-" ~ earned.key) }}</span>
+                <span class="profile-achievement-description">{{ ftl_get_message("achievement-" ~ earned.key ~ "-description") }}</span>
+                <time class="profile-achievement-date" datetime="{{ earned.earned_at }}">{{ earned.earned_at|dateformat(format="short", tz="Asia/Seoul") }}</time>
+              </span>
             </li>
           {% endfor %}
         </ul>

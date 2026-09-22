@@ -310,6 +310,19 @@ mod tests {
         }
     }
 
+    #[test]
+    fn every_achievement_has_its_own_icon() {
+        let macro_file = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/templates/achievement_icon_macro.jinja"
+        ))
+        .unwrap();
+        for achievement in ALL {
+            let branch = format!("key == \"{}\"", locale_key(achievement));
+            assert!(macro_file.contains(&branch), "no icon for {achievement}");
+        }
+    }
+
     #[tokio::test]
     async fn the_list_is_what_the_database_allows() {
         let Some(mut tx) = tx().await else { return };
