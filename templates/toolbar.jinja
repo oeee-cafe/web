@@ -65,12 +65,12 @@
       <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
     </div>
     <div class="toolbar-end">
-      {# Search, signed in or out. The one icon among worded buttons: a
-         magnifier needs no decoding, and a word here is the width that
+      {# Search, signed in or out: a button like its neighbours, holding a
+         magnifier rather than a word, since a word here is the width that
          pushes a phone's first row into its compact steps. Hidden in the
          iOS app, whose own search tab is the native field (theme_head.jinja
          marks the root). #}
-      <a class="toolbar-icon toolbar-search" href="/search"
+      <a class="toolbar-button toolbar-search" href="/search"
          aria-label="{{ ftl_get_message("search") }}" title="{{ ftl_get_message("search") }} (/)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
       </a>
