@@ -1146,6 +1146,19 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
 }
 
+/* On a touch screen iOS zooms the page into any field it focuses whose text
+   is under 16px, and leaves it zoomed after the keyboard goes -- in Safari
+   and in the iOS app's web views alike. So there every field that takes
+   typing, or opens a list, is written at 16px. Important, because pages set
+   their own fields' sizes (style.css) and this has to win over all of them. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Checkboxes and radios
 
