@@ -756,23 +756,21 @@ html[data-app] .toolbar-search {
   margin-left: 0;
 }
 
-/* Drawing is what the site is for, so it is marked out in the cucumber's
-   green: tinted exactly as 넷캔 is (below), since a lime fill beside that
-   tint made both greens look off. */
+/* Drawing is what the site is for, so it is the one filled control: the
+   cucumber's lime, with dark ink in both themes. */
 /* Its edge is a border, as every other button in the bar has, so it is
    their height: an inset shadow drew the same line 2px shorter. */
 .toolbar-end .toolbar-draw,
 .toolbar-end a.toolbar-draw:visited {
-  border: 1px solid rgba(60, 103, 18, 0.5);
-  background-color: var(--ds-surface);
-  background-image: linear-gradient(rgba(122, 190, 40, 0.14), rgba(122, 190, 40, 0.14));
-  color: var(--ds-ink);
-  box-shadow: 0 0 0 3px rgba(122, 190, 40, 0.12), var(--ds-shadow-raise);
-  font-weight: 700;
+  border: 1px solid var(--ds-accent-line);
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+  box-shadow: var(--ds-shadow-raise);
+  font-weight: 600;
 }
 
 .toolbar-end .toolbar-draw:hover {
-  background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
+  background-color: var(--ds-accent-hover);
 }
 
 .toolbar-draw svg {
