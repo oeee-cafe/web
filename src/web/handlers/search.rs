@@ -2,7 +2,7 @@ use crate::app_error::AppError;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
 use crate::web::handlers::ExtractFtlLang;
-use crate::web::responses::{SearchPostResult, SearchResponse, SearchUserResult};
+use crate::web::responses::{SearchPostResult, SearchResponse};
 use crate::web::state::AppState;
 use axum::extract::Query;
 use axum::http::{header, HeaderMap};
@@ -31,13 +31,6 @@ pub struct SearchPageQuery {
     q: Option<String>,
 }
 
-#[derive(Serialize)]
-pub struct SearchUserRow {
-    pub id: Uuid,
-    pub login_name: String,
-    pub display_name: String,
-}
-
 /// A matching post, with what `post_card.jinja` needs to draw it as well as
 /// the few fields the JSON endpoint returns.
 #[derive(Serialize)]
@@ -54,8 +47,7 @@ pub struct SearchPostRow {
     pub published_at: Option<DateTime<Utc>>,
 }
 
-/// Users by login or display name, and posts by title or content, as the
-/// viewer is allowed to see them. Shared by `/search` and `/api/v1/search`
+/// Posts by title or content, as the viewer is allowed to see them. Shared by `/search` and `/api/v1/search`
 /// so the page and the app's JSON cannot disagree about what matches.
 pub async fn search(
     tx: &mut Transaction<'_, Postgres>,
@@ -63,34 +55,8 @@ pub async fn search(
     limit: i64,
     viewer_user_id: Option<Uuid>,
     viewer_show_sensitive: bool,
-) -> Result<(Vec<SearchUserRow>, Vec<SearchPostRow>), AppError> {
+) -> Result<Vec<SearchPostRow>, AppError> {
     let search_term = format!("%{}%", q);
-
-    let users = sqlx::query_as!(
-        SearchUserRow,
-        r#"
-        SELECT
-            id,
-            login_name,
-            display_name
-        FROM users
-        WHERE login_name ILIKE $1
-           OR display_name ILIKE $1
-        ORDER BY
-            CASE
-                WHEN login_name ILIKE $2 THEN 0
-                WHEN display_name ILIKE $2 THEN 1
-                ELSE 2
-            END,
-            login_name
-        LIMIT $3
-        "#,
-        search_term,
-        q,
-        limit
-    )
-    .fetch_all(&mut **tx)
-    .await?;
 
     // Only posts from public communities, or from none.
     let posts = sqlx::query_as!(
@@ -127,7 +93,7 @@ pub async fn search(
     .fetch_all(&mut **tx)
     .await?;
 
-    Ok((users, posts))
+    Ok(posts)
 }
 
 fn viewer(auth_session: &AuthSession) -> (Option<Uuid>, bool) {
@@ -146,7 +112,7 @@ pub async fn search_json(
     let limit = query.limit.unwrap_or(20).min(50);
     let (viewer_user_id, viewer_show_sensitive) = viewer(&auth_session);
 
-    let (users, posts) = search(
+    let posts = search(
         &mut tx,
         &query.q,
         limit,
@@ -156,15 +122,6 @@ pub async fn search_json(
     .await?;
 
     tx.commit().await?;
-
-    let users_typed: Vec<SearchUserResult> = users
-        .into_iter()
-        .map(|user| SearchUserResult {
-            id: user.id,
-            login_name: user.login_name,
-            display_name: user.display_name,
-        })
-        .collect();
 
     // Minimal fields for thumbnails
     let posts_typed: Vec<SearchPostResult> = posts
@@ -190,10 +147,7 @@ pub async fn search_json(
         })
         .collect();
 
-    Ok(Json(SearchResponse {
-        users: users_typed,
-        posts: posts_typed,
-    }))
+    Ok(Json(SearchResponse { posts: posts_typed }))
 }
 
 /// What the iOS and Android apps add to their web views' user agent.
@@ -208,7 +162,7 @@ fn has_native_search_field(headers: &HeaderMap) -> bool {
         .is_some_and(|ua| APP_USER_AGENT_MARKERS.iter().any(|marker| ua.contains(marker)))
 }
 
-/// GET /search — users and drawings matching `q`, under the form that asked.
+/// GET /search — drawings matching `q`, under the form that asked.
 ///
 /// A missing or blank `q` is the form alone rather than a 404, since the apps'
 /// search tabs and a bare visit both land here with nothing typed yet. The apps
@@ -231,10 +185,10 @@ pub async fn search_page(
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
-    let (users, posts) = match search_query {
+    let posts = match search_query {
         Some(ref q) => {
             let (viewer_user_id, viewer_show_sensitive) = viewer(&auth_session);
-            let (users, posts) = search(
+            let posts = search(
                 &mut tx,
                 q,
                 SEARCH_PAGE_LIMIT,
@@ -243,13 +197,12 @@ pub async fn search_page(
             )
             .await?;
             // A card is a picture; a post without one has nothing to show.
-            let posts: Vec<_> = posts
+            posts
                 .into_iter()
                 .filter(|post| post.image_filename.is_some())
-                .collect();
-            (users, posts)
+                .collect()
         }
-        None => (Vec::new(), Vec::new()),
+        None => Vec::new(),
     };
     tx.commit().await?;
 
@@ -258,7 +211,6 @@ pub async fn search_page(
         current_user => auth_session.user,
         search_query,
         native_search_field => has_native_search_field(&headers),
-        users,
         posts,
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,

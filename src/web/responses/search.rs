@@ -4,16 +4,7 @@ use uuid::Uuid;
 /// Response for search endpoint
 #[derive(Serialize, Debug)]
 pub struct SearchResponse {
-    pub users: Vec<SearchUserResult>,
     pub posts: Vec<SearchPostResult>,
-}
-
-/// User search result
-#[derive(Serialize, Debug)]
-pub struct SearchUserResult {
-    pub id: Uuid,
-    pub login_name: String,
-    pub display_name: String,
 }
 
 /// Post search result (thumbnail format)
