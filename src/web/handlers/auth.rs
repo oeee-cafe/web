@@ -3,6 +3,7 @@ use crate::models::device::delete_device_by_token;
 use crate::models::user::{
     create_user, update_user_preferred_language, AuthSession, Credentials, Language, UserDraft,
 };
+use crate::web::handlers::identity::{link_pending_identity, pending_provider_name};
 use crate::web::handlers::{
     detect_preferred_language, get_bundle, safe_format_message, safe_get_message, ExtractFtlLang,
 };
@@ -15,6 +16,7 @@ use axum_messages::Messages;
 use fluent::{FluentArgs, FluentValue};
 use minijinja::context;
 use serde::{Deserialize, Serialize};
+use tower_sessions::Session;
 
 use super::ExtractAcceptLanguage;
 
@@ -56,6 +58,7 @@ pub struct CreateUserForm {
 
 pub async fn do_signup(
     mut auth_session: AuthSession,
+    session: Session,
     ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     messages: Messages,
     State(state): State<AppState>,
@@ -110,6 +113,7 @@ pub async fn do_signup(
     if auth_session.login(&user).await.is_err() {
         return Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response());
     }
+    link_pending_identity(&session, &state, &messages, &bundle, &user).await?;
 
     let mut args = FluentArgs::new();
     args.set("name", FluentValue::from(user.display_name.clone()));
@@ -124,6 +128,7 @@ pub async fn do_signup(
 
 pub async fn login(
     messages: Messages,
+    session: Session,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Query(NextUrl { next }): Query<NextUrl>,
     State(state): State<crate::web::state::AppState>,
@@ -135,6 +140,9 @@ pub async fn login(
     let rendered: String = template.render(context! {
         messages => collected_messages,
         next => next,
+        // A provider's account waiting for this sign-in to be linked to.
+        linking_provider => pending_provider_name(&session).await,
+        steam_enabled => state.config.steam.is_some(),
         ftl_lang
     })?;
 
@@ -143,6 +151,7 @@ pub async fn login(
 
 pub async fn do_login(
     mut auth_session: AuthSession,
+    session: Session,
     ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     messages: Messages,
     State(state): State<AppState>,
@@ -186,6 +195,12 @@ pub async fn do_login(
     }
 
     if auth_session.login(&user).await.is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+    if link_pending_identity(&session, &state, &messages, &bundle, &user)
+        .await
+        .is_err()
+    {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 

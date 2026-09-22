@@ -31,12 +31,21 @@
     </section>
 
     <section class="settings-group">
+      {% if has_password %}
       <div class="profile-section-label">{{ ftl_get_message("account-change-password") }}</div>
       <form method="post" action="/account/password" class="ds-card settings-card">
         <div class="form-field">
           <label class="ds-label" for="current_password">{{ ftl_get_message("account-change-password-current") }}</label>
           <input class="ds-input" name="current_password" id="current_password" type="password" autocomplete="current-password" />
         </div>
+      {% else %}
+      {# An account made by signing in with Steam, say: it has no password
+         to give, and setting one lets it sign in on the web and in the
+         mobile apps as well. #}
+      <div class="profile-section-label">{{ ftl_get_message("account-set-password") }}</div>
+      <form method="post" action="/account/password" class="ds-card settings-card">
+        <p class="ds-help">{{ ftl_get_message("account-set-password-hint") }}</p>
+      {% endif %}
         <div class="form-field">
           <label class="ds-label" for="new_password">{{ ftl_get_message("account-change-password-new") }}</label>
           <input class="ds-input" name="new_password" id="new_password" type="password" autocomplete="new-password" />
@@ -50,6 +59,24 @@
           <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-info-edit") }}</button>
         </div>
       </form>
+    </section>
+
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("account-linked-accounts") }}</div>
+      <div class="ds-card settings-card">
+        {% for identity in identities %}
+          <form method="post" action="/account/identities/{{ identity.provider }}/unlink" class="settings-row">
+            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% else %}{{ identity.provider }}{% endif %}{% if identity.display_hint %}: {{ identity.display_hint }}{% endif %}</span>
+            <button type="submit" class="ds-button">{{ ftl_get_message("account-unlink") }}</button>
+          </form>
+        {% else %}
+          <p class="ds-help">{{ ftl_get_message("account-linked-accounts-none") }}</p>
+        {% endfor %}
+        {% if steam_enabled and not steam_linked %}
+          {# Followed only inside the Oeee Cafe app on Steam; see login.jinja. #}
+          <a class="ds-button auth-steam" href="/auth/steam/app?next=/account">{{ ftl_get_message("account-link-steam") }}</a>
+        {% endif %}
+      </div>
     </section>
 
     <section class="settings-group">
@@ -119,8 +146,14 @@
         <p class="settings-status is-danger">{{ ftl_get_message("account-delete-warning") }}</p>
         <div id="delete-error"></div>
         <div class="form-field">
+          {% if has_password %}
           <label class="ds-label" for="delete_password">{{ ftl_get_message("account-change-password-current") }}</label>
           <input class="ds-input" name="password" id="delete_password" type="password" autocomplete="current-password" required />
+          {% else %}
+          <label class="ds-label" for="delete_login_name">{{ ftl_format_pattern("account-delete-type-login-name", {"loginName": current_user.login_name}) }}</label>
+          <input class="ds-input" name="login_name" id="delete_login_name"
+                 autocapitalize="none" autocomplete="off" spellcheck="false" required />
+          {% endif %}
         </div>
         <div class="settings-foot">
           <span></span>

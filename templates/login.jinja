@@ -11,6 +11,11 @@
   <div class="auth-page">
     <form method="post" class="ds-card auth-card">
       <h1 class="auth-title">{{ ftl_get_message("sign-in") }}</h1>
+      {% if linking_provider %}
+        {# Arrived from signing in with Steam, say, to an account that is
+           not linked yet: signing in here links it. #}
+        <p class="auth-lede">{{ ftl_format_pattern("identity-login-notice", {"provider": linking_provider}) }}</p>
+      {% endif %}
       <div class="form-field">
         <label class="ds-label" for="login_name">{{ ftl_get_message("login-name") }}</label>
         <input class="ds-input" name="login_name" id="login_name"
@@ -24,11 +29,21 @@
       {% if next %}<input type="hidden" name="next" value="{{ next }}" />{% endif %}
       <button type="submit" class="ds-button ds-button-primary auth-submit">{{ ftl_get_message("sign-in") }}</button>
       <a class="ds-button auth-secondary" href="/password-reset">{{ ftl_get_message("forgot-password") }}</a>
+      {% if steam_enabled and not linking_provider %}
+        {# Only the Oeee Cafe app on Steam can follow this: it stops the
+           navigation, asks Steam for a ticket and posts it to /auth/steam.
+           Hidden everywhere else, where following it would only say so. #}
+        <a class="ds-button auth-secondary auth-steam" href="/auth/steam/app{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-steam") }}</a>
+      {% endif %}
+      {% if linking_provider %}
+        <button type="submit" form="identity-cancel" class="ds-button auth-secondary">{{ ftl_get_message("identity-cancel") }}</button>
+      {% endif %}
 
       <div class="auth-divider"><span>{{ ftl_get_message("sign-in-no-account") }}</span></div>
       {# Carries where the reader was going, so signing up from here ends
          where signing in would have. #}
       <a class="ds-button auth-secondary" href="/signup{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-up") }}</a>
     </form>
+    {% if linking_provider %}<form id="identity-cancel" method="post" action="/auth/cancel"></form>{% endif %}
   </div>
 {% endblock content %}

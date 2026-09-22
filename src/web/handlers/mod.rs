@@ -41,6 +41,7 @@ pub mod devices;
 pub mod draw;
 pub mod hashtag;
 pub mod home;
+pub mod identity;
 pub mod notifications;
 pub mod password_reset;
 pub mod policy;
@@ -1221,6 +1222,126 @@ mod template_tests {
         assert!(rendered.contains("signup-agree"));
         // Signing in instead keeps where the reader was going.
         assert!(rendered.contains("/login?next="));
+    }
+
+    /// Signing up after signing in with Steam: a handle and a name, the
+    /// agreement, no password -- and a way to sign into an existing account
+    /// instead, which keeps where the reader was going.
+    #[test]
+    fn the_welcome_page_asks_for_a_handle_and_the_agreement() {
+        let env = test_support::env();
+        let render = |provider_name: serde_json::Value, error: serde_json::Value| {
+            env.get_template("identity_welcome.jinja")
+                .expect("welcome loads")
+                .render(context! {
+                    provider => "Steam",
+                    provider_name,
+                    login_name => "",
+                    display_name => "오이",
+                    error,
+                    next => "/collaborate",
+                    ..chrome()
+                })
+                .expect("welcome renders")
+        };
+
+        let rendered = render(json!("오이"), json!(null));
+        assert!(rendered.contains(r#"name="login_name""#));
+        assert!(rendered.contains(r#"value="오이""#));
+        assert!(rendered.contains(r#"<input type="checkbox" name="agree" value="1" required />"#));
+        assert!(!rendered.contains(r#"type="password""#));
+        assert!(rendered.contains("identity-welcome-body(name=오이,provider=Steam)"));
+        assert!(rendered.contains("/login?next="));
+        assert!(rendered.contains(r#"action="/auth/cancel""#));
+        assert!(!rendered.contains("auth-error"));
+
+        let rendered = render(json!(null), json!("This username is already taken."));
+        assert!(rendered.contains("identity-welcome-body-unnamed(provider=Steam)"));
+        assert!(rendered.contains("This username is already taken."));
+    }
+
+    #[test]
+    fn signing_in_offers_steam_only_where_it_is_on_and_says_what_it_will_link() {
+        let env = test_support::env();
+        let render = |steam_enabled: bool, linking_provider: serde_json::Value| {
+            env.get_template("login.jinja")
+                .expect("login loads")
+                .render(context! {
+                    next => "/draw",
+                    steam_enabled,
+                    linking_provider,
+                    ..chrome()
+                })
+                .expect("login renders")
+        };
+
+        let off = render(false, json!(null));
+        assert!(!off.contains("/auth/steam/app"));
+        assert!(!off.contains("identity-login-notice"));
+
+        let on = render(true, json!(null));
+        assert!(on.contains("auth-steam"));
+        assert!(on.contains("/auth/steam/app?next="));
+
+        // Signing in to claim a Steam account: say so, offer a way out, and
+        // do not offer Steam again.
+        let linking = render(true, json!("Steam"));
+        assert!(linking.contains("identity-login-notice(provider=Steam)"));
+        assert!(linking.contains(r#"action="/auth/cancel""#));
+        assert!(!linking.contains("/auth/steam/app"));
+    }
+
+    /// An account made with Steam has no password: it is offered one to set
+    /// rather than asked for its current one, and deleting it asks for its
+    /// handle.
+    #[test]
+    fn the_account_page_asks_what_the_account_can_answer() {
+        let env = test_support::env();
+        let render = |has_password: bool, identities: serde_json::Value| {
+            env.get_template("account.jinja")
+                .expect("account loads")
+                .render(context! {
+                    current_user => json!({
+                        "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
+                        "login_name": "oeee",
+                        "display_name": "오이",
+                        "email": null,
+                        "email_verified_at": null,
+                        "created_at": "2026-09-22T00:00:00Z",
+                        "preferred_language": null,
+                        "show_sensitive_content": false,
+                        "role": "user",
+                    }),
+                    languages => vec![("ko", "한국어"), ("en", "English")],
+                    identities,
+                    has_password,
+                    steam_enabled => true,
+                    steam_linked => false,
+                    messages => Vec::<serde_json::Value>::new(),
+                    draft_post_count => 0,
+                    unread_notification_count => 0,
+                    ftl_lang => "en",
+                })
+                .expect("account renders")
+        };
+
+        let with_password = render(true, json!([]));
+        assert!(with_password.contains(r#"name="current_password""#));
+        assert!(with_password.contains(r#"name="password""#));
+        assert!(!with_password.contains(r#"id="delete_login_name""#));
+        assert!(with_password.contains("account-linked-accounts-none"));
+        assert!(with_password.contains("/auth/steam/app?next=/account"));
+
+        let without = render(
+            false,
+            json!([{"provider": "steam", "display_hint": "오이", "subject": "76561197960287930"}]),
+        );
+        assert!(!without.contains(r#"name="current_password""#));
+        assert!(without.contains("account-set-password"));
+        assert!(without.contains(r#"id="delete_login_name""#));
+        assert!(without.contains("account-delete-type-login-name(loginName=oeee)"));
+        assert!(without.contains(r#"action="/account/identities/steam/unlink""#));
+        assert!(without.contains("Steam: 오이"));
     }
 
     /// The replay switch is enforced in the handler; this is the other half of

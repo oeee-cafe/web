@@ -3346,6 +3346,37 @@ a.user-pill:hover {
   padding: 0 var(--ds-space-3);
 }
 
+/* What signing in with Steam (or another provider) is about to do, and
+   what is wrong with the form when it came back. */
+.auth-lede {
+  margin: 0 0 var(--ds-space-4);
+  font-size: var(--ds-text-m);
+  line-height: 1.45;
+}
+
+.auth-hint {
+  margin: 4px 0 0;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.auth-error {
+  margin: 0 0 var(--ds-space-3);
+  color: var(--ds-danger);
+  font-size: var(--ds-text-m);
+}
+
+/* Signing in with Steam is a link only the Oeee Cafe app on Steam can
+   follow, so it shows only there: the app marks the page's root element
+   before anything is drawn. */
+.auth-steam {
+  display: none;
+}
+
+html[data-steam-app] .auth-steam {
+  display: block;
+}
+
 /* The agreement: a box to tick, and the two pages it agrees to. */
 .auth-agree {
   margin: var(--ds-space-2) 0 var(--ds-space-3);

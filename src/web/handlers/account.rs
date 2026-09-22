@@ -6,8 +6,9 @@ use crate::models::email_verification_challenge::{
 use crate::models::user::{
     delete_user_with_activity, find_user_by_id, update_password, update_user_email_verified_at,
     update_user_preferred_language, update_user_show_sensitive_content, update_user_with_activity,
-    AuthSession, Language,
+    AuthSession, DeleteConfirmation, Language,
 };
+use crate::models::identity::list_identities_for_user;
 use crate::web::context::CommonContext;
 use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::state::AppState;
@@ -46,6 +47,11 @@ pub async fn account(
 
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let identities = match auth_session.user.as_ref() {
+        Some(user) => list_identities_for_user(&mut tx, user.id).await?,
+        None => Vec::new(),
+    };
+    let has_password = auth_session.user.as_ref().is_some_and(|u| u.has_password());
 
     let languages = vec![
         ("ko", "한국어"),
@@ -57,6 +63,10 @@ pub async fn account(
     let rendered = template.render(context! {
         current_user => auth_session.user,
         languages,
+        steam_linked => identities.iter().any(|i| i.provider == "steam"),
+        identities,
+        has_password,
+        steam_enabled => state.config.steam.is_some(),
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         messages => messages.into_iter().collect::<Vec<_>>(),
@@ -122,6 +132,8 @@ pub async fn save_show_sensitive_content(
 
 #[derive(Deserialize)]
 pub struct EditPasswordForm {
+    /// Absent when the account has no password yet and this sets its first.
+    #[serde(default)]
     current_password: String,
     new_password: String,
     new_password_confirm: String,
@@ -150,7 +162,9 @@ pub async fn edit_password(
         .await?
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
-    if user.verify_password(&form.current_password).is_err() {
+    // An account made with an identity provider sets its first password
+    // without one to give; the session is all it has to show.
+    if user.has_password() && user.verify_password(&form.current_password).is_err() {
         messages.error(safe_get_message(
             &bundle,
             "account-change-password-error-incorrect-current",
@@ -363,7 +377,10 @@ pub async fn edit_account(
 
 #[derive(Deserialize)]
 pub struct DeleteAccountRequest {
-    password: String,
+    /// For an account with a password.
+    password: Option<String>,
+    /// For one without: the account's own handle, typed out.
+    login_name: Option<String>,
 }
 
 pub async fn delete_account(
@@ -392,7 +409,11 @@ pub async fn delete_account(
     match delete_user_with_activity(
         &mut tx,
         user.id,
-        &payload.password,
+        DeleteConfirmation::for_user(
+            &user,
+            payload.password.as_deref(),
+            payload.login_name.as_deref(),
+        ),
         &state.config,
         Some(&state),
     )
@@ -423,7 +444,8 @@ pub async fn delete_account(
 
 #[derive(Deserialize)]
 pub struct DeleteAccountForm {
-    password: String,
+    password: Option<String>,
+    login_name: Option<String>,
 }
 
 pub async fn delete_account_htmx(
@@ -445,7 +467,7 @@ pub async fn delete_account_htmx(
     match delete_user_with_activity(
         &mut tx,
         user.id,
-        &form.password,
+        DeleteConfirmation::for_user(&user, form.password.as_deref(), form.login_name.as_deref()),
         &state.config,
         Some(&state),
     )

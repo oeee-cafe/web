@@ -70,6 +70,28 @@ pub struct AppConfig {
     // FCM configuration (V1 API)
     pub fcm_service_account_path: String,
     pub fcm_project_id: String,
+
+    /// Steam sign-in, as a `[steam]` table. Unset means the site does not
+    /// offer it, and `/auth/steam` turns every ticket away.
+    #[serde(default)]
+    pub steam: Option<SteamConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SteamConfig {
+    /// The app id of Oeee Cafe on Steam.
+    pub app_id: u32,
+    /// A publisher Web API key (Steamworks > Users & Permissions > Manage
+    /// Groups), not a user's key: AuthenticateUserTicket accepts no other.
+    pub web_api_key: String,
+    /// Where the partner Web API is. Only a test changes it.
+    #[serde(default = "default_steam_web_api_url")]
+    pub web_api_url: String,
+}
+
+fn default_steam_web_api_url() -> String {
+    "https://partner.steam-api.com".to_string()
 }
 
 fn default_log_level() -> String {

@@ -15,7 +15,9 @@ use crate::AppConfig;
 
 pub struct UserDraft {
     pub login_name: String,
-    pub password_hash: String,
+    /// None for an account made by signing in with an identity provider,
+    /// until its owner sets a password.
+    pub password_hash: Option<String>,
     pub display_name: String,
 }
 
@@ -34,9 +36,19 @@ impl UserDraft {
 
         Ok(Self {
             login_name,
-            password_hash,
+            password_hash: Some(password_hash),
             display_name,
         })
+    }
+
+    /// An account signed into with an identity provider rather than a
+    /// password.
+    pub fn without_password(login_name: String, display_name: String) -> Self {
+        Self {
+            login_name,
+            password_hash: None,
+            display_name,
+        }
     }
 }
 
@@ -64,7 +76,7 @@ pub struct User {
     pub id: Uuid,
     pub login_name: String,
     #[serde(skip_serializing)]
-    pub password_hash: String,
+    pub password_hash: Option<String>,
     pub display_name: String,
     pub email: Option<String>,
     pub email_verified_at: Option<DateTime<Utc>>,
@@ -79,10 +91,22 @@ pub struct User {
 
 impl User {
     pub fn verify_password(&self, password: &str) -> Result<(), argon2::password_hash::Error> {
+        // No password, or the '' a deleted account used to be given: nothing
+        // to match, so nothing does.
+        let hash = match self.password_hash.as_deref() {
+            Some(hash) if !hash.is_empty() => hash,
+            _ => return Err(argon2::password_hash::Error::Password),
+        };
         let argon2 = Argon2::default();
-        let pwstr = PasswordHashString::new(&self.password_hash)?;
+        let pwstr = PasswordHashString::new(hash)?;
         let password_hash = pwstr.password_hash();
         argon2.verify_password(password.as_bytes(), &password_hash)
+    }
+
+    /// Whether the account can be signed into with a password. One made by
+    /// signing in with Steam, say, cannot until its owner sets one.
+    pub fn has_password(&self) -> bool {
+        self.password_hash.as_deref().is_some_and(|hash| !hash.is_empty())
     }
 
     /// Site-wide staff. Gates everything under `/admin`.
@@ -437,7 +461,7 @@ pub async fn create_user(
             RETURNING id, created_at, updated_at
         ",
         user_draft.login_name,
-        user_draft.password_hash.to_string(),
+        user_draft.password_hash.as_deref(),
         user_draft.display_name,
     );
     let result = q.fetch_one(&mut **tx).await?;
@@ -579,10 +603,31 @@ pub async fn find_users_with_public_posts_and_banner(
     Ok(q.fetch_all(&mut **tx).await?)
 }
 
+/// What a person gives to show they mean to delete their account.
+pub enum DeleteConfirmation<'a> {
+    /// Their password, for an account that has one.
+    Password(&'a str),
+    /// Their handle, typed out, for an account signed into only with an
+    /// identity provider: there is no password to ask for, and a provider's
+    /// fresh sign-in is not something every client can produce.
+    LoginName(&'a str),
+}
+
+impl<'a> DeleteConfirmation<'a> {
+    /// Takes whichever the account calls for from what the client sent.
+    pub fn for_user(user: &User, password: Option<&'a str>, login_name: Option<&'a str>) -> Self {
+        if user.has_password() {
+            Self::Password(password.unwrap_or_default())
+        } else {
+            Self::LoginName(login_name.unwrap_or_default())
+        }
+    }
+}
+
 pub async fn delete_user(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
-    password: &str,
+    confirmation: DeleteConfirmation<'_>,
 ) -> Result<()> {
     // First, find the user
     let user = find_user_by_id(tx, id).await?;
@@ -593,9 +638,20 @@ pub async fn delete_user(
         return Err(anyhow::anyhow!("User is already deleted"));
     }
 
-    // Verify password
-    user.verify_password(password)
-        .map_err(|_| anyhow::anyhow!("Invalid password"))?;
+    match confirmation {
+        DeleteConfirmation::Password(password) => {
+            user.verify_password(password)
+                .map_err(|_| anyhow::anyhow!("Invalid password"))?;
+        }
+        DeleteConfirmation::LoginName(login_name) => {
+            // Checked against the account, not just for being non-empty: an
+            // account with a password never gets here, but one that answers
+            // with its handle has to answer with its own.
+            if user.has_password() || login_name.trim() != user.login_name {
+                return Err(anyhow::anyhow!("The username does not match"));
+            }
+        }
+    }
 
     // Check if user owns any communities
     let community_count = query!(
@@ -619,6 +675,13 @@ pub async fn delete_user(
     // session data in binary format without a direct user_id reference.
     // The user won't be able to log in again anyway because authentication
     // checks filter out deleted users.
+
+    // Unlink every identity provider, so the Steam account (or any other)
+    // that signed into this one can make a new account rather than find
+    // itself linked to a deleted one.
+    query!("DELETE FROM user_identities WHERE user_id = $1", id)
+        .execute(&mut **tx)
+        .await?;
 
     // Delete devices (will cascade automatically)
     query!(
@@ -663,7 +726,7 @@ pub async fn delete_user(
             deleted_at = NOW(),
             email = NULL,
             display_name = '[deleted]',
-            password_hash = '',
+            password_hash = NULL,
             updated_at = NOW()
         WHERE id = $1
         "#,
@@ -678,7 +741,7 @@ pub async fn delete_user(
 pub async fn delete_user_with_activity(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
-    password: &str,
+    confirmation: DeleteConfirmation<'_>,
     _config: &AppConfig,
     state: Option<&crate::web::state::AppState>,
 ) -> Result<()> {
@@ -686,7 +749,7 @@ pub async fn delete_user_with_activity(
     let actor = super::actor::Actor::find_by_user_id(tx, id).await?;
 
     // Delete the user
-    delete_user(tx, id, password).await?;
+    delete_user(tx, id, confirmation).await?;
 
     // If state is provided and actor exists, send ActivityPub Delete activity
     if let (Some(state), Some(actor)) = (state, actor) {

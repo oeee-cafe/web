@@ -836,7 +836,7 @@ mod replay_visibility_tests {
         User {
             id,
             login_name: "someone".to_string(),
-            password_hash: String::new(),
+            password_hash: None,
             display_name: "Someone".to_string(),
             email: None,
             email_verified_at: None,
