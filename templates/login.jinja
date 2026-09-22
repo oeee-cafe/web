@@ -42,6 +42,13 @@
            the iOS app, which stops the navigation and signs in natively. #}
         <a class="ds-button auth-secondary auth-apple" href="/auth/apple{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-apple") }}</a>
       {% endif %}
+      {% if google_enabled and not linking_provider %}
+        {# Google's sign-in page, and back. Google refuses its own pages in
+           an embedded web view, so in the apps this is the Android app's
+           only, which stops the navigation and signs in with Credential
+           Manager. #}
+        <a class="ds-button auth-secondary auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-google") }}</a>
+      {% endif %}
       {% if linking_provider %}
         <button type="submit" form="identity-cancel" class="ds-button auth-secondary">{{ ftl_get_message("identity-cancel") }}</button>
       {% endif %}

@@ -51,3 +51,22 @@ email_from_address = ""
 # app_id = 0
 # web_api_key = ""
 # supporter_app_ids = [0]
+
+# Sign in with Apple. Leave the table out to turn it off. client_id is the
+# Services ID whose return URL is {base_url}/auth/apple/callback; app_ids are
+# the bundle ids of the apps that sign in natively (the iOS app), whose tokens
+# name the bundle id as audience rather than the Services ID.
+# [apple]
+# client_id = "cafe.oeee.web"
+# app_ids = ["cafe.oeee"]
+
+# Sign in with Google. Leave the table out to turn it off. client_id and
+# client_secret are a Web application OAuth client's (Google Cloud console >
+# APIs & Services > Credentials), with {base_url}/auth/google/callback as an
+# authorised redirect URI. The Android app signs in with Credential Manager
+# and is given this same client id as its server client id, so its tokens name
+# it as audience too; it needs an Android OAuth client of its own in the same
+# project, with the signing certificate's SHA-1, but nothing here.
+# [google]
+# client_id = "0000.apps.googleusercontent.com"
+# client_secret = ""

@@ -144,6 +144,7 @@ pub async fn login(
         linking_provider => pending_provider_name(&session).await,
         steam_enabled => state.config.steam.is_some(),
         apple_enabled => state.config.apple.is_some(),
+        google_enabled => state.config.google.is_some(),
         ftl_lang
     })?;
 

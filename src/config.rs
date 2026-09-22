@@ -80,6 +80,11 @@ pub struct AppConfig {
     /// not offer it.
     #[serde(default)]
     pub apple: Option<AppleConfig>,
+
+    /// Sign in with Google, as a `[google]` table. Unset means the site does
+    /// not offer it.
+    #[serde(default)]
+    pub google: Option<GoogleConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,6 +108,36 @@ pub struct AppleConfig {
 
 fn default_apple_keys_url() -> String {
     "https://appleid.apple.com/auth/keys".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct GoogleConfig {
+    /// The OAuth client id of the **Web application** client (Google Cloud
+    /// console > APIs & Services > Credentials), whose authorised redirect
+    /// URI is `{base_url}/auth/google/callback`. Google's ID tokens name it
+    /// as their audience -- the Android app's too, since Credential Manager
+    /// is given this as its server client id, so there is nothing else to
+    /// list here the way `[apple].app_ids` lists bundle ids.
+    pub client_id: String,
+    /// That client's secret. Only ever sent to Google's token endpoint, to
+    /// trade a code for an ID token.
+    pub client_secret: String,
+    /// Where Google publishes the keys it signs ID tokens with. Only a test
+    /// changes it.
+    #[serde(default = "default_google_keys_url")]
+    pub keys_url: String,
+    /// Where a code is traded for a token. Only a test changes it.
+    #[serde(default = "default_google_token_url")]
+    pub token_url: String,
+}
+
+fn default_google_keys_url() -> String {
+    "https://www.googleapis.com/oauth2/v3/certs".to_string()
+}
+
+fn default_google_token_url() -> String {
+    "https://oauth2.googleapis.com/token".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
