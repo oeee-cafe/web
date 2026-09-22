@@ -28,8 +28,10 @@
 //! page of its own ([`do_apple_sign_in`]).
 //!
 //! Google comes back by a GET, which a Lax cookie is sent with, so
-//! [`google_callback`] is the whole of it. What the Android app posts to
-//! [`do_google_sign_in`] is made by the page, as the Steam app's post is.
+//! [`google_callback`] is the whole of it. What the phone apps post to
+//! [`do_google_sign_in`] is made by the page, as the Steam app's post is:
+//! Google will not sign in inside a web view at all, so each app does it its
+//! own way and hands the ID token back to the page.
 
 use axum::extract::{Path, Query, State};
 use axum::http::header::ORIGIN;
@@ -752,10 +754,11 @@ pub struct GoogleStartForm {
     next: Option<String>,
 }
 
-/// A sign-in for the Android app to make natively: the nonce it hands
-/// Credential Manager, kept in the web view's session as `/auth/google` keeps
-/// it for a browser. Google refuses its own sign-in pages inside an embedded
-/// web view, so the app cannot take the browser's way round.
+/// A sign-in for the phone apps to make themselves: the nonce they hand
+/// Google, kept in the web view's session as `/auth/google` keeps it for a
+/// browser. Google refuses its own sign-in pages inside an embedded web view,
+/// so neither app can take the browser's way round -- Android asks Credential
+/// Manager, iOS a browser of the system's.
 ///
 /// The app asks from inside the page, so the answer is this session's;
 /// another site's page gets neither the session nor, without CORS, the
@@ -792,9 +795,9 @@ pub async fn google_start(
     Ok(axum::Json(answer).into_response())
 }
 
-/// What the Android app's page posts: the ID token Credential Manager
-/// handed it and the state the sign-in was started with, or an error when
-/// Google would not say who this is.
+/// What a phone app's page posts: the ID token the app ended up with and the
+/// state the sign-in was started with, or an error when Google would not say
+/// who this is.
 #[derive(Deserialize)]
 pub struct GoogleNativeAnswer {
     state: Option<String>,
@@ -802,7 +805,7 @@ pub struct GoogleNativeAnswer {
     error: Option<String>,
 }
 
-/// An ID token the Android app signed in for, posted from the page.
+/// An ID token a phone app signed in for, posted from the page.
 pub async fn do_google_sign_in(
     mut auth_session: AuthSession,
     session: Session,

@@ -653,7 +653,7 @@
         // (WebTab.swift): the page stays, so nothing slides in over it.
         if (link.classList.contains("auth-apple") &&
             document.documentElement.hasAttribute("data-native-apple-sign-in")) return;
-        // The Android app does the same for Google (WebTabController.kt).
+        // Both phone apps do the same for Google (GoogleSignIn.kt, GoogleSignIn.swift).
         if (link.classList.contains("auth-google") &&
             document.documentElement.hasAttribute("data-native-google-sign-in")) return;
         var thumb = link.querySelector("img[width][height]");
