@@ -30,7 +30,7 @@
   </span>
   {% for reaction in reaction_counts %}
     {% if current_user %}
-      <button class="reaction-button {% if reaction.reacted_by_user %}reacted{% endif %}"
+      <button class="reaction-button {% if reaction.reacted_by_user %}reacted{% endif %}" data-haptic="light"
               hx-post="{% if reaction.reacted_by_user %}/posts/{{ post_id }}/reactions/remove{% else %}/posts/{{ post_id }}/reactions/add{% endif %}"
               hx-vals='{"emoji": "{{ reaction.emoji }}"}'
               hx-target="#post-reactions-{{ post_id }}"

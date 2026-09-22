@@ -28,6 +28,13 @@
         event.viewTransition.skipTransition();
       }
     });
+    // A control marked data-haptic ("light", "medium", "selection") is felt
+    // as well as seen when it is pressed, as the app's own controls are.
+    document.addEventListener("click", function (event) {
+      var control = event.target && event.target.closest ? event.target.closest("[data-haptic]") : null;
+      var app = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.oeeeHaptic;
+      if (control && app) app.postMessage(control.getAttribute("data-haptic"));
+    }, true);
   } else if (/OeeeCafeAndroid/.test(navigator.userAgent)) {
     document.documentElement.setAttribute("data-app", "android");
   }

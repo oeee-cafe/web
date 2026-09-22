@@ -226,6 +226,19 @@ html:not([data-app="ios"]) .ds-page {
   cursor: text;
 }
 
+/* In the iOS app a long press on a drawing opens the app's own menu for it
+   -- a preview, Save to Photos, Copy, Share (WebTab.swift in oeee-cafe/ios)
+   -- which the press has to be let through to. Not a drawing marked
+   sensitive: the preview would show it unblurred. */
+html[data-app="ios"] .ds-page .post-card-image,
+html[data-app="ios"] .ds-page .post-stage-image {
+  -webkit-touch-callout: default;
+}
+
+html[data-app="ios"] .ds-page .post-card-image .sensitive {
+  -webkit-touch-callout: none;
+}
+
 .ds-page a,
 .ds-page a:hover {
   text-decoration: none;

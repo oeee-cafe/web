@@ -24,13 +24,37 @@ const SITEMAP_HASHTAG_LIMIT: i64 = 5_000;
 /// This endpoint is used by iOS to verify the app's association with the domain
 /// More info: https://developer.apple.com/documentation/xcode/supporting-associated-domains
 pub async fn apple_app_site_association() -> impl IntoResponse {
-    let association = json!({
-        "webcredentials": {
-            "apps": ["K4CQ85R27U.cafe.oeee"]
-        }
-    });
+    (StatusCode::OK, Json(association()))
+}
 
-    (StatusCode::OK, Json(association))
+/// The iOS app's claims on the site: its sign-ins, and the pages a tapped link
+/// opens in the app rather than in Safari -- every page a person reads. Not
+/// what only a program asks for (the API, ActivityPub, static files), nor the
+/// sign-in handoffs, which have to finish where they started, nor signing out.
+fn association() -> serde_json::Value {
+    const APP: &str = "K4CQ85R27U.cafe.oeee";
+    json!({
+        "webcredentials": {
+            "apps": [APP]
+        },
+        "applinks": {
+            "details": [{
+                "appIDs": [APP],
+                "components": [
+                    { "/": "/api/*", "exclude": true },
+                    { "/": "/ap/*", "exclude": true },
+                    { "/": "/static/*", "exclude": true },
+                    { "/": "/.well-known/*", "exclude": true },
+                    { "/": "/auth/*", "exclude": true },
+                    { "/": "/logout", "exclude": true },
+                    { "/": "/robots.txt", "exclude": true },
+                    { "/": "/sitemap.xml", "exclude": true },
+                    { "/": "/health", "exclude": true },
+                    { "/": "/*" }
+                ]
+            }]
+        }
+    })
 }
 
 /// Handler for Android Digital Asset Links (App Links & Credentials)
@@ -165,7 +189,27 @@ fn escape_xml_into(out: &mut String, value: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::escape_xml_into;
+    use super::{association, escape_xml_into};
+
+    #[test]
+    fn the_app_opens_pages_but_not_the_api_or_sign_in_handoffs() {
+        let value = association();
+        assert_eq!(value["webcredentials"]["apps"][0], "K4CQ85R27U.cafe.oeee");
+        let details = &value["applinks"]["details"][0];
+        assert_eq!(details["appIDs"][0], "K4CQ85R27U.cafe.oeee");
+        let components = details["components"].as_array().unwrap();
+        let excluded: Vec<&str> = components
+            .iter()
+            .filter(|c| c["exclude"] == true)
+            .map(|c| c["/"].as_str().unwrap())
+            .collect();
+        for path in ["/api/*", "/ap/*", "/auth/*", "/logout"] {
+            assert!(excluded.contains(&path), "{path} should stay in the browser");
+        }
+        // Apple takes the first component that matches, so the catch-all is last.
+        assert_eq!(components.last().unwrap()["/"], "/*");
+        assert!(components.last().unwrap().get("exclude").is_none());
+    }
 
     #[test]
     fn escapes_xml_metacharacters() {
