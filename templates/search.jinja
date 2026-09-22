@@ -1,0 +1,72 @@
+{% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {% if search_query %}{{ search_query }} - {% endif %}{{ ftl_get_message("search") }}
+{% endblock title %}
+{% block content %}
+  {# The per-row choice applies to the drawings grid below, as on every other
+     grid of drawings. #}
+  {% include "post_feed_head.jinja" %}
+  {# Site search: the form, then the people and the drawings it matched.
+     GET /search is also where the iOS app's native search field lands, so
+     the form is here for the plain website rather than for the app. #}
+  <div class="center-wide communities-page search-page">
+    <h1 class="collaborate-title">{{ ftl_get_message("search") }}</h1>
+    <div class="communities-bar">
+      <form method="get" action="/search" class="communities-filters" role="search">
+        <input type="search"
+               name="q"
+               placeholder="{{ ftl_get_message("search-placeholder") }}"
+               aria-label="{{ ftl_get_message("search-placeholder") }}"
+               value="{% if search_query %}{{ search_query }}{% endif %}"
+               class="ds-input communities-search"
+               autocomplete="off"
+               autocapitalize="none"
+               spellcheck="false"
+               {% if not search_query %}autofocus{% endif %} />
+        <button type="submit" class="ds-button">{{ ftl_get_message("search") }}</button>
+      </form>
+    </div>
+
+    {% if search_query %}
+      <p class="hashtag-search-info">
+        {{ ftl_get_message("search-results-for") }} "<strong>{{ search_query }}</strong>"
+      </p>
+
+      {% if users or posts %}
+        {% if users %}
+          <section class="profile-section" aria-labelledby="search-users-heading">
+            <div id="search-users-heading" class="profile-section-label">{{ ftl_get_message("search-users") }}</div>
+            <div class="member-list">
+              {% for user in users %}
+                <div class="member-row">
+                  <span class="member-initial" aria-hidden="true">{{ (user.display_name or user.login_name)[:1]|upper }}</span>
+                  <span class="member-text">
+                    <a class="member-name" href="/@{{ user.login_name }}">{{ user.display_name }}</a>
+                    <span class="member-meta">@{{ user.login_name }}</span>
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+
+        {% if posts %}
+          {% import "post_card.jinja" as card %}
+          <section class="profile-section" aria-labelledby="search-posts-heading">
+            <div class="grid-header">
+              <div id="search-posts-heading" class="profile-section-label">{{ ftl_get_message("search-posts") }}</div>
+              {% include "post_feed_controls.jinja" %}
+            </div>
+            <div class="posts-grid">
+              {% for post in posts %}
+                {{ card.post_card(post, r2_public_endpoint_url, false) }}
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+      {% else %}
+        <p class="communities-empty">{{ ftl_get_message("search-no-results") }}</p>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock content %}

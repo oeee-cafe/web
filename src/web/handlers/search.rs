@@ -1,10 +1,21 @@
 use crate::app_error::AppError;
 use crate::models::user::AuthSession;
+use crate::web::context::CommonContext;
+use crate::web::handlers::ExtractFtlLang;
 use crate::web::responses::{SearchPostResult, SearchResponse, SearchUserResult};
 use crate::web::state::AppState;
 use axum::extract::Query;
+use axum::response::{Html, IntoResponse};
 use axum::{extract::State, response::Json};
-use serde::Deserialize;
+use chrono::{DateTime, Utc};
+use minijinja::context;
+use serde::{Deserialize, Serialize};
+use sqlx::{Postgres, Transaction};
+use uuid::Uuid;
+
+/// Matches of each kind shown on `/search`, which has no load-more: the most
+/// the JSON endpoint will hand out in one go.
+const SEARCH_PAGE_LIMIT: i64 = 50;
 
 #[derive(Deserialize)]
 pub struct SearchQuery {
@@ -13,26 +24,49 @@ pub struct SearchQuery {
     limit: Option<i64>,
 }
 
-pub async fn search_json(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Query(query): Query<SearchQuery>,
-) -> Result<Json<SearchResponse>, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
+#[derive(Deserialize)]
+pub struct SearchPageQuery {
+    #[serde(default)]
+    q: Option<String>,
+}
 
-    let search_term = format!("%{}%", query.q);
-    let limit = query.limit.unwrap_or(20).min(50);
+#[derive(Serialize)]
+pub struct SearchUserRow {
+    pub id: Uuid,
+    pub login_name: String,
+    pub display_name: String,
+}
 
-    // Get viewer preferences for sensitive content filtering
-    let (viewer_user_id, viewer_show_sensitive) = if let Some(user) = auth_session.user {
-        (Some(user.id), user.show_sensitive_content)
-    } else {
-        (None, false)
-    };
+/// A matching post, with what `post_card.jinja` needs to draw it as well as
+/// the few fields the JSON endpoint returns.
+#[derive(Serialize)]
+pub struct SearchPostRow {
+    pub id: Uuid,
+    pub title: Option<String>,
+    pub user_login_name: String,
+    pub image_filename: Option<String>,
+    pub image_width: Option<i32>,
+    pub image_height: Option<i32>,
+    pub is_sensitive: bool,
+    pub community_slug: Option<String>,
+    pub community_name: Option<String>,
+    pub published_at: Option<DateTime<Utc>>,
+}
 
-    // Search for users by login_name or display_name
-    let users = sqlx::query!(
+/// Users by login or display name, and posts by title or content, as the
+/// viewer is allowed to see them. Shared by `/search` and `/api/v1/search`
+/// so the page and the app's JSON cannot disagree about what matches.
+pub async fn search(
+    tx: &mut Transaction<'_, Postgres>,
+    q: &str,
+    limit: i64,
+    viewer_user_id: Option<Uuid>,
+    viewer_show_sensitive: bool,
+) -> Result<(Vec<SearchUserRow>, Vec<SearchPostRow>), AppError> {
+    let search_term = format!("%{}%", q);
+
+    let users = sqlx::query_as!(
+        SearchUserRow,
         r#"
         SELECT
             id,
@@ -51,26 +85,27 @@ pub async fn search_json(
         LIMIT $3
         "#,
         search_term,
-        query.q,
+        q,
         limit
     )
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut **tx)
     .await?;
 
-    // Search for posts by title or content (only from public communities)
-    let posts = sqlx::query!(
+    // Only posts from public communities, or from none.
+    let posts = sqlx::query_as!(
+        SearchPostRow,
         r#"
         SELECT
             posts.id,
             posts.title,
-            posts.content,
-            posts.author_id,
             users.login_name AS user_login_name,
             images.image_filename AS "image_filename?",
             images.width AS "image_width?",
             images.height AS "image_height?",
-            posts.published_at,
-            (posts.is_sensitive OR posts.is_explicit) AS "is_sensitive!"
+            (posts.is_sensitive OR posts.is_explicit) AS "is_sensitive!",
+            communities.slug AS "community_slug?",
+            communities.name AS "community_name?",
+            posts.published_at
         FROM posts
         LEFT JOIN users ON posts.author_id = users.id
         LEFT JOIN images ON posts.image_id = images.id
@@ -88,12 +123,39 @@ pub async fn search_json(
         viewer_show_sensitive,
         viewer_user_id
     )
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok((users, posts))
+}
+
+fn viewer(auth_session: &AuthSession) -> (Option<Uuid>, bool) {
+    match auth_session.user {
+        Some(ref user) => (Some(user.id), user.show_sensitive_content),
+        None => (None, false),
+    }
+}
+
+pub async fn search_json(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Query(query): Query<SearchQuery>,
+) -> Result<Json<SearchResponse>, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let limit = query.limit.unwrap_or(20).min(50);
+    let (viewer_user_id, viewer_show_sensitive) = viewer(&auth_session);
+
+    let (users, posts) = search(
+        &mut tx,
+        &query.q,
+        limit,
+        viewer_user_id,
+        viewer_show_sensitive,
+    )
     .await?;
 
     tx.commit().await?;
 
-    // Convert users to typed structs
     let users_typed: Vec<SearchUserResult> = users
         .into_iter()
         .map(|user| SearchUserResult {
@@ -103,7 +165,7 @@ pub async fn search_json(
         })
         .collect();
 
-    // Convert posts to typed structs with minimal fields for thumbnails
+    // Minimal fields for thumbnails
     let posts_typed: Vec<SearchPostResult> = posts
         .into_iter()
         .map(|post| {
@@ -131,4 +193,61 @@ pub async fn search_json(
         users: users_typed,
         posts: posts_typed,
     }))
+}
+
+/// GET /search — users and drawings matching `q`, under the form that asked.
+///
+/// A missing or blank `q` is the form alone rather than a 404, since the iOS
+/// app's search tab and a bare visit both land here with nothing typed yet.
+pub async fn search_page(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    Query(params): Query<SearchPageQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let search_query = params
+        .q
+        .as_deref()
+        .map(str::trim)
+        .filter(|q| !q.is_empty())
+        .map(str::to_owned);
+
+    let mut tx = state.db_pool.begin().await?;
+    let common_ctx =
+        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+
+    let (users, posts) = match search_query {
+        Some(ref q) => {
+            let (viewer_user_id, viewer_show_sensitive) = viewer(&auth_session);
+            let (users, posts) = search(
+                &mut tx,
+                q,
+                SEARCH_PAGE_LIMIT,
+                viewer_user_id,
+                viewer_show_sensitive,
+            )
+            .await?;
+            // A card is a picture; a post without one has nothing to show.
+            let posts: Vec<_> = posts
+                .into_iter()
+                .filter(|post| post.image_filename.is_some())
+                .collect();
+            (users, posts)
+        }
+        None => (Vec::new(), Vec::new()),
+    };
+    tx.commit().await?;
+
+    let template = state.env.get_template("search.jinja")?;
+    let rendered = template.render(context! {
+        current_user => auth_session.user,
+        search_query,
+        users,
+        posts,
+        draft_post_count => common_ctx.draft_post_count,
+        unread_notification_count => common_ctx.unread_notification_count,
+        ftl_lang
+    })?;
+
+    Ok(Html(rendered).into_response())
 }
