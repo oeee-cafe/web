@@ -267,7 +267,14 @@
             } catch (error) {}
           }, 100);
         });
-        if (!document.activeElement || document.activeElement === document.body) {
+        // In the iOS app the page scrolls, not the content area (ds.css), so
+        // there is nothing for the keyboard to scroll, and the content area is
+        // not focusable at all: a tap inside it would focus it, and WebKit
+        // scrolls a focused element back into view when the page comes back
+        // from the back/forward cache -- to its top, over where the reader was.
+        if (document.documentElement.getAttribute("data-app") === "ios") {
+          content.removeAttribute("tabindex");
+        } else if (!document.activeElement || document.activeElement === document.body) {
           try {
             content.focus({ preventScroll: true });
           } catch (error) {
@@ -678,9 +685,23 @@
         var bar = document.querySelector(".nav-bar");
         var shown = bar && bar.getBoundingClientRect().bottom > 0;
         root.setAttribute("data-push", shown ? "" : "whole");
-        var transition = document.startViewTransition(function () { loading(path, true); });
+        // The skeleton is laid in the transition's own time, which can come
+        // after the page has already been left for the next: then it is not
+        // laid at all, or it would be over the page when the reader comes back.
+        var left = false;
+        var transition = document.startViewTransition(function () {
+          if (!left) loading(path, true);
+        });
+        function leave() {
+          left = true;
+          transition.skipTransition();
+        }
+        window.addEventListener("pagehide", leave);
         transition.finished.then(done, done);
-        function done() { root.removeAttribute("data-push"); }
+        function done() {
+          root.removeAttribute("data-push");
+          window.removeEventListener("pagehide", leave);
+        }
       }
       document.addEventListener("submit", function (event) {
         var form = event.target;
