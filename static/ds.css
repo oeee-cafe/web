@@ -534,6 +534,19 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   vertical-align: top;
 }
 
+/* Square, and the buttons' 30px tall: 16px of icon, 2px of margin, 4px of
+   padding and the border, the same on every side -- compact included,
+   where the worded buttons only lose width they have to spare. */
+.toolbar-end .toolbar-search,
+.nav-bar.is-compact .toolbar-end > a.toolbar-search {
+  padding: 4px;
+  line-height: 0;
+}
+
+.toolbar-end .toolbar-search svg {
+  margin: 2px;
+}
+
 html[data-app="ios"] .toolbar-search {
   display: none;
 }
