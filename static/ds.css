@@ -602,15 +602,6 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
 }
 
-/* Where you are: the tint deepened, as the section group raises its
-   current one. */
-.nav-bar .toolbar-links a.toolbar-live[aria-current="page"],
-.nav-bar .toolbar-links a.toolbar-live[aria-current="page"]:hover {
-  border-color: #3c6712;
-  background-image: linear-gradient(rgba(122, 190, 40, 0.3), rgba(122, 190, 40, 0.3));
-  box-shadow: var(--ds-shadow-raise);
-}
-
 /* Its box sizing said outright: the painter pages' reset makes every box
    border-box, which took the rim out of a 6px dot and left 2px of lime. */
 .toolbar-live-dot {
@@ -692,8 +683,9 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   background-color: var(--ds-hover);
 }
 
-.nav-bar .toolbar-links a[aria-current="page"],
-.nav-bar .toolbar-links a[aria-current="page"]:hover {
+/* The sections only: 넷캔 stays as it is on its own pages. */
+.nav-bar .toolbar-sections a[aria-current="page"],
+.nav-bar .toolbar-sections a[aria-current="page"]:hover {
   background-color: var(--ds-surface);
   box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
   font-weight: 600;
