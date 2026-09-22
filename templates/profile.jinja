@@ -219,7 +219,7 @@
          HTML5 validation before it will issue a request for a form. The login
          name is interpolated here rather than carried in a JS variable, so the
          modal no longer has any state of its own to reset. #}
-      <form id="profile-report-form"
+      <form id="profile-report-form" data-haptic-done="success"
             hx-post="/@{{ user.login_name }}/report"
             hx-target="this"
             hx-swap="outerHTML"

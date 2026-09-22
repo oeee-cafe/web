@@ -34,13 +34,58 @@
         event.viewTransition.skipTransition();
       }
     });
-    // A control marked data-haptic ("light", "medium", "selection") is felt
-    // as well as seen when it is pressed, as the app's own controls are.
-    document.addEventListener("click", function (event) {
-      var control = event.target && event.target.closest ? event.target.closest("[data-haptic]") : null;
+    // Controls are felt as well as seen, as the app's own are (Haptics in
+    // DrawingMenu.swift, oeee-cafe/ios): "light", "medium", "selection",
+    // "success", "warning", "error".
+    function feel(name) {
       var app = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.oeeeHaptic;
-      if (control && app) app.postMessage(control.getAttribute("data-haptic"));
+      if (app && name) app.postMessage(name);
+    }
+    document.addEventListener("click", function (event) {
+      var target = event.target;
+      if (!target || !target.closest) return;
+      // A control that says how it feels (data-haptic).
+      var control = target.closest("[data-haptic]");
+      if (control) {
+        feel(control.getAttribute("data-haptic"));
+        return;
+      }
+      // A segmented control ticks when its choice changes, as a picker does;
+      // pressing the segment already chosen changes nothing.
+      var segment = target.closest(".ds-segmented > *");
+      if (segment && !segment.matches('[aria-pressed="true"], [aria-current="page"], .is-selected')) {
+        feel("selection");
+      }
     }, true);
+    // So do a checkbox or a radio when it changes, and a slider at each step.
+    document.addEventListener("change", function (event) {
+      var target = event.target;
+      if (target && target.matches && target.matches('input[type="checkbox"], input[type="radio"]')) feel("selection");
+    }, true);
+    document.addEventListener("input", function (event) {
+      var target = event.target;
+      if (target && target.matches && target.matches('input[type="range"]')) feel("selection");
+    }, true);
+    // What a press asked the site for: a failure is felt as one, and a form
+    // marked data-haptic-done is felt when it has gone through. Only a press
+    // or a submission -- a page loading more as it scrolls is not felt.
+    function pressed(ctx) {
+      var event = ctx && ctx.sourceEvent;
+      return !!event && (event.type === "click" || event.type === "submit");
+    }
+    document.addEventListener("htmx:after:request", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      if (!pressed(ctx)) return;
+      if (ctx.response && ctx.response.status >= 400) {
+        feel("error");
+        return;
+      }
+      var done = event.target && event.target.closest ? event.target.closest("[data-haptic-done]") : null;
+      if (done) feel(done.getAttribute("data-haptic-done"));
+    });
+    document.addEventListener("htmx:error", function (event) {
+      if (pressed(event.detail && event.detail.ctx)) feel("error");
+    });
   } else if (/OeeeCafeAndroid/.test(navigator.userAgent)) {
     document.documentElement.setAttribute("data-app", "android");
   }
