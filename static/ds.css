@@ -590,7 +590,6 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
 }
 
 .toolbar-live-dot {
-  position: relative;
   display: inline-block;
   width: 6px;
   height: 6px;
@@ -599,53 +598,29 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   border-radius: 50%;
   background-color: var(--ds-accent);
   vertical-align: 1px;
-  -webkit-animation: toolbar-live-pulse 0.8s ease-in-out infinite;
-  animation: toolbar-live-pulse 0.8s ease-in-out infinite;
+  -webkit-animation: toolbar-live-pulse 1.2s ease-out infinite;
+  animation: toolbar-live-pulse 1.2s ease-out infinite;
 }
 
-/* The ring that spreads from it and fades. */
-.toolbar-live-dot::after {
-  content: "";
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: #7abe28;
-  -webkit-animation: toolbar-live-ring 0.8s ease-out infinite;
-  animation: toolbar-live-ring 0.8s ease-out infinite;
-}
-
+/* The ring that spreads from it and fades is its own shadow, which is
+   centred on it by construction: a positioned ::after drifted off the dot
+   in iOS Safari. */
 @-webkit-keyframes toolbar-live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  0% { opacity: 1; box-shadow: 0 0 0 0 rgba(122, 190, 40, 0.7); }
+  50% { opacity: 0.55; }
+  100% { opacity: 1; box-shadow: 0 0 0 7px rgba(122, 190, 40, 0); }
 }
 
 @keyframes toolbar-live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
-}
-
-@-webkit-keyframes toolbar-live-ring {
-  0% { opacity: 0.6; -webkit-transform: scale(1); transform: scale(1); }
-  100% { opacity: 0; -webkit-transform: scale(2.6); transform: scale(2.6); }
-}
-
-@keyframes toolbar-live-ring {
-  0% { opacity: 0.6; transform: scale(1); }
-  100% { opacity: 0; transform: scale(2.6); }
+  0% { opacity: 1; box-shadow: 0 0 0 0 rgba(122, 190, 40, 0.7); }
+  50% { opacity: 0.55; }
+  100% { opacity: 1; box-shadow: 0 0 0 7px rgba(122, 190, 40, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toolbar-live-dot,
-  .toolbar-live-dot::after {
+  .toolbar-live-dot {
     -webkit-animation: none;
     animation: none;
-  }
-
-  .toolbar-live-dot::after {
-    display: none;
   }
 }
 
