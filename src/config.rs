@@ -116,13 +116,19 @@ pub struct GoogleConfig {
     /// The OAuth client id of the **Web application** client (Google Cloud
     /// console > APIs & Services > Credentials), whose authorised redirect
     /// URI is `{base_url}/auth/google/callback`. Google's ID tokens name it
-    /// as their audience -- the Android app's too, since Credential Manager
-    /// is given this as its server client id, so there is nothing else to
-    /// list here the way `[apple].app_ids` lists bundle ids.
+    /// as their audience, and so do the Android app's: Credential Manager is
+    /// given this as its server client id.
     pub client_id: String,
     /// That client's secret. Only ever sent to Google's token endpoint, to
     /// trade a code for an ID token.
     pub client_secret: String,
+    /// The client ids of the apps that sign in with Google themselves and
+    /// post the ID token, whose tokens name the app's own client id as
+    /// audience rather than the web one. The iOS app's iOS OAuth client
+    /// belongs here; the Android app's does not, since Credential Manager is
+    /// given `client_id` above as its server client id.
+    #[serde(default)]
+    pub app_ids: Vec<String>,
     /// Where Google publishes the keys it signs ID tokens with. Only a test
     /// changes it.
     #[serde(default = "default_google_keys_url")]

@@ -66,7 +66,10 @@ email_from_address = ""
 # authorised redirect URI. The Android app signs in with Credential Manager
 # and is given this same client id as its server client id, so its tokens name
 # it as audience too; it needs an Android OAuth client of its own in the same
-# project, with the signing certificate's SHA-1, but nothing here.
+# project, with the signing certificate's SHA-1, but nothing here. The iOS app
+# signs in against an iOS OAuth client of its own, whose tokens name that
+# client as audience, so it goes in app_ids.
 # [google]
 # client_id = "0000.apps.googleusercontent.com"
 # client_secret = ""
+# app_ids = ["1111.apps.googleusercontent.com"]
