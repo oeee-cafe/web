@@ -827,21 +827,18 @@ html[data-app] .toolbar-search {
 }
 
 /* The square is the button: no padded hover area around it. */
-.nav-bar .toolbar-menu summary,
-.nav-bar .toolbar-end .toolbar-theme-button {
+.nav-bar .toolbar-menu summary {
   padding: 0;
   line-height: 0;
 }
 
 .nav-bar .toolbar-menu summary:hover,
-.nav-bar .toolbar-menu[open] summary,
-.nav-bar .toolbar-end .toolbar-theme-button:hover {
+.nav-bar .toolbar-menu[open] summary {
   background: none;
 }
 
 .toolbar-menu summary:hover .toolbar-avatar,
-.toolbar-menu[open] .toolbar-avatar,
-.toolbar-theme-button:hover .toolbar-avatar {
+.toolbar-menu[open] .toolbar-avatar {
   background-color: var(--ds-ground);
 }
 
@@ -945,44 +942,28 @@ html[data-app] .toolbar-search {
   vertical-align: middle;
 }
 
-/* The guest's menu wears the avatar's shape, so the bar ends the same way
-   signed in or out. */
-
-
+/* The theme menu wears the avatar's shape, so the two squares at the
+   bar's end match. */
 .toolbar-avatar-guest svg {
   vertical-align: middle;
 }
 
-/* The round theme button, signed out: shaped like the avatar it stands in
-   for, showing the theme in use. */
-.toolbar-end .toolbar-theme-button {
-  display: block;
-  margin-top: 0;
-  margin-bottom: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--ds-ink);
-  cursor: default;
-  font: inherit;
-  line-height: 0;
-  box-shadow: none;
-  min-height: 0;
-}
-
-.toolbar-end .toolbar-theme-button:hover {
-  background-color: var(--ds-hover);
-}
-
-.nav-bar .toolbar-theme-button svg {
+/* The theme menu's square shows the theme in use. */
+.nav-bar .toolbar-theme-menu svg {
   display: none;
 }
 
-:root[data-theme="light"] .nav-bar .toolbar-theme-button .toolbar-theme-light,
-:root[data-theme="dark"] .nav-bar .toolbar-theme-button .toolbar-theme-dark,
-:root:not([data-theme]) .nav-bar .toolbar-theme-button .toolbar-theme-system {
+:root[data-theme="light"] .nav-bar .toolbar-theme-menu .toolbar-theme-light,
+:root[data-theme="dark"] .nav-bar .toolbar-theme-menu .toolbar-theme-dark,
+:root:not([data-theme]) .nav-bar .toolbar-theme-menu .toolbar-theme-system {
   display: inline-block;
+}
+
+/* The switch first, then a rule, then About. */
+.toolbar-theme-menu .toolbar-theme {
+  margin-bottom: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ds-line);
 }
 
 /* When one row will not hold the name, the sections and the account --
