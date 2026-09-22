@@ -1,3 +1,4 @@
+pub mod achievement;
 pub mod actor;
 pub mod admin;
 pub mod banner;

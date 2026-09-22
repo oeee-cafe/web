@@ -417,6 +417,9 @@ pub async fn save_session_to_post(
     .execute(&mut *tx)
     .await?;
 
+    // Everyone who drew in it has collaborated.
+    crate::models::achievement::award_achievements_for_session(&mut tx, session_id).await?;
+
     tx.commit().await?;
 
     tracing::info!(

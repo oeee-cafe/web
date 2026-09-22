@@ -198,6 +198,12 @@ pub async fn link_identity(
     .execute(&mut **tx)
     .await?;
     if inserted.rows_affected() == 1 {
+        if identity.provider == Provider::Steam {
+            // A Steam account newly linked is given everything already
+            // earned, drawn before Steam or not, and told about all of it.
+            super::achievement::award_achievements(tx, user_id).await?;
+            super::achievement::resend_achievements_to_steam(tx, user_id).await?;
+        }
         return Ok(Ok(()));
     }
 
@@ -407,6 +413,45 @@ mod tests {
                 .unwrap(),
             Err(UnlinkError::NotLinked)
         );
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn linking_steam_hands_over_what_was_already_earned() {
+        let Some(mut tx) = tx().await else { return };
+        let artist = user(&mut tx, "identity_test_g", None, None).await;
+        let image = query!(
+            r#"
+            INSERT INTO images (width, height, paint_duration, stroke_count, image_filename, tool)
+            VALUES (10, 10, '0'::interval, 0, $1, 'neo') RETURNING id
+            "#,
+            format!("{}.png", Uuid::new_v4()),
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+        .id;
+        query!(
+            "INSERT INTO posts (author_id, image_id, published_at) VALUES ($1, $2, now())",
+            artist.id,
+            image
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+
+        link_identity(&mut tx, artist.id, &steam("76561190000000010"))
+            .await
+            .unwrap()
+            .unwrap();
+        let waiting = crate::models::achievement::unsynced_achievements(&mut tx, 1000)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|u| u.user_id == artist.id)
+            .expect("waiting for Steam");
+        assert_eq!(waiting.steam_id, "76561190000000010");
+        assert_eq!(waiting.achievements, ["FIRST_DRAWING"]);
         tx.rollback().await.unwrap();
     }
 

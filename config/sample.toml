@@ -37,8 +37,11 @@ smtp_user = ""
 smtp_password = ""
 email_from_address = ""
 
-# Sign in with Steam, from the Oeee Cafe app on Steam. Leave the table out to
-# turn it off. web_api_key is a publisher key, not a user's.
+# Sign in with Steam, from the Oeee Cafe app on Steam, and its achievements.
+# Leave the table out to turn both off. web_api_key is a publisher key, not a
+# user's. The achievements' API names in Steamworks are FIRST_DRAWING,
+# FIRST_RELAY and FIRST_COLLABORATION, each set to be unlocked by the game
+# server ("Set By: Official GS"); the server unlocks them itself.
 # [steam]
 # app_id = 0
 # web_api_key = ""
