@@ -318,7 +318,6 @@ invitation-accepted = 已接受邀请
 invitation-rejected = 已拒绝邀请
 invitation-sent-at = 发送时间
 
-community-drawing-tool = 画板
 community-drawing-width = 宽度
 community-drawing-height = 高度
 community-drawing-new = 新作品

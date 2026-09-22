@@ -320,7 +320,6 @@ invitation-accepted = Invitation accepted
 invitation-rejected = Invitation rejected
 invitation-sent-at = Sent
 
-community-drawing-tool = Tool
 community-drawing-width = Width
 community-drawing-height = Height
 community-drawing-new = New post
