@@ -427,6 +427,42 @@ pub async fn apple_sign_in(
     Ok(Redirect::to(&url).into_response())
 }
 
+#[derive(Deserialize)]
+pub struct AppleStartForm {
+    next: Option<String>,
+}
+
+/// A sign-in for the iOS app to make natively: the state and nonce it hands
+/// Apple, kept in the web view's session as `/auth/apple` keeps them for a
+/// browser. The app asks from inside the page, so the answer is this
+/// session's; another site's page gets neither the session nor, without
+/// CORS, the answer.
+pub async fn apple_start(
+    session: Session,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<AppleStartForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    if state.config.apple.is_none() {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    }
+    let request = AppleRequest {
+        state: random_token(),
+        nonce: random_token(),
+        next: local_next(form.next.as_deref()),
+        started_at: Utc::now(),
+    };
+    let answer = serde_json::json!({ "state": request.state, "nonce": request.nonce });
+    session
+        .insert(APPLE_REQUEST_KEY, request)
+        .await
+        .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+    Ok(axum::Json(answer).into_response())
+}
+
 /// What Apple posts back: an ID token and the state it was sent with, or an
 /// error such as `user_cancelled_authorize`. `code` is also posted, and not
 /// needed: the ID token already says who signed in.

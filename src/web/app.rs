@@ -22,8 +22,8 @@ use crate::web::handlers::auth::{
     api_login, api_logout, api_me, api_signup, do_login, do_logout, do_signup, login, signup,
 };
 use crate::web::handlers::identity::{
-    apple_callback, apple_sign_in, cancel_pending_identity, do_apple_sign_in, do_identity_welcome,
-    do_steam_sign_in, do_unlink_identity, identity_welcome, steam_app_only,
+    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_sign_in,
+    do_identity_welcome, do_steam_sign_in, do_unlink_identity, identity_welcome, steam_app_only,
 };
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
@@ -623,6 +623,7 @@ impl App {
             .route("/auth/apple", get(apple_sign_in))
             .route("/auth/apple", post(do_apple_sign_in))
             .route("/auth/apple/callback", post(apple_callback))
+            .route("/auth/apple/start", post(apple_start))
             .route("/auth/welcome", get(identity_welcome))
             .route("/auth/welcome", post(do_identity_welcome))
             .route("/auth/cancel", post(cancel_pending_identity))

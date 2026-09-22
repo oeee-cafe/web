@@ -13,6 +13,12 @@
   // flashes up and away.
   if (/OeeeCafeiOS/.test(navigator.userAgent)) {
     document.documentElement.setAttribute("data-app", "ios");
+    // An app that signs in with Apple itself stops the button's navigation
+    // (WebTab.swift); an older one would open Apple's page in Safari, away
+    // from this session, so the button shows only for one that says so.
+    if (/\bSignInWithApple\b/.test(navigator.userAgent)) {
+      document.documentElement.setAttribute("data-native-apple-sign-in", "");
+    }
     // Going back in the app is the web view's edge swipe, which already
     // moved the page; a cross-fade after it would move it twice. Listened
     // for here, in the head, so it is heard before the page first paints.
