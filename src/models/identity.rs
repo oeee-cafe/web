@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use sqlx::{query, query_as, Postgres, Transaction};
 
+use super::supporter::OwnedProduct;
 use super::user::User;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,12 +61,13 @@ pub struct VerifiedIdentity {
     /// An address the provider vouches for. Trusted: an Oeee Cafe account
     /// with this address, verified, is signed into and linked.
     pub email: Option<String>,
-    /// Whether the provider says this account owns the Supporter Pack now --
-    /// the DLC, on Steam. `None` when that could not be asked, which leaves
-    /// the account's standing as it was. Whichever account it signs into is a
-    /// supporter while it is `Some(true)`, and keeps the achievement after.
+    /// Which years' Supporter Packs the provider says this account owns now
+    /// -- the DLCs, on Steam. `None` when that could not be asked, which
+    /// leaves the account's standing as it was, and `Some` of nothing when
+    /// it owns none. Whichever account it signs into supports the years it
+    /// names, and keeps the achievement after.
     #[serde(default)]
-    pub purchased: Option<bool>,
+    pub purchased: Option<Vec<OwnedProduct>>,
 }
 
 impl VerifiedIdentity {
@@ -76,7 +78,11 @@ impl VerifiedIdentity {
             Provider::Steam => Some("STEAM_SUPPORTER"),
             Provider::Apple => None,
         }
-        .filter(|_| self.purchased == Some(true))
+        .filter(|_| {
+            self.purchased
+                .as_deref()
+                .is_some_and(|packs| !packs.is_empty())
+        })
     }
 }
 
@@ -220,10 +226,7 @@ pub async fn link_identity(
     .execute(&mut **tx)
     .await?;
     if inserted.rows_affected() == 1 {
-        super::supporter::record_supporter_check_for(tx, identity).await?;
-        if let Some(achievement) = identity.supporter_achievement() {
-            super::achievement::grant_achievement(tx, user_id, achievement).await?;
-        }
+        refresh_standing(tx, user_id, identity).await?;
         if identity.provider == Provider::Steam {
             // A Steam account newly linked is given everything already
             // earned, drawn before Steam or not, and told about all of it.
@@ -242,7 +245,7 @@ pub async fn link_identity(
     .await?;
     match owner {
         Some(row) if row.user_id == user_id => {
-            touch_identity(tx, identity).await?;
+            touch_identity(tx, user_id, identity).await?;
             Ok(Ok(()))
         }
         Some(_) => Ok(Err(LinkError::LinkedElsewhere)),
@@ -250,10 +253,11 @@ pub async fn link_identity(
     }
 }
 
-/// Records a sign-in, keeping the name and address shown on the account page
-/// current with what the provider says now.
+/// Records a sign-in by `user_id`, keeping the name and address shown on
+/// the account page current with what the provider says now.
 pub async fn touch_identity(
     tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
     identity: &VerifiedIdentity,
 ) -> Result<()> {
     query!(
@@ -271,32 +275,33 @@ pub async fn touch_identity(
     )
     .execute(&mut **tx)
     .await?;
-    refresh_standing(tx, identity).await
+    refresh_standing(tx, user_id, identity).await
 }
 
-/// Records what the provider says now about the Supporter Pack for the
-/// account `identity` is linked to, and gives it the achievement if it owns
-/// one -- bought since it was linked, or before the achievement existed.
-/// Neither signs anyone in nor links anything: an identity linked to no
-/// account changes nothing.
+/// Records the packs the provider says `identity` owns now as `user_id`'s,
+/// and gives that account the achievement if it owns any -- bought since it
+/// signed in, or before the achievement existed.
+///
+/// The packs are the account's, not the identity's: the Steam app hands over
+/// a ticket for whoever is signed in here, linked or not (see
+/// `models::supporter`). Neither signs anyone in nor links anything.
 pub async fn refresh_standing(
     tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
     identity: &VerifiedIdentity,
 ) -> Result<()> {
-    super::supporter::record_supporter_check_for(tx, identity).await?;
-    if let Some(achievement) = identity.supporter_achievement() {
-        query!(
-            r#"
-            INSERT INTO user_achievements (user_id, achievement)
-            SELECT user_id, $3 FROM user_identities WHERE provider = $1 AND subject = $2
-            ON CONFLICT DO NOTHING
-            "#,
-            identity.provider.as_str(),
-            identity.subject,
-            achievement,
+    if let Some(packs) = identity.purchased.as_deref() {
+        super::supporter::record_owned_products(
+            tx,
+            user_id,
+            identity.provider,
+            &identity.subject,
+            packs,
         )
-        .execute(&mut **tx)
         .await?;
+    }
+    if let Some(achievement) = identity.supporter_achievement() {
+        super::achievement::grant_achievement(tx, user_id, achievement).await?;
     }
     Ok(())
 }
@@ -351,6 +356,14 @@ mod tests {
     use super::*;
     use sqlx::PgPool;
 
+    /// This year's Supporter Pack on Steam, as Steam would name it.
+    fn pack() -> OwnedProduct {
+        OwnedProduct {
+            product: "481".to_string(),
+            year: super::super::supporter::current_year(),
+        }
+    }
+
     async fn tx() -> Option<Transaction<'static, Postgres>> {
         let url = std::env::var("DATABASE_URL").ok()?;
         let pool = PgPool::connect(&url).await.ok()?;
@@ -389,7 +402,7 @@ mod tests {
             subject: subject.to_string(),
             name: Some("오이".to_string()),
             email: None,
-            purchased: Some(false),
+            purchased: Some(Vec::new()),
         }
     }
 
@@ -523,7 +536,7 @@ mod tests {
         // Bought, then linked.
         let buyer = user(&mut tx, "identity_test_h", None, None).await;
         let bought = VerifiedIdentity {
-            purchased: Some(true),
+            purchased: Some(vec![pack()]),
             ..steam("76561190000000011")
         };
         link_identity(&mut tx, buyer.id, &bought)
@@ -542,8 +555,9 @@ mod tests {
         assert!(!has_supporter_achievement(&mut tx, borrower.id).await);
         touch_identity(
             &mut tx,
+            borrower.id,
             &VerifiedIdentity {
-                purchased: Some(true),
+                purchased: Some(vec![pack()]),
                 ..borrowed
             },
         )

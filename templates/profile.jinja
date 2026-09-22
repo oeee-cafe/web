@@ -1,7 +1,7 @@
 {% from "follow_macro.jinja" import follow_button, unfollow_button %} {% extends "base.jinja" %}
 {% from "user_pill_macro.jinja" import user_pill %}
 {% from "achievement_icon_macro.jinja" import achievement_icon %}
-{% from "supporter_badge_macro.jinja" import supporter_heart %}
+{% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
 {% from "per_row_macro.jinja" import per_row %}
 {% block title %}
   {{ super() }} | {{ user.display_name }} (@{{ user.login_name }})
@@ -52,10 +52,17 @@
           <div class="profile-handle">@{{ user.login_name }}@{{ domain }}</div>
         {% endif %}
         <div class="profile-chips">
-          {% if is_supporter %}
-            {# First, and on the accent: the one chip that is a thank-you. #}
-            <a class="profile-chip supporter-chip" href="/about#supporters">{{ supporter_heart() }}{{ ftl_get_message("supporter-badge") }}</a>
-          {% endif %}
+          {% for standing in supporter_standings %}
+            {# First, and on the accent: the chips that are a thank-you. One
+               for every year they have supported, earliest first, on the
+               platform that year's pack was bought on. A year that has
+               passed stays here -- the mark beside their name is this
+               year's, this is what they gave. #}
+            <a class="profile-chip supporter-chip"
+               href="/about#supporters"
+               aria-label="{{ ftl_format_pattern('supporter-year', {'platform': supporter_mark_name(standing.provider), 'year': standing.year}) }}"
+               title="{{ supporter_mark_name(standing.provider) }}">{{ supporter_mark(standing.provider) }}{{ standing.year }}</a>
+          {% endfor %}
           <a class="profile-chip" href="/@{{ user.login_name }}/guestbook">{{ ftl_get_message("profile-guestbook") }}</a>
           {% for link, target in links %}
             <a class="profile-chip" href="{{ link.url }}" target="{{ target }}" rel="noopener">{{ link.description }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>

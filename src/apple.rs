@@ -11,6 +11,11 @@
 //! with a state and nonce it asks the site for from inside its web view, and
 //! posts the token it gets to the same place. Its token names the app's
 //! bundle ID as audience; the rest is checked the same way.
+//!
+//! Apple says nothing here about what anyone has bought -- an ID token names
+//! a person and nothing else, which is why `purchased` is always `None`
+//! below. What the app sells goes through `app_store`, which asks a
+//! different Apple with a different key.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};

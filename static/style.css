@@ -2831,7 +2831,63 @@ html[data-app="android"][data-push]::view-transition-new(root) {
   background-color: var(--ds-ground);
 }
 
-/* A supporter: the one chip on the accent, a heart before the word. */
+/* The Supporter Pack's own page and the heart that leads to it. Only an app
+   can take the money -- StoreKit in the iOS app, Steam's overlay in the
+   Steam build -- so both are hidden until an app that can sell marks the
+   root `data-store`, before anything is drawn, as the Steam app marks
+   `data-steam-app` above. Each button appears only in front of its own
+   store; a browser gets the page and the line saying where it is sold. */
+.toolbar-supporter,
+.supporter-buy,
+.supporter-restore {
+  display: none;
+}
+
+html[data-store] .toolbar-supporter {
+  display: -webkit-inline-box;
+  display: inline-flex;
+}
+
+html[data-store="apple"] .supporter-buy[data-store="apple"],
+html[data-store="steam"] .supporter-buy[data-store="steam"],
+html[data-store="apple"] .supporter-restore {
+  display: -webkit-inline-box;
+  display: inline-flex;
+}
+
+html[data-store] .supporter-elsewhere {
+  display: none;
+}
+
+.supporter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-3);
+}
+
+.supporter-actions:empty {
+  margin-top: 0;
+}
+
+/* The price the store told the app, after the button's words. Empty until
+   it has -- and empty is nothing at all, not a gap. */
+.supporter-price:not(:empty)::before {
+  content: " · ";
+}
+
+.supporter-price {
+  opacity: 0.85;
+}
+
+/* The thanks, with this year's mark before it. */
+.supporter-thanks .supporter-mark {
+  margin-right: 4px;
+}
+
+/* A supporter: the chips on the accent, one for every platform they
+   support on, each with that platform's mark before the word and the date
+   it started after it. */
 .profile-chip.supporter-chip,
 .profile-chip.supporter-chip:visited {
   border-color: var(--ds-accent-line);
@@ -2843,38 +2899,37 @@ html[data-app="android"][data-push]::view-transition-new(root) {
   background-color: var(--ds-accent-hover);
 }
 
-.supporter-chip .supporter-heart {
+.supporter-chip .supporter-mark {
   margin-right: 4px;
   vertical-align: -2px;
 }
 
-/* The same heart, small and round, beside a supporter's name wherever a
-   page prints it; the accent disc is what makes it read as a mark rather
-   than a reaction. */
+/* The same mark before a platform's name where a supporter chooses which of
+   them to wear. */
+.community-form-choice-name .supporter-mark {
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+
+/* The same mark beside a supporter's name wherever a page prints it. An
+   emoji is drawn in its own colours by the reader's system, so there is no
+   accent disc behind it and nothing here sets a colour: a disc under a
+   gamepad read as a reaction someone had left. */
 .supporter-badge,
 .supporter-badge:visited {
   display: -webkit-inline-box;
   display: inline-flex;
   -webkit-box-align: center;
   align-items: center;
-  -webkit-box-pack: center;
-  justify-content: center;
   flex: none;
-  width: 18px;
-  height: 18px;
   margin-left: 4px;
-  border-radius: 9px;
-  background-color: var(--ds-accent);
-  box-shadow: inset 0 0 0 1px var(--ds-accent-line);
-  color: var(--ds-accent-ink);
-  vertical-align: -3px;
+  font-size: 12px;
+  line-height: 1;
   text-decoration: none;
 }
 
-.supporter-badge .supporter-heart {
+.supporter-badge .supporter-mark {
   display: block;
-  width: 12px;
-  height: 12px;
 }
 
 .profile-chip-out {

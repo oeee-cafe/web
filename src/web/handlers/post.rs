@@ -1,6 +1,6 @@
 use crate::app_error::AppError;
 use crate::web::presence::{Activity, Presence};
-use crate::models::supporter::supporters_on_post;
+use crate::models::supporter::supporter_marks_on_post;
 use crate::models::achievement::award_achievements;
 use crate::models::actor::Actor;
 use crate::models::comment::{
@@ -597,7 +597,7 @@ pub async fn post_view(
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
     let comments = build_comment_thread_tree(&mut tx, uuid).await?;
-    let supporters = supporters_on_post(&mut tx, uuid).await?;
+    let supporters = supporter_marks_on_post(&mut tx, uuid).await?;
 
     // Get parent post data if it exists
     let (parent_post_author_login_name, parent_post_data) =
@@ -1788,7 +1788,7 @@ pub async fn do_create_comment(
     // post is not used after this point, no need to unwrap
 
     let comments = build_comment_thread_tree(&mut tx, post_id).await?;
-    let supporters = supporters_on_post(&mut tx, post_id).await?;
+    let supporters = supporter_marks_on_post(&mut tx, post_id).await?;
     let _ = tx.commit().await;
 
     // Send push notifications for created notifications
@@ -2667,7 +2667,7 @@ pub async fn post_view_by_login_name(
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
     let comments = build_comment_thread_tree(&mut tx, uuid).await?;
-    let supporters = supporters_on_post(&mut tx, uuid).await?;
+    let supporters = supporter_marks_on_post(&mut tx, uuid).await?;
 
     // Get parent post data if it exists
     let (parent_post_author_login_name, parent_post_data) =

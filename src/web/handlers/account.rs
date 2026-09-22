@@ -8,8 +8,10 @@ use crate::models::user::{
     update_user_preferred_language, update_user_show_sensitive_content, update_user_with_activity,
     AuthSession, DeleteConfirmation, Language,
 };
-use crate::models::identity::list_identities_for_user;
-use crate::models::supporter::{is_supporter, set_show_in_credits, shows_in_credits};
+use crate::models::identity::{list_identities_for_user, Provider};
+use crate::models::supporter::{
+    current_year, mark_for, set_mark, set_show_in_credits, shows_in_credits, standings,
+};
 use crate::web::context::CommonContext;
 use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::state::AppState;
@@ -53,12 +55,28 @@ pub async fn account(
         None => Vec::new(),
     };
     let has_password = auth_session.user.as_ref().is_some_and(|u| u.has_password());
-    // `None` for anyone who is not a supporter, who has no credits to be in.
-    let show_in_credits = match auth_session.user.as_ref() {
-        Some(user) if is_supporter(&mut tx, user.id).await? => {
-            Some(shows_in_credits(&mut tx, user.id).await?)
-        }
-        _ => None,
+    // The platforms this year's pack was bought on, which is what there is
+    // to choose a mark between. A year that has passed is on their profile
+    // and not here. `None` for anyone not supporting this year, who has no
+    // credits to be in and no mark to wear.
+    let mut supporter_platforms: Vec<String> = match auth_session.user.as_ref() {
+        Some(user) => standings(&mut tx, user.id)
+            .await?
+            .into_iter()
+            .filter(|standing| standing.year == current_year())
+            .map(|standing| standing.provider)
+            .collect(),
+        None => Vec::new(),
+    };
+    // Two years bought on the same platform are one platform to choose.
+    supporter_platforms.sort();
+    supporter_platforms.dedup();
+    let (show_in_credits, worn_mark) = match auth_session.user.as_ref() {
+        Some(user) if !supporter_platforms.is_empty() => (
+            Some(shows_in_credits(&mut tx, user.id).await?),
+            mark_for(&mut tx, user.id).await?,
+        ),
+        _ => (None, None),
     };
 
     let languages = vec![
@@ -76,6 +94,10 @@ pub async fn account(
         identities,
         has_password,
         show_in_credits,
+        supporter_platforms,
+        // Not `supporter_mark`: account.jinja imports a macro by that name,
+        // and an imported name wins over a context one.
+        worn_mark,
         steam_enabled => state.config.steam.is_some(),
         apple_enabled => state.config.apple.is_some(),
         draft_post_count => common_ctx.draft_post_count,
@@ -142,16 +164,22 @@ pub async fn save_show_sensitive_content(
 }
 
 #[derive(Deserialize)]
-pub struct ShowInCreditsForm {
+pub struct SupporterForm {
     pub show_in_credits: Option<String>,
+    /// Which platform's mark to wear: a provider's name, or empty for the
+    /// default. Absent -- which is what a page rendered by the other colour
+    /// mid-deploy posts -- leaves the choice alone rather than clearing a
+    /// mark it never showed.
+    pub mark: Option<String>,
 }
 
-/// Whether a supporter is thanked by name on /about. Their badge stays either
-/// way.
-pub async fn save_show_in_credits(
+/// What a supporter is asked: whether they are thanked by name on /about,
+/// and which platform's mark goes beside their name. Their mark stays
+/// either way; a name that is not a provider is ignored.
+pub async fn save_supporter_settings(
     auth_session: AuthSession,
     State(state): State<AppState>,
-    Form(form): Form<ShowInCreditsForm>,
+    Form(form): Form<SupporterForm>,
 ) -> Result<impl IntoResponse, AppError> {
     let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
     let mut tx = state.db_pool.begin().await?;
@@ -161,6 +189,15 @@ pub async fn save_show_in_credits(
         form.show_in_credits.as_deref() == Some("on"),
     )
     .await?;
+    match form.mark.as_deref() {
+        Some("") => set_mark(&mut tx, user.id, None).await?,
+        Some(name) => {
+            if let Some(provider) = Provider::parse(name) {
+                set_mark(&mut tx, user.id, Some(provider)).await?;
+            }
+        }
+        None => {}
+    }
     tx.commit().await?;
     Ok(Redirect::to("/account").into_response())
 }

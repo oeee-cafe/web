@@ -12,8 +12,9 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
 
-use crate::config::SteamConfig;
+use crate::config::{SteamConfig, SupporterApp};
 use crate::models::identity::{Provider, VerifiedIdentity};
+use crate::models::supporter::OwnedProduct;
 
 /// What the app names when it asks for a ticket, and what the ticket is
 /// checked against: a ticket made for some other service is not accepted
@@ -149,12 +150,12 @@ pub async fn verify_ticket(
     if params.publisherbanned {
         return Ok(Err(TicketRejected::Banned));
     }
-    let purchased = match supporter_status(config, &params.steamid).await {
+    let purchased = match owned_supporter_packs(config, &params.steamid).await {
         Ok(owned) => owned,
         Err(error) => {
             // Unknown, which leaves the account's standing as it was; asked
             // again at the next sign-in or the next recheck.
-            tracing::warn!("could not check the Supporter Pack with Steam: {error:#}");
+            tracing::warn!("could not check the Supporter Packs with Steam: {error:#}");
             None
         }
     };
@@ -194,27 +195,37 @@ struct Ownership {
     result: Option<String>,
 }
 
-/// Whether `steam_id` owns any of `supporter_app_ids` now, or `None` when
-/// there are none configured to own.
+/// Which years' Supporter Packs `steam_id` owns now, or `None` when there
+/// are none configured to own or Steam could not be asked about them.
 ///
-/// Owning one is enough, so a check that fails for one app still answers
-/// yes when another is owned; it only fails when nothing was found owned.
-pub async fn supporter_status(config: &SteamConfig, steam_id: &str) -> Result<Option<bool>> {
-    if config.supporter_app_ids.is_empty() {
+/// The app itself is never one of them: owning Oeee Cafe is not supporting
+/// it, and a config that names only `app_id` asks Steam nothing at all.
+///
+/// Every pack is asked about, because each is a year of its own and the
+/// answer is the whole list. One failed question is a failed answer: a
+/// missing pack would read as a refund and take a year away.
+pub async fn owned_supporter_packs(
+    config: &SteamConfig,
+    steam_id: &str,
+) -> Result<Option<Vec<OwnedProduct>>> {
+    let packs: Vec<&SupporterApp> = config
+        .supporter_apps
+        .iter()
+        .filter(|pack| pack.app_id != config.app_id)
+        .collect();
+    if packs.is_empty() {
         return Ok(None);
     }
-    let mut failure = None;
-    for &app_id in &config.supporter_app_ids {
-        match owns_outright(config, steam_id, app_id).await {
-            Ok(true) => return Ok(Some(true)),
-            Ok(false) => {}
-            Err(error) => failure = Some(error),
+    let mut owned = Vec::new();
+    for pack in packs {
+        if owns_outright(config, steam_id, pack.app_id).await? {
+            owned.push(OwnedProduct {
+                product: pack.app_id.to_string(),
+                year: pack.year,
+            });
         }
     }
-    match failure {
-        Some(error) => Err(error),
-        None => Ok(Some(false)),
-    }
+    Ok(Some(owned))
 }
 
 /// Whether `steam_id` bought `app_id` on Steam: owns it for good, as itself.
@@ -367,14 +378,14 @@ pub async fn sync_achievements(db: sqlx::PgPool, config: SteamConfig) {
 
 /// Asks Steam again, once a day, about every linked Steam account, so
 /// standing follows ownership without anyone signing in: a refund takes the
-/// badge away, a purchase made while signed in gives it, and an app added to
-/// `supporter_app_ids` reaches everyone who already owns it. A check Steam
+/// mark away, a purchase made while signed in gives it, and a year added to
+/// `supporter_apps` reaches everyone who already owns it. A check Steam
 /// cannot answer changes nothing.
 ///
 /// Both colours run this for a moment during a deploy, and asking twice is
 /// harmless.
 pub async fn recheck_supporters(db: sqlx::PgPool, config: SteamConfig) {
-    use crate::models::supporter::{record_supporter_check, steam_accounts_due_for_check};
+    use crate::models::supporter::{record_owned_products, steam_accounts_due_for_check};
 
     let mut every = tokio::time::interval(Duration::from_secs(10 * 60));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -391,8 +402,8 @@ pub async fn recheck_supporters(db: sqlx::PgPool, config: SteamConfig) {
                 continue;
             }
         };
-        for steam_id in due {
-            let owned = match supporter_status(&config, &steam_id).await {
+        for account in due {
+            let owned = match owned_supporter_packs(&config, &account.steam_id).await {
                 Ok(Some(owned)) => owned,
                 Ok(None) => return,
                 Err(error) => {
@@ -402,7 +413,14 @@ pub async fn recheck_supporters(db: sqlx::PgPool, config: SteamConfig) {
             };
             let recorded = async {
                 let mut tx = db.begin().await?;
-                record_supporter_check(&mut tx, &steam_id, owned).await?;
+                record_owned_products(
+                    &mut tx,
+                    account.user_id,
+                    Provider::Steam,
+                    &account.steam_id,
+                    &owned,
+                )
+                .await?;
                 tx.commit().await?;
                 anyhow::Ok(())
             };
@@ -482,9 +500,16 @@ mod tests {
         SteamConfig {
             app_id: 480,
             web_api_key: "publisher-key".to_string(),
-            supporter_app_ids: vec![481],
+            supporter_apps: vec![SupporterApp {
+                year: 2026,
+                app_id: 481,
+            }],
             web_api_url: format!("http://{addr}"),
         }
+    }
+
+    fn years(owned: &[OwnedProduct]) -> Vec<i32> {
+        owned.iter().map(|pack| pack.year).collect()
     }
 
     #[tokio::test]
@@ -498,36 +523,76 @@ mod tests {
         assert_eq!(identity.subject, STEAM_ID);
         assert_eq!(identity.name.as_deref(), Some("오이"));
         assert_eq!(identity.email, None);
-        assert_eq!(identity.purchased, Some(true));
+        assert_eq!(
+            identity.purchased.as_deref().map(years),
+            Some(vec![2026]),
+            "the year of the pack it owns"
+        );
     }
 
     #[tokio::test]
     async fn without_a_supporter_pack_nobody_is_asked_about() {
         let mut config = fake_steam(false).await;
-        config.supporter_app_ids = vec![];
+        config.supporter_apps = vec![];
         let identity = verify_ticket(&config, "14000000abcdef")
             .await
             .unwrap()
             .unwrap();
         assert_eq!(identity.purchased, None);
 
-        // The free app is owned, and owning it makes nobody a supporter.
-        config.supporter_app_ids = vec![config.app_id];
+        // Naming the app itself names nothing: buying Oeee Cafe is not
+        // supporting it, so there is nothing left to ask Steam about.
+        config.supporter_apps = vec![SupporterApp {
+            year: 2026,
+            app_id: config.app_id,
+        }];
         let identity = verify_ticket(&config, "14000000abcdef")
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(identity.purchased, Some(false));
+        assert_eq!(identity.purchased, None);
+        assert_eq!(
+            owned_supporter_packs(&config, STEAM_ID).await.unwrap(),
+            None
+        );
     }
 
+    /// Every year is asked about and the answer is the whole list: this
+    /// account bought 2026's and not 2027's.
     #[tokio::test]
-    async fn owning_any_one_supporter_app_is_enough() {
-        // As if the app had gone paid beside a delisted Supporter Pack.
+    async fn the_years_owned_come_back_and_the_years_unbought_do_not() {
         let mut config = fake_steam(false).await;
-        config.supporter_app_ids = vec![config.app_id, 481];
+        config.supporter_apps = vec![
+            SupporterApp {
+                year: 2027,
+                app_id: 482,
+            },
+            SupporterApp {
+                year: 2026,
+                app_id: 481,
+            },
+        ];
+        let owned = owned_supporter_packs(&config, STEAM_ID)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(years(&owned), vec![2026]);
+        assert_eq!(owned[0].product, "481");
+
+        // The app itself among them is passed over rather than counted.
+        config.supporter_apps = vec![
+            SupporterApp {
+                year: 2026,
+                app_id: config.app_id,
+            },
+            SupporterApp {
+                year: 2027,
+                app_id: 482,
+            },
+        ];
         assert_eq!(
-            supporter_status(&config, STEAM_ID).await.unwrap(),
-            Some(true)
+            owned_supporter_packs(&config, STEAM_ID).await.unwrap(),
+            Some(Vec::new())
         );
     }
 
@@ -540,7 +605,11 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(identity.subject, STEAM_ID);
-        assert_eq!(identity.purchased, Some(false));
+        assert_eq!(
+            identity.purchased,
+            Some(Vec::new()),
+            "a borrowed copy is none"
+        );
     }
 
     #[tokio::test]
@@ -555,7 +624,10 @@ mod tests {
         let config = SteamConfig {
             app_id: 480,
             web_api_key: "k".to_string(),
-            supporter_app_ids: vec![481],
+            supporter_apps: vec![SupporterApp {
+                year: 2026,
+                app_id: 481,
+            }],
             // Nothing listens here; reaching it would be an error, not Invalid.
             web_api_url: "http://127.0.0.1:9".to_string(),
         };
@@ -587,7 +659,7 @@ mod tests {
         let mut config = SteamConfig {
             app_id: 480,
             web_api_key: "publisher-key".to_string(),
-            supporter_app_ids: vec![],
+            supporter_apps: vec![],
             web_api_url: format!("http://{addr}"),
         };
 

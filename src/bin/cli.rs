@@ -43,6 +43,8 @@ enum Commands {
     SendTestPush { login_name: String },
     /// Grant or revoke site-wide staff access (user, moderator, admin)
     SetRole { login_name: String, role: RoleArg },
+    /// Check that the App Store will talk to us about purchases
+    CheckAppStore,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -83,6 +85,37 @@ async fn main() -> Result<()> {
         exit(1);
     });
 
+    // Asking Apple about a key needs no database, and a check that first
+    // opens a pool would fail for the wrong reason on a server whose
+    // Postgres is down.
+    if matches!(cli.command, Commands::CheckAppStore) {
+        // What the config says, then whether Apple agrees: a wrong issuer or
+        // a key Apple has revoked is a 401 here rather than a purchase that
+        // quietly grants nothing.
+        let Some(store) = cfg.app_store.as_ref() else {
+            println!("no [app_store] table in the config: the app sells nothing");
+            exit(1);
+        };
+        println!(
+            "issuer {}, key {}, app {}",
+            store.issuer_id, store.key_id, store.bundle_id
+        );
+        if store.supporter_products.is_empty() {
+            println!("no packs: [[app_store.supporter_products]] is empty");
+        }
+        for pack in &store.supporter_products {
+            println!("  {} -> {}", pack.year, pack.product_id);
+        }
+        match oeee_cafe::app_store::check(store).await {
+            Ok(()) => println!("the App Store accepted the key"),
+            Err(error) => {
+                println!("the App Store did not: {error:#}");
+                exit(1);
+            }
+        }
+        return Ok(());
+    }
+
     let db = match cfg.connect_database().await {
         Ok(db) => db,
         Err(e) => {
@@ -95,6 +128,8 @@ async fn main() -> Result<()> {
     // You can check for the existence of subcommands, and if found use their
     // matches just as you would the top level cmd
     match &cli.command {
+        // Answered above, before the database was opened.
+        Commands::CheckAppStore => unreachable!(),
         Commands::ListCommunities => {
             let communities = get_communities(&mut tx).await?;
             for community in communities {

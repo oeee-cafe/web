@@ -42,11 +42,13 @@ use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 
 use crate::app_error::AppError;
+use crate::app_store;
 use crate::apple;
 use crate::models::identity::{
     find_user_by_identity, find_user_by_verified_email, link_identity, refresh_standing,
     touch_identity, unlink_identity, LinkError, Provider, UnlinkError, VerifiedIdentity,
 };
+use crate::models::supporter::record_purchase;
 use crate::models::user::{
     create_user, find_user_by_login_name, login_name_conflicts_with_community,
     update_user_email_verified_at, update_user_preferred_language, AuthSession, User, UserDraft,
@@ -160,7 +162,7 @@ async fn sign_in_with(
 
     match (linked, current) {
         (Some(linked), None) => {
-            touch_identity(&mut tx, &identity).await?;
+            touch_identity(&mut tx, linked.id, &identity).await?;
             tx.commit().await?;
             auth_session
                 .login(&linked)
@@ -170,7 +172,7 @@ async fn sign_in_with(
             Ok(Redirect::to(next.as_deref().unwrap_or("/")).into_response())
         }
         (Some(linked), Some(current)) if linked.id == current.id => {
-            touch_identity(&mut tx, &identity).await?;
+            touch_identity(&mut tx, linked.id, &identity).await?;
             tx.commit().await?;
             Ok(Redirect::to(next.as_deref().unwrap_or("/")).into_response())
         }
@@ -369,16 +371,22 @@ pub struct SteamRefreshForm {
     ticket: String,
 }
 
-/// Asks Steam again what the ticket's Steam account owns, and records it for
-/// whichever account that Steam account is linked to. The Steam app posts
-/// here in the background when Steam says a DLC has been installed -- the
-/// Supporter Pack, bought in the overlay or the store while the app was open
-/// -- so the badge follows at once rather than at the next daily recheck.
+/// Asks Steam again which Supporter Packs the ticket's Steam account owns,
+/// and records them for whoever is signed in. The Steam app posts here in
+/// the background when Steam says a DLC has been installed -- a pack, bought
+/// in the overlay or the store while the app was open -- so the mark follows
+/// at once rather than at the next daily recheck.
+///
+/// The packs are the signed-in account's, so buying one inside the Steam app
+/// works without linking Steam at all. With nobody signed in there is still
+/// the account the Steam identity is linked to, if it is linked to one, and
+/// otherwise nothing to record against.
 ///
 /// Unlike `/auth/steam` it signs nobody in and links nothing, so a page that
-/// is mid-drawing, or signed in as someone else, is left as it was. Standing
-/// is only ever what Steam says, so there is nothing here worth forging.
+/// is mid-drawing is left as it was. Standing is only ever what Steam says,
+/// so there is nothing here worth forging.
 pub async fn do_steam_refresh(
+    auth_session: AuthSession,
     State(state): State<AppState>,
     headers: HeaderMap,
     Form(form): Form<SteamRefreshForm>,
@@ -399,7 +407,76 @@ pub async fn do_steam_refresh(
         }
     };
     let mut tx = state.db_pool.begin().await?;
-    refresh_standing(&mut tx, &identity).await?;
+    let holder = match auth_session.user.as_ref() {
+        Some(user) => Some(user.id),
+        None => find_user_by_identity(&mut tx, Provider::Steam, &identity.subject)
+            .await?
+            .map(|user| user.id),
+    };
+    let Some(holder) = holder else {
+        return Ok(StatusCode::UNAUTHORIZED.into_response());
+    };
+    refresh_standing(&mut tx, holder, &identity).await?;
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[derive(Deserialize)]
+pub struct ApplePurchaseForm {
+    /// `Transaction.id` from StoreKit, as the app read it off the purchase
+    /// it just made or off an entitlement it restored.
+    transaction_id: String,
+}
+
+/// Asks the App Store what a transaction was, and records it for the account
+/// the app named when it began the purchase. The iOS app posts here after a
+/// purchase goes through and again when it restores one -- from inside its
+/// web view, as it posts a native Sign in with Apple token, so the session
+/// it is signed in as comes with it.
+///
+/// The id is worth nothing on its own: Apple is asked what the transaction
+/// was, and the pack goes to whoever is signed in here -- no Apple identity
+/// needed, so buying inside the app works for an account that signs in with
+/// a password.
+///
+/// Restoring posts the same transaction again, which updates the one row
+/// that purchase has: it can give a pack back, or hand it to the account
+/// restoring it, but it cannot make a second one (see `models::supporter`).
+pub async fn do_apple_purchase(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<ApplePurchaseForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let Some(config) = state.config.app_store.as_ref() else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let Some(user) = auth_session.user.as_ref() else {
+        return Ok(StatusCode::UNAUTHORIZED.into_response());
+    };
+    let purchase = match app_store::look_up(config, &form.transaction_id).await {
+        Ok(Some(purchase)) => purchase,
+        // Not a transaction of ours, or not one Apple knows.
+        Ok(None) => return Ok(StatusCode::BAD_REQUEST.into_response()),
+        Err(error) => {
+            tracing::warn!("an App Store purchase could not be checked: {error:#}");
+            return Ok(StatusCode::BAD_GATEWAY.into_response());
+        }
+    };
+
+    let mut tx = state.db_pool.begin().await?;
+    record_purchase(
+        &mut tx,
+        user.id,
+        Provider::Apple,
+        &purchase.transaction,
+        &purchase.pack,
+        purchase.owned,
+    )
+    .await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }

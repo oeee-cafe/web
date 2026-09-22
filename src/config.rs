@@ -80,6 +80,60 @@ pub struct AppConfig {
     /// not offer it.
     #[serde(default)]
     pub apple: Option<AppleConfig>,
+
+    /// The App Store's side of the iOS app, as an `[app_store]` table: what
+    /// the Supporter Pack is sold as, and the key that asks Apple about a
+    /// purchase. Separate from `[apple]`, which signs people in with
+    /// different credentials entirely. Unset means the app sells nothing and
+    /// `/auth/apple/purchase` answers every transaction with a 404.
+    #[serde(default)]
+    pub app_store: Option<AppStoreConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct AppStoreConfig {
+    /// The issuer of the In-App Purchase key, a UUID App Store Connect
+    /// prints beside it (Users and Access > Integrations > In-App Purchase).
+    pub issuer_id: String,
+    /// That key's id, which every request names in its token's header.
+    pub key_id: String,
+    /// Where the `.p8` private key file is. Kept off the repository, like
+    /// the APNs key beside it.
+    pub private_key_path: String,
+    /// The app the purchase has to have been made in: `cafe.oeee` for the
+    /// iOS app. A transaction from any other bundle buys nothing here.
+    pub bundle_id: String,
+    /// A Supporter Pack per year, as `[[app_store.supporter_products]]`
+    /// tables of `year` and `product_id` -- non-consumables, one per year,
+    /// for the reason `[[steam.supporter_apps]]` gives. Empty means the app
+    /// sells nothing and no transaction is asked about.
+    #[serde(default)]
+    pub supporter_products: Vec<SupporterProduct>,
+    /// Where the App Store Server API is, and where its sandbox is: a
+    /// transaction production has never heard of is asked about there, so
+    /// TestFlight and Xcode builds work without a second deployment. Only a
+    /// test changes them.
+    #[serde(default = "default_app_store_api_url")]
+    pub api_url: String,
+    #[serde(default = "default_app_store_sandbox_api_url")]
+    pub sandbox_api_url: String,
+}
+
+/// A year's Supporter Pack in the App Store.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SupporterProduct {
+    pub year: i32,
+    pub product_id: String,
+}
+
+fn default_app_store_api_url() -> String {
+    "https://api.storekit.itunes.apple.com".to_string()
+}
+
+fn default_app_store_sandbox_api_url() -> String {
+    "https://api.storekit-sandbox.itunes.apple.com".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,16 +167,29 @@ pub struct SteamConfig {
     /// A publisher Web API key (Steamworks > Users & Permissions > Manage
     /// Groups), not a user's key: AuthenticateUserTicket accepts no other.
     pub web_api_key: String,
-    /// The Steam apps whose owners are supporters: a badge beside their
-    /// name and a line in the credits on /about. Owning any one of them outright
-    /// counts. The Supporter Pack DLC today; were the app itself ever sold,
-    /// its id would go beside the DLC's -- a delisted DLC stays owned, so
-    /// the DLC's id stays too. Empty means nobody's standing changes.
+    /// A Supporter Pack DLC per year, as `[[steam.supporter_apps]]` tables
+    /// of `year` and `app_id`. Owning one makes its buyer a supporter for
+    /// that year: a mark beside their name while the year lasts, and a line
+    /// on their profile for good.
+    ///
+    /// A DLC is owned once and for good, so supporting again next year is
+    /// buying next year's -- and a delisted one stays owned, so a year's id
+    /// stays here once it has been here. The app's own `app_id` is never one
+    /// of them however it is listed: buying Oeee Cafe is not supporting it.
+    /// Empty means nobody's standing changes.
     #[serde(default)]
-    pub supporter_app_ids: Vec<u32>,
+    pub supporter_apps: Vec<SupporterApp>,
     /// Where the partner Web API is. Only a test changes it.
     #[serde(default = "default_steam_web_api_url")]
     pub web_api_url: String,
+}
+
+/// A year's Supporter Pack on Steam.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SupporterApp {
+    pub year: i32,
+    pub app_id: u32,
 }
 
 fn default_steam_web_api_url() -> String {
@@ -147,5 +214,80 @@ impl AppConfig {
     /// false in development for easier debugging (immediate sending).
     pub fn use_activitypub_queue(&self) -> bool {
         self.env == "production"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The sample is the only written account of what a config looks like,
+    /// and a table shaped wrong is a server that does not boot. The packs
+    /// are the part with shape to get wrong: a table array inside a table,
+    /// one entry per year.
+    ///
+    /// Only the tables this reads are deserialized, not the whole config:
+    /// the sample leaves some required fields out entirely, which is its own
+    /// problem and not this one's.
+    #[test]
+    fn the_sample_configs_packs_parse_when_uncommented() {
+        #[derive(Deserialize)]
+        struct Sample {
+            steam: Option<SteamConfig>,
+            apple: Option<AppleConfig>,
+            app_store: Option<AppStoreConfig>,
+        }
+
+        let sample =
+            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/config/sample.toml"))
+                .unwrap();
+        // A commented line that is config rather than prose -- a table
+        // heading, or a key with a value -- is a line somebody is meant to
+        // be able to uncomment, so that is how it is read here.
+        let uncommented: String = sample
+            .lines()
+            .filter_map(|line| match line.strip_prefix("# ") {
+                Some(rest)
+                    if (rest.starts_with('[') && rest.ends_with(']') && !rest.contains(' '))
+                        || rest
+                            .split_once(" = ")
+                            .is_some_and(|(key, _)| !key.contains(' ')) =>
+                {
+                    Some(rest)
+                }
+                Some(_) => None,
+                None => Some(line).filter(|line| !line.starts_with('#')),
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let parsed: Sample = ::config::Config::builder()
+            .add_source(::config::File::from_str(
+                &uncommented,
+                ::config::FileFormat::Toml,
+            ))
+            .build()
+            .expect("the sample builds")
+            .try_deserialize()
+            .expect("the sample's tables deserialize");
+
+        let steam = parsed.steam.expect("a [steam] table");
+        assert_eq!(steam.supporter_apps.len(), 1);
+        assert_eq!(steam.supporter_apps[0].year, 2026);
+        assert_eq!(
+            steam.web_api_url, "https://partner.steam-api.com",
+            "the default is the real one"
+        );
+        assert!(parsed.apple.is_some_and(|apple| !apple.app_ids.is_empty()));
+
+        let store = parsed.app_store.expect("an [app_store] table");
+        assert_eq!(store.bundle_id, "cafe.oeee");
+        assert_eq!(store.supporter_products.len(), 1);
+        assert_eq!(store.supporter_products[0].year, 2026);
+        assert_eq!(
+            store.supporter_products[0].product_id,
+            "cafe.oeee.supporter.2026"
+        );
+        assert!(store.api_url.contains("api.storekit."));
+        assert!(store.sandbox_api_url.contains("sandbox"));
     }
 }
