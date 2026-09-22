@@ -506,3 +506,7 @@ achievement-first-collaboration = First Collaboration
 achievement-first-collaboration-description = Drew together with others for the first time.
 achievement-steam-supporter = Steam Supporter
 achievement-steam-supporter-description = Bought Oeee Cafe on Steam.
+profile-tabs-label = Drawings
+profile-tab-public = Public
+profile-tab-private = Private
+profile-private-community-posts-note = Drawings from private communities are not shown on your public profile.

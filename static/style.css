@@ -2972,6 +2972,33 @@ a.user-pill:hover {
   margin-bottom: 0;
 }
 
+/* Never wider than the page: a segmented control does not wrap, so on a
+   phone a long label would push the whole page sideways -- in the apps, a
+   web page showing through. Past that width the labels give way instead,
+   each cut short with an ellipsis. */
+.profile-tabs {
+  display: -webkit-box;
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.ds-page .profile-tabs > button {
+  -webkit-box-flex: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-panel-note {
+  margin: 0 0 var(--ds-space-2);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
 .community-draw-choice {
   display: block;
   margin-top: var(--ds-space-2);

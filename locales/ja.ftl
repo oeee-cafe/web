@@ -504,3 +504,7 @@ achievement-first-collaboration = はじめての共同お絵かき
 achievement-first-collaboration-description = はじめてみんなで一緒に描きました。
 achievement-steam-supporter = Steamサポーター
 achievement-steam-supporter-description = SteamでOEEEカフェを購入しました。
+profile-tabs-label = 絵
+profile-tab-public = 公開コミュニティ
+profile-tab-private = プライベートコミュニティ
+profile-private-community-posts-note = プライベートコミュニティで描いた絵は公開プロフィールに表示されません。
