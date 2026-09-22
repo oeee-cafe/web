@@ -1639,7 +1639,7 @@ mod template_tests {
                 .find("<nav class=\"nav-bar\"")
                 .unwrap_or_else(|| panic!("{name} has no toolbar"));
             assert!(rendered.contains("/static/ds.css"), "{name}");
-            assert!(rendered.contains("toolbar-badge\">3<"), "{name} unread count");
+            assert!(rendered.contains("toolbar-bell-unread"), "{name} unread bell");
             if let Some(header) = rendered.find("id=\"oeee-painter-header\"") {
                 assert!(nav < header, "the toolbar is the painter page's first row");
             }
@@ -2321,12 +2321,12 @@ mod template_tests {
             .render(context! { unread_notification_count => 0, ftl_lang => "en" })
             .expect("nav renders at zero");
         assert!(
-            with_count.contains("<span class=\"toolbar-badge\">3</span>"),
-            "the badge should show the count"
+            with_count.contains("toolbar-bell-unread") && with_count.contains("(3)"),
+            "unread fills the bell and puts the count in its label"
         );
         assert!(
-            !without.contains("toolbar-badge"),
-            "zero unread shows no badge"
+            !without.contains("toolbar-bell-unread") && !without.contains("(0)"),
+            "zero unread is a plain bell"
         );
         assert!(
             with_count.contains("id=\"nav-notifications\""),
