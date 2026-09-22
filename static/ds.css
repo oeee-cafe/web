@@ -263,6 +263,33 @@ html {
   cursor: default;
 }
 
+/* In the desktop app on Windows, WebView2 draws Edge's classic grey
+   scrollbars, the one part of the window that still looks like a browser.
+   There they are the design system's: a thin rounded thumb in the line
+   colour on no track, a little stronger under the pointer. macOS draws its
+   own overlay scrollbars and is left alone. */
+html[data-desktop="windows"] ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  background: transparent;
+}
+
+html[data-desktop="windows"] ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background-clip: padding-box;
+  background-color: var(--ds-line-strong);
+}
+
+html[data-desktop="windows"] ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ds-frame);
+}
+
+html[data-desktop="windows"] ::-webkit-scrollbar-corner,
+html[data-desktop="windows"] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* ---------------------------------------------------------------------------
    The content area
 
