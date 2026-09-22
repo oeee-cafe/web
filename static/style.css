@@ -140,6 +140,18 @@ main {
   padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
 }
 
+/* In the macOS app the toolbar floats over the content (ds.css, after "The
+   content area"), so the page starts below it, and so does what sticks. */
+@media (min-width: 601px) {
+  html[data-desktop="macos"] .ds-page > main.ds-content {
+    padding-top: calc(var(--ds-header-height, 53px) + var(--space-5));
+  }
+
+  html[data-desktop="macos"] .post-stage {
+    top: calc(var(--ds-header-height, 53px) + var(--ds-space-4));
+  }
+}
+
 main > .center > :first-child,
 main > .center > :first-child > :first-child,
 main > .center-wide > :first-child,
