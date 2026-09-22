@@ -189,6 +189,99 @@ async fn persona_name(config: &SteamConfig, steam_id: &str) -> Result<Option<Str
         .filter(|name| !name.is_empty()))
 }
 
+/// Unlocks `achievements` (their API names in Steamworks) for `steam_id`.
+///
+/// Server-side, with the publisher key, through `SetUserStatsForGame`: the
+/// achievements are set to be unlocked by the game server only, so the app
+/// cannot grant them and an account earns them however it drew -- in the
+/// app, in a browser or on a phone.
+pub async fn set_achievements(
+    config: &SteamConfig,
+    steam_id: &str,
+    achievements: &[String],
+) -> Result<()> {
+    let url = format!(
+        "{}/ISteamUserStats/SetUserStatsForGame/v1/",
+        config.web_api_url.trim_end_matches('/')
+    );
+    let mut form = vec![
+        ("key".to_string(), config.web_api_key.clone()),
+        ("steamid".to_string(), steam_id.to_string()),
+        ("appid".to_string(), config.app_id.to_string()),
+        ("count".to_string(), achievements.len().to_string()),
+    ];
+    for (i, name) in achievements.iter().enumerate() {
+        form.push((format!("name[{i}]"), name.clone()));
+        form.push((format!("value[{i}]"), "1".to_string()));
+    }
+    let response = http().post(url).form(&form).send().await?;
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(anyhow!("SetUserStatsForGame answered {status}: {body}"));
+    }
+    // Steam answers 200 with a result code in the body; 1 is success.
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+        let result = json
+            .pointer("/result/result")
+            .or_else(|| json.pointer("/response/result"))
+            .and_then(serde_json::Value::as_i64);
+        if let Some(code) = result.filter(|code| *code != 1) {
+            return Err(anyhow!(
+                "SetUserStatsForGame answered result {code}: {body}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Tells Steam about achievements it has not yet accepted, for as long as
+/// the server runs. An achievement Steam turns away or cannot be reached for
+/// is tried again next time round; nothing is lost by waiting.
+///
+/// Both colours run this for a moment during a deploy. Unlocking an
+/// achievement twice is unlocking it once, so they do no harm.
+pub async fn sync_achievements(db: sqlx::PgPool, config: SteamConfig) {
+    use crate::models::achievement::{mark_synced, unsynced_achievements};
+
+    let mut every = tokio::time::interval(Duration::from_secs(30));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        every.tick().await;
+        let waiting = match db.begin().await {
+            Ok(mut tx) => unsynced_achievements(&mut tx, 50).await,
+            Err(error) => Err(error.into()),
+        };
+        let waiting = match waiting {
+            Ok(waiting) => waiting,
+            Err(error) => {
+                tracing::warn!("could not list achievements for Steam: {error:#}");
+                continue;
+            }
+        };
+        for account in waiting {
+            if let Err(error) =
+                set_achievements(&config, &account.steam_id, &account.achievements).await
+            {
+                tracing::warn!(
+                    user_id = %account.user_id,
+                    "Steam did not take achievements: {error:#}"
+                );
+                continue;
+            }
+            let marked = async {
+                let mut tx = db.begin().await?;
+                mark_synced(&mut tx, account.user_id, &account.achievements).await?;
+                tx.commit().await?;
+                anyhow::Ok(())
+            };
+            if let Err(error) = marked.await {
+                tracing::warn!("could not record achievements Steam took: {error:#}");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,6 +366,50 @@ mod tests {
             let result = verify_ticket(&config, ticket).await.unwrap();
             assert_eq!(result.unwrap_err(), TicketRejected::Invalid, "{ticket:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn achievements_go_to_steam_as_one_form() {
+        use axum::extract::Form;
+        use axum::routing::post;
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let app = Router::new().route(
+            "/ISteamUserStats/SetUserStatsForGame/v1/",
+            post({
+                let seen = seen.clone();
+                move |Form(form): Form<HashMap<String, String>>| async move {
+                    let ok = form.get("key").map(String::as_str) == Some("publisher-key");
+                    *seen.lock().unwrap() = Some(form);
+                    Json(json!({"result": {"result": if ok { 1 } else { 8 }}}))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let mut config = SteamConfig {
+            app_id: 480,
+            web_api_key: "publisher-key".to_string(),
+            web_api_url: format!("http://{addr}"),
+        };
+
+        let achievements = ["FIRST_DRAWING".to_string(), "FIRST_RELAY".to_string()];
+        set_achievements(&config, STEAM_ID, &achievements)
+            .await
+            .unwrap();
+        let form = seen.lock().unwrap().take().unwrap();
+        assert_eq!(form["steamid"], STEAM_ID);
+        assert_eq!(form["appid"], "480");
+        assert_eq!(form["count"], "2");
+        assert_eq!(form["name[0]"], "FIRST_DRAWING");
+        assert_eq!(form["value[0]"], "1");
+        assert_eq!(form["name[1]"], "FIRST_RELAY");
+        assert_eq!(form["value[1]"], "1");
+
+        config.web_api_key = "wrong".to_string();
+        assert!(set_achievements(&config, STEAM_ID, &achievements)
+            .await
+            .is_err());
     }
 
     #[tokio::test]

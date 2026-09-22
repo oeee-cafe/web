@@ -1,5 +1,6 @@
 use crate::app_error::AppError;
 use crate::web::presence::{Activity, Presence};
+use crate::models::achievement::award_achievements;
 use crate::models::actor::Actor;
 use crate::models::comment::{
     build_comment_thread_tree, create_comment, extract_mentions, find_users_by_login_names,
@@ -1236,6 +1237,9 @@ pub async fn post_publish(
     // publish is running in, so swallowing the error only moved the failure to
     // whichever query ran next and made it unattributable.
     set_post_hashtags(&mut tx, post_id, form.hashtags.as_deref()).await?;
+
+    // A first drawing, or a first relay.
+    award_achievements(&mut tx, user_id).await?;
 
     // Find the actor for this user to send ActivityPub activities
     let actor = Actor::find_by_user_id(&mut tx, user_id).await?;

@@ -179,6 +179,16 @@ impl App {
 
         let cleanup_task = tokio::task::spawn(cleanup_collaborative_sessions(self.state.clone()));
 
+        // Achievements Steam has not heard about yet. Nothing waits on it or
+        // needs stopping cleanly: an unlock cut short is sent again by the
+        // next process.
+        if let Some(steam) = self.state.config.steam.clone() {
+            tokio::task::spawn(crate::steam::sync_achievements(
+                self.state.db_pool.clone(),
+                steam,
+            ));
+        }
+
         let session_layer = SessionManagerLayer::new(session_store)
             .with_secure(self.state.config.env == "production")
             .with_same_site(SameSite::Lax)
