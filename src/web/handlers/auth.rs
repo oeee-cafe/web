@@ -143,6 +143,7 @@ pub async fn login(
         // A provider's account waiting for this sign-in to be linked to.
         linking_provider => pending_provider_name(&session).await,
         steam_enabled => state.config.steam.is_some(),
+        apple_enabled => state.config.apple.is_some(),
         ftl_lang
     })?;
 

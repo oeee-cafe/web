@@ -1,5 +1,5 @@
 //! Accounts from other services that sign into an Oeee Cafe account: Steam
-//! now, Microsoft and Apple after it.
+//! and Apple now, Microsoft after them.
 //!
 //! A provider is only ever asked one thing -- who is this? -- and answers
 //! with a [`VerifiedIdentity`]. Everything after that (signing in, linking to
@@ -18,6 +18,7 @@ use super::user::User;
 #[serde(rename_all = "lowercase")]
 pub enum Provider {
     Steam,
+    Apple,
 }
 
 impl Provider {
@@ -25,12 +26,14 @@ impl Provider {
     pub fn as_str(self) -> &'static str {
         match self {
             Provider::Steam => "steam",
+            Provider::Apple => "apple",
         }
     }
 
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "steam" => Some(Provider::Steam),
+            "apple" => Some(Provider::Apple),
             _ => None,
         }
     }
@@ -39,6 +42,7 @@ impl Provider {
     pub fn display_name(self) -> &'static str {
         match self {
             Provider::Steam => "Steam",
+            Provider::Apple => "Apple",
         }
     }
 }
@@ -68,6 +72,7 @@ impl VerifiedIdentity {
     fn supporter_achievement(&self) -> Option<&'static str> {
         match self.provider {
             Provider::Steam => Some("STEAM_SUPPORTER"),
+            Provider::Apple => None,
         }
         .filter(|_| self.purchased)
     }

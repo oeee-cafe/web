@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+{# Apple's answer to a sign-in, posted from appleid.apple.com and so arrived
+   without the session cookie. Posted on again from here, this site's own
+   page, where the cookie comes along and /auth/apple can check the answer
+   against the sign-in it started. Nothing else is on the page: it is gone
+   as soon as it has loaded. #}
+<html lang="{{ ftl_lang }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Oeee Cafe</title>
+  </head>
+  <body>
+    <form id="apple-answer" method="post" action="/auth/apple">
+      {% if answer.state %}<input type="hidden" name="state" value="{{ answer.state }}" />{% endif %}
+      {% if answer.id_token %}<input type="hidden" name="id_token" value="{{ answer.id_token }}" />{% endif %}
+      {% if answer.user %}<input type="hidden" name="user" value="{{ answer.user }}" />{% endif %}
+      {% if answer.error %}<input type="hidden" name="error" value="{{ answer.error }}" />{% endif %}
+      <noscript><button type="submit">{{ ftl_get_message("apple-sign-in-continue") }}</button></noscript>
+    </form>
+    <script>
+      document.getElementById("apple-answer").submit();
+    </script>
+  </body>
+</html>

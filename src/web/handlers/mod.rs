@@ -1291,6 +1291,55 @@ mod template_tests {
         assert!(!linking.contains("/auth/steam/app"));
     }
 
+    #[test]
+    fn signing_in_offers_apple_only_where_it_is_on() {
+        let env = test_support::env();
+        let render = |apple_enabled: bool, linking_provider: serde_json::Value| {
+            env.get_template("login.jinja")
+                .expect("login loads")
+                .render(context! {
+                    next => "/draw",
+                    apple_enabled,
+                    linking_provider,
+                    ..chrome()
+                })
+                .expect("login renders")
+        };
+        assert!(!render(false, json!(null)).contains("/auth/apple"));
+        let on = render(true, json!(null));
+        assert!(on.contains("auth-apple"));
+        assert!(on.contains("/auth/apple?next="));
+        assert!(on.contains("sign-in-with-apple"));
+        assert!(!render(true, json!("Apple")).contains("/auth/apple"));
+    }
+
+    /// Apple's answer, posted on from this site: every field it carried, as
+    /// a value and never as markup.
+    #[test]
+    fn apples_answer_is_posted_on_as_it_came() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("identity_apple_return.jinja")
+            .expect("return page loads")
+            .render(context! {
+                answer => json!({
+                    "state": "the-state",
+                    "id_token": "a.b.c",
+                    "user": r#"{"name":{"firstName":"\"><script>"}}"#,
+                    "error": null,
+                }),
+                ftl_lang => "en",
+            })
+            .expect("return page renders");
+        assert!(rendered.contains(r#"action="/auth/apple""#));
+        assert!(rendered.contains(r#"name="state" value="the-state""#));
+        assert!(rendered.contains(r#"name="id_token" value="a.b.c""#));
+        assert!(rendered.contains(r#"name="user""#));
+        assert!(!rendered.contains("<script>\""));
+        assert!(!rendered.contains(r#"name="error""#));
+        assert_eq!(rendered.matches("<script").count(), 1);
+    }
+
     /// An account made with Steam has no password: it is offered one to set
     /// rather than asked for its current one, and deleting it asks for its
     /// handle.
@@ -1317,6 +1366,8 @@ mod template_tests {
                     has_password,
                     steam_enabled => true,
                     steam_linked => false,
+                    apple_enabled => true,
+                    apple_linked => false,
                     messages => Vec::<serde_json::Value>::new(),
                     draft_post_count => 0,
                     unread_notification_count => 0,
@@ -1331,6 +1382,7 @@ mod template_tests {
         assert!(!with_password.contains(r#"id="delete_login_name""#));
         assert!(with_password.contains("account-linked-accounts-none"));
         assert!(with_password.contains("/auth/steam/app?next=/account"));
+        assert!(with_password.contains("/auth/apple?next=/account"));
 
         let without = render(
             false,
@@ -1342,6 +1394,14 @@ mod template_tests {
         assert!(without.contains("account-delete-type-login-name(loginName=oeee)"));
         assert!(without.contains(r#"action="/account/identities/steam/unlink""#));
         assert!(without.contains("Steam: 오이"));
+
+        // Apple gives a name only the first time; the address stands in.
+        let apple = render(
+            true,
+            json!([{"provider": "apple", "display_hint": null, "email": "x@privaterelay.appleid.com", "subject": "001234.abc"}]),
+        );
+        assert!(apple.contains("Apple: x@privaterelay.appleid.com"));
+        assert!(apple.contains(r#"action="/account/identities/apple/unlink""#));
     }
 
     /// The replay switch is enforced in the handler; this is the other half of

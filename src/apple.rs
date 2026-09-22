@@ -1,0 +1,447 @@
+//! Asking Apple who signed in.
+//!
+//! Sign in with Apple on the web: the site sends the browser to Apple with a
+//! `state` and a `nonce` it keeps in the session, and Apple posts back an ID
+//! token -- a JWT it signed, naming the person by `sub` and carrying the
+//! nonce. The site checks the signature against Apple's published keys, that
+//! the token was made for this site (`aud`) and for this sign-in (`nonce`),
+//! and takes nothing else Apple's post says on its word.
+
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use anyhow::{anyhow, Result};
+use jsonwebtoken::jwk::JwkSet;
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
+use serde::Deserialize;
+
+use crate::config::AppleConfig;
+use crate::models::identity::{Provider, VerifiedIdentity};
+
+/// Who signs Apple's ID tokens, and where a browser is sent to sign in.
+pub const ISSUER: &str = "https://appleid.apple.com";
+const AUTHORIZE_URL: &str = "https://appleid.apple.com/auth/authorize";
+
+/// How long Apple's keys are kept before being asked for again. Apple
+/// rotates them rarely, and a token signed with a key not yet seen asks
+/// sooner (see [`KEYS_REFRESH_AT_MOST`]).
+const KEYS_FOR: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// A token naming a key that is not in the set fetches the set again, but no
+/// more often than this: a stream of made-up key ids is not a stream of
+/// requests to Apple.
+const KEYS_REFRESH_AT_MOST: Duration = Duration::from_secs(60);
+
+fn http() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .expect("reqwest client")
+    })
+}
+
+/// Where to send the browser to sign in. Apple posts the answer to
+/// `redirect_uri` (`response_mode=form_post`, which it requires when asked
+/// for a name or an address).
+pub fn authorize_url(config: &AppleConfig, redirect_uri: &str, state: &str, nonce: &str) -> String {
+    let mut url = url::Url::parse(AUTHORIZE_URL).expect("Apple's authorize URL");
+    url.query_pairs_mut()
+        .append_pair("client_id", &config.client_id)
+        .append_pair("redirect_uri", redirect_uri)
+        .append_pair("response_type", "code id_token")
+        .append_pair("response_mode", "form_post")
+        .append_pair("scope", "name email")
+        .append_pair("state", state)
+        .append_pair("nonce", nonce);
+    url.into()
+}
+
+struct CachedKeys {
+    keys: JwkSet,
+    fetched_at: Instant,
+}
+
+/// Apple's keys, by the URL they came from (a test serves its own).
+fn key_cache() -> &'static Mutex<HashMap<String, CachedKeys>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, CachedKeys>>> = OnceLock::new();
+    CACHE.get_or_init(Default::default)
+}
+
+async fn fetch_keys(keys_url: &str) -> Result<JwkSet> {
+    Ok(http()
+        .get(keys_url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?)
+}
+
+/// The key Apple signed with, by its `kid`: from the cache while it is fresh
+/// and has it, from Apple otherwise. `None` when Apple has no such key.
+async fn decoding_key(config: &AppleConfig, kid: &str) -> Result<Option<DecodingKey>> {
+    let cached = {
+        let cache = key_cache().lock().unwrap();
+        cache.get(&config.keys_url).map(|cached| {
+            let age = cached.fetched_at.elapsed();
+            (
+                cached.keys.find(kid).cloned(),
+                age < KEYS_FOR,
+                age < KEYS_REFRESH_AT_MOST,
+            )
+        })
+    };
+    match cached {
+        Some((Some(jwk), true, _)) => return Ok(Some(DecodingKey::from_jwk(&jwk)?)),
+        // Not there, and asked for only a moment ago.
+        Some((None, true, true)) => return Ok(None),
+        _ => {}
+    }
+
+    let keys = fetch_keys(&config.keys_url).await?;
+    let jwk = keys.find(kid).cloned();
+    key_cache().lock().unwrap().insert(
+        config.keys_url.clone(),
+        CachedKeys {
+            keys,
+            fetched_at: Instant::now(),
+        },
+    );
+    jwk.map(|jwk| DecodingKey::from_jwk(&jwk))
+        .transpose()
+        .map_err(Into::into)
+}
+
+#[derive(Deserialize)]
+struct Claims {
+    sub: String,
+    nonce: Option<String>,
+    email: Option<String>,
+    /// `true`, or `"true"`: Apple has sent both.
+    email_verified: Option<serde_json::Value>,
+}
+
+fn is_true(value: Option<&serde_json::Value>) -> bool {
+    match value {
+        Some(serde_json::Value::Bool(b)) => *b,
+        Some(serde_json::Value::String(s)) => s == "true",
+        _ => false,
+    }
+}
+
+/// The `user` field Apple posts alongside the token, the first time a person
+/// signs in to this site and never again. Not signed, so only ever a
+/// suggestion for a new account's name.
+#[derive(Deserialize)]
+struct AppleUser {
+    name: Option<AppleName>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppleName {
+    first_name: Option<String>,
+    last_name: Option<String>,
+}
+
+/// Whether a name is written family name first, without a space: Korean,
+/// Japanese and Chinese names are.
+fn family_name_first(name: &str) -> bool {
+    name.chars().any(|c| {
+        matches!(c,
+            '\u{1100}'..='\u{11FF}'   // Hangul Jamo
+            | '\u{3040}'..='\u{30FF}' // Hiragana, Katakana
+            | '\u{3400}'..='\u{4DBF}' // CJK Extension A
+            | '\u{4E00}'..='\u{9FFF}' // CJK Unified Ideographs
+            | '\u{AC00}'..='\u{D7AF}' // Hangul Syllables
+        )
+    })
+}
+
+/// A display name from the `user` field, if it holds one.
+fn name_from_user(user: Option<&str>) -> Option<String> {
+    let user: AppleUser = serde_json::from_str(user?).ok()?;
+    let name = user.name?;
+    let first = name.first_name.unwrap_or_default().trim().to_string();
+    let last = name.last_name.unwrap_or_default().trim().to_string();
+    let joined = match (first.is_empty(), last.is_empty()) {
+        (true, true) => return None,
+        (false, true) => first,
+        (true, false) => last,
+        (false, false) if family_name_first(&first) || family_name_first(&last) => {
+            format!("{last}{first}")
+        }
+        (false, false) => format!("{first} {last}"),
+    };
+    Some(joined.chars().take(255).collect())
+}
+
+/// Checks an ID token Apple posted back and says whose it is.
+///
+/// `nonce` is the one this sign-in was started with, kept in the session;
+/// `user` is the `user` field of Apple's post, when there was one.
+/// `Ok(None)` means the token is not one to accept: not Apple's, not for this
+/// site, expired, or from another sign-in.
+pub async fn verify_id_token(
+    config: &AppleConfig,
+    id_token: &str,
+    nonce: &str,
+    user: Option<&str>,
+) -> Result<Option<VerifiedIdentity>> {
+    let Ok(header) = decode_header(id_token) else {
+        return Ok(None);
+    };
+    if header.alg != Algorithm::RS256 {
+        return Ok(None);
+    }
+    let Some(kid) = header.kid else {
+        return Ok(None);
+    };
+    let Some(key) = decoding_key(config, &kid).await? else {
+        return Ok(None);
+    };
+
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.set_issuer(&[ISSUER]);
+    validation.set_audience(&[&config.client_id]);
+    validation.set_required_spec_claims(&["exp", "iss", "aud", "sub"]);
+    let claims = match decode::<Claims>(id_token, &key, &validation) {
+        Ok(data) => data.claims,
+        Err(error) => {
+            tracing::info!("Apple ID token turned away: {error}");
+            return Ok(None);
+        }
+    };
+    if claims.nonce.as_deref() != Some(nonce) || nonce.is_empty() {
+        return Ok(None);
+    }
+    if claims.sub.is_empty() {
+        return Err(anyhow!("Apple signed a token with an empty sub"));
+    }
+
+    // Only an address Apple has checked; a private relay address counts, and
+    // mail sent to it reaches the person.
+    let email = claims
+        .email
+        .filter(|_| is_true(claims.email_verified.as_ref()))
+        .map(|email| email.trim().to_string())
+        .filter(|email| !email.is_empty() && email.len() <= 320);
+
+    Ok(Some(VerifiedIdentity {
+        provider: Provider::Apple,
+        subject: claims.sub,
+        name: name_from_user(user),
+        email,
+        purchased: false,
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::routing::get;
+    use axum::{Json, Router};
+    use jsonwebtoken::{encode, EncodingKey, Header};
+    use serde_json::{json, Value};
+
+    /// A throwaway RSA key, standing in for Apple's.
+    const PRIVATE_KEY: &str = include_str!("testdata/apple_test_key.pem");
+    const MODULUS: &str = include_str!("testdata/apple_test_key.n");
+    const KID: &str = "test-key";
+    const CLIENT_ID: &str = "cafe.oeee.web";
+
+    async fn fake_apple() -> AppleConfig {
+        let app = Router::new().route(
+            "/auth/keys",
+            get(|| async {
+                Json::<Value>(json!({"keys": [{
+                    "kty": "RSA",
+                    "kid": KID,
+                    "use": "sig",
+                    "alg": "RS256",
+                    "n": MODULUS.trim(),
+                    "e": "AQAB",
+                }]}))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        AppleConfig {
+            client_id: CLIENT_ID.to_string(),
+            keys_url: format!("http://{addr}/auth/keys"),
+        }
+    }
+
+    fn token(claims: Value) -> String {
+        token_with(KID, claims)
+    }
+
+    fn token_with(kid: &str, claims: Value) -> String {
+        let mut header = Header::new(Algorithm::RS256);
+        header.kid = Some(kid.to_string());
+        encode(
+            &header,
+            &claims,
+            &EncodingKey::from_rsa_pem(PRIVATE_KEY.as_bytes()).unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn claims() -> Value {
+        json!({
+            "iss": ISSUER,
+            "aud": CLIENT_ID,
+            "exp": chrono::Utc::now().timestamp() + 600,
+            "iat": chrono::Utc::now().timestamp(),
+            "sub": "001234.abcdef.0123",
+            "nonce": "the-nonce",
+            "email": "oeee@privaterelay.appleid.com",
+            "email_verified": "true",
+            "is_private_email": "true",
+        })
+    }
+
+    fn with(mut claims: Value, key: &str, value: Value) -> Value {
+        claims[key] = value;
+        claims
+    }
+
+    #[tokio::test]
+    async fn a_good_token_names_its_apple_account() {
+        let config = fake_apple().await;
+        let user = r#"{"name":{"firstName":"Oeee","lastName":"Cafe"},"email":"x@example.test"}"#;
+        let identity = verify_id_token(&config, &token(claims()), "the-nonce", Some(user))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(identity.provider, Provider::Apple);
+        assert_eq!(identity.subject, "001234.abcdef.0123");
+        assert_eq!(identity.name.as_deref(), Some("Oeee Cafe"));
+        // The token's address, not the unsigned `user` field's.
+        assert_eq!(
+            identity.email.as_deref(),
+            Some("oeee@privaterelay.appleid.com")
+        );
+        assert!(!identity.purchased);
+    }
+
+    #[tokio::test]
+    async fn an_unverified_address_is_not_carried() {
+        let config = fake_apple().await;
+        let identity = verify_id_token(
+            &config,
+            &token(with(claims(), "email_verified", json!(false))),
+            "the-nonce",
+            None,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(identity.email, None);
+        assert_eq!(identity.name, None);
+    }
+
+    #[tokio::test]
+    async fn a_token_for_another_sign_in_or_site_is_turned_away() {
+        let config = fake_apple().await;
+        let turned_away = [
+            // Another sign-in's nonce, or none.
+            (token(claims()), "another-nonce"),
+            (token(with(claims(), "nonce", Value::Null)), "the-nonce"),
+            // Made for another site.
+            (
+                token(with(claims(), "aud", json!("com.example.other"))),
+                "the-nonce",
+            ),
+            // Not Apple's.
+            (
+                token(with(claims(), "iss", json!("https://evil.test"))),
+                "the-nonce",
+            ),
+            // Expired.
+            (
+                token(with(
+                    claims(),
+                    "exp",
+                    json!(chrono::Utc::now().timestamp() - 3600),
+                )),
+                "the-nonce",
+            ),
+            // Signed with a key Apple does not have.
+            (token_with("no-such-key", claims()), "the-nonce"),
+            // Not a token.
+            ("not.a.token".to_string(), "the-nonce"),
+        ];
+        for (id_token, nonce) in turned_away {
+            assert!(
+                verify_id_token(&config, &id_token, nonce, None)
+                    .await
+                    .unwrap()
+                    .is_none(),
+                "{id_token}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_token_whose_signature_does_not_match_is_turned_away() {
+        let config = fake_apple().await;
+        // Someone else's claims under this token's signature.
+        let good = token(claims());
+        let other = token(with(claims(), "sub", json!("someone.else")));
+        let (header, rest) = good.split_once('.').unwrap();
+        let signature = rest.split_once('.').unwrap().1;
+        let payload = other.split('.').nth(1).unwrap();
+        let forged = format!("{header}.{payload}.{signature}");
+        assert!(verify_id_token(&config, &forged, "the-nonce", None)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn a_name_is_written_the_way_its_language_writes_it() {
+        let name = |first: &str, last: &str| {
+            name_from_user(Some(
+                &json!({"name": {"firstName": first, "lastName": last}}).to_string(),
+            ))
+        };
+        assert_eq!(name("Oeee", "Cafe").as_deref(), Some("Oeee Cafe"));
+        assert_eq!(name("지혁", "서").as_deref(), Some("서지혁"));
+        assert_eq!(name("太郎", "山田").as_deref(), Some("山田太郎"));
+        assert_eq!(name(" 오이 ", "").as_deref(), Some("오이"));
+        assert_eq!(name("", " "), None);
+        assert_eq!(name_from_user(Some("{}")), None);
+        assert_eq!(name_from_user(Some("not json")), None);
+        assert_eq!(name_from_user(None), None);
+    }
+
+    #[test]
+    fn the_browser_is_sent_to_apple_with_what_comes_back() {
+        let config = AppleConfig {
+            client_id: CLIENT_ID.to_string(),
+            keys_url: String::new(),
+        };
+        let url = url::Url::parse(&authorize_url(
+            &config,
+            "https://oeee.cafe/auth/apple/callback",
+            "the-state",
+            "the-nonce",
+        ))
+        .unwrap();
+        let query: HashMap<_, _> = url.query_pairs().into_owned().collect();
+        assert_eq!(url.host_str(), Some("appleid.apple.com"));
+        assert_eq!(query["client_id"], CLIENT_ID);
+        assert_eq!(
+            query["redirect_uri"],
+            "https://oeee.cafe/auth/apple/callback"
+        );
+        assert_eq!(query["response_mode"], "form_post");
+        assert_eq!(query["state"], "the-state");
+        assert_eq!(query["nonce"], "the-nonce");
+    }
+}
