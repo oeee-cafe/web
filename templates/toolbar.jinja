@@ -640,6 +640,10 @@
         if (event.defaultPrevented && !boosted) return;
         if (link.origin !== location.origin) return;
         if (link.pathname === location.pathname && link.search === location.search) return;
+        // The iOS app stops this link and signs in with Apple's own sheet
+        // (WebTab.swift): the page stays, so nothing slides in over it.
+        if (link.classList.contains("auth-apple") &&
+            document.documentElement.hasAttribute("data-native-apple-sign-in")) return;
         var thumb = link.querySelector("img[width][height]");
         window.oeeeSkeletonHint = thumb ? {
           width: parseInt(thumb.getAttribute("width"), 10),
