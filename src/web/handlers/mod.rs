@@ -784,8 +784,8 @@ mod community_page_tests {
         let dialog = rendered
             .find("id=\"community-draw-modal\"")
             .expect("the drawing dialog");
-        let tool = rendered.find("id=\"community-draw-tool\"").expect("tool choice");
-        assert!(tool > dialog, "the drawing form is back on the page");
+        let size = rendered.find("community-draw-size").expect("size choice");
+        assert!(size > dialog, "the drawing form is back on the page");
         assert!(rendered.contains("/collaborate?community=open"));
 
         // Two-tone: the dialog asks for an orientation, and there is no

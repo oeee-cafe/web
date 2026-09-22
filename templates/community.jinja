@@ -149,13 +149,8 @@
           </form>
         {% else %}
           <form action="/draw" method="post">
+            <input type="hidden" name="tool" value="neo" />
             <input type="hidden" name="community_id" value="{{ community_id }}" />
-            <div class="form-field">
-              <label class="ds-label" for="community-draw-tool">{{ ftl_get_message('community-drawing-tool') }}</label>
-              <select id="community-draw-tool" name="tool" class="ds-select">
-                <option value="neo" selected>Neo Cucumber</option>
-              </select>
-            </div>
             <div class="form-field community-draw-size">
               <label>
                 <span class="ds-label">{{ ftl_get_message('community-drawing-width') }}</span>
