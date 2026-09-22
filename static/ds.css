@@ -593,10 +593,14 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   box-shadow: 0 0 0 0.5px #3c6712, var(--ds-shadow-raise);
 }
 
+/* Its box sizing said outright: the painter pages' reset makes every box
+   border-box, which took the rim out of a 6px dot and left 2px of lime. */
 .toolbar-live-dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
   margin-right: 7px;
   border: 2px solid #3c6712;
   border-radius: 50%;
