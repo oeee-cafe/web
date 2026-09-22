@@ -1573,6 +1573,9 @@ mod template_tests {
             "/collaborate",
             "/communities",
             "/hashtags",
+            // search.jinja: the shared post cards and the per-row control's
+            // inline script, no bundle.
+            "/search",
             "/home",
             "/notifications",
             "/account",

@@ -534,6 +534,10 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   vertical-align: top;
 }
 
+html[data-app="ios"] .toolbar-search {
+  display: none;
+}
+
 .toolbar-end .toolbar-icon .toolbar-badge {
   position: absolute;
   top: -2px;

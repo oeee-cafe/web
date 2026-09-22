@@ -65,6 +65,15 @@
       <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
     </div>
     <div class="toolbar-end">
+      {# Search, signed in or out. The one icon among worded buttons: a
+         magnifier needs no decoding, and a word here is the width that
+         pushes a phone's first row into its compact steps. Hidden in the
+         iOS app, whose own search tab is the native field (theme_head.jinja
+         marks the root). #}
+      <a class="toolbar-icon toolbar-search" href="/search"
+         aria-label="{{ ftl_get_message("search") }}" title="{{ ftl_get_message("search") }} (/)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+      </a>
       {% if current_user %}
         {% include "nav_notifications.jinja" %}
         {# Drafts in the bar while there are any: something left to finish
@@ -144,6 +153,7 @@
         {% if current_user %}
           <dt><kbd>N</kbd></dt><dd>{{ ftl_get_message("draw") }}</dd>
         {% endif %}
+        <dt><kbd>/</kbd></dt><dd>{{ ftl_get_message("search") }}</dd>
         <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>R</kbd></dt><dd>{{ ftl_get_message("nav-recent") }}</dd>
         {% if current_user %}
           <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>F</kbd></dt><dd>{{ ftl_get_message("timeline") }}</dd>
@@ -337,6 +347,16 @@
         "communities": function () { go("/communities"); },
         "together": function () { go("/collaborate"); },
         "hashtags": function () { go("/hashtags"); },
+        // Already there, the field is what was wanted, not a reload.
+        "search": function () {
+          var field = location.pathname === "/search" && document.querySelector('.search-page input[name="q"]');
+          if (field) {
+            field.focus();
+            field.select();
+          } else {
+            go("/search");
+          }
+        },
         "notifications": function () { go("/notifications"); },
         "drafts": function () { go("/posts/drafts"); },
         "profile": function () { go(profilePath()); },
@@ -393,6 +413,9 @@
         if (key === "?" || (key === "/" && event.shiftKey)) {
           event.preventDefault();
           toggleShortcuts();
+        } else if (key === "/") {
+          event.preventDefault();
+          window.oeeeCommand("search");
         } else if (key === "g" || key === "G") {
           awaitingGo = true;
           goTimer = setTimeout(function () { awaitingGo = false; }, 1500);
