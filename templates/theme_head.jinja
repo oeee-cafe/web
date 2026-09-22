@@ -42,7 +42,9 @@
     // The Mac app is a web view too, but not a phone: it takes none of the
     // behaviour `data-app` turns on, so it is marked on its own. What it
     // shares with the others is that a sign-in page opened inside it is
-    // opened inside a web view, which Google refuses (style.css).
+    // opened inside a web view, which Google refuses -- so, as for the phone
+    // apps, its button shows only for a build that signs in some other way
+    // and says so below (style.css).
     document.documentElement.setAttribute("data-mac-app", "");
   }
   // Google refuses its own sign-in pages in an embedded web view, so the

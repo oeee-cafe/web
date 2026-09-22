@@ -5,6 +5,7 @@ pub mod build_info;
 pub mod config;
 pub mod db;
 pub mod google;
+pub mod handoff;
 pub mod jwks;
 pub mod locale;
 pub mod markdown_utils;

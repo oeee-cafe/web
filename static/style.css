@@ -3768,7 +3768,7 @@ html[data-steam-app] .auth-apple {
 }
 
 html[data-app]:not([data-native-google-sign-in]) .auth-google,
-html[data-mac-app] .auth-google,
+html[data-mac-app]:not([data-native-google-sign-in]) .auth-google,
 html[data-desktop] .auth-google,
 html[data-steam-app] .auth-google {
   display: none;
