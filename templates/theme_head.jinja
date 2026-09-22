@@ -38,13 +38,14 @@
     });
   } else if (/OeeeCafeAndroid/.test(navigator.userAgent)) {
     document.documentElement.setAttribute("data-app", "android");
-    // Google refuses its own sign-in pages in an embedded web view, so the
-    // button shows only for an app that signs in with Credential Manager
-    // and says so (GoogleSignIn.kt in oeee-cafe/android). An app built
-    // without a client id to give it does not say it.
-    if (/\bSignInWithGoogle\b/.test(navigator.userAgent)) {
-      document.documentElement.setAttribute("data-native-google-sign-in", "");
-    }
+  }
+  // Google refuses its own sign-in pages in an embedded web view, so the
+  // button shows only for an app that signs in some other way and says so:
+  // Credential Manager on Android (GoogleSignIn.kt), a browser of the
+  // system's on iOS (GoogleSignIn.swift). An app built without a client id
+  // to sign in with does not say it.
+  if (/\bSignInWithGoogle\b/.test(navigator.userAgent)) {
+    document.documentElement.setAttribute("data-native-google-sign-in", "");
   }
   if (document.documentElement.hasAttribute("data-app")) {
     // Controls are felt as well as seen, as the apps' own are: "light",
