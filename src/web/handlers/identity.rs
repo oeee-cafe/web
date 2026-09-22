@@ -1,5 +1,5 @@
-//! Signing in with another service's account: Steam and Apple now, Microsoft
-//! after them.
+//! Signing in with another service's account: Steam, Apple and Google now,
+//! Microsoft after them.
 //!
 //! A provider's own handler turns what its client sent into a
 //! [`VerifiedIdentity`] and hands it to [`sign_in_with`], which is the same
@@ -26,6 +26,12 @@
 //! is exactly the cross-site post the cookie is not sent with -- so it lands
 //! on [`apple_callback`], which hands it straight back to this site from a
 //! page of its own ([`do_apple_sign_in`]).
+//!
+//! Google comes back by a GET, which a Lax cookie is sent with, so
+//! [`google_callback`] is the whole of it. What the phone apps post to
+//! [`do_google_sign_in`] is made by the page, as the Steam app's post is:
+//! Google will not sign in inside a web view at all, so each app does it its
+//! own way and hands the ID token back to the page.
 
 use axum::extract::{Path, Query, State};
 use axum::http::header::ORIGIN;
@@ -44,6 +50,7 @@ use tower_sessions::Session;
 use crate::app_error::AppError;
 use crate::app_store;
 use crate::apple;
+use crate::google;
 use crate::models::identity::{
     find_user_by_identity, find_user_by_verified_email, link_identity, refresh_standing,
     touch_identity, unlink_identity, LinkError, Provider, UnlinkError, VerifiedIdentity,
@@ -103,6 +110,15 @@ fn local_next(next: Option<&str>) -> Option<String> {
         && !next.starts_with("/\\")
         && !next.chars().any(char::is_control);
     local.then(|| next.to_string())
+}
+
+/// Where to send someone back to when a sign-in did not happen.
+fn back_for(auth_session: &AuthSession) -> &'static str {
+    if auth_session.user.is_some() {
+        "/account"
+    } else {
+        "/login"
+    }
 }
 
 /// Whether a POST came from one of this site's own pages, by its `Origin`.
@@ -317,11 +333,7 @@ pub async fn do_steam_sign_in(
     }
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
     let next = local_next(form.next.as_deref());
-    let back = if auth_session.user.is_some() {
-        "/account"
-    } else {
-        "/login"
-    };
+    let back = back_for(&auth_session);
 
     let Some(config) = state.config.steam.as_ref() else {
         messages
@@ -518,12 +530,7 @@ pub async fn apple_sign_in(
         messages
             .clone()
             .error(safe_get_message(&bundle, "apple-sign-in-unavailable"));
-        let back = if auth_session.user.is_some() {
-            "/account"
-        } else {
-            "/login"
-        };
-        return Ok(Redirect::to(back).into_response());
+        return Ok(Redirect::to(back_for(&auth_session)).into_response());
     };
 
     let request = AppleRequest {
@@ -624,11 +631,7 @@ pub async fn do_apple_sign_in(
         return Ok(StatusCode::FORBIDDEN.into_response());
     }
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
-    let back = if auth_session.user.is_some() {
-        "/account"
-    } else {
-        "/login"
-    };
+    let back = back_for(&auth_session);
 
     // Each sign-in's state and nonce answer once.
     let request = session
@@ -688,6 +691,298 @@ pub async fn do_apple_sign_in(
         request.next,
     )
     .await
+}
+
+const GOOGLE_REQUEST_KEY: &str = "identity.google";
+
+/// A sign-in with Google under way: what Google's answer has to carry back.
+#[derive(Serialize, Deserialize)]
+struct GoogleRequest {
+    state: String,
+    nonce: String,
+    next: Option<String>,
+    started_at: DateTime<Utc>,
+}
+
+fn google_redirect_uri(base_url: &str) -> String {
+    format!("{}/auth/google/callback", base_url.trim_end_matches('/'))
+}
+
+/// Sends the browser to Google to sign in, remembering what its answer has to
+/// carry back.
+pub async fn google_sign_in(
+    auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    Query(query): Query<NextQuery>,
+) -> Result<Response, AppError> {
+    let Some(config) = state.config.google.as_ref() else {
+        let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "google-sign-in-unavailable"));
+        return Ok(Redirect::to(back_for(&auth_session)).into_response());
+    };
+
+    let request = GoogleRequest {
+        state: random_token(),
+        nonce: random_token(),
+        next: local_next(query.next.as_deref()),
+        started_at: Utc::now(),
+    };
+    let url = google::authorize_url(
+        config,
+        &google_redirect_uri(&state.config.base_url),
+        &request.state,
+        &request.nonce,
+    );
+    session
+        .insert(GOOGLE_REQUEST_KEY, request)
+        .await
+        .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+    Ok(Redirect::to(&url).into_response())
+}
+
+/// What Google sends the browser back with: a code and the state it was sent
+/// with, or an error such as `access_denied`.
+#[derive(Deserialize)]
+pub struct GoogleAnswer {
+    state: Option<String>,
+    code: Option<String>,
+    error: Option<String>,
+}
+
+/// Where Google sends the browser back. A top-level GET, which the session
+/// cookie is sent with, so the answer is read here rather than bounced off a
+/// page of this site the way Apple's post is.
+pub async fn google_callback(
+    mut auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    Query(answer): Query<GoogleAnswer>,
+) -> Result<Response, AppError> {
+    let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+    let back = back_for(&auth_session);
+
+    // Each sign-in's state and nonce answer once.
+    let request = take_google_request(&session).await;
+    let Some(config) = state.config.google.as_ref() else {
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "google-sign-in-unavailable"));
+        return Ok(Redirect::to(back).into_response());
+    };
+    // Put away without signing in: the page stays as it was.
+    if answer.error.is_some() {
+        return Ok(Redirect::to(back).into_response());
+    }
+    let invalid = || -> Result<Response, AppError> {
+        messages
+            .clone()
+            .error(say(&bundle, "identity-sign-in-invalid", Provider::Google));
+        Ok(Redirect::to(back).into_response())
+    };
+    let (Some(request), Some(code)) = (request, answer.code.as_deref()) else {
+        return invalid();
+    };
+    if answer.state.as_deref() != Some(request.state.as_str()) {
+        return invalid();
+    }
+
+    let id_token = match google::exchange_code(
+        config,
+        &google_redirect_uri(&state.config.base_url),
+        code,
+    )
+    .await
+    {
+        Ok(Some(id_token)) => id_token,
+        Ok(None) => return invalid(),
+        Err(error) => {
+            // Not a refusal -- that is Ok(None), and said where it happens --
+            // but Google not answering at all.
+            tracing::error!("Google could not be reached to trade the code: {error:#}");
+            messages
+                .clone()
+                .error(say(&bundle, "identity-sign-in-failed", Provider::Google));
+            return Ok(Redirect::to(back).into_response());
+        }
+    };
+
+    finish_google_sign_in(
+        &mut auth_session,
+        &session,
+        &messages,
+        &bundle,
+        &state,
+        config,
+        &id_token,
+        &request.nonce,
+        request.next,
+        back,
+    )
+    .await
+}
+
+#[derive(Deserialize)]
+pub struct GoogleStartForm {
+    next: Option<String>,
+}
+
+/// A sign-in for the phone apps to make themselves: the nonce they hand
+/// Google, kept in the web view's session as `/auth/google` keeps it for a
+/// browser. Google refuses its own sign-in pages inside an embedded web view,
+/// so neither app can take the browser's way round -- Android asks Credential
+/// Manager, iOS a browser of the system's.
+///
+/// The app asks from inside the page, so the answer is this session's;
+/// another site's page gets neither the session nor, without CORS, the
+/// answer.
+pub async fn google_start(
+    session: Session,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<GoogleStartForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    if state.config.google.is_none() {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    }
+    let request = GoogleRequest {
+        state: random_token(),
+        nonce: random_token(),
+        next: local_next(form.next.as_deref()),
+        started_at: Utc::now(),
+    };
+    // Which OAuth client each app signs in against is the app's own: Android is
+    // built with the site's, iOS with one of its own (GoogleSignIn.kt,
+    // GoogleSignIn.swift), and the site takes the tokens of both
+    // (`[google].client_id` and `app_ids`).
+    let answer = serde_json::json!({ "state": request.state, "nonce": request.nonce });
+    session
+        .insert(GOOGLE_REQUEST_KEY, request)
+        .await
+        .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+    Ok(axum::Json(answer).into_response())
+}
+
+/// What a phone app's page posts: the ID token the app ended up with and the
+/// state the sign-in was started with, or an error when Google would not say
+/// who this is.
+#[derive(Deserialize)]
+pub struct GoogleNativeAnswer {
+    state: Option<String>,
+    id_token: Option<String>,
+    error: Option<String>,
+}
+
+/// An ID token a phone app signed in for, posted from the page.
+pub async fn do_google_sign_in(
+    mut auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(answer): Form<GoogleNativeAnswer>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+    let back = back_for(&auth_session);
+
+    let request = take_google_request(&session).await;
+    let Some(config) = state.config.google.as_ref() else {
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "google-sign-in-unavailable"));
+        return Ok(Redirect::to(back).into_response());
+    };
+    let invalid = || -> Result<Response, AppError> {
+        messages
+            .clone()
+            .error(say(&bundle, "identity-sign-in-invalid", Provider::Google));
+        Ok(Redirect::to(back).into_response())
+    };
+    let Some(request) = request else {
+        return invalid();
+    };
+    if answer.state.as_deref() != Some(request.state.as_str()) {
+        return invalid();
+    }
+    if answer.error.is_some() {
+        return invalid();
+    }
+    let Some(id_token) = answer.id_token.as_deref() else {
+        return invalid();
+    };
+
+    finish_google_sign_in(
+        &mut auth_session,
+        &session,
+        &messages,
+        &bundle,
+        &state,
+        config,
+        id_token,
+        &request.nonce,
+        request.next,
+        back,
+    )
+    .await
+}
+
+/// The sign-in's state and nonce, taken from the session so they answer once,
+/// and only while the sign-in is still recent.
+async fn take_google_request(session: &Session) -> Option<GoogleRequest> {
+    session
+        .remove::<GoogleRequest>(GOOGLE_REQUEST_KEY)
+        .await
+        .ok()
+        .flatten()
+        .filter(|request| Utc::now() - request.started_at <= Duration::minutes(PENDING_FOR))
+}
+
+/// Checking an ID token and going on with whoever it names: the same for a
+/// token traded for a code and one Credential Manager handed the app.
+#[allow(clippy::too_many_arguments)]
+async fn finish_google_sign_in(
+    auth_session: &mut AuthSession,
+    session: &Session,
+    messages: &Messages,
+    bundle: &Bundle<'_>,
+    state: &AppState,
+    config: &crate::config::GoogleConfig,
+    id_token: &str,
+    nonce: &str,
+    next: Option<String>,
+    back: &str,
+) -> Result<Response, AppError> {
+    let identity = match google::verify_id_token(config, id_token, nonce).await {
+        Ok(Some(identity)) => identity,
+        Ok(None) => {
+            messages
+                .clone()
+                .error(say(bundle, "identity-sign-in-invalid", Provider::Google));
+            return Ok(Redirect::to(back).into_response());
+        }
+        Err(error) => {
+            tracing::error!("Google sign-in could not be checked: {error:#}");
+            messages
+                .clone()
+                .error(say(bundle, "identity-sign-in-failed", Provider::Google));
+            return Ok(Redirect::to(back).into_response());
+        }
+    };
+
+    sign_in_with(auth_session, session, messages, bundle, state, identity, next).await
 }
 
 /// A handle as the `users` table's own constraint allows it:
