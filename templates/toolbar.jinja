@@ -270,12 +270,12 @@
             } catch (error) {}
           }, 100);
         });
-        // In the iOS app the page scrolls, not the content area (ds.css), so
-        // there is nothing for the keyboard to scroll, and the content area is
-        // not focusable at all: a tap inside it would focus it, and WebKit
+        // In the phone apps the page scrolls, not the content area (ds.css),
+        // so there is nothing for the keyboard to scroll, and the content area
+        // is not focusable at all: a tap inside it would focus it, and WebKit
         // scrolls a focused element back into view when the page comes back
         // from the back/forward cache -- to its top, over where the reader was.
-        if (document.documentElement.getAttribute("data-app") === "ios") {
+        if (document.documentElement.hasAttribute("data-app")) {
           content.removeAttribute("tabindex");
         } else if (!document.activeElement || document.activeElement === document.body) {
           try {
@@ -655,14 +655,15 @@
         if (!link.closest(".nav-bar") && link.pathname !== location.pathname) push(link.pathname);
         else loading(link.pathname);
       });
-      // In the iOS app a page opened from the one showing is pushed, as a
-      // screen is onto a navigation stack: its skeleton slides in from the
-      // right edge over the page it came from (style.css), at the tap, while
-      // the page itself loads. Going back is the web view's own edge swipe.
+      // In the phone apps a page opened from the one showing is pushed, as a
+      // screen is onto a navigation stack: its skeleton comes in over the
+      // page it came from (style.css -- sliding from the right edge on iOS,
+      // along the shared axis on Android), at the tap, while the page itself
+      // loads. Going back is the web view's own edge swipe on iOS.
       function push(path) {
         var root = document.documentElement;
         var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (root.getAttribute("data-app") !== "ios" || !document.startViewTransition || reduced) {
+        if (!root.hasAttribute("data-app") || !document.startViewTransition || reduced) {
           loading(path);
           return;
         }

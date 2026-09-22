@@ -178,12 +178,12 @@
   display: none !important;
 }
 
-/* In the iOS app the reader's text size is the site's: the app says how much
-   larger or smaller than the system's default it is, as --oeee-text-scale on
-   the root (WebTab.swift in oeee-cafe/ios), and every step of the type scale
-   follows it. Text grows and shrinks; pictures, the spaces between things and
+/* In the phone apps the reader's text size is the site's: the app says how
+   much larger or smaller than the system's default it is, as
+   --oeee-text-scale on the root (WebTab.swift in oeee-cafe-ios; an app that
+   has not said yet gets 1), and every step of the type scale follows it. Text grows and shrinks; pictures, the spaces between things and
    the painter do not, as in the system's own apps. */
-html[data-app="ios"] {
+html[data-app] {
   --ds-text-xs: calc(11px * var(--oeee-text-scale, 1));
   --ds-text-s: calc(12px * var(--oeee-text-scale, 1));
   --ds-text-m: calc(13px * var(--oeee-text-scale, 1));
@@ -210,8 +210,8 @@ html[data-app="ios"] {
    - Images and links do not drag out of the window.
    - The page does not rubber-band, and the document's own ground is the
      window's, so nothing white shows at its edges or between pages. In the
-     iOS app it does, as everything on a phone does: pulling it down past
-     its top is how it is refreshed there.
+     phone apps it does, as everything on a phone does: pulling it down past
+     its top is how it is refreshed there, and Android stretches it.
    --------------------------------------------------------------------------- */
 :root {
   --ds-link: #2f5410;
@@ -232,8 +232,8 @@ html {
 }
 
 /* `data-app` marks the phone apps' pages (theme_head.jinja). */
-html:not([data-app="ios"]),
-html:not([data-app="ios"]) .ds-page {
+html:not([data-app]),
+html:not([data-app]) .ds-page {
   overscroll-behavior: none;
 }
 
@@ -403,10 +403,13 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    phone browser from tucking its address bar away, which costs more screen
    than the toolbar staying put would save.
 
-   The iOS app keeps the page scrolling at every width too. There the page
-   is the app's scroll view, and only it gives iOS's manners: pulling down
-   to refresh, a tap on the status bar to go back to the top, and the tab
-   bar's second tap scrolling up.
+   The phone apps keep the page scrolling at every width too. There the page
+   is the app's scroll view, and only it gives the platform's manners:
+   pulling down to refresh, a tap on the status bar to go back to the top,
+   and the tab bar's second tap scrolling up. Both apps ask the web view
+   whether it has scrolled, so on a tablet or a phone held sideways an inner
+   area would leave them told it is always at the top -- Android's pull to
+   refresh firing halfway down a list.
 
    What depended on the window scrolling: htmx's `revealed` is an
    IntersectionObserver against the viewport, which sees inside a scrolling
@@ -414,11 +417,11 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    toolbar.jinja, since browsers only restore the window's own scroll.
    --------------------------------------------------------------------------- */
 @media (min-width: 601px) {
-  html:not([data-app="ios"]) {
+  html:not([data-app]) {
     height: 100%;
   }
 
-  html:not([data-app="ios"]) .ds-page {
+  html:not([data-app]) .ds-page {
     display: -webkit-box;
     display: flex;
     -webkit-box-orient: vertical;
@@ -428,11 +431,11 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
     overflow: hidden;
   }
 
-  html:not([data-app="ios"]) .ds-page > header {
+  html:not([data-app]) .ds-page > header {
     flex: 0 0 auto;
   }
 
-  html:not([data-app="ios"]) .ds-page > main.ds-content {
+  html:not([data-app]) .ds-page > main.ds-content {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
@@ -1379,10 +1382,10 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
     font-size: 16px !important;
   }
 
-  /* Larger in the iOS app when the reader's text is, and never smaller. */
-  html[data-app="ios"] input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
-  html[data-app="ios"] textarea,
-  html[data-app="ios"] select {
+  /* Larger in the phone apps when the reader's text is, and never smaller. */
+  html[data-app] input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+  html[data-app] textarea,
+  html[data-app] select {
     font-size: max(16px, calc(16px * var(--oeee-text-scale, 1))) !important;
   }
 }
