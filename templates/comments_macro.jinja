@@ -1,5 +1,5 @@
 {% from "supporter_badge_macro.jinja" import supporter_badge %}
-{% macro comment_item(comment, current_user, supporters=[]) %}
+{% macro comment_item(comment, current_user, supporters={}) %}
   {# Only show comment if it's not deleted, or if it's deleted but has children #}
   {% if not comment.deleted_at or (comment.children and comment.children|length > 0) %}
   <div class="comment-wrapper">
@@ -11,7 +11,7 @@
           {% else %}
             <a href="{{ comment.actor_url }}" class="comment-author" target="_blank" rel="noopener noreferrer">{{ comment.actor_name }}</a>
           {% endif %}
-          {% if comment.is_local and comment.actor_login_name in supporters %}{{ supporter_badge() }}{% endif %}
+          {% if comment.is_local %}{{ supporter_badge(supporters, comment.actor_login_name) }}{% endif %}
           <span class="muted comment-handle">{{ comment.actor_handle }}</span>
           <span class="muted comment-timestamp">{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</span>
         </div>
@@ -61,7 +61,7 @@
   {% endif %}
 {% endmacro %}
 
-{% macro comments(comments, current_user, supporters=[]) %}
+{% macro comments(comments, current_user, supporters={}) %}
   {% for comment in comments %}
     {{ comment_item(comment, current_user, supporters) }}
   {% endfor %}

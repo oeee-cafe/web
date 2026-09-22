@@ -4,7 +4,7 @@ use crate::web::handlers::about::{about, design};
 use crate::web::handlers::account::{
     account, delete_account, delete_account_htmx, edit_account, edit_password, get_account_json,
     request_email_verification_code, request_email_verification_json, save_language,
-    save_show_in_credits, save_show_sensitive_content, verify_email_code_json, verify_email_verification_code,
+    save_show_sensitive_content, save_supporter_settings, verify_email_code_json, verify_email_verification_code,
 };
 use crate::web::handlers::activitypub::{
     activitypub_get_community, activitypub_get_post, activitypub_get_user,
@@ -22,9 +22,9 @@ use crate::web::handlers::auth::{
     api_login, api_logout, api_me, api_signup, do_login, do_logout, do_signup, login, signup,
 };
 use crate::web::handlers::identity::{
-    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_sign_in,
-    do_identity_welcome, do_steam_refresh, do_steam_sign_in, do_unlink_identity, identity_welcome,
-    steam_app_only,
+    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_purchase,
+    do_apple_sign_in, do_identity_welcome, do_steam_refresh, do_steam_sign_in, do_unlink_identity,
+    identity_welcome, steam_app_only,
 };
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
@@ -189,10 +189,21 @@ impl App {
                 steam.clone(),
             ));
             // Supporter standing, from what Steam says each account owns.
-            if !steam.supporter_app_ids.is_empty() {
+            if !steam.supporter_apps.is_empty() {
                 tokio::task::spawn(crate::steam::recheck_supporters(
                     self.state.db_pool.clone(),
                     steam,
+                ));
+            }
+        }
+
+        // The same, for what the App Store says about the purchases the iOS
+        // app has handed over: a refund takes the mark away within a day.
+        if let Some(app_store) = self.state.config.app_store.clone() {
+            if !app_store.supporter_products.is_empty() {
+                tokio::task::spawn(crate::app_store::recheck_supporters(
+                    self.state.db_pool.clone(),
+                    app_store,
                 ));
             }
         }
@@ -231,7 +242,7 @@ impl App {
             .route("/account", post(edit_account))
             .route("/account/password", post(edit_password))
             .route("/account/language", post(save_language))
-            .route("/account/credits", post(save_show_in_credits))
+            .route("/account/credits", post(save_supporter_settings))
             .route(
                 "/account/show-sensitive-content",
                 post(save_show_sensitive_content),
@@ -634,6 +645,7 @@ impl App {
             .route("/auth/apple", post(do_apple_sign_in))
             .route("/auth/apple/callback", post(apple_callback))
             .route("/auth/apple/start", post(apple_start))
+            .route("/auth/apple/purchase", post(do_apple_purchase))
             .route("/auth/welcome", get(identity_welcome))
             .route("/auth/welcome", post(do_identity_welcome))
             .route("/auth/cancel", post(cancel_pending_identity))

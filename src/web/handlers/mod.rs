@@ -50,6 +50,7 @@ pub mod privacy;
 pub mod profile;
 pub mod report;
 pub mod search;
+pub mod supporter;
 pub mod well_known;
 
 pub async fn handler_404(
@@ -1393,31 +1394,8 @@ mod template_tests {
     /// says what they chose.
     #[test]
     fn a_supporter_chooses_whether_to_be_credited() {
-        let env = test_support::env();
         let render = |show_in_credits: serde_json::Value| {
-            env.get_template("account.jinja")
-                .expect("account loads")
-                .render(context! {
-                    current_user => json!({
-                        "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
-                        "login_name": "oeee",
-                        "display_name": "오이",
-                        "email": null,
-                        "email_verified_at": null,
-                        "created_at": "2026-09-22T00:00:00Z",
-                        "preferred_language": null,
-                        "show_sensitive_content": false,
-                        "role": "user",
-                    }),
-                    languages => vec![("ko", "한국어"), ("en", "English")],
-                    identities => json!([{"provider": "steam", "display_hint": "오이", "subject": "76561197960287930"}]),
-                    has_password => true,
-                    show_in_credits,
-                    steam_enabled => true,
-                    steam_linked => true,
-                    ..chrome()
-                })
-                .expect("account renders")
+            render_account(show_in_credits, json!(["steam"]), json!("steam"))
         };
         let squash = |html: String| html.split_whitespace().collect::<Vec<_>>().join(" ");
         let listed = squash(render(json!(true)));
@@ -1427,6 +1405,62 @@ mod template_tests {
         assert!(hidden.contains(r#"action="/account/credits""#));
         assert!(!hidden.contains(r#"name="show_in_credits" id="show_in_credits" value="on" checked"#));
         assert!(!render(json!(null)).contains("/account/credits"));
+    }
+
+    /// The account page as the handler renders it, for a supporter who
+    /// bought this year's pack on `supporter_platforms` and wears
+    /// `worn_mark`.
+    fn render_account(
+        show_in_credits: serde_json::Value,
+        supporter_platforms: serde_json::Value,
+        worn_mark: serde_json::Value,
+    ) -> String {
+        test_support::env()
+            .get_template("account.jinja")
+            .expect("account loads")
+            .render(context! {
+                current_user => json!({
+                    "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
+                    "login_name": "oeee",
+                    "display_name": "오이",
+                    "email": null,
+                    "email_verified_at": null,
+                    "created_at": "2026-09-22T00:00:00Z",
+                    "preferred_language": null,
+                    "show_sensitive_content": false,
+                    "role": "user",
+                }),
+                languages => vec![("ko", "한국어"), ("en", "English")],
+                identities => json!([{"provider": "steam", "display_hint": "오이", "subject": "76561197960287930"}]),
+                has_password => true,
+                show_in_credits,
+                supporter_platforms,
+                worn_mark,
+                steam_enabled => true,
+                steam_linked => true,
+                ..chrome()
+            })
+            .expect("account renders")
+    }
+
+    /// Which platform's mark to wear is only a question for someone who
+    /// supports on more than one, and the answer they gave is the one
+    /// selected.
+    #[test]
+    fn only_a_supporter_on_two_platforms_is_asked_which_mark_to_wear() {
+        let one = render_account(json!(true), json!(["steam"]), json!("steam"));
+        assert!(!one.contains(r#"name="mark""#), "nothing to choose between");
+
+        let both = render_account(json!(true), json!(["steam", "apple"]), json!("apple"));
+        let squashed = both.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert_eq!(squashed.matches(r#"name="mark""#).count(), 2, "one for each");
+        assert!(squashed.contains(r#"name="mark" value="apple" checked"#));
+        assert!(!squashed.contains(r#"name="mark" value="steam" checked"#));
+        // Saved by the same button as the credits, in the same form.
+        assert_eq!(squashed.matches(r#"action="/account/credits""#).count(), 1);
+
+        // Nobody else is asked at all.
+        assert!(!render_account(json!(null), json!([]), json!(null)).contains(r#"name="mark""#));
     }
 
     /// An account made with Steam has no password: it is offered one to set
@@ -1842,12 +1876,12 @@ mod template_tests {
         })
     }
 
-    /// The heart goes beside every name on a post's page that belongs to a
-    /// supporter -- the author, someone who drew with them, a commenter, a
-    /// reply -- and beside no one else's, remote accounts included however
-    /// they are named.
+    /// A supporter's mark goes beside every name on a post's page that
+    /// belongs to one -- the author, someone who drew with them, a
+    /// commenter, a reply -- and beside no one else's, remote accounts
+    /// included however they are named. Each wears their own platform's.
     #[test]
-    fn supporters_wear_the_heart_on_a_post_page() {
+    fn supporters_wear_their_platforms_mark_on_a_post_page() {
         let env = test_support::env();
         let mut reply = comment(Some("fan"), "Fan");
         reply["children"] = json!([comment(Some("someone"), "Someone")]);
@@ -1884,28 +1918,35 @@ mod template_tests {
         };
         let badges = |html: &str| html.matches(r#"class="supporter-badge""#).count();
 
-        let page = render(json!(["someone", "friend", "fan"]));
+        let page = render(json!({"someone": "steam", "friend": "apple", "fan": "steam"}));
         // Author, co-drawer, the commenter and the author's reply to them.
         assert_eq!(badges(&page), 4);
         let byline = page.find("post-inspector-byline").unwrap();
         let handle = page[byline..].find("post-inspector-handle").unwrap() + byline;
         assert!(page[byline..handle].contains("supporter-badge"), "beside the author");
         assert!(page.contains(r#"href="/about#supporters""#));
+        // The co-drawer bought elsewhere and wears the other mark: one
+        // storefront on the page, the rest gamepads.
+        assert_eq!(page.matches(r#"aria-label="supporter-badge-apple""#).count(), 1);
+        assert_eq!(page.matches(r#"aria-label="supporter-badge-steam""#).count(), 3);
 
-        assert_eq!(badges(&render(json!([]))), 0);
+        assert_eq!(badges(&render(json!({}))), 0);
         // The comments fragment an HTMX post swaps in, the same way.
         let fragment = env
             .get_template("post_comments.jinja")
             .unwrap()
-            .render(context! { comments, supporters => json!(["fan"]), ..chrome() })
+            .render(context! { comments, supporters => json!({"fan": "steam"}), ..chrome() })
             .unwrap();
         assert_eq!(badges(&fragment), 1);
     }
 
+    /// Every year they have supported, earliest first, each on the platform
+    /// that year's pack was bought on -- including years that have passed,
+    /// whose mark they no longer wear.
     #[test]
     fn a_supporters_profile_says_so_first() {
         let env = test_support::env();
-        let render = |is_supporter: bool| {
+        let render = |supporter_standings: serde_json::Value| {
             env.get_template("profile.jinja")
                 .expect("profile loads")
                 .render(context! {
@@ -1914,7 +1955,7 @@ mod template_tests {
                     links => Vec::<serde_json::Value>::new(),
                     followings => Vec::<serde_json::Value>::new(),
                     achievements => Vec::<serde_json::Value>::new(),
-                    is_supporter,
+                    supporter_standings,
                     public_community_posts => Vec::<serde_json::Value>::new(),
                     private_community_posts => Vec::<serde_json::Value>::new(),
                     domain => "oeee.cafe",
@@ -1923,11 +1964,22 @@ mod template_tests {
                 })
                 .expect("profile renders")
         };
-        let supporter = render(true);
+        let supporter = render(json!([
+            {"provider": "steam", "year": 2026, "since": "2026-09-22T00:00:00Z"},
+            {"provider": "apple", "year": 2027, "since": "2027-01-04T00:00:00Z"},
+        ]));
         let chip = supporter.find("supporter-chip").expect("a supporter chip");
         assert!(chip < supporter.find("/@oeee/guestbook").unwrap(), "before the guestbook");
         assert!(supporter.contains(r#"href="/about#supporters""#));
-        assert!(!render(false).contains("supporter-chip"));
+        assert_eq!(supporter.matches("supporter-chip").count(), 2, "one per year");
+        let steam = supporter.find("supporter-badge-steam").expect("the Steam chip");
+        let apple = supporter.find("supporter-badge-apple").expect("the App Store chip");
+        assert!(steam < apple, "earliest year first");
+        // The year is the chip, and the platform is what it is read as.
+        assert!(supporter.contains("🎮</span>2026</a>"), "{supporter}");
+        assert!(supporter.contains("🍎</span>2027</a>"));
+        assert!(supporter.contains("supporter-year(platform=supporter-badge-steam,year=2026)"));
+        assert!(!render(json!([])).contains("supporter-chip"));
     }
 
     /// The credits: a section on /about that every badge leads to, left out
@@ -1946,10 +1998,12 @@ mod template_tests {
                 .expect("about renders")
         };
         let about = render(json!([
-            {"login_name": "a", "display_name": "에이", "since": "2026-09-22T00:00:00Z"},
-            {"login_name": "b", "display_name": "비", "since": "2026-09-23T00:00:00Z"},
+            {"login_name": "a", "display_name": "에이", "mark": "steam", "since": "2026-09-22T00:00:00Z"},
+            {"login_name": "b", "display_name": "비", "mark": "apple", "since": "2026-09-23T00:00:00Z"},
         ]));
         assert!(about.contains(r#"id="supporters""#));
+        // Each chip wears its own platform's mark.
+        assert_eq!(about.matches("supporter-mark").count(), 2);
         assert!(about.contains("about-supporters-thanks"));
         let a = about.find(r#"href="/@a""#).expect("a is thanked");
         let b = about.find(r#"href="/@b""#).expect("b is thanked");

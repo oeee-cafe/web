@@ -42,12 +42,47 @@ email_from_address = ""
 # user's. The achievements' API names in Steamworks are FIRST_DRAWING,
 # FIRST_RELAY, FIRST_COLLABORATION and STEAM_SUPPORTER, each set to be unlocked by the game
 # server ("Set By: Official GS"); the server unlocks them itself.
-# supporter_app_ids are the Steam apps whose owners are supporters -- the
-# Supporter Pack DLC -- and owning any one outright earns STEAM_SUPPORTER, the
-# supporter badge and a line in the credits on /about. To make every buyer of a paid app
-# a supporter, add the app's id and keep the DLC's (a delisted DLC stays
-# owned); linked Steam accounts are rechecked daily, so no one has to sign in.
 # [steam]
 # app_id = 0
 # web_api_key = ""
-# supporter_app_ids = [0]
+
+# A Supporter Pack DLC per year: owning one makes its buyer a supporter for
+# that year -- the mark beside their name while the year lasts, and a line on
+# their profile for good. A DLC is owned once and for good, so supporting
+# again next year is buying next year's, and a year's id stays here once it
+# has been here (a delisted DLC stays owned). The app's own app_id is never
+# counted however it is listed: buying Oeee Cafe is not supporting it. Steam
+# accounts are rechecked daily, so a purchase or a refund lands without
+# anyone signing in.
+# [[steam.supporter_apps]]
+# year = 2026
+# app_id = 0
+
+# Sign in with Apple. client_id is the Services ID whose return URL is
+# {base_url}/auth/apple/callback; app_ids are the bundle IDs of the apps that
+# sign in natively, whose tokens name the bundle as audience instead.
+# [apple]
+# client_id = "cafe.oeee.web"
+# app_ids = ["cafe.oeee"]
+
+# The App Store's side of the iOS app: what the Supporter Pack is sold as,
+# and the key that asks Apple about a purchase. Separate credentials from
+# [apple] above, from App Store Connect > Users and Access > Integrations >
+# In-App Purchase: issuer_id is printed above the key list, key_id beside the
+# key, and private_key_path points at the .p8 that download gave you -- kept
+# here in config/, which is not in the repository, and read from /app/config
+# in the container.
+#
+# supporter_products are the packs, one per year, as non-consumables: the
+# same year-by-year shape as [[steam.supporter_apps]], for the same reason.
+# A transaction production has never heard of is asked about in Apple's
+# sandbox, so TestFlight and Xcode builds work without a second deployment.
+# [app_store]
+# issuer_id = "00000000-0000-0000-0000-000000000000"
+# key_id = "ABCD123456"
+# private_key_path = "config/SubscriptionKey_ABCD123456.p8"
+# bundle_id = "cafe.oeee"
+#
+# [[app_store.supporter_products]]
+# year = 2026
+# product_id = "cafe.oeee.supporter.2026"

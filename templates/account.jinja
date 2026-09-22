@@ -1,4 +1,5 @@
 {% extends "base.jinja" %}
+{% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("account") }}
 {% endblock title %}
@@ -89,6 +90,25 @@
         <div class="profile-section-label">{{ ftl_get_message("account-supporter") }}</div>
         <form action="/account/credits" method="post" class="ds-card settings-card">
           <p class="ds-help">{{ ftl_get_message("account-supporter-thanks") }}</p>
+          {% if (supporter_platforms or [])|length > 1 %}
+            {# Buying this year's pack on more than one platform is the only
+               time there is anything to choose: which one's mark goes beside
+               their name. Their profile names every year either way. #}
+            <div class="form-field">
+              <span class="ds-label">{{ ftl_get_message("account-supporter-mark") }}</span>
+              <div class="community-form-choices">
+                {% for platform in supporter_platforms %}
+                  <label class="community-form-choice">
+                    <input type="radio"
+                           name="mark"
+                           value="{{ platform }}"
+                           {% if platform == worn_mark %}checked{% endif %} />
+                    <span class="community-form-choice-name">{{ supporter_mark(platform) }}{{ supporter_mark_name(platform) }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
           <div class="community-form-choices">
             <label class="community-form-choice">
               <input type="checkbox"

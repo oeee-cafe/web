@@ -1,6 +1,6 @@
 use crate::app_error::AppError;
 use crate::models::achievement::list_achievements;
-use crate::models::supporter::is_supporter;
+use crate::models::supporter::standings;
 use crate::models::actor::Actor;
 use crate::models::banner::{
     activate_banner, delete_banner, find_banner_by_id, list_user_banners,
@@ -233,7 +233,7 @@ pub async fn profile(
     };
 
     let achievements = list_achievements(&mut tx, user.id).await?;
-    let is_supporter = is_supporter(&mut tx, user.id).await?;
+    let supporter_standings = standings(&mut tx, user.id).await?;
     let links = find_links_by_user_id(&mut tx, user.id).await?;
     let links = links
         .iter()
@@ -255,7 +255,7 @@ pub async fn profile(
         is_following => is_current_user_following,
         followings,
         achievements,
-        is_supporter,
+        supporter_standings,
         user => Some(user),
         domain => state.config.domain.clone(),
         public_community_posts,
@@ -314,7 +314,7 @@ pub async fn profile_or_community(
         };
 
         let achievements = list_achievements(&mut tx, user.id).await?;
-        let is_supporter = is_supporter(&mut tx, user.id).await?;
+        let supporter_standings = standings(&mut tx, user.id).await?;
         let links = find_links_by_user_id(&mut tx, user.id).await?;
         let links = links
             .iter()
@@ -336,7 +336,7 @@ pub async fn profile_or_community(
             is_following => is_current_user_following,
             followings,
             achievements,
-            is_supporter,
+            supporter_standings,
             user => Some(user),
             domain => state.config.domain.clone(),
             public_community_posts,
