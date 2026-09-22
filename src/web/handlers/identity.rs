@@ -44,8 +44,8 @@ use tower_sessions::Session;
 use crate::app_error::AppError;
 use crate::apple;
 use crate::models::identity::{
-    find_user_by_identity, find_user_by_verified_email, link_identity, touch_identity,
-    unlink_identity, LinkError, Provider, UnlinkError, VerifiedIdentity,
+    find_user_by_identity, find_user_by_verified_email, link_identity, refresh_standing,
+    touch_identity, unlink_identity, LinkError, Provider, UnlinkError, VerifiedIdentity,
 };
 use crate::models::user::{
     create_user, find_user_by_login_name, login_name_conflicts_with_community,
@@ -361,6 +361,47 @@ pub async fn do_steam_sign_in(
         next,
     )
     .await
+}
+
+#[derive(Deserialize)]
+pub struct SteamRefreshForm {
+    /// A Web API ticket from `GetAuthTicketForWebApi`, hex-encoded.
+    ticket: String,
+}
+
+/// Asks Steam again what the ticket's Steam account owns, and records it for
+/// whichever account that Steam account is linked to. The Steam app posts
+/// here in the background when Steam says a DLC has been installed -- the
+/// Supporter Pack, bought in the overlay or the store while the app was open
+/// -- so the badge follows at once rather than at the next daily recheck.
+///
+/// Unlike `/auth/steam` it signs nobody in and links nothing, so a page that
+/// is mid-drawing, or signed in as someone else, is left as it was. Standing
+/// is only ever what Steam says, so there is nothing here worth forging.
+pub async fn do_steam_refresh(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<SteamRefreshForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let Some(config) = state.config.steam.as_ref() else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let identity = match steam::verify_ticket(config, &form.ticket).await {
+        Ok(Ok(identity)) => identity,
+        Ok(Err(TicketRejected::Invalid)) => return Ok(StatusCode::BAD_REQUEST.into_response()),
+        Ok(Err(TicketRejected::Banned)) => return Ok(StatusCode::FORBIDDEN.into_response()),
+        Err(error) => {
+            tracing::warn!("Steam standing could not be refreshed: {error:#}");
+            return Ok(StatusCode::BAD_GATEWAY.into_response());
+        }
+    };
+    let mut tx = state.db_pool.begin().await?;
+    refresh_standing(&mut tx, &identity).await?;
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 const APPLE_REQUEST_KEY: &str = "identity.apple";
