@@ -1599,11 +1599,11 @@ mod template_tests {
         assert!(with.contains("achievement-first-drawing-description"));
         assert!(with.contains("achievement-steam-supporter"));
         assert!(with.contains(r#"datetime="2026-09-22T00:00:00Z""#));
-        // Each with its own icon: the pencil for a first drawing, the heart
-        // for buying on Steam.
+        // Each with its own Material Symbols icon: the brush for a first
+        // drawing, the game controller for buying on Steam.
         assert_eq!(with.matches(r#"class="achievement-icon""#).count(), 2);
-        assert!(with.contains("M18.4 2.6a2 2 0 0 1 2.9 2.9"));
-        assert!(with.contains("M12 20.5s-8-4.9-8-10.8"));
+        assert!(with.contains(r#"d="M6 21q-1.125 0-2.225-.55T2 19"#));
+        assert!(with.contains(r#"d="M4.55 19q-1.275 0-1.975-.888"#));
         assert!(!render(json!([])).contains("profile-achievements"));
         // Under the banners of those they follow, over their drawings.
         let at = |needle: &str| with.find(needle).unwrap_or_else(|| panic!("no {needle}"));
