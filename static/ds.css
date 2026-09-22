@@ -385,6 +385,78 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   outline: none;
 }
 
+/* The macOS app: the toolbar is a window's toolbar there, and like Finder's
+   or Safari's it is frosted glass the content scrolls under, rather than a
+   strip the content stops at. So the header floats over the content area,
+   which now starts at the window's top, and the area pads its content down
+   by the header's height -- `--ds-header-height`, kept by base.jinja, since
+   a stacked toolbar or a message makes it taller. Its scrollbar runs from
+   under the toolbar, as a Mac's does.
+
+   The glass is a layer behind the header rather than the header itself: a
+   backdrop filter makes its element the frame for everything fixed inside
+   it, and the keyboard shortcuts panel is fixed inside the toolbar. With
+   reduced transparency asked for, the toolbar is solid again.
+
+   On the website, on Windows and on phones, nothing here applies. */
+:root {
+  --ds-bar: rgba(204, 204, 255, 0.72);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ds-bar: rgba(23, 23, 43, 0.72);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ds-bar: rgba(23, 23, 43, 0.72);
+}
+
+@media (min-width: 601px) {
+  html[data-desktop="macos"] .ds-page {
+    position: relative;
+  }
+
+  html[data-desktop="macos"] .ds-page > header {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 50;
+  }
+
+  html[data-desktop="macos"] .ds-page > header::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+    background-color: var(--ds-bar);
+    -webkit-backdrop-filter: saturate(1.8) blur(20px);
+    backdrop-filter: saturate(1.8) blur(20px);
+  }
+
+  html[data-desktop="macos"] .ds-page > header .nav-bar {
+    background-color: transparent;
+  }
+
+  /* A jump to an anchor lands below the toolbar, not under it. */
+  html[data-desktop="macos"] .ds-page > main.ds-content {
+    scroll-padding-top: var(--ds-header-height, 53px);
+  }
+}
+
+@media (min-width: 601px) and (prefers-reduced-transparency: reduce) {
+  html[data-desktop="macos"] .ds-page > header::before {
+    background-color: var(--ds-ground);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    The toolbar
 
