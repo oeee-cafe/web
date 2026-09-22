@@ -2524,8 +2524,12 @@ pub async fn hx_delete_post(
         .send()
         .await?;
     let post_data = post.clone();
-    let redirect_url =
-        if let Some(community_id_str) = post_data.get("community_id").and_then(|id| id.clone()) {
+    // A draft goes back to the drafts it was one of; a published post to
+    // where it lived.
+    let is_draft = post_data.get("published_at").and_then(|v| v.as_ref()).is_none();
+    let redirect_url = if is_draft {
+        "/posts/drafts".to_string()
+    } else if let Some(community_id_str) = post_data.get("community_id").and_then(|id| id.clone()) {
             let community_id = Uuid::parse_str(&community_id_str)?;
             get_community_slug_url(&mut tx, community_id).await?
         } else {
