@@ -8,6 +8,7 @@ pub mod models;
 pub mod push;
 pub mod redis;
 pub mod relative_time;
+pub mod steam;
 pub mod web;
 
 pub use crate::config::AppConfig;

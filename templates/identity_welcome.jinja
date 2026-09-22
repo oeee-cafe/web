@@ -1,0 +1,55 @@
+{% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("identity-welcome-title") }}
+{% endblock title %}
+{% block content %}
+  {# Someone has signed in with Steam (or another provider) whose account is
+     not linked to one here. Signing up as the sign-up page lays it out, less
+     the password: a handle, the name they go by, the agreement. And for
+     someone who does have an account, a way to sign into it instead, after
+     which the provider's account is linked to it. #}
+  <div class="auth-page">
+    <form method="post" action="/auth/welcome" class="ds-card auth-card">
+      <h1 class="auth-title">{{ ftl_get_message("identity-welcome-title") }}</h1>
+      <p class="auth-lede">
+        {% if provider_name %}
+          {{ ftl_format_pattern("identity-welcome-body", {"provider": provider, "name": provider_name}) }}
+        {% else %}
+          {{ ftl_format_pattern("identity-welcome-body-unnamed", {"provider": provider}) }}
+        {% endif %}
+      </p>
+      {% if error %}<p class="auth-error" role="alert">{{ error }}</p>{% endif %}
+      <div class="form-field">
+        <label class="ds-label" for="login_name">{{ ftl_get_message("login-name") }}</label>
+        <input class="ds-input" name="login_name" id="login_name" value="{{ login_name }}"
+               pattern="[a-zA-Z0-9_\-]{1,50}" maxlength="50"
+               autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
+        <p class="auth-hint">{{ ftl_get_message("login-name-invalid") }}</p>
+      </div>
+      <div class="form-field">
+        <label class="ds-label" for="display_name">{{ ftl_get_message("display-name") }}</label>
+        <input class="ds-input" name="display_name" id="display_name" value="{{ display_name }}"
+               maxlength="255" autocomplete="nickname" required />
+      </div>
+
+      <div class="auth-agree">
+        <label class="auth-agree-check">
+          <input type="checkbox" name="agree" value="1" required />
+          <span>{{ ftl_get_message("signup-agree") }}</span>
+        </label>
+        <div class="auth-agree-links">
+          <a class="profile-chip" href="/policy" target="_blank" rel="noopener">{{ ftl_get_message("community-guidelines") }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+          <a class="profile-chip" href="/privacy" target="_blank" rel="noopener">{{ ftl_get_message("privacy-policy") }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+
+      <button type="submit" class="ds-button ds-button-primary auth-submit">{{ ftl_get_message("identity-welcome-create") }}</button>
+
+      <div class="auth-divider"><span>{{ ftl_get_message("sign-up-have-account") }}</span></div>
+      {# The identity waits in the session; signing in from here links it. #}
+      <a class="ds-button auth-secondary" href="/login{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_format_pattern("identity-welcome-link-existing", {"provider": provider}) }}</a>
+      <button type="submit" form="identity-cancel" class="ds-button auth-secondary">{{ ftl_get_message("identity-cancel") }}</button>
+    </form>
+    <form id="identity-cancel" method="post" action="/auth/cancel"></form>
+  </div>
+{% endblock content %}

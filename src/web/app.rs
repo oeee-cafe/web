@@ -21,6 +21,10 @@ use crate::web::handlers::admin::{
 use crate::web::handlers::auth::{
     api_login, api_logout, api_me, api_signup, do_login, do_logout, do_signup, login, signup,
 };
+use crate::web::handlers::identity::{
+    cancel_pending_identity, do_identity_welcome, do_steam_sign_in, do_unlink_identity,
+    identity_welcome, steam_app_only,
+};
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
     create_collaborative_session, get_active_sessions_json, get_auth_info, get_collaboration_meta,
@@ -222,6 +226,10 @@ impl App {
                 post(verify_email_verification_code),
             )
             .route("/account/delete", delete(delete_account_htmx))
+            .route(
+                "/account/identities/:provider/unlink",
+                post(do_unlink_identity),
+            )
             .route("/comments", post(do_create_comment))
             .route("/posts/:post_id/reactions/add", post(add_reaction))
             .route("/posts/:post_id/reactions/remove", post(remove_reaction))
@@ -600,6 +608,11 @@ impl App {
             .route("/signup", post(do_signup))
             .route("/login", get(login))
             .route("/login", post(do_login))
+            .route("/auth/steam/app", get(steam_app_only))
+            .route("/auth/steam", post(do_steam_sign_in))
+            .route("/auth/welcome", get(identity_welcome))
+            .route("/auth/welcome", post(do_identity_welcome))
+            .route("/auth/cancel", post(cancel_pending_identity))
             .route("/password-reset", get(password_reset_request_page))
             .route("/password-reset", post(password_reset_request))
             .route("/password-reset/verify", get(password_reset_verify_page))
