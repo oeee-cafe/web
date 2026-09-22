@@ -3577,3 +3577,85 @@ a.user-pill:hover {
   margin: 0;
   padding: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Settings
+
+   A settings pane: groups as cards under their labels, fields the card's
+   width, each group's button at its foot.
+   --------------------------------------------------------------------------- */
+.settings-page {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.settings-title {
+  margin: 0 0 var(--ds-space-5);
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+}
+
+.settings-group {
+  margin-bottom: var(--ds-space-5);
+}
+
+.settings-group .profile-section-label {
+  margin: 0 0 6px;
+}
+
+.settings-card .ds-input,
+.settings-card .form-field input.ds-input,
+.settings-card .ds-select {
+  width: 100%;
+  max-width: none;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.settings-card .form-field:last-of-type {
+  margin-bottom: 0;
+}
+
+.settings-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--ds-space-4);
+}
+
+.settings-foot > * + * {
+  margin-left: var(--ds-space-3);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-row-text {
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+.settings-status {
+  margin: 0 0 var(--ds-space-3);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: var(--ds-radius-s);
+  font-size: var(--ds-text-m);
+}
+
+.settings-status.is-good {
+  background-color: var(--ds-hover);
+  color: var(--ds-muted);
+}
+
+.settings-status.is-warning,
+.settings-status.is-danger {
+  background-color: rgba(220, 38, 38, 0.1);
+  color: var(--ds-danger);
+}
+
+.settings-danger .profile-section-label {
+  color: var(--ds-danger);
+}

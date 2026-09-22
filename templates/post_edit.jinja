@@ -1,51 +1,51 @@
+{# Editing a post, in place of its title and description in the post's card:
+   the same fields, switches and buttons as publishing it. #}
 <form id="post-edit-container"
+      class="publish-form post-edit-form"
       hx-put="/posts/{{ post_id }}"
       hx-target="this"
       hx-swap="outerHTML"
       hx-disable="find button">
-    <div class="form-group">
-        <label>{{ ftl_get_message("post-title") }}:</label>
-        <input type="text" name="title" value="{{ post.title }}">
+    <div class="form-field">
+        <label class="ds-label" for="post-edit-title">{{ ftl_get_message("post-title") }}</label>
+        <input class="ds-input" type="text" id="post-edit-title" name="title" value="{{ post.title }}">
     </div>
-    <div class="form-group">
-        <label>{{ ftl_get_message("post-description") }}:</label>
-        <textarea name="content">{{ post.content }}</textarea>
+    <div class="form-field">
+        <label class="ds-label" for="post-edit-content">{{ ftl_get_message("post-description") }}</label>
+        <textarea class="ds-textarea" id="post-edit-content" name="content" rows="4">{{ post.content }}</textarea>
     </div>
-    <div class="form-group">
-        <label for="post-edit-hashtags">{{ ftl_get_message("post-hashtags") }}:</label>
+    <div class="form-field">
+        <label class="ds-label" for="post-edit-hashtags">{{ ftl_get_message("post-hashtags") }}</label>
         {# Same cap the publish form has always carried. Without it a long
            enough line was a failed edit rather than a truncated tag. #}
-        <input type="text"
+        <input class="ds-input"
+               type="text"
                id="post-edit-hashtags"
                name="hashtags"
                value="{{ hashtags }}"
                maxlength="500"
                aria-describedby="post-edit-hashtags-hint"
                placeholder="{{ ftl_get_message("post-hashtags-placeholder") }}">
-        <span id="post-edit-hashtags-hint" class="form-hint">{{ ftl_get_message("post-hashtags-hint") }}</span>
+        <span id="post-edit-hashtags-hint" class="ds-help">{{ ftl_get_message("post-hashtags-hint") }}</span>
     </div>
-    <div class="form-group form-group-checkbox">
-        <input type="checkbox"
-               name="is_sensitive"
-               id="is_sensitive"
-               {% if post.is_sensitive == "true" %}checked{% endif %}>
-        <label for="is_sensitive">{{ ftl_get_message("sensitive") }}</label>
+    <div class="community-form-choices publish-switches">
+        <label class="community-form-choice">
+            <input type="checkbox" name="is_sensitive" id="is_sensitive"
+                   {% if post.is_sensitive == "true" %}checked{% endif %}>
+            <span class="community-form-choice-name">{{ ftl_get_message("sensitive") }}</span>
+        </label>
+        <label class="community-form-choice">
+            <input type="checkbox" name="allow_relay" id="allow_relay"
+                   {% if post.allow_relay == "true" %}checked{% endif %}>
+            <span class="community-form-choice-name">{{ ftl_get_message("allow-relay") }}</span>
+        </label>
+        <label class="community-form-choice">
+            <input type="checkbox" name="allow_replay" id="allow_replay"
+                   {% if post.allow_replay == "true" %}checked{% endif %}>
+            <span class="community-form-choice-name">{{ ftl_get_message("allow-replay") }}</span>
+        </label>
     </div>
-    <div class="form-group form-group-checkbox">
-        <input type="checkbox"
-               name="allow_relay"
-               id="allow_relay"
-               {% if post.allow_relay == "true" %}checked{% endif %}>
-        <label for="allow_relay">{{ ftl_get_message("allow-relay") }}</label>
-    </div>
-    <div class="form-group form-group-checkbox">
-        <input type="checkbox"
-               name="allow_replay"
-               id="allow_replay"
-               {% if post.allow_replay == "true" %}checked{% endif %}>
-        <label for="allow_replay">{{ ftl_get_message("allow-replay") }}</label>
-    </div>
-    <div class="form-actions">
+    <div class="form-actions community-form-actions">
         <button type="button" class="ds-button" hx-get="/posts/{{ post_id }}" hx-target="#post-edit-container" hx-swap="outerHTML">{{ ftl_get_message("cancel") }}</button>
         <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("save") }}</button>
     </div>
