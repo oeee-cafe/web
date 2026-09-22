@@ -2724,6 +2724,19 @@ nav a:visited,
   margin-top: var(--ds-space-3);
 }
 
+/* Following, those with a banner: /about's banners (.about-banner), two to
+   a row. */
+.profile-ally-banners {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-gap: 8px;
+  gap: 8px;
+}
+
+.profile-ally-banners + .profile-allies {
+  margin-top: var(--ds-space-2);
+}
+
 .profile-chips > *,
 .profile-allies > * {
   margin: 0 6px 6px 0;

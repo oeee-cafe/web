@@ -92,14 +92,33 @@
     {% if followings|length > 0 %}
       <section class="profile-section">
         <div class="profile-section-label">{{ ftl_get_message("profile-following") }}</div>
-        <div class="profile-allies">
-          {% for following in followings|selectattr("banner_image_filename") %}
-            {{ user_pill("/@" ~ following.login_name, following.banner_image_filename, following.banner_image_width, following.banner_image_height, following.display_name, "@" ~ following.login_name, r2_public_endpoint_url) }}
-          {% endfor %}
-          {% for following in followings|rejectattr("banner_image_filename") %}
-            <a class="profile-chip" href="/@{{ following.login_name }}" title="@{{ following.login_name }}">{{ following.display_name }}</a>
-          {% endfor %}
-        </div>
+        {# Those with a banner as /about shows banners -- framed, in hard
+           pixels, the name on hover -- two to a row; those without, as
+           chips after them. #}
+        {% set with_banner = followings|selectattr("banner_image_filename")|list %}
+        {% set without_banner = followings|rejectattr("banner_image_filename")|list %}
+        {% if with_banner %}
+          <div class="profile-ally-banners">
+            {% for following in with_banner %}
+              <a class="about-banner" href="/@{{ following.login_name }}" title="{{ following.display_name }} (@{{ following.login_name }})">
+                <img width="200"
+                     height="40"
+                     alt="{{ following.display_name }} (@{{ following.login_name }})"
+                     loading="lazy"
+                     decoding="async"
+                     draggable="false"
+                     src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if without_banner %}
+          <div class="profile-allies">
+            {% for following in without_banner %}
+              <a class="profile-chip" href="/@{{ following.login_name }}" title="@{{ following.login_name }}">{{ following.display_name }}</a>
+            {% endfor %}
+          </div>
+        {% endif %}
       </section>
     {% endif %}
 

@@ -1598,6 +1598,45 @@ mod template_tests {
         assert!(!render(json!([])).contains("profile-achievements"));
     }
 
+    /// Following: those with a banner framed as /about frames them, the rest
+    /// as chips after, and a group left out when nobody is in it.
+    #[test]
+    fn the_profile_shows_following_banners_as_about_does() {
+        let env = test_support::env();
+        let render = |followings: serde_json::Value| {
+            env.get_template("profile.jinja")
+                .expect("profile loads")
+                .render(context! {
+                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이"}),
+                    banner => json!(null),
+                    links => Vec::<serde_json::Value>::new(),
+                    followings,
+                    achievements => Vec::<serde_json::Value>::new(),
+                    public_community_posts => Vec::<serde_json::Value>::new(),
+                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    domain => "oeee.cafe",
+                    is_following => false,
+                    ..chrome()
+                })
+                .expect("profile renders")
+        };
+        let banner = json!({
+            "login_name": "a", "display_name": "에이",
+            "banner_image_filename": "abcdef.png", "banner_image_width": 200, "banner_image_height": 40,
+        });
+        let plain = json!({"login_name": "b", "display_name": "비", "banner_image_filename": null});
+
+        let both = render(json!([banner, plain]));
+        assert!(both.contains(r#"class="profile-ally-banners""#));
+        assert!(both.contains(r#"<a class="about-banner" href="/@a""#));
+        assert!(both.contains("/image/ab/abcdef.png"));
+        assert!(both.contains(r#"<a class="profile-chip" href="/@b""#));
+        assert!(!both.contains(r#"href="/@b" title="비"#), "bannerless stay chips");
+
+        assert!(!render(json!([plain])).contains("profile-ally-banners"));
+        assert!(!render(json!([banner])).contains(r#"class="profile-allies""#));
+    }
+
     /// What the Steam app reads to tell friends what someone is doing: the
     /// painters, the collaborative room's head and any page on the base
     /// layout carry it when the handler passes one, and none of them when it
