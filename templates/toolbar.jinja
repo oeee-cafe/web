@@ -59,7 +59,6 @@
           <a href="/home">{{ ftl_get_message("timeline") }}</a>
         {% endif %}
         <a href="/communities">{{ ftl_get_message("community") }}</a>
-        <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
       </div>
       {# Drawing together, live: its own button beside the sections rather
          than one of them, with a pulsing light in the mark's green, since what is behind it
@@ -80,12 +79,6 @@
       </a>
       {% if current_user %}
         {% include "nav_notifications.jinja" %}
-        {# Drafts in the bar while there are any: something left to finish
-           is worth seeing without opening a menu, and nothing is when there
-           is not. #}
-        {% if draft_post_count > 0 %}
-          <a class="toolbar-button" href="/posts/drafts">{{ ftl_get_message("drafts") }} <span class="toolbar-badge">{{ draft_post_count }}</span></a>
-        {% endif %}
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
            again. #}
@@ -100,7 +93,13 @@
         <details class="toolbar-menu">
           <summary aria-label="{{ current_user.display_name or current_user.login_name }}">
             <span class="toolbar-avatar" aria-hidden="true">{{ (current_user.display_name or current_user.login_name or "?")[:1]|upper }}</span>
-            {% if not current_user.email_verified_at %}<span class="toolbar-dot" title="{{ ftl_get_message('email-not-verified') }}"></span>{% endif %}
+            {# A dot on the initial when the menu holds something to see to:
+               an unverified email first, then drafts left to finish. Drafts
+               used to be a button in the bar while there were any, which
+               changed the bar's width -- and so whether it fit one row on a
+               phone -- from one visit to the next. #}
+            {% if not current_user.email_verified_at %}<span class="toolbar-dot" title="{{ ftl_get_message('email-not-verified') }}"></span>
+            {% elif draft_post_count > 0 %}<span class="toolbar-dot toolbar-dot-drafts" title="{{ ftl_get_message('drafts') }}"></span>{% endif %}
           </summary>
           <div class="toolbar-menu-items">
             <div class="toolbar-menu-who">
@@ -108,6 +107,9 @@
               <span>@{{ current_user.login_name }}</span>
             </div>
             <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>
+            <a href="/posts/drafts">{{ ftl_get_message("drafts") }}
+              {%- if draft_post_count > 0 %} <span class="toolbar-badge">{{ draft_post_count }}</span>{% endif -%}
+            </a>
             <a href="/account">{{ ftl_get_message("account") }}
               {% if not current_user.email_verified_at %}
                 <span class="dangerous">({{ ftl_get_message("email-not-verified") }})</span>

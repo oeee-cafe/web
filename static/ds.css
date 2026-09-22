@@ -561,10 +561,11 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   margin-left: 8px;
 }
 
-/* Drawing together, live: a button of its own beside the sections, raised
-   off the bar as the current section is raised out of its group, with a
+/* Drawing together, live: a button of its own beside the sections, with a
    light the cucumber's green, the site's mark -- a lime disc in a dark
-   rim -- pulsing. It is the sections' 30px tall -- 4px of padding, 20px
+   rim -- pulsing. Built as every other button in the bar is -- the border,
+   the corners, the one shadow -- and told apart only by its fill: plain for
+   most, this green tint here, lime for Draw. It is the sections' 30px tall -- 4px of padding, 20px
    of line and its border, as the section group's 2px of padding and 26px
    of button make. */
 .nav-bar .toolbar-links a.toolbar-live,
@@ -579,18 +580,22 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   border-radius: 6px;
   background-color: var(--ds-surface);
   background-image: linear-gradient(rgba(122, 190, 40, 0.14), rgba(122, 190, 40, 0.14));
-  box-shadow: 0 0 0 3px rgba(122, 190, 40, 0.12), var(--ds-shadow-raise);
+  box-shadow: var(--ds-shadow-raise);
   color: var(--ds-ink);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .nav-bar .toolbar-links a.toolbar-live:hover {
   background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
 }
 
-.nav-bar .toolbar-links a.toolbar-live[aria-current="page"] {
+/* Where you are: the tint deepened, as the section group raises its
+   current one. */
+.nav-bar .toolbar-links a.toolbar-live[aria-current="page"],
+.nav-bar .toolbar-links a.toolbar-live[aria-current="page"]:hover {
   border-color: #3c6712;
-  box-shadow: 0 0 0 0.5px #3c6712, var(--ds-shadow-raise);
+  background-image: linear-gradient(rgba(122, 190, 40, 0.3), rgba(122, 190, 40, 0.3));
+  box-shadow: var(--ds-shadow-raise);
 }
 
 /* Its box sizing said outright: the painter pages' reset makes every box
@@ -848,6 +853,10 @@ html[data-app] .toolbar-search {
   border-radius: 4px;
   background-color: var(--ds-danger);
   vertical-align: top;
+}
+
+.toolbar-dot-drafts {
+  background-color: var(--ds-badge);
 }
 
 .toolbar-menu {
