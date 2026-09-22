@@ -241,7 +241,7 @@
           {% endif %}
         </div>
         {% if current_user %}
-          <form id="comment-form" class="post-comment-form" hx-post="/comments" hx-target="#comments" hx-swap="innerHTML"
+          <form id="comment-form" class="post-comment-form" hx-post="/comments" hx-target="#comments" hx-swap="innerHTML" data-haptic-done="success"
                 hx-disable="find button">
             <input type="hidden" name="post_id" value="{{ post_id }}">
             <input type="hidden" id="parent_comment_id" name="parent_comment_id" value="">
@@ -332,7 +332,7 @@
         <h2 id="report-title">{{ ftl_get_message("post-report-title") }}</h2>
         {# `required` on the textarea is the empty-description check: htmx runs
            HTML5 validation before it will issue a request for a form. #}
-        <form id="report-form"
+        <form id="report-form" data-haptic-done="success"
               hx-post="/posts/{{ post_id }}/report"
               hx-target="this"
               hx-swap="outerHTML"
