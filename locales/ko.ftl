@@ -26,6 +26,7 @@ timeline-empty = 동맹이 비어 있습니다. <a href="/communities">커뮤니
 
 draw = 그리기!
 collaborate = 넷캔
+draw-alone = 혼자 그리기
 drafts = 임시 보관함
 profile = 프로필
 community = 커뮤니티

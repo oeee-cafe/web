@@ -574,15 +574,40 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   margin-left: 8px;
 }
 
-/* Drawing together, live: a button of its own beside the sections, with a
-   light the cucumber's green, the site's mark -- a lime disc in a dark
-   rim -- pulsing. Built as every other button in the bar is -- the border,
-   the corners, the one shadow -- and told apart only by its fill: plain for
-   most, this green tint here, lime for Draw. It is the sections' 30px tall -- 4px of padding, 20px
-   of line and its border, as the section group's 2px of padding and 26px
-   of button make. */
-.nav-bar .toolbar-links a.toolbar-live,
-.nav-bar .toolbar-links a.toolbar-live:visited {
+/* The two ways to start drawing, joined into one control: together, live,
+   in a green tint with a light the cucumber's green, the site's mark -- a
+   lime disc in a dark rim -- pulsing; and alone, in lime. One border and
+   one shadow around the pair, the corners only at its ends. Signed out
+   there is only the first half, and it has all four. */
+.toolbar-create {
+  display: -webkit-box;
+  display: flex;
+  flex: none;
+  border-radius: 6px;
+  box-shadow: var(--ds-shadow-raise);
+}
+
+.toolbar-create form {
+  margin: 0;
+}
+
+.nav-bar .toolbar-create a.toolbar-live:not(:last-child) {
+  border-right-width: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.nav-bar .toolbar-end .toolbar-create .toolbar-draw {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: none;
+}
+
+/* Built as every other button in the bar is -- the border, the corners --
+   and told apart only by its fill. 30px tall, as they are: 4px of padding,
+   20px of line and its border. */
+.nav-bar .toolbar-create a.toolbar-live,
+.nav-bar .toolbar-create a.toolbar-live:visited {
   display: -webkit-box;
   display: flex;
   -webkit-box-align: center;
@@ -593,22 +618,24 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   border-radius: 6px;
   background-color: var(--ds-surface);
   background-image: linear-gradient(rgba(122, 190, 40, 0.14), rgba(122, 190, 40, 0.14));
-  box-shadow: var(--ds-shadow-raise);
+  box-shadow: none;
   color: var(--ds-ink);
   font-weight: 600;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.nav-bar .toolbar-links a.toolbar-live:hover {
+.nav-bar .toolbar-create a.toolbar-live:hover {
   background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
 }
 
 /* Where you are: the tint deepened, as the section group raises its
    current one. */
-.nav-bar .toolbar-links a.toolbar-live[aria-current="page"],
-.nav-bar .toolbar-links a.toolbar-live[aria-current="page"]:hover {
+.nav-bar .toolbar-create a.toolbar-live[aria-current="page"],
+.nav-bar .toolbar-create a.toolbar-live[aria-current="page"]:hover {
   border-color: #3c6712;
   background-image: linear-gradient(rgba(122, 190, 40, 0.3), rgba(122, 190, 40, 0.3));
-  box-shadow: var(--ds-shadow-raise);
 }
 
 /* Its box sizing said outright: the painter pages' reset makes every box
@@ -1042,7 +1069,8 @@ html[data-app] .toolbar-search {
 }
 
 .nav-bar.is-stacked .toolbar-end > a,
-.nav-bar.is-stacked .toolbar-draw {
+.nav-bar.is-stacked .toolbar-draw,
+.nav-bar.is-stacked .toolbar-create a.toolbar-live {
   padding-right: 10px;
   padding-left: 10px;
 }
@@ -1065,7 +1093,8 @@ html[data-app] .toolbar-search {
 
 .nav-bar.is-compact .toolbar-end > a,
 .nav-bar.is-compact .toolbar-end .toolbar-button,
-.nav-bar.is-compact .toolbar-draw {
+.nav-bar.is-compact .toolbar-draw,
+.nav-bar.is-compact .toolbar-create a.toolbar-live {
   padding-right: 8px;
   padding-left: 8px;
 }

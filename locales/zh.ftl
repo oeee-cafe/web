@@ -26,6 +26,7 @@ timeline-empty = 时间线是空的。在<a href="/communities">社区</a>中与
 
 draw = 画画！
 collaborate = 协作画画
+draw-alone = 独自画画
 drafts = 草稿箱
 profile = 个人资料
 community = 社区
