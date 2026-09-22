@@ -1338,6 +1338,9 @@ mod template_tests {
         assert!(!rendered.contains("<script>\""));
         assert!(!rendered.contains(r#"name="error""#));
         assert_eq!(rendered.matches("<script").count(), 1);
+        // `no-referrer` would send the post with `Origin: null`, which
+        // from_this_site turns away.
+        assert!(!rendered.contains("no-referrer"));
     }
 
     /// Only a supporter is asked whether to be in the credits, and the box

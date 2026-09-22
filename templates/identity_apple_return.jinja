@@ -3,13 +3,16 @@
    without the session cookie. Posted on again from here, this site's own
    page, where the cookie comes along and /auth/apple can check the answer
    against the sign-in it started. Nothing else is on the page: it is gone
-   as soon as it has loaded. #}
+   as soon as it has loaded.
+
+   No referrer policy of its own: under `no-referrer` a browser sends
+   `Origin: null` with the post, and /auth/apple turns away a post that does
+   not say it came from this site. #}
 <html lang="{{ ftl_lang }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <meta name="referrer" content="no-referrer" />
     <title>Oeee Cafe</title>
   </head>
   <body>
