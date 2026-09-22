@@ -39,6 +39,18 @@ export function notePointerType(type: string): void {
 }
 
 /**
+ * Treats this load as a pen's before one has been seen.
+ *
+ * For a host that already knows fingers are not for drawing here -- the iOS
+ * app, when the system's "Only Draw with Apple Pencil" is on -- so the first
+ * stroke of a session is as safe from a resting palm as every later one.
+ * Like the latch it closes, it lasts until a reload.
+ */
+export function preferPen(): void {
+  penSeen = true;
+}
+
+/**
  * Forgets the pen, for tests that need a session which has not seen one.
  *
  * Nothing in the painter calls this: within a load the latch only ever closes.

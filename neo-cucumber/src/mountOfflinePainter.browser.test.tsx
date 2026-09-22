@@ -575,3 +575,45 @@ it("still records a replay by default", async () => {
   expect(new TextDecoder().decode(await replay.slice(0, 4).arrayBuffer())).toBe("NEO ");
   act(() => painter.unmount());
 });
+
+it("switches to the eraser and back, and to the tool before, on a pen's command", async () => {
+  const element = document.createElement("div");
+  document.body.appendChild(element);
+  let painter!: ReturnType<typeof mount>;
+  act(() => {
+    painter = mount(element, {
+      width: 64,
+      height: 64,
+      mode: { kind: "standard" },
+      controls: { kind: "toolbox" },
+    });
+  });
+  await act(async () => painter.ready);
+  // The tool whose toolbox button is pressed, by its name: a button's title
+  // starts with the tool's name and goes on to say what clicking again does.
+  // NEO calls its eraser "White" (消しペン).
+  const tool = () =>
+    Array.from(element.querySelectorAll<HTMLButtonElement>('button[aria-pressed="true"]'))
+      .map((button) => button.title.split(" — ")[0])
+      .find((name) => !name.startsWith("Palette"));
+
+  const first = tool();
+  expect(first).not.toBe("White");
+
+  act(() => painter.command("toggle-eraser"));
+  expect(tool()).toBe("White");
+
+  act(() => painter.command("toggle-eraser"));
+  expect(tool()).toBe(first);
+
+  // Back to the eraser, then "previous" returns to the tool before it, and
+  // "previous" again to the eraser: a pen's switch goes both ways.
+  act(() => painter.command("toggle-eraser"));
+  act(() => painter.command("previous-tool"));
+  expect(tool()).toBe(first);
+  act(() => painter.command("previous-tool"));
+  expect(tool()).toBe("White");
+
+  act(() => painter.unmount());
+  element.remove();
+});

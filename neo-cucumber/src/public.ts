@@ -167,6 +167,8 @@ export interface PainterOptions {
   };
 }
 
+export type PainterCommand = "toggle-eraser" | "previous-tool";
+
 export interface PainterChange {
   canUndo: boolean;
   canRedo: boolean;
@@ -226,6 +228,21 @@ export interface PainterHandle {
   /** Undo or redo through the painter's active history policy. */
   undo(): void;
   redo(): void;
+
+  /**
+   * What a pen's own gestures stand for -- Apple Pencil's double-tap and
+   * squeeze, as the iOS app forwards them: the eraser and back again, or the
+   * tool before this one. The same switch the toolbox makes. Standard mode
+   * only; two-tone's pens have no eraser to switch to.
+   */
+  command(command: PainterCommand): void;
+
+  /**
+   * Fingers pan and pinch rather than draw, from the first stroke rather than
+   * from the first time a pen is seen. For a host that knows a pen is the only
+   * thing drawing here.
+   */
+  preferPen(): void;
 
   /** Enable or suspend pointer-driven editing without unmounting the painter. */
   setInteractionEnabled(enabled: boolean): void;
