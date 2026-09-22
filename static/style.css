@@ -3670,6 +3670,53 @@ html[data-steam-app] .auth-apple {
   display: none;
 }
 
+/* Signing in with Google. Google refuses its own sign-in pages inside an
+   embedded web view (`disallowed_useragent`), so this is a browser's -- and
+   the Android app's, which stops the link and signs in with Credential
+   Manager instead, saying so in its user agent (theme_head.jinja). White
+   with a grey edge in light and Google's dark grey in dark, as Google asks
+   of its sign-in buttons. */
+.ds-button.auth-google,
+.ds-button.auth-google:visited {
+  border-color: #747775;
+  background-color: #fff;
+  color: #1f1f1f;
+}
+
+.ds-button.auth-google:hover {
+  background-color: #f2f2f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ds-button.auth-google,
+  :root:not([data-theme="light"]) .ds-button.auth-google:visited {
+    border-color: #8e918f;
+    background-color: #131314;
+    color: #e3e3e3;
+  }
+
+  :root:not([data-theme="light"]) .ds-button.auth-google:hover {
+    background-color: #1e1f20;
+  }
+}
+
+:root[data-theme="dark"] .ds-button.auth-google,
+:root[data-theme="dark"] .ds-button.auth-google:visited {
+  border-color: #8e918f;
+  background-color: #131314;
+  color: #e3e3e3;
+}
+
+:root[data-theme="dark"] .ds-button.auth-google:hover {
+  background-color: #1e1f20;
+}
+
+html[data-app]:not([data-native-google-sign-in]) .auth-google,
+html[data-desktop] .auth-google,
+html[data-steam-app] .auth-google {
+  display: none;
+}
+
 /* The agreement: a box to tick, and the two pages it agrees to. */
 .auth-agree {
   margin: var(--ds-space-2) 0 var(--ds-space-3);

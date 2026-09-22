@@ -1359,6 +1359,28 @@ mod template_tests {
         assert!(!render(true, json!("Apple")).contains("/auth/apple"));
     }
 
+    #[test]
+    fn signing_in_offers_google_only_where_it_is_on() {
+        let env = test_support::env();
+        let render = |google_enabled: bool, linking_provider: serde_json::Value| {
+            env.get_template("login.jinja")
+                .expect("login loads")
+                .render(context! {
+                    next => "/draw",
+                    google_enabled,
+                    linking_provider,
+                    ..chrome()
+                })
+                .expect("login renders")
+        };
+        assert!(!render(false, json!(null)).contains("/auth/google"));
+        let on = render(true, json!(null));
+        assert!(on.contains("auth-google"));
+        assert!(on.contains("/auth/google?next="));
+        assert!(on.contains("sign-in-with-google"));
+        assert!(!render(true, json!("Google")).contains("/auth/google"));
+    }
+
     /// Apple's answer, posted on from this site: every field it carried, as
     /// a value and never as markup.
     #[test]
@@ -1457,6 +1479,8 @@ mod template_tests {
                     steam_linked => false,
                     apple_enabled => true,
                     apple_linked => false,
+                    google_enabled => true,
+                    google_linked => false,
                     messages => Vec::<serde_json::Value>::new(),
                     draft_post_count => 0,
                     unread_notification_count => 0,
@@ -1472,6 +1496,7 @@ mod template_tests {
         assert!(with_password.contains("account-linked-accounts-none"));
         assert!(with_password.contains("/auth/steam/app?next=/account"));
         assert!(with_password.contains("/auth/apple?next=/account"));
+        assert!(with_password.contains("/auth/google?next=/account"));
 
         let without = render(
             false,

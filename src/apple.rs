@@ -12,41 +12,17 @@
 //! posts the token it gets to the same place. Its token names the app's
 //! bundle ID as audience; the rest is checked the same way.
 
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
-
 use anyhow::{anyhow, Result};
-use jsonwebtoken::jwk::JwkSet;
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{decode, decode_header, Algorithm, Validation};
 use serde::Deserialize;
 
 use crate::config::AppleConfig;
+use crate::jwks;
 use crate::models::identity::{Provider, VerifiedIdentity};
 
 /// Who signs Apple's ID tokens, and where a browser is sent to sign in.
 pub const ISSUER: &str = "https://appleid.apple.com";
 const AUTHORIZE_URL: &str = "https://appleid.apple.com/auth/authorize";
-
-/// How long Apple's keys are kept before being asked for again. Apple
-/// rotates them rarely, and a token signed with a key not yet seen asks
-/// sooner (see [`KEYS_REFRESH_AT_MOST`]).
-const KEYS_FOR: Duration = Duration::from_secs(24 * 60 * 60);
-
-/// A token naming a key that is not in the set fetches the set again, but no
-/// more often than this: a stream of made-up key ids is not a stream of
-/// requests to Apple.
-const KEYS_REFRESH_AT_MOST: Duration = Duration::from_secs(60);
-
-fn http() -> &'static reqwest::Client {
-    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .expect("reqwest client")
-    })
-}
 
 /// Where to send the browser to sign in. Apple posts the answer to
 /// `redirect_uri` (`response_mode=form_post`, which it requires when asked
@@ -62,62 +38,6 @@ pub fn authorize_url(config: &AppleConfig, redirect_uri: &str, state: &str, nonc
         .append_pair("state", state)
         .append_pair("nonce", nonce);
     url.into()
-}
-
-struct CachedKeys {
-    keys: JwkSet,
-    fetched_at: Instant,
-}
-
-/// Apple's keys, by the URL they came from (a test serves its own).
-fn key_cache() -> &'static Mutex<HashMap<String, CachedKeys>> {
-    static CACHE: OnceLock<Mutex<HashMap<String, CachedKeys>>> = OnceLock::new();
-    CACHE.get_or_init(Default::default)
-}
-
-async fn fetch_keys(keys_url: &str) -> Result<JwkSet> {
-    Ok(http()
-        .get(keys_url)
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?)
-}
-
-/// The key Apple signed with, by its `kid`: from the cache while it is fresh
-/// and has it, from Apple otherwise. `None` when Apple has no such key.
-async fn decoding_key(config: &AppleConfig, kid: &str) -> Result<Option<DecodingKey>> {
-    let cached = {
-        let cache = key_cache().lock().unwrap();
-        cache.get(&config.keys_url).map(|cached| {
-            let age = cached.fetched_at.elapsed();
-            (
-                cached.keys.find(kid).cloned(),
-                age < KEYS_FOR,
-                age < KEYS_REFRESH_AT_MOST,
-            )
-        })
-    };
-    match cached {
-        Some((Some(jwk), true, _)) => return Ok(Some(DecodingKey::from_jwk(&jwk)?)),
-        // Not there, and asked for only a moment ago.
-        Some((None, true, true)) => return Ok(None),
-        _ => {}
-    }
-
-    let keys = fetch_keys(&config.keys_url).await?;
-    let jwk = keys.find(kid).cloned();
-    key_cache().lock().unwrap().insert(
-        config.keys_url.clone(),
-        CachedKeys {
-            keys,
-            fetched_at: Instant::now(),
-        },
-    );
-    jwk.map(|jwk| DecodingKey::from_jwk(&jwk))
-        .transpose()
-        .map_err(Into::into)
 }
 
 #[derive(Deserialize)]
@@ -205,7 +125,7 @@ pub async fn verify_id_token(
     let Some(kid) = header.kid else {
         return Ok(None);
     };
-    let Some(key) = decoding_key(config, &kid).await? else {
+    let Some(key) = jwks::decoding_key(&config.keys_url, &kid).await? else {
         return Ok(None);
     };
 
@@ -250,6 +170,8 @@ pub async fn verify_id_token(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
     use axum::routing::get;
     use axum::{Json, Router};
     use jsonwebtoken::{encode, EncodingKey, Header};
