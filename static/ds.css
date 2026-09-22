@@ -82,6 +82,16 @@
   --ds-danger: #dc2626;
   --ds-danger-hover: #b91c1c;
   --ds-danger-ink: #ffffff;
+  /* Notices: a tint to sit on, an edge, and ink that reads on the tint. */
+  --ds-success-surface: #eefad2;
+  --ds-success-line: rgba(79, 138, 16, 0.4);
+  --ds-success-text: #2f5410;
+  --ds-warning-surface: #fff3e4;
+  --ds-warning-line: rgba(214, 110, 20, 0.45);
+  --ds-warning-text: #7a3b06;
+  --ds-danger-surface: #fef2f2;
+  --ds-danger-line: rgba(220, 38, 38, 0.4);
+  --ds-danger-text: #991b1b;
   /* Skeletons: text blocks, and where a drawing will be. */
   --ds-skeleton: rgba(60, 60, 150, 0.2);
   --ds-skeleton-drawing: #e6e6fa;
@@ -110,6 +120,15 @@
     --ds-badge: #ff8c00;
     --ds-danger: #ef4444;
     --ds-danger-hover: #dc2626;
+    --ds-success-surface: rgba(196, 238, 98, 0.1);
+    --ds-success-line: rgba(196, 238, 98, 0.35);
+    --ds-success-text: #d3f190;
+    --ds-warning-surface: rgba(255, 140, 0, 0.12);
+    --ds-warning-line: rgba(255, 140, 0, 0.4);
+    --ds-warning-text: #ffc680;
+    --ds-danger-surface: rgba(239, 68, 68, 0.13);
+    --ds-danger-line: rgba(239, 68, 68, 0.42);
+    --ds-danger-text: #fca5a5;
     --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
     --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
     --ds-skeleton: rgba(200, 200, 255, 0.16);
@@ -136,6 +155,15 @@
   --ds-badge: #ff8c00;
   --ds-danger: #ef4444;
   --ds-danger-hover: #dc2626;
+  --ds-success-surface: rgba(196, 238, 98, 0.1);
+  --ds-success-line: rgba(196, 238, 98, 0.35);
+  --ds-success-text: #d3f190;
+  --ds-warning-surface: rgba(255, 140, 0, 0.12);
+  --ds-warning-line: rgba(255, 140, 0, 0.4);
+  --ds-warning-text: #ffc680;
+  --ds-danger-surface: rgba(239, 68, 68, 0.13);
+  --ds-danger-line: rgba(239, 68, 68, 0.42);
+  --ds-danger-text: #fca5a5;
   --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
   --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
   --ds-skeleton: rgba(200, 200, 255, 0.16);
@@ -1959,6 +1987,150 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   border-radius: var(--ds-radius-m);
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-raise);
+}
+
+/* ---------------------------------------------------------------------------
+   Notices
+
+   What the site has to say about the last thing you did: signed in, the
+   password did not match, the click did not save. A tinted strip in the
+   page's column, under the toolbar, one per message -- the level is its
+   colour, and the words are the same weight as the page's own, because a
+   sentence set in bold on a box of red is shouting.
+
+   `.ds-notices` is the list that holds them, lined up with the content
+   column below (main's side padding, then .center's width). A notice that
+   can be put away carries `.ds-notice-close`, which only ever removes it:
+   a message is already said, so nothing is lost by the reader not wanting
+   to see it again.
+   --------------------------------------------------------------------------- */
+.ds-notices {
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  max-width: calc(829px + 2 * var(--ds-space-3));
+  margin: var(--ds-space-3) auto 0;
+  padding: 0 var(--ds-space-3);
+  list-style: none;
+}
+
+.ds-notices:empty {
+  display: none;
+}
+
+.ds-notice {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: start;
+  align-items: flex-start;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-base);
+  line-height: calc(20px * var(--oeee-text-scale, 1));
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.ds-notice + .ds-notice {
+  margin-top: var(--ds-space-2);
+}
+
+/* The level's mark: a dot in its own colour before the words, so the level
+   is not told by the tint alone. */
+.ds-notice::before {
+  content: "";
+  -webkit-box-flex: 0;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin: calc(6px * var(--oeee-text-scale, 1)) var(--ds-space-2) 0 0;
+  border-radius: 50%;
+  background-color: var(--ds-muted);
+}
+
+.ds-notice-body {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.ds-notice-success {
+  border-color: var(--ds-success-line);
+  background-color: var(--ds-success-surface);
+  color: var(--ds-success-text);
+}
+
+.ds-notice-success::before {
+  background-color: var(--ds-focus);
+}
+
+.ds-notice-warning {
+  border-color: var(--ds-warning-line);
+  background-color: var(--ds-warning-surface);
+  color: var(--ds-warning-text);
+}
+
+.ds-notice-warning::before {
+  background-color: var(--ds-badge);
+}
+
+.ds-notice-error {
+  border-color: var(--ds-danger-line);
+  background-color: var(--ds-danger-surface);
+  color: var(--ds-danger-text);
+}
+
+.ds-notice-error::before {
+  background-color: var(--ds-danger);
+}
+
+/* Written against `.ds-page` too, as the segmented control's buttons are, so
+   no page's own button rule outranks it. */
+.ds-notice-close,
+.ds-page .ds-notice-close {
+  -webkit-box-flex: 0;
+  flex: 0 0 auto;
+  width: 20px;
+  height: calc(20px * var(--oeee-text-scale, 1));
+  min-height: 0;
+  margin: 0 calc(-1 * var(--ds-space-1)) 0 var(--ds-space-2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ds-radius-s);
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: default;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.ds-notice-close:hover,
+.ds-page .ds-notice-close:hover {
+  background-color: var(--ds-hover);
+  opacity: 1;
+}
+
+.ds-notice-close:active,
+.ds-page .ds-notice-close:active {
+  background-color: var(--ds-press);
+}
+
+.ds-notice-close svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: 0 auto;
 }
 
 /* ---------------------------------------------------------------------------

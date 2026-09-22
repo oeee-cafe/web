@@ -77,9 +77,20 @@ pub async fn error_banner(req: Request, next: Next) -> Response {
     };
 
     let (mut parts, _) = response.into_parts();
+    // A notice in the design system's own markup, the flash messages' shape;
+    // templates/notice_close.jinja is the same close button as a template.
+    let close = html_escape(&safe_get_message(&bundle, "close"));
     let body = format!(
-        r#"<p class="htmx-error-message" role="alert">{}</p>"#,
-        html_escape(&safe_get_message(&bundle, key))
+        concat!(
+            r#"<div class="ds-notice ds-notice-error htmx-error-message" role="alert">"#,
+            r#"<span class="ds-notice-body">{message}</span>"#,
+            r#"<button class="ds-notice-close" type="button" aria-label="{close}" title="{close}">"#,
+            r#"<svg viewBox="0 0 12 12" aria-hidden="true">"#,
+            r#"<path d="M2.5 2.5l7 7m0-7l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />"#,
+            r#"</svg></button></div>"#,
+        ),
+        message = html_escape(&safe_get_message(&bundle, key)),
+        close = close,
     );
 
     parts.headers.insert(

@@ -1605,10 +1605,70 @@ mod template_tests {
             .expect("design.jinja loads")
             .render(chrome())
             .expect("design.jinja renders");
-        for class in ["ds-button-primary", "ds-select", "ds-input", "ds-segmented", "ds-window"] {
+        for class in [
+            "ds-button-primary",
+            "ds-select",
+            "ds-input",
+            "ds-segmented",
+            "ds-window",
+            "ds-notice-error",
+        ] {
             assert!(rendered.contains(class), "{class} missing from the reference");
         }
         assert!(rendered.contains("<body class=\"ds-page\">"));
+    }
+
+    /// The page's `<header>`: the toolbar and whatever notices sit under it.
+    fn header(rendered: &str) -> &str {
+        let start = rendered.find("<header>").expect("page has a header");
+        let end = rendered.find("</header>").expect("header closes");
+        &rendered[start..end]
+    }
+
+    /// Flash messages are notices, coloured by their level. The context gets
+    /// axum-messages' own type, whose level serialises as `"Error"`, so this
+    /// renders that type and not a stand-in shaped the way the template wishes.
+    #[test]
+    fn flash_messages_render_as_notices_by_level() {
+        let message = |level, text: &str| axum_messages::Message {
+            level,
+            message: text.to_string(),
+            metadata: None,
+        };
+        let rendered = test_support::env()
+            .get_template("design.jinja")
+            .expect("design.jinja loads")
+            .render(context! {
+                current_user => json!(null),
+                messages => vec![
+                    message(axum_messages::Level::Success, "Welcome, Tandemaus"),
+                    message(axum_messages::Level::Error, "<b>not bold</b>"),
+                ],
+                draft_post_count => 0,
+                unread_notification_count => 0,
+                ftl_lang => "en",
+            })
+            .expect("design.jinja renders");
+        let header = header(&rendered);
+        assert!(header.contains("ds-notice ds-notice-success"), "got: {header}");
+        assert!(header.contains("ds-notice ds-notice-error"), "got: {header}");
+        assert!(header.contains("Welcome, Tandemaus"));
+        assert!(header.contains("&lt;b&gt;not bold"), "a message is text, not markup");
+        assert!(header.contains("ds-notice-close"));
+    }
+
+    /// With nothing to say the header holds no notice list at all, so there is
+    /// no empty strip under the toolbar.
+    #[test]
+    fn no_flash_messages_render_no_notice_list() {
+        let rendered = test_support::env()
+            .get_template("design.jinja")
+            .expect("design.jinja loads")
+            .render(chrome())
+            .expect("design.jinja renders");
+        let header = header(&rendered);
+        assert!(!header.contains("<ul class=\"ds-notices\">"), "got: {header}");
+        assert!(header.contains(r#"<div id="htmx-error" class="ds-notices htmx-error"></div>"#));
     }
 
     /// The painter pages carry the site's toolbar, so every window has the
