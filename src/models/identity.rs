@@ -56,6 +56,21 @@ pub struct VerifiedIdentity {
     /// An address the provider vouches for. Trusted: an Oeee Cafe account
     /// with this address, verified, is signed into and linked.
     pub email: Option<String>,
+    /// Whether the provider says this account bought Oeee Cafe from it --
+    /// Steam, for the Steam app. Whichever account it signs into gets the
+    /// provider's supporter achievement.
+    #[serde(default)]
+    pub purchased: bool,
+}
+
+impl VerifiedIdentity {
+    /// The achievement for having bought Oeee Cafe from this provider.
+    fn supporter_achievement(&self) -> Option<&'static str> {
+        match self.provider {
+            Provider::Steam => Some("STEAM_SUPPORTER"),
+        }
+        .filter(|_| self.purchased)
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -198,6 +213,9 @@ pub async fn link_identity(
     .execute(&mut **tx)
     .await?;
     if inserted.rows_affected() == 1 {
+        if let Some(achievement) = identity.supporter_achievement() {
+            super::achievement::grant_achievement(tx, user_id, achievement).await?;
+        }
         if identity.provider == Provider::Steam {
             // A Steam account newly linked is given everything already
             // earned, drawn before Steam or not, and told about all of it.
@@ -245,6 +263,22 @@ pub async fn touch_identity(
     )
     .execute(&mut **tx)
     .await?;
+
+    // Bought since it was linked, or before the achievement existed.
+    if let Some(achievement) = identity.supporter_achievement() {
+        query!(
+            r#"
+            INSERT INTO user_achievements (user_id, achievement)
+            SELECT user_id, $3 FROM user_identities WHERE provider = $1 AND subject = $2
+            ON CONFLICT DO NOTHING
+            "#,
+            identity.provider.as_str(),
+            identity.subject,
+            achievement,
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
     Ok(())
 }
 
@@ -336,6 +370,7 @@ mod tests {
             subject: subject.to_string(),
             name: Some("오이".to_string()),
             email: None,
+            purchased: false,
         }
     }
 
@@ -452,6 +487,50 @@ mod tests {
             .expect("waiting for Steam");
         assert_eq!(waiting.steam_id, "76561190000000010");
         assert_eq!(waiting.achievements, ["FIRST_DRAWING"]);
+        tx.rollback().await.unwrap();
+    }
+
+    async fn is_supporter(tx: &mut Transaction<'_, Postgres>, id: Uuid) -> bool {
+        crate::models::achievement::list_achievements(tx, id)
+            .await
+            .unwrap()
+            .iter()
+            .any(|e| e.achievement == "STEAM_SUPPORTER" && e.key == "steam-supporter")
+    }
+
+    #[tokio::test]
+    async fn buying_on_steam_is_an_achievement_whenever_steam_says_so() {
+        let Some(mut tx) = tx().await else { return };
+        // Bought, then linked.
+        let buyer = user(&mut tx, "identity_test_h", None, None).await;
+        let bought = VerifiedIdentity {
+            purchased: true,
+            ..steam("76561190000000011")
+        };
+        link_identity(&mut tx, buyer.id, &bought)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(is_supporter(&mut tx, buyer.id).await);
+
+        // Linked from a borrowed copy, then signed in having bought it.
+        let borrower = user(&mut tx, "identity_test_i", None, None).await;
+        let borrowed = steam("76561190000000012");
+        link_identity(&mut tx, borrower.id, &borrowed)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!is_supporter(&mut tx, borrower.id).await);
+        touch_identity(
+            &mut tx,
+            &VerifiedIdentity {
+                purchased: true,
+                ..borrowed
+            },
+        )
+        .await
+        .unwrap();
+        assert!(is_supporter(&mut tx, borrower.id).await);
         tx.rollback().await.unwrap();
     }
 

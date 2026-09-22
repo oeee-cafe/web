@@ -149,6 +149,14 @@ pub async fn verify_ticket(
     if params.publisherbanned {
         return Ok(Err(TicketRejected::Banned));
     }
+    let purchased = owns_outright(config, &params.steamid)
+        .await
+        .unwrap_or_else(|error| {
+            // Asked again at the next sign-in; the achievement waits.
+            tracing::warn!("could not check Steam ownership: {error:#}");
+            false
+        });
+
     let name = persona_name(config, &params.steamid)
         .await
         .unwrap_or_else(|error| {
@@ -161,7 +169,56 @@ pub async fn verify_ticket(
         subject: params.steamid,
         name,
         email: None,
+        purchased,
     }))
+}
+
+#[derive(Deserialize)]
+struct OwnershipResponse {
+    appownership: Ownership,
+}
+
+#[derive(Deserialize)]
+struct Ownership {
+    #[serde(default)]
+    ownsapp: bool,
+    #[serde(default)]
+    permanent: bool,
+    #[serde(default)]
+    sitelicense: bool,
+    #[serde(default)]
+    timedtrial: bool,
+    ownersteamid: Option<String>,
+    result: Option<String>,
+}
+
+/// Whether `steam_id` bought Oeee Cafe on Steam: owns it for good, as itself.
+/// Not a copy borrowed through Family Sharing (owned by someone else), a
+/// free weekend or a timed trial (not permanent), or a cafe's site licence.
+async fn owns_outright(config: &SteamConfig, steam_id: &str) -> Result<bool> {
+    let url = format!(
+        "{}/ISteamUser/CheckAppOwnership/v2/",
+        config.web_api_url.trim_end_matches('/')
+    );
+    let response: OwnershipResponse = http()
+        .get(url)
+        .query(&[
+            ("key", config.web_api_key.as_str()),
+            ("steamid", steam_id),
+            ("appid", &config.app_id.to_string()),
+        ])
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let o = response.appownership;
+    Ok(o.result.as_deref().unwrap_or("OK") == "OK"
+        && o.ownsapp
+        && o.permanent
+        && !o.sitelicense
+        && !o.timedtrial
+        && o.ownersteamid.as_deref() == Some(steam_id))
 }
 
 /// The name the player goes by on Steam, offered as a new account's display
@@ -295,6 +352,10 @@ mod tests {
 
     /// A stand-in for Steam's partner Web API that accepts one ticket.
     async fn fake_steam(publisher_banned: bool) -> SteamConfig {
+        fake_steam_owned_by(publisher_banned, STEAM_ID).await
+    }
+
+    async fn fake_steam_owned_by(publisher_banned: bool, owner: &'static str) -> SteamConfig {
         let app = Router::new()
             .route(
                 "/ISteamUserAuth/AuthenticateUserTicket/v1/",
@@ -314,6 +375,21 @@ mod tests {
                     } else {
                         json!({"response": {"error": {"errorcode": 101, "errordesc": "Invalid ticket"}}})
                     })
+                }),
+            )
+            .route(
+                "/ISteamUser/CheckAppOwnership/v2/",
+                get(move || async move {
+                    Json::<Value>(json!({"appownership": {
+                        "ownsapp": true,
+                        "permanent": true,
+                        "timestamp": "2026-09-22T00:00:00Z",
+                        "ownersteamid": owner,
+                        "sitelicense": false,
+                        "timedtrial": false,
+                        "usercanceled": false,
+                        "result": "OK",
+                    }}))
                 }),
             )
             .route(
@@ -345,6 +421,19 @@ mod tests {
         assert_eq!(identity.subject, STEAM_ID);
         assert_eq!(identity.name.as_deref(), Some("오이"));
         assert_eq!(identity.email, None);
+        assert!(identity.purchased);
+    }
+
+    #[tokio::test]
+    async fn a_borrowed_copy_is_not_a_purchase() {
+        // Family Sharing: the app is owned, by somebody else.
+        let config = fake_steam_owned_by(false, "76561197960287931").await;
+        let identity = verify_ticket(&config, "14000000abcdef")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(identity.subject, STEAM_ID);
+        assert!(!identity.purchased);
     }
 
     #[tokio::test]

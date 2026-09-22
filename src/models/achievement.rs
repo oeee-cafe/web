@@ -15,6 +15,22 @@ use anyhow::Result;
 use sqlx::types::Uuid;
 use sqlx::{query, Postgres, Transaction};
 
+/// Every achievement, by its Steamworks API name. The same set as the
+/// `user_achievements_achievement_check` constraint; the profile names each
+/// from `achievement-<key>` and `achievement-<key>-description` in every
+/// locale, and a test holds all three together.
+pub const ALL: [&str; 4] = [
+    "FIRST_DRAWING",
+    "FIRST_RELAY",
+    "FIRST_COLLABORATION",
+    "STEAM_SUPPORTER",
+];
+
+/// `FIRST_DRAWING` as the locale files spell it: `first-drawing`.
+pub fn locale_key(achievement: &str) -> String {
+    achievement.to_lowercase().replace('_', "-")
+}
+
 /// Records whatever `user_id` has earned and not yet been given.
 pub async fn award_achievements(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) -> Result<()> {
     query!(
@@ -59,6 +75,54 @@ pub async fn award_achievements(tx: &mut Transaction<'_, Postgres>, user_id: Uui
     .execute(&mut **tx)
     .await?;
     Ok(())
+}
+
+/// Gives `user_id` an achievement that is not derived from what the site
+/// stores: having bought Oeee Cafe on Steam, which only Steam knows.
+pub async fn grant_achievement(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    achievement: &str,
+) -> Result<()> {
+    query!(
+        "INSERT INTO user_achievements (user_id, achievement) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        user_id,
+        achievement,
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// An achievement someone has, for their profile.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Earned {
+    /// The Steamworks API name, `FIRST_DRAWING`.
+    pub achievement: String,
+    /// The same as the locale files spell it: `first-drawing`, for
+    /// `achievement-first-drawing` and `achievement-first-drawing-description`.
+    pub key: String,
+    pub earned_at: chrono::DateTime<chrono::Utc>,
+}
+
+pub async fn list_achievements(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+) -> Result<Vec<Earned>> {
+    let rows = query!(
+        "SELECT achievement, earned_at FROM user_achievements WHERE user_id = $1 ORDER BY earned_at, achievement",
+        user_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| Earned {
+            key: locale_key(&row.achievement),
+            achievement: row.achievement,
+            earned_at: row.earned_at,
+        })
+        .collect())
 }
 
 /// [`award_achievements`] for everyone who drew in a collaborative session.
@@ -223,6 +287,46 @@ mod tests {
         .into_iter()
         .map(|row| row.achievement)
         .collect()
+    }
+
+    #[test]
+    fn every_achievement_is_worded_in_every_locale() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+        for locale in ["en", "ko", "ja", "zh"] {
+            let text = std::fs::read_to_string(dir.join(format!("{locale}.ftl"))).unwrap();
+            for achievement in ALL {
+                let key = locale_key(achievement);
+                for id in [
+                    format!("achievement-{key}"),
+                    format!("achievement-{key}-description"),
+                ] {
+                    assert!(
+                        text.lines()
+                            .any(|line| line.starts_with(&format!("{id} = "))),
+                        "{locale}.ftl has no {id}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn the_list_is_what_the_database_allows() {
+        let Some(mut tx) = tx().await else { return };
+        let definition: String = sqlx::query_scalar!(
+            r#"SELECT pg_get_constraintdef(oid) AS "d!" FROM pg_constraint WHERE conname = 'user_achievements_achievement_check'"#
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        let allowed = definition.matches("::text").count();
+        assert_eq!(allowed, ALL.len(), "{definition}");
+        for achievement in ALL {
+            assert!(
+                definition.contains(&format!("'{achievement}'")),
+                "{definition}"
+            );
+        }
     }
 
     #[tokio::test]
