@@ -5,6 +5,7 @@ use crate::web::handlers::ExtractFtlLang;
 use crate::web::responses::{SearchPostResult, SearchResponse, SearchUserResult};
 use crate::web::state::AppState;
 use axum::extract::Query;
+use axum::http::{header, HeaderMap};
 use axum::response::{Html, IntoResponse};
 use axum::{extract::State, response::Json};
 use chrono::{DateTime, Utc};
@@ -195,14 +196,28 @@ pub async fn search_json(
     }))
 }
 
+/// What the iOS and Android apps add to their web views' user agent.
+const APP_USER_AGENT_MARKERS: [&str; 2] = ["OeeeCafeiOS", "OeeeCafeAndroid"];
+
+/// Whether the page is shown in one of the apps, whose search tab has a native
+/// search field above the page.
+fn has_native_search_field(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|ua| APP_USER_AGENT_MARKERS.iter().any(|marker| ua.contains(marker)))
+}
+
 /// GET /search — users and drawings matching `q`, under the form that asked.
 ///
-/// A missing or blank `q` is the form alone rather than a 404, since the iOS
-/// app's search tab and a bare visit both land here with nothing typed yet.
+/// A missing or blank `q` is the form alone rather than a 404, since the apps'
+/// search tabs and a bare visit both land here with nothing typed yet. The apps
+/// bring their own search field, so they get the results without the form.
 pub async fn search_page(
     auth_session: AuthSession,
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    headers: HeaderMap,
     Query(params): Query<SearchPageQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     let search_query = params
@@ -242,6 +257,7 @@ pub async fn search_page(
     let rendered = template.render(context! {
         current_user => auth_session.user,
         search_query,
+        native_search_field => has_native_search_field(&headers),
         users,
         posts,
         draft_post_count => common_ctx.draft_post_count,

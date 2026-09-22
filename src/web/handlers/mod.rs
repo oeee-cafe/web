@@ -2128,11 +2128,21 @@ mod template_tests {
         users: Vec<crate::web::handlers::search::SearchUserRow>,
         posts: Vec<crate::web::handlers::search::SearchPostRow>,
     ) -> String {
+        render_search_in(false, search_query, users, posts)
+    }
+
+    fn render_search_in(
+        native_search_field: bool,
+        search_query: Option<&str>,
+        users: Vec<crate::web::handlers::search::SearchUserRow>,
+        posts: Vec<crate::web::handlers::search::SearchPostRow>,
+    ) -> String {
         test_support::env()
             .get_template("search.jinja")
             .unwrap_or_else(|e| panic!("search.jinja loads: {e:#}"))
             .render(context! {
                 search_query,
+                native_search_field,
                 users,
                 posts,
                 ..chrome()
@@ -2178,5 +2188,16 @@ mod template_tests {
         assert!(found.contains(r#"href="/@someone/00000000-0000-0000-0000-000000000000""#));
         assert!(found.contains("/image/ab/abcdef0123.png"));
         assert!(!found.contains("search-no-results"));
+    }
+
+    #[test]
+    fn search_page_in_the_apps_leaves_the_form_to_their_own_field() {
+        let blank = render_search_in(true, None, vec![], vec![]);
+        assert!(!blank.contains(r#"action="/search""#));
+
+        let none = render_search_in(true, Some("zzz"), vec![], vec![]);
+        assert!(!none.contains(r#"action="/search""#));
+        assert!(!none.contains("communities-search"));
+        assert!(none.contains("search-no-results"));
     }
 }

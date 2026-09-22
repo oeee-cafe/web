@@ -7,10 +7,11 @@
      grid of drawings. #}
   {% include "post_feed_head.jinja" %}
   {# Site search: the form, then the people and the drawings it matched.
-     GET /search is also where the iOS app's native search field lands, so
-     the form is here for the plain website rather than for the app. #}
+     GET /search is also where the apps' native search fields land; they
+     have their own field above the page, so they get no form here. #}
   <div class="center-wide communities-page search-page">
     <h1 class="collaborate-title">{{ ftl_get_message("search") }}</h1>
+    {% if not native_search_field %}
     <div class="communities-bar">
       <form method="get" action="/search" class="communities-filters" role="search">
         <input type="search"
@@ -26,6 +27,7 @@
         <button type="submit" class="ds-button">{{ ftl_get_message("search") }}</button>
       </form>
     </div>
+    {% endif %}
 
     {% if search_query %}
       <p class="hashtag-search-info">
