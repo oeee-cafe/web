@@ -63,12 +63,7 @@ pub async fn start_draw(
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Form(input): Form<Input>,
 ) -> Result<Html<String>, AppError> {
-    let tool = input.tool.as_deref().unwrap_or("neo");
-    let template_filename = match tool {
-        "neo" => "draw_post_cucumber.jinja",
-        "tegaki" => "draw_post_tegaki.jinja",
-        _ => "draw_post_cucumber.jinja",
-    };
+    let template_filename = "draw_post_cucumber.jinja";
 
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
@@ -187,12 +182,7 @@ pub async fn start_draw_mobile(
         None
     };
 
-    let tool = &input.tool;
-    let template_filename = match tool.as_str() {
-        "tegaki" => "draw_post_tegaki_mobile.jinja",
-        "neo" => "draw_post_cucumber_mobile.jinja",
-        _ => "draw_post_cucumber_mobile.jinja",
-    };
+    let template_filename = "draw_post_cucumber_mobile.jinja";
 
     let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
     let painter_mode = match community.as_ref().and_then(|community| {
@@ -219,7 +209,7 @@ pub async fn start_draw_mobile(
     let rendered = template.render(context! {
         current_user => auth_session.user,
         community_name => community.as_ref().map(|c| c.name.clone()),
-        tool => tool,
+        tool => &input.tool,
         width => input.width.parse::<u32>()?,
         height => input.height.parse::<u32>()?,
         background_color => community.as_ref().and_then(|c| c.background_color.clone()),

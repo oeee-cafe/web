@@ -3,7 +3,7 @@
 
    One file of tokens and components for every page, the painter pages
    included. The site's pages load it through base.jinja, before style.css;
-   the painter and tegaki pages load it after their own sheet.
+   the painter page loads it after its own sheet.
 
    Three rules keep it safe to load anywhere:
 
