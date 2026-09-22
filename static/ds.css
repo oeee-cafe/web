@@ -770,6 +770,27 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   margin: 2px;
 }
 
+/* Notifications, the same square as search, with its count on the corner
+   the way .toolbar-icon carries one: out of the flow, so the button is one
+   width whatever the number (nav_notifications.jinja). */
+.toolbar-end .toolbar-bell,
+.nav-bar.is-compact .toolbar-end .toolbar-bell {
+  position: relative;
+  padding: 4px;
+  line-height: 0;
+}
+
+.toolbar-end .toolbar-bell svg {
+  margin: 2px;
+}
+
+.toolbar-end .toolbar-bell .toolbar-badge {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+  margin-left: 0;
+}
+
 html[data-app] .toolbar-search {
   display: none;
 }
