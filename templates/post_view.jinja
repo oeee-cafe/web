@@ -427,7 +427,7 @@
         navigator.share({ title: button.getAttribute("data-share-title"), url: url }).catch(function () {});
       } else if (navigator.clipboard) {
         navigator.clipboard.writeText(url).then(function () {
-          alert(button.getAttribute("data-share-copied"));
+          dsAlert(button.getAttribute("data-share-copied"));
         });
       }
     }

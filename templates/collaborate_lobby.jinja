@@ -200,11 +200,11 @@
           const result = await response.json();
           window.location.href = result.url;
         } else {
-          alert(e.target.dataset.error);
+          dsAlert(e.target.dataset.error);
         }
       } catch (error) {
         console.error('Error creating session:', error);
-        alert(e.target.dataset.networkError);
+        dsAlert(e.target.dataset.networkError);
       }
     });
   </script>
