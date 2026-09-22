@@ -772,22 +772,20 @@ pub async fn google_start(
     if !from_this_site(&headers, &state.config.base_url) {
         return Ok(StatusCode::FORBIDDEN.into_response());
     }
-    let Some(config) = state.config.google.as_ref() else {
+    if state.config.google.is_none() {
         return Ok(StatusCode::NOT_FOUND.into_response());
-    };
+    }
     let request = GoogleRequest {
         state: random_token(),
         nonce: random_token(),
         next: local_next(form.next.as_deref()),
         started_at: Utc::now(),
     };
-    // The client id is the app's to pass to Credential Manager as its server
-    // client id: the site's own, so the token comes back made for the site.
-    let answer = serde_json::json!({
-        "state": request.state,
-        "nonce": request.nonce,
-        "client_id": config.client_id,
-    });
+    // Which OAuth client each app signs in against is the app's own: Android is
+    // built with the site's, iOS with one of its own (GoogleSignIn.kt,
+    // GoogleSignIn.swift), and the site takes the tokens of both
+    // (`[google].client_id` and `app_ids`).
+    let answer = serde_json::json!({ "state": request.state, "nonce": request.nonce });
     session
         .insert(GOOGLE_REQUEST_KEY, request)
         .await
