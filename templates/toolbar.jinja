@@ -60,12 +60,6 @@
         {% endif %}
         <a href="/communities">{{ ftl_get_message("community") }}</a>
       </div>
-      {# Drawing together, live: its own button beside the sections rather
-         than one of them, with a pulsing light in the mark's green, since what is behind it
-         is happening now. Shown signed out too: the lobby is a public
-         gallery of finished collaborative drawings, and only creating a
-         session needs an account. #}
-      <a class="toolbar-live" href="/collaborate"><span class="toolbar-live-dot" aria-hidden="true"></span>{{ ftl_get_message("collaborate") }}</a>
     </div>
     <div class="toolbar-end">
       {# Search, signed in or out: a button like its neighbours, holding a
@@ -79,6 +73,15 @@
       </a>
       {% if current_user %}
         {% include "nav_notifications.jinja" %}
+      {% endif %}
+      {# The two ways to start drawing, as one control: together, live,
+         with a pulsing light in the mark's green since what is behind it is
+         happening now; and alone. Drawing together is shown signed out
+         too -- the lobby is a public gallery of finished collaborative
+         drawings, and only creating a session needs an account. #}
+      <div class="toolbar-create">
+        <a class="toolbar-live" href="/collaborate"><span class="toolbar-live-dot" aria-hidden="true"></span>{{ ftl_get_message("collaborate") }}</a>
+      {% if current_user %}
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
            again. #}
@@ -86,11 +89,13 @@
           <input type="hidden" name="tool" value="neo" />
           <input type="hidden" name="width" value="300" />
           <input type="hidden" name="height" value="300" />
-          <button type="submit" id="nav-draw-button" class="toolbar-draw" title="{{ ftl_get_message('draw') }}" aria-label="{{ ftl_get_message('draw') }}">
-            {# material-symbols:brush (Apache 2.0; THIRD-PARTY-NOTICES.md). #}<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 21q-1.125 0-2.225-.55T2 19q.65 0 1.325-.513T4 17q0-1.25.875-2.125T7 14t2.125.875T10 17q0 1.65-1.175 2.825T6 21m5.75-6L9 12.25l8.95-8.95q.275-.275.688-.288t.712.288l1.35 1.35q.3.3.3.7t-.3.7z"/></svg><span>{{ ftl_get_message('draw') }}</span>
+          <button type="submit" id="nav-draw-button" class="toolbar-draw" title="{{ ftl_get_message('draw-alone') }}" aria-label="{{ ftl_get_message('draw-alone') }}">
+            {# material-symbols:brush (Apache 2.0; THIRD-PARTY-NOTICES.md). #}<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 21q-1.125 0-2.225-.55T2 19q.65 0 1.325-.513T4 17q0-1.25.875-2.125T7 14t2.125.875T10 17q0 1.65-1.175 2.825T6 21m5.75-6L9 12.25l8.95-8.95q.275-.275.688-.288t.712.288l1.35 1.35q.3.3.3.7t-.3.7z"/></svg><span>{{ ftl_get_message('draw-alone') }}</span>
           </button>
         </form>
-      {% else %}
+      {% endif %}
+      </div>
+      {% if not current_user %}
         {# The same places as signed in: where the bell is, signing in;
            where Draw is, the one filled button. #}
         <a class="toolbar-signin" href="/login">{{ ftl_get_message("sign-in") }}</a>
