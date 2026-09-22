@@ -27,6 +27,18 @@ encoding in `frontend/collaborate/binaryProtocol.ts`. Those describe a design
 that was studied and then written independently; no Drawpile code was carried
 into them.
 
+## Material Symbols
+
+<https://github.com/google/material-design-icons> — Apache License 2.0,
+Copyright Google.
+
+The painter draws its tools with Material Symbols through the
+`@iconify-json/material-symbols` package. The profile's achievement icons in
+`templates/achievement_icon_macro.jinja` are the same artwork -- `brush`,
+`reply`, `group`, `sports-esports` and `star` -- with their path data copied
+from that package into the template, since server-rendered pages cannot load
+it. They are unmodified.
+
 ## PaintBBS NEO
 
 <https://github.com/yangnaru/neo> — included as the git submodule `neo`.
