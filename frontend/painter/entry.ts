@@ -43,6 +43,11 @@ declare global {
   }
 }
 
+// The hand-off to the native painter screens of the apps before they became
+// web views (oeee-cafe-apple before e1846e7, oeee-cafe-android before
+// 43ee094), which opened this page in a web view of their own and took over
+// once it was saved. Builds of those are still installed; nothing current
+// registers either name, so for everyone else this is a plain page load.
 function nativeAvailable(): boolean {
   return Boolean(
     window.webkit?.messageHandlers?.oeee || window.OeeeCafe?.postMessage,
@@ -55,6 +60,17 @@ function postNative(message: NativeMessage): void {
   } else if (window.OeeeCafe?.postMessage) {
     window.OeeeCafe.postMessage(JSON.stringify(message));
   }
+}
+
+/**
+ * Something the page has to say, through the site's own alert
+ * (confirm_dialog.jinja) where the page has one: the browser's is titled with
+ * the site's address, and in the apps it is the web view's box.
+ */
+function say(message: string): void {
+  const site = (window as unknown as { dsAlert?: (message: string) => void }).dsAlert;
+  if (site) site(message);
+  else window.alert(message);
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -265,7 +281,7 @@ void painter.ready
   })
   .catch((error) => {
     console.error(error);
-    alert("Failed to start the painter.");
+    say("Failed to start the painter.");
   });
 
 /**
@@ -357,7 +373,7 @@ saveButton.addEventListener("click", () => {
         leaving = true;
       }).catch((error) => {
         console.error(error);
-        alert("Failed to save drawing. Please try again.");
+        say("Failed to save drawing. Please try again.");
         saveButton.disabled = false;
       });
     });

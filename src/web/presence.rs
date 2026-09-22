@@ -4,7 +4,7 @@
 //! on each page it loads and hands it to Steam as rich presence ("Drawing in
 //! 오이카페 모에화"). The site only says what the page is; the words are
 //! Steam's, from the localisation file uploaded with the app
-//! (`steam/rich_presence.vdf` in oeee-cafe/desktop). A page without the tag
+//! (`steam/rich_presence.vdf` in oeee-cafe-desktop). A page without the tag
 //! is browsing.
 //!
 //! Only a public community is named. Rich presence is shown to every one of

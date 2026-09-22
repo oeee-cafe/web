@@ -1,0 +1,193 @@
+{# What the site tells the apps, and the one way it tells them.
+
+   The apps -- oeee-cafe-apple (iOS and macOS), oeee-cafe-android, and
+   oeee-cafe-desktop (Windows, on Steam and the Microsoft Store) -- are web
+   views around this site. Each used to learn what it needed by reading the
+   page: a CSS class on the unread badge, the painter's paths, which images
+   were drawings, a pixel under the status bar. Every one of those broke the
+   day the site changed and nothing said so; the unread badge on Windows and
+   macOS read 0 for weeks after the bell stopped rendering `.toolbar-badge`.
+   So the site says these things itself, and the apps listen.
+
+   The channel is one object called `oeeeBridge`, which each app registers
+   before the page's first script runs:
+
+     iOS, macOS   webkit.messageHandlers.oeeeBridge (WKScriptMessageHandler)
+     Android      window.oeeeBridge (WebViewCompat.addWebMessageListener,
+                  restricted to the site's origin)
+     Windows      window.oeeeBridge, an init script whose postMessage emits
+                  the Tauri event `oeee-bridge` with the string as payload
+
+   Every message is a JSON string -- a string because that is all Android's
+   listener carries -- of an object with `v` (this contract's version, 1) and
+   `type`. The apps ignore types they do not know and fields they do not
+   know, so the site can add either without a release of any of them.
+
+   page     {path, signedIn, presence, community, group, painting, refreshable}
+            On every page, and again whenever any of it changes: a boosted
+            navigation, a back swipe that restored the page. `signedIn` is
+            null on a page without the toolbar, which cannot tell. `presence`
+            is presence_meta.jinja's activity, or null for browsing;
+            `painting` is whether leaving would lose a drawing in progress,
+            and `refreshable` whether pulling down may reload the page --
+            neither a painter nor a replay may be.
+   unread   {count}
+            The number on the bell (nav_notifications.jinja): unread
+            notifications and invitations waiting, together. Sent whenever it
+            changes, which is when a request swaps the bell.
+   theme    {choice, dark, top, bottom}
+            `choice` is "light", "dark" or "system"; `dark` what that comes
+            to now. `top` and `bottom` are the colours at the page's two
+            edges, as CSS colours, for the bars an app draws against them --
+            or null where nothing there has a colour, the app's own then.
+   haptic   {name}
+            "light", "medium", "selection", "success", "warning" or "error":
+            a control that is felt as well as seen.
+   pressed  {drawing: {src, link, width, height} | null}
+            As a finger lands, whether it is on a drawing -- an image marked
+            data-oeee-drawing, which is never a sensitive one -- so an app
+            that opens its own menu on a long press knows which in time.
+            `link` is the post's page, or "" on the post page itself.
+   painter  {state: "ready"}
+            The painter can be driven: window.oeeePainter.command(name) and
+            .preferPen() (frontend/painter/iosApp.ts).
+
+   The other way, the apps call the page: window.oeeeCommand(name)
+   (toolbar.jinja), window.oeeePainter, and --oeee-text-scale on the root.
+
+   Builds of the apps from before this contract listen on channels of their
+   own (oeeeHaptic, oeeePainter), and the site keeps talking to those when
+   there is no oeeeBridge. #}
+<script>
+  (function () {
+    var root = document.documentElement;
+    function channel() {
+      var handlers = window.webkit && window.webkit.messageHandlers;
+      var target = (handlers && handlers.oeeeBridge) || window.oeeeBridge;
+      return target && target.postMessage ? target : null;
+    }
+    var last = {};
+    // Sends a message of `type`, unless it is the same as the last one of
+    // that type and `always` is not set. Returns whether an app heard it.
+    function post(type, data, always) {
+      var target = channel();
+      if (!target) return false;
+      var message = { v: 1, type: type };
+      for (var key in data) message[key] = data[key];
+      var text = JSON.stringify(message);
+      if (!always && last[type] === text) return true;
+      last[type] = text;
+      try {
+        target.postMessage(text);
+      } catch (error) {
+        return false;
+      }
+      return true;
+    }
+
+    // A boosted navigation keeps the head it arrived in (toolbar.jinja), so
+    // the presence meta a painter page was loaded with is still there on the
+    // page after it. Boosted links only ever lead to pages without one.
+    var boosted = false;
+    var PAINTING = /^(drawing|relaying|drawing-banner|collaborating)$/;
+    function pageState() {
+      var meta = boosted ? null : document.querySelector('meta[name="oeee-presence"]');
+      var presence = meta ? meta.getAttribute("content") : null;
+      var bar = document.querySelector(".nav-bar");
+      return {
+        path: location.pathname,
+        signedIn: bar ? bar.hasAttribute("data-signed-in") : null,
+        presence: presence,
+        community: (meta && meta.getAttribute("data-community")) || null,
+        group: (meta && meta.getAttribute("data-group")) || null,
+        painting: PAINTING.test(presence || ""),
+        refreshable: !presence
+      };
+    }
+
+    // A colour someone can see: the first background up from `element`, the
+    // root's included, that is not transparent. Null when there is none --
+    // not transparent black, which an app would paint as black.
+    function colourAt(element) {
+      for (; element && element.nodeType === 1; element = element.parentElement) {
+        var colour = getComputedStyle(element).backgroundColor;
+        if (colour && colour !== "transparent" && !/^rgba\(.*,\s*0\)$/.test(colour)) return colour;
+      }
+      return null;
+    }
+    function themeState() {
+      var choice = root.getAttribute("data-theme") || "system";
+      var system = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      return {
+        choice: choice,
+        dark: choice === "dark" || (choice === "system" && !!system),
+        top: document.body ? colourAt(document.querySelector(".nav-bar") || document.body) : null,
+        bottom: document.body ? colourAt(document.body) : null
+      };
+    }
+
+    function report() {
+      if (!channel()) return;
+      post("page", pageState());
+      post("theme", themeState());
+      var bell = document.getElementById("nav-notifications");
+      if (bell) post("unread", { count: parseInt(bell.getAttribute("data-unread"), 10) || 0 });
+    }
+
+    document.addEventListener("DOMContentLoaded", report);
+    window.addEventListener("load", report);
+    window.addEventListener("pageshow", function (event) {
+      if (event.persisted) boosted = false;
+      report();
+    });
+    window.addEventListener("popstate", function () { setTimeout(report, 0); });
+    document.addEventListener("htmx:after:swap", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      if (event.target === document.body || (ctx && ctx.target === document.body)) boosted = true;
+      report();
+    });
+    if (window.MutationObserver) {
+      new MutationObserver(report).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    }
+    if (window.matchMedia) {
+      var scheme = window.matchMedia("(prefers-color-scheme: dark)");
+      if (scheme.addEventListener) scheme.addEventListener("change", report);
+      else if (scheme.addListener) scheme.addListener(report);
+    }
+
+    // Which drawing a finger lands on, said as it lands: by the time a long
+    // press is recognised the app can no longer ask the page in time.
+    window.addEventListener("touchstart", function (event) {
+      if (!channel()) return;
+      var target = event.target;
+      var image = target && target.closest ? target.closest("img[data-oeee-drawing]") : null;
+      var link = image ? image.closest("a[href]") : null;
+      post("pressed", {
+        drawing: image ? {
+          src: image.currentSrc || image.src,
+          link: link ? link.href : "",
+          width: image.naturalWidth || image.width,
+          height: image.naturalHeight || image.height
+        } : null
+      }, true);
+    }, { capture: true, passive: true });
+
+    window.oeeeApp = {
+      // Whether an app is listening at all.
+      connected: function () { return !!channel(); },
+      post: post,
+      // A control felt as well as seen. An app from before the bridge has
+      // oeeeHaptic instead: a message handler on iOS, a web message listener
+      // on Android.
+      feel: function (name) {
+        if (!name) return;
+        if (post("haptic", { name: name }, true)) return;
+        var handlers = window.webkit && window.webkit.messageHandlers;
+        var legacy = (handlers && handlers.oeeeHaptic) || window.oeeeHaptic;
+        if (legacy && legacy.postMessage) legacy.postMessage(name);
+      },
+      // Said again after something the page changed by itself.
+      report: report
+    };
+  })();
+</script>

@@ -6,7 +6,9 @@
    is corrected by the same request that caused it to change. Before this it
    was only ever right on a fresh page load, and sat there overstating the
    unread count for the rest of the visit. #}
-<span id="nav-notifications">
+{%- set unread_count = unread_notification_count if unread_notification_count is defined else 0 %}
+{# data-unread is the count the apps are sent (app_bridge.jinja). #}
+<span id="nav-notifications" data-unread="{{ unread_count }}">
   {# A bell, beside search's magnifier: the two icons at the bar's end, the
      rest of it words. It was a word while every other button was one too,
      and a bell among them the one control to decode; search became an icon
@@ -22,6 +24,10 @@
   {%- set label = ftl_get_message("notifications") ~ (" (" ~ unread_notification_count ~ ")" if unread else "") %}
   <a href="/notifications" class="toolbar-button toolbar-bell{% if unread %} toolbar-bell-unread{% endif %}"
      aria-label="{{ label }}" title="{{ label }}">
+    {# The count as it was rendered before the bell, for the desktop and Mac
+       apps released before app_bridge.jinja: they read it from here for the
+       icon's badge, and read 0 without it. #}
+    {%- if unread %}<span class="toolbar-badge" hidden>{{ unread_notification_count }}</span>{% endif %}
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16.5v-5.5a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 21.5h4"/></svg>
   </a>
 </span>

@@ -1,5 +1,5 @@
 use crate::app_error::{error_codes, AppError};
-use crate::models::device::delete_device_by_token;
+use crate::models::device::{delete_device_by_token, delete_user_device_by_token};
 use crate::models::user::{
     create_user, update_user_preferred_language, AuthSession, Credentials, Language, UserDraft,
 };
@@ -223,7 +223,35 @@ pub enum LoginError {
     PasswordNotMatch,
 }
 
-pub async fn do_logout(mut auth_session: AuthSession) -> impl IntoResponse {
+/// The cookie the apps set to the push token they registered (POST
+/// /api/v1/devices), so that signing out on the site's own page also stops
+/// that device's notifications. Before it, each app caught the page's logout
+/// form on its way out and deleted the device itself first.
+const DEVICE_COOKIE: &str = "oeee_device";
+
+fn device_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
+    headers
+        .get_all(axum::http::header::COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(name, _)| *name == DEVICE_COOKIE)
+        .map(|(_, token)| token.trim().to_string())
+        .filter(|token| !token.is_empty())
+}
+
+pub async fn do_logout(
+    mut auth_session: AuthSession,
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> impl IntoResponse {
+    if let (Some(user), Some(token)) = (auth_session.user.as_ref(), device_cookie(&headers)) {
+        if let Ok(mut tx) = state.db_pool.begin().await {
+            let _ = delete_user_device_by_token(&mut tx, user.id, &token).await;
+            let _ = tx.commit().await;
+        }
+    }
     match auth_session.logout().await {
         Ok(_) => Redirect::to("/").into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -598,4 +626,25 @@ pub async fn api_signup(
         }),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::{header::COOKIE, HeaderMap, HeaderValue};
+
+    #[test]
+    fn the_device_cookie_is_found_among_the_others() {
+        let mut headers = HeaderMap::new();
+        headers.insert(COOKIE, HeaderValue::from_static("id=abc; oeee_device=tok123; theme=dark"));
+        assert_eq!(device_cookie(&headers).as_deref(), Some("tok123"));
+    }
+
+    #[test]
+    fn no_device_cookie_is_none() {
+        let mut headers = HeaderMap::new();
+        assert_eq!(device_cookie(&headers), None);
+        headers.insert(COOKIE, HeaderValue::from_static("oeee_device=; x_oeee_device=nope"));
+        assert_eq!(device_cookie(&headers), None);
+    }
 }

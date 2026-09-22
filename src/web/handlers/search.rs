@@ -150,7 +150,9 @@ pub async fn search_json(
     Ok(Json(SearchResponse { posts: posts_typed }))
 }
 
-/// What the iOS and Android apps add to their web views' user agent.
+/// What the iOS and Android apps add to their web views' user agent. The
+/// same two are matched in the browser by theme_head.jinja, which marks the
+/// root data-app; a third phone app has to be added to both.
 const APP_USER_AGENT_MARKERS: [&str; 2] = ["OeeeCafeiOS", "OeeeCafeAndroid"];
 
 /// Whether the page is shown in one of the apps, whose search tab has a native

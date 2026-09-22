@@ -1201,6 +1201,52 @@ mod template_tests {
         assert!(card.contains("sensitive{% endif %}"), "the card no longer marks sensitive drawings");
     }
 
+    /// What app_bridge.jinja tells the apps is read from marks the templates
+    /// make, and an app sees nothing wrong when one goes missing: it is just
+    /// told 0, or nothing. So the marks are pinned here.
+    #[test]
+    fn the_apps_are_told_the_unread_count_and_who_is_signed_in() {
+        let env = test_support::env();
+        let bell = |count: i64| {
+            env.get_template("nav_notifications.jinja")
+                .unwrap()
+                .render(context! { unread_notification_count => count, ftl_lang => "en" })
+                .unwrap()
+        };
+        let three = bell(3);
+        assert!(three.contains(r#"data-unread="3""#), "{three}");
+        // Apps released before the bridge read the count from here.
+        assert!(three.contains(r#"<span class="toolbar-badge" hidden>3</span>"#), "{three}");
+        assert!(bell(0).contains(r#"data-unread="0""#));
+        assert!(!bell(0).contains("toolbar-badge"));
+
+        let toolbar = |current_user: serde_json::Value| {
+            env.get_template("toolbar.jinja")
+                .unwrap()
+                .render(context! { current_user, ..chrome() })
+                .unwrap()
+        };
+        assert!(!toolbar(json!(null)).contains("data-signed-in"));
+        let signed_in = toolbar(json!({
+            "id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+            "login_name": "reader",
+            "display_name": "Reader",
+            "email_verified_at": "2026-01-01",
+        }));
+        assert!(signed_in.contains(r#"hx-boost:inherited="true" data-signed-in"#));
+    }
+
+    /// Only a drawing that is not blurred is offered to an app's long-press
+    /// menu, whose preview would show it as it is.
+    #[test]
+    fn only_drawings_shown_as_they_are_are_offered_to_the_apps() {
+        let card = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/post_card.jinja"),
+        )
+        .expect("post_card.jinja reads");
+        assert!(card.contains("{% if not post.is_sensitive and not admin %}data-oeee-drawing{% endif %}"));
+    }
+
     /// Signing up asks for agreement to the two pages it links, and the box
     /// is required in the page as the handler requires it on the server.
     #[test]
@@ -1986,7 +2032,8 @@ mod template_tests {
                 with.contains(r#"<meta name="oeee-presence" content="drawing" data-community="오이카페 &quot;모에화&quot; &lt;b&gt;" />"#),
                 "{template_name} should carry the presence tag, escaped"
             );
-            assert!(!render(json!(null)).contains("oeee-presence"), "{template_name}");
+            // The tag, not the name: app_bridge.jinja's script reads it.
+            assert!(!render(json!(null)).contains(r#"<meta name="oeee-presence""#), "{template_name}");
         }
 
         let room = env

@@ -180,7 +180,7 @@
 
 /* In the phone apps the reader's text size is the site's: the app says how
    much larger or smaller than the system's default it is, as
-   --oeee-text-scale on the root (WebTab.swift in oeee-cafe-ios; an app that
+   --oeee-text-scale on the root (WebTab.swift in oeee-cafe-apple, WebTab.kt in oeee-cafe-android; an app that
    has not said yet gets 1), and every step of the type scale follows it. Text grows and shrinks; pictures, the spaces between things and
    the painter do not, as in the system's own apps. */
 html[data-app] {
@@ -270,16 +270,12 @@ html:not([data-app]) .ds-page {
 }
 
 /* In the iOS app a long press on a drawing opens the app's own menu for it
-   -- a preview, Save to Photos, Copy, Share (WebTab.swift in oeee-cafe/ios)
-   -- which the press has to be let through to. Not a drawing marked
-   sensitive: the preview would show it unblurred. */
-html[data-app="ios"] .ds-page .post-card-image,
-html[data-app="ios"] .ds-page .post-stage-image {
+   -- a preview, Save to Photos, Copy, Share (DrawingMenu.swift in
+   oeee-cafe-apple) -- which the press has to be let through to. The
+   templates mark only drawings that are not sensitive: the preview would
+   show one unblurred. */
+html[data-app="ios"] .ds-page img[data-oeee-drawing] {
   -webkit-touch-callout: default;
-}
-
-html[data-app="ios"] .ds-page .post-card-image .sensitive {
-  -webkit-touch-callout: none;
 }
 
 .ds-page a,

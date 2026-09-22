@@ -1320,6 +1320,7 @@ pub async fn invite_user(
                 "notification_type".to_string(),
                 serde_json::json!("community_invite"),
             );
+            data.insert("url".to_string(), serde_json::json!("/notifications"));
 
             tracing::info!(
                 "Sending community invitation push notification to user {}: title={}, body={}",
@@ -1513,6 +1514,7 @@ pub async fn do_accept_invitation(
         "notification_type".to_string(),
         serde_json::json!("invitation_accepted"),
     );
+    data.insert("url".to_string(), serde_json::json!(format!("/communities/@{}/members", community.slug)));
 
     tracing::info!(
         "Sending invitation accepted push notification to user {}: title={}, body={}",
@@ -1627,6 +1629,7 @@ pub async fn do_reject_invitation(
         "notification_type".to_string(),
         serde_json::json!("invitation_rejected"),
     );
+    data.insert("url".to_string(), serde_json::json!(format!("/communities/@{}/members", community.slug)));
 
     tracing::info!(
         "Sending invitation rejected push notification to user {}: title={}, body={}",
@@ -2567,6 +2570,7 @@ pub async fn invite_user_json(
         "notification_type".to_string(),
         serde_json::json!("community_invite"),
     );
+    data.insert("url".to_string(), serde_json::json!("/notifications"));
 
     tracing::info!(
         "Sending community invitation push notification to user {}: title={}, body={}",

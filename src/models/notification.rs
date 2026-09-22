@@ -475,6 +475,39 @@ pub async fn delete_notification(
     Ok(result.rows_affected() > 0)
 }
 
+/// The page a push notification opens, as a path on the site: the post it is
+/// about, or for a follow the follower, or for a guestbook the guestbook it
+/// was written in. The notifications page when there is nothing better, which
+/// is where every notification can be found anyway.
+fn push_url(notification: &NotificationWithActor, recipient_login_name: Option<&str>) -> String {
+    use NotificationType::*;
+    match notification.notification_type {
+        Comment | Reaction | Mention | PostReply | CommentReply | CommunityPost => {
+            match (notification.post_id, &notification.post_author_login_name) {
+                (Some(post_id), Some(author)) => format!("/@{author}/{post_id}"),
+                (Some(post_id), None) => format!("/posts/{post_id}"),
+                _ => "/notifications".to_string(),
+            }
+        }
+        // A follower from another server has no login name here, and no page
+        // of theirs on this site to open.
+        Follow => match &notification.actor_login_name {
+            Some(actor) => format!("/@{actor}"),
+            None => "/notifications".to_string(),
+        },
+        // An entry is written in the recipient's own guestbook; a reply is the
+        // actor answering one the recipient wrote in theirs.
+        GuestbookEntry => match recipient_login_name {
+            Some(recipient) => format!("/@{recipient}"),
+            None => "/notifications".to_string(),
+        },
+        GuestbookReply => match &notification.actor_login_name {
+            Some(actor) => format!("/@{actor}"),
+            None => "/notifications".to_string(),
+        },
+    }
+}
+
 /// Send push notification for a newly created notification
 /// This should be called after create_notification() succeeds and the transaction is committed
 pub async fn send_push_for_notification(
@@ -521,6 +554,25 @@ pub async fn send_push_for_notification(
     data.insert(
         "notification_type".to_string(),
         serde_json::json!(format!("{:?}", notification.notification_type)),
+    );
+
+    // Where tapping it goes. The apps open this rather than working it out
+    // from the type, so a new kind of notification, or a route that moves,
+    // is right in every app without a release of any of them.
+    let recipient_login_name = match notification.notification_type {
+        NotificationType::GuestbookEntry => sqlx::query_scalar!(
+            "SELECT login_name FROM users WHERE id = $1",
+            notification.recipient_id
+        )
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten(),
+        _ => None,
+    };
+    data.insert(
+        "url".to_string(),
+        serde_json::json!(push_url(notification, recipient_login_name.as_deref())),
     );
 
     if let Some(post_id) = notification.post_id {
@@ -771,5 +823,73 @@ pub fn format_community_invitation_message(
             // Fallback to English for unknown types
             ("Notification".to_string(), "You have a new notification".to_string())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn notification(kind: NotificationType) -> NotificationWithActor {
+        NotificationWithActor {
+            id: Uuid::nil(),
+            recipient_id: Uuid::nil(),
+            actor_id: Uuid::nil(),
+            actor_name: "Actor".to_string(),
+            actor_handle: "@actor".to_string(),
+            actor_login_name: Some("actor".to_string()),
+            notification_type: kind,
+            post_id: None,
+            comment_id: None,
+            reaction_iri: None,
+            reaction_emoji: None,
+            guestbook_entry_id: None,
+            read_at: None,
+            created_at: Utc::now(),
+            post_title: None,
+            post_author_login_name: None,
+            post_image_filename: None,
+            post_image_width: None,
+            post_image_height: None,
+            comment_content: None,
+            comment_content_html: None,
+            guestbook_content: None,
+            actor_count: 1,
+        }
+    }
+
+    #[test]
+    fn a_push_opens_what_it_is_about() {
+        let post_id = Uuid::parse_str("9c881320-2b43-4afa-b2bb-7128c8a3e985").unwrap();
+        let mut comment = notification(NotificationType::Comment);
+        comment.post_id = Some(post_id);
+        assert_eq!(push_url(&comment, None), format!("/posts/{post_id}"));
+        comment.post_author_login_name = Some("author".to_string());
+        assert_eq!(push_url(&comment, None), format!("/@author/{post_id}"));
+
+        assert_eq!(push_url(&notification(NotificationType::Follow), None), "/@actor");
+        assert_eq!(
+            push_url(&notification(NotificationType::GuestbookEntry), Some("me")),
+            "/@me"
+        );
+        assert_eq!(
+            push_url(&notification(NotificationType::GuestbookReply), None),
+            "/@actor"
+        );
+    }
+
+    #[test]
+    fn a_push_with_nowhere_better_opens_the_notifications() {
+        assert_eq!(
+            push_url(&notification(NotificationType::Reaction), None),
+            "/notifications"
+        );
+        assert_eq!(
+            push_url(&notification(NotificationType::GuestbookEntry), None),
+            "/notifications"
+        );
+        let mut remote = notification(NotificationType::Follow);
+        remote.actor_login_name = None;
+        assert_eq!(push_url(&remote, None), "/notifications");
     }
 }
