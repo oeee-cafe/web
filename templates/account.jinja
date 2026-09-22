@@ -3,74 +3,66 @@
   {{ super() }} | {{ ftl_get_message("account") }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <h2>{{ ftl_get_message("account") }}</h2>
-    <form method="post">
-      <fieldset>
-        <legend>{{ ftl_get_message("account-info") }}</legend>
-        <p>{{ ftl_get_message("account-created-at") }}: {{ current_user.created_at|dateformat(format="short", tz="Asia/Seoul") }}</p>
-        <p>
-          <label for="login_name">{{ ftl_get_message("login-name") }}:</label>
-          <input name="login_name"
-                 id="login_name"
-                 autocapitalize="none"
+  {# Account settings as a settings pane lays them out: each group a card
+     under its own label, its fields the width of the card, and the button
+     that saves that group at the card's foot. Every group is still its own
+     form posting where it always did. Deleting the account is last and set
+     apart. #}
+  <div class="settings-page">
+    <h1 class="settings-title">{{ ftl_get_message("account") }}</h1>
+
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("account-info") }}</div>
+      <form method="post" class="ds-card settings-card">
+        <div class="form-field">
+          <label class="ds-label" for="login_name">{{ ftl_get_message("login-name") }}</label>
+          <input class="ds-input" name="login_name" id="login_name" autocapitalize="none" spellcheck="false"
                  value="{{ current_user.login_name }}" />
-        </p>
-        <p>
-          <label for="display_name">{{ ftl_get_message("display-name") }}:</label>
-          <input name="display_name"
-                 id="display_name"
-                 value="{{ current_user.display_name }}" />
-        </p>
-      </fieldset>
-      <input type="submit" value="{{ ftl_get_message("account-info-edit") }}" />
-    </form>
-    <form method="post" action="/account/password">
-      <fieldset>
-        <legend>{{ ftl_get_message("account-change-password") }}</legend>
-        <p>
-          <label for="current_password">{{ ftl_get_message("account-change-password-current") }}:</label>
-          <input name="current_password" id="current_password" type="password" />
-        </p>
-        <p>
-          <label for="new_password">{{ ftl_get_message("account-change-password-new") }}:</label>
-          <input name="new_password" id="new_password" type="password" />
-        </p>
-        <p>
-          <label for="new_password_confirm">{{ ftl_get_message("account-change-password-new-repeat") }}:</label>
-          <input name="new_password_confirm" id="new_password_confirm" type="password" />
-        </p>
-      </fieldset>
-      <input type="submit" value="{{ ftl_get_message("account-info-edit") }}" />
-    </form>
-    <form hx-post="/account/request-verify-email" hx-swap="outerHTML"
-          hx-disable="find button">
-      <fieldset>
-        <legend>{{ ftl_get_message("account-change-email") }}</legend>
-        {% if current_user.email_verified_at %}
-          <p>
-            {{ ftl_get_message("account-change-email-verified-at") }}: {{ current_user.email_verified_at|dateformat(format="short",
-             tz="Asia/Seoul") }}
-          </p>
-        {% else %}
-          <p class="dangerous">{{ ftl_get_message("account-email-not-verified-warning") }}</p>
-        {% endif %}
-        <p>
-          <label for="email">{{ ftl_get_message("account-change-email-email") }}:</label>
-          <input name="email"
-                 id="email"
-                 type="email"
-                 value="{%- if current_user.email -%}{{ current_user.email }}{%- endif -%}" />
-        </p>
-      </fieldset>
-      <input type="submit" value="{{ ftl_get_message("account-verify-email-request") }}" />
-    </form>
-    <form action="/account/language" method="post">
-      <fieldset>
-        <legend>{{ ftl_get_message("account-language-settings") }}</legend>
-        <p>
-          <label for="language">{{ ftl_get_message("account-language-current") }}:</label>
-          <select name="language" id="language">
+        </div>
+        <div class="form-field">
+          <label class="ds-label" for="display_name">{{ ftl_get_message("display-name") }}</label>
+          <input class="ds-input" name="display_name" id="display_name" value="{{ current_user.display_name }}" />
+        </div>
+        <div class="settings-foot">
+          <span class="ds-help">{{ ftl_get_message("account-created-at") }} {{ current_user.created_at|dateformat(format="short", tz="Asia/Seoul") }}</span>
+          <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-info-edit") }}</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("account-change-password") }}</div>
+      <form method="post" action="/account/password" class="ds-card settings-card">
+        <div class="form-field">
+          <label class="ds-label" for="current_password">{{ ftl_get_message("account-change-password-current") }}</label>
+          <input class="ds-input" name="current_password" id="current_password" type="password" autocomplete="current-password" />
+        </div>
+        <div class="form-field">
+          <label class="ds-label" for="new_password">{{ ftl_get_message("account-change-password-new") }}</label>
+          <input class="ds-input" name="new_password" id="new_password" type="password" autocomplete="new-password" />
+        </div>
+        <div class="form-field">
+          <label class="ds-label" for="new_password_confirm">{{ ftl_get_message("account-change-password-new-repeat") }}</label>
+          <input class="ds-input" name="new_password_confirm" id="new_password_confirm" type="password" autocomplete="new-password" />
+        </div>
+        <div class="settings-foot">
+          <span></span>
+          <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-info-edit") }}</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("account-change-email") }}</div>
+      {% include "email_edit.jinja" %}
+    </section>
+
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("account-language-settings") }}</div>
+      <form action="/account/language" method="post" class="ds-card settings-card">
+        <div class="form-field">
+          <label class="ds-label" for="language">{{ ftl_get_message("account-language-current") }}</label>
+          <select class="ds-select" name="language" id="language">
             {% for code, name in languages %}
               <option value="{{ code }}"
                       {% if code == current_user.preferred_language|lower %}selected{% endif %}>{{ name }}</option>
@@ -80,48 +72,61 @@
               {{ ftl_get_message("account-language-auto") }}
             </option>
           </select>
-        </p>
-      </fieldset>
-      <input type="submit" value="{{ ftl_get_message("account-language-settings-save") }}" />
-    </form>
-    <form action="/account/show-sensitive-content" method="post">
-      <fieldset>
-        <legend>{{ ftl_get_message("account-content-settings") }}</legend>
-        <p>
-          <label>
+        </div>
+        <div class="settings-foot">
+          <span></span>
+          <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-language-settings-save") }}</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("account-content-settings") }}</div>
+      <form action="/account/show-sensitive-content" method="post" class="ds-card settings-card">
+        <div class="community-form-choices">
+          <label class="community-form-choice">
             <input type="checkbox"
                    name="show_sensitive_content"
                    id="show_sensitive_content"
                    value="on"
                    {% if current_user.show_sensitive_content == true %}checked{% endif %} />
-            {{ ftl_get_message("account-show-sensitive-content") }}
+            <span class="community-form-choice-name">{{ ftl_get_message("account-show-sensitive-content") }}</span>
           </label>
-        </p>
-      </fieldset>
-      <input type="submit" value="{{ ftl_get_message("account-content-settings-save") }}" />
-    </form>
-    <form id="delete-account-form"
-          hx-delete="/account/delete"
-          hx-confirm="{{ ftl_get_message("account-delete-confirm") }}"
-          hx-target="#delete-error"
-          hx-swap="innerHTML"
-          hx-disable="find button">
-      <fieldset class="dangerous">
-        <legend>{{ ftl_get_message("account-delete") }}</legend>
-        <p class="dangerous">{{ ftl_get_message("account-delete-warning") }}</p>
+        </div>
+        <div class="settings-foot">
+          <span></span>
+          <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-content-settings-save") }}</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="settings-group">
+      <form action="/logout" method="post" class="ds-card settings-card settings-row">
+        <span class="settings-row-text">@{{ current_user.login_name }}</span>
+        <button type="submit" class="ds-button">{{ ftl_get_message("sign-out") }}</button>
+      </form>
+    </section>
+
+    <section class="settings-group settings-danger">
+      <div class="profile-section-label">{{ ftl_get_message("account-delete") }}</div>
+      <form id="delete-account-form"
+            class="ds-card settings-card"
+            hx-delete="/account/delete"
+            hx-confirm="{{ ftl_get_message("account-delete-confirm") }}"
+            hx-target="#delete-error"
+            hx-swap="innerHTML"
+            hx-disable="find button">
+        <p class="settings-status is-danger">{{ ftl_get_message("account-delete-warning") }}</p>
         <div id="delete-error"></div>
-        <p>
-          <label for="delete_password">{{ ftl_get_message("account-change-password-current") }}:</label>
-          <input name="password"
-                 id="delete_password"
-                 type="password"
-                 required />
-        </p>
-      </fieldset>
-      <button type="submit" class="dangerous">{{ ftl_get_message("account-delete-button") }}</button>
-    </form>
-    <form action="/logout" method="post">
-      <button type="submit">{{ ftl_get_message("sign-out") }}</button>
-    </form>
+        <div class="form-field">
+          <label class="ds-label" for="delete_password">{{ ftl_get_message("account-change-password-current") }}</label>
+          <input class="ds-input" name="password" id="delete_password" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="settings-foot">
+          <span></span>
+          <button type="submit" class="ds-button ds-button-danger">{{ ftl_get_message("account-delete-button") }}</button>
+        </div>
+      </form>
+    </section>
   </div>
 {% endblock content %}

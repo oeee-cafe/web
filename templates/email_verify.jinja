@@ -1,25 +1,26 @@
-<form hx-post="/account/verify-email" hx-swap="outerHTML"
-      hx-disable="find button">
+{# The email card's second step: the code that was sent. Swapped in place of
+   email_edit.jinja, so it is the same card. #}
+<form hx-post="/account/verify-email" hx-swap="outerHTML" hx-disable="find button"
+      class="ds-card settings-card">
   <input type="hidden" name="challenge_id" value="{{ challenge_id }}" />
-  <fieldset>
-    <legend>{{ ftl_get_message("account-change-email") }}</legend>
-    <p>
-      <label for="email">{{ ftl_get_message("account-change-email-email") }}:</label>
-      <input name="email" id="email" type="email" value="{{ email }}" disabled />
-    </p>
-    {% if not success %}
-      <p>
-        <label for="token">{{ ftl_get_message("account-change-email-token") }}:</label>
-        <input name="token" id="token" type="text" pattern="\d*" maxlength="6" />
-      </p>
-    {% endif %}
-    {% if message %}
-      {% if success %}
-        <p class="safe">{{ message }}</p>
-      {% else %}
-        <p class="dangerous">{{ message }}</p>
-      {% endif %}
-    {% endif %}
-  </fieldset>
-  <input type="submit" value="{{ ftl_get_message("account-change-email-verify") }}" />
+  <div class="form-field">
+    <label class="ds-label" for="email">{{ ftl_get_message("account-change-email-email") }}</label>
+    <input class="ds-input" name="email" id="email" type="email" value="{{ email }}" disabled />
+  </div>
+  {% if not success %}
+    <div class="form-field">
+      <label class="ds-label" for="token">{{ ftl_get_message("account-change-email-token") }}</label>
+      <input class="ds-input" name="token" id="token" type="text" inputmode="numeric" pattern="\d*" maxlength="6"
+             autocomplete="one-time-code" autofocus />
+    </div>
+  {% endif %}
+  {% if message %}
+    <p class="settings-status {% if success %}is-good{% else %}is-warning{% endif %}">{{ message }}</p>
+  {% endif %}
+  {% if not success %}
+    <div class="settings-foot">
+      <span></span>
+      <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-change-email-verify") }}</button>
+    </div>
+  {% endif %}
 </form>

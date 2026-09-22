@@ -1,23 +1,22 @@
-<form hx-post="/account/request-verify-email" hx-swap="outerHTML"
-      hx-disable="find button">
-  <fieldset>
-    <legend>{{ ftl_get_message("account-change-email") }}</legend>
-    {% if current_user.email_verified_at %}
-      <p>
-        {{ ftl_get_message("account-change-email-verified-at") }}: {{ current_user.email_verified_at|dateformat(format="short",
-         tz="Asia/Seoul") }}
-      </p>
-    {% else %}
-      <p class="dangerous">{{ ftl_get_message("account-email-not-verified-warning") }}</p>
-    {% endif %}
-    <p>
-      <label for="email">{{ ftl_get_message("account-change-email-email") }}:</label>
-      <input name="email"
-             id="email"
-             type="email"
-             value="{%- if current_user.email -%}{{ current_user.email }}{%- endif -%}" />
+{# The email card: where verification starts. Rendered inside the account
+   page and swapped back in by the handlers, so it carries its own card. #}
+<form hx-post="/account/request-verify-email" hx-swap="outerHTML" hx-disable="find button"
+      class="ds-card settings-card">
+  {% if current_user.email_verified_at %}
+    <p class="settings-status is-good">
+      {{ ftl_get_message("account-change-email-verified-at") }}: {{ current_user.email_verified_at|dateformat(format="short", tz="Asia/Seoul") }}
     </p>
-    {% if message %}<p>{{ message }}</p>{% endif %}
-  </fieldset>
-  <input type="submit" value="{{ ftl_get_message("account-verify-email-request") }}" />
+  {% else %}
+    <p class="settings-status is-warning">{{ ftl_get_message("account-email-not-verified-warning") }}</p>
+  {% endif %}
+  <div class="form-field">
+    <label class="ds-label" for="email">{{ ftl_get_message("account-change-email-email") }}</label>
+    <input class="ds-input" name="email" id="email" type="email" autocomplete="email"
+           value="{%- if current_user.email -%}{{ current_user.email }}{%- endif -%}" />
+  </div>
+  {% if message %}<p class="settings-status is-warning">{{ message }}</p>{% endif %}
+  <div class="settings-foot">
+    <span></span>
+    <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-verify-email-request") }}</button>
+  </div>
 </form>
