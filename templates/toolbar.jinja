@@ -40,7 +40,8 @@
    Written for Firefox 56 like the rest of static/style.css, which no
    build step touches: flex without `gap`, and the account menu is a
    <details>, so it opens with no script at all. #}
-<nav class="nav-bar" hx-boost:inherited="true">
+{# data-signed-in is how the apps are told whether anyone is (app_bridge.jinja). #}
+<nav class="nav-bar" hx-boost:inherited="true"{% if current_user %} data-signed-in{% endif %}>
   <div id="menubar">
     {# The mark -- the cucumber slice the site's icon is -- and the site's
        name beside it, in the page's language: home. Its box is the buttons'
@@ -71,8 +72,8 @@
       {# Search, signed in or out: a button like its neighbours, holding a
          magnifier rather than a word, since a word here is the width that
          pushes a phone's first row into its compact steps. Hidden in the
-         iOS app, whose own search tab is the native field (theme_head.jinja
-         marks the root). #}
+         phone apps, whose own search tabs are the native field
+         (theme_head.jinja marks the root). #}
       <a class="toolbar-button toolbar-search" href="/search"
          aria-label="{{ ftl_get_message("search") }}" title="{{ ftl_get_message("search") }} (/)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>

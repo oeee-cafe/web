@@ -6,9 +6,11 @@
    ahead of the system setting. It has to run here, in the head: a page that
    paints first and then turns dark flashes. Boosted navigation keeps the
    root element, so the mark survives it. #}
+{% include "app_bridge.jinja" %}
 <script>
   // The apps' web views name themselves in the user agent (WebTab.swift on
-  // iOS, WebTab.kt on Android). Marked here, before paint, so the toolbar's
+  // iOS, WebTab.kt on Android), and the server matches the same two
+  // (APP_USER_AGENT_MARKERS in search.rs). Marked here, before paint, so the toolbar's
   // search button -- which the apps' native search tabs stand in for -- never
   // flashes up and away.
   if (/OeeeCafeiOS/.test(navigator.userAgent)) {
@@ -39,16 +41,11 @@
   }
   if (document.documentElement.hasAttribute("data-app")) {
     // Controls are felt as well as seen, as the apps' own are: "light",
-    // "medium", "selection", "success", "warning", "error". iOS hears them
-    // as a message handler (Haptics in DrawingMenu.swift, oeee-cafe-ios);
-    // Android as a web message listener of the same name, which is how its
-    // app already takes oeeeLogout and oeeeEdgeColors (WebTab.kt,
-    // oeee-cafe-android). An app that has neither feels nothing.
+    // "medium", "selection", "success", "warning", "error", sent to the app
+    // as a haptic message (app_bridge.jinja). An app that cannot feel them
+    // ignores them.
     function feel(name) {
-      if (!name) return;
-      var ios = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.oeeeHaptic;
-      var app = ios || window.oeeeHaptic;
-      if (app && app.postMessage) app.postMessage(name);
+      window.oeeeApp.feel(name);
     }
     document.addEventListener("click", function (event) {
       var target = event.target;

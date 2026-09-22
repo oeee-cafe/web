@@ -123,6 +123,27 @@ pub async fn delete_device_by_token(
     Ok(result.rows_affected() > 0)
 }
 
+/// Delete one of a user's devices, and only theirs: the token comes from a
+/// cookie, which is no proof that the device was ever registered to them.
+pub async fn delete_user_device_by_token(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    device_token: &str,
+) -> Result<bool> {
+    let result = sqlx::query!(
+        r#"
+        DELETE FROM devices
+        WHERE user_id = $1 AND device_token = $2
+        "#,
+        user_id,
+        device_token,
+    )
+    .execute(&mut **tx)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
 /// Get devices by platform for a user
 pub async fn get_user_devices_by_platform(
     tx: &mut Transaction<'_, Postgres>,

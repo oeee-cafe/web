@@ -22,7 +22,10 @@
            decoding="async"
            {# Staff reviewing content need to see it; the blur is for readers. #}
            class="{% if post.is_sensitive and not admin %}sensitive{% endif %}{% if post.image_width > 300 and post.image_height > 300 %} drawing-downscaled{% endif %}"
-           {% if post.is_sensitive and not admin %}aria-label="Sensitive content: {{ post.title }}"{% endif %} />
+           {% if post.is_sensitive and not admin %}aria-label="Sensitive content: {{ post.title }}"{% endif %}
+           {# A drawing the apps may open their own menu on (app_bridge.jinja):
+              never a blurred one, whose preview would show it unblurred. #}
+           {% if not post.is_sensitive and not admin %}data-oeee-drawing{% endif %} />
     </a>
     {# Attribution stays visible rather than appearing on hover: it is the
        artist's credit, and hover does not exist on touch anyway. The author and

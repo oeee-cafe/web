@@ -1026,7 +1026,11 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
 
   // Drawing alarm, offered in two-tone mode
   const handleTimerExpire = useCallback(() => {
-    alert(t`Time's up.`);
+    // The site's own alert where the page has one (confirm_dialog.jinja);
+    // the offline painter has only the browser's.
+    const site = (window as unknown as { dsAlert?: (message: string) => void }).dsAlert;
+    if (site) site(t`Time's up.`);
+    else window.alert(t`Time's up.`);
   }, [t]);
 
   const {
