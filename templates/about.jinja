@@ -1,4 +1,5 @@
 {% extends "base.jinja" %}
+{% from "supporter_badge_macro.jinja" import supporter_heart %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("nav-about") }}
 {% endblock title %}
@@ -39,6 +40,21 @@
         <a class="ds-button" href="/privacy">{{ ftl_get_message("privacy-policy") }}</a>
       </div>
     </section>
+
+    {% if supporters|length > 0 %}
+      {# The credits: everyone whose Steam account owns the Supporter Pack,
+         earliest first, unless they asked to be left off on their account
+         page. Every supporter badge on the site leads here. #}
+      <section class="profile-section" id="supporters">
+        <div class="profile-section-label">{{ ftl_get_message("about-supporters") }}</div>
+        <p class="ds-help about-supporters-thanks">{{ ftl_get_message("about-supporters-thanks") }}</p>
+        <div class="profile-chips">
+          {% for supporter in supporters %}
+            <a class="profile-chip supporter-chip" href="/@{{ supporter.login_name }}" title="@{{ supporter.login_name }}">{{ supporter_heart() }}{{ supporter.display_name }}</a>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
 
     {% if users_with_public_posts_and_banner|length > 0 %}
       {# Everyone who draws here in the open and has a banner, as a wall of

@@ -4,7 +4,7 @@ use crate::web::handlers::about::{about, design};
 use crate::web::handlers::account::{
     account, delete_account, delete_account_htmx, edit_account, edit_password, get_account_json,
     request_email_verification_code, request_email_verification_json, save_language,
-    save_show_sensitive_content, verify_email_code_json, verify_email_verification_code,
+    save_show_in_credits, save_show_sensitive_content, verify_email_code_json, verify_email_verification_code,
 };
 use crate::web::handlers::activitypub::{
     activitypub_get_community, activitypub_get_post, activitypub_get_user,
@@ -185,8 +185,15 @@ impl App {
         if let Some(steam) = self.state.config.steam.clone() {
             tokio::task::spawn(crate::steam::sync_achievements(
                 self.state.db_pool.clone(),
-                steam,
+                steam.clone(),
             ));
+            // Supporter standing, from what Steam says each account owns.
+            if !steam.supporter_app_ids.is_empty() {
+                tokio::task::spawn(crate::steam::recheck_supporters(
+                    self.state.db_pool.clone(),
+                    steam,
+                ));
+            }
         }
 
         let session_layer = SessionManagerLayer::new(session_store)
@@ -223,6 +230,7 @@ impl App {
             .route("/account", post(edit_account))
             .route("/account/password", post(edit_password))
             .route("/account/language", post(save_language))
+            .route("/account/credits", post(save_show_in_credits))
             .route(
                 "/account/show-sensitive-content",
                 post(save_show_sensitive_content),

@@ -1340,6 +1340,46 @@ mod template_tests {
         assert_eq!(rendered.matches("<script").count(), 1);
     }
 
+    /// Only a supporter is asked whether to be in the credits, and the box
+    /// says what they chose.
+    #[test]
+    fn a_supporter_chooses_whether_to_be_credited() {
+        let env = test_support::env();
+        let render = |show_in_credits: serde_json::Value| {
+            env.get_template("account.jinja")
+                .expect("account loads")
+                .render(context! {
+                    current_user => json!({
+                        "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
+                        "login_name": "oeee",
+                        "display_name": "오이",
+                        "email": null,
+                        "email_verified_at": null,
+                        "created_at": "2026-09-22T00:00:00Z",
+                        "preferred_language": null,
+                        "show_sensitive_content": false,
+                        "role": "user",
+                    }),
+                    languages => vec![("ko", "한국어"), ("en", "English")],
+                    identities => json!([{"provider": "steam", "display_hint": "오이", "subject": "76561197960287930"}]),
+                    has_password => true,
+                    show_in_credits,
+                    steam_enabled => true,
+                    steam_linked => true,
+                    ..chrome()
+                })
+                .expect("account renders")
+        };
+        let squash = |html: String| html.split_whitespace().collect::<Vec<_>>().join(" ");
+        let listed = squash(render(json!(true)));
+        assert!(listed.contains(r#"action="/account/credits""#));
+        assert!(listed.contains(r#"value="on" checked"#));
+        let hidden = squash(render(json!(false)));
+        assert!(hidden.contains(r#"action="/account/credits""#));
+        assert!(!hidden.contains(r#"name="show_in_credits" id="show_in_credits" value="on" checked"#));
+        assert!(!render(json!(null)).contains("/account/credits"));
+    }
+
     /// An account made with Steam has no password: it is offered one to set
     /// rather than asked for its current one, and deleting it asks for its
     /// handle.
@@ -1669,6 +1709,143 @@ mod template_tests {
         let at = |needle: &str| with.find(needle).unwrap_or_else(|| panic!("no {needle}"));
         assert!(at("profile-ally-banners") < at("profile-achievements"));
         assert!(at("profile-achievements") < at("data-profile-panel=\"public\""));
+    }
+
+    /// A comment as `build_comment_thread_tree` serializes one.
+    fn comment(login_name: Option<&str>, name: &str) -> serde_json::Value {
+        json!({
+            "id": uuid::Uuid::new_v4().to_string(),
+            "post_id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+            "actor_id": uuid::Uuid::new_v4().to_string(),
+            "parent_comment_id": null,
+            "content": "hi",
+            "content_html": "<p>hi</p>",
+            "iri": null,
+            "actor_name": name,
+            "actor_handle": format!("@{}@oeee.example", login_name.unwrap_or(name)),
+            "actor_url": "/@someone",
+            "actor_login_name": login_name,
+            "is_local": login_name.is_some(),
+            "updated_at": "2026-09-22T00:00:00Z",
+            "created_at": "2026-09-22T00:00:00Z",
+            "deleted_at": null,
+            "children": [],
+        })
+    }
+
+    /// The heart goes beside every name on a post's page that belongs to a
+    /// supporter -- the author, someone who drew with them, a commenter, a
+    /// reply -- and beside no one else's, remote accounts included however
+    /// they are named.
+    #[test]
+    fn supporters_wear_the_heart_on_a_post_page() {
+        let env = test_support::env();
+        let mut reply = comment(Some("fan"), "Fan");
+        reply["children"] = json!([comment(Some("someone"), "Someone")]);
+        reply["children"][0]["parent_comment_id"] = reply["id"].clone();
+        let comments = json!([
+            reply,
+            comment(Some("plain"), "Plain"),
+            // A remote account sharing a supporter's local name.
+            comment(None, "fan"),
+        ]);
+        let render = |supporters: serde_json::Value| {
+            env.get_template("post_view.jinja")
+                .expect("post_view.jinja loads")
+                .render(context! {
+                    post => post_page("true", "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d"),
+                    post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                    r2_public_endpoint_url => "https://images.example",
+                    base_url => "https://oeee.example",
+                    domain => "oeee.example",
+                    comments => comments.clone(),
+                    supporters,
+                    collaborative_participants => json!([
+                        {"login_name": "someone", "display_name": "Someone"},
+                        {"login_name": "friend", "display_name": "Friend"},
+                    ]),
+                    reaction_counts => Vec::<serde_json::Value>::new(),
+                    hashtags => Vec::<serde_json::Value>::new(),
+                    child_posts => Vec::<serde_json::Value>::new(),
+                    post_community => json!(null),
+                    parent_post_data => json!(null),
+                    ..chrome()
+                })
+                .expect("post_view.jinja renders")
+        };
+        let badges = |html: &str| html.matches(r#"class="supporter-badge""#).count();
+
+        let page = render(json!(["someone", "friend", "fan"]));
+        // Author, co-drawer, the commenter and the author's reply to them.
+        assert_eq!(badges(&page), 4);
+        let byline = page.find("post-inspector-byline").unwrap();
+        let handle = page[byline..].find("post-inspector-handle").unwrap() + byline;
+        assert!(page[byline..handle].contains("supporter-badge"), "beside the author");
+        assert!(page.contains(r#"href="/about#supporters""#));
+
+        assert_eq!(badges(&render(json!([]))), 0);
+        // The comments fragment an HTMX post swaps in, the same way.
+        let fragment = env
+            .get_template("post_comments.jinja")
+            .unwrap()
+            .render(context! { comments, supporters => json!(["fan"]), ..chrome() })
+            .unwrap();
+        assert_eq!(badges(&fragment), 1);
+    }
+
+    #[test]
+    fn a_supporters_profile_says_so_first() {
+        let env = test_support::env();
+        let render = |is_supporter: bool| {
+            env.get_template("profile.jinja")
+                .expect("profile loads")
+                .render(context! {
+                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이"}),
+                    banner => json!(null),
+                    links => Vec::<serde_json::Value>::new(),
+                    followings => Vec::<serde_json::Value>::new(),
+                    achievements => Vec::<serde_json::Value>::new(),
+                    is_supporter,
+                    public_community_posts => Vec::<serde_json::Value>::new(),
+                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    domain => "oeee.cafe",
+                    is_following => false,
+                    ..chrome()
+                })
+                .expect("profile renders")
+        };
+        let supporter = render(true);
+        let chip = supporter.find("supporter-chip").expect("a supporter chip");
+        assert!(chip < supporter.find("/@oeee/guestbook").unwrap(), "before the guestbook");
+        assert!(supporter.contains(r#"href="/about#supporters""#));
+        assert!(!render(false).contains("supporter-chip"));
+    }
+
+    /// The credits: a section on /about that every badge leads to, left out
+    /// while there is nobody in it.
+    #[test]
+    fn the_about_page_thanks_its_supporters() {
+        let env = test_support::env();
+        let render = |supporters: serde_json::Value| {
+            env.get_template("about.jinja")
+                .expect("about loads")
+                .render(context! {
+                    supporters,
+                    users_with_public_posts_and_banner => Vec::<serde_json::Value>::new(),
+                    ..chrome()
+                })
+                .expect("about renders")
+        };
+        let about = render(json!([
+            {"login_name": "a", "display_name": "에이", "since": "2026-09-22T00:00:00Z"},
+            {"login_name": "b", "display_name": "비", "since": "2026-09-23T00:00:00Z"},
+        ]));
+        assert!(about.contains(r#"id="supporters""#));
+        assert!(about.contains("about-supporters-thanks"));
+        let a = about.find(r#"href="/@a""#).expect("a is thanked");
+        let b = about.find(r#"href="/@b""#).expect("b is thanked");
+        assert!(a < b, "earliest first");
+        assert!(!render(json!([])).contains(r#"id="supporters""#));
     }
 
     /// Following: those with a banner framed as /about frames them, the rest

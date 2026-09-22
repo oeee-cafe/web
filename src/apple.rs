@@ -243,7 +243,7 @@ pub async fn verify_id_token(
         subject: claims.sub,
         name: name_from_user(user),
         email,
-        purchased: false,
+        purchased: None,
     }))
 }
 
@@ -336,7 +336,7 @@ mod tests {
             identity.email.as_deref(),
             Some("oeee@privaterelay.appleid.com")
         );
-        assert!(!identity.purchased);
+        assert_eq!(identity.purchased, None);
     }
 
     #[tokio::test]
