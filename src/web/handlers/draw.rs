@@ -385,45 +385,27 @@ pub async fn draw_finish(
         .expect("Time went backwards");
     let duration_ms = since_the_epoch.as_millis() - security_timer;
 
-    if tool == "neo" || tool == "cucumber" || tool == "neo-cucumber-offline" {
-        // Get first 2 characters for directory prefix
-        let replay_prefix = replay_sha256.chars().take(2).collect::<String>();
-        if replay_prefix.len() < 2 {
-            return Err(AppError::InvalidHash("Replay hash too short".to_string()));
-        }
-        upload_object(
-            &client,
-            &state.config.aws_s3_bucket,
-            replay_data,
-            &format!("replay/{}/{}.pch", replay_prefix, replay_sha256),
-            &BASE64.encode(&safe_decode_hash(&replay_sha256)?),
-        )
-        .await?;
-    } else if tool == "tegaki" {
-        // Get first 2 characters for directory prefix
-        let replay_prefix = replay_sha256.chars().take(2).collect::<String>();
-        if replay_prefix.len() < 2 {
-            return Err(AppError::InvalidHash("Replay hash too short".to_string()));
-        }
-        upload_object(
-            &client,
-            &state.config.aws_s3_bucket,
-            replay_data,
-            &format!("replay/{}/{}.tgkr", replay_prefix, replay_sha256),
-            &BASE64.encode(&safe_decode_hash(&replay_sha256)?),
-        )
-        .await?;
-    } else {
+    // Every painter left records a NEO replay. Tegaki's .tgkr is still
+    // played for the posts that have one, but nothing can make a new one.
+    if !(tool == "neo" || tool == "cucumber" || tool == "neo-cucumber-offline") {
         return Ok(StatusCode::BAD_REQUEST.into_response());
     }
 
-    let replay_filename = if tool == "neo" || tool == "cucumber" || tool == "neo-cucumber-offline" {
-        format!("{}.pch", replay_sha256)
-    } else if tool == "tegaki" {
-        format!("{}.tgkr", replay_sha256)
-    } else {
-        return Ok(StatusCode::BAD_REQUEST.into_response());
-    };
+    // Get first 2 characters for directory prefix
+    let replay_prefix = replay_sha256.chars().take(2).collect::<String>();
+    if replay_prefix.len() < 2 {
+        return Err(AppError::InvalidHash("Replay hash too short".to_string()));
+    }
+    upload_object(
+        &client,
+        &state.config.aws_s3_bucket,
+        replay_data,
+        &format!("replay/{}/{}.pch", replay_prefix, replay_sha256),
+        &BASE64.encode(&safe_decode_hash(&replay_sha256)?),
+    )
+    .await?;
+
+    let replay_filename = format!("{}.pch", replay_sha256);
 
     let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
 
@@ -443,7 +425,6 @@ pub async fn draw_finish(
 
     let tool_enum: Tool = match tool.as_str() {
         "neo" => Tool::Neo,
-        "tegaki" => Tool::Tegaki,
         "cucumber" => Tool::Cucumber,
         "neo-cucumber-offline" => Tool::NeoCucumber,
         _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
