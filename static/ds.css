@@ -656,7 +656,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   margin: 2px;
 }
 
-html[data-app="ios"] .toolbar-search {
+html[data-app] .toolbar-search {
   display: none;
 }
 
