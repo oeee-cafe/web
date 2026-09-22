@@ -974,10 +974,10 @@ mod tests {
     }
 
     /// The marks someone may choose between and the providers a purchase may
-    /// come from are the same list, and it is the list [`Provider`] knows.
-    /// Every one of them has to be a provider an identity may come from too,
-    /// though that list may be longer: a platform can sign people in without
-    /// selling anything.
+    /// come from are the same list: the platforms that sell a pack. Each has
+    /// to be a provider an identity can come from as well, though that list
+    /// is longer -- Google signs people in and sells nothing, which is why
+    /// this names the sellers rather than every [`Provider`].
     #[tokio::test]
     async fn the_marks_are_what_the_database_allows() {
         let Some(mut tx) = tx().await else { return };
@@ -1006,13 +1006,17 @@ mod tests {
             named(&mut tx, "supporter_purchases_provider_check").await
         );
 
-        let mut known = [Provider::Steam, Provider::Apple]
+        let mut sells = [Provider::Steam, Provider::Apple]
             .map(|provider| provider.as_str().to_string())
             .to_vec();
-        known.sort();
+        sells.sort();
         assert_eq!(
-            marks, known,
-            "a provider the code knows and the database does not, or the other way about"
+            marks, sells,
+            "a seller the code knows and the database does not, or the other way about"
+        );
+        assert!(
+            !marks.contains(&Provider::Google.as_str().to_string()),
+            "Google sells no pack yet; giving it one is a migration, not a mark"
         );
 
         let signs_in = named(&mut tx, "user_identities_provider_check").await;

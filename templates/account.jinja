@@ -67,7 +67,7 @@
       <div class="ds-card settings-card">
         {% for identity in identities %}
           <form method="post" action="/account/identities/{{ identity.provider }}/unlink" class="settings-row">
-            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% elif identity.provider == "apple" %}Apple{% else %}{{ identity.provider }}{% endif %}{% if identity.display_hint %}: {{ identity.display_hint }}{% elif identity.email %}: {{ identity.email }}{% endif %}</span>
+            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% elif identity.provider == "apple" %}Apple{% elif identity.provider == "google" %}Google{% else %}{{ identity.provider }}{% endif %}{% if identity.display_hint %}: {{ identity.display_hint }}{% elif identity.email %}: {{ identity.email }}{% endif %}</span>
             <button type="submit" class="ds-button">{{ ftl_get_message("account-unlink") }}</button>
           </form>
         {% else %}
@@ -80,6 +80,10 @@
         {% if apple_enabled and not apple_linked %}
           {# Not inside most of the apps; see login.jinja. #}
           <a class="ds-button auth-apple" href="/auth/apple?next=/account">{{ ftl_get_message("account-link-apple") }}</a>
+        {% endif %}
+        {% if google_enabled and not google_linked %}
+          {# Not inside most of the apps; see login.jinja. #}
+          <a class="ds-button auth-google" href="/auth/google?next=/account">{{ ftl_get_message("account-link-google") }}</a>
         {% endif %}
       </div>
     </section>
@@ -172,13 +176,6 @@
           <span></span>
           <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-content-settings-save") }}</button>
         </div>
-      </form>
-    </section>
-
-    <section class="settings-group">
-      <form action="/logout" method="post" class="ds-card settings-card settings-row">
-        <span class="settings-row-text">@{{ current_user.login_name }}</span>
-        <button type="submit" class="ds-button">{{ ftl_get_message("sign-out") }}</button>
       </form>
     </section>
 

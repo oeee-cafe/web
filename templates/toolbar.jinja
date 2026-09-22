@@ -134,6 +134,14 @@
                 <span class="dangerous">({{ ftl_get_message("email-not-verified") }})</span>
               {% endif %}
             </a>
+            {# Signing out: here rather than at the foot of /account, where
+               it was, because it belongs beside the name it ends. A POST,
+               so it is a form and not a link; unboosted, so the signed out
+               document is a fresh one rather than a body swapped into the
+               signed in page's head. #}
+            <form action="/logout" method="post" hx-boost="false">
+              <button type="submit" class="toolbar-menu-signout">{{ ftl_get_message("sign-out") }}</button>
+            </form>
             {# The menu's foot, the same signed in or out: the theme, then
                a rule, then what the site is. #}
             {{ theme_choices() }}
@@ -656,6 +664,9 @@
         // (WebTab.swift): the page stays, so nothing slides in over it.
         if (link.classList.contains("auth-apple") &&
             document.documentElement.hasAttribute("data-native-apple-sign-in")) return;
+        // Both phone apps do the same for Google (GoogleSignIn.kt, GoogleSignIn.swift).
+        if (link.classList.contains("auth-google") &&
+            document.documentElement.hasAttribute("data-native-google-sign-in")) return;
         var thumb = link.querySelector("img[width][height]");
         window.oeeeSkeletonHint = thumb ? {
           width: parseInt(thumb.getAttribute("width"), 10),

@@ -1,5 +1,5 @@
-//! Accounts from other services that sign into an Oeee Cafe account: Steam
-//! and Apple now, Microsoft after them.
+//! Accounts from other services that sign into an Oeee Cafe account: Steam,
+//! Apple and Google now, Microsoft after them.
 //!
 //! A provider is only ever asked one thing -- who is this? -- and answers
 //! with a [`VerifiedIdentity`]. Everything after that (signing in, linking to
@@ -20,6 +20,7 @@ use super::user::User;
 pub enum Provider {
     Steam,
     Apple,
+    Google,
 }
 
 impl Provider {
@@ -28,6 +29,7 @@ impl Provider {
         match self {
             Provider::Steam => "steam",
             Provider::Apple => "apple",
+            Provider::Google => "google",
         }
     }
 
@@ -35,6 +37,7 @@ impl Provider {
         match value {
             "steam" => Some(Provider::Steam),
             "apple" => Some(Provider::Apple),
+            "google" => Some(Provider::Google),
             _ => None,
         }
     }
@@ -44,6 +47,7 @@ impl Provider {
         match self {
             Provider::Steam => "Steam",
             Provider::Apple => "Apple",
+            Provider::Google => "Google",
         }
     }
 }
@@ -53,7 +57,8 @@ impl Provider {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VerifiedIdentity {
     pub provider: Provider,
-    /// The provider's stable id for the person: a SteamID64, Apple's `sub`.
+    /// The provider's stable id for the person: a SteamID64, Apple's or
+    /// Google's `sub`.
     pub subject: String,
     /// What the provider calls them, such as a Steam persona name. Offered as
     /// the display name of a new account.
@@ -76,7 +81,7 @@ impl VerifiedIdentity {
     fn supporter_achievement(&self) -> Option<&'static str> {
         match self.provider {
             Provider::Steam => Some("STEAM_SUPPORTER"),
-            Provider::Apple => None,
+            Provider::Apple | Provider::Google => None,
         }
         .filter(|_| {
             self.purchased
