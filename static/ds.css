@@ -150,6 +150,21 @@
   display: none !important;
 }
 
+/* In the iOS app the reader's text size is the site's: the app says how much
+   larger or smaller than the system's default it is, as --oeee-text-scale on
+   the root (WebTab.swift in oeee-cafe/ios), and every step of the type scale
+   follows it. Text grows and shrinks; pictures, the spaces between things and
+   the painter do not, as in the system's own apps. */
+html[data-app="ios"] {
+  --ds-text-xs: calc(11px * var(--oeee-text-scale, 1));
+  --ds-text-s: calc(12px * var(--oeee-text-scale, 1));
+  --ds-text-m: calc(13px * var(--oeee-text-scale, 1));
+  --ds-text-base: calc(14px * var(--oeee-text-scale, 1));
+  --ds-text-l: calc(16px * var(--oeee-text-scale, 1));
+  --ds-text-xl: calc(20px * var(--oeee-text-scale, 1));
+  --ds-text-2xl: calc(26px * var(--oeee-text-scale, 1));
+}
+
 /* ---------------------------------------------------------------------------
    Behaving like an application
 
@@ -497,7 +512,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   border-bottom: 1px solid var(--ds-line);
   color: var(--ds-ink);
   font-family: var(--ds-font);
-  font-size: 13px;
+  font-size: var(--ds-text-m);
   line-height: 1.5;
   view-transition-name: toolbar;
   -moz-user-select: none;
@@ -542,7 +557,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   font-size: var(--ds-text-l);
   font-weight: 700;
   letter-spacing: -0.01em;
-  line-height: 20px;
+  line-height: calc(20px * var(--oeee-text-scale, 1));
 }
 
 /* Each group stays on one line; when the bar is too narrow for them, the
@@ -663,9 +678,9 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   background: none;
   color: var(--ds-ink);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: 20px;
+  line-height: calc(20px * var(--oeee-text-scale, 1));
   text-decoration: none;
   white-space: nowrap;
 }
@@ -711,9 +726,9 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   padding: 4px 11px;
   border-radius: 6px;
   color: var(--ds-ink);
-  font-size: 13px;
+  font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: 20px;
+  line-height: calc(20px * var(--oeee-text-scale, 1));
   text-decoration: none;
   white-space: nowrap;
 }
@@ -893,8 +908,8 @@ html[data-app] .toolbar-search {
   padding: 8px 10px;
   border-bottom: 1px solid var(--ds-line);
   margin-bottom: 4px;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--ds-text-m);
+  line-height: calc(18px * var(--oeee-text-scale, 1));
 }
 
 .toolbar-menu-who span {
@@ -907,7 +922,7 @@ html[data-app] .toolbar-search {
   padding: 6px 10px;
   border-radius: 6px;
   color: var(--ds-ink);
-  font-size: 13px;
+  font-size: var(--ds-text-m);
   text-decoration: none;
 }
 
@@ -1002,7 +1017,7 @@ html[data-app] .toolbar-search {
   overflow: hidden;
   padding-right: 3px;
   padding-left: 3px;
-  font-size: 12px;
+  font-size: var(--ds-text-s);
   text-align: center;
   text-overflow: ellipsis;
 }
@@ -1156,7 +1171,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   font-family: var(--ds-font);
   font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
   text-align: center;
   text-decoration: none;
   vertical-align: middle;
@@ -1216,7 +1231,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   min-height: 24px;
   padding: 2px 9px;
   font-size: var(--ds-text-s);
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
 }
 
 .ds-button[disabled],
@@ -1249,13 +1264,13 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
   font-family: var(--ds-font);
   font-size: var(--ds-text-base);
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
 }
 
 .ds-textarea,
 .ds-page textarea:not([class]) {
   padding: 8px 10px;
-  line-height: 20px;
+  line-height: calc(20px * var(--oeee-text-scale, 1));
 }
 
 /* Native drop-downs, drawn to match: the closed control is ours, the open
@@ -1278,7 +1293,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
   font-family: var(--ds-font);
   font-size: var(--ds-text-m);
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -1318,6 +1333,13 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   textarea,
   select {
     font-size: 16px !important;
+  }
+
+  /* Larger in the iOS app when the reader's text is, and never smaller. */
+  html[data-app="ios"] input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+  html[data-app="ios"] textarea,
+  html[data-app="ios"] select {
+    font-size: max(16px, calc(16px * var(--oeee-text-scale, 1))) !important;
   }
 }
 
@@ -1609,7 +1631,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
   font-size: var(--ds-text-l);
   font-weight: 700;
-  line-height: 22px;
+  line-height: calc(22px * var(--oeee-text-scale, 1));
 }
 
 .ds-fieldset > legend + *,
@@ -1836,7 +1858,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   box-shadow: 0 0 0 1px var(--ds-line);
   color: var(--ds-ink);
   font-weight: 600;
-  line-height: 22px;
+  line-height: calc(22px * var(--oeee-text-scale, 1));
   text-align: center;
   font-variant-numeric: tabular-nums;
   -moz-box-sizing: border-box;
@@ -1871,7 +1893,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   font-family: var(--ds-font);
   font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: 20px;
+  line-height: calc(20px * var(--oeee-text-scale, 1));
   min-height: 0;
   box-shadow: none;
   text-decoration: none;
@@ -2088,7 +2110,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   font-family: var(--ds-font);
   font-size: var(--ds-text-s);
   font-weight: 600;
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
   text-align: center;
 }
 

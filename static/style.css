@@ -29,6 +29,17 @@
   --leading-normal: 1.5;
 }
 
+/* In the iOS app these follow the reader's text size too, as the design
+   system's do (ds.css, --oeee-text-scale). */
+html[data-app="ios"] {
+  --text-xs: calc(0.75rem * var(--oeee-text-scale, 1));
+  --text-sm: calc(0.875rem * var(--oeee-text-scale, 1));
+  --text-base: calc(1rem * var(--oeee-text-scale, 1));
+  --text-lg: calc(1.125rem * var(--oeee-text-scale, 1));
+  --text-xl: calc(1.375rem * var(--oeee-text-scale, 1));
+  --text-2xl: calc(1.75rem * var(--oeee-text-scale, 1));
+}
+
 /* The site's older names for its colours, now the design system's: NEO's
    palette, light and dark by the one rule ds.css follows. Only the
    highlight and danger colours differ by theme here, as nothing in ds.css
@@ -390,7 +401,7 @@ html[data-push]::view-transition-new(root) {
 .post-card-meta {
   padding: 8px 1px 0;
   font-size: var(--ds-text-s);
-  line-height: 16px;
+  line-height: calc(16px * var(--oeee-text-scale, 1));
   color: var(--ds-muted);
 }
 
@@ -399,7 +410,7 @@ html[data-push]::view-transition-new(root) {
   color: var(--ds-ink);
   font-size: var(--ds-text-m);
   font-weight: 600;
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
 }
 
 .post-card-title,
@@ -1327,7 +1338,7 @@ html[data-push]::view-transition-new(root) {
   color: var(--ds-ink);
   font: inherit;
   font-size: var(--ds-text-m);
-  line-height: 20px;
+  line-height: calc(20px * var(--oeee-text-scale, 1));
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -2122,7 +2133,7 @@ html[data-push]::view-transition-new(root) {
 .community-card-body {
   display: block;
   padding: 10px 12px 12px;
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
 }
 
 .community-card-name,
@@ -2468,7 +2479,7 @@ html[data-push]::view-transition-new(root) {
   color: #ffffff;
   font-size: var(--ds-text-s);
   font-weight: 600;
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
 }
 
 .session-live-dot {
@@ -2791,7 +2802,7 @@ html[data-push]::view-transition-new(root) {
   background-color: var(--ds-surface);
   color: var(--ds-ink);
   font-size: var(--ds-text-m);
-  line-height: 18px;
+  line-height: calc(18px * var(--oeee-text-scale, 1));
   white-space: nowrap;
 }
 
@@ -3442,7 +3453,7 @@ a.user-pill:hover {
   font: inherit;
   font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: 20px;
+  line-height: calc(20px * var(--oeee-text-scale, 1));
 }
 
 .ds-page .post-stage-replay .neo-cucumber-replay-button:hover {
@@ -3471,7 +3482,7 @@ a.user-pill:hover {
   font: inherit;
   font-size: var(--ds-text-s);
   font-weight: 500;
-  line-height: 20px;
+  line-height: calc(20px * var(--oeee-text-scale, 1));
   text-decoration: none;
 }
 
