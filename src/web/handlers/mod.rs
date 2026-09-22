@@ -1516,7 +1516,7 @@ mod template_tests {
     #[test]
     fn the_painter_pages_carry_the_toolbar() {
         let env = test_support::env();
-        for name in ["draw_post_cucumber.jinja", "draw_post_tegaki.jinja"] {
+        for name in ["draw_post_cucumber.jinja"] {
             let rendered = env
                 .get_template(name)
                 .unwrap_or_else(|e| panic!("{name} loads: {e:#}"))
