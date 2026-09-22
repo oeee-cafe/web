@@ -85,3 +85,50 @@
     });
   })();
 </script>
+{# The same alert with nothing to decide: something the page has to say, and
+   OK. `dsAlert(message)` stands in for the browser's alert(), which the
+   desktop app on Windows and the Android app draw as the web view's own box,
+   titled "oeee.cafe says". #}
+<div id="ds-alert" class="ds-modal ds-alert" style="display: none;" role="alertdialog" aria-modal="true" aria-describedby="ds-alert-message">
+  <div class="ds-modal-panel ds-alert-panel">
+    <p id="ds-alert-message" class="ds-alert-message"></p>
+    <div class="ds-alert-actions">
+      <button type="button" class="ds-button ds-button-primary" data-alert-ok>{{ ftl_get_message("ok") }}</button>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var dialog = document.getElementById("ds-alert");
+    var message = document.getElementById("ds-alert-message");
+    var ok = dialog.querySelector("[data-alert-ok]");
+    var opener = null;
+
+    function close() {
+      dialog.style.display = "none";
+      if (opener && document.body.contains(opener)) opener.focus();
+      opener = null;
+    }
+
+    window.dsAlert = function (text) {
+      if (dialog.style.display === "none") opener = document.activeElement;
+      message.textContent = text;
+      dialog.style.display = "flex";
+      ok.focus();
+    };
+
+    ok.addEventListener("click", close);
+    dialog.addEventListener("mousedown", function (event) {
+      if (event.target === dialog) close();
+    });
+    dialog.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" || event.key === "Esc") {
+        event.preventDefault();
+        close();
+      } else if (event.key === "Tab") {
+        // One button: the keyboard stays on it.
+        event.preventDefault();
+      }
+    });
+  })();
+</script>

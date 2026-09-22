@@ -132,6 +132,7 @@ edit-community-button = コミュニティに移動
 save = 保存
 cancel = キャンセル
 close = 閉じる
+ok = OK
 delete = 削除
 draw-save-confirm = この絵を保存しますか？保存すると、続きを描くことはできません。
 
