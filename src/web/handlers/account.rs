@@ -9,6 +9,7 @@ use crate::models::user::{
     AuthSession, DeleteConfirmation, Language,
 };
 use crate::models::identity::list_identities_for_user;
+use crate::models::supporter::{is_supporter, set_show_in_credits, shows_in_credits};
 use crate::web::context::CommonContext;
 use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::state::AppState;
@@ -52,6 +53,13 @@ pub async fn account(
         None => Vec::new(),
     };
     let has_password = auth_session.user.as_ref().is_some_and(|u| u.has_password());
+    // `None` for anyone who is not a supporter, who has no credits to be in.
+    let show_in_credits = match auth_session.user.as_ref() {
+        Some(user) if is_supporter(&mut tx, user.id).await? => {
+            Some(shows_in_credits(&mut tx, user.id).await?)
+        }
+        _ => None,
+    };
 
     let languages = vec![
         ("ko", "한국어"),
@@ -67,6 +75,7 @@ pub async fn account(
         apple_linked => identities.iter().any(|i| i.provider == "apple"),
         identities,
         has_password,
+        show_in_credits,
         steam_enabled => state.config.steam.is_some(),
         apple_enabled => state.config.apple.is_some(),
         draft_post_count => common_ctx.draft_post_count,
@@ -129,6 +138,30 @@ pub async fn save_show_sensitive_content(
     .await;
     let _ = tx.commit().await;
 
+    Ok(Redirect::to("/account").into_response())
+}
+
+#[derive(Deserialize)]
+pub struct ShowInCreditsForm {
+    pub show_in_credits: Option<String>,
+}
+
+/// Whether a supporter is thanked by name on /about. Their badge stays either
+/// way.
+pub async fn save_show_in_credits(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Form(form): Form<ShowInCreditsForm>,
+) -> Result<impl IntoResponse, AppError> {
+    let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
+    let mut tx = state.db_pool.begin().await?;
+    set_show_in_credits(
+        &mut tx,
+        user.id,
+        form.show_in_credits.as_deref() == Some("on"),
+    )
+    .await?;
+    tx.commit().await?;
     Ok(Redirect::to("/account").into_response())
 }
 

@@ -113,6 +113,13 @@ pub struct SteamConfig {
     /// A publisher Web API key (Steamworks > Users & Permissions > Manage
     /// Groups), not a user's key: AuthenticateUserTicket accepts no other.
     pub web_api_key: String,
+    /// The Steam apps whose owners are supporters: a badge beside their
+    /// name and a line in the credits on /about. Owning any one of them outright
+    /// counts. The Supporter Pack DLC today; were the app itself ever sold,
+    /// its id would go beside the DLC's -- a delisted DLC stays owned, so
+    /// the DLC's id stays too. Empty means nobody's standing changes.
+    #[serde(default)]
+    pub supporter_app_ids: Vec<u32>,
     /// Where the partner Web API is. Only a test changes it.
     #[serde(default = "default_steam_web_api_url")]
     pub web_api_url: String,

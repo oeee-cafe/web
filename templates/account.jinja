@@ -83,6 +83,30 @@
       </div>
     </section>
 
+    {% if show_in_credits is defined and show_in_credits is not none %}
+      {# Only a supporter has a line in the credits to keep or take away. #}
+      <section class="settings-group">
+        <div class="profile-section-label">{{ ftl_get_message("account-supporter") }}</div>
+        <form action="/account/credits" method="post" class="ds-card settings-card">
+          <p class="ds-help">{{ ftl_get_message("account-supporter-thanks") }}</p>
+          <div class="community-form-choices">
+            <label class="community-form-choice">
+              <input type="checkbox"
+                     name="show_in_credits"
+                     id="show_in_credits"
+                     value="on"
+                     {% if show_in_credits %}checked{% endif %} />
+              <span class="community-form-choice-name">{{ ftl_get_message("account-show-in-credits") }}</span>
+            </label>
+          </div>
+          <div class="settings-foot">
+            <a href="/about#supporters">{{ ftl_get_message("account-supporter-see-credits") }}</a>
+            <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("account-content-settings-save") }}</button>
+          </div>
+        </form>
+      </section>
+    {% endif %}
+
     <section class="settings-group">
       <div class="profile-section-label">{{ ftl_get_message("account-change-email") }}</div>
       {% include "email_edit.jinja" %}

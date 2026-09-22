@@ -1,4 +1,5 @@
 use crate::app_error::AppError;
+use crate::models::supporter::list_credits;
 use crate::models::user::{find_users_with_public_posts_and_banner, AuthSession};
 use crate::web::context::CommonContext;
 use crate::web::state::AppState;
@@ -22,6 +23,7 @@ pub async fn about(
     let users_with_public_posts_and_banner = find_users_with_public_posts_and_banner(&mut tx)
         .await
         .unwrap_or_default();
+    let supporters = list_credits(&mut tx).await?;
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("about.jinja")?;
     let rendered: String = template.render(context! {
@@ -29,6 +31,7 @@ pub async fn about(
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         users_with_public_posts_and_banner,
+        supporters,
         ftl_lang,
     })?;
 

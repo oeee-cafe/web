@@ -42,6 +42,12 @@ email_from_address = ""
 # user's. The achievements' API names in Steamworks are FIRST_DRAWING,
 # FIRST_RELAY, FIRST_COLLABORATION and STEAM_SUPPORTER, each set to be unlocked by the game
 # server ("Set By: Official GS"); the server unlocks them itself.
+# supporter_app_ids are the Steam apps whose owners are supporters -- the
+# Supporter Pack DLC -- and owning any one outright earns STEAM_SUPPORTER, the
+# supporter badge and a line in the credits on /about. To make every buyer of a paid app
+# a supporter, add the app's id and keep the DLC's (a delisted DLC stays
+# owned); linked Steam accounts are rechecked daily, so no one has to sign in.
 # [steam]
 # app_id = 0
 # web_api_key = ""
+# supporter_app_ids = [0]

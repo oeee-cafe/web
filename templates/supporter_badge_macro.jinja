@@ -1,0 +1,18 @@
+{# The mark a supporter wears beside their name wherever a page prints it:
+   someone whose Steam account owns the Supporter Pack (see
+   models/supporter.rs). A heart, on the accent, leading to the thanks on
+   /about -- material-symbols:favorite (Apache 2.0; see
+   THIRD-PARTY-NOTICES.md), copied from @iconify-json/material-symbols as
+   achievement_icon_macro.jinja's are.
+
+   `supporter_badge()` is the small inline mark and `supporter_heart()` the
+   heart alone, for a chip that spells the word out beside it. A page that knows several
+   people passes the login names of the supporters among them and asks
+   `if login_name in supporters`. #}
+{% macro supporter_heart() -%}
+  <svg class="supporter-heart" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 21l-1.45-1.3q-2.525-2.275-4.175-3.925T3.75 12.812T2.388 10.4T2 8.15Q2 5.8 3.575 4.225T7.5 2.65q1.3 0 2.475.55T12 4.75q.85-1 2.025-1.55t2.475-.55q2.35 0 3.925 1.575T22 8.15q0 1.15-.387 2.25t-1.363 2.412t-2.625 2.963T13.45 19.7z"/></svg>
+{%- endmacro %}
+
+{% macro supporter_badge() -%}
+  <a class="supporter-badge" href="/about#supporters" title="{{ ftl_get_message("supporter-badge") }}" aria-label="{{ ftl_get_message("supporter-badge") }}">{{ supporter_heart() }}</a>
+{%- endmacro %}

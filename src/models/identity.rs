@@ -60,21 +60,23 @@ pub struct VerifiedIdentity {
     /// An address the provider vouches for. Trusted: an Oeee Cafe account
     /// with this address, verified, is signed into and linked.
     pub email: Option<String>,
-    /// Whether the provider says this account bought Oeee Cafe from it --
-    /// Steam, for the Steam app. Whichever account it signs into gets the
-    /// provider's supporter achievement.
+    /// Whether the provider says this account owns the Supporter Pack now --
+    /// the DLC, on Steam. `None` when that could not be asked, which leaves
+    /// the account's standing as it was. Whichever account it signs into is a
+    /// supporter while it is `Some(true)`, and keeps the achievement after.
     #[serde(default)]
-    pub purchased: bool,
+    pub purchased: Option<bool>,
 }
 
 impl VerifiedIdentity {
-    /// The achievement for having bought Oeee Cafe from this provider.
+    /// The achievement for having bought the Supporter Pack from this
+    /// provider.
     fn supporter_achievement(&self) -> Option<&'static str> {
         match self.provider {
             Provider::Steam => Some("STEAM_SUPPORTER"),
             Provider::Apple => None,
         }
-        .filter(|_| self.purchased)
+        .filter(|_| self.purchased == Some(true))
     }
 }
 
@@ -218,6 +220,7 @@ pub async fn link_identity(
     .execute(&mut **tx)
     .await?;
     if inserted.rows_affected() == 1 {
+        super::supporter::record_supporter_check_for(tx, identity).await?;
         if let Some(achievement) = identity.supporter_achievement() {
             super::achievement::grant_achievement(tx, user_id, achievement).await?;
         }
@@ -268,6 +271,7 @@ pub async fn touch_identity(
     )
     .execute(&mut **tx)
     .await?;
+    super::supporter::record_supporter_check_for(tx, identity).await?;
 
     // Bought since it was linked, or before the achievement existed.
     if let Some(achievement) = identity.supporter_achievement() {
@@ -375,7 +379,7 @@ mod tests {
             subject: subject.to_string(),
             name: Some("오이".to_string()),
             email: None,
-            purchased: false,
+            purchased: Some(false),
         }
     }
 
@@ -495,7 +499,7 @@ mod tests {
         tx.rollback().await.unwrap();
     }
 
-    async fn is_supporter(tx: &mut Transaction<'_, Postgres>, id: Uuid) -> bool {
+    async fn has_supporter_achievement(tx: &mut Transaction<'_, Postgres>, id: Uuid) -> bool {
         crate::models::achievement::list_achievements(tx, id)
             .await
             .unwrap()
@@ -509,14 +513,14 @@ mod tests {
         // Bought, then linked.
         let buyer = user(&mut tx, "identity_test_h", None, None).await;
         let bought = VerifiedIdentity {
-            purchased: true,
+            purchased: Some(true),
             ..steam("76561190000000011")
         };
         link_identity(&mut tx, buyer.id, &bought)
             .await
             .unwrap()
             .unwrap();
-        assert!(is_supporter(&mut tx, buyer.id).await);
+        assert!(has_supporter_achievement(&mut tx, buyer.id).await);
 
         // Linked from a borrowed copy, then signed in having bought it.
         let borrower = user(&mut tx, "identity_test_i", None, None).await;
@@ -525,17 +529,17 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert!(!is_supporter(&mut tx, borrower.id).await);
+        assert!(!has_supporter_achievement(&mut tx, borrower.id).await);
         touch_identity(
             &mut tx,
             &VerifiedIdentity {
-                purchased: true,
+                purchased: Some(true),
                 ..borrowed
             },
         )
         .await
         .unwrap();
-        assert!(is_supporter(&mut tx, borrower.id).await);
+        assert!(has_supporter_achievement(&mut tx, borrower.id).await);
         tx.rollback().await.unwrap();
     }
 

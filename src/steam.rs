@@ -149,13 +149,15 @@ pub async fn verify_ticket(
     if params.publisherbanned {
         return Ok(Err(TicketRejected::Banned));
     }
-    let purchased = owns_outright(config, &params.steamid)
-        .await
-        .unwrap_or_else(|error| {
-            // Asked again at the next sign-in; the achievement waits.
-            tracing::warn!("could not check Steam ownership: {error:#}");
-            false
-        });
+    let purchased = match supporter_status(config, &params.steamid).await {
+        Ok(owned) => owned,
+        Err(error) => {
+            // Unknown, which leaves the account's standing as it was; asked
+            // again at the next sign-in or the next recheck.
+            tracing::warn!("could not check the Supporter Pack with Steam: {error:#}");
+            None
+        }
+    };
 
     let name = persona_name(config, &params.steamid)
         .await
@@ -192,10 +194,34 @@ struct Ownership {
     result: Option<String>,
 }
 
-/// Whether `steam_id` bought Oeee Cafe on Steam: owns it for good, as itself.
+/// Whether `steam_id` owns any of `supporter_app_ids` now, or `None` when
+/// there are none configured to own.
+///
+/// Owning one is enough, so a check that fails for one app still answers
+/// yes when another is owned; it only fails when nothing was found owned.
+pub async fn supporter_status(config: &SteamConfig, steam_id: &str) -> Result<Option<bool>> {
+    if config.supporter_app_ids.is_empty() {
+        return Ok(None);
+    }
+    let mut failure = None;
+    for &app_id in &config.supporter_app_ids {
+        match owns_outright(config, steam_id, app_id).await {
+            Ok(true) => return Ok(Some(true)),
+            Ok(false) => {}
+            Err(error) => failure = Some(error),
+        }
+    }
+    match failure {
+        Some(error) => Err(error),
+        None => Ok(Some(false)),
+    }
+}
+
+/// Whether `steam_id` bought `app_id` on Steam: owns it for good, as itself.
 /// Not a copy borrowed through Family Sharing (owned by someone else), a
 /// free weekend or a timed trial (not permanent), or a cafe's site licence.
-async fn owns_outright(config: &SteamConfig, steam_id: &str) -> Result<bool> {
+/// A refunded purchase is not owned.
+async fn owns_outright(config: &SteamConfig, steam_id: &str, app_id: u32) -> Result<bool> {
     let url = format!(
         "{}/ISteamUser/CheckAppOwnership/v2/",
         config.web_api_url.trim_end_matches('/')
@@ -205,7 +231,7 @@ async fn owns_outright(config: &SteamConfig, steam_id: &str) -> Result<bool> {
         .query(&[
             ("key", config.web_api_key.as_str()),
             ("steamid", steam_id),
-            ("appid", &config.app_id.to_string()),
+            ("appid", &app_id.to_string()),
         ])
         .send()
         .await?
@@ -339,6 +365,54 @@ pub async fn sync_achievements(db: sqlx::PgPool, config: SteamConfig) {
     }
 }
 
+/// Asks Steam again, once a day, about every linked Steam account, so
+/// standing follows ownership without anyone signing in: a refund takes the
+/// badge away, a purchase made while signed in gives it, and an app added to
+/// `supporter_app_ids` reaches everyone who already owns it. A check Steam
+/// cannot answer changes nothing.
+///
+/// Both colours run this for a moment during a deploy, and asking twice is
+/// harmless.
+pub async fn recheck_supporters(db: sqlx::PgPool, config: SteamConfig) {
+    use crate::models::supporter::{record_supporter_check, steam_accounts_due_for_check};
+
+    let mut every = tokio::time::interval(Duration::from_secs(10 * 60));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        every.tick().await;
+        let due = match db.begin().await {
+            Ok(mut tx) => steam_accounts_due_for_check(&mut tx, 100).await,
+            Err(error) => Err(error.into()),
+        };
+        let due = match due {
+            Ok(due) => due,
+            Err(error) => {
+                tracing::warn!("could not list Steam accounts to recheck: {error:#}");
+                continue;
+            }
+        };
+        for steam_id in due {
+            let owned = match supporter_status(&config, &steam_id).await {
+                Ok(Some(owned)) => owned,
+                Ok(None) => return,
+                Err(error) => {
+                    tracing::warn!("could not recheck a Steam account's ownership: {error:#}");
+                    continue;
+                }
+            };
+            let recorded = async {
+                let mut tx = db.begin().await?;
+                record_supporter_check(&mut tx, &steam_id, owned).await?;
+                tx.commit().await?;
+                anyhow::Ok(())
+            };
+            if let Err(error) = recorded.await {
+                tracing::warn!("could not record a supporter recheck: {error:#}");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -379,9 +453,11 @@ mod tests {
             )
             .route(
                 "/ISteamUser/CheckAppOwnership/v2/",
-                get(move || async move {
+                // Owns the Supporter Pack (481), not only the free app (480).
+                get(move |Query(q): Query<HashMap<String, String>>| async move {
+                    let dlc = q.get("appid").map(String::as_str) == Some("481");
                     Json::<Value>(json!({"appownership": {
-                        "ownsapp": true,
+                        "ownsapp": dlc,
                         "permanent": true,
                         "timestamp": "2026-09-22T00:00:00Z",
                         "ownersteamid": owner,
@@ -406,6 +482,7 @@ mod tests {
         SteamConfig {
             app_id: 480,
             web_api_key: "publisher-key".to_string(),
+            supporter_app_ids: vec![481],
             web_api_url: format!("http://{addr}"),
         }
     }
@@ -421,7 +498,37 @@ mod tests {
         assert_eq!(identity.subject, STEAM_ID);
         assert_eq!(identity.name.as_deref(), Some("오이"));
         assert_eq!(identity.email, None);
-        assert!(identity.purchased);
+        assert_eq!(identity.purchased, Some(true));
+    }
+
+    #[tokio::test]
+    async fn without_a_supporter_pack_nobody_is_asked_about() {
+        let mut config = fake_steam(false).await;
+        config.supporter_app_ids = vec![];
+        let identity = verify_ticket(&config, "14000000abcdef")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(identity.purchased, None);
+
+        // The free app is owned, and owning it makes nobody a supporter.
+        config.supporter_app_ids = vec![config.app_id];
+        let identity = verify_ticket(&config, "14000000abcdef")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(identity.purchased, Some(false));
+    }
+
+    #[tokio::test]
+    async fn owning_any_one_supporter_app_is_enough() {
+        // As if the app had gone paid beside a delisted Supporter Pack.
+        let mut config = fake_steam(false).await;
+        config.supporter_app_ids = vec![config.app_id, 481];
+        assert_eq!(
+            supporter_status(&config, STEAM_ID).await.unwrap(),
+            Some(true)
+        );
     }
 
     #[tokio::test]
@@ -433,7 +540,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(identity.subject, STEAM_ID);
-        assert!(!identity.purchased);
+        assert_eq!(identity.purchased, Some(false));
     }
 
     #[tokio::test]
@@ -448,6 +555,7 @@ mod tests {
         let config = SteamConfig {
             app_id: 480,
             web_api_key: "k".to_string(),
+            supporter_app_ids: vec![481],
             // Nothing listens here; reaching it would be an error, not Invalid.
             web_api_url: "http://127.0.0.1:9".to_string(),
         };
@@ -479,6 +587,7 @@ mod tests {
         let mut config = SteamConfig {
             app_id: 480,
             web_api_key: "publisher-key".to_string(),
+            supporter_app_ids: vec![],
             web_api_url: format!("http://{addr}"),
         };
 
