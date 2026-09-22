@@ -1100,7 +1100,10 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
    dark ink on it, as the primary button is. Every checkbox and radio on a
    `.ds-page` page takes this with no class; `.ds-check` gives it to one
    elsewhere. The margin is left to the engine, as it was, so a label that
-   leaned on it keeps its spacing.
+   leaned on it keeps its spacing -- all but the bottom one. Beside text a
+   box sits on the baseline by its margin's edge, and WebKit gives a
+   checkbox 3px there and a radio none, so the one stood 3px above the
+   other on the same line.
 
    The marks are pictures, not generated content: Gecko before 80 draws no
    ::before on an input. They are drawn in --ds-accent-ink, which is the
@@ -1117,6 +1120,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   flex: none;
   width: 16px;
   height: 16px;
+  margin-bottom: 0;
   padding: 0;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
