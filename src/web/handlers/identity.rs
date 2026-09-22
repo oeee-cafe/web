@@ -726,7 +726,9 @@ pub async fn google_callback(
         Ok(Some(id_token)) => id_token,
         Ok(None) => return invalid(),
         Err(error) => {
-            tracing::error!("Google would not trade the code: {error:#}");
+            // Not a refusal -- that is Ok(None), and said where it happens --
+            // but Google not answering at all.
+            tracing::error!("Google could not be reached to trade the code: {error:#}");
             messages
                 .clone()
                 .error(say(&bundle, "identity-sign-in-failed", Provider::Google));
