@@ -1,0 +1,10 @@
+{# The button that puts a notice away (ds.css, "Notices"; base.jinja does
+   the removing). web::htmx::error_banner writes the same markup by hand. #}
+<button class="ds-notice-close"
+        type="button"
+        aria-label="{{ ftl_get_message('close') }}"
+        title="{{ ftl_get_message('close') }}">
+  <svg viewBox="0 0 12 12" aria-hidden="true">
+    <path d="M2.5 2.5l7 7m0-7l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+  </svg>
+</button>

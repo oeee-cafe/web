@@ -113,6 +113,19 @@
     </section>
 
     <section>
+      <h2>Notices</h2>
+      <p class="ds-help">Flash messages and the htmx error banner. The level is the colour; Info and Debug are plain.</p>
+      <ul class="ds-notices" style="max-width: none; margin: 0; padding: 0">
+        {% for level, text in [("info", "Your drawing is saved as a draft."), ("success", "Welcome, 날다람지!"), ("warning", "This community is about to be archived."), ("error", "The passwords did not match. 비밀번호가 일치하지 않습니다.")] %}
+          <li class="ds-notice ds-notice-{{ level }}">
+            <span class="ds-notice-body">{{ text }}</span>
+            {% include "notice_close.jinja" %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section>
       <h2>Surfaces</h2>
       <div class="row" style="align-items: flex-start">
         <div class="ds-card" style="width: 280px">
