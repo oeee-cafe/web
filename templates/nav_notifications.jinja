@@ -7,10 +7,18 @@
    was only ever right on a fresh page load, and sat there overstating the
    unread count for the rest of the visit. #}
 <span id="nav-notifications">
-  {# In words, like every other place the bar can take you: a bell among
-     buttons that all say what they are was the one control to decode. #}
-  <a href="/notifications" class="toolbar-button">
-    {{- ftl_get_message("notifications") -}}
-    {%- if unread_notification_count is defined and unread_notification_count > 0 %} <span class="toolbar-badge">{{ unread_notification_count }}</span>{% endif -%}
+  {# A bell, beside search's magnifier: the two icons at the bar's end, the
+     rest of it words. It was a word while every other button was one too,
+     and a bell among them the one control to decode; search became an icon
+     for width, and this follows it for the same reason and one more. The
+     count sits on the bell's corner rather than beside a label, so the
+     button is one width at 0 unread or 99, and the unread count no longer
+     decides whether the bar fits on one row -- the thing drafts were taken
+     out of the bar to stop. The name is in the label and the tooltip. #}
+  <a href="/notifications" class="toolbar-button toolbar-bell"
+     aria-label="{{ ftl_get_message("notifications") }}{% if unread_notification_count is defined and unread_notification_count > 0 %} ({{ unread_notification_count }}){% endif %}"
+     title="{{ ftl_get_message("notifications") }}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16.5v-5.5a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 21.5h4"/></svg>
+    {%- if unread_notification_count is defined and unread_notification_count > 0 %}<span class="toolbar-badge">{{ unread_notification_count }}</span>{% endif -%}
   </a>
 </span>
