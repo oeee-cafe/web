@@ -561,7 +561,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   margin-left: 8px;
 }
 
-/* Drawing together, live: a pill of its own beside the sections, raised
+/* Drawing together, live: a button of its own beside the sections, raised
    off the bar as the current section is raised out of its group, with a
    recording light. It is the sections' 30px tall -- 4px of padding, 20px
    of line and its border, as the section group's 2px of padding and 26px
@@ -571,7 +571,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   flex: none;
   padding: 4px 12px 4px 10px;
   border: 1px solid rgba(220, 38, 38, 0.5);
-  border-radius: 999px;
+  border-radius: 6px;
   background-color: var(--ds-surface);
   background-image: linear-gradient(rgba(220, 38, 38, 0.1), rgba(220, 38, 38, 0.1));
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08), var(--ds-shadow-raise);
@@ -597,8 +597,8 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   border-radius: 50%;
   background-color: var(--ds-danger);
   vertical-align: 1px;
-  -webkit-animation: toolbar-live-pulse 1.6s ease-in-out infinite;
-  animation: toolbar-live-pulse 1.6s ease-in-out infinite;
+  -webkit-animation: toolbar-live-pulse 0.8s ease-in-out infinite;
+  animation: toolbar-live-pulse 0.8s ease-in-out infinite;
 }
 
 /* The ring that spreads from it and fades, as a recording light's glow. */
@@ -611,8 +611,8 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   height: 8px;
   border-radius: 50%;
   background-color: var(--ds-danger);
-  -webkit-animation: toolbar-live-ring 1.6s ease-out infinite;
-  animation: toolbar-live-ring 1.6s ease-out infinite;
+  -webkit-animation: toolbar-live-ring 0.8s ease-out infinite;
+  animation: toolbar-live-ring 0.8s ease-out infinite;
 }
 
 @-webkit-keyframes toolbar-live-pulse {
