@@ -569,6 +569,10 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    of button make. */
 .nav-bar .toolbar-links a.toolbar-live,
 .nav-bar .toolbar-links a.toolbar-live:visited {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+  align-items: center;
   flex: none;
   padding: 4px 12px 4px 10px;
   border: 1px solid rgba(60, 103, 18, 0.5);
@@ -596,8 +600,8 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   margin-right: 7px;
   border: 2px solid #3c6712;
   border-radius: 50%;
+  flex: none;
   background-color: var(--ds-accent);
-  vertical-align: 1px;
   -webkit-animation: toolbar-live-pulse 1.2s ease-out infinite;
   animation: toolbar-live-pulse 1.2s ease-out infinite;
 }
