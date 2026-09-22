@@ -75,8 +75,8 @@
       <section class="profile-section">
         <div class="profile-section-label">{{ ftl_get_message("profile-following") }}</div>
         {# Those with a banner as /about shows banners -- framed, in hard
-           pixels, the name on hover -- two to a row; those without, as
-           chips after them. #}
+           pixels, the name on hover -- more to a row the wider the window;
+           those without, as chips after them. #}
         {% set with_banner = followings|selectattr("banner_image_filename")|list %}
         {% set without_banner = followings|rejectattr("banner_image_filename")|list %}
         {% if with_banner %}
