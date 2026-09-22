@@ -94,6 +94,7 @@
         {% set image_url = r2_public_endpoint_url ~ "/image/" ~ post.image_filename[:2] ~ "/" ~ post.image_filename %}
         <div class="{% if inline_replay %}post-stage-replay{% else %}post-stage-frame{% endif %}" data-post-stage
              data-width="{{ post.image_width }}" data-height="{{ post.image_height }}"
+             style="--post-stage-shown: {{ post.image_width }}px"
              {% if inline_replay %}
                id="post-stage-replay"
                data-replay="{{ r2_public_endpoint_url|safe }}/replay/{{ post.replay_filename[:2] }}/{{ post.replay_filename }}"
@@ -371,8 +372,10 @@
         var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 190, height) : Infinity;
         var zoom = Math.max(1, Math.min(Math.floor(room / width), Math.floor(tall / height), 4));
         if (width * zoom > room) zoom = 1;
-        if (zoom > 1) stageBox.style.setProperty("--post-stage-shown", (width * zoom) + "px");
-        else stageBox.style.removeProperty("--post-stage-shown");
+        // Always a length, never auto: an auto-sized replay box takes the
+        // width of its controls, which stretched a 300px drawing to ~400
+        // and resized it again whenever Play became Pause.
+        stageBox.style.setProperty("--post-stage-shown", (width * zoom) + "px");
         stageBox.classList.toggle("is-zoomed", zoom > 1);
       }
       fitStage();

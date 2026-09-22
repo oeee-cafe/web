@@ -84,8 +84,21 @@ export function mount(
   seek.setAttribute("aria-label", labels.seek);
 
   const buttons = el("div", "neo-cucumber-replay-buttons");
-  const playButton = el("button", "neo-cucumber-replay-button", labels.play);
+  // Play and Pause are both in the button, the one not in use hidden but
+  // still taking room, so the button is as wide as the wider of them. With
+  // only the current one in it, every press moved the buttons after it --
+  // and on the post page, where the controls can set the stage's width,
+  // resized the drawing too.
+  const playButton = el("button", "neo-cucumber-replay-button");
   playButton.type = "button";
+  const playLabel = el("span", "neo-cucumber-replay-label", labels.play);
+  const pauseLabel = el("span", "neo-cucumber-replay-label", labels.pause);
+  playButton.append(playLabel, pauseLabel);
+  const showPlaying = (playing: boolean) => {
+    playLabel.setAttribute("aria-hidden", String(playing));
+    pauseLabel.setAttribute("aria-hidden", String(!playing));
+  };
+  showPlaying(false);
   const rewindButton = el("button", "neo-cucumber-replay-button", labels.rewind);
   rewindButton.type = "button";
   const skipButton = el("button", "neo-cucumber-replay-button", labels.skip);
@@ -111,7 +124,7 @@ export function mount(
   const onState = (state: PlayerState) => {
     seek.max = String(Math.max(1, state.total));
     seek.value = String(state.position);
-    playButton.textContent = state.playing ? labels.pause : labels.play;
+    showPlaying(state.playing);
   };
 
   // With a poster, the drawing stands where the canvas will, the controls

@@ -2681,6 +2681,17 @@ html[data-push]::view-transition-new(root) {
   margin: 0;
 }
 
+/* The play button holds both of its labels, so it keeps one width; the one
+   not in use takes room across and none down. */
+.neo-cucumber-replay-label {
+  display: block;
+}
+.neo-cucumber-replay-label[aria-hidden="true"] {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
 /* The three debounced search boxes. They cannot use hx-disable — disabling an
    input mid-keystroke drops what is being typed — so this is the only way they
    can say a request is in flight. htmx's own stylesheet does the showing and
@@ -3360,6 +3371,7 @@ a.user-pill:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-width: 0;
   max-width: 100%;
 }
 

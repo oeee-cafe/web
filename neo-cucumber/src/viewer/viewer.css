@@ -68,3 +68,14 @@
   margin: 0;
   color: #1a1a2e;
 }
+
+/* The play button holds both of its labels, so it keeps one width; the one
+   not in use takes room across and none down. */
+.neo-cucumber-replay-label {
+  display: block;
+}
+.neo-cucumber-replay-label[aria-hidden="true"] {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
