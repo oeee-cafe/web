@@ -2724,11 +2724,13 @@ nav a:visited,
   margin-top: var(--ds-space-3);
 }
 
-/* Following, those with a banner: /about's banners (.about-banner), two to
-   a row. */
+/* Following, those with a banner: /about's banners (.about-banner), as many
+   to a row as fit at 140px or wider -- two on the narrowest phone, more as
+   the window grows. Banners are 200px; much smaller and their pixel art
+   stops reading. */
 .profile-ally-banners {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   grid-gap: 8px;
   gap: 8px;
 }
