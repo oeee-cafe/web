@@ -3659,3 +3659,174 @@ a.user-pill:hover {
 .settings-danger .profile-section-label {
   color: var(--ds-danger);
 }
+
+/* ---------------------------------------------------------------------------
+   Members, a community's comments, and not found
+   --------------------------------------------------------------------------- */
+.members-header .profile-chip {
+  margin-bottom: var(--ds-space-2);
+}
+
+.members-header .settings-title {
+  margin-top: var(--ds-space-2);
+}
+
+.members-invite {
+  display: flex;
+  align-items: center;
+}
+
+.members-invite .ds-input {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: var(--ds-space-2);
+}
+
+.member-list,
+.comment-list {
+  overflow: hidden;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+}
+
+.member-row,
+.comment-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+}
+
+.member-row + .member-row,
+.comment-row + .comment-row {
+  border-top: 1px solid var(--ds-line);
+}
+
+.comment-row {
+  align-items: flex-start;
+}
+
+.comment-row:hover {
+  background-color: var(--ds-field);
+}
+
+.member-initial {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 12px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 6px;
+  background-color: var(--ds-field);
+  color: var(--ds-ink);
+  font-weight: 700;
+}
+
+.member-text,
+.comment-row-body {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.member-name-line {
+  display: flex;
+  align-items: center;
+}
+
+.member-name,
+.member-name:visited {
+  color: var(--ds-ink);
+  font-weight: 600;
+}
+
+.member-meta,
+.comment-row-meta {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.member-row > .ds-button {
+  flex: none;
+  margin-left: 12px;
+}
+
+.comment-row-head {
+  display: flex;
+  align-items: baseline;
+}
+
+.comment-row-head > * + * {
+  margin-left: 6px;
+}
+
+.comment-row-link,
+.comment-row-link:visited {
+  color: var(--ds-ink);
+  font-weight: 600;
+}
+
+/* The whole row is the way to the drawing; links in what was said sit
+   above the stretch. */
+.comment-row-link::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.comment-row-content {
+  position: relative;
+  z-index: 1;
+  margin-top: 2px;
+  font-size: var(--ds-text-base);
+  line-height: 1.5;
+  word-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.comment-row-content p {
+  margin: 0;
+}
+
+.comment-row-post {
+  margin-top: 4px;
+  color: var(--ds-faint);
+  font-size: var(--ds-text-s);
+}
+
+.not-found {
+  text-align: center;
+}
+
+.not-found-mark {
+  display: block;
+  margin: 0 auto var(--ds-space-3);
+}
+
+.not-found-code {
+  margin: 0;
+  color: var(--ds-faint);
+  font-size: var(--ds-text-2xl);
+  font-weight: 700;
+}
+
+.not-found-text {
+  margin: var(--ds-space-1) 0 var(--ds-space-4);
+  color: var(--ds-muted);
+}

@@ -1,39 +1,36 @@
+{# A comment in a list of them: the drawing it is on, framed, then who said
+   it and when, what they said, and the drawing's title. The whole row goes
+   to the drawing, through one stretched link, so links inside what was said
+   still work. #}
 {% macro comment_card(comment, r2_public_endpoint_url, ftl_get_message) %}
-  <div class="comment-card-link" onclick="if(event.target.tagName !== 'A') { window.location.href='/@{{ comment.post_author_login_name }}/{{ comment.post_id }}'; }">
-    <div class="comment">
-      {% if comment.post_image_filename %}
-        <div class="comment-thumbnail">
-          <img src="{{ r2_public_endpoint_url }}/image/{{ comment.post_image_filename[:2] }}/{{ comment.post_image_filename }}"
-               alt="{{ comment.post_title }}"
+  <div class="comment-row">
+    {% if comment.post_image_filename %}
+      <span class="notification-figure">
+        <span class="notification-thumbnail">
+          <img class="notification-post-image"
+               src="{{ r2_public_endpoint_url }}/image/{{ comment.post_image_filename[:2] }}/{{ comment.post_image_filename }}"
+               alt=""
                width="{{ comment.post_image_width }}"
                height="{{ comment.post_image_height }}"
+               draggable="false"
                loading="lazy"
                decoding="async">
-        </div>
-      {% endif %}
-      <div class="comment-body">
-        <div class="comment-header">
-          <span class="comment-author">{{ comment.actor_name }}</span>
-          <span class="muted comment-handle">{{ comment.actor_handle }}</span>
-          <span class="muted comment-timestamp">{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</span>
-        </div>
-        <div class="comment-content">
-          {% if comment.content_html %}
-            {{ comment.content_html|safe }}
-          {% else %}
-            {{ comment.content|markdown|safe }}
-          {% endif %}
-        </div>
-        {% if comment.post_title %}
-          <div class="comment-post-reference">
-            → {{ comment.post_title }}
-          </div>
+        </span>
+      </span>
+    {% endif %}
+    <div class="comment-row-body">
+      <div class="comment-row-head">
+        <a class="comment-row-link" href="/@{{ comment.post_author_login_name }}/{{ comment.post_id }}">{{ comment.actor_name }}</a>
+        <span class="comment-row-meta">{{ comment.actor_handle }} · <span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>
+      </div>
+      <div class="comment-row-content ds-selectable">
+        {% if comment.content_html %}
+          {{ comment.content_html|safe }}
         {% else %}
-          <div class="comment-post-reference">
-            → {{ ftl_get_message("post-no-title") }}
-          </div>
+          {{ comment.content|markdown|safe }}
         {% endif %}
       </div>
+      <div class="comment-row-post">→ {{ comment.post_title or ftl_get_message("post-no-title") }}</div>
     </div>
   </div>
 {% endmacro %}

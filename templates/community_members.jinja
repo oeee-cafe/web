@@ -3,122 +3,90 @@
   {{ super() }} | {{ community.name }} - {{ ftl_get_message("community-members") }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <h2>{{ community.name }} - {{ ftl_get_message("community-members") }}</h2>
-    <p><a href="/communities/@{{ community.slug }}">← {{ ftl_get_message("community") }}</a></p>
+  {# A private community's people, as a list application shows them: who
+     each is, their role as a pill, when they joined, and what can be done
+     about them at the row's end. Inviting someone is one field and a button
+     at the top; invitations still waiting are a list of their own. #}
+  <div class="settings-page members-page">
+    <div class="members-header">
+      <div>
+        <a class="profile-chip" href="/communities/@{{ community.slug }}">← {{ community.name }}</a>
+        <h1 class="settings-title">{{ ftl_get_message("community-members") }}</h1>
+      </div>
+    </div>
 
     {% if can_invite %}
-    <div class="invite-section">
-      <h3>{{ ftl_get_message("community-invite-user") }}</h3>
-      <form method="post" action="/communities/@{{ community.slug }}/invite">
-        <fieldset>
-          <p>
-            <label for="login_name">{{ ftl_get_message("community-invite-username") }}:</label>
-            <input type="text" name="login_name" id="login_name" required autocomplete="off" />
-          </p>
-          <input type="submit" value="{{ ftl_get_message("community-invite-button") }}" />
-        </fieldset>
-      </form>
-    </div>
+      <section class="settings-group">
+        <div class="profile-section-label">{{ ftl_get_message("community-invite-user") }}</div>
+        <form method="post" action="/communities/@{{ community.slug }}/invite" class="ds-card settings-card members-invite">
+          <input class="ds-input" type="text" name="login_name" id="login_name" required autocomplete="off"
+                 autocapitalize="none" spellcheck="false"
+                 placeholder="{{ ftl_get_message("community-invite-username") }}"
+                 aria-label="{{ ftl_get_message("community-invite-username") }}" />
+          <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("community-invite-button") }}</button>
+        </form>
+      </section>
     {% endif %}
 
     {% if can_invite and pending_invitations %}
-    <div class="pending-invitations-section">
-      <h3>{{ ftl_get_message("invitations-pending") }}</h3>
-      <table class="members-table">
-        <thead>
-          <tr>
-            <th>{{ ftl_get_message("login-name") }}</th>
-            <th>{{ ftl_get_message("display-name") }}</th>
-            <th>{{ ftl_get_message("invitation-sent-at") }}</th>
-            <th>{{ ftl_get_message("edit") }}</th>
-          </tr>
-        </thead>
-        <tbody>
+      <section class="settings-group">
+        <div class="profile-section-label">{{ ftl_get_message("invitations-pending") }}</div>
+        <div class="member-list">
           {% for invitation in pending_invitations %}
-          <tr>
-            <td><a href="/@{{ invitation.invitee_login_name }}">@{{ invitation.invitee_login_name }}</a></td>
-            <td>{{ invitation.invitee_display_name }}</td>
-            <td class="muted">{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
-            <td>
-              <button class="ds-button ds-button-danger ds-button-small"
+            <div class="member-row">
+              <span class="member-initial" aria-hidden="true">{{ (invitation.invitee_display_name or invitation.invitee_login_name)[:1]|upper }}</span>
+              <span class="member-text">
+                <a class="member-name" href="/@{{ invitation.invitee_login_name }}">{{ invitation.invitee_display_name }}</a>
+                <span class="member-meta">@{{ invitation.invitee_login_name }} · <span title="{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ invitation.created_at|ago }}</span></span>
+              </span>
+              <button class="ds-button ds-button-small"
                       hx-delete="/communities/@{{ community.slug }}/invitations/{{ invitation.id }}"
                       hx-confirm="{{ ftl_get_message("community-retract-invitation-confirm") }}"
-                      hx-target="closest tr"
+                      hx-target="closest .member-row"
                       hx-swap="outerHTML swap:0s"
-                      hx-disable="this">
-                {{ ftl_get_message("community-retract-invitation") }}
-              </button>
-            </td>
-          </tr>
+                      hx-disable="this">{{ ftl_get_message("community-retract-invitation") }}</button>
+            </div>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
+        </div>
+      </section>
     {% endif %}
 
-    <div class="members-section">
-      <h3>{{ ftl_get_message("community-members") }}</h3>
+    <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("community-members") }}</div>
       {% if members %}
-      <table class="members-table">
-        <thead>
-          <tr>
-            <th>{{ ftl_get_message("login-name") }}</th>
-            <th>{{ ftl_get_message("display-name") }}</th>
-            <th>{{ ftl_get_message("community-member-role") }}</th>
-            <th>{{ ftl_get_message("community-member-joined") }}</th>
-            {% if can_remove %}
-            <th>{{ ftl_get_message("edit") }}</th>
-            {% endif %}
-          </tr>
-        </thead>
-        <tbody>
+        <div class="member-list">
           {% for member in members %}
-          <tr>
-            <td><a href="/@{{ member.login_name }}">@{{ member.login_name }}</a></td>
-            <td>{{ member.display_name }}</td>
-            <td>
-              {% if member.role == "Owner" %}
-                {{ ftl_get_message("community-member-role-owner") }}
-              {% elif member.role == "Moderator" %}
-                {{ ftl_get_message("community-member-role-moderator") }}
-              {% else %}
-                {{ ftl_get_message("community-member-role-member") }}
+            <div class="member-row">
+              <span class="member-initial" aria-hidden="true">{{ (member.display_name or member.login_name)[:1]|upper }}</span>
+              <span class="member-text">
+                <span class="member-name-line">
+                  <a class="member-name" href="/@{{ member.login_name }}">{{ member.display_name }}</a>
+                  {% if member.role == "Owner" %}
+                    <span class="community-card-badge">{{ ftl_get_message("community-member-role-owner") }}</span>
+                  {% elif member.role == "Moderator" %}
+                    <span class="community-card-badge">{{ ftl_get_message("community-member-role-moderator") }}</span>
+                  {% endif %}
+                </span>
+                <span class="member-meta">@{{ member.login_name }} · {{ ftl_get_message("community-member-joined") }} <span title="{{ member.joined_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ member.joined_at|ago }}</span></span>
+              </span>
+              {% if can_remove and member.role != "Owner" %}
+                <button class="ds-button ds-button-small"
+                        hx-delete="/communities/@{{ community.slug }}/members/{{ member.user_id }}"
+                        hx-confirm="{{ ftl_get_message("community-remove-member-confirm") }}"
+                        hx-target="closest .member-row"
+                        hx-swap="outerHTML swap:0s"
+                        hx-disable="this">{{ ftl_get_message("community-remove-member") }}</button>
+              {% elif not can_remove and current_user and current_user.id == member.user_id and member.role != "Owner" %}
+                <button class="ds-button ds-button-danger ds-button-small"
+                        hx-post="/communities/@{{ community.slug }}/leave"
+                        hx-confirm="{{ ftl_get_message("community-leave-confirm") }}"
+                        hx-target="body"
+                        hx-disable="this">{{ ftl_get_message("community-leave") }}</button>
               {% endif %}
-            </td>
-            <td class="muted">{{ member.joined_at|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
-            {% if can_remove %}
-            <td>
-              {% if member.role != "Owner" %}
-              <button class="ds-button ds-button-danger ds-button-small"
-                      hx-delete="/communities/@{{ community.slug }}/members/{{ member.user_id }}"
-                      hx-confirm="{{ ftl_get_message("community-remove-member-confirm") }}"
-                      hx-target="closest tr"
-                      hx-swap="outerHTML swap:0s"
-                      hx-disable="this">
-                {{ ftl_get_message("community-remove-member") }}
-              </button>
-              {% endif %}
-            </td>
-            {% elif current_user and current_user.id == member.user_id and member.role != "Owner" %}
-            <td>
-              <button class="ds-button ds-button-danger ds-button-small"
-                      hx-post="/communities/@{{ community.slug }}/leave"
-                      hx-confirm="{{ ftl_get_message("community-leave-confirm") }}"
-                      hx-target="body"
-                      hx-disable="this">
-                {{ ftl_get_message("community-leave") }}
-              </button>
-            </td>
-            {% endif %}
-          </tr>
+            </div>
           {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <p>No members yet.</p>
+        </div>
       {% endif %}
-    </div>
+    </section>
   </div>
-
 {% endblock content %}
