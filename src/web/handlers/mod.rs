@@ -2177,16 +2177,14 @@ mod template_tests {
     /// from what `search_page` actually hands the template.
     fn render_search(
         search_query: Option<&str>,
-        users: Vec<crate::web::handlers::search::SearchUserRow>,
         posts: Vec<crate::web::handlers::search::SearchPostRow>,
     ) -> String {
-        render_search_in(false, search_query, users, posts)
+        render_search_in(false, search_query, posts)
     }
 
     fn render_search_in(
         native_search_field: bool,
         search_query: Option<&str>,
-        users: Vec<crate::web::handlers::search::SearchUserRow>,
         posts: Vec<crate::web::handlers::search::SearchPostRow>,
     ) -> String {
         test_support::env()
@@ -2195,7 +2193,6 @@ mod template_tests {
             .render(context! {
                 search_query,
                 native_search_field,
-                users,
                 posts,
                 ..chrome()
             })
@@ -2204,25 +2201,20 @@ mod template_tests {
 
     #[test]
     fn search_page_renders_form_empty_state_and_results() {
-        use crate::web::handlers::search::{SearchPostRow, SearchUserRow};
+        use crate::web::handlers::search::SearchPostRow;
 
         // Nothing asked yet: the form alone.
-        let blank = render_search(None, vec![], vec![]);
+        let blank = render_search(None, vec![]);
         assert!(blank.contains(r#"action="/search""#) && blank.contains(r#"name="q""#));
         assert!(!blank.contains("search-no-results"));
 
         // Asked, and nothing matched.
-        let none = render_search(Some("zzz"), vec![], vec![]);
+        let none = render_search(Some("zzz"), vec![]);
         assert!(none.contains("search-no-results"));
         assert!(none.contains(r#"value="zzz""#));
 
         let found = render_search(
             Some("그림"),
-            vec![SearchUserRow {
-                id: uuid::Uuid::nil(),
-                login_name: "someone".into(),
-                display_name: "그림쟁이".into(),
-            }],
             vec![SearchPostRow {
                 id: uuid::Uuid::nil(),
                 title: Some("그림".into()),
@@ -2236,7 +2228,7 @@ mod template_tests {
                 published_at: Some(chrono::Utc::now()),
             }],
         );
-        assert!(found.contains(r#"href="/@someone""#));
+        assert!(!found.contains("search-users"));
         assert!(found.contains(r#"href="/@someone/00000000-0000-0000-0000-000000000000""#));
         assert!(found.contains("/image/ab/abcdef0123.png"));
         assert!(!found.contains("search-no-results"));
@@ -2244,10 +2236,10 @@ mod template_tests {
 
     #[test]
     fn search_page_in_the_apps_leaves_the_form_to_their_own_field() {
-        let blank = render_search_in(true, None, vec![], vec![]);
+        let blank = render_search_in(true, None, vec![]);
         assert!(!blank.contains(r#"action="/search""#));
 
-        let none = render_search_in(true, Some("zzz"), vec![], vec![]);
+        let none = render_search_in(true, Some("zzz"), vec![]);
         assert!(!none.contains(r#"action="/search""#));
         assert!(!none.contains("communities-search"));
         assert!(none.contains("search-no-results"));
