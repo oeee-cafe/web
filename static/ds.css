@@ -977,6 +977,34 @@ html[data-app] .toolbar-search {
   background-color: var(--ds-hover);
 }
 
+/* Signing out is a POST, so the one item here that is not a link is a
+   button. It wears exactly what the links beside it wear -- a button
+   inherits neither the page's font nor its colour, and brings a border
+   and a background of its own, so each is undone by hand. */
+.toolbar-menu-items form {
+  margin: 0;
+}
+
+.toolbar-menu-signout {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: transparent;
+  color: var(--ds-ink);
+  font: inherit;
+  font-size: var(--ds-text-m);
+  text-align: left;
+}
+
+.toolbar-menu-signout:hover {
+  background-color: var(--ds-hover);
+}
+
 /* The theme choice, at the foot of a toolbar menu. */
 .toolbar-theme {
   margin-top: 4px;
@@ -1578,7 +1606,8 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
 .toolbar-end .toolbar-button:active,
 .toolbar-menu summary:active,
 .toolbar-draw:active,
-.toolbar-menu-items a:active {
+.toolbar-menu-items a:active,
+.toolbar-menu-signout:active {
   background-image: linear-gradient(var(--ds-press), var(--ds-press));
 }
 

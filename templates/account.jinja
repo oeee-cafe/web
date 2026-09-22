@@ -155,13 +155,6 @@
       </form>
     </section>
 
-    <section class="settings-group">
-      <form action="/logout" method="post" class="ds-card settings-card settings-row">
-        <span class="settings-row-text">@{{ current_user.login_name }}</span>
-        <button type="submit" class="ds-button">{{ ftl_get_message("sign-out") }}</button>
-      </form>
-    </section>
-
     <section class="settings-group settings-danger">
       <div class="profile-section-label">{{ ftl_get_message("account-delete") }}</div>
       <form id="delete-account-form"

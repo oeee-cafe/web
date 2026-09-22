@@ -2188,6 +2188,10 @@ mod template_tests {
             "/login",
             "/signup",
             "/posts/drafts",
+            // Signing out answers with a redirect to "/", and its form opts
+            // out of boost besides, so the signed out document is a fresh
+            // one.
+            "/logout",
         ];
 
         for (attr, _) in [("href=\"", 0), ("action=\"", 0)] {
