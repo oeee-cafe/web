@@ -136,6 +136,8 @@ h6 {
    20px on /collaborate, which is exactly the inconsistency this file grew. */
 main {
   padding: var(--space-5) var(--space-3) var(--space-6);
+  /* Clear of a phone's home indicator; see ds.css on viewport-fit. */
+  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
 }
 
 main > .center > :first-child,
@@ -295,8 +297,9 @@ nav a:visited,
 }
 
 /* The drawing in a hard 1px frame, as the painter frames its canvas, and
-   no rounded corners: a drawing is not a control. It lifts a little under
-   the pointer. */
+   no rounded corners: a drawing is not a control. Under the pointer the
+   frame darkens and nothing moves, as a thumbnail does in a file browser;
+   pressed, the drawing dims until it opens. */
 .posts-grid .posts-grid-item > a:first-child {
   position: relative;
   display: block;
@@ -304,22 +307,14 @@ nav a:visited,
   padding-top: 100%;
   background-color: #ffffff;
   box-shadow: 0 0 0 1px var(--ds-frame);
-  transition: box-shadow 0.12s ease, transform 0.12s ease;
 }
 
 .posts-grid .posts-grid-item > a:first-child:hover {
-  box-shadow: 0 0 0 1px var(--ds-frame), 0 6px 16px rgba(40, 40, 90, 0.18);
-  transform: translateY(-2px);
+  box-shadow: 0 0 0 1px var(--ds-ink);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .posts-grid .posts-grid-item > a:first-child {
-    transition: none;
-  }
-
-  .posts-grid .posts-grid-item > a:first-child:hover {
-    transform: none;
-  }
+.posts-grid .posts-grid-item > a:first-child:active {
+  filter: brightness(0.9);
 }
 
 .posts-grid .posts-grid-item img {
@@ -1766,6 +1761,10 @@ nav a:visited,
   background-color: var(--ds-field);
 }
 
+.move-row:active {
+  background-image: linear-gradient(var(--ds-press), var(--ds-press));
+}
+
 /* The radio is the row's state; the row shows it. It stays in the page,
    off to one side, so the keyboard and a screen reader still reach it. */
 .move-row input {
@@ -1871,6 +1870,7 @@ nav a:visited,
   justify-content: flex-end;
   margin: 0 -8px;
   padding: 12px 8px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--ds-line);
   background-color: var(--ds-ground);
 }
@@ -1993,7 +1993,6 @@ nav a:visited,
   background-color: var(--ds-surface);
   box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
   color: var(--ds-ink);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .ds-page a.community-card,
@@ -2002,12 +2001,11 @@ nav a:visited,
 }
 
 .community-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 0 0.5px var(--ds-frame), 0 6px 16px rgba(40, 40, 90, 0.16);
+  box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
 }
 
 .community-card:active {
-  transform: none;
+  filter: brightness(0.94);
 }
 
 /* Three squares edge to edge: a third of the card tall whatever a community
@@ -2358,12 +2356,14 @@ nav a:visited,
   border-radius: var(--ds-radius-m);
   background-color: var(--ds-surface);
   box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .session-card:not(.is-full):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 0 0.5px var(--ds-frame), 0 6px 16px rgba(40, 40, 90, 0.16);
+  box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
+}
+
+.session-card:not(.is-full):active {
+  filter: brightness(0.94);
 }
 
 .session-card.is-full {
@@ -3036,6 +3036,10 @@ a.user-pill:hover {
   background-color: transparent;
 }
 
+.community-form-choice:not(.is-fixed):active {
+  background-image: linear-gradient(var(--ds-press), var(--ds-press));
+}
+
 .community-form-choice input {
   flex: none;
   margin: 2px 10px 0 0;
@@ -3442,12 +3446,14 @@ html[data-steam-app] .auth-steam {
   background-color: #ffffff;
   line-height: 0;
   box-shadow: 0 0 0 1px var(--ds-frame);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .about-banner:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 0 1px var(--ds-frame), 0 6px 16px rgba(40, 40, 90, 0.18);
+  box-shadow: 0 0 0 1px var(--ds-ink);
+}
+
+.about-banner:active {
+  filter: brightness(0.9);
 }
 
 .about-banner img {

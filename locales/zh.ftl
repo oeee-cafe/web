@@ -165,6 +165,7 @@ move-section-unlisted = 您参与过的社区
 move-section-public-participated = 您参与过的公开社区
 move-section-public-other = 其他公开社区
 post-delete-confirm = 确定要删除这幅画吗？
+comment-delete-confirm = 确定要删除这条评论吗？
 post-relay = 接力
 post-reply-with-drawing = 用画回复
 post-reply-select-tool = 选择工具和画布尺寸

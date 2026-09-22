@@ -165,6 +165,7 @@ move-section-unlisted = 投稿したコミュニティ
 move-section-public-participated = 投稿したパブリックコミュニティ
 move-section-public-other = その他のパブリックコミュニティ
 post-delete-confirm = 本当にこの画像を削除しますか？
+comment-delete-confirm = 本当にこのコメントを削除しますか？
 post-relay = リレー
 post-reply-with-drawing = 絵で返信
 post-reply-select-tool = ツールとキャンバスサイズを選択
