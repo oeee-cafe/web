@@ -706,7 +706,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   font-weight: 600;
 }
 
-/* A plain link at the toolbar's end -- notifications, drafts, signing in,
+/* A plain link at the toolbar's end -- signing in, drafts,
    the site's about page -- is drawn as a button, since that is what it is
    there. */
 .toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon),
@@ -737,7 +737,8 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   color: var(--ds-ink);
 }
 
-.toolbar-end .toolbar-button .toolbar-badge {
+.toolbar-end .toolbar-button .toolbar-badge,
+.toolbar-sections .toolbar-badge {
   margin-left: 4px;
   vertical-align: 1px;
 }
