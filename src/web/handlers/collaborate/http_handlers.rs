@@ -1,6 +1,8 @@
 use crate::app_error::AppError;
 use crate::models::user::AuthSession;
+use crate::models::community::find_community_by_id;
 use crate::web::context::CommonContext;
+use crate::web::presence::{Activity, Presence};
 use crate::web::handlers::{ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::state::AppState;
 use axum::body::Bytes;
@@ -603,6 +605,7 @@ pub async fn serve_collaborative_app(
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     auth_session: AuthSession,
+    session_id: Option<Path<Uuid>>,
 ) -> Result<Response, AppError> {
     let html = std::fs::read_to_string("neo-cucumber/dist/index.html")
         .map_err(|_| anyhow::anyhow!("Failed to load collaborative app"))?;
@@ -610,8 +613,32 @@ pub async fn serve_collaborative_app(
     let mut tx = state.db_pool.begin().await?;
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|user| user.id)).await?;
+    // In a room: drawing together, grouped with friends in the same room,
+    // and the community named if it is public. The lobby is browsing.
+    let presence = match session_id {
+        Some(Path(session_id)) => {
+            let community_id = sqlx::query_scalar!(
+                "SELECT community_id FROM collaborative_sessions WHERE id = $1",
+                session_id
+            )
+            .fetch_optional(&mut *tx)
+            .await?
+            .flatten();
+            let community = match community_id {
+                Some(id) => find_community_by_id(&mut tx, id).await?,
+                None => None,
+            };
+            Some(
+                Presence::new(Activity::Collaborating)
+                    .in_community(community.as_ref())
+                    .in_room(session_id),
+            )
+        }
+        None => None,
+    };
     tx.commit().await?;
     let chrome = context! {
+        presence,
         current_user => auth_session.user,
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,

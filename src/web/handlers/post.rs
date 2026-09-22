@@ -1,4 +1,5 @@
 use crate::app_error::AppError;
+use crate::web::presence::{Activity, Presence};
 use crate::models::actor::Actor;
 use crate::models::comment::{
     build_comment_thread_tree, create_comment, extract_mentions, find_users_by_login_names,
@@ -994,6 +995,7 @@ pub async fn post_replay_view(
     let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
     let rendered = template
         .render(context! {
+            presence => Presence::new(Activity::WatchingReplay),
             current_user => auth_session.user,
                 post => Some(&post),
             post_id => post.get("id")
@@ -3168,6 +3170,7 @@ pub async fn post_replay_view_by_login_name(
     let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
     let rendered = template
         .render(context! {
+            presence => Presence::new(Activity::WatchingReplay),
             current_user => auth_session.user,
             post => Some(&post),
             post_id => post_id,

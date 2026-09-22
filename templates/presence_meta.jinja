@@ -1,0 +1,3 @@
+{# What the reader is doing here, for the Oeee Cafe app on Steam to show
+   their friends (src/web/presence.rs). Nothing reads it in a browser. #}
+{% if presence %}<meta name="oeee-presence" content="{{ presence.activity }}"{% if presence.community %} data-community="{{ presence.community }}"{% endif %}{% if presence.group %} data-group="{{ presence.group }}"{% endif %} />{% endif %}
