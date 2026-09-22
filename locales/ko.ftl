@@ -461,3 +461,4 @@ sign-up-have-account = 이미 계정이 있나요?
 about-apps = 앱
 about-elsewhere = 다른 곳에서
 about-documents = 문서
+post-no-reactions = 아직 반응이 없습니다.

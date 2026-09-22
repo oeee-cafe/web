@@ -48,16 +48,13 @@
                   {# Taken off the page where it stands (?in_place), rather than
                      sending the reader to wherever the draft would have lived. #}
                   <button type="button"
-                          class="notification-icon-button"
-                          title="{{ ftl_get_message('delete') }}"
+                          class="ds-button ds-button-small"
                           aria-label="{{ ftl_get_message('delete') }}: {{ title }}"
                           hx-delete="/posts/{{ post.id }}?in_place=1"
                           hx-confirm="{{ ftl_get_message('post-delete-confirm') }}"
                           hx-target="closest .draft-item"
                           hx-swap="outerHTML swapEmpty:true"
-                          hx-disable="this">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10.5 10.5v6M13.5 10.5v6"/></svg>
-                  </button>
+                          hx-disable="this">{{ ftl_get_message("delete") }}</button>
                 </div>
               </div>
             </div>

@@ -461,3 +461,4 @@ sign-up-have-account = すでにアカウントをお持ちの方
 about-apps = アプリ
 about-elsewhere = ほかの場所で
 about-documents = ドキュメント
+post-no-reactions = まだリアクションはありません。

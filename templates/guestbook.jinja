@@ -1,60 +1,54 @@
 {% from "guestbook_macro.jinja" import guestbook_entry %}
-{% from "follow_macro.jinja" import follow_button, unfollow_button %}
 {% extends "base.jinja" %}
 {% block title %}
-  {{ super() }} | {{ user.display_name }} (@{{ user.login_name }})
+  {{ super() }} | {{ ftl_get_message("guestbook") }} | {{ user.display_name }} (@{{ user.login_name }})
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <div class="profile-header">
-      <h2>
-        {{ user.display_name }}
-        <span class="muted">@{{ user.login_name }}</span>
-      </h2>
-      <div class="banner-controls">
-        {% if current_user %}
-          {% if is_following %}
-            {{ unfollow_button() }} {%
-            else %} {{ follow_button() }}
-          {% endif %}
-        {% endif %}
-        {% if banner %}
-          {%
-          if user.id == current_user.id %}<a href="/banners/draw">
-          <img width="{{ banner.width }}"
-               height="{{ banner.height }}"
-               alt="{{ current_user.display_name }} (@{{ current_user.login_name }}) 동맹 배너"
-               class="banner"
-               src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
-        </a>
-      {% else %}
-        <img width="{{ banner.width }}"
-             height="{{ banner.height }}"
-             alt="{{ current_user.display_name }} (@{{ current_user.login_name }}) 동맹 배너"
-             class="banner"
-             src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
-      {% endif %}
-    {% else %}
-      {% if user.id == current_user.id %}<a href="/banners/draw" class="button">{{ ftl_get_message("profile-draw-banner") }}</a>{% endif %}
+  {# A person's guestbook as a conversation page: back to their profile, a
+     field to write in (for anyone but them), and the entries as one list,
+     newest first -- a new one lands at its top without leaving the page. #}
+  <div class="notifications-page guestbook-page">
+    <div class="members-header">
+      <div>
+        <a class="profile-chip" href="/@{{ user.login_name }}">← {{ user.display_name }}</a>
+        <h1 class="settings-title">{{ ftl_get_message("guestbook") }}</h1>
+      </div>
+    </div>
+    {% if current_user and current_user.id != user.id %}
+      <form class="ds-card settings-card guestbook-compose"
+            id="guestbook-compose"
+            hx-post="/@{{ user.login_name }}/guestbook"
+            hx-target="#guestbook-entries"
+            hx-swap="afterbegin"
+            hx-disable="find button">
+        <textarea class="ds-textarea" name="content" rows="3" required
+                  aria-label="{{ ftl_get_message("guestbook") }}"></textarea>
+        <div class="guestbook-form-actions">
+          <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("guestbook-write") }}</button>
+        </div>
+      </form>
+    {% endif %}
+    <div class="member-list guestbook-list" id="guestbook-entries"{% if guestbook_entries|length == 0 %} hidden{% endif %}>
+      {%- for entry in guestbook_entries %}{{ guestbook_entry(entry) }}{% endfor -%}
+    </div>
+    {% if guestbook_entries|length == 0 %}
+      <div class="ds-card notifications-empty" id="guestbook-empty"><p>{{ ftl_get_message("guestbook-empty") }}</p></div>
     {% endif %}
   </div>
-</div>
-{% if current_user and current_user.id != user.id %}
-  <form hx-post="/@{{ user.login_name }}/guestbook" hx-swap="outerHTML"
-        hx-disable="find button">
-    <textarea name="content" title="{{ ftl_get_message("guestbook") }}"></textarea>
-    <input type="submit" value="{{ ftl_get_message("guestbook-write") }}" />
-  </form>
-{% endif %}
-{% if guestbook_entries|length == 0 %}
-  <p class="muted">{{ ftl_get_message("guestbook-empty") }}</p>
-{% else %}
-  <div class="guestbook-entries">
-    {% for entry in guestbook_entries %}
-      {{ guestbook_entry(entry) }}
-    {% endfor
-    %}
-  </div>
-{% endif %}
-</div>
+  <script>
+    (function () {
+      // Once the new entry is in the list: the list shows, the empty note
+      // goes, and the field is cleared for the next.
+      function afterSwap(e) {
+        if (!e.target || e.target.id !== "guestbook-entries") return;
+        e.target.hidden = false;
+        var empty = document.getElementById("guestbook-empty");
+        if (empty) empty.parentNode.removeChild(empty);
+        var form = document.getElementById("guestbook-compose");
+        if (form) form.reset();
+      }
+      document.addEventListener("htmx:after:swap", afterSwap);
+      document.addEventListener("htmx:afterSwap", afterSwap);
+    })();
+  </script>
 {% endblock content %}

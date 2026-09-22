@@ -975,18 +975,6 @@ nav a:visited,
   color: green;
 }
 
-.guestbook-entry {
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-2);
-  margin: var(--space-2) 0;
-}
-
-.guestbook-reply {
-  border: 1px solid var(--main-border-color);
-  padding: var(--space-2);
-  margin: var(--space-2) 0;
-}
-
 
 
 /* ---------------------------------------------------------------------------
@@ -3829,4 +3817,193 @@ a.user-pill:hover {
 .not-found-text {
   margin: var(--ds-space-1) 0 var(--ds-space-4);
   color: var(--ds-muted);
+}
+
+.auth-lede {
+  margin: 0 0 var(--ds-space-4);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+  line-height: 1.5;
+}
+
+.auth-email {
+  word-wrap: break-word;
+}
+
+/* Profile links: a row's controls, and the form that adds one. */
+.link-actions {
+  display: flex;
+  flex: none;
+  margin-left: 12px;
+}
+
+.link-actions > * + * {
+  margin-left: 4px;
+}
+
+.link-add {
+  margin-top: var(--ds-space-3);
+}
+
+.link-add .ds-input {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin-top: var(--ds-space-2);
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.link-add .profile-section-label {
+  margin: 0;
+}
+
+/* A person's banners: cards in a grid, each banner in a frame at its 5:1
+   shape and hard pixels; the one in use ringed in the cucumber. */
+.banners-page {
+  max-width: 820px;
+}
+
+.banner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-gap: 16px;
+  gap: 16px;
+}
+
+.banner-card {
+  padding: var(--ds-space-3);
+}
+
+.banner-card.is-active {
+  box-shadow: 0 0 0 2px var(--ds-accent-line), var(--ds-shadow-raise);
+}
+
+.banner-frame {
+  position: relative;
+  display: block;
+  height: 0;
+  padding-top: 20%;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--ds-frame);
+}
+
+.banner-frame img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
+}
+
+.banner-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--ds-space-2);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.banner-active {
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+}
+
+.banner-card-actions {
+  display: flex;
+  margin-top: var(--ds-space-2);
+}
+
+.banner-card-actions > * + * {
+  margin-left: 6px;
+}
+
+.reaction-group-emoji {
+  font-size: var(--ds-text-l);
+  vertical-align: -1px;
+}
+
+.reactions-page .settings-title::first-letter {
+  text-transform: uppercase;
+}
+
+/* A guestbook: entries as rows of a conversation, the owner's reply quoted
+   under the entry it answers. */
+.guestbook-compose {
+  margin-bottom: var(--ds-space-4);
+}
+
+.guestbook-compose .ds-textarea,
+.guestbook-reply-form .ds-textarea {
+  display: block;
+  width: 100%;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.guestbook-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--ds-space-2);
+}
+
+.guestbook-entry {
+  position: relative;
+  padding: 12px 14px;
+}
+
+.guestbook-entry + .guestbook-entry {
+  border-top: 1px solid var(--ds-line);
+}
+
+.guestbook-head {
+  display: flex;
+  align-items: baseline;
+  padding-right: 64px;
+}
+
+.guestbook-head > * + * {
+  margin-left: 6px;
+}
+
+.guestbook-content {
+  margin-top: 4px;
+  font-size: var(--ds-text-base);
+  line-height: 1.5;
+  white-space: pre-line;
+  word-wrap: break-word;
+}
+
+.guestbook-reply {
+  margin: 10px 0 0 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--ds-line-strong);
+}
+
+.guestbook-reply-form {
+  margin-top: 8px;
+}
+
+.guestbook-reply-form summary {
+  list-style: none;
+}
+
+.guestbook-reply-form summary::-webkit-details-marker {
+  display: none;
+}
+
+.guestbook-reply-form[open] summary {
+  margin-bottom: 8px;
+}
+
+.guestbook-delete {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  margin: 0;
 }
