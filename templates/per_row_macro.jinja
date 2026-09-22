@@ -10,7 +10,7 @@
    one page -- the profile's two tabs -- stay in step.
 
    Hidden on a phone, which keeps three a row whatever was chosen (style.css). #}
-{% macro per_row(id="post-cols", var="--home-cols", key="homeCols", default=4) %}
+{% macro per_row(id="post-cols", var="--home-cols", key="homeCols", default=6) %}
   <div class="ds-per-row" data-per-row data-var="{{ var }}" data-key="{{ key }}" data-default="{{ default }}">
     <svg class="ds-per-row-few" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
     <input class="ds-range" type="range" id="{{ id }}" min="1" max="12" step="1" aria-label="{{ ftl_get_message('feed-columns') }}" title="{{ ftl_get_message('feed-columns') }}" />

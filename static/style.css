@@ -284,7 +284,7 @@ nav a:visited,
 
 .posts-grid {
   display: grid;
-  grid-template-columns: repeat(var(--home-cols, 4), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--home-cols, 6), minmax(0, 1fr));
   grid-gap: 20px 12px;
   gap: 20px 12px;
   margin: var(--space-4) 0;
@@ -3539,4 +3539,41 @@ a.user-pill:hover {
   .doc-card {
     padding: var(--ds-space-5) var(--ds-space-4);
   }
+}
+
+/* Publishing: the post page's layout, the form in its card. */
+.publish-form {
+  margin-top: var(--ds-space-4);
+}
+
+.publish-form .ds-input,
+.publish-form .form-field input.ds-input,
+.publish-form .ds-textarea {
+  width: 100%;
+  max-width: none;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.publish-switches {
+  margin-bottom: var(--ds-space-4);
+}
+
+.publish-switches .community-form-choice input {
+  margin-top: 3px;
+}
+
+.publish-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--ds-space-4);
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--ds-line);
+}
+
+.publish-foot form,
+.publish-foot .delete-form {
+  margin: 0;
+  padding: 0;
 }

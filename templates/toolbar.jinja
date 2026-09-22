@@ -464,7 +464,7 @@
       }
       function perRow() {
         var cols = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--home-cols"), 10);
-        if (!(cols >= 1 && cols <= 12)) cols = 4;
+        if (!(cols >= 1 && cols <= 12)) cols = 6;
         return window.innerWidth <= 600 ? 3 : cols;
       }
       function postGrid(rows) {

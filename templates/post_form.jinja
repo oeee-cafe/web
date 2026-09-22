@@ -98,112 +98,131 @@
   </script>
 {% endblock head %}
 {% block content %}
-  <div class="center">
-    <section class="post-preview-section">
-      <h2>{{ ftl_get_message("draft-post") }}</h2>
-      <div class="post-preview-meta">
-        <p>{{ ftl_get_message("post-created-at") }}: {{ post.created_at }}</p>
-        <p>{{ ftl_get_message("post-duration") }}: {{ post.paint_duration }}</p>
-        {% if link %}
-        <p>
-          {{ ftl_get_message("community") }}:
-          <a href="{{ link }}">{{ post.community_name }}</a>
-        </p>
-        {% endif %}
-      </div>
-      <div class="post-preview-image">
-        <img width="{{ post.image_width }}"
-             height="{{ post.image_height }}"
-             alt="{{ ftl_get_message("draft-post") }}"
-             src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-      </div>
-    </section>
-    <form action="/posts/publish" method="post">
-      <input type="hidden" name="post_id" value="{{ post.id }}" />
-      <fieldset>
-        <legend>{{ ftl_get_message("post-publish") }}</legend>
-        <div class="form-group">
-          <label for="title">{{ ftl_get_message("post-title") }}:</label>
-          <input type="text"
-                 id="title"
-                 name="title"
-                 required
-                 minlength="1"
-                 maxlength="200"
-                 aria-required="true" />
+  {# Publishing a drawing, laid out as the post it will become: the drawing on
+     the ground at the left, at the same whole-step zoom as the post page, and
+     beside it one card -- what the drawing is so far, what it will be called
+     and said about it, the three switches as a grouped list, and the button
+     that publishes it. Deleting is set apart at the card's foot. #}
+  <div class="post-page publish-page">
+    <div class="post-stage">
+      <div class="post-stage-column">
+        <div class="post-stage-frame" data-post-stage
+             data-width="{{ post.image_width }}" data-height="{{ post.image_height }}">
+          <img draggable="false" class="post-stage-image"
+               width="{{ post.image_width }}"
+               height="{{ post.image_height }}"
+               alt="{{ ftl_get_message("draft-post") }}"
+               src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
         </div>
-        <div class="form-group">
-          <label for="content">{{ ftl_get_message("post-description") }}:</label>
-          <textarea id="content"
-                    name="content"
-                    required
-                    minlength="1"
-                    maxlength="5000"
-                    rows="5"
-                    aria-required="true"></textarea>
-        </div>
-        <div class="form-group">
-          <label for="hashtags-input">{{ ftl_get_message("post-hashtags") }}:</label>
-          <div class="hashtag-input-container">
-            {# hx-vals sends only the tag being typed. hx-include used to send
-               the whole field alongside it, which the endpoint never read. #}
-            <input type="text"
-                   id="hashtags-input"
-                   name="hashtags"
-                   placeholder="{{ ftl_get_message("post-hashtags-placeholder") }}"
-                   autocomplete="off"
-                   maxlength="500"
-                   role="combobox"
-                   aria-expanded="false"
-                   aria-controls="hashtag-suggestions"
-                   aria-autocomplete="list"
-                   aria-describedby="hashtags-hint"
-                   hx-get="/api/hashtags/autocomplete"
-                   hx-trigger="keyup changed delay:300ms"
-                   hx-target="#hashtag-suggestions"
-                   hx-vals='js:{q: document.getElementById("hashtags-input").value.split(/[\s,\u3001\uFF0C#\uFF03]+/).pop()}'
-                   hx-indicator="#hashtag-autocomplete-indicator" />
-            <span id="hashtag-autocomplete-indicator"
-                  class="htmx-indicator search-indicator"
-                  role="status">{{ ftl_get_message("searching") }}</span>
-            <div id="hashtag-suggestions"
-                 class="hashtag-autocomplete"
-                 role="listbox"
-                 aria-label="{{ ftl_get_message("post-hashtags") }}"></div>
+      </div>
+    </div>
+
+    <div class="post-side">
+      <section class="ds-card post-inspector">
+        <h1 class="post-inspector-title">{{ ftl_get_message("post-publish") }}</h1>
+        <dl class="post-inspector-facts publish-facts">
+          <dt>{{ ftl_get_message("post-created-at") }}</dt>
+          <dd>{{ post.created_at }}</dd>
+          <dt>{{ ftl_get_message("post-duration") }}</dt>
+          <dd>{{ post.paint_duration }}</dd>
+          <dt>{{ ftl_get_message("community") }}</dt>
+          <dd>{% if link %}<a href="{{ link }}">{{ post.community_name }}</a>{% else %}{{ ftl_get_message("personal-post") }}{% endif %}</dd>
+        </dl>
+
+        <form action="/posts/publish" method="post" class="publish-form">
+          <input type="hidden" name="post_id" value="{{ post.id }}" />
+          <div class="form-field">
+            <label class="ds-label" for="title">{{ ftl_get_message("post-title") }}</label>
+            <input class="ds-input" type="text" id="title" name="title"
+                   required minlength="1" maxlength="200" aria-required="true" autofocus />
           </div>
-          <span id="hashtags-hint" class="form-hint">{{ ftl_get_message("post-hashtags-hint") }}</span>
+          <div class="form-field">
+            <label class="ds-label" for="content">{{ ftl_get_message("post-description") }}</label>
+            <textarea class="ds-textarea" id="content" name="content"
+                      required minlength="1" maxlength="5000" rows="4" aria-required="true"></textarea>
+          </div>
+          <div class="form-field">
+            <label class="ds-label" for="hashtags-input">{{ ftl_get_message("post-hashtags") }}</label>
+            <div class="hashtag-input-container">
+              {# hx-vals sends only the tag being typed. #}
+              <input class="ds-input"
+                     type="text"
+                     id="hashtags-input"
+                     name="hashtags"
+                     placeholder="{{ ftl_get_message("post-hashtags-placeholder") }}"
+                     autocomplete="off"
+                     maxlength="500"
+                     role="combobox"
+                     aria-expanded="false"
+                     aria-controls="hashtag-suggestions"
+                     aria-autocomplete="list"
+                     aria-describedby="hashtags-hint"
+                     hx-get="/api/hashtags/autocomplete"
+                     hx-trigger="keyup changed delay:300ms"
+                     hx-target="#hashtag-suggestions"
+                     hx-vals='js:{q: document.getElementById("hashtags-input").value.split(/[\s,\u3001\uFF0C#\uFF03]+/).pop()}'
+                     hx-indicator="#hashtag-autocomplete-indicator" />
+              <span id="hashtag-autocomplete-indicator"
+                    class="htmx-indicator search-indicator"
+                    role="status">{{ ftl_get_message("searching") }}</span>
+              <div id="hashtag-suggestions"
+                   class="hashtag-autocomplete"
+                   role="listbox"
+                   aria-label="{{ ftl_get_message("post-hashtags") }}"></div>
+            </div>
+            <span id="hashtags-hint" class="ds-help">{{ ftl_get_message("post-hashtags-hint") }}</span>
+          </div>
+
+          {# The three switches as a settings pane lists them: one row each,
+             the whole row the target. #}
+          <div class="community-form-choices publish-switches">
+            <label class="community-form-choice">
+              <input type="checkbox" id="is_sensitive" name="is_sensitive" />
+              <span class="community-form-choice-name">{{ ftl_get_message("sensitive") }}</span>
+            </label>
+            <label class="community-form-choice">
+              <input type="checkbox" id="allow_relay" name="allow_relay" checked />
+              <span class="community-form-choice-name">{{ ftl_get_message("allow-relay") }}</span>
+            </label>
+            <label class="community-form-choice">
+              <input type="checkbox" id="allow_replay" name="allow_replay" checked />
+              <span class="community-form-choice-name">{{ ftl_get_message("allow-replay") }}</span>
+            </label>
+          </div>
+
+          <button type="submit" class="ds-button ds-button-primary auth-submit">{{ ftl_get_message("post-publish") }}</button>
+        </form>
+
+        <div class="publish-foot">
+          <a class="ds-button" href="/posts/drafts">{{ ftl_get_message("drafts") }}</a>
+          <form hx-delete="/posts/{{ post_id }}"
+                hx-confirm="{{ ftl_get_message("post-delete-confirm") }}"
+                hx-target="body"
+                class="delete-form"
+                hx-disable="find button">
+            <button type="submit" class="ds-button ds-button-danger">{{ ftl_get_message("delete") }}</button>
+          </form>
         </div>
-        <div class="form-group form-group-checkbox">
-          <input type="checkbox"
-                 id="is_sensitive"
-                 name="is_sensitive" />
-          <label for="is_sensitive">{{ ftl_get_message("sensitive") }}</label>
-        </div>
-        <div class="form-group form-group-checkbox">
-          <input type="checkbox"
-                 id="allow_relay"
-                 name="allow_relay"
-                 checked />
-          <label for="allow_relay">{{ ftl_get_message("allow-relay") }}</label>
-        </div>
-        <div class="form-group form-group-checkbox">
-          <input type="checkbox"
-                 id="allow_replay"
-                 name="allow_replay"
-                 checked />
-          <label for="allow_replay">{{ ftl_get_message("allow-replay") }}</label>
-        </div>
-        <div class="form-actions">
-          <input type="submit" value="{{ ftl_get_message("post-publish") }}" />
-        </div>
-      </fieldset>
-    </form>
-    <form hx-delete="/posts/{{ post_id }}"
-          hx-confirm="{{ ftl_get_message("post-delete-confirm") }}"
-          hx-target="body"
-          class="delete-form"
-          hx-disable="find button">
-      <button type="submit" class="ds-button ds-button-danger">{{ ftl_get_message("delete") }}</button>
-    </form>
+      </section>
+    </div>
   </div>
+  <script>
+    (function () {
+      // The post page's stage: whole steps up to what fits.
+      var stageBox = document.querySelector("[data-post-stage]");
+      function fitStage() {
+        var width = parseInt(stageBox.getAttribute("data-width"), 10);
+        var height = parseInt(stageBox.getAttribute("data-height"), 10);
+        var room = stageBox.parentNode.parentNode.clientWidth;
+        var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 190, height) : Infinity;
+        var zoom = Math.max(1, Math.min(Math.floor(room / width), Math.floor(tall / height), 4));
+        if (width * zoom > room) zoom = 1;
+        if (zoom > 1) stageBox.style.setProperty("--post-stage-shown", (width * zoom) + "px");
+        else stageBox.style.removeProperty("--post-stage-shown");
+        stageBox.classList.toggle("is-zoomed", zoom > 1);
+      }
+      fitStage();
+      window.addEventListener("resize", fitStage);
+    })();
+  </script>
 {% endblock content %}
