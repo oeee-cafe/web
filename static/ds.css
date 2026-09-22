@@ -166,7 +166,9 @@
      among text, the accent's green tells it apart.
    - Images and links do not drag out of the window.
    - The page does not rubber-band, and the document's own ground is the
-     window's, so nothing white shows at its edges or between pages.
+     window's, so nothing white shows at its edges or between pages. In the
+     iOS app it does, as everything on a phone does: pulling it down past
+     its top is how it is refreshed there.
    --------------------------------------------------------------------------- */
 :root {
   --ds-link: #2f5410;
@@ -184,11 +186,15 @@
 
 html {
   background-color: var(--ds-ground);
+}
+
+/* `data-app` marks the phone apps' pages (theme_head.jinja). */
+html:not([data-app="ios"]),
+html:not([data-app="ios"]) .ds-page {
   overscroll-behavior: none;
 }
 
 .ds-page {
-  overscroll-behavior: none;
   cursor: default;
   -moz-user-select: none;
   -webkit-user-select: none;
@@ -341,17 +347,22 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    phone browser from tucking its address bar away, which costs more screen
    than the toolbar staying put would save.
 
+   The iOS app keeps the page scrolling at every width too. There the page
+   is the app's scroll view, and only it gives iOS's manners: pulling down
+   to refresh, a tap on the status bar to go back to the top, and the tab
+   bar's second tap scrolling up.
+
    What depended on the window scrolling: htmx's `revealed` is an
    IntersectionObserver against the viewport, which sees inside a scrolling
    area, so infinite scroll is unchanged; where you were on a page is kept by
    toolbar.jinja, since browsers only restore the window's own scroll.
    --------------------------------------------------------------------------- */
 @media (min-width: 601px) {
-  html {
+  html:not([data-app="ios"]) {
     height: 100%;
   }
 
-  .ds-page {
+  html:not([data-app="ios"]) .ds-page {
     display: -webkit-box;
     display: flex;
     -webkit-box-orient: vertical;
@@ -361,11 +372,11 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
     overflow: hidden;
   }
 
-  .ds-page > header {
+  html:not([data-app="ios"]) .ds-page > header {
     flex: 0 0 auto;
   }
 
-  .ds-page > main.ds-content {
+  html:not([data-app="ios"]) .ds-page > main.ds-content {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
