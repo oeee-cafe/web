@@ -271,9 +271,19 @@ pub async fn touch_identity(
     )
     .execute(&mut **tx)
     .await?;
-    super::supporter::record_supporter_check_for(tx, identity).await?;
+    refresh_standing(tx, identity).await
+}
 
-    // Bought since it was linked, or before the achievement existed.
+/// Records what the provider says now about the Supporter Pack for the
+/// account `identity` is linked to, and gives it the achievement if it owns
+/// one -- bought since it was linked, or before the achievement existed.
+/// Neither signs anyone in nor links anything: an identity linked to no
+/// account changes nothing.
+pub async fn refresh_standing(
+    tx: &mut Transaction<'_, Postgres>,
+    identity: &VerifiedIdentity,
+) -> Result<()> {
+    super::supporter::record_supporter_check_for(tx, identity).await?;
     if let Some(achievement) = identity.supporter_achievement() {
         query!(
             r#"

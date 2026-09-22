@@ -275,6 +275,40 @@ mod tests {
         tx.rollback().await.unwrap();
     }
 
+    /// What the Steam app sends when a DLC is installed: standing and the
+    /// achievement for the linked account, and nothing at all for a Steam
+    /// account linked to none.
+    #[tokio::test]
+    async fn a_refresh_records_standing_and_links_nothing() {
+        use crate::models::identity::{find_user_by_identity, refresh_standing};
+        let Some(mut tx) = tx().await else { return };
+        let id = user(&mut tx, "supporter_test_k").await;
+        link_identity(&mut tx, id, &steam("76561190000000110", Some(false)))
+            .await
+            .unwrap()
+            .unwrap();
+        refresh_standing(&mut tx, &steam("76561190000000110", Some(true)))
+            .await
+            .unwrap();
+        assert!(is_supporter(&mut tx, id).await.unwrap());
+        let achieved: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM user_achievements WHERE user_id = $1 AND achievement = 'STEAM_SUPPORTER')",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        assert!(achieved);
+
+        let stranger = steam("76561190000000111", Some(true));
+        refresh_standing(&mut tx, &stranger).await.unwrap();
+        assert!(find_user_by_identity(&mut tx, Provider::Steam, &stranger.subject)
+            .await
+            .unwrap()
+            .is_none());
+        tx.rollback().await.unwrap();
+    }
+
     #[tokio::test]
     async fn the_badge_goes_with_the_steam_account() {
         let Some(mut tx) = tx().await else { return };
