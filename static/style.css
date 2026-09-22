@@ -3201,56 +3201,11 @@ a.user-pill:hover {
   margin-top: var(--ds-space-3);
 }
 
-/* The seek bar as the design system's slider. WebKit's track is a plain
-   line: the viewer moves the knob without an event, so there is nothing
-   to keep a painted fill in step. */
+/* The seek bar is the design system's slider (ds.css), across the stage.
+   WebKit's track is a plain line: the viewer moves the knob without an
+   event, so there is nothing to keep a painted fill in step. */
 .post-stage-replay .neo-cucumber-replay-seek {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
   width: 100%;
-  height: 20px;
-  margin: 0;
-  background: transparent;
-  cursor: default;
-}
-
-.post-stage-replay .neo-cucumber-replay-seek::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--ds-line-strong);
-}
-
-.post-stage-replay .neo-cucumber-replay-seek::-moz-range-track {
-  height: 4px;
-  border: 0;
-  border-radius: 2px;
-  background: var(--ds-line-strong);
-}
-
-.post-stage-replay .neo-cucumber-replay-seek::-moz-range-progress {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--ds-accent-line);
-}
-
-.post-stage-replay .neo-cucumber-replay-seek::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -6px;
-  border-radius: 50%;
-  background: var(--ds-field);
-  box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
-}
-
-.post-stage-replay .neo-cucumber-replay-seek::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--ds-field);
-  box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
 }
 
 .post-stage-replay .neo-cucumber-replay-buttons {
