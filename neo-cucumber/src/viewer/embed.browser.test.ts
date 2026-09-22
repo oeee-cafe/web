@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount } from "./embed";
+import "./viewer.css";
 
 /**
  * A post page shows every drawing that has a replay with the replay's
@@ -58,5 +59,24 @@ describe("the viewer with a poster", () => {
     const { fetchSpy, viewer } = mountWithPoster();
     viewer.play();
     await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps the play button one width whether it says Play or Pause", () => {
+    const { container } = mountWithPoster();
+    const button = container.querySelector<HTMLButtonElement>(".neo-cucumber-replay-button");
+    const [play, pause] = Array.from(
+      container.querySelectorAll<HTMLElement>(".neo-cucumber-replay-label")
+    );
+    if (!button || !play || !pause) throw new Error("no play button");
+    // Only the current label is read out, and only it is seen.
+    expect(play.getAttribute("aria-hidden")).toBe("false");
+    expect(pause.getAttribute("aria-hidden")).toBe("true");
+    expect(pause.getBoundingClientRect().height).toBe(0);
+    const width = button.getBoundingClientRect().width;
+    const height = button.getBoundingClientRect().height;
+    play.setAttribute("aria-hidden", "true");
+    pause.setAttribute("aria-hidden", "false");
+    expect(button.getBoundingClientRect().width).toBe(width);
+    expect(button.getBoundingClientRect().height).toBe(height);
   });
 });
