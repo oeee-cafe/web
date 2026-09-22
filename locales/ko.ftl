@@ -504,3 +504,7 @@ achievement-first-collaboration = 첫 함께 그리기
 achievement-first-collaboration-description = 처음으로 다른 사람과 함께 그렸습니다.
 achievement-steam-supporter = Steam 후원자
 achievement-steam-supporter-description = Steam에서 오이카페를 구매했습니다.
+profile-tabs-label = 그림
+profile-tab-public = 공개 커뮤니티
+profile-tab-private = 비공개 커뮤니티
+profile-private-community-posts-note = 비공개 커뮤니티에서 그린 그림은 공개 프로필에 보이지 않습니다.

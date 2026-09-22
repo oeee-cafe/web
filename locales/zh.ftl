@@ -504,3 +504,7 @@ achievement-first-collaboration = 第一次合作
 achievement-first-collaboration-description = 第一次与他人一起画画。
 achievement-steam-supporter = Steam 支持者
 achievement-steam-supporter-description = 在 Steam 上购买了黄瓜咖啡馆。
+profile-tabs-label = 作品
+profile-tab-public = 公开社区
+profile-tab-private = 私密社区
+profile-private-community-posts-note = 私密社区的作品不会显示在你的公开个人资料中。

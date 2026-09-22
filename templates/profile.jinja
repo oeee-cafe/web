@@ -106,11 +106,13 @@
     <section class="profile-section">
       {% if user.id == current_user.id %}
         {# Their own profile holds both: what everyone sees, and what only
-           they do. One grid at a time, chosen like any other view. #}
+           they do. One grid at a time, chosen like any other view. The tabs
+           are named short so both fit a phone's width beside each other;
+           what the private one means is said inside it. #}
         <div class="grid-header">
-          <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-public-community-posts') }}">
-            <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-public-community-posts") }}</button>
-            <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-private-community-posts") }}</button>
+          <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-tabs-label') }}">
+            <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-tab-public") }}</button>
+            <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-tab-private") }}</button>
           </div>
           {{ per_row() }}
         </div>
@@ -141,6 +143,7 @@
       </div>
       {% if user.id == current_user.id %}
         <div data-profile-panel="private" hidden>
+          <p class="profile-panel-note">{{ ftl_get_message("profile-private-community-posts-note") }}</p>
           {% if private_community_posts %}
             <div class="posts-grid">
               {% for post in private_community_posts %}
