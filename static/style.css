@@ -2796,11 +2796,39 @@ nav a:visited,
 
 .profile-achievement {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   padding: var(--ds-space-3);
   border: 1px solid var(--ds-line);
   border-radius: var(--ds-radius-s);
   background-color: var(--ds-surface);
+}
+
+/* The badge at the start, the words beside it. */
+.achievement-icon {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-right: var(--ds-space-3);
+  border-radius: 10px;
+  background-color: var(--ds-accent);
+  box-shadow: inset 0 0 0 1px var(--ds-accent-line);
+  color: var(--ds-accent-ink);
+}
+
+.achievement-icon svg {
+  display: block;
+}
+
+.profile-achievement-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .profile-achievement-name {
@@ -2809,6 +2837,9 @@ nav a:visited,
 
 .profile-achievement-description {
   margin-top: 2px;
+  /* Korean breaks between words, not inside them. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   font-size: var(--ds-text-m);
   line-height: 1.4;
 }
