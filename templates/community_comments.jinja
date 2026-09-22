@@ -4,16 +4,24 @@
   {{ super() }} | {{ community.name }} | {{ ftl_get_message("recent-comments") }}
 {% endblock title %}
 {% block content %}
-  <div class="center">
-    <h2>
-      <a href="/communities/@{{ community.slug }}">{{ community.name }}</a> - {{ ftl_get_message("recent-comments") }}
-    </h2>
+  {# A community's recent comments as an inbox is laid out: one grouped list,
+     each row the drawing it is on, who said what, and the whole row the way
+     to the drawing. #}
+  <div class="notifications-page">
+    <div class="members-header">
+      <div>
+        <a class="profile-chip" href="/communities/@{{ community.slug }}">← {{ community.name }}</a>
+        <h1 class="settings-title">{{ ftl_get_message("recent-comments") }}</h1>
+      </div>
+    </div>
     {% if comments %}
-      {% for comment in comments %}
-        {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
-      {% endfor %}
+      <div class="comment-list">
+        {% for comment in comments %}
+          {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
+        {% endfor %}
+      </div>
     {% else %}
-      <p>{{ ftl_get_message("no-comments-yet") }}</p>
+      <div class="ds-card notifications-empty"><p>{{ ftl_get_message("no-comments-yet") }}</p></div>
     {% endif %}
   </div>
 {% endblock content %}
