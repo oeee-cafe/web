@@ -13,6 +13,21 @@
   // flashes up and away.
   if (/OeeeCafeiOS/.test(navigator.userAgent)) {
     document.documentElement.setAttribute("data-app", "ios");
+    // Going back in the app is the web view's edge swipe, which already
+    // moved the page; a cross-fade after it would move it twice. Listened
+    // for here, in the head, so it is heard before the page first paints.
+    var fromCache = false;
+    window.addEventListener("pageshow", function (event) {
+      fromCache = event.persisted;
+    });
+    window.addEventListener("pagereveal", function (event) {
+      if (!event.viewTransition) return;
+      var entry = window.performance && performance.getEntriesByType
+        ? performance.getEntriesByType("navigation")[0] : null;
+      if (fromCache || (entry && entry.type === "back_forward")) {
+        event.viewTransition.skipTransition();
+      }
+    });
   } else if (/OeeeCafeAndroid/.test(navigator.userAgent)) {
     document.documentElement.setAttribute("data-app", "android");
   }
