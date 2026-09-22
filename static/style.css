@@ -3541,6 +3541,54 @@ html[data-steam-app] .auth-steam {
   display: block;
 }
 
+/* Signing in with Apple goes to Apple's page and back, which the apps'
+   web views would open in a browser of their own, away from the session
+   the answer has to come back to. So it is a browser's only. Black on
+   light and white on dark, as Apple asks of its sign-in buttons. */
+.ds-button.auth-apple,
+.ds-button.auth-apple:visited {
+  border-color: #000;
+  background-color: #000;
+  color: #fff;
+}
+
+.ds-button.auth-apple:hover {
+  border-color: #333;
+  background-color: #333;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ds-button.auth-apple,
+  :root:not([data-theme="light"]) .ds-button.auth-apple:visited {
+    border-color: #fff;
+    background-color: #fff;
+    color: #000;
+  }
+
+  :root:not([data-theme="light"]) .ds-button.auth-apple:hover {
+    border-color: #e5e5e5;
+    background-color: #e5e5e5;
+  }
+}
+
+:root[data-theme="dark"] .ds-button.auth-apple,
+:root[data-theme="dark"] .ds-button.auth-apple:visited {
+  border-color: #fff;
+  background-color: #fff;
+  color: #000;
+}
+
+:root[data-theme="dark"] .ds-button.auth-apple:hover {
+  border-color: #e5e5e5;
+  background-color: #e5e5e5;
+}
+
+html[data-app] .auth-apple,
+html[data-desktop] .auth-apple,
+html[data-steam-app] .auth-apple {
+  display: none;
+}
+
 /* The agreement: a box to tick, and the two pages it agrees to. */
 .auth-agree {
   margin: var(--ds-space-2) 0 var(--ds-space-3);

@@ -66,7 +66,7 @@
       <div class="ds-card settings-card">
         {% for identity in identities %}
           <form method="post" action="/account/identities/{{ identity.provider }}/unlink" class="settings-row">
-            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% else %}{{ identity.provider }}{% endif %}{% if identity.display_hint %}: {{ identity.display_hint }}{% endif %}</span>
+            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% elif identity.provider == "apple" %}Apple{% else %}{{ identity.provider }}{% endif %}{% if identity.display_hint %}: {{ identity.display_hint }}{% elif identity.email %}: {{ identity.email }}{% endif %}</span>
             <button type="submit" class="ds-button">{{ ftl_get_message("account-unlink") }}</button>
           </form>
         {% else %}
@@ -75,6 +75,10 @@
         {% if steam_enabled and not steam_linked %}
           {# Followed only inside the Oeee Cafe app on Steam; see login.jinja. #}
           <a class="ds-button auth-steam" href="/auth/steam/app?next=/account">{{ ftl_get_message("account-link-steam") }}</a>
+        {% endif %}
+        {% if apple_enabled and not apple_linked %}
+          {# Not inside the apps; see login.jinja. #}
+          <a class="ds-button auth-apple" href="/auth/apple?next=/account">{{ ftl_get_message("account-link-apple") }}</a>
         {% endif %}
       </div>
     </section>

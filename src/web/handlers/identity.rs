@@ -1,5 +1,5 @@
-//! Signing in with another service's account: Steam now, Microsoft and Apple
-//! after it.
+//! Signing in with another service's account: Steam and Apple now, Microsoft
+//! after them.
 //!
 //! A provider's own handler turns what its client sent into a
 //! [`VerifiedIdentity`] and hands it to [`sign_in_with`], which is the same
@@ -22,6 +22,10 @@
 //! account, and the reader's next password sign-in would link it. So the
 //! POSTs that take an identity also have to come from this site's own pages
 //! ([`from_this_site`]). The Steam app's post does: it is made from the page.
+//! Apple's does not -- Apple posts its answer from appleid.apple.com, which
+//! is exactly the cross-site post the cookie is not sent with -- so it lands
+//! on [`apple_callback`], which hands it straight back to this site from a
+//! page of its own ([`do_apple_sign_in`]).
 
 use axum::extract::{Path, Query, State};
 use axum::http::header::ORIGIN;
@@ -38,6 +42,7 @@ use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 
 use crate::app_error::AppError;
+use crate::apple;
 use crate::models::identity::{
     find_user_by_identity, find_user_by_verified_email, link_identity, touch_identity,
     unlink_identity, LinkError, Provider, UnlinkError, VerifiedIdentity,
@@ -354,6 +359,179 @@ pub async fn do_steam_sign_in(
         &state,
         identity,
         next,
+    )
+    .await
+}
+
+const APPLE_REQUEST_KEY: &str = "identity.apple";
+
+/// A sign-in with Apple under way: what Apple's answer has to carry back.
+#[derive(Serialize, Deserialize)]
+struct AppleRequest {
+    state: String,
+    nonce: String,
+    next: Option<String>,
+    started_at: DateTime<Utc>,
+}
+
+fn random_token() -> String {
+    use rand::RngCore;
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
+fn apple_redirect_uri(base_url: &str) -> String {
+    format!("{}/auth/apple/callback", base_url.trim_end_matches('/'))
+}
+
+/// Sends the browser to Apple to sign in, remembering what its answer has to
+/// carry back.
+pub async fn apple_sign_in(
+    auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    Query(query): Query<NextQuery>,
+) -> Result<Response, AppError> {
+    let Some(config) = state.config.apple.as_ref() else {
+        let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "apple-sign-in-unavailable"));
+        let back = if auth_session.user.is_some() {
+            "/account"
+        } else {
+            "/login"
+        };
+        return Ok(Redirect::to(back).into_response());
+    };
+
+    let request = AppleRequest {
+        state: random_token(),
+        nonce: random_token(),
+        next: local_next(query.next.as_deref()),
+        started_at: Utc::now(),
+    };
+    let url = apple::authorize_url(
+        config,
+        &apple_redirect_uri(&state.config.base_url),
+        &request.state,
+        &request.nonce,
+    );
+    session
+        .insert(APPLE_REQUEST_KEY, request)
+        .await
+        .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+    Ok(Redirect::to(&url).into_response())
+}
+
+/// What Apple posts back: an ID token and the state it was sent with, or an
+/// error such as `user_cancelled_authorize`. `code` is also posted, and not
+/// needed: the ID token already says who signed in.
+#[derive(Deserialize, Serialize)]
+pub struct AppleAnswer {
+    state: Option<String>,
+    id_token: Option<String>,
+    /// JSON with the person's name, the first time only.
+    user: Option<String>,
+    error: Option<String>,
+}
+
+/// Where Apple posts its answer. The post comes from appleid.apple.com, so it
+/// arrives without the session cookie; this page only posts the same fields
+/// on to `/auth/apple` from this site, where the cookie comes along. It reads
+/// and writes nothing in the session -- touching it here would start a new,
+/// empty one over the reader's.
+pub async fn apple_callback(
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Form(answer): Form<AppleAnswer>,
+) -> Result<Html<String>, AppError> {
+    let template = state.env.get_template("identity_apple_return.jinja")?;
+    let rendered = template.render(context! {
+        answer,
+        ftl_lang,
+    })?;
+    Ok(Html(rendered))
+}
+
+pub async fn do_apple_sign_in(
+    mut auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(answer): Form<AppleAnswer>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+    let back = if auth_session.user.is_some() {
+        "/account"
+    } else {
+        "/login"
+    };
+
+    // Each sign-in's state and nonce answer once.
+    let request = session
+        .remove::<AppleRequest>(APPLE_REQUEST_KEY)
+        .await
+        .ok()
+        .flatten()
+        .filter(|request| Utc::now() - request.started_at <= Duration::minutes(PENDING_FOR));
+    let Some(config) = state.config.apple.as_ref() else {
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "apple-sign-in-unavailable"));
+        return Ok(Redirect::to(back).into_response());
+    };
+    if answer.error.as_deref() == Some("user_cancelled_authorize") {
+        return Ok(Redirect::to(back).into_response());
+    }
+    let invalid = || -> Result<Response, AppError> {
+        messages
+            .clone()
+            .error(say(&bundle, "identity-sign-in-invalid", Provider::Apple));
+        Ok(Redirect::to(back).into_response())
+    };
+    let (Some(request), Some(id_token)) = (request, answer.id_token.as_deref()) else {
+        return invalid();
+    };
+    if answer.state.as_deref() != Some(request.state.as_str()) {
+        return invalid();
+    }
+
+    let identity = match apple::verify_id_token(
+        config,
+        id_token,
+        &request.nonce,
+        answer.user.as_deref(),
+    )
+    .await
+    {
+        Ok(Some(identity)) => identity,
+        Ok(None) => return invalid(),
+        Err(error) => {
+            tracing::error!("Apple sign-in could not be checked: {error:#}");
+            messages
+                .clone()
+                .error(say(&bundle, "identity-sign-in-failed", Provider::Apple));
+            return Ok(Redirect::to(back).into_response());
+        }
+    };
+
+    sign_in_with(
+        &mut auth_session,
+        &session,
+        &messages,
+        &bundle,
+        &state,
+        identity,
+        request.next,
     )
     .await
 }

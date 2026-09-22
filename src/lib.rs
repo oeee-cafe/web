@@ -1,4 +1,5 @@
 pub mod app_error;
+pub mod apple;
 pub mod build_info;
 pub mod config;
 pub mod db;

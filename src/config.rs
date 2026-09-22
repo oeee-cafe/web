@@ -75,6 +75,29 @@ pub struct AppConfig {
     /// offer it, and `/auth/steam` turns every ticket away.
     #[serde(default)]
     pub steam: Option<SteamConfig>,
+
+    /// Sign in with Apple, as an `[apple]` table. Unset means the site does
+    /// not offer it.
+    #[serde(default)]
+    pub apple: Option<AppleConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct AppleConfig {
+    /// The Services ID registered for Sign in with Apple (Certificates,
+    /// Identifiers & Profiles > Identifiers > Services IDs), whose return URL
+    /// is `{base_url}/auth/apple/callback`. Apple's ID tokens name it as
+    /// their audience.
+    pub client_id: String,
+    /// Where Apple publishes the keys it signs ID tokens with. Only a test
+    /// changes it.
+    #[serde(default = "default_apple_keys_url")]
+    pub keys_url: String,
+}
+
+fn default_apple_keys_url() -> String {
+    "https://appleid.apple.com/auth/keys".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
