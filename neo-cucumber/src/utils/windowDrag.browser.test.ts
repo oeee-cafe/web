@@ -11,6 +11,7 @@ import { attachWindowDrag, windowBounds, type WindowPosition } from "./windowDra
  */
 
 interface Harness {
+  frame: HTMLElement;
   handle: HTMLElement;
   positions: WindowPosition[];
   detach(): void;
@@ -34,6 +35,7 @@ function mount(minimumY?: number, height = 200): Harness {
   });
 
   harness = {
+    frame,
     handle,
     positions,
     detach: () => {
@@ -74,6 +76,52 @@ describe("dragging a floating window", () => {
     drag(handle, { x: 10, y: 10 }, { x: 60, y: 90 });
 
     expect(positions.at(-1)).toEqual({ x: 50, y: 80 });
+  });
+
+  it("moves the frame itself mid-drag and reports only where it ended", () => {
+    // Reporting every step put each one through React, which renders an
+    // update from a native pointermove after the frame it arrived in -- a
+    // window a frame behind the pointer, which Safari's 60fps made visible.
+    const { frame, handle, positions } = mount();
+
+    handle.dispatchEvent(pointer("pointerdown", 10, 10));
+    handle.dispatchEvent(pointer("pointermove", 40, 50));
+    handle.dispatchEvent(pointer("pointermove", 60, 90));
+
+    expect(positions).toEqual([]);
+    const moving = frame.getBoundingClientRect();
+    expect({ x: moving.left, y: moving.top }).toEqual({ x: 50, y: 80 });
+
+    handle.dispatchEvent(pointer("pointerup", 60, 90));
+
+    expect(positions).toEqual([{ x: 50, y: 80 }]);
+    expect(frame.style.transform).toBe("");
+    const settled = frame.getBoundingClientRect();
+    expect({ x: settled.left, y: settled.top }).toEqual({ x: 50, y: 80 });
+  });
+
+  it("follows a host that moves the window mid-drag", () => {
+    const { frame, handle, positions } = mount();
+
+    handle.dispatchEvent(pointer("pointerdown", 10, 10));
+    handle.dispatchEvent(pointer("pointermove", 30, 30));
+    frame.style.left = "5px";
+    handle.dispatchEvent(pointer("pointermove", 60, 90));
+
+    const rect = frame.getBoundingClientRect();
+    expect({ x: rect.left, y: rect.top }).toEqual({ x: 50, y: 80 });
+
+    handle.dispatchEvent(pointer("pointerup", 60, 90));
+    expect(positions).toEqual([{ x: 50, y: 80 }]);
+  });
+
+  it("reports nothing for a press that never moved", () => {
+    const { handle, positions } = mount();
+
+    handle.dispatchEvent(pointer("pointerdown", 10, 10));
+    handle.dispatchEvent(pointer("pointerup", 10, 10));
+
+    expect(positions).toEqual([]);
   });
 
   it("keeps it on screen when dragged past the edge", () => {

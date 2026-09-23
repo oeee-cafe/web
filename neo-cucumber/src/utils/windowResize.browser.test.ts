@@ -29,7 +29,13 @@ function mount() {
     detach();
     frame.remove();
   };
-  return { corner, sizes };
+  return { frame, corner, sizes };
+}
+
+/** The size the frame has on screen, which is what the gesture changes as it goes. */
+function shown(frame: HTMLElement): WindowSize {
+  const rect = frame.getBoundingClientRect();
+  return { width: rect.width, height: rect.height };
 }
 
 function pointer(type: string, x: number, y: number): PointerEvent {
@@ -51,7 +57,7 @@ afterEach(() => {
 
 describe("resizing a floating window", () => {
   it("does not jump when the corner is grabbed away from its last pixel", () => {
-    const { corner, sizes } = mount();
+    const { frame, corner, sizes } = mount();
 
     // 8px up and to the left of the frame's corner at (264, 220), which is
     // where a finger on a 20px handle actually lands.
@@ -59,11 +65,16 @@ describe("resizing a floating window", () => {
     corner.dispatchEvent(pointer("pointermove", 256, 212));
 
     // Nothing moved, so nothing resized.
-    expect(sizes.at(-1)).toEqual({ width: 224, height: 200 });
+    expect(shown(frame)).toEqual({ width: 224, height: 200 });
 
     // And from there the window follows the pointer one-for-one.
     corner.dispatchEvent(pointer("pointermove", 296, 262));
-    expect(sizes.at(-1)).toEqual({ width: 264, height: 250 });
+    expect(shown(frame)).toEqual({ width: 264, height: 250 });
+
+    // Reported once, when it is let go, rather than a step behind all along.
+    expect(sizes).toEqual([]);
+    corner.dispatchEvent(pointer("pointerup", 296, 262));
+    expect(sizes).toEqual([{ width: 264, height: 250 }]);
   });
 
   it("sizes it to the corner under a touch pointer", () => {
@@ -78,17 +89,18 @@ describe("resizing a floating window", () => {
   });
 
   it("refuses to shrink below the minimum", () => {
-    const { corner, sizes } = mount();
+    const { frame, corner, sizes } = mount();
 
     corner.dispatchEvent(pointer("pointerdown", 264, 220));
     corner.dispatchEvent(pointer("pointermove", 60, 40));
 
+    expect(shown(frame)).toEqual({ width: 180, height: 140 });
+    corner.dispatchEvent(pointer("pointerup", 60, 40));
     expect(sizes.at(-1)).toEqual({ width: 180, height: 140 });
   });
 
   it("does not move the window it is sizing", () => {
-    const { corner } = mount();
-    const frame = corner.parentElement as HTMLElement;
+    const { frame, corner } = mount();
 
     corner.dispatchEvent(pointer("pointerdown", 264, 220));
     corner.dispatchEvent(pointer("pointermove", 340, 400));
