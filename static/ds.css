@@ -427,8 +427,8 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    rule.
 
    Opaque, because the content now passes beneath: the ground and its grid,
-   the same pair the body carries, so a notice sits on what it sat on before.
-   The grid holds the body's phase until the page moves, and only the strip
+   the same pair the page carries, so a notice sits on what it sat on before.
+   The grid holds the page's phase until the page moves, and only the strip
    around a notice ever shows it -- the toolbar has its own ground, and with
    no notice up the header is the toolbar's height exactly. */
 .ds-page > header {
@@ -467,7 +467,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* Its own ground under its own grid, covering the body's, so the two
+    /* Its own ground under its own grid, covering the page's, so the two
        never show out of step. */
     background-color: var(--ds-ground);
     background-image: linear-gradient(var(--ds-grid) 1px, transparent 1px),

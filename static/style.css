@@ -89,13 +89,22 @@ html[data-app] {
   --link-color: var(--main-anchor-color);
 }
 
-/* The ground and the type are the window's; see "The window" below. */
-body {
-  margin: 0;
+/* The ground and the type are the window's; see "The window" below.
+
+   The ground and its grid are the root's, not the body's. A body's background
+   is drawn over the whole window only while the root has none of its own, and
+   ds.css gives the root the ground; so the body's grid covered the body and no
+   more, and on a page shorter than the screen it stopped where the page did,
+   with bare ground below it. */
+html {
   background-color: var(--ds-ground);
   background-image: linear-gradient(var(--ds-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
   background-size: 14px 14px;
+}
+
+body {
+  margin: 0;
   color: var(--main-text-color);
   font-family: var(--ds-font);
   /* Stated explicitly so the em-based sizes elsewhere have a known base. */
