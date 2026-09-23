@@ -254,10 +254,14 @@ html {
   background-color: var(--ds-ground);
 }
 
-/* `data-form="handheld"` marks the phone and tablet apps' pages, which
-   bounce as their own screens do (theme_head.jinja). */
-html:not([data-form="handheld"]),
-html:not([data-form="handheld"]) .ds-page {
+/* Only the Mac and Windows apps (data-form="desktop") never bounce: a
+   window's content does not, and their toolbar is the window's title bar,
+   fused to the top. Everywhere else the page bounces and pulls down to
+   reload as the browser or the app does by itself -- iOS Safari's own pull
+   to reload included, which this used to take away -- since the toolbar
+   is a bar on the page there, and comes down with it. */
+html[data-form="desktop"],
+html[data-form="desktop"] .ds-page {
   overscroll-behavior: none;
 }
 
