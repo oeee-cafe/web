@@ -236,7 +236,6 @@ collaborate-active-sessions = アクティブな公開セッション
 collaborate-your-sessions = 自分のセッション
 collaborate-session-full = 満員
 collaborate-session-link-only = リンク限定
-collaborate-create-error = セッションを作成できませんでした。もう一度お試しください。
 collaborate-create-network-error = セッションを作成できませんでした。接続を確認してからもう一度お試しください。
 collaborate-sign-in-to-create = ログインして一緒に描き始めましょう
 collaborate-finished-drawings = 完成した共同制作の絵

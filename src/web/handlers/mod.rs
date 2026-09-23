@@ -869,6 +869,78 @@ mod community_page_tests {
         assert!(rendered.contains(">3h<"), "not a relative time");
     }
 
+    /// A guestbook's list and its empty note are one or the other by CSS
+    /// (`:empty`), so the list has to be empty to the letter when it has no
+    /// entries, and an entry has to bring no whitespace around it -- or the
+    /// last one deleted would leave a blank card and no note.
+    #[test]
+    fn a_guestbook_list_is_empty_to_the_letter() {
+        let env = test_support::env();
+        let render = |entries: Vec<serde_json::Value>| {
+            env.get_template("guestbook.jinja")
+                .expect("loads")
+                .render(context! {
+                    user => json!({"login_name": "oeee", "display_name": "오이", "id": "u1"}),
+                    current_user => json!(null),
+                    messages => Vec::<serde_json::Value>::new(),
+                    draft_post_count => 0,
+                    unread_notification_count => 0,
+                    ftl_lang => "en",
+                    guestbook_entries => entries,
+                })
+                .expect("renders")
+        };
+        let empty = render(vec![]);
+        assert!(empty.contains(r#"id="guestbook-entries"></div>"#), "the list is not :empty");
+        assert!(empty.contains("guestbook-empty"));
+        let entry = json!({
+            "id": "e1", "author_id": "u2", "recipient_id": "u1",
+            "author_login_name": "someone", "author_display_name": "Someone",
+            "content": "hi", "reply": null,
+            "created_at": chrono::Utc::now().to_rfc3339(),
+        });
+        let one = render(vec![entry.clone()]);
+        assert!(one.contains(r#"id="guestbook-entries"><div class="guestbook-entry">"#));
+        let alone = env
+            .get_template("guestbook_entry.jinja")
+            .expect("loads")
+            .render(context! { entry, user => json!({"login_name": "oeee"}), current_user => json!(null), ftl_lang => "en" })
+            .expect("renders");
+        assert!(alone.starts_with("<div") && alone.ends_with("</div>"), "{alone:?}");
+    }
+
+    /// Throwing a draft away answers with what else changes, out of band:
+    /// the count always, and at the last one the empty state in the grid's
+    /// place and the per-row control gone. Ids the drafts page carries.
+    #[test]
+    fn a_thrown_away_draft_updates_the_count_and_empties_the_page() {
+        let env = test_support::env();
+        let oob = env.get_template("draft_delete_oob.jinja").expect("loads");
+        let some = oob.render(context! { remaining => 2, ftl_lang => "en" }).expect("renders");
+        assert!(some.contains(r#"<span id="drafts-count" hx-swap-oob="true">2</span>"#));
+        assert!(!some.contains("drafts-body"), "drafts left, the grid stays");
+        let none = oob.render(context! { remaining => 0, ftl_lang => "en" }).expect("renders");
+        assert!(none.contains(r#"<div id="drafts-body" hx-swap-oob="true">"#));
+        assert!(none.contains("draft-empty"));
+        assert!(none.contains(r#"<div id="drafts-tools" class="drafts-tools" hx-swap-oob="true"></div>"#));
+
+        let page = env
+            .get_template("draft_posts.jinja")
+            .expect("loads")
+            .render(context! {
+                current_user => json!({"login_name": "someone"}),
+                messages => Vec::<serde_json::Value>::new(),
+                draft_post_count => 0,
+                unread_notification_count => 0,
+                ftl_lang => "en",
+                posts => Vec::<serde_json::Value>::new(),
+            })
+            .expect("renders");
+        for id in ["drafts-count", "drafts-tools", "drafts-body"] {
+            assert!(page.contains(&format!(r#"id="{id}""#)), "the page has no #{id}");
+        }
+    }
+
     /// The grid is the shared feed fragment, so its sentinel points wherever
     /// the handler said — and it must be this community's endpoint rather than
     /// the home feed's, or scrolling a community page loads the front page.

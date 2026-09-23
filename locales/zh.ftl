@@ -236,7 +236,6 @@ collaborate-active-sessions = 活跃的公共会话
 collaborate-your-sessions = 我的会话
 collaborate-session-full = 已满
 collaborate-session-link-only = 仅限链接
-collaborate-create-error = 创建会话失败，请重试。
 collaborate-create-network-error = 创建会话失败，请检查网络连接后重试。
 collaborate-sign-in-to-create = 登录后即可开始共同绘画
 collaborate-finished-drawings = 已完成的共同作品

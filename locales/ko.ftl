@@ -236,7 +236,6 @@ collaborate-active-sessions = 활성 공개 세션
 collaborate-your-sessions = 내 세션
 collaborate-session-full = 가득 참
 collaborate-session-link-only = 링크 전용
-collaborate-create-error = 세션을 만들지 못했습니다. 다시 시도해 주세요.
 collaborate-create-network-error = 세션을 만들지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.
 collaborate-sign-in-to-create = 로그인하고 넷캔을 시작해 보세요
 collaborate-finished-drawings = 완성된 넷캔 그림

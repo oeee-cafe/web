@@ -76,19 +76,6 @@
          `.ds-notices:empty` gives it no box while it holds nothing. #}
       <div id="htmx-error" class="ds-notices htmx-error"></div>
     </header>
-    {# Putting a notice away. Delegated, so the htmx banner's notices, which
-       arrive after this runs, close the same way. A list left with nothing
-       in it is emptied outright, so `:empty` takes the list away too. #}
-    <script>
-      document.addEventListener("click", function (event) {
-        var button = event.target.closest && event.target.closest(".ds-notice-close");
-        if (!button) return;
-        var notice = button.parentNode;
-        var list = notice.parentNode;
-        list.removeChild(notice);
-        if (!list.querySelector(".ds-notice")) list.innerHTML = "";
-      });
-    </script>
     {# In the macOS app the header floats over the content (ds.css), which
        needs its height to start below it -- a height that changes when the
        toolbar stacks or a message arrives. #}

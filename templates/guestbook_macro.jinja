@@ -3,7 +3,7 @@
    answers through a Reply button that opens its field in place, rather than
    a field standing open under every entry. Rendered by the page and alone by
    the handlers (guestbook_entry.jinja), with `user` and `current_user`. #}
-{% macro guestbook_entry(entry) %}
+{% macro guestbook_entry(entry) -%}
   <div class="guestbook-entry">
     <div class="guestbook-head">
       <a class="member-name" href="/@{{ entry.author_login_name }}">{{ entry.author_display_name }}</a>
@@ -39,7 +39,7 @@
       </form>
     {% endif %}
   </div>
-{% endmacro %}
+{%- endmacro %}
 {% macro guestbook_entry_reply(entry) %}
   <div class="guestbook-reply">
     <div class="guestbook-head">
@@ -48,4 +48,4 @@
     </div>
     <div class="guestbook-content ds-selectable">{{ entry.reply }}</div>
   </div>
-{% endmacro %}
+{%- endmacro %}

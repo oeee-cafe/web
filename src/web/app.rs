@@ -33,10 +33,10 @@ use crate::web::handlers::identity::{
 };
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
-    create_collaborative_session, get_active_sessions_json, get_auth_info, get_collaboration_meta,
-    load_more_collaborative_posts, report_session_diagnostics, save_collaborative_session,
-    serve_collaborative_app, serve_session_preview, upload_session_preview,
-    websocket_collaborate_handler,
+    create_collaborative_session, create_collaborative_session_form, get_active_sessions_json,
+    get_auth_info, get_collaboration_meta, load_more_collaborative_posts,
+    report_session_diagnostics, save_collaborative_session, serve_collaborative_app,
+    serve_session_preview, upload_session_preview, websocket_collaborate_handler,
 };
 use crate::web::handlers::collaborate_cleanup::cleanup_collaborative_sessions;
 use crate::web::handlers::community::{
@@ -614,7 +614,7 @@ impl App {
             .route("/posts/:id", get(redirect_post_to_login_name))
             .route(
                 "/collaborate",
-                get(collaborate_lobby).post(create_collaborative_session),
+                get(collaborate_lobby).post(create_collaborative_session_form),
             )
             // Static segment, so it wins over /collaborate/:uuid — and no UUID
             // can spell "sessions" anyway.

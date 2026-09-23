@@ -44,12 +44,19 @@
              into the script below: they are translated text, and an attribute
              is the only context minijinja escapes correctly for. A label
              column and a control column, so the eye follows one edge down. #}
+          {# Sent by htmx: the server answers with where the new session
+             is (HX-Redirect), and a refusal goes to the page's error banner
+             (web::htmx). Only a request that got no answer at all is ours to
+             say, which the banner cannot. Without script it is an ordinary
+             form, redirected there. #}
           <form id="create-session-form"
                 class="session-form"
                 method="post"
                 action="/collaborate"
-                data-error="{{ ftl_get_message("collaborate-create-error") }}"
-                data-network-error="{{ ftl_get_message("collaborate-create-network-error") }}">
+                hx-post="/collaborate"
+                hx-disable="find button[type=submit]"
+                data-network-error="{{ ftl_get_message("collaborate-create-network-error") }}"
+                hx-on::error="if (!(event.detail.ctx && event.detail.ctx.response)) dsAlert(this.dataset.networkError)">
             <label for="canvas-size">{{ ftl_get_message("collaborate-canvas-size-label") }}</label>
             <div class="field">
               <select id="canvas-size" name="canvas-size" class="ds-select" required>
@@ -166,47 +173,6 @@
       // asked for: open it with that community chosen.
       {% if selected_community_slug %}toggleSessionDialog(true);{% endif %}
     })();
-  </script>
-  <script>
-    document.getElementById('create-session-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const formData = new FormData(e.target);
-      const canvasSize = formData.get('canvas-size').split('x');
-      const width = parseInt(canvasSize[0]);
-      const height = parseInt(canvasSize[1]);
-      
-      const requestData = {
-        title: formData.get('title') || null,
-        width: width,
-        height: height,
-        is_public: formData.get('is_public') === 'on',
-        max_participants: parseInt(formData.get('max_participants')),
-        // Empty means a personal session; the server treats "" as None. A
-        // saved session becomes a post in whichever community is chosen here.
-        community_id: formData.get('community_id') || null
-      };
-      
-      try {
-        const response = await fetch('/collaborate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestData)
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          window.location.href = result.url;
-        } else {
-          dsAlert(e.target.dataset.error);
-        }
-      } catch (error) {
-        console.error('Error creating session:', error);
-        dsAlert(e.target.dataset.networkError);
-      }
-    });
   </script>
   <script>
     // A type-ahead facade over the community <select>. The select stays the
