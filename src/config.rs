@@ -82,13 +82,21 @@ pub struct AppConfig {
     pub apple: Option<AppleConfig>,
 
     /// The App Store's side of the iOS and macOS apps, as an `[app_store]`
-    /// table: what the Supporter Pack is sold as, and the key that asks
-    /// Apple about a purchase. Separate from `[apple]`, which signs people in
-    /// with different credentials entirely. Unset means the apps sell
-    /// nothing and `/store/apple/purchases` answers every transaction with a
-    /// 404.
+    /// table: the key that asks Apple about a purchase. Separate from
+    /// `[apple]`, which signs people in with different credentials entirely.
+    /// What the Supporter Pack is sold as is the catalogue's to say
+    /// (`models::store_product`). Unset means `/store/apple/purchases`
+    /// answers every transaction with a 404.
     #[serde(default)]
     pub app_store: Option<AppStoreConfig>,
+
+    /// The Microsoft Store's side of the Windows app, as a
+    /// `[microsoft_store]` table: the Microsoft Entra app the site asks the
+    /// Microsoft Store's collections API with (`crate::microsoft_store`).
+    /// Unset means `/store/microsoft/tickets` and
+    /// `/store/microsoft/purchases` answer 404.
+    #[serde(default)]
+    pub microsoft_store: Option<MicrosoftStoreConfig>,
 
     /// Sign in with Google, as a `[google]` table. Unset means the site does
     /// not offer it.
@@ -110,10 +118,14 @@ pub struct AppStoreConfig {
     /// The app the purchase has to have been made in: `cafe.oeee` for the
     /// iOS app. A transaction from any other bundle buys nothing here.
     pub bundle_id: String,
+    /// Deprecated: the packs live in the `store_products` table now, and
+    /// /admin/store changes them. Still read so a config that lists them
+    /// boots, and imported into the table on boot -- added where missing,
+    /// never changing a row already there (`store_product::import_configured`).
+    /// Nothing else reads it.
+    ///
     /// A Supporter Pack per year, as `[[app_store.supporter_products]]`
-    /// tables of `year` and `product_id` -- non-consumables, one per year,
-    /// for the reason `[[steam.supporter_apps]]` gives. Empty means the app
-    /// sells nothing and no transaction is asked about.
+    /// tables of `year` and `product_id`.
     #[serde(default)]
     pub supporter_products: Vec<SupporterProduct>,
     /// Where the App Store Server API is, and where its sandbox is: a
@@ -209,16 +221,14 @@ pub struct SteamConfig {
     /// A publisher Web API key (Steamworks > Users & Permissions > Manage
     /// Groups), not a user's key: AuthenticateUserTicket accepts no other.
     pub web_api_key: String,
-    /// A Supporter Pack DLC per year, as `[[steam.supporter_apps]]` tables
-    /// of `year` and `app_id`. Owning one makes its buyer a supporter for
-    /// that year: a mark beside their name while the year lasts, and a line
-    /// on their profile for good.
+    /// Deprecated, as `app_store.supporter_products` is: the packs live in
+    /// the `store_products` table, this is imported into it on boot where
+    /// missing, and nothing else reads it. The app's own `app_id` is left
+    /// out of the import however it is listed: buying Oeee Cafe is not
+    /// supporting it.
     ///
-    /// A DLC is owned once and for good, so supporting again next year is
-    /// buying next year's -- and a delisted one stays owned, so a year's id
-    /// stays here once it has been here. The app's own `app_id` is never one
-    /// of them however it is listed: buying Oeee Cafe is not supporting it.
-    /// Empty means nobody's standing changes.
+    /// A Supporter Pack DLC per year, as `[[steam.supporter_apps]]` tables
+    /// of `year` and `app_id`.
     #[serde(default)]
     pub supporter_apps: Vec<SupporterApp>,
     /// Where the partner Web API is. Only a test changes it.
@@ -232,6 +242,34 @@ pub struct SteamConfig {
 pub struct SupporterApp {
     pub year: i32,
     pub app_id: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct MicrosoftStoreConfig {
+    /// The Microsoft Entra tenant the app below is registered in, whose id
+    /// is associated with the Partner Center account that sells the Windows
+    /// app (Partner Center > Account settings > Tenants).
+    pub tenant_id: String,
+    /// The application (client) id of a web app registered in that tenant
+    /// and added to the Windows app's product in Partner Center (Product
+    /// management > Product collections and purchases). Its tokens are what
+    /// the Microsoft Store is asked with.
+    pub client_id: String,
+    /// A client secret of that app. Only ever sent to Microsoft's token
+    /// endpoint.
+    pub client_secret: String,
+    /// Where tokens come from. Unset is Microsoft Entra's v1 endpoint for
+    /// the tenant (see `microsoft_store::token_url`); only a test changes it.
+    #[serde(default)]
+    pub token_url: Option<String>,
+    /// Where the collections API is. Only a test changes it.
+    #[serde(default = "default_microsoft_collections_url")]
+    pub collections_url: String,
+}
+
+fn default_microsoft_collections_url() -> String {
+    "https://purchase.mp.microsoft.com/v8.0/b2b/collections/query".to_string()
 }
 
 fn default_steam_web_api_url() -> String {
@@ -278,6 +316,7 @@ mod tests {
             steam: Option<SteamConfig>,
             apple: Option<AppleConfig>,
             app_store: Option<AppStoreConfig>,
+            microsoft_store: Option<MicrosoftStoreConfig>,
         }
 
         let sample =
@@ -331,5 +370,12 @@ mod tests {
         );
         assert!(store.api_url.contains("api.storekit."));
         assert!(store.sandbox_api_url.contains("sandbox"));
+
+        let microsoft = parsed.microsoft_store.expect("a [microsoft_store] table");
+        assert_eq!(microsoft.token_url, None, "the tenant's own, unless a test says");
+        assert_eq!(
+            microsoft.collections_url,
+            "https://purchase.mp.microsoft.com/v8.0/b2b/collections/query"
+        );
     }
 }

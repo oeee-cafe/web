@@ -46,14 +46,11 @@ email_from_address = ""
 # app_id = 0
 # web_api_key = ""
 
-# A Supporter Pack DLC per year: owning one makes its buyer a supporter for
-# that year -- the mark beside their name while the year lasts, and a line on
-# their profile for good. A DLC is owned once and for good, so supporting
-# again next year is buying next year's, and a year's id stays here once it
-# has been here (a delisted DLC stays owned). The app's own app_id is never
-# counted however it is listed: buying Oeee Cafe is not supporting it. Steam
-# accounts are rechecked daily, so a purchase or a refund lands without
-# anyone signing in.
+# Deprecated: the Supporter Packs every store sells are a table now, changed
+# at /admin/store. A pack still listed here is added to it on boot where it
+# is missing, and a pack already there is left as staff left it, so this can
+# be deleted once the table has them. The app's own app_id is never added
+# however it is listed: buying Oeee Cafe is not supporting it.
 # [[steam.supporter_apps]]
 # year = 2026
 # app_id = 0
@@ -88,8 +85,9 @@ email_from_address = ""
 # here in config/, which is not in the repository, and read from /app/config
 # in the container.
 #
-# supporter_products are the packs, one per year, as non-consumables: the
-# same year-by-year shape as [[steam.supporter_apps]], for the same reason.
+# supporter_products is deprecated, as [[steam.supporter_apps]] is: the packs
+# are sold from the table /admin/store changes, and one listed here is only
+# added to it on boot where it is missing.
 # A transaction production has never heard of is asked about in Apple's
 # sandbox, so TestFlight and Xcode builds work without a second deployment.
 # [app_store]
@@ -101,3 +99,14 @@ email_from_address = ""
 # [[app_store.supporter_products]]
 # year = 2026
 # product_id = "cafe.oeee.supporter.2026"
+
+# The Microsoft Store's side of the Windows app. Leave the table out and the
+# Microsoft Store build sells nothing. tenant_id is the Microsoft Entra tenant
+# associated with the Partner Center account; client_id and client_secret are
+# a web app registered in it and added to the app's product in Partner Center
+# (Product management > Product collections and purchases). The add-ons it
+# sells are listed at /admin/store by their Store IDs.
+# [microsoft_store]
+# tenant_id = "00000000-0000-0000-0000-000000000000"
+# client_id = "00000000-0000-0000-0000-000000000000"
+# client_secret = ""

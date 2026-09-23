@@ -531,6 +531,7 @@ supporter-pack-years = 你支持过的年份
 supporter-pack-years-help = 礼包买过一次就一直属于你，名字旁边的标记则是今年的。
 supporter-badge-steam = Steam 支持者
 supporter-badge-apple = App Store 支持者
+supporter-badge-microsoft = Microsoft Store 支持者
 supporter-year = { $year }年 { $platform }
 about-supporters = 支持者
 about-supporters-thanks = 他们购买了今年的支持者礼包，让黄瓜咖啡馆为每个人继续运转。谢谢你们。

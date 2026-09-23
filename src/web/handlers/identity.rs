@@ -54,6 +54,8 @@ use crate::models::identity::{
     find_user_by_identity, find_user_by_verified_email, link_identity, touch_identity,
     unlink_identity, LinkError, Provider, UnlinkError, VerifiedIdentity,
 };
+use crate::models::store_product;
+use crate::models::supporter::Store;
 use crate::models::user::{
     create_user, find_user_by_login_name, login_name_conflicts_with_community,
     update_user_email_verified_at, update_user_preferred_language, AuthSession, User, UserDraft,
@@ -345,7 +347,10 @@ pub async fn do_steam_sign_in(
         return Ok(Redirect::to(back).into_response());
     };
 
-    let identity = match steam::verify_ticket(config, &form.ticket).await {
+    // Signing in says what the account owns as well, against every Steam
+    // product the catalogue has.
+    let packs = store_product::packs_in(&state.db_pool, Store::Steam).await?;
+    let identity = match steam::verify_ticket(config, &packs, &form.ticket).await {
         Ok(Ok(identity)) => identity,
         Ok(Err(TicketRejected::Invalid)) => {
             messages

@@ -71,9 +71,12 @@
    restore  {}
             The Supporter Pack, on /supporter, through the store the build
             sells through (data-store, below): what the products cost, sell
-            one, hand over what was already bought. The app answers with
-            oeeeApp.store.prices and oeeeApp.store.purchased, and every store
-            goes the same way (app_store.jinja).
+            one, hand over what was already bought. The products are the
+            site's catalogue, and the server draws only the build's own
+            store's buttons, so every one asked about is the app's to sell.
+            The app answers with oeeeApp.store.prices and
+            oeeeApp.store.purchased, and every store goes the same way
+            (app_store.jinja).
    signIn   {provider, nonce?}
    browse   {url}
             A sign-in the page is carrying for an app: make an ID token for
@@ -102,8 +105,10 @@
    A build that sells says which store it sells through in its user agent
    -- store/apple (the App Store), store/microsoft (the Microsoft Store) or
    store/steam -- so `data-store` is on the root before the page paints,
-   early enough that the buttons on /supporter, and Steam's sign-in, are
-   never drawn in a build that would do nothing with them. It is the build
+   early enough that Steam's sign-in is never drawn in a build that would
+   do nothing with it. The server reads the same words to choose
+   /supporter's buttons (Store::from_user_agent in models/supporter.rs,
+   the same rule), so those are never in the page at all. It is the build
    that says so, not the platform: the Microsoft Store build of the Windows
    app is not the Steam one. A build that says nothing is offered nothing
    to press.
@@ -129,7 +134,12 @@
                              true when the page knew the name
      store.prices(prices)    supporter.jinja
      store.purchased(proofs) app_store.jinja: proof of what the store sold,
-                             answered with the proofs the site took
+                             answered with the proofs the site took -- for
+                             the Microsoft Store, a Store ID key, which the
+                             app gets from GetCustomerCollectionsIdAsync
+                             (ticket, user)
+     store.ticket()          app_store.jinja: {ticket, user} for that call,
+                             or null outside the Microsoft Store build
      painter.command(name), painter.preferPen()
                              frontend/shared/appBridge.ts, on a drawing page
 

@@ -1,0 +1,104 @@
+{% extends "admin/base.jinja" %}
+{# The Supporter Pack catalogue (models/store_product.rs): what each store
+   sells, which year a purchase of it counts for, and whether /supporter
+   offers it. A product is never removed, only taken off sale -- whoever
+   bought it keeps it, and a refund of it still has to be heard -- and its
+   year never changes, since that is what its purchases were credited
+   with. So each row has a toggle and nothing else. #}
+{% block admin_content %}
+  <h2>Store</h2>
+  <p class="muted">
+    The Supporter Packs each store sells. /supporter offers a store's
+    products on sale for {{ this_year }} to the app that sells through it.
+    Off sale only stops that: a product off sale still counts for everyone
+    who bought it, and its refunds are still heard.
+  </p>
+
+  {% if error %}
+    <p role="alert"><span class="admin-tag deleted">not added</span> {{ error }}</p>
+  {% endif %}
+
+  {% for group in groups %}
+    <h3>{{ group.store }}</h3>
+    {% if group.store == "microsoft" and not microsoft_configured %}
+      <p class="muted">
+        This server has no <code>[microsoft_store]</code> in its config, so
+        nothing bought here can be checked yet.
+      </p>
+    {% endif %}
+    {% if group.products|length == 0 %}
+      <p class="muted">Nothing yet.</p>
+    {% else %}
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Year</th>
+            <th>Button</th>
+            <th>Added</th>
+            <th>On sale</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in group.products %}
+            <tr>
+              <td><code>{{ product.product }}</code></td>
+              <td>
+                {% if product.year == this_year %}<strong>{{ product.year }}</strong>{% else %}{{ product.year }}{% endif %}
+              </td>
+              <td>
+                {% if product.label %}{{ product.label }}{% else %}<span class="muted">the usual words</span>{% endif %}
+              </td>
+              <td>{{ product.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
+              <td>
+                {% if product.on_sale %}on sale{% else %}<span class="admin-tag deleted">off sale</span>{% endif %}
+              </td>
+              <td>
+                <form method="post"
+                      action="/admin/store/{{ product.store|urlencode }}/{{ product.product|urlencode }}/on-sale">
+                  <input type="hidden"
+                         name="on_sale"
+                         value="{% if product.on_sale %}false{% else %}true{% endif %}" />
+                  <button type="submit">
+                    {% if product.on_sale %}Take off sale{% else %}Put on sale{% endif %}
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  {% endfor %}
+
+  <h3>Add a product</h3>
+  <p class="muted">
+    The store's own id: an App Store product id, a Microsoft Store ID, or a
+    Steam DLC's app id. Its year cannot be changed after it is added.
+  </p>
+  <form method="post" action="/admin/store" class="admin-filters">
+    <label>
+      Store
+      <select name="store" required>
+        <option value="">—</option>
+        {% for store in stores %}
+          <option value="{{ store }}" {% if form.store == store %}selected{% endif %}>{{ store }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Product id
+      <input type="text" name="product" value="{{ form.product }}" required />
+    </label>
+    <label>
+      Year
+      <input type="number" name="year" value="{{ form.year or this_year }}" required />
+    </label>
+    <label>
+      Button label (optional)
+      <input type="text" name="label" value="{{ form.label }}" maxlength="100" />
+    </label>
+    <button type="submit">Add</button>
+  </form>
+{% endblock admin_content %}

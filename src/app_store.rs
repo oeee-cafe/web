@@ -167,14 +167,22 @@ fn read_transaction(jws: &str) -> Result<Transaction> {
     Ok(data.claims)
 }
 
-/// What the App Store says about `transaction_id`.
+/// What the App Store says about `transaction_id`, against `packs`: every
+/// product the catalogue has for the App Store, on sale or not
+/// (`store_product::packs`), since a pack taken off sale still counts for
+/// whoever bought it.
 ///
 /// `None` when nothing here sold it: a transaction Apple does not know, or
-/// one from another app or another product. A refunded purchase, or one
-/// shared with the family rather than bought, comes back as a [`Purchase`]
-/// that is not owned -- that is an answer, and takes standing away.
-pub async fn look_up(config: &AppStoreConfig, transaction_id: &str) -> Result<Option<Purchase>> {
-    if config.supporter_products.is_empty() {
+/// one from another app or of a product the catalogue does not have. A
+/// refunded purchase, or one shared with the family rather than bought,
+/// comes back as a [`Purchase`] that is not owned -- that is an answer, and
+/// takes standing away. The year it counts for is the catalogue's.
+pub async fn look_up(
+    config: &AppStoreConfig,
+    packs: &[OwnedProduct],
+    transaction_id: &str,
+) -> Result<Option<Purchase>> {
+    if packs.is_empty() {
         return Ok(None);
     }
     let signed = match signed_transaction(config, &config.api_url, transaction_id).await? {
@@ -190,20 +198,16 @@ pub async fn look_up(config: &AppStoreConfig, transaction_id: &str) -> Result<Op
     if transaction.bundle_id != config.bundle_id {
         return Ok(None);
     }
-    let Some(pack) = config
-        .supporter_products
+    let Some(pack) = packs
         .iter()
-        .find(|pack| pack.product_id == transaction.product_id)
+        .find(|pack| pack.product == transaction.product_id)
     else {
         return Ok(None);
     };
     let owned = transaction.revocation_date.is_none()
         && transaction.in_app_ownership_type.as_deref() != Some("FAMILY_SHARED");
     Ok(Some(Purchase {
-        pack: OwnedProduct {
-            product: transaction.product_id,
-            year: pack.year,
-        },
+        pack: pack.clone(),
         transaction: transaction.original_transaction_id,
         owned,
     }))
@@ -224,8 +228,18 @@ const ASKS_PER_MINUTE: usize = 6;
 /// deploy, and a limit that is twice as generous for that moment is still a
 /// limit. Nothing here is worth a round trip to Redis.
 pub fn may_ask(user_id: Uuid) -> bool {
-    static ASKED: OnceLock<Mutex<HashMap<Uuid, Vec<Instant>>>> = OnceLock::new();
-    let mut asked = ASKED.get_or_init(Default::default).lock().unwrap();
+    static ASKED: Asked = OnceLock::new();
+    may_ask_of(&ASKED, user_id, ASKS_PER_MINUTE)
+}
+
+/// Who has asked a store what, and when: one per store, since each store's
+/// rate limit is its own.
+pub(crate) type Asked = OnceLock<Mutex<HashMap<Uuid, Vec<Instant>>>>;
+
+/// Whether `user_id` may send us to the store `asked` counts for again, at
+/// most `per_minute` times a minute.
+pub(crate) fn may_ask_of(asked: &Asked, user_id: Uuid, per_minute: usize) -> bool {
+    let mut asked = asked.get_or_init(Default::default).lock().unwrap();
     let now = Instant::now();
     // What has fallen out of the window is forgotten, and an account whose
     // asks all have is forgotten with it: this map would otherwise hold
@@ -235,7 +249,7 @@ pub fn may_ask(user_id: Uuid) -> bool {
         !asks.is_empty()
     });
     let asks = asked.entry(user_id).or_default();
-    if asks.len() >= ASKS_PER_MINUTE {
+    if asks.len() >= per_minute {
         return false;
     }
     asks.push(now);
@@ -264,11 +278,13 @@ pub async fn check(config: &AppStoreConfig) -> Result<()> {
 
 /// Asks the App Store again, once a day, about every purchase it has told us
 /// about, so a refund takes the mark away without anyone signing in. A check
-/// Apple cannot answer changes nothing.
+/// Apple cannot answer changes nothing. The catalogue is read afresh each
+/// time round, so a product added at /admin/store is known by the next one.
 ///
 /// Both colours run this for a moment during a deploy, and asking twice is
 /// harmless.
 pub async fn recheck_supporters(db: sqlx::PgPool, config: AppStoreConfig) {
+    use crate::models::store_product;
     use crate::models::supporter::{apple_purchases_due_for_check, record_recheck, Store};
 
     let mut every = tokio::time::interval(Duration::from_secs(10 * 60));
@@ -286,8 +302,23 @@ pub async fn recheck_supporters(db: sqlx::PgPool, config: AppStoreConfig) {
                 continue;
             }
         };
+        if due.is_empty() {
+            continue;
+        }
+        let packs = match store_product::packs_in(&db, Store::Apple).await {
+            Ok(packs) => packs,
+            Err(error) => {
+                tracing::warn!("could not read the App Store's products: {error:#}");
+                continue;
+            }
+        };
+        // An empty catalogue is one nobody has filled in, not a refund of
+        // everything: asking would answer every purchase with "not ours".
+        if packs.is_empty() {
+            continue;
+        }
         for due in due {
-            let owned = match look_up(&config, &due.transaction).await {
+            let owned = match look_up(&config, &packs, &due.transaction).await {
                 Ok(Some(answer)) => answer.owned,
                 // Apple no longer knows it, or it is no longer one of ours:
                 // either way it supports nothing.
@@ -316,7 +347,6 @@ pub async fn recheck_supporters(db: sqlx::PgPool, config: AppStoreConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SupporterProduct;
     use axum::extract::Path;
     use axum::http::HeaderMap;
     use axum::response::IntoResponse;
@@ -465,19 +495,25 @@ mod tests {
             key_id: KEY_ID.to_string(),
             private_key_path: PRIVATE_KEY_PATH.to_string(),
             bundle_id: BUNDLE_ID.to_string(),
-            supporter_products: vec![SupporterProduct {
-                year: PACK_YEAR,
-                product_id: PRODUCT_ID.to_string(),
-            }],
+            supporter_products: vec![],
             api_url: format!("http://{addr}/production"),
             sandbox_api_url: format!("http://{addr}/sandbox"),
         }
     }
 
+    /// The catalogue's App Store products, as `store_product::packs` gives
+    /// them.
+    fn packs() -> Vec<OwnedProduct> {
+        vec![OwnedProduct {
+            product: PRODUCT_ID.to_string(),
+            year: PACK_YEAR,
+        }]
+    }
+
     #[tokio::test]
     async fn a_purchase_names_the_pack_and_the_year() {
         let config = fake_app_store().await;
-        let purchase = look_up(&config, "1000").await.unwrap().unwrap();
+        let purchase = look_up(&config, &packs(), "1000").await.unwrap().unwrap();
         assert_eq!(purchase.pack.product, PRODUCT_ID);
         assert_eq!(purchase.pack.year, PACK_YEAR, "the year it supports");
         assert_eq!(purchase.transaction, "1000", "what a restore names");
@@ -490,7 +526,7 @@ mod tests {
     async fn a_refund_and_a_shared_copy_are_not_purchases() {
         let config = fake_app_store().await;
         for id in ["1001", "1002"] {
-            let purchase = look_up(&config, id).await.unwrap().unwrap();
+            let purchase = look_up(&config, &packs(), id).await.unwrap().unwrap();
             assert!(!purchase.owned, "{id} bought nothing");
         }
     }
@@ -503,7 +539,7 @@ mod tests {
             // deployment does not sell, and one Apple has never heard of.
             "1003", "1004", "9999",
         ] {
-            assert_eq!(look_up(&config, id).await.unwrap(), None, "{id}");
+            assert_eq!(look_up(&config, &packs(), id).await.unwrap(), None, "{id}");
         }
     }
 
@@ -512,16 +548,27 @@ mod tests {
     #[tokio::test]
     async fn a_sandbox_purchase_is_asked_about_after_production() {
         let config = fake_app_store().await;
-        let purchase = look_up(&config, "2000").await.unwrap().unwrap();
+        let purchase = look_up(&config, &packs(), "2000").await.unwrap().unwrap();
         assert!(purchase.owned);
         assert_eq!(purchase.transaction, "2000");
     }
 
     #[tokio::test]
     async fn without_a_supporter_product_nothing_is_asked_about() {
-        let mut config = fake_app_store().await;
-        config.supporter_products = vec![];
-        assert_eq!(look_up(&config, "1000").await.unwrap(), None);
+        let config = fake_app_store().await;
+        assert_eq!(look_up(&config, &[], "1000").await.unwrap(), None);
+    }
+
+    /// The year comes from the catalogue, whatever the product id says.
+    #[tokio::test]
+    async fn the_year_is_the_catalogues() {
+        let config = fake_app_store().await;
+        let packs = [OwnedProduct {
+            product: PRODUCT_ID.to_string(),
+            year: 2031,
+        }];
+        let purchase = look_up(&config, &packs, "1000").await.unwrap().unwrap();
+        assert_eq!(purchase.pack.year, 2031);
     }
 
     /// The key, the key id and the issuer are all in the token, so a
@@ -555,10 +602,10 @@ mod tests {
     async fn a_token_apple_would_refuse_is_an_error_and_not_an_answer() {
         let mut config = fake_app_store().await;
         config.key_id = "WRONGKEY00".to_string();
-        assert!(look_up(&config, "1000").await.is_err());
+        assert!(look_up(&config, &packs(), "1000").await.is_err());
 
         let mut config = fake_app_store().await;
         config.private_key_path = "/nowhere/app-store.p8".to_string();
-        assert!(look_up(&config, "1000").await.is_err());
+        assert!(look_up(&config, &packs(), "1000").await.is_err());
     }
 }

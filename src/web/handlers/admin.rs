@@ -12,13 +12,19 @@ use crate::models::admin::{
     AdminCommunity, AdminPostFilter, AdminSessionStatus, AdminSort,
 };
 use crate::web::handlers::collaborate::preview::preview_versions;
+use crate::models::store_product::{
+    self, add as add_store_product, find as find_store_product, list_all as list_store_products,
+    set_on_sale as set_store_product_on_sale, StoreProduct,
+};
+use crate::models::supporter::{current_year, Store};
 use crate::models::user::find_user_by_login_name;
 use crate::web::context::CommonContext;
+use crate::web::handlers::identity::from_this_site;
 use crate::web::handlers::{AdminUser, ExtractFtlLang};
 use crate::web::state::AppState;
 use axum::extract::{Path, Query, State};
-use axum::http::header;
-use axum::response::{Html, IntoResponse, Response};
+use axum::http::{header, HeaderMap, StatusCode};
+use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::Form;
 use minijinja::context;
 use serde::Deserialize;
@@ -684,6 +690,225 @@ pub async fn replay_collaborative_session(
     Ok(Html(html).into_response())
 }
 
+/// The catalogue a store at a time, as /admin/store lists it.
+#[derive(serde::Serialize)]
+struct StoreGroup {
+    store: Store,
+    products: Vec<StoreProduct>,
+}
+
+/// What the add form was sent, echoed back when it is turned away so
+/// nothing has to be typed twice.
+#[derive(Debug, Default, Deserialize, serde::Serialize)]
+pub struct AddStoreProductForm {
+    #[serde(default)]
+    store: String,
+    #[serde(default)]
+    product: String,
+    #[serde(default)]
+    year: String,
+    #[serde(default)]
+    label: String,
+}
+
+/// The years a pack may be for: from the first one sold to a few ahead,
+/// which is as far as anyone plans a pack. A typo like 20226 or 206 is
+/// caught here rather than credited to purchases for ever.
+fn sensible_years() -> std::ops::RangeInclusive<i32> {
+    2020..=current_year() + 5
+}
+
+/// A product ready to add, or why not. Its year cannot be changed once it
+/// is in, so this is the one place it is looked at.
+fn validate_store_product(
+    form: &AddStoreProductForm,
+    steam_app_id: Option<u32>,
+) -> Result<(Store, String, i32, Option<String>), String> {
+    let store = Store::parse(form.store.trim()).ok_or("Choose a store.")?;
+    let product = form.product.trim();
+    if product.is_empty() {
+        return Err("A product id is needed.".to_string());
+    }
+    // Every store's ids are one unbroken word. Whitespace inside one is a
+    // paste gone wrong, and would never match anything the store says.
+    if product.chars().any(char::is_whitespace) || product.chars().count() > 100 {
+        return Err("A product id is one word, with no spaces.".to_string());
+    }
+    if store == Store::Steam {
+        let Ok(app_id) = product.parse::<u32>() else {
+            return Err("A Steam product is a DLC's app id, which is a number.".to_string());
+        };
+        if Some(app_id) == steam_app_id {
+            return Err(
+                "That is Oeee Cafe's own app id. Buying the app is not supporting it.".to_string(),
+            );
+        }
+    }
+    let year = form
+        .year
+        .trim()
+        .parse::<i32>()
+        .ok()
+        .filter(|year| sensible_years().contains(year))
+        .ok_or_else(|| {
+            let years = sensible_years();
+            format!(
+                "The year has to be between {} and {}.",
+                years.start(),
+                years.end()
+            )
+        })?;
+    let label = form.label.trim();
+    if label.chars().count() > 100 {
+        return Err("A button label is a hundred characters at most.".to_string());
+    }
+    let label = (!label.is_empty()).then(|| label.to_string());
+    Ok((store, product.to_string(), year, label))
+}
+
+async fn render_store_page(
+    state: &AppState,
+    admin: &AdminUser,
+    ftl_lang: String,
+    error: Option<String>,
+    form: AddStoreProductForm,
+) -> Result<String, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let mut products = list_store_products(&mut tx).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
+    tx.commit().await?;
+
+    let groups: Vec<StoreGroup> = Store::ALL
+        .into_iter()
+        .map(|store| StoreGroup {
+            store,
+            products: {
+                let (mine, rest) = products
+                    .drain(..)
+                    .partition(|product| product.store == store.as_str());
+                products = rest;
+                mine
+            },
+        })
+        .collect();
+
+    let template = state.env.get_template("admin/store.jinja")?;
+    Ok(template.render(context! {
+        current_user => admin.0.clone(),
+        groups,
+        stores => Store::ALL,
+        this_year => current_year(),
+        microsoft_configured => state.config.microsoft_store.is_some(),
+        error,
+        form,
+        draft_post_count => common_ctx.draft_post_count,
+        unread_notification_count => common_ctx.unread_notification_count,
+        ftl_lang,
+    })?)
+}
+
+/// GET /admin/store -- the Supporter Pack catalogue: every product each
+/// store sells or has sold, which year it counts for, and whether
+/// /supporter offers it.
+pub async fn admin_store(
+    admin: AdminUser,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+) -> Result<Html<String>, AppError> {
+    let rendered =
+        render_store_page(&state, &admin, ftl_lang, None, AddStoreProductForm::default()).await?;
+    Ok(Html(rendered))
+}
+
+/// POST /admin/store -- adds a product, on sale. Turned away, the page comes
+/// back with why and with what was typed.
+///
+/// Admin POSTs otherwise lean on the session cookie being SameSite=Lax.
+/// This one decides what people are charged for, so it checks the Origin as
+/// the purchase routes do (`from_this_site`) as well.
+pub async fn admin_add_store_product(
+    admin: AdminUser,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<AddStoreProductForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let steam_app_id = state.config.steam.as_ref().map(|steam| steam.app_id);
+    let refused = |error: String, form: AddStoreProductForm| async {
+        let rendered = render_store_page(&state, &admin, ftl_lang.clone(), Some(error), form).await?;
+        Ok::<_, AppError>((StatusCode::BAD_REQUEST, Html(rendered)).into_response())
+    };
+    let (store, product, year, label) = match validate_store_product(&form, steam_app_id) {
+        Ok(valid) => valid,
+        Err(error) => return refused(error, form).await,
+    };
+
+    let mut tx = state.db_pool.begin().await?;
+    let added = add_store_product(&mut tx, store, &product, year, label.as_deref()).await?;
+    tx.commit().await?;
+    if !added {
+        return refused(
+            format!(
+                "{} already has {product}. A product keeps its year; to stop selling it, take it off sale.",
+                store.as_str()
+            ),
+            form,
+        )
+        .await;
+    }
+    tracing::info!(
+        admin = %admin.0.login_name,
+        store = store.as_str(),
+        product,
+        year,
+        "added a product to the store catalogue"
+    );
+    store_product::refresh_any_on_sale(&state.db_pool).await?;
+    Ok(Redirect::to("/admin/store").into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StoreProductOnSaleForm {
+    /// Desired end state, not a toggle, so a double-submit is idempotent.
+    pub on_sale: bool,
+}
+
+/// POST /admin/store/:store/:product/on-sale -- puts a product on sale or
+/// takes it off. Off sale is off /supporter and nowhere else: whoever
+/// bought it keeps it, and its refunds are still heard.
+pub async fn admin_set_store_product_on_sale(
+    admin: AdminUser,
+    State(state): State<AppState>,
+    Path((store, product)): Path<(String, String)>,
+    headers: HeaderMap,
+    Form(form): Form<StoreProductOnSaleForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let Some(store) = Store::parse(&store) else {
+        return Err(AppError::NotFound("Store".to_string()));
+    };
+    let mut tx = state.db_pool.begin().await?;
+    if find_store_product(&mut tx, store, &product).await?.is_none() {
+        return Err(AppError::NotFound("Product".to_string()));
+    }
+    set_store_product_on_sale(&mut tx, store, &product, form.on_sale).await?;
+    tx.commit().await?;
+    tracing::info!(
+        admin = %admin.0.login_name,
+        store = store.as_str(),
+        product,
+        on_sale = form.on_sale,
+        "changed whether a product is on sale"
+    );
+    store_product::refresh_any_on_sale(&state.db_pool).await?;
+    Ok(Redirect::to("/admin/store").into_response())
+}
+
 #[cfg(test)]
 mod tests {
     //! `cargo check` validates the handlers but not the Jinja, so render every
@@ -1216,5 +1441,108 @@ mod tests {
                 ftl_lang => "en",
             })
             .expect("communities.jinja renders");
+    }
+
+    /// The catalogue as the handler hands it over: `StoreProduct`s grouped
+    /// under a `Store`, a year as a number, a label or null, and the add
+    /// form echoed back as the strings it was sent.
+    fn render_store(error: serde_json::Value, form: serde_json::Value) -> String {
+        test_env()
+            .get_template("admin/store.jinja")
+            .expect("template loads")
+            .render(context! {
+                current_user => current_user(),
+                groups => json!([
+                    {"store": "apple", "products": [
+                        {"store": "apple", "product": "cafe.oeee.supporter.2026", "year": 2026,
+                         "label": null, "on_sale": true, "created_at": "2026-01-01T00:00:00Z"},
+                        {"store": "apple", "product": "cafe.oeee.supporter.2025", "year": 2025,
+                         "label": "Last year's", "on_sale": false, "created_at": "2025-01-01T00:00:00Z"},
+                    ]},
+                    {"store": "microsoft", "products": []},
+                    {"store": "steam", "products": [
+                        {"store": "steam", "product": "481", "year": 2026,
+                         "label": null, "on_sale": true, "created_at": "2026-01-01T00:00:00Z"},
+                    ]},
+                ]),
+                stores => json!(["apple", "microsoft", "steam"]),
+                this_year => 2026,
+                microsoft_configured => false,
+                error,
+                form,
+                draft_post_count => 0,
+                unread_notification_count => 0,
+                ftl_lang => "en",
+            })
+            .expect("store.jinja renders")
+    }
+
+    #[test]
+    fn renders_store_catalogue() {
+        let rendered = render_store(
+            json!(null),
+            json!({"store": "", "product": "", "year": "", "label": ""}),
+        );
+        // A toggle per product, saying what pressing it will do.
+        assert!(rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/on-sale""#));
+        assert!(rendered.contains("Take off sale"));
+        assert!(rendered.contains("Put on sale"));
+        assert!(rendered.contains("Last year&#x27;s") || rendered.contains("Last year's"));
+        assert!(rendered.contains(r#"href="/admin/store""#), "in the nav");
+        assert!(rendered.contains("[microsoft_store]"), "says the store cannot be asked");
+        assert!(rendered.contains(r#"name="year" value="2026""#), "this year by default");
+        assert!(!rendered.contains("not added"));
+    }
+
+    #[test]
+    fn a_refused_product_comes_back_with_why_and_what_was_typed() {
+        let rendered = render_store(
+            json!("A product id is one word, with no spaces."),
+            json!({"store": "steam", "product": "4 81", "year": "2027", "label": "Hi"}),
+        );
+        assert!(rendered.contains("not added"));
+        assert!(rendered.contains("A product id is one word, with no spaces."));
+        assert!(rendered.contains(r#"<option value="steam" selected>"#));
+        assert!(rendered.contains(r#"name="product" value="4 81""#));
+        assert!(rendered.contains(r#"name="year" value="2027""#));
+    }
+
+    #[test]
+    fn a_store_product_is_checked_before_it_is_added() {
+        use super::{validate_store_product, AddStoreProductForm};
+        use crate::models::supporter::{current_year, Store};
+        let form = |store: &str, product: &str, year: &str, label: &str| AddStoreProductForm {
+            store: store.to_string(),
+            product: product.to_string(),
+            year: year.to_string(),
+            label: label.to_string(),
+        };
+        let year = current_year().to_string();
+        assert_eq!(
+            validate_store_product(&form("microsoft", " 9NBLGGH4R315 ", &year, "  "), Some(480)),
+            Ok((Store::Microsoft, "9NBLGGH4R315".to_string(), current_year(), None))
+        );
+        assert_eq!(
+            validate_store_product(&form("apple", "cafe.oeee.x", &year, " Buy "), None)
+                .unwrap()
+                .3
+                .as_deref(),
+            Some("Buy")
+        );
+        for (refused, why) in [
+            (form("google", "x", &year, ""), "an unknown store"),
+            (form("", "x", &year, ""), "no store"),
+            (form("apple", "  ", &year, ""), "no product"),
+            (form("apple", "cafe oeee", &year, ""), "whitespace"),
+            (form("apple", "cafe\u{3000}oeee", &year, ""), "an ideographic space"),
+            (form("steam", "abc", &year, ""), "a Steam product that is not an app id"),
+            (form("steam", "480", &year, ""), "the app itself"),
+            (form("apple", "x", "1999", ""), "too early"),
+            (form("apple", "x", "20226", ""), "a typo"),
+            (form("apple", "x", "", ""), "no year"),
+            (form("apple", "x", &year, &"가".repeat(101)), "a long label"),
+        ] {
+            assert!(validate_store_product(&refused, Some(480)).is_err(), "{why}");
+        }
     }
 }

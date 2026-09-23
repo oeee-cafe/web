@@ -1,6 +1,7 @@
-//! Supporters: accounts that have bought a Supporter Pack -- on Steam as the
-//! DLC for that year in `steam.supporter_apps`, or in the iOS app as the
-//! year's non-consumable in `app_store.supporter_products`.
+//! Supporters: accounts that have bought a Supporter Pack -- on Steam as a
+//! DLC, in the App Store as a non-consumable, in the Microsoft Store as a
+//! durable add-on -- each one a product the catalogue names and gives a
+//! year (`models::store_product`).
 //!
 //! **A pack is a year's.** Buying 2026's supports the site through 2026, and
 //! supporting again means buying 2027's when it comes. So the mark beside
@@ -56,9 +57,8 @@ use super::identity::Provider;
 pub enum Store {
     /// The App Store, which the iOS and macOS apps sell through.
     Apple,
-    /// The Microsoft Store, which the Windows app will sell through. Named
-    /// so the database and the page can say it; nothing records a purchase
-    /// from it yet.
+    /// The Microsoft Store, which the Microsoft Store build of the Windows
+    /// app sells through (`crate::microsoft_store`).
     Microsoft,
     /// Steam, which the Steam build of the desktop app sells through.
     Steam,
@@ -100,6 +100,40 @@ impl Store {
             .into_iter()
             .find(|store| store.identity() == Some(provider))
     }
+
+    /// The store the app a request came from sells through, from its user
+    /// agent, or `None` for a browser and for a build that sells nowhere.
+    ///
+    /// The same rule as theme_head.jinja's, which marks the root
+    /// `data-store` for the page's scripts: an app ends its user agent with
+    /// `OeeeCafe/<app> [store/<store>]`, and a store counts only where one
+    /// of the four apps is named too. Both read the words whole, as a
+    /// regular expression's `\b` does -- `OeeeCafe/iosx` names no app. It
+    /// decides which buttons /supporter draws and nothing else: nothing is
+    /// trusted for being named here, and a purchase is checked with the
+    /// store.
+    pub fn from_user_agent(user_agent: &str) -> Option<Self> {
+        word_after(user_agent, "OeeeCafe/", &["ios", "android", "macos", "windows"])?;
+        let store = word_after(user_agent, "store/", &["apple", "microsoft", "steam"])?;
+        Store::parse(store)
+    }
+}
+
+/// The first of `names` that follows `prefix` in `text` as a word of its
+/// own, where `prefix` starts a word: `\bprefix(names)\b`, with a word
+/// what JavaScript's `\w` is.
+fn word_after<'a>(text: &str, prefix: &str, names: &[&'a str]) -> Option<&'a str> {
+    let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    text.match_indices(prefix).find_map(|(at, _)| {
+        if text[..at].chars().next_back().is_some_and(word) {
+            return None;
+        }
+        let rest = &text[at + prefix.len()..];
+        names.iter().copied().find(|name| {
+            rest.strip_prefix(name)
+                .is_some_and(|after| !after.chars().next().is_some_and(word))
+        })
+    })
 }
 
 /// One Supporter Pack, as the platform names it.
@@ -1066,6 +1100,7 @@ mod tests {
             marks,
             named(&mut tx, "supporter_purchases_store_check").await
         );
+        assert_eq!(marks, named(&mut tx, "store_products_store_check").await);
 
         let mut stores = Store::ALL.map(|store| store.as_str().to_string()).to_vec();
         stores.sort();
@@ -1095,10 +1130,43 @@ mod tests {
         assert_eq!(Store::owned_by_identity(Provider::Google), None);
     }
 
-    /// The stores that sell a pack now, each of which needs its mark worded
-    /// and drawn. The Microsoft Store joins them when it sells: until then
-    /// nothing records a purchase from it, so no one can wear its mark.
-    const SELLING: [Store; 2] = [Store::Steam, Store::Apple];
+    /// The stores that sell a pack, each of which needs its mark worded and
+    /// drawn: every one of them, now that the Microsoft Store records its
+    /// purchases too.
+    const SELLING: [Store; 3] = Store::ALL;
+
+    /// The same cases as appContract.browser.test.ts gives theme_head.jinja,
+    /// which reads the same user agents for `data-store`.
+    #[test]
+    fn the_store_is_read_from_the_user_agent_as_the_page_reads_it() {
+        let cases = [
+            ("Mozilla/5.0 OeeeCafe/ios store/apple", Some(Store::Apple)),
+            ("Mozilla/5.0 OeeeCafe/android", None),
+            ("Mozilla/5.0 OeeeCafe/macos store/apple", Some(Store::Apple)),
+            (
+                "Mozilla/5.0 Edg/120 OeeeCafe/windows store/steam",
+                Some(Store::Steam),
+            ),
+            (
+                "Mozilla/5.0 Edg/120 OeeeCafe/windows store/microsoft",
+                Some(Store::Microsoft),
+            ),
+            ("Mozilla/5.0 Edg/120 OeeeCafe/windows", None),
+            // A browser, and a store named with no app to be in.
+            ("Mozilla/5.0 Firefox/56.0", None),
+            ("Mozilla/5.0 store/apple", None),
+            // Only the names these are, and only as words of their own.
+            ("Mozilla/5.0 OeeeCafe/tv store/nowhere", None),
+            ("Mozilla/5.0 OeeeCafe/iosx store/apple", None),
+            ("Mozilla/5.0 OeeeCafe/ios store/applesauce", None),
+            ("Mozilla/5.0 OeeeCafe/ios mystore/apple", None),
+            ("Mozilla/5.0 XOeeeCafe/ios store/apple", None),
+            ("", None),
+        ];
+        for (user_agent, expected) in cases {
+            assert_eq!(Store::from_user_agent(user_agent), expected, "{user_agent}");
+        }
+    }
 
     #[test]
     fn every_platform_mark_is_worded_in_every_locale() {

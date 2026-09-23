@@ -225,17 +225,13 @@ fn main() {
             // Whether any store here sells a Supporter Pack, which is what
             // decides if the toolbar has a heart in it at all. Which store
             // the reader is in front of is the page's own business
-            // (theme_head.jinja).
-            let packs_on_sale = cfg.steam.as_ref().is_some_and(|steam| {
-                steam
-                    .supporter_apps
-                    .iter()
-                    .any(|pack| pack.app_id != steam.app_id)
-            }) || cfg
-                .app_store
-                .as_ref()
-                .is_some_and(|store| !store.supporter_products.is_empty());
-            env.add_global("supporter_packs_on_sale", packs_on_sale);
+            // (theme_head.jinja). Asked of the catalogue as each page is
+            // rendered rather than fixed here, since staff change it at
+            // /admin/store while the server runs.
+            env.add_global(
+                "supporter_packs_on_sale",
+                minijinja::Value::from_object(PacksOnSale),
+            );
 
             env.set_loader(path_loader(&template_path));
 
@@ -283,4 +279,23 @@ fn main() {
                 .await
                 .expect("Failed to serve app")
         });
+}
+
+/// `supporter_packs_on_sale` in a template: true while any store has a pack
+/// on sale, as `store_product::any_on_sale` last read it.
+#[derive(Debug)]
+struct PacksOnSale;
+
+impl minijinja::value::Object for PacksOnSale {
+    fn repr(self: &Arc<Self>) -> minijinja::value::ObjectRepr {
+        minijinja::value::ObjectRepr::Plain
+    }
+
+    fn is_true(self: &Arc<Self>) -> bool {
+        oeee_cafe::models::store_product::any_on_sale()
+    }
+
+    fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", oeee_cafe::models::store_product::any_on_sale())
+    }
 }

@@ -9,6 +9,7 @@ pub mod handoff;
 pub mod jwks;
 pub mod locale;
 pub mod markdown_utils;
+pub mod microsoft_store;
 pub mod models;
 pub mod push;
 pub mod redis;

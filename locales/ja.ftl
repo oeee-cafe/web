@@ -531,6 +531,7 @@ supporter-pack-years = 支援してくださった年
 supporter-pack-years-help = 一度買ったパックはそのまま残り、お名前の横のマークは今年のパックのものです。
 supporter-badge-steam = Steamサポーター
 supporter-badge-apple = App Storeサポーター
+supporter-badge-microsoft = Microsoft Storeサポーター
 supporter-year = { $year }年 { $platform }
 about-supporters = サポーター
 about-supporters-thanks = 今年のサポーターパックを購入し、みんなのためにOEEEカフェを支えてくれている方々です。ありがとうございます。
