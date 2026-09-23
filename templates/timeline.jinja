@@ -10,9 +10,10 @@
     {# Same chrome as /: shared head, controls, grid and card fragment. The two
        feeds differ only in which query fills them and where the sentinel
        points, both of which come from the `feed` object. #}
-    <section role="region" aria-labelledby="post-feed-heading">
+    <section role="region" aria-label="{{ ftl_get_message("timeline-my") }}">
       <div class="feed-header">
-        <h2 id="post-feed-heading" class="home-section-title">{{ ftl_get_message("timeline-my") }}</h2>
+        {% set feed_switch = "following" %}
+        {% include "feed_switch.jinja" %}
         {# Only with posts to arrange: an empty feed has no columns to set. #}
         {% if feed.posts and feed.posts|length > 0 %}
           {% include "post_feed_controls.jinja" %}

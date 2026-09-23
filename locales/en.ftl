@@ -18,6 +18,9 @@ keyboard-shortcuts = Keyboard shortcuts
 keyboard-shortcuts-show = Show keyboard shortcuts
 keyboard-shortcuts-then = then
 nav-home = Home
+feed-switch = Feed
+feed-recent = Recent
+feed-following = Following
 timeline = Timeline
 timeline-my = My timeline
 timeline-empty = Your timeline is empty. Discover and follow other people from <a href="/communities">communities</a>!

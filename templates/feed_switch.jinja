@@ -1,0 +1,13 @@
+{# Which of the two feeds the Home tab shows, where the feed's heading would
+   be: Recent (/), every public drawing as it arrives, or Following
+   (/home), the drawings of the people the reader follows. Two orders of
+   one feed rather than two places, so a switch on the feed rather than
+   two tabs in the toolbar -- which marks Home on both (oeeeMarkCurrent,
+   toolbar.jinja). Links, so each is still its own address to go back to
+   and to share. Only for someone signed in: signed out there is one feed,
+   and / names it with a heading as before. `feed_switch` is the one
+   showing. #}
+<nav class="ds-segmented feed-switch" aria-label="{{ ftl_get_message("feed-switch") }}">
+  <a href="/"{% if feed_switch == "recent" %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-recent") }}</a>
+  <a href="/home"{% if feed_switch == "following" %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-following") }}</a>
+</nav>

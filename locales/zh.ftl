@@ -20,6 +20,9 @@ keyboard-shortcuts = 键盘快捷键
 keyboard-shortcuts-show = 显示键盘快捷键
 keyboard-shortcuts-then = 然后
 nav-home = 首页
+feed-switch = 动态
+feed-recent = 最新
+feed-following = 关注
 timeline = 时间线
 timeline-my = 我的时间线
 timeline-empty = 时间线是空的。在<a href="/communities">社区</a>中与其他用户建立联系吧！

@@ -1406,6 +1406,44 @@ mod tests {
         assert!(!rendered.contains("--page-width"));
     }
 
+    /// Recent and Following are two orders of the one feed Home shows, so
+    /// they are a switch where its heading was rather than two tabs in the
+    /// toolbar. Signed out there is only the one, and it keeps its heading.
+    #[test]
+    fn home_switches_between_recent_and_following_in_place_of_its_heading() {
+        let env = test_support::env();
+        let home = env.get_template("home.jinja").expect("template loads");
+
+        let signed_out = home
+            .render(home_context(vec![sample_post()], false))
+            .expect("home.jinja renders");
+        assert!(!signed_out.contains("feed-switch"), "one feed signed out, no switch");
+        assert!(signed_out.contains(r#"<h2 class="home-section-title">recent-drawings</h2>"#));
+
+        let signed_in = home
+            .render(context! {
+                current_user => json!({"login_name": "someone"}),
+                ..home_context(vec![sample_post()], false)
+            })
+            .expect("home.jinja renders");
+        assert!(signed_in.contains(r#"<a href="/" aria-current="page">feed-recent</a>"#));
+        assert!(signed_in.contains(r#"<a href="/home">feed-following</a>"#));
+        assert!(!signed_in.contains("home-section-title"), "the switch is the heading");
+        // Home is the one section for both: no toolbar tab for /home.
+        assert!(!signed_in.contains(r#"<a href="/home">timeline</a>"#));
+
+        let timeline = env
+            .get_template("timeline.jinja")
+            .expect("template loads")
+            .render(context! {
+                current_user => json!({"login_name": "someone"}),
+                ..home_context(vec![sample_post()], false)
+            })
+            .expect("timeline.jinja renders");
+        assert!(timeline.contains(r#"<a href="/">feed-recent</a>"#));
+        assert!(timeline.contains(r#"<a href="/home" aria-current="page">feed-following</a>"#));
+    }
+
     /// A drawing fills its square, cropped from its longer side, so it is
     /// scaled down -- smoothly -- only when its shorter side is larger than
     /// the square; anything else keeps hard pixels, which only work upward.

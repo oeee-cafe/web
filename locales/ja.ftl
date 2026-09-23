@@ -20,6 +20,9 @@ keyboard-shortcuts = キーボードショートカット
 keyboard-shortcuts-show = キーボードショートカットを表示
 keyboard-shortcuts-then = の次に
 nav-home = ホーム
+feed-switch = フィード
+feed-recent = 新着
+feed-following = 同盟
 timeline = タイムライン
 timeline-my = 私のタイムライン
 timeline-empty = タイムラインが空です。 <a href="/communities">コミュニティ</a>で他の人と同盟を結びましょう！
