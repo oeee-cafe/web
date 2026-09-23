@@ -80,7 +80,7 @@
     <div class="toolbar-end">
       {# The Supporter Pack: a heart, before search, leading to /supporter.
          For someone signed in only: the pack is bought against an account,
-         and the bar signed out is already asking for two other things.
+         and the bar signed out is already asking for something else.
          Someone reading without one meets it after joining, on the page
          rather than in the bar. Which store can take the money is the
          page's business (style.css). Left out of the markup entirely when
@@ -159,11 +159,11 @@
            question is still asked, and the name it asks about is there to
            read.
 
-           Then the same places as signed in: where the bell is, signing
-           in; where Draw is, the one filled button. #}
+           Then signing in, as the one filled button where Draw is when
+           signed in. Signing up has no button of its own: the sign in page
+           offers it, so one button covers both. #}
         <a class="toolbar-about" href="/about" aria-label="{{ ftl_get_message("nav-about-menu") }}" title="{{ ftl_get_message("nav-about-menu") }}"><span class="toolbar-about-words">{{ ftl_get_message("nav-about-menu") }}</span><span class="toolbar-about-mark" aria-hidden="true">?</span></a>
-        <a class="toolbar-signin" href="/login">{{ ftl_get_message("sign-in") }}</a>
-        <a class="toolbar-draw" href="/signup">{{ ftl_get_message("sign-up") }}</a>
+        <a class="toolbar-draw" href="/login">{{ ftl_get_message("sign-in") }}</a>
       {% endif %}
       {% if current_user %}
         <details class="toolbar-menu">
