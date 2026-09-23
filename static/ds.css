@@ -796,15 +796,22 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    outrank all of them, rather than listing every layout and missing the
    next one added. Unread fills the bell in the badge's orange: the shape
    changes as well as the colour, and the width does not
-   (nav_notifications.jinja). */
+   (nav_notifications.jinja).
+
+   The Supporter Pack's heart is the third of them, shown only in an app
+   that can sell one (style.css). A square icon button added without being
+   named here keeps the worded buttons' 4px 11px and their 20px line height,
+   and comes out 40x26 sitting 2px below its neighbours. */
 .nav-bar .toolbar-end a.toolbar-button.toolbar-search,
-.nav-bar .toolbar-end a.toolbar-button.toolbar-bell {
+.nav-bar .toolbar-end a.toolbar-button.toolbar-bell,
+.nav-bar .toolbar-end a.toolbar-button.toolbar-supporter {
   padding: 4px;
   line-height: 0;
 }
 
 .toolbar-end .toolbar-search svg,
-.toolbar-end .toolbar-bell svg {
+.toolbar-end .toolbar-bell svg,
+.toolbar-end .toolbar-supporter svg {
   margin: 2px;
 }
 

@@ -71,13 +71,18 @@
     <div class="toolbar-end">
       {# The Supporter Pack, where it can be bought: a heart, before search,
          leading to /supporter. Only an app can take the money, so the
-         button is hidden until theme_head.jinja marks the root with the
-         store this page is being read in front of -- and left out of the
-         markup entirely when this deployment has no pack for sale. #}
+         button is hidden until an app that can sell marks the root
+         `data-store` -- and left out of the markup entirely when this
+         deployment has no pack for sale.
+
+         Drawn as its neighbours are: no fill, a 2px round stroke, 16px in
+         a 30px square (ds.css names it beside them). The filled weight in
+         this bar is the Draw button's, and belongs to the one control that
+         is filled in. #}
       {% if supporter_packs_on_sale %}
         <a class="toolbar-button toolbar-supporter" href="/supporter"
            aria-label="{{ ftl_get_message("supporter-pack") }}" title="{{ ftl_get_message("supporter-pack") }}">
-          {# material-symbols:favorite (Apache 2.0; THIRD-PARTY-NOTICES.md). #}<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 21l-1.45-1.3q-2.525-2.275-4.175-3.925T3.75 12.812T2.388 10.4T2 8.15Q2 5.8 3.575 4.225T7.5 2.65q1.3 0 2.475.55T12 4.75q.85-1 2.025-1.55t2.475-.55q2.35 0 3.925 1.575T22 8.15q0 1.15-.387 2.25t-1.363 2.412t-2.625 2.963T13.45 19.7z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3 5.2 13.5a4.5 4.5 0 0 1 6.8-5.9 4.5 4.5 0 0 1 6.8 5.9z"/></svg>
         </a>
       {% endif %}
       {# Search, signed in or out: a button like its neighbours, holding a

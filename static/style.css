@@ -2837,22 +2837,11 @@ html[data-app="android"][data-push]::view-transition-new(root) {
    root `data-store`, before anything is drawn, as the Steam app marks
    `data-steam-app` above. Each button appears only in front of its own
    store; a browser gets the page and the line saying where it is sold. */
-.toolbar-supporter,
-.supporter-buy,
-.supporter-restore {
+html:not([data-store]) .toolbar-supporter,
+html:not([data-store="apple"]) .supporter-buy[data-store="apple"],
+html:not([data-store="steam"]) .supporter-buy[data-store="steam"],
+html:not([data-store="apple"]) .supporter-restore {
   display: none;
-}
-
-html[data-store] .toolbar-supporter {
-  display: -webkit-inline-box;
-  display: inline-flex;
-}
-
-html[data-store="apple"] .supporter-buy[data-store="apple"],
-html[data-store="steam"] .supporter-buy[data-store="steam"],
-html[data-store="apple"] .supporter-restore {
-  display: -webkit-inline-box;
-  display: inline-flex;
 }
 
 html[data-store] .supporter-elsewhere {
