@@ -696,9 +696,11 @@
           loading(path);
           return;
         }
-        // On a phone the toolbar scrolls away with the page; pushed from
-        // further down, it is not on either screen, and must not be held
-        // still as if it were.
+        // The toolbar is held still across the push only when it is there to
+        // hold: it is sticky (ds.css), so on a page that scrolls it always
+        // is, but the painter gives its own copy `position: relative`, and a
+        // push from further down that page would hold a bar that is on
+        // neither screen. Measured rather than assumed, for that reason.
         var bar = document.querySelector(".nav-bar");
         var shown = bar && bar.getBoundingClientRect().bottom > 0;
         root.setAttribute("data-push", shown ? "" : "whole");
