@@ -202,21 +202,27 @@ pub async fn start_draw_mobile(
     Form(input): Form<InputMobile>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = &state.db_pool;
-    let mut tx = db.begin().await?;
 
-    // Auto-set language preference from browser if not already set
+    // Auto-set language preference from browser if not already set. In a
+    // transaction of its own, committed here: it used to share the page's,
+    // which was never committed, so every visit set it and threw it away.
+    // Best effort, as on the banner painter: the painter opens without it.
     if let Some(user) = &auth_session.user {
         if user.preferred_language.is_none() {
             if let Some(lang) = detect_preferred_language(&accept_language) {
-                if update_user_preferred_language(&mut tx, user.id, Some(lang))
-                    .await
-                    .is_ok()
-                {
-                    // Language preference saved, will be committed with the transaction
+                if let Ok(mut tx) = db.begin().await {
+                    if update_user_preferred_language(&mut tx, user.id, Some(lang))
+                        .await
+                        .is_ok()
+                    {
+                        let _ = tx.commit().await;
+                    }
                 }
             }
         }
     }
+
+    let mut tx = db.begin().await?;
 
     let community_id = input
         .community_id
@@ -297,6 +303,8 @@ pub async fn start_draw_mobile(
         ftl_lang,
         painter_config
     })?;
+
+    tx.commit().await?;
 
     Ok(Html(rendered).into_response())
 }
