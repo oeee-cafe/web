@@ -664,6 +664,7 @@ mod social_meta_tests {
             "id": "00000000-0000-0000-0000-000000000001",
             "login_name": "artist",
             "display_name": "An Artist",
+            "created_at": "2024-03-05T12:00:00Z",
         });
         let ctx = context! {
             user => user,
