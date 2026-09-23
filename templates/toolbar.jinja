@@ -671,20 +671,38 @@
         window.oeeeMarkCurrent(path || location.pathname);
         var content = document.querySelector("main.ds-content");
         if (!content || content.querySelector(".ds-skeleton")) return;
+        // Laid over the page, where the reader is looking, and the page
+        // hidden rather than taken out: nothing scrolls. Taken out, the page
+        // gave up its height and the reader's place with it -- and that
+        // place is what htmx's history cache keeps for going back, taken
+        // as the next page arrives, before anything here is asked; so going
+        // back found the page at its top. The skeleton sits at the top of
+        // what shows, wherever that is: the content area's own scroll on a
+        // wide screen, the window's on a phone.
         var kept = [];
         for (var c = 0; c < content.children.length; c++) {
           var child = content.children[c];
-          kept.push([child, child.style.display]);
-          child.style.display = "none";
+          kept.push([child, child.style.visibility]);
+          child.style.visibility = "hidden";
         }
         var skeleton = skeletonFor(path || location.pathname);
+        var position = content.style.position;
+        content.style.position = "relative";
+        skeleton.style.position = "absolute";
+        // Below the toolbar, which sticks over a phone's page and floats
+        // over the Mac app's content area.
+        var header = document.querySelector(".ds-page > header");
+        var shown = header ? header.getBoundingClientRect().bottom : 0;
+        skeleton.style.top = (content.scrollTop + Math.max(0, shown - content.getBoundingClientRect().top)) + "px";
+        skeleton.style.right = "0";
+        skeleton.style.left = "0";
         content.appendChild(skeleton);
-        content.scrollTop = 0;
         function restore() {
           if (!skeleton.parentNode) return;
           skeleton.parentNode.removeChild(skeleton);
           window.oeeeMarkCurrent(location.pathname);
-          for (var k = 0; k < kept.length; k++) kept[k][0].style.display = kept[k][1];
+          for (var k = 0; k < kept.length; k++) kept[k][0].style.visibility = kept[k][1];
+          content.style.position = position;
         }
         restoring = restore;
         setTimeout(restore, 10000);
