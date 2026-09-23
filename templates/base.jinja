@@ -78,7 +78,7 @@
     </header>
     {# Putting a notice away. Delegated, so the htmx banner's notices, which
        arrive after this runs, close the same way. A list left with nothing
-       in it is emptied outright, so `:empty` takes its margin away too. #}
+       in it is emptied outright, so `:empty` takes the list away too. #}
     <script>
       document.addEventListener("click", function (event) {
         var button = event.target.closest && event.target.closest(".ds-notice-close");
