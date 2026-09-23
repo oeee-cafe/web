@@ -8,9 +8,15 @@
  * repository each had their own drag handling only one of them ever got
  * fixed.
  *
- * It reports positions rather than applying them: a React window keeps its
- * position in state, a host panel may write it straight to `style`, and the
- * one thing neither of them should have to reimplement is the arithmetic.
+ * While the pointer is down it moves the frame itself and reports only where
+ * the gesture ended. Reporting every step used to put each one through the
+ * host's state: React files an update from a native `pointermove` as
+ * continuous input and renders it in a task of its own, after the frame the
+ * event arrived in has usually been painted, so the window trailed the
+ * pointer by a frame and not always the same one. Safari runs pages at 60fps
+ * even on a 120Hz screen, which makes each of those misses 16ms long, and
+ * that is where the drag was seen to stutter. Moving the frame in the event
+ * handler keeps it under the pointer on the frame the pointer moved.
  */
 
 export interface WindowPosition {
@@ -19,7 +25,11 @@ export interface WindowPosition {
 }
 
 export interface WindowDragOptions {
-  /** Called with the frame's new viewport position during a drag. */
+  /**
+   * Called with the frame's viewport position when a drag ends. During the
+   * drag the frame is moved by a `transform`, which is removed as the final
+   * position is written to its `left` and `top` and handed here.
+   */
   onPosition(position: WindowPosition): void;
   /**
    * How high the window may go, in viewport coordinates.
@@ -90,10 +100,15 @@ export function attachWindowDrag(
   options: WindowDragOptions,
 ): () => void {
   let offset: WindowPosition | null = null;
+  /** Where the drag has put the frame, which is only its `transform` until it ends. */
+  let target: WindowPosition | null = null;
+  /** The translation currently applied, so the frame's own place can be recovered. */
+  let shift: WindowPosition = { x: 0, y: 0 };
 
   const onPointerDown = (event: PointerEvent) => {
     const rect = frame.getBoundingClientRect();
     offset = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    target = null;
     handle.setPointerCapture(event.pointerId);
     event.preventDefault();
   };
@@ -102,30 +117,50 @@ export function attachWindowDrag(
     if (!offset) return;
     const rect = frame.getBoundingClientRect();
     const bounds = windowBounds();
-    options.onPosition({
+    target = {
       x: within(event.clientX - offset.x, 0, bounds.width - rect.width),
       y: within(
         event.clientY - offset.y,
         options.minimumY ?? 0,
         bounds.height - rect.height,
       ),
-    });
+    };
+    // Measured from where the frame sits under the translation rather than
+    // from where the drag began, so a host that moves the window mid-drag --
+    // clamping it to a viewport that just shrank -- does not throw it off.
+    const base = { x: rect.left - shift.x, y: rect.top - shift.y };
+    shift = { x: target.x - base.x, y: target.y - base.y };
+    frame.style.transform = `translate(${shift.x}px, ${shift.y}px)`;
   };
 
   const endDrag = () => {
+    if (!offset) return;
     offset = null;
+    const end = target;
+    target = null;
+    shift = { x: 0, y: 0 };
+    frame.style.transform = "";
+    if (!end) return;
+    // Written here as well as reported, so the frame does not spend a frame
+    // back where the drag started while the host's state catches up.
+    frame.style.left = `${end.x}px`;
+    frame.style.top = `${end.y}px`;
+    options.onPosition(end);
   };
 
   handle.addEventListener("pointerdown", onPointerDown);
   handle.addEventListener("pointermove", onPointerMove);
   handle.addEventListener("pointerup", endDrag);
   handle.addEventListener("pointercancel", endDrag);
+  handle.addEventListener("lostpointercapture", endDrag);
 
   return () => {
+    endDrag();
     handle.removeEventListener("pointerdown", onPointerDown);
     handle.removeEventListener("pointermove", onPointerMove);
     handle.removeEventListener("pointerup", endDrag);
     handle.removeEventListener("pointercancel", endDrag);
+    handle.removeEventListener("lostpointercapture", endDrag);
   };
 }
 
@@ -135,7 +170,10 @@ export interface WindowSize {
 }
 
 export interface WindowResizeOptions {
-  /** Called with the frame's new size while its corner is dragged. */
+  /**
+   * Called with the frame's size when a resize ends. During it the size is
+   * written straight to the frame's `style`, for the reason the drag is.
+   */
   onSize(size: WindowSize): void;
   /** How small the window may be made. */
   minimum?: WindowSize;
@@ -150,8 +188,9 @@ export interface WindowResizeOptions {
  * using it simply looks unresizable. The gesture is here beside the drag for
  * the same reason the drag is here: two windows, one implementation.
  *
- * Sizes are reported rather than applied, and the anchor is the corner the
- * window is pinned by, so a resize never moves it.
+ * The size is written to the frame as the corner moves and reported once, when
+ * it is let go -- the drag above says why. The anchor is the corner the window
+ * is pinned by, so a resize never moves it.
  *
  * Where inside the handle the gesture started is remembered, because the handle
  * is 20px of grabbable corner and almost nobody lands on its last pixel.
@@ -171,9 +210,12 @@ export function attachWindowResize(
     offsetX: number;
     offsetY: number;
   } | null = null;
+  /** The size the gesture has reached, reported when it ends. */
+  let size: WindowSize | null = null;
 
   const onPointerDown = (event: PointerEvent) => {
     const rect = frame.getBoundingClientRect();
+    size = null;
     origin = {
       left: rect.left,
       top: rect.top,
@@ -192,7 +234,7 @@ export function attachWindowResize(
       x: event.clientX + origin.offsetX,
       y: event.clientY + origin.offsetY,
     };
-    options.onSize({
+    size = {
       width: Math.max(
         options.minimum?.width ?? 0,
         Math.min(corner.x - origin.left, bounds.width - origin.left),
@@ -201,23 +243,32 @@ export function attachWindowResize(
         options.minimum?.height ?? 0,
         Math.min(corner.y - origin.top, bounds.height - origin.top),
       ),
-    });
+    };
+    frame.style.width = `${size.width}px`;
+    frame.style.height = `${size.height}px`;
   };
 
   const endResize = () => {
+    if (!origin) return;
     origin = null;
+    const end = size;
+    size = null;
+    if (end) options.onSize(end);
   };
 
   handle.addEventListener("pointerdown", onPointerDown);
   handle.addEventListener("pointermove", onPointerMove);
   handle.addEventListener("pointerup", endResize);
   handle.addEventListener("pointercancel", endResize);
+  handle.addEventListener("lostpointercapture", endResize);
 
   return () => {
+    endResize();
     handle.removeEventListener("pointerdown", onPointerDown);
     handle.removeEventListener("pointermove", onPointerMove);
     handle.removeEventListener("pointerup", endResize);
     handle.removeEventListener("pointercancel", endResize);
+    handle.removeEventListener("lostpointercapture", endResize);
   };
 }
 
