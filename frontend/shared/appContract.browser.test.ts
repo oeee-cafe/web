@@ -152,7 +152,7 @@ async function open(options: Options = {}): Promise<Page> {
       ${options.caption ? template("app_caption.jinja") : ""}
     </nav>
     <a href="/@artist/9c881320"><img data-oeee-drawing width="300" height="200"
-       src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></a>
+       src="/image/9c881320.png"></a>
     <a class="auth-apple" href="/auth/apple?next=%2Fafter">Apple</a>
     <a class="auth-google" href="/auth/google?next=%2Fafter">Google</a>
     <a class="auth-steam" href="/auth/steam/app?next=%2Fafter">Steam</a>
