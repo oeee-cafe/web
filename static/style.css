@@ -182,11 +182,13 @@ main {
 /* In the macOS app the toolbar floats over the content (ds.css, after "The
    content area"), so the page starts below it, and so does what sticks. */
 @media (min-width: 601px) {
-  html[data-app="macos"] .ds-page > main.ds-content {
+  html[data-app="macos"] .ds-page > main.ds-content,
+  html:not([data-form]) .ds-page > main.ds-content {
     padding-top: calc(var(--ds-header-height, 53px) + var(--space-5));
   }
 
-  html[data-app="macos"] .post-stage {
+  html[data-app="macos"] .post-stage,
+  html:not([data-form]) .post-stage {
     top: calc(var(--ds-header-height, 53px) + var(--ds-space-4));
   }
 }
