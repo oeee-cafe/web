@@ -1,14 +1,32 @@
+DO $$
+DECLARE
+    r record;
+BEGIN
+    FOR r IN
+        SELECT conrelid::regclass AS tbl, conname
+        FROM pg_constraint
+        WHERE conrelid IN ('tags'::regclass, 'post_tags'::regclass)
+    LOOP
+        EXECUTE format('ALTER TABLE %s RENAME CONSTRAINT %I TO %I', r.tbl, r.conname,
+            regexp_replace(regexp_replace(r.conname, '(^|_)tag_id(_|$)', '\1hashtag_id\2', 'g'),
+                '(^|_)tags(_|$)', '\1hashtags\2', 'g'));
+    END LOOP;
+    FOR r IN
+        SELECT c.relname
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indexrelid
+        WHERE i.indrelid IN ('tags'::regclass, 'post_tags'::regclass)
+        AND c.relname NOT LIKE '%hashtag%'
+    LOOP
+        EXECUTE format('ALTER INDEX %I RENAME TO %I', r.relname,
+            regexp_replace(regexp_replace(r.relname, '(^|_)tag_id(_|$)', '\1hashtag_id\2', 'g'),
+                '(^|_)tags(_|$)', '\1hashtags\2', 'g'));
+    END LOOP;
+END
+$$;
+
 ALTER VIEW tag_stats RENAME COLUMN tag_id TO hashtag_id;
 ALTER VIEW tag_stats RENAME TO hashtag_stats;
-
-ALTER INDEX idx_post_tags_tag_id RENAME TO idx_post_hashtags_hashtag_id;
-ALTER TABLE post_tags RENAME CONSTRAINT post_tags_post_id_fkey TO post_hashtags_post_id_fkey;
-ALTER TABLE post_tags RENAME CONSTRAINT post_tags_tag_id_fkey TO post_hashtags_hashtag_id_fkey;
-ALTER TABLE post_tags RENAME CONSTRAINT post_tags_pkey TO post_hashtags_pkey;
 ALTER TABLE post_tags RENAME COLUMN tag_id TO hashtag_id;
 ALTER TABLE post_tags RENAME TO post_hashtags;
-
-ALTER INDEX idx_tags_name RENAME TO idx_hashtags_name;
-ALTER TABLE tags RENAME CONSTRAINT tags_name_key TO hashtags_name_key;
-ALTER TABLE tags RENAME CONSTRAINT tags_pkey TO hashtags_pkey;
 ALTER TABLE tags RENAME TO hashtags;
