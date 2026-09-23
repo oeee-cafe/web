@@ -41,10 +41,11 @@
   --ds-space-4: 16px;
   --ds-space-5: 24px;
   --ds-space-6: 32px;
-  /* Corners: small for controls, medium for what floats. Drawings have
-     none -- they are framed the way the painter frames its canvas. */
-  --ds-radius-s: 6px;
-  --ds-radius-m: 10px;
+  /* Corners: rounded a little, never app-rounded -- small for controls,
+     medium for what floats. Drawings have none -- they are framed the way
+     the painter frames its canvas. */
+  --ds-radius-s: 4px;
+  --ds-radius-m: 6px;
   --ds-control-height: 30px;
   /* Ground: NEO's own -- the lavender the painter has always stood on, and
      its 14px grid -- so the site and the painter are one surface. Dark is
@@ -70,9 +71,12 @@
   --ds-ink: #22223a;
   --ds-muted: #4a4a78;
   --ds-faint: #7777a3;
-  /* Lines. */
-  --ds-line: rgba(60, 60, 130, 0.18);
-  --ds-line-strong: rgba(60, 60, 130, 0.35);
+  /* Lines: solid, and a step past the grid, so an edge never reads as one
+     more grid line and never lets the grid through. Line is between rows
+     and around fields' neighbours; strong is the edge of a control or a
+     box on the ground. */
+  --ds-line: #a3a3e0;
+  --ds-line-strong: #7c7cc4;
   --ds-frame: #666699;
   /* States, laid over whatever is beneath. */
   --ds-hover: rgba(60, 60, 150, 0.08);
@@ -101,9 +105,10 @@
   /* Skeletons: text blocks, and where a drawing will be. */
   --ds-skeleton: rgba(60, 60, 150, 0.2);
   --ds-skeleton-drawing: #e6e6fa;
-  /* Depth. */
-  --ds-shadow-raise: 0 1px 2px rgba(40, 40, 90, 0.12);
-  --ds-shadow-menu: 0 8px 24px rgba(40, 40, 90, 0.22);
+  /* Depth: hard shadows with no blur -- a 1px ledge under what is raised,
+     an offset block under what floats. Never a soft glow. */
+  --ds-shadow-raise: 0 1px 0 rgba(40, 40, 110, 0.22);
+  --ds-shadow-menu: 3px 3px 0 rgba(40, 40, 110, 0.22);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -111,16 +116,16 @@
     --ds-ground: #17172b;
     --ds-grid: #22223f;
     --ds-grid-solid: #22223f;
-    --ds-surface: #23233c;
+    --ds-surface: #25254a;
     /* The card is darker than the track here, so it would sink, not rise. */
-    --ds-thumb: #3a3a62;
+    --ds-thumb: #3d3d70;
     --ds-track: #25253c;
-    --ds-field: #1d1d33;
+    --ds-field: #1c1c38;
     --ds-ink: #dcdcea;
     --ds-muted: #a3a3bd;
     --ds-faint: #77779a;
-    --ds-line: rgba(200, 200, 255, 0.14);
-    --ds-line-strong: rgba(200, 200, 255, 0.28);
+    --ds-line: #3c3c68;
+    --ds-line-strong: #58588f;
     --ds-frame: #9595a7;
     --ds-hover: rgba(200, 200, 255, 0.08);
     --ds-selected: rgba(200, 200, 255, 0.15);
@@ -129,14 +134,14 @@
     --ds-badge: #ff8c00;
     --ds-danger: #ef4444;
     --ds-danger-hover: #dc2626;
-    --ds-success-surface: rgba(196, 238, 98, 0.1);
+    --ds-success-surface: #26361c;
     --ds-success-text: #d3f190;
-    --ds-warning-surface: rgba(255, 140, 0, 0.12);
+    --ds-warning-surface: #3d2a14;
     --ds-warning-text: #ffc680;
-    --ds-danger-surface: rgba(239, 68, 68, 0.13);
+    --ds-danger-surface: #3f1c26;
     --ds-danger-text: #fca5a5;
-    --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --ds-shadow-raise: 0 1px 0 rgba(0, 0, 0, 0.5);
+    --ds-shadow-menu: 3px 3px 0 rgba(0, 0, 0, 0.45);
     --ds-skeleton: rgba(200, 200, 255, 0.16);
     --ds-skeleton-drawing: #2a2a46;
   }
@@ -146,15 +151,15 @@
   --ds-ground: #17172b;
   --ds-grid: #22223f;
   --ds-grid-solid: #22223f;
-  --ds-surface: #23233c;
-  --ds-thumb: #3a3a62;
+  --ds-surface: #25254a;
+  --ds-thumb: #3d3d70;
   --ds-track: #25253c;
-  --ds-field: #1d1d33;
+  --ds-field: #1c1c38;
   --ds-ink: #dcdcea;
   --ds-muted: #a3a3bd;
   --ds-faint: #77779a;
-  --ds-line: rgba(200, 200, 255, 0.14);
-  --ds-line-strong: rgba(200, 200, 255, 0.28);
+  --ds-line: #3c3c68;
+  --ds-line-strong: #58588f;
   --ds-frame: #9595a7;
   --ds-hover: rgba(200, 200, 255, 0.08);
   --ds-selected: rgba(200, 200, 255, 0.15);
@@ -163,14 +168,14 @@
   --ds-badge: #ff8c00;
   --ds-danger: #ef4444;
   --ds-danger-hover: #dc2626;
-  --ds-success-surface: rgba(196, 238, 98, 0.1);
+  --ds-success-surface: #26361c;
   --ds-success-text: #d3f190;
-  --ds-warning-surface: rgba(255, 140, 0, 0.12);
+  --ds-warning-surface: #3d2a14;
   --ds-warning-text: #ffc680;
-  --ds-danger-surface: rgba(239, 68, 68, 0.13);
+  --ds-danger-surface: #3f1c26;
   --ds-danger-text: #fca5a5;
-  --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --ds-shadow-raise: 0 1px 0 rgba(0, 0, 0, 0.5);
+  --ds-shadow-menu: 3px 3px 0 rgba(0, 0, 0, 0.45);
   --ds-skeleton: rgba(200, 200, 255, 0.16);
   --ds-skeleton-drawing: #2a2a46;
 }
@@ -1671,6 +1676,12 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page input[type="url"]:not([class]),
 .ds-page input[type="search"]:not([class]),
 .ds-page input[type="number"]:not([class]),
+.ds-page input[type="tel"]:not([class]),
+.ds-page input[type="date"]:not([class]),
+.ds-page input[type="time"]:not([class]),
+.ds-page input[type="datetime-local"]:not([class]),
+.ds-page input[type="month"]:not([class]),
+.ds-page input[type="week"]:not([class]),
 .ds-page input:not([type]):not([class]),
 .ds-page textarea:not([class]) {
   -moz-box-sizing: border-box;
@@ -1685,6 +1696,12 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   font-family: var(--ds-font);
   font-size: var(--ds-text-base);
   line-height: calc(18px * var(--ds-text-scale, 1));
+}
+
+/* The date and time fields' own button, in the muted ink rather than the
+   engine's black. */
+.ds-page input:not([class])::-webkit-calendar-picker-indicator {
+  opacity: 0.6;
 }
 
 .ds-textarea,
@@ -1884,9 +1901,11 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 }
 
 /* What the engine still draws itself -- a select's open list, a date
-   picker, a scrollbar outside the Windows app -- in the page's theme. */
+   picker, a scrollbar outside the Windows app -- in the page's theme, and
+   in the cucumber's green where it takes an accent. */
 .ds-page {
   color-scheme: light;
+  accent-color: var(--ds-focus);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -2035,7 +2054,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   min-width: 0;
   margin: 0 0 var(--ds-space-4);
   padding: 20px;
-  border: 1px solid var(--ds-line);
+  border: 1px solid var(--ds-line-strong);
   border-radius: var(--ds-radius-m);
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-raise);
@@ -2287,6 +2306,328 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 }
 
 /* ---------------------------------------------------------------------------
+   Native elements
+
+   What the browser already knows how to do, drawn in the system's look
+   rather than rebuilt from boxes and script (design.jinja, "Native before
+   custom"). Each is the default for the element on a `.ds-page` page:
+   a disclosure, a table, a list box, a progress bar, a file field, and the
+   text elements a comment from another server can carry -- ammonia lets
+   through `pre`, `code`, `blockquote`, `hr` and tables, and they read here
+   the way they read in the system's own pages.
+
+   Containers are written `:not([class])`, so a component built on one
+   (the toolbar's menus are `details`) keeps its own look. Text elements
+   are not: `.ds-page code` is as specific as a page's own `.x code`, which
+   comes later and wins.
+   --------------------------------------------------------------------------- */
+
+/* A file field: its button is a secondary button. The older engines name
+   the part differently, and one name an engine does not know voids the
+   rule, so each is its own. */
+.ds-page input[type="file"]:not([class]) {
+  max-width: 100%;
+  color: var(--ds-muted);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-m);
+}
+
+.ds-page input[type="file"]:not([class])::-webkit-file-upload-button {
+  margin-right: 10px;
+  padding: 5px 14px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+  color: var(--ds-ink);
+  font: inherit;
+  font-weight: 500;
+}
+
+.ds-page input[type="file"]:not([class])::file-selector-button {
+  margin-right: 10px;
+  padding: 5px 14px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+  color: var(--ds-ink);
+  font: inherit;
+  font-weight: 500;
+}
+
+/* A colour well, framed like a drawing. */
+.ds-page input[type="color"]:not([class]) {
+  width: 44px;
+  height: var(--ds-control-height);
+  padding: 2px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-field);
+}
+
+/* A list box: a field rather than a button, its chosen rows lime. */
+.ds-page select[multiple]:not([class]),
+.ds-page select[size]:not([size="1"]):not([class]) {
+  padding: 4px;
+  background-color: var(--ds-field);
+  background-image: none;
+  box-shadow: none;
+}
+
+.ds-page select[multiple]:not([class]) option {
+  padding: 3px 6px;
+  border-radius: 3px;
+  background-color: transparent;
+}
+
+.ds-page select[multiple]:not([class]) option:checked {
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+}
+
+.ds-page optgroup {
+  color: var(--ds-muted);
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* The open drop-down itself, where the engine lets a page draw it
+   (customizable select, Chromium 135). Only under a mouse: on a touch
+   screen the system's own sheet or wheel is the better list, and it is
+   what a phone's reader expects. Everywhere else the system's list stays,
+   in the page's colour scheme. */
+@supports (appearance: base-select) {
+  @media (hover: hover) and (pointer: fine) {
+    .ds-select,
+    .ds-page select:not([class]):not([multiple]):not([size]) {
+      appearance: base-select;
+    }
+
+    .ds-select::picker-icon,
+    .ds-page select:not([class])::picker-icon {
+      display: none;
+    }
+
+    .ds-select::picker(select),
+    .ds-page select:not([class])::picker(select) {
+      appearance: base-select;
+      margin-top: 2px;
+      padding: 3px;
+      border: 1px solid var(--ds-line-strong);
+      border-radius: var(--ds-radius-s);
+      background-color: var(--ds-surface);
+      box-shadow: var(--ds-shadow-menu);
+      color: var(--ds-ink);
+    }
+
+    .ds-select option,
+    .ds-page select:not([class]) option {
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: var(--ds-text-m);
+    }
+
+    .ds-select option::checkmark,
+    .ds-page select:not([class]) option::checkmark {
+      display: none;
+    }
+
+    .ds-select option:hover,
+    .ds-select option:focus-visible,
+    .ds-page select:not([class]) option:hover,
+    .ds-page select:not([class]) option:focus-visible {
+      outline: none;
+      background-color: var(--ds-selected);
+    }
+
+    .ds-select option:checked,
+    .ds-page select:not([class]) option:checked {
+      background-color: var(--ds-accent);
+      color: var(--ds-accent-ink);
+      font-weight: 600;
+    }
+  }
+}
+
+/* A disclosure: a bordered row that opens into a card. */
+.ds-page details:not([class]) {
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+}
+
+.ds-page details:not([class]) > summary {
+  padding: 6px 10px;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-base);
+  font-weight: 600;
+  cursor: default;
+}
+
+.ds-page details:not([class]) > summary:hover {
+  background-color: var(--ds-hover);
+}
+
+.ds-page details:not([class])[open] > summary {
+  border-bottom: 1px solid var(--ds-line);
+}
+
+.ds-page details:not([class]) > :not(summary) {
+  margin: 0;
+  padding: 8px 10px;
+}
+
+/* Progress and meter: a framed track, filled flat. Each engine's parts are
+   their own rules, for the reason the file field's are. */
+.ds-page progress:not([class]),
+.ds-page meter:not([class]) {
+  display: block;
+  width: 100%;
+  height: 12px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 3px;
+  background: var(--ds-field);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.ds-page progress:not([class])::-webkit-progress-bar {
+  background: var(--ds-field);
+}
+
+.ds-page progress:not([class])::-webkit-progress-value {
+  background: var(--ds-accent);
+  box-shadow: 1px 0 0 var(--ds-accent-line);
+}
+
+.ds-page progress:not([class])::-moz-progress-bar {
+  background: var(--ds-accent);
+}
+
+.ds-page meter:not([class])::-webkit-meter-inner-element {
+  display: block;
+}
+
+.ds-page meter:not([class])::-webkit-meter-bar {
+  height: 10px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ds-field);
+}
+
+.ds-page meter:not([class])::-webkit-meter-optimum-value {
+  background: var(--ds-accent);
+}
+
+.ds-page meter:not([class])::-webkit-meter-suboptimum-value {
+  background: var(--ds-badge);
+}
+
+.ds-page meter:not([class])::-webkit-meter-even-less-good-value {
+  background: var(--ds-danger);
+}
+
+.ds-page meter:not([class]):-moz-meter-optimum::-moz-meter-bar {
+  background: var(--ds-accent);
+}
+
+.ds-page meter:not([class]):-moz-meter-sub-optimum::-moz-meter-bar {
+  background: var(--ds-badge);
+}
+
+.ds-page meter:not([class]):-moz-meter-sub-sub-optimum::-moz-meter-bar {
+  background: var(--ds-danger);
+}
+
+/* A table: a card of rows with a line between each, its head on the
+   segmented control's track. Separate borders, because a collapsed table
+   ignores its own corners. */
+.ds-page table:not([class]) {
+  width: 100%;
+  border: 1px solid var(--ds-line-strong);
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-raise);
+  font-size: var(--ds-text-base);
+  overflow: hidden;
+}
+
+.ds-page table:not([class]) th,
+.ds-page table:not([class]) td {
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ds-page table:not([class]) th {
+  background-color: var(--ds-track);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-m);
+  font-weight: 700;
+}
+
+.ds-page table:not([class]) tr + tr > td,
+.ds-page table:not([class]) thead + tbody > tr:first-child > td {
+  border-top: 1px solid var(--ds-line);
+}
+
+/* Text. */
+.ds-page blockquote {
+  margin: 0;
+  padding: 6px 12px;
+  border-left: 3px solid var(--ds-accent-line);
+  color: var(--ds-muted);
+}
+
+.ds-page hr {
+  height: 0;
+  margin: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--ds-line-strong);
+}
+
+.ds-page code,
+.ds-page pre {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.ds-page code {
+  padding: 1px 4px;
+  border: 1px solid var(--ds-line);
+  border-radius: 3px;
+  background-color: var(--ds-field);
+}
+
+.ds-page pre {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-field);
+  overflow-x: auto;
+}
+
+/* Code inside a code block is the block's, not a second box. */
+.ds-page pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.ds-page mark {
+  padding: 0 2px;
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+}
+
+/* ---------------------------------------------------------------------------
    Grouping
    --------------------------------------------------------------------------- */
 
@@ -2427,7 +2768,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 /* A surface on the ground: settings groups, forms, anything that is a box. */
 .ds-card {
   padding: var(--ds-space-4);
-  border: 1px solid var(--ds-line);
+  border: 1px solid var(--ds-line-strong);
   border-radius: var(--ds-radius-m);
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-raise);
@@ -2509,12 +2850,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   margin: 0;
 }
 
-/* A level's tint is laid over the ground rather than being the row's
-   colour, because in dark mode the tints are translucent and the header
-   behind a row carries the grid. */
 .ds-notice-success {
-  background-color: var(--ds-ground);
-  background-image: linear-gradient(var(--ds-success-surface), var(--ds-success-surface));
+  background-color: var(--ds-success-surface);
   color: var(--ds-success-text);
 }
 
@@ -2523,8 +2860,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 }
 
 .ds-notice-warning {
-  background-color: var(--ds-ground);
-  background-image: linear-gradient(var(--ds-warning-surface), var(--ds-warning-surface));
+  background-color: var(--ds-warning-surface);
   color: var(--ds-warning-text);
 }
 
@@ -2533,8 +2869,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 }
 
 .ds-notice-error {
-  background-color: var(--ds-ground);
-  background-image: linear-gradient(var(--ds-danger-surface), var(--ds-danger-surface));
+  background-color: var(--ds-danger-surface);
   color: var(--ds-danger-text);
 }
 
@@ -2590,6 +2925,13 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
    sits in NEO's chrome: its lavender panel, its bevel, its title bar with
    the three grab dots. Written out here rather than borrowed from the
    painter's sheet, which these pages do not load.
+
+   One difference, on purpose: NEO fades its title bar from grey-blue to
+   sky, and the site draws no gradients (design.jinja, "Direction"), so
+   here the bar is one saturated blue -- the colour of a 90s window's title
+   bar, and dark enough to stand clear of the panel under it, which the
+   fade's bright end did not. White on it is 5.0:1 in light and 5.9:1 in
+   dark. The painter keeps NEO's own bar.
    --------------------------------------------------------------------------- */
 :root {
   --ds-neo-panel: #ccccff;
@@ -2597,8 +2939,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   --ds-neo-text: #4a4a78;
   --ds-neo-light: #ffffff;
   --ds-neo-shadow: #8f8fb3;
-  --ds-neo-title-from: #9397b2;
-  --ds-neo-title-to: #b1d6fd;
+  --ds-neo-title: #4a6cc4;
   --ds-neo-title-ink: #ffffff;
   --ds-neo-well: #e9e9ff;
 }
@@ -2610,9 +2951,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
     --ds-neo-text: #c1c1cd;
     --ds-neo-light: #63637e;
     --ds-neo-shadow: #1c1c21;
-    --ds-neo-title-from: #24243a;
-    --ds-neo-title-to: #3d4f70;
-    --ds-neo-title-ink: #d7d7e4;
+    --ds-neo-title: #4460b0;
+    --ds-neo-title-ink: #ffffff;
     --ds-neo-well: #20203a;
   }
 }
@@ -2623,9 +2963,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   --ds-neo-text: #c1c1cd;
   --ds-neo-light: #63637e;
   --ds-neo-shadow: #1c1c21;
-  --ds-neo-title-from: #24243a;
-  --ds-neo-title-to: #3d4f70;
-  --ds-neo-title-ink: #d7d7e4;
+  --ds-neo-title: #4460b0;
+  --ds-neo-title-ink: #ffffff;
   --ds-neo-well: #20203a;
 }
 
@@ -2641,8 +2980,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-window-title {
   height: 18px;
   padding: 0 4px;
-  background: -webkit-linear-gradient(left, var(--ds-neo-title-from), var(--ds-neo-title-to));
-  background: linear-gradient(to right, var(--ds-neo-title-from), var(--ds-neo-title-to));
+  background-color: var(--ds-neo-title);
   color: var(--ds-neo-title-ink);
   font-family: Arial, Helvetica, sans-serif;
   font-size: 12px;
@@ -2661,8 +2999,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   height: 3px;
   margin: 0 12px 0 1px;
   border-radius: 2px;
-  background-color: rgba(255, 255, 255, 0.7);
-  box-shadow: 5px 0 0 rgba(255, 255, 255, 0.7), 10px 0 0 rgba(255, 255, 255, 0.7);
+  background-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 5px 0 0 rgba(255, 255, 255, 0.75), 10px 0 0 rgba(255, 255, 255, 0.75);
   vertical-align: middle;
 }
 
@@ -2700,7 +3038,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   width: 360px;
   max-width: calc(100% - 32px);
   padding: 16px 20px 20px;
-  border: 1px solid var(--ds-line);
+  border: 1px solid var(--ds-line-strong);
   border-radius: var(--ds-radius-m);
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-menu);
@@ -2738,13 +3076,14 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   margin: 0;
 }
 
+.ds-page kbd,
 .ds-shortcuts kbd {
   display: inline-block;
   min-width: 20px;
   padding: 1px 6px;
   border: 1px solid var(--ds-line-strong);
   border-bottom-width: 2px;
-  border-radius: 5px;
+  border-radius: var(--ds-radius-s);
   background-color: var(--ds-field);
   color: var(--ds-ink);
   font-family: var(--ds-font);
@@ -2937,7 +3276,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   width: 480px;
   max-width: calc(100% - 32px);
   padding: 16px 20px 20px;
-  border: 1px solid var(--ds-line);
+  border: 1px solid var(--ds-line-strong);
   border-radius: var(--ds-radius-m);
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-menu);

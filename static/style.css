@@ -131,6 +131,14 @@ h6 {
   font-weight: 600;
 }
 
+/* The page's own titles carry a poster's weight, set tight (design.jinja,
+   "Direction"); the smaller headings stay at the chrome's. */
+h1,
+h2 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
 h1 {
   font-size: var(--text-2xl);
 }
@@ -879,6 +887,26 @@ nav a:visited,
   display: inline;
   white-space: pre-wrap;
   font: inherit;
+}
+
+/* Nor are a comment's code and quotes boxes here (ds.css, "Native
+   elements"): in two clamped lines they are only words. Written against
+   `.ds-page` as those defaults are, so this outranks them. */
+.ds-page .notification-preview pre,
+.ds-page .notification-preview code,
+.ds-page .notification-preview blockquote {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.ds-page .notification-preview hr,
+.ds-page .notification-preview table {
+  display: none;
 }
 
 .notification-meta {

@@ -3,20 +3,36 @@
    rendered by the real stylesheet in whichever theme is on. It is where a
    change to the system is looked at before it reaches a page, and where
    Firefox 56 can be checked in one visit. Unlinked and unindexed; not
-   translated, because it is for the people who build the site. #}
+   translated, because it is for the people who build the site.
+
+   Everything here is drawn by ds.css's own classes, or by no class at all
+   where the system styles the native element. The <style> below only lays
+   the samples out; nothing in it may change how a sample looks. #}
 {% block title %}Design system | {{ ftl_get_message("brand") }}{% endblock title %}
 {% block head %}
   <meta name="robots" content="noindex" />
   <style>
     .ds-ref section { margin: 0 0 40px; }
     .ds-ref h2 { margin: 0 0 12px; font-size: var(--ds-text-xl); }
+    .ds-ref h3 { margin: 16px 0 8px; color: var(--ds-muted); font-size: var(--ds-text-m); font-weight: 600; }
     .ds-ref .row { display: flex; flex-wrap: wrap; align-items: center; }
     .ds-ref .row > * { margin: 0 12px 12px 0; }
+    .ds-ref .row-top { align-items: flex-start; }
     .ds-ref .swatch { width: 132px; }
     .ds-ref .chip { height: 44px; border: 1px solid var(--ds-line); border-radius: var(--ds-radius-s); }
-    .ds-ref .swatch code { display: block; margin-top: 4px; font-size: var(--ds-text-s); color: var(--ds-muted); }
+    .ds-ref .chip-text { display: flex; align-items: center; padding: 0 10px; font-size: var(--ds-text-m); }
+    .ds-ref .swatch .token { display: block; margin-top: 4px; font-size: var(--ds-text-s); color: var(--ds-muted); }
     .ds-ref .field { width: 280px; }
+    .ds-ref .direction p,
+    .ds-ref .direction ul { max-width: 640px; margin: 0 0 12px; line-height: 1.55; }
+    .ds-ref .direction ul { padding-left: 20px; }
+    .ds-ref .direction li + li { margin-top: 6px; }
     .ds-ref .drawing { width: 150px; height: 150px; background: #fff; box-shadow: 0 0 0 1px var(--ds-frame); }
+    .ds-ref .space { height: 12px; background: var(--ds-accent); box-shadow: 0 0 0 1px var(--ds-accent-line); }
+    .ds-ref .box { display: flex; align-items: center; justify-content: center; width: 96px; height: 64px; border: 1px solid var(--ds-line-strong); background: var(--ds-surface); font-size: var(--ds-text-s); color: var(--ds-muted); }
+    .ds-ref .stack > * + * { margin-top: 8px; }
+    .ds-ref .sample-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); grid-gap: 16px; }
+    .ds-ref .skeleton-tile { width: 120px; }
   </style>
 {% endblock head %}
 {% block content %}
@@ -24,13 +40,110 @@
     <h1>Design system</h1>
     <p class="ds-help">Everything in <code>static/ds.css</code>, in the current theme. The painter's Dark button switches it.</p>
 
+    <section class="direction">
+      <h2>Direction</h2>
+      <p>
+        Web 2.0, built on the 90s web. Things have clear edges and vivid colour,
+        like the web around 2006, and sit on bones from the oekaki boards a
+        decade earlier: the painter's window chrome, graph paper under
+        everything, hard pixels. The site should feel like a place where people
+        draw, not like a product dashboard that happens to show pictures.
+      </p>
+      <ul>
+        <li>
+          <strong>Edges are drawn.</strong> Every box, control and bar has a line
+          around it or between it and the next. Nothing is marked out by a
+          shadow or a change of shade alone. Rows share one line between them,
+          as the toolbar and its notices do.
+        </li>
+        <li>
+          <strong>Colour is vivid.</strong> The ground is NEO's lavender and
+          night blue. The cucumber lime means "do this" and appears once per
+          view. Orange is for counts, red for what cannot be undone. Use
+          saturated colours from the palette rather than neutral greys.
+        </li>
+        <li>
+          <strong>The ground is graph paper.</strong> NEO's 14px grid runs under
+          every page, so the site and the painter share one surface. Cards,
+          fields and rows sit on it with solid fills and never let it show
+          through.
+        </li>
+        <li>
+          <strong>Depth is shallow and hard.</strong> Shadows have no blur: a
+          raised control sits on a 1px ledge, and a floating menu or dialog
+          casts a 3px offset block. There are no soft, wide glows, and frosted
+          glass appears only where the platform uses it, as in the macOS app's
+          toolbar.
+        </li>
+        <li>
+          <strong>The 90s stay in the details.</strong> What belongs to drawing
+          wears the painter's window: bevel, title bar, grab dots. Drawings keep
+          square corners and a frame, and are never smoothed when scaled. Type is
+          small and dense (13–14px for the chrome), and corners are rounded only
+          a little.
+        </li>
+        <li>
+          <strong>No gradients.</strong> Every fill is one flat colour: no gloss
+          on buttons, no fades on bars, no sheen on cards. Depth comes from
+          lines and the one small shadow, never from shading. CSS may still
+          use <code>linear-gradient()</code> as a tool when both stops are
+          the same colour or meet at a hard edge: the grid's 1px lines, a flat
+          tint laid over the ground, a slider's filled part. What you see must
+          never fade from one colour into another. The one exception is the
+          painter itself, whose title bars are NEO's and stay exactly as NEO
+          draws them.
+        </li>
+        <li>
+          <strong>Native before custom.</strong> Use the browser's own element
+          for a job whenever one exists (<code>select</code>,
+          <code>details</code>, checkbox, radio, range, <code>fieldset</code>,
+          <code>table</code>) and style it here, rather than building a widget
+          from <code>div</code>s and script. Native elements work with the
+          keyboard, screen readers and the phone's own pickers for free, and
+          they survive old engines. Build a custom widget only when no native
+          element does the job, or when the Firefox 56 floor rules the
+          native one out.
+        </li>
+        <li>
+          <strong>Avoid:</strong> gradients, borderless flat cards,
+          grey-on-white minimalism, pill-shaped or heavily rounded boxes, large
+          empty margins, and thin light type.
+        </li>
+      </ul>
+      <p class="ds-help">
+        It all has to hold in Firefox 56, the engine oekaki users keep for the
+        old applets. That is one more reason to use lines and solid fills
+        rather than filters and blends.
+      </p>
+    </section>
+
     <section>
       <h2>Colour</h2>
+      {% for group, names in [
+        ("Ground and surfaces", ["ground", "grid", "surface", "field", "track", "thumb"]),
+        ("Ink", ["ink", "muted", "faint"]),
+        ("Lines", ["line", "line-strong", "frame"]),
+        ("Action and signals", ["accent", "accent-hover", "accent-ink", "accent-line", "focus", "badge", "danger", "danger-hover"]),
+        ("States, laid over what is beneath", ["hover", "selected", "press"]),
+        ("Loading", ["skeleton", "skeleton-drawing"]),
+        ("The painter's window", ["neo-panel", "neo-ink", "neo-text", "neo-light", "neo-shadow", "neo-title", "neo-well"])
+      ] %}
+        <h3>{{ group }}</h3>
+        <div class="row">
+          {% for name in names %}
+            <div class="swatch">
+              <div class="chip" style="background: var(--ds-{{ name }})"></div>
+              <code class="token">--ds-{{ name }}</code>
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+      <h3>Notices: tint and the ink that reads on it</h3>
       <div class="row">
-        {% for name in ["ground", "surface", "field", "ink", "muted", "faint", "line-strong", "frame", "accent", "accent-ink", "badge", "danger", "focus", "neo-panel"] %}
+        {% for level in ["success", "warning", "danger"] %}
           <div class="swatch">
-            <div class="chip" style="background: var(--ds-{{ name }})"></div>
-            <code>--ds-{{ name }}</code>
+            <div class="chip chip-text" style="background: var(--ds-{{ level }}-surface); color: var(--ds-{{ level }}-text)">{{ level | capitalize }}</div>
+            <code class="token">--ds-{{ level }}-*</code>
           </div>
         {% endfor %}
       </div>
@@ -41,6 +154,32 @@
       {% for size in ["2xl", "xl", "l", "base", "m", "s", "xs"] %}
         <div style="font-size: var(--ds-text-{{ size }})">--ds-text-{{ size }} · 오이카페 OEEEカフェ Oeee Cafe</div>
       {% endfor %}
+      <h3>Headings and text</h3>
+      <div class="ds-card stack">
+        <h1 style="margin: 0">Heading one · 그림 게시판</h1>
+        <h2 style="margin: 0">Heading two · お絵かき</h2>
+        <h3 style="margin: 0; color: var(--ds-ink); font-size: var(--ds-text-l)">Heading three</h3>
+        <p style="margin: 0">Body text is the page's own weight. A <a href="#">link in a sentence</a> is underlined; <strong>strong</strong> and <em>emphasis</em> read as they do anywhere. <mark>Marked text</mark> for a search's match.</p>
+        <p class="ds-help" style="margin: 0">Help text, under a field or beside a count.</p>
+        <p style="margin: 0">Inline <code>code</code>, and keys: <kbd>G</kbd> then <kbd>R</kbd>.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Space, corners and depth</h2>
+      <h3>Space: a 4px scale</h3>
+      <div class="stack">
+        {% for step in range(1, 7) %}
+          <div class="row" style="margin: 0"><div class="space" style="width: var(--ds-space-{{ step }})"></div><code class="token">--ds-space-{{ step }}</code></div>
+        {% endfor %}
+      </div>
+      <h3>Corners and shadows</h3>
+      <div class="row">
+        <div class="box" style="border-radius: var(--ds-radius-s)">radius-s</div>
+        <div class="box" style="border-radius: var(--ds-radius-m)">radius-m</div>
+        <div class="box" style="border-radius: var(--ds-radius-m); box-shadow: var(--ds-shadow-raise)">shadow-raise</div>
+        <div class="box" style="border-radius: var(--ds-radius-m); box-shadow: var(--ds-shadow-menu)">shadow-menu</div>
+      </div>
     </section>
 
     <section>
@@ -51,33 +190,61 @@
         <button class="ds-button ds-button-quiet" type="button">Quiet</button>
         <button class="ds-button ds-button-danger" type="button">Delete</button>
         <button class="ds-button" type="button" disabled>Disabled</button>
-        <button type="button">Unclassed</button>
-        <input type="submit" value="Unclassed submit" />
+      </div>
+      <div class="row">
+        <button class="ds-button ds-button-small ds-button-primary" type="button">Small primary</button>
+        <button class="ds-button ds-button-small" type="button">Small</button>
+        <button class="ds-button ds-button-small ds-button-quiet" type="button">Small quiet</button>
+        <a class="ds-button" href="#">A link as a button</a>
+      </div>
+      <h3>Native, with no class</h3>
+      <div class="row">
+        <button type="button">Button</button>
+        <input type="submit" value="Submit" />
+        <input type="reset" value="Reset" />
+        <button type="button" disabled>Disabled</button>
       </div>
     </section>
 
     <section>
       <h2>Fields</h2>
-      <div class="row">
+      <div class="row row-top">
         <label class="field">
           <span class="ds-label">Title</span>
           <input class="ds-input" type="text" placeholder="Untitled" style="width: 100%" />
           <span class="ds-help">Shown above the drawing.</span>
         </label>
         <label class="field">
-          <span class="ds-label">Unclassed</span>
-          <input type="text" value="A plain input" style="width: 100%" />
+          <span class="ds-label">Disabled</span>
+          <input class="ds-input" type="text" value="Cannot be changed" disabled style="width: 100%" />
         </label>
       </div>
       <label>
         <span class="ds-label">Description</span>
         <textarea class="ds-textarea" rows="3" style="width: 100%">날다람지</textarea>
       </label>
+      <h3>Native, with no class</h3>
+      <div class="row row-top">
+        {% for type, label, value in [("text", "Text", "A plain input"), ("email", "Email", "tandemaus@oeee.cafe"), ("password", "Password", "hunter22"), ("search", "Search", "#oekaki"), ("number", "Number", "12"), ("url", "Link", "https://oeee.cafe"), ("tel", "Phone", ""), ("date", "Date", "2026-09-23"), ("time", "Time", "14:30")] %}
+          <label class="field">
+            <span class="ds-label">{{ label }}</span>
+            <input type="{{ type }}" value="{{ value }}" style="width: 100%" />
+          </label>
+        {% endfor %}
+        <label class="field">
+          <span class="ds-label">File</span>
+          <input type="file" />
+        </label>
+        <label class="field">
+          <span class="ds-label">Colour</span>
+          <input type="color" value="#c4ee62" />
+        </label>
+      </div>
     </section>
 
     <section>
       <h2>Drop-downs</h2>
-      <div class="row">
+      <div class="row row-top">
         <select class="ds-select" aria-label="Community">
           <option>Pokémon</option>
           <option>페르소나!!</option>
@@ -88,8 +255,25 @@
           <option>Unlisted</option>
           <option>Private</option>
         </select>
+        <select aria-label="Canvas">
+          <optgroup label="Square">
+            <option>300 × 300</option>
+            <option>400 × 400</option>
+          </optgroup>
+          <optgroup label="Wide">
+            <option>400 × 300</option>
+            <option>600 × 400</option>
+          </optgroup>
+        </select>
         <select class="ds-select" aria-label="Disabled" disabled>
           <option>Disabled</option>
+        </select>
+        <select multiple size="4" aria-label="Tags">
+          <option selected>oekaki</option>
+          <option>pixel</option>
+          <option selected>cucumber</option>
+          <option>sketch</option>
+          <option>relay</option>
         </select>
       </div>
     </section>
@@ -99,22 +283,95 @@
       <div class="row">
         <label><input type="checkbox" checked /> Allow relays</label>
         <label><input type="checkbox" /> Sensitive</label>
+        <label><input type="checkbox" class="ds-indeterminate" /> Some</label>
+        <label><input type="checkbox" checked disabled /> Locked</label>
         <label><input type="radio" name="ref-radio" checked /> Public</label>
         <label><input type="radio" name="ref-radio" /> Private</label>
-        <label><input type="range" min="1" max="12" value="6" aria-label="Size" /></label>
+        <label><input type="radio" name="ref-radio" disabled /> Disabled</label>
       </div>
       <div class="row">
+        <label><input type="range" min="1" max="12" value="6" aria-label="Size" /></label>
         <div class="ds-segmented" role="group" aria-label="Whose drawings">
           <button type="button" aria-pressed="true">Everyone</button>
           <button type="button" aria-pressed="false">Following</button>
+          <button type="button" aria-pressed="false">Mine</button>
         </div>
         <span class="ds-badge">3</span>
+        <span class="ds-badge">128</span>
       </div>
+      <script>
+        document.querySelectorAll(".ds-indeterminate").forEach(function (box) { box.indeterminate = true; });
+      </script>
+    </section>
+
+    <section>
+      <h2>Forms</h2>
+      <p class="ds-help">A plain <code>fieldset</code> is a card and its <code>legend</code> the title; the submit is the lime one.</p>
+      <form onsubmit="return false">
+        <fieldset>
+          <legend>Profile</legend>
+          <p>
+            <label for="ref-name">Display name</label>
+            <input id="ref-name" type="text" value="날다람지" />
+          </p>
+          <p>
+            <label for="ref-bio">Bio</label>
+            <textarea id="ref-bio" rows="2">Draws cucumbers.</textarea>
+          </p>
+          <p>
+            <input id="ref-public" type="checkbox" checked />
+            <label for="ref-public">Show my drawings on the home page</label>
+          </p>
+          <div class="form-actions">
+            <button type="submit">Save</button>
+            <button type="button" class="ds-button">Cancel</button>
+          </div>
+        </fieldset>
+      </form>
+    </section>
+
+    <section>
+      <h2>Native elements</h2>
+      <p class="ds-help">Elements the browser already knows how to do, styled rather than rebuilt.</p>
+      <div class="sample-grid">
+        <div class="stack">
+          <details>
+            <summary>What is oekaki?</summary>
+            <p>Drawing in the browser, on a small canvas, with a replay of every stroke.</p>
+          </details>
+          <details open>
+            <summary>An open disclosure</summary>
+            <p>Opened by default with the <code>open</code> attribute.</p>
+          </details>
+        </div>
+        <div class="stack">
+          <label class="ds-label" for="ref-progress">Uploading</label>
+          <progress id="ref-progress" value="62" max="100">62%</progress>
+          <label class="ds-label" for="ref-meter">Storage</label>
+          <meter id="ref-meter" value="0.7" low="0.5" high="0.9" optimum="0.2">70%</meter>
+        </div>
+        <div class="stack">
+          <blockquote>A replay that renders differently from the canvas it was recorded on is the worst failure this codebase can produce.</blockquote>
+          <hr />
+          <pre>ssh mini 'zsh -l -c deploy.sh'</pre>
+        </div>
+      </div>
+      <h3>Table</h3>
+      <table>
+        <thead>
+          <tr><th>User</th><th>Drawings</th><th>Joined</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>날다람지</td><td>128</td><td>2024-03-02</td></tr>
+          <tr><td>Tandemaus</td><td>41</td><td>2025-11-19</td></tr>
+          <tr><td>きゅうり</td><td>7</td><td>2026-09-01</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section>
       <h2>Notices</h2>
-      <p class="ds-help">Flash messages and the htmx error banner. The level is the colour; Info and Debug are plain.</p>
+      <p class="ds-help">Flash messages and the htmx error banner, as rows of the header. The level is the colour; Info and Debug are plain.</p>
       <ul class="ds-notices" style="border-top: 1px solid var(--ds-line)">
         {% for level, text in [("info", "Your drawing is saved as a draft."), ("success", "Welcome, 날다람지!"), ("warning", "This community is about to be archived."), ("error", "The passwords did not match. 비밀번호가 일치하지 않습니다.")] %}
           <li class="ds-notice ds-notice-{{ level }}">
@@ -127,7 +384,7 @@
 
     <section>
       <h2>Surfaces</h2>
-      <div class="row" style="align-items: flex-start">
+      <div class="row row-top">
         <div class="ds-card" style="width: 280px">
           <strong>A card</strong>
           <p class="ds-help">Settings groups, forms, anything that is a box on the ground.</p>
@@ -137,6 +394,32 @@
           <div class="ds-window-body">What belongs to drawing wears the painter's chrome.</div>
         </div>
         <div class="drawing" aria-label="A drawing's frame"></div>
+      </div>
+      <h3>An alert, as hx-confirm asks through it</h3>
+      <div class="ds-modal-panel ds-alert-panel">
+        <p class="ds-alert-message">Delete this drawing? Its replay goes with it.</p>
+        <div class="ds-alert-actions">
+          <button type="button" class="ds-button">Cancel</button>
+          <button type="button" class="ds-button ds-button-danger">Delete</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Waiting</h2>
+      <div class="row row-top">
+        <div class="skeleton-tile">
+          <div class="ds-skeleton-square"></div>
+          <span class="ds-skeleton-bar ds-skeleton-gap" style="width: 80%; height: 12px"></span>
+          <span class="ds-skeleton-bar ds-skeleton-gap" style="width: 50%; height: 12px"></span>
+        </div>
+        <div style="width: 240px">
+          <span class="ds-skeleton-bar" style="width: 70%; height: 20px"></span>
+          <span class="ds-skeleton-bar ds-skeleton-gap-l" style="height: 12px"></span>
+          <span class="ds-skeleton-bar ds-skeleton-gap" style="height: 12px"></span>
+          <span class="ds-skeleton-bar ds-skeleton-gap" style="width: 60%; height: 12px"></span>
+        </div>
+        <span class="ds-spinner">Loading</span>
       </div>
     </section>
   </div>
