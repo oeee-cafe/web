@@ -91,15 +91,12 @@
   --ds-danger: #dc2626;
   --ds-danger-hover: #b91c1c;
   --ds-danger-ink: #ffffff;
-  /* Notices: a tint to sit on, an edge, and ink that reads on the tint. */
+  /* Notices: a tint to sit on, and ink that reads on the tint. */
   --ds-success-surface: #eefad2;
-  --ds-success-line: rgba(79, 138, 16, 0.4);
   --ds-success-text: #2f5410;
   --ds-warning-surface: #fff3e4;
-  --ds-warning-line: rgba(214, 110, 20, 0.45);
   --ds-warning-text: #7a3b06;
   --ds-danger-surface: #fef2f2;
-  --ds-danger-line: rgba(220, 38, 38, 0.4);
   --ds-danger-text: #991b1b;
   /* Skeletons: text blocks, and where a drawing will be. */
   --ds-skeleton: rgba(60, 60, 150, 0.2);
@@ -133,13 +130,10 @@
     --ds-danger: #ef4444;
     --ds-danger-hover: #dc2626;
     --ds-success-surface: rgba(196, 238, 98, 0.1);
-    --ds-success-line: rgba(196, 238, 98, 0.35);
     --ds-success-text: #d3f190;
     --ds-warning-surface: rgba(255, 140, 0, 0.12);
-    --ds-warning-line: rgba(255, 140, 0, 0.4);
     --ds-warning-text: #ffc680;
     --ds-danger-surface: rgba(239, 68, 68, 0.13);
-    --ds-danger-line: rgba(239, 68, 68, 0.42);
     --ds-danger-text: #fca5a5;
     --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
     --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -170,13 +164,10 @@
   --ds-danger: #ef4444;
   --ds-danger-hover: #dc2626;
   --ds-success-surface: rgba(196, 238, 98, 0.1);
-  --ds-success-line: rgba(196, 238, 98, 0.35);
   --ds-success-text: #d3f190;
   --ds-warning-surface: rgba(255, 140, 0, 0.12);
-  --ds-warning-line: rgba(255, 140, 0, 0.4);
   --ds-warning-text: #ffc680;
   --ds-danger-surface: rgba(239, 68, 68, 0.13);
-  --ds-danger-line: rgba(239, 68, 68, 0.42);
   --ds-danger-text: #fca5a5;
   --ds-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
   --ds-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -460,10 +451,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    rule.
 
    Opaque, because the content now passes beneath: the ground and its grid,
-   the same pair the page carries, so a notice sits on what it sat on before.
-   The grid holds the page's phase until the page moves, and only the strip
-   around a notice ever shows it -- the toolbar has its own ground, and with
-   no notice up the header is the toolbar's height exactly. */
+   the same pair the page carries. Nothing in it shows the grid today -- the
+   toolbar has its own ground and each notice row its own tint, edge to edge,
+   so the header is exactly the toolbar and its rows -- but a gap between
+   them would show the page's ground rather than the content under it. */
 .ds-page > header {
   position: -webkit-sticky;
   position: sticky;
@@ -2446,23 +2437,30 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
    Notices
 
    What the site has to say about the last thing you did: signed in, the
-   password did not match, the click did not save. A tinted strip in the
-   page's column, under the toolbar, one per message -- the level is its
-   colour, and the words are the same weight as the page's own, because a
-   sentence set in bold on a box of red is shouting.
+   password did not match, the click did not save. A row of the header, under
+   the toolbar and built like it -- the full width of the window, its content
+   at the toolbar's 12px from either edge, and one line between each row and
+   the next: the toolbar's own bottom border is what separates it from the
+   first, and each row closes with the same line. Nothing floats and nothing
+   is rounded; the header reads as one bar that has grown rows. One row per
+   message -- the level is its tint, and the words are the same weight as the
+   page's own, because a sentence set in bold on a box of red is shouting.
 
-   `.ds-notices` is the list that holds them, lined up with the content
-   column below (main's side padding, then .center's width). A notice that
-   can be put away carries `.ds-notice-close`, which only ever removes it:
-   a message is already said, so nothing is lost by the reader not wanting
-   to see it again.
+   `.ds-notices` is the list that holds them. It keeps no margin of its own:
+   the gap between the last row and the page is main's top padding
+   (style.css), the same gap the page keeps under the toolbar when there is
+   nothing to say, so a message arriving pushes the page down rather than
+   crowding it. A margin here would sit inside the sticky header and show a
+   strip of ground that the content then scrolls behind.
+
+   A notice that can be put away carries `.ds-notice-close`, at the row's
+   end where the toolbar keeps the account: it only ever removes the notice,
+   since a message is already said, and nothing is lost by the reader not
+   wanting to see it again.
    --------------------------------------------------------------------------- */
 .ds-notices {
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-  max-width: calc(829px + 2 * var(--ds-space-3));
-  margin: var(--ds-space-3) auto 0;
-  padding: 0 var(--ds-space-3);
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
@@ -2479,20 +2477,16 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   box-sizing: border-box;
   margin: 0;
   padding: var(--ds-space-2) var(--ds-space-3);
-  border: 1px solid var(--ds-line-strong);
-  border-radius: var(--ds-radius-m);
+  border: 0;
+  border-bottom: 1px solid var(--ds-line);
+  border-radius: 0;
   background-color: var(--ds-surface);
-  box-shadow: var(--ds-shadow-raise);
   color: var(--ds-ink);
   font-family: var(--ds-font);
   font-size: var(--ds-text-base);
   line-height: calc(20px * var(--ds-text-scale, 1));
   overflow-wrap: break-word;
   word-wrap: break-word;
-}
-
-.ds-notice + .ds-notice {
-  margin-top: var(--ds-space-2);
 }
 
 /* The level's mark: a dot in its own colour before the words, so the level
@@ -2515,9 +2509,12 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   margin: 0;
 }
 
+/* A level's tint is laid over the ground rather than being the row's
+   colour, because in dark mode the tints are translucent and the header
+   behind a row carries the grid. */
 .ds-notice-success {
-  border-color: var(--ds-success-line);
-  background-color: var(--ds-success-surface);
+  background-color: var(--ds-ground);
+  background-image: linear-gradient(var(--ds-success-surface), var(--ds-success-surface));
   color: var(--ds-success-text);
 }
 
@@ -2526,8 +2523,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 }
 
 .ds-notice-warning {
-  border-color: var(--ds-warning-line);
-  background-color: var(--ds-warning-surface);
+  background-color: var(--ds-ground);
+  background-image: linear-gradient(var(--ds-warning-surface), var(--ds-warning-surface));
   color: var(--ds-warning-text);
 }
 
@@ -2536,8 +2533,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 }
 
 .ds-notice-error {
-  border-color: var(--ds-danger-line);
-  background-color: var(--ds-danger-surface);
+  background-color: var(--ds-ground);
+  background-image: linear-gradient(var(--ds-danger-surface), var(--ds-danger-surface));
   color: var(--ds-danger-text);
 }
 
