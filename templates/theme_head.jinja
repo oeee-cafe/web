@@ -34,30 +34,12 @@
     document.documentElement.setAttribute("data-app", "android");
   } else if (/OeeeCafeMac/.test(navigator.userAgent)) {
     // The Mac app is a web view too, but not a phone: it takes none of the
-    // behaviour `data-app` turns on, so it is marked on its own. What it
-    // shares with the others is that a sign-in page opened inside it is
-    // opened inside a web view, which Google refuses -- so, as for the phone
-    // apps, its button shows only for a build that signs in some other way
-    // and says so below (style.css).
+    // behaviour `data-app` turns on, so it is marked on its own. It also
+    // marks itself `data-desktop="macos"` (MacWindow.js), which the Windows
+    // app does too, and this is what tells the two apart -- the Mac app
+    // signs in with Apple and Google itself, and the Windows one cannot
+    // (style.css).
     document.documentElement.setAttribute("data-mac-app", "");
-  }
-  // An app that can finish an Apple sign-in itself stops the button's
-  // navigation and says so: the iOS app with Apple's own sheet
-  // (AppleSignIn.swift), the Android app by sending it to a browser and
-  // taking the answer back through a handoff (SignInHandoff.kt). An app
-  // that says nothing would open Apple's page in a browser of its own,
-  // where the answer arrives without this session, so it is shown no
-  // button.
-  if (/\bSignInWithApple\b/.test(navigator.userAgent)) {
-    document.documentElement.setAttribute("data-native-apple-sign-in", "");
-  }
-  // Google refuses its own sign-in pages in an embedded web view, so the
-  // button shows only for an app that signs in some other way and says so:
-  // Credential Manager on Android (GoogleSignIn.kt), a browser of the
-  // system's on iOS (GoogleSignIn.swift). An app built without a client id
-  // to sign in with does not say it.
-  if (/\bSignInWithGoogle\b/.test(navigator.userAgent)) {
-    document.documentElement.setAttribute("data-native-google-sign-in", "");
   }
   if (document.documentElement.hasAttribute("data-app")) {
     // Controls are felt as well as seen, as the apps' own are: "light",
