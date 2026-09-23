@@ -1,17 +1,17 @@
 {% extends "base.jinja" %}
 {% block title %}
-  {{ super() }} | #{{ hashtag.display_name }}
+  {{ super() }} | #{{ tag.display_name }}
 {% endblock title %}
 {% block social_meta %}
   <meta property="og:site_name" content="{{ ftl_get_message('brand') }}" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="#{{ hashtag.display_name }}" />
+  <meta property="og:title" content="#{{ tag.display_name }}" />
   <meta property="og:description"
-        content="{{ ftl_format_pattern('hashtag-post-count', {'count': post_count}) }}" />
+        content="{{ ftl_format_pattern('tag-post-count', {'count': post_count}) }}" />
   {# The stored name, escaped: the display name differs from it in case, and a
      tag in a non-Latin script has to survive being put in a URL. #}
   <meta property="og:url"
-        content="{{ base_url|safe }}/hashtags/{{ hashtag.name|urlencode }}" />
+        content="{{ base_url|safe }}/tags/{{ tag.name|urlencode }}" />
   {# Lead with the most recent drawing carrying the tag, which is a far better
      preview than the site mark. #}
   {% if feed.posts %}
@@ -30,17 +30,17 @@
   {% include "post_feed_head.jinja" %}
   {# A tag's page as a community's is laid out: the card saying what it is,
      then its drawings. #}
-  <div class="profile hashtag-page">
+  <div class="profile tag-page">
     <section class="profile-card ds-card">
       <div class="profile-identity">
-        <h1 class="profile-name">#{{ hashtag.display_name }}</h1>
+        <h1 class="profile-name">#{{ tag.display_name }}</h1>
         {# Counted over the same filter the grid below is drawn from, so this
            is the number of drawings on the page rather than a stored counter
            that had drifted from it. #}
-        <div class="profile-handle">{{ ftl_format_pattern("hashtag-post-count", {"count": post_count}) }}</div>
+        <div class="profile-handle">{{ ftl_format_pattern("tag-post-count", {"count": post_count}) }}</div>
       </div>
       <div class="profile-actions">
-        <a class="ds-button" href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
+        <a class="ds-button" href="/tags">{{ ftl_get_message("tag-discovery") }}</a>
       </div>
     </section>
 
@@ -56,7 +56,7 @@
           {% include "post_feed_fragment.jinja" %}
         </div>
       {% else %}
-        <p class="profile-empty">{{ ftl_get_message("hashtag-no-posts") }}</p>
+        <p class="profile-empty">{{ ftl_get_message("tag-no-posts") }}</p>
       {% endif %}
     </section>
   </div>

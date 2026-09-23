@@ -1,12 +1,12 @@
 {% extends "base.jinja" %}
 {% import "pill_macro.jinja" as pill %}
 {% block title %}
-  {{ super() }} | {{ ftl_get_message("hashtag-discovery") }}
+  {{ super() }} | {{ ftl_get_message("tag-discovery") }}
 {% endblock title %}
 {% block content %}
   {# The tag directory, laid out as the community directory is: one bar --
      the order as a segmented control, then search -- over a grid of cards,
-     and no heading above them, since the toolbar's Hashtags already says
+     and no heading above them, since the toolbar's Tags already says
      where this is. #}
   <div class="center-wide communities-page">
     {# Each order keeps the search it was chosen from, so reordering results
@@ -15,36 +15,36 @@
     <div class="communities-bar">
       <nav class="ds-segmented" aria-label="{{ ftl_get_message("sort-by") }}" {{ pill.in_place() }}>
         {% for key, label in [("trending", "sort-trending"), ("popular", "sort-popular"), ("recent", "sort-recent"), ("alphabetical", "sort-alphabetical")] %}
-          <a href="/hashtags?sort={{ key }}{{ search_suffix }}"{% if sort_by == key %} aria-current="page"{% endif %}>{{ ftl_get_message(label) }}</a>
+          <a href="/tags?sort={{ key }}{{ search_suffix }}"{% if sort_by == key %} aria-current="page"{% endif %}>{{ ftl_get_message(label) }}</a>
         {% endfor %}
       </nav>
-      {# The form still GETs /hashtags, so this works with scripting off and
+      {# The form still GETs /tags, so this works with scripting off and
          Enter still navigates to a bookmarkable URL; the htmx attributes on
          the input search as you type on top of that. The sort rides inside
          the form, so Enter keeps the chosen order. #}
-      <form method="get" action="/hashtags" class="communities-filters hashtag-search-form" role="search">
+      <form method="get" action="/tags" class="communities-filters tag-search-form" role="search">
         <input type="search"
                name="q"
-               placeholder="{{ ftl_get_message("hashtag-search-placeholder") }}"
-               aria-label="{{ ftl_get_message("hashtag-search-placeholder") }}"
+               placeholder="{{ ftl_get_message("tag-search-placeholder") }}"
+               aria-label="{{ ftl_get_message("tag-search-placeholder") }}"
                value="{% if search_query %}{{ search_query }}{% endif %}"
                class="ds-input communities-search"
                autocomplete="off"
-               hx-get="/api/hashtags/cards"
+               hx-get="/api/tags/cards"
                hx-trigger="input changed delay:300ms, search"
-               hx-target="#hashtag-results"
+               hx-target="#tag-results"
                hx-swap="innerHTML"
                hx-include="[name='sort']"
-               hx-indicator="#hashtag-search-indicator" />
+               hx-indicator="#tag-search-indicator" />
         <input type="hidden" name="sort" value="{{ sort_by }}" />
-        <span id="hashtag-search-indicator"
+        <span id="tag-search-indicator"
               class="htmx-indicator search-indicator"
               role="status">{{ ftl_get_message("searching") }}</span>
       </form>
     </div>
 
-    <div id="hashtag-results">
-      {% include "hashtag_results.jinja" %}
+    <div id="tag-results">
+      {% include "tag_results.jinja" %}
     </div>
   </div>
 {% endblock content %}

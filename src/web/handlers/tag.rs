@@ -1,7 +1,7 @@
 use crate::app_error::AppError;
-use crate::models::hashtag::{
-    browse_hashtags, find_hashtag_by_name, find_posts_by_hashtag, hashtag_covers,
-    normalize_hashtag, search_hashtags, Hashtag, HashtagCover, HashtagSort,
+use crate::models::tag::{
+    browse_tags, find_tag_by_name, find_posts_by_tag, tag_covers,
+    normalize_tag, search_tags, Tag, TagCover, TagSort,
 };
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
@@ -16,15 +16,15 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction};
 
 /// Tags listed on the directory, and matches returned by a search.
-const HASHTAG_LIST_LIMIT: i64 = 100;
+const TAG_LIST_LIMIT: i64 = 100;
 
 /// Suggestions offered under the tag field while someone types.
-const HASHTAG_AUTOCOMPLETE_LIMIT: i64 = 10;
+const TAG_AUTOCOMPLETE_LIMIT: i64 = 10;
 
-/// Where `/hashtags/:name` and its load-more endpoint agree on a tag.
+/// Where `/tags/:name` and its load-more endpoint agree on a tag.
 ///
 /// The path segment is normalized the same way the tag field normalizes what
-/// was typed into it, so `/hashtags/Art`, `/hashtags/art` and `/hashtags/#art`
+/// was typed into it, so `/tags/Art`, `/tags/art` and `/tags/#art`
 /// are one page rather than three, one of which 404s.
 enum Requested {
     /// The path already spells the tag the way it is stored.
@@ -34,7 +34,7 @@ enum Requested {
 }
 
 fn canonicalize(requested: &str) -> Requested {
-    let normalized = normalize_hashtag(requested);
+    let normalized = normalize_tag(requested);
     if normalized == requested {
         Requested::Canonical(normalized)
     } else {
@@ -42,17 +42,17 @@ fn canonicalize(requested: &str) -> Requested {
     }
 }
 
-/// `/hashtags/<name>`, with the name escaped. Tags are letters, digits and
+/// `/tags/<name>`, with the name escaped. Tags are letters, digits and
 /// underscores now, so this only ever has non-ASCII to encode — but it is the
 /// difference between a link that works for 그림 and one that depends on the
 /// browser guessing.
-fn hashtag_url(name: &str) -> String {
-    format!("/hashtags/{}", urlencoding::encode(name))
+fn tag_url(name: &str) -> String {
+    format!("/tags/{}", urlencoding::encode(name))
 }
 
-/// The 404 page, rather than the bare `<h1>Hashtag not found</h1>` string this
+/// The 404 page, rather than the bare `<h1>Tag not found</h1>` string this
 /// used to answer with: unstyled, untranslated, and outside the site chrome.
-async fn hashtag_not_found(
+async fn tag_not_found(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
     auth_session: &AuthSession,
@@ -69,8 +69,8 @@ async fn hashtag_not_found(
     Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
 
-/// GET /hashtags/:hashtag_name — one tag's drawings.
-pub async fn hashtag_view(
+/// GET /tags/:tag_name — one tag's drawings.
+pub async fn tag_view(
     auth_session: AuthSession,
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
@@ -80,19 +80,19 @@ pub async fn hashtag_view(
         Requested::Canonical(name) => name,
         Requested::Elsewhere(name) if name.is_empty() => {
             let mut tx = state.db_pool.begin().await?;
-            let response = hashtag_not_found(&mut tx, &state, &auth_session, &ftl_lang).await?;
+            let response = tag_not_found(&mut tx, &state, &auth_session, &ftl_lang).await?;
             tx.commit().await?;
             return Ok(response);
         }
         Requested::Elsewhere(name) => {
-            return Ok(Redirect::permanent(&hashtag_url(&name)).into_response())
+            return Ok(Redirect::permanent(&tag_url(&name)).into_response())
         }
     };
 
     let mut tx = state.db_pool.begin().await?;
 
-    let Some(hashtag) = find_hashtag_by_name(&mut tx, &name).await? else {
-        let response = hashtag_not_found(&mut tx, &state, &auth_session, &ftl_lang).await?;
+    let Some(tag) = find_tag_by_name(&mut tx, &name).await? else {
+        let response = tag_not_found(&mut tx, &state, &auth_session, &ftl_lang).await?;
         tx.commit().await?;
         return Ok(response);
     };
@@ -104,7 +104,7 @@ pub async fn hashtag_view(
 
     // The total comes back from the same query as the posts, over the same
     // filter, so the count in the heading is the number of drawings below it.
-    let (posts, post_count) = find_posts_by_hashtag(
+    let (posts, post_count) = find_posts_by_tag(
         &mut tx,
         &name,
         HOME_POSTS_PER_BATCH,
@@ -119,12 +119,12 @@ pub async fn hashtag_view(
 
     tx.commit().await?;
 
-    let template = state.env.get_template("hashtag_view.jinja")?;
+    let template = state.env.get_template("tag_view.jinja")?;
     let rendered = template.render(context! {
         current_user => auth_session.user,
-        hashtag => hashtag,
+        tag => tag,
         post_count,
-        feed => feed_context(posts, &format!("{}/posts", hashtag_url(&name)), 0),
+        feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), 0),
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang
@@ -139,15 +139,15 @@ pub struct LoadMoreQuery {
     limit: i64,
 }
 
-/// GET /hashtags/:hashtag_name/posts — the next batch of cards for the tag
+/// GET /tags/:tag_name/posts — the next batch of cards for the tag
 /// page's infinite scroll. Same fragment every other feed loads.
-pub async fn load_more_hashtag_posts(
+pub async fn load_more_tag_posts(
     auth_session: AuthSession,
     State(state): State<AppState>,
     Path(requested): Path<String>,
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    let name = normalize_hashtag(&requested);
+    let name = normalize_tag(&requested);
 
     let (viewer_user_id, viewer_show_sensitive) = match auth_session.user.as_ref() {
         Some(user) => (Some(user.id), user.show_sensitive_content),
@@ -155,7 +155,7 @@ pub async fn load_more_hashtag_posts(
     };
 
     let mut tx = state.db_pool.begin().await?;
-    let (posts, _) = find_posts_by_hashtag(
+    let (posts, _) = find_posts_by_tag(
         &mut tx,
         &name,
         query.limit.clamp(1, HOME_POSTS_PER_BATCH),
@@ -170,7 +170,7 @@ pub async fn load_more_hashtag_posts(
         .env
         .get_template("post_feed_fragment.jinja")?
         .render(context! {
-            feed => feed_context(posts, &format!("{}/posts", hashtag_url(&name)), query.offset),
+            feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), query.offset),
             r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
         })?;
 
@@ -182,8 +182,8 @@ pub struct AutocompleteQuery {
     q: String,
 }
 
-/// GET /api/hashtags/autocomplete — suggestions under the tag field.
-pub async fn hashtag_autocomplete(
+/// GET /api/tags/autocomplete — suggestions under the tag field.
+pub async fn tag_autocomplete(
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Query(params): Query<AutocompleteQuery>,
@@ -191,26 +191,26 @@ pub async fn hashtag_autocomplete(
     // Nothing typed is nothing to suggest. The field fires on every keystroke
     // including the one that empties it, and an empty query used to match every
     // tag on the site and drop the menu open over the form.
-    let query = normalize_hashtag(&params.q);
-    let hashtags = if query.is_empty() {
+    let query = normalize_tag(&params.q);
+    let tags = if query.is_empty() {
         Vec::new()
     } else {
         let mut tx = state.db_pool.begin().await?;
-        let hashtags = search_hashtags(&mut tx, &query, HASHTAG_AUTOCOMPLETE_LIMIT).await?;
+        let tags = search_tags(&mut tx, &query, TAG_AUTOCOMPLETE_LIMIT).await?;
         tx.commit().await?;
-        hashtags
+        tags
     };
 
     let rendered = state
         .env
-        .get_template("hashtag_autocomplete.jinja")?
-        .render(context! { hashtags, ftl_lang })?;
+        .get_template("tag_autocomplete.jinja")?
+        .render(context! { tags, ftl_lang })?;
 
     Ok(Html(rendered).into_response())
 }
 
 #[derive(Deserialize)]
-pub struct HashtagDiscoveryQuery {
+pub struct TagDiscoveryQuery {
     q: Option<String>,
     sort: Option<String>,
 }
@@ -223,17 +223,17 @@ pub struct HashtagDiscoveryQuery {
 /// titled `Search results for ""` on the other.
 /// A tag as the directory shows it: the tag, and the drawings on its card.
 #[derive(Serialize)]
-struct HashtagCard {
+struct TagCard {
     #[serde(flatten)]
-    hashtag: Hashtag,
-    covers: Vec<HashtagCover>,
+    tag: Tag,
+    covers: Vec<TagCover>,
 }
 
-async fn requested_hashtags(
+async fn requested_tags(
     state: &AppState,
-    params: &HashtagDiscoveryQuery,
-) -> Result<(Vec<HashtagCard>, Option<String>, HashtagSort), AppError> {
-    let sort = HashtagSort::from_param(params.sort.as_deref());
+    params: &TagDiscoveryQuery,
+) -> Result<(Vec<TagCard>, Option<String>, TagSort), AppError> {
+    let sort = TagSort::from_param(params.sort.as_deref());
     let query = params
         .q
         .as_deref()
@@ -242,45 +242,45 @@ async fn requested_hashtags(
         .map(str::to_string);
 
     let mut tx = state.db_pool.begin().await?;
-    let hashtags = match query.as_deref() {
-        Some(query) => search_hashtags(&mut tx, query, HASHTAG_LIST_LIMIT).await?,
-        None => browse_hashtags(&mut tx, sort, HASHTAG_LIST_LIMIT).await?,
+    let tags = match query.as_deref() {
+        Some(query) => search_tags(&mut tx, query, TAG_LIST_LIMIT).await?,
+        None => browse_tags(&mut tx, sort, TAG_LIST_LIMIT).await?,
     };
-    let ids: Vec<_> = hashtags.iter().map(|h| h.id).collect();
-    let mut covers = hashtag_covers(&mut tx, &ids).await?;
+    let ids: Vec<_> = tags.iter().map(|h| h.id).collect();
+    let mut covers = tag_covers(&mut tx, &ids).await?;
     tx.commit().await?;
 
-    let cards = hashtags
+    let cards = tags
         .into_iter()
-        .map(|hashtag| {
+        .map(|tag| {
             let (mine, rest): (Vec<_>, Vec<_>) =
-                covers.drain(..).partition(|c| c.hashtag_id == hashtag.id);
+                covers.drain(..).partition(|c| c.tag_id == tag.id);
             covers = rest;
-            HashtagCard { hashtag, covers: mine }
+            TagCard { tag, covers: mine }
         })
         .collect();
 
     Ok((cards, query, sort))
 }
 
-/// GET /api/hashtags/cards — the tag list alone, for the search box.
+/// GET /api/tags/cards — the tag list alone, for the search box.
 ///
-/// Shares `hashtag_results.jinja` with the page, and reaches the same queries
-/// `hashtag_discovery` does, so typing into the box and loading the URL cannot
+/// Shares `tag_results.jinja` with the page, and reaches the same queries
+/// `tag_discovery` does, so typing into the box and loading the URL cannot
 /// disagree about what matches. The page still answers the plain form GET for
 /// anyone without scripting.
-pub async fn hashtag_cards(
+pub async fn tag_cards(
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    Query(params): Query<HashtagDiscoveryQuery>,
+    Query(params): Query<TagDiscoveryQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    let (hashtags, search_query, _) = requested_hashtags(&state, &params).await?;
+    let (tags, search_query, _) = requested_tags(&state, &params).await?;
 
     let rendered = state
         .env
-        .get_template("hashtag_results.jinja")?
+        .get_template("tag_results.jinja")?
         .render(context! {
-            hashtags,
+            tags,
             search_query,
             ftl_lang,
         })?;
@@ -288,24 +288,24 @@ pub async fn hashtag_cards(
     Ok(Html(rendered).into_response())
 }
 
-/// GET /hashtags — the tag directory.
-pub async fn hashtag_discovery(
+/// GET /tags — the tag directory.
+pub async fn tag_discovery(
     auth_session: AuthSession,
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    Query(params): Query<HashtagDiscoveryQuery>,
+    Query(params): Query<TagDiscoveryQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    let (hashtags, search_query, sort) = requested_hashtags(&state, &params).await?;
+    let (tags, search_query, sort) = requested_tags(&state, &params).await?;
 
     let mut tx = state.db_pool.begin().await?;
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("hashtag_discovery.jinja")?;
+    let template = state.env.get_template("tag_discovery.jinja")?;
     let rendered = template.render(context! {
         current_user => auth_session.user,
-        hashtags,
+        tags,
         search_query,
         sort_by => sort.as_param(),
         draft_post_count => common_ctx.draft_post_count,

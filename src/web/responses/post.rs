@@ -88,7 +88,7 @@ pub struct PostDetail {
     pub allow_replay: bool,
     pub published_at_utc: Option<String>,
     pub community: Option<PostCommunityInfo>,
-    pub hashtags: Vec<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Serialize, Debug)]

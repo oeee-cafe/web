@@ -140,10 +140,10 @@
             {% if post.content %}
               <div class="post-inspector-description ds-selectable">{{ post.content|markdown|safe }}</div>
             {% endif %}
-            {% if hashtags %}
+            {% if tags %}
               <div class="post-inspector-tags">
-                {% for hashtag in hashtags %}
-                  <a href="/hashtags/{{ hashtag.name|urlencode }}" class="profile-chip">#{{ hashtag.display_name }}</a>
+                {% for tag in tags %}
+                  <a href="/tags/{{ tag.name|urlencode }}" class="profile-chip">#{{ tag.display_name }}</a>
                 {% endfor %}
               </div>
             {% endif %}

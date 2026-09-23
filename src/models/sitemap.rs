@@ -114,17 +114,17 @@ pub async fn sitemap_communities(
 
 /// Tags that have at least one publicly visible post, newest activity first.
 ///
-/// `hashtag_stats` is the same view the tag pages count from, so the sitemap
+/// `tag_stats` is the same view the tag pages count from, so the sitemap
 /// cannot advertise a tag whose page would come back empty.
-pub async fn sitemap_hashtags(
+pub async fn sitemap_tags(
     tx: &mut Transaction<'_, Postgres>,
     limit: i64,
 ) -> Result<Vec<SitemapEntry>> {
     let rows = query!(
         r#"
             SELECT h.name, s.last_posted_at
-            FROM hashtags h
-            JOIN hashtag_stats s ON s.hashtag_id = h.id
+            FROM tags h
+            JOIN tag_stats s ON s.tag_id = h.id
             ORDER BY s.last_posted_at DESC
             LIMIT $1
         "#,
@@ -137,7 +137,7 @@ pub async fn sitemap_hashtags(
         .into_iter()
         .filter_map(|row| {
             row.last_posted_at.map(|last_posted_at| SitemapEntry {
-                path: format!("/hashtags/{}", urlencoding::encode(&row.name)),
+                path: format!("/tags/{}", urlencoding::encode(&row.name)),
                 last_modified: last_posted_at,
             })
         })

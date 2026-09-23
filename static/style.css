@@ -1375,22 +1375,22 @@ nav a:visited,
   opacity: 0.75;
 }
 
-/* Hashtags */
+/* Tags */
 
-.post-hashtags {
+.post-tags {
   padding: var(--space-2) 0;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-.trending-hashtags {
+.trending-tags {
   padding: 0;
   margin: 0 0 var(--space-5) 0;
   background-color: var(--main-bg-color);
 }
 
-.trending-hashtags h3 {
+.trending-tags h3 {
   margin-top: 0;
   margin-bottom: var(--space-3);
   padding-bottom: var(--space-2);
@@ -1399,7 +1399,7 @@ nav a:visited,
   font-weight: 600;
 }
 
-.hashtag-list {
+.tag-list {
   list-style: none;
   padding-left: 0;
   margin: 0;
@@ -1409,11 +1409,11 @@ nav a:visited,
   line-height: 1.8;
 }
 
-.hashtag-item {
+.tag-item {
   padding: 0;
 }
 
-.hashtag-item a {
+.tag-item a {
   display: inline-block;
   text-decoration: none;
   padding: var(--space-1) var(--space-2);
@@ -1422,12 +1422,12 @@ nav a:visited,
   font-weight: 500;
 }
 
-.hashtag-item a:hover {
+.tag-item a:hover {
   background-color: var(--main-nav-bg-color);
   border-color: var(--main-highlight-color);
 }
 
-.hashtag-post-count {
+.tag-post-count {
   color: var(--main-text-color);
   opacity: 0.8;
   font-size: var(--text-xs);
@@ -1443,13 +1443,13 @@ nav a:visited,
   margin-top: 2px;
 }
 
-/* Hashtag Autocomplete */
+/* Tag Autocomplete */
 
-.hashtag-input-container {
+.tag-input-container {
   position: relative;
 }
 
-.hashtag-autocomplete {
+.tag-autocomplete {
   position: absolute;
   top: 100%;
   left: 0;
@@ -1463,30 +1463,30 @@ nav a:visited,
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.hashtag-autocomplete-list {
+.tag-autocomplete-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.hashtag-autocomplete-item {
+.tag-autocomplete-item {
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--main-border-color);
 }
 
-.hashtag-autocomplete-item:last-child {
+.tag-autocomplete-item:last-child {
   border-bottom: none;
 }
 
-.hashtag-autocomplete-item:hover,
+.tag-autocomplete-item:hover,
 /* Arrow keys move this, so it has to look the same as hovering: the menu is
    reachable from the keyboard now, and a highlight only the mouse can produce
    would leave that navigation invisible. */
-.hashtag-autocomplete-item.is-active {
+.tag-autocomplete-item.is-active {
   background-color: var(--main-nav-bg-color);
 }
 
-.hashtag-autocomplete-list {
+.tag-autocomplete-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1509,13 +1509,13 @@ nav a:visited,
   font-size: var(--text-xs);
 }
 
-/* Trending Hashtags Section Layout */
+/* Trending Tags Section Layout */
 
 .recent-comments-section {
   margin-bottom: var(--space-5);
 }
 
-.trending-hashtags-section {
+.trending-tags-section {
   margin-bottom: var(--space-5);
 }
 
@@ -2385,13 +2385,13 @@ nav a:visited,
 
 /* The tag directory borrows the community directory's bar and cards; only
    the tag's glyph on an empty cover is its own. */
-.hashtag-card .community-card-empty {
+.tag-card .community-card-empty {
   color: var(--ds-faint);
   font-size: var(--ds-text-2xl);
   font-weight: 700;
 }
 
-.hashtag-search-info {
+.tag-search-info {
   margin: 0 0 var(--ds-space-3);
   color: var(--ds-muted);
   font-size: var(--ds-text-m);

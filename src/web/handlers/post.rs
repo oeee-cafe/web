@@ -11,7 +11,7 @@ use crate::models::community::{
     find_community_by_id, get_known_communities, get_user_role_in_community, is_user_member,
 };
 use crate::models::follow;
-use crate::models::hashtag::{get_hashtags_for_post, set_post_hashtags};
+use crate::models::tag::{get_tags_for_post, set_post_tags};
 use crate::models::image::find_image_by_id;
 use crate::models::notification::{
     create_notification, get_notification_by_id, get_unread_count, send_push_for_notification,
@@ -717,8 +717,8 @@ pub async fn post_view(
         .await
         .unwrap_or_default();
 
-    // Get hashtags for this post
-    let hashtags = get_hashtags_for_post(&mut tx, uuid)
+    // Get tags for this post
+    let tags = get_tags_for_post(&mut tx, uuid)
         .await
         .unwrap_or_default();
 
@@ -737,7 +737,7 @@ pub async fn post_view(
                 current_user => auth_session.user,
                 post => Some(&post),
                 post_id => id,
-                hashtags,
+                tags,
                 post_community,
                 ftl_lang
             })?
@@ -769,7 +769,7 @@ pub async fn post_view(
                 supporters,
                 collaborative_participants,
                 reaction_counts,
-                hashtags,
+                tags,
                 child_posts,
                 post_community,
                 ftl_lang
@@ -972,7 +972,7 @@ pub struct PostPublishForm {
     is_sensitive: Option<String>,
     allow_relay: Option<String>,
     allow_replay: Option<String>,
-    hashtags: Option<String>,
+    tags: Option<String>,
 }
 
 pub async fn post_publish(
@@ -1035,7 +1035,7 @@ pub async fn post_publish(
     // Not `let _ =`: a tag that fails to store aborts the transaction this
     // publish is running in, so swallowing the error only moved the failure to
     // whichever query ran next and made it unattributable.
-    set_post_hashtags(&mut tx, post_id, form.hashtags.as_deref()).await?;
+    set_post_tags(&mut tx, post_id, form.tags.as_deref()).await?;
 
     // A first drawing, or a first relay.
     award_achievements(&mut tx, user_id).await?;
@@ -2060,11 +2060,11 @@ pub async fn hx_edit_post(
         return Ok(StatusCode::FORBIDDEN.into_response());
     }
 
-    // Get existing hashtags for this post
-    let hashtags = get_hashtags_for_post(&mut tx, post_uuid)
+    // Get existing tags for this post
+    let tags = get_tags_for_post(&mut tx, post_uuid)
         .await
         .unwrap_or_default();
-    let hashtags_string = hashtags
+    let tags_string = tags
         .iter()
         .map(|h| h.display_name.clone())
         .collect::<Vec<_>>()
@@ -2077,7 +2077,7 @@ pub async fn hx_edit_post(
         current_user => auth_session.user,
         post,
         post_id => id,
-        hashtags => hashtags_string,
+        tags => tags_string,
         ftl_lang
     })?;
 
@@ -2091,7 +2091,7 @@ pub struct EditPostForm {
     pub is_sensitive: Option<String>,
     pub allow_relay: Option<String>,
     pub allow_replay: Option<String>,
-    pub hashtags: Option<String>,
+    pub tags: Option<String>,
 }
 
 pub async fn hx_do_edit_post(
@@ -2136,12 +2136,12 @@ pub async fn hx_do_edit_post(
     )
     .await;
 
-    set_post_hashtags(&mut tx, post_uuid, form.hashtags.as_deref()).await?;
+    set_post_tags(&mut tx, post_uuid, form.tags.as_deref()).await?;
 
     let post = find_post_by_id(&mut tx, post_uuid).await?;
 
-    // Get hashtags for this post
-    let hashtags = get_hashtags_for_post(&mut tx, post_uuid)
+    // Get tags for this post
+    let tags = get_tags_for_post(&mut tx, post_uuid)
         .await
         .unwrap_or_default();
 
@@ -2207,7 +2207,7 @@ pub async fn hx_do_edit_post(
             current_user => auth_session.user,
                 post,
             post_id => id,
-            hashtags,
+            tags,
             ftl_lang
         })?
         .render_block("post_edit_block")?;
@@ -2596,8 +2596,8 @@ pub async fn post_view_by_login_name(
         .await
         .unwrap_or_default();
 
-    // Get hashtags for this post
-    let hashtags = get_hashtags_for_post(&mut tx, uuid)
+    // Get tags for this post
+    let tags = get_tags_for_post(&mut tx, uuid)
         .await
         .unwrap_or_default();
 
@@ -2616,7 +2616,7 @@ pub async fn post_view_by_login_name(
                 current_user => auth_session.user,
                 post => Some(&post),
                 post_id => post_id,
-                hashtags,
+                tags,
                 post_community,
                 ftl_lang
             })?
@@ -2648,7 +2648,7 @@ pub async fn post_view_by_login_name(
                 supporters,
                 collaborative_participants,
                 reaction_counts,
-                hashtags,
+                tags,
                 child_posts,
                 post_community,
                 ftl_lang

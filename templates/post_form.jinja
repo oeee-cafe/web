@@ -6,8 +6,8 @@
     // working from the keyboard, and anyone on a screen reader, had a menu they
     // could neither reach nor dismiss.
     document.addEventListener('DOMContentLoaded', function () {
-      var input = document.getElementById('hashtags-input');
-      var menu = document.getElementById('hashtag-suggestions');
+      var input = document.getElementById('tags-input');
+      var menu = document.getElementById('tag-suggestions');
       if (!input || !menu) return;
 
       // The separators the server splits on, so the tag being typed is the same
@@ -17,7 +17,7 @@
 
       function options() {
         return Array.prototype.slice.call(
-          menu.querySelectorAll('.hashtag-autocomplete-item')
+          menu.querySelectorAll('.tag-autocomplete-item')
         );
       }
 
@@ -47,19 +47,19 @@
           return t.trim();
         });
         tags.pop(); // the partial tag this suggestion replaces
-        tags.push(item.dataset.hashtag);
+        tags.push(item.dataset.tag);
         input.value = tags.join(', ') + ', ';
         close();
         input.focus();
       }
 
       menu.addEventListener('click', function (e) {
-        var item = e.target.closest('.hashtag-autocomplete-item');
+        var item = e.target.closest('.tag-autocomplete-item');
         if (item) choose(item);
       });
 
       menu.addEventListener('mousemove', function (e) {
-        var item = e.target.closest('.hashtag-autocomplete-item');
+        var item = e.target.closest('.tag-autocomplete-item');
         if (item) highlight(options().indexOf(item));
       });
 
@@ -142,35 +142,35 @@
                       required minlength="1" maxlength="5000" rows="4" aria-required="true"></textarea>
           </div>
           <div class="form-field">
-            <label class="ds-label" for="hashtags-input">{{ ftl_get_message("post-hashtags") }}</label>
-            <div class="hashtag-input-container">
+            <label class="ds-label" for="tags-input">{{ ftl_get_message("post-tags") }}</label>
+            <div class="tag-input-container">
               {# hx-vals sends only the tag being typed. #}
               <input class="ds-input"
                      type="text"
-                     id="hashtags-input"
-                     name="hashtags"
-                     placeholder="{{ ftl_get_message("post-hashtags-placeholder") }}"
+                     id="tags-input"
+                     name="tags"
+                     placeholder="{{ ftl_get_message("post-tags-placeholder") }}"
                      autocomplete="off"
                      maxlength="500"
                      role="combobox"
                      aria-expanded="false"
-                     aria-controls="hashtag-suggestions"
+                     aria-controls="tag-suggestions"
                      aria-autocomplete="list"
-                     aria-describedby="hashtags-hint"
-                     hx-get="/api/hashtags/autocomplete"
+                     aria-describedby="tags-hint"
+                     hx-get="/api/tags/autocomplete"
                      hx-trigger="keyup changed delay:300ms"
-                     hx-target="#hashtag-suggestions"
-                     hx-vals='js:{q: document.getElementById("hashtags-input").value.split(/[\s,\u3001\uFF0C#\uFF03]+/).pop()}'
-                     hx-indicator="#hashtag-autocomplete-indicator" />
-              <span id="hashtag-autocomplete-indicator"
+                     hx-target="#tag-suggestions"
+                     hx-vals='js:{q: document.getElementById("tags-input").value.split(/[\s,\u3001\uFF0C#\uFF03]+/).pop()}'
+                     hx-indicator="#tag-autocomplete-indicator" />
+              <span id="tag-autocomplete-indicator"
                     class="htmx-indicator search-indicator"
                     role="status">{{ ftl_get_message("searching") }}</span>
-              <div id="hashtag-suggestions"
-                   class="hashtag-autocomplete"
+              <div id="tag-suggestions"
+                   class="tag-autocomplete"
                    role="listbox"
-                   aria-label="{{ ftl_get_message("post-hashtags") }}"></div>
+                   aria-label="{{ ftl_get_message("post-tags") }}"></div>
             </div>
-            <span id="hashtags-hint" class="ds-help">{{ ftl_get_message("post-hashtags-hint") }}</span>
+            <span id="tags-hint" class="ds-help">{{ ftl_get_message("post-tags-hint") }}</span>
           </div>
 
           {# The three switches as a settings pane lists them: one row each,

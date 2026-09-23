@@ -15,18 +15,18 @@
         <textarea class="ds-textarea" id="post-edit-content" name="content" rows="4">{{ post.content }}</textarea>
     </div>
     <div class="form-field">
-        <label class="ds-label" for="post-edit-hashtags">{{ ftl_get_message("post-hashtags") }}</label>
+        <label class="ds-label" for="post-edit-tags">{{ ftl_get_message("post-tags") }}</label>
         {# Same cap the publish form has always carried. Without it a long
            enough line was a failed edit rather than a truncated tag. #}
         <input class="ds-input"
                type="text"
-               id="post-edit-hashtags"
-               name="hashtags"
-               value="{{ hashtags }}"
+               id="post-edit-tags"
+               name="tags"
+               value="{{ tags }}"
                maxlength="500"
-               aria-describedby="post-edit-hashtags-hint"
-               placeholder="{{ ftl_get_message("post-hashtags-placeholder") }}">
-        <span id="post-edit-hashtags-hint" class="ds-help">{{ ftl_get_message("post-hashtags-hint") }}</span>
+               aria-describedby="post-edit-tags-hint"
+               placeholder="{{ ftl_get_message("post-tags-placeholder") }}">
+        <span id="post-edit-tags-hint" class="ds-help">{{ ftl_get_message("post-tags-hint") }}</span>
     </div>
     <div class="community-form-choices publish-switches">
         <label class="community-form-choice">

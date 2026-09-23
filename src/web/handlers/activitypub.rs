@@ -1175,19 +1175,19 @@ pub struct Tag {
 }
 
 impl Tag {
-    fn hashtag(domain: &str, hashtag: &crate::models::hashtag::PostHashtag) -> Option<Tag> {
+    fn hashtag(domain: &str, tag: &crate::models::tag::PostTag) -> Option<Tag> {
         Some(Tag {
             r#type: "Hashtag".to_string(),
             href: format!(
-                "https://{}/hashtags/{}",
+                "https://{}/tags/{}",
                 domain,
-                urlencoding::encode(&hashtag.name)
+                urlencoding::encode(&tag.name)
             )
             .parse()
             .ok(),
             // With the `#`, which is what every implementation expects to read
             // and what the name in the database deliberately does not carry.
-            name: Some(format!("#{}", hashtag.display_name)),
+            name: Some(format!("#{}", tag.display_name)),
         })
     }
 }
@@ -1199,10 +1199,10 @@ async fn hashtag_tags(
     post_id: Uuid,
     domain: &str,
 ) -> Result<Vec<Tag>, AppError> {
-    Ok(crate::models::hashtag::get_hashtags_for_post(tx, post_id)
+    Ok(crate::models::tag::get_tags_for_post(tx, post_id)
         .await?
         .iter()
-        .filter_map(|hashtag| Tag::hashtag(domain, hashtag))
+        .filter_map(|tag| Tag::hashtag(domain, tag))
         .collect())
 }
 
