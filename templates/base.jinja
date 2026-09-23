@@ -77,14 +77,14 @@
         if (!list.querySelector(".ds-notice")) list.innerHTML = "";
       });
     </script>
-    {# In the macOS app and in a browser the header floats over the content
-       (ds.css), which needs its height to start below it -- a height that
-       changes when the toolbar stacks or a message arrives. #}
+    {# The header's height, which changes when the toolbar stacks or a
+       message arrives: in the macOS app and in a wider browser the header
+       floats over the content, which starts below it, and everywhere the
+       bar floats the fade behind it runs to its edges (ds.css). #}
     <script>
       (function () {
         var root = document.documentElement;
-        var app = root.getAttribute("data-app");
-        if ((app && app !== "macos") || !window.ResizeObserver) return;
+        if (!window.ResizeObserver) return;
         var header = document.querySelector(".ds-page > header");
         function measure() {
           root.style.setProperty("--ds-header-height", header.offsetHeight + "px");

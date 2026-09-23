@@ -530,14 +530,17 @@ html:not([data-form="desktop"]) .ds-page > header .nav-bar #menubar {
   }
 }
 
-/* What scrolls up past the bar fades into the ground before it reaches the
-   top of the screen, rather than being cut off there: the iOS app's page
-   stops at the status bar, which is plain ground, and a line of drawings
-   sliced through against it looked torn. A fixed wash, the ground at the
-   top running out to nothing a little below the bar, under the bar (so the
-   bar stays sharp) and over everything else. At rest there is nothing under
-   it but the top of the page, whose grid already comes in from the ground
-   the same way (style.css).
+/* What scrolls up past the bar fades into the ground as it passes under
+   it, and is gone by the bar's top edge, rather than being cut off at the
+   top of the screen: the iOS app's page stops at the status bar, which is
+   plain ground, and a line of drawings sliced through against it looked
+   torn. A fixed wash, under the bar (so the bar stays sharp) and over
+   everything else: nothing at the bar's bottom edge, the whole ground at
+   its top edge and above. `--ds-header-height` is the header's, which
+   ends where the bar does, kept by base.jinja; before it is measured, and
+   in an engine with nothing to measure it by, the bar's usual height. At
+   rest there is nothing under it but the top of the page, whose grid
+   already comes in from the ground the same way (style.css).
 
    On a phone's screen and anything held in the hand -- not on a desktop
    browser, where the top of the window is the window's own edge and the
@@ -550,10 +553,10 @@ html:not([data-form="desktop"]) .ds-page > header .nav-bar #menubar {
     right: 0;
     left: 0;
     z-index: 49;
-    height: 88px;
-    height: calc(env(safe-area-inset-top, 0px) + 88px);
-    background-image: linear-gradient(var(--ds-ground), transparent);
-    background-image: linear-gradient(var(--ds-ground) env(safe-area-inset-top, 0px), transparent);
+    height: 66px;
+    height: var(--ds-header-height, calc(env(safe-area-inset-top, 0px) + 66px));
+    background-image: linear-gradient(var(--ds-ground) 6px, transparent);
+    background-image: linear-gradient(var(--ds-ground) calc(env(safe-area-inset-top, 0px) + 6px), transparent);
     pointer-events: none;
   }
 }
@@ -565,8 +568,8 @@ html[data-form="handheld"] .ds-page::before {
   right: 0;
   left: 0;
   z-index: 49;
-  height: calc(env(safe-area-inset-top, 0px) + 88px);
-  background-image: linear-gradient(var(--ds-ground) env(safe-area-inset-top, 0px), transparent);
+  height: var(--ds-header-height, calc(env(safe-area-inset-top, 0px) + 66px));
+  background-image: linear-gradient(var(--ds-ground) calc(env(safe-area-inset-top, 0px) + 6px), transparent);
   pointer-events: none;
 }
 
