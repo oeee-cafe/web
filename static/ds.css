@@ -892,21 +892,24 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-raise);
   overflow: hidden;
-  transition: border-radius 160ms ease, background-color 160ms ease;
+  transition: background-color 160ms ease;
 }
 
 .toolbar-end .toolbar-search-pill:hover {
   background-color: var(--ds-ground);
 }
 
-/* Open: the square rounds into the pill, and wears the field's fill and
-   the focus ring, because from here on it is a field and not a button.
+/* Open, it wears the field's fill and the focus ring, because from here
+   on it is a field and not a button. Its corners are the 6px above
+   throughout: what widens is the only thing that changes, so it reads as
+   the same button grown rather than a second control arriving in its
+   place, and the bar keeps one corner radius across everything in it.
+
    :focus-within is what opens it and there is no second way -- the pill
    keeps what overflows it, so a field that grew inside a pill that did
    not would be a field nobody could see. Firefox 52 for that selector
    against 56 for this file, so the floor has it. */
 .toolbar-end .toolbar-search-pill:focus-within {
-  border-radius: 15px;
   background-color: var(--ds-field);
   outline: 2px solid var(--ds-focus);
   outline-offset: 1px;
@@ -1011,7 +1014,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   }
 }
 
-/* A pill that opens by widening is worth having; one that opens by
+/* A button that opens by widening is worth having; one that opens by
    appearing is what someone who asked for less motion gets. */
 @media (prefers-reduced-motion: reduce) {
   .toolbar-end .toolbar-search-field,
