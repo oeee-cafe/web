@@ -39,7 +39,7 @@ pub mod collaborate_cleanup;
 pub mod community;
 pub mod devices;
 pub mod draw;
-pub mod hashtag;
+pub mod tag;
 pub mod home;
 pub mod identity;
 pub mod notifications;
@@ -1163,7 +1163,7 @@ mod template_tests {
                 comments => Vec::<serde_json::Value>::new(),
                 collaborative_participants => Vec::<serde_json::Value>::new(),
                 reaction_counts => Vec::<serde_json::Value>::new(),
-                hashtags => Vec::<serde_json::Value>::new(),
+                tags => Vec::<serde_json::Value>::new(),
                 child_posts => Vec::<serde_json::Value>::new(),
                 post_community => json!(null),
                 parent_post_data => json!(null),
@@ -1916,7 +1916,7 @@ mod template_tests {
                         "allow_replay": allow_replay,
                     }),
                     post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
-                    hashtags => "",
+                    tags => "",
                     ..chrome()
                 })
                 .unwrap_or_else(|e| panic!("post_edit.jinja renders: {e:#}"))
@@ -2213,7 +2213,7 @@ mod template_tests {
                         {"login_name": "friend", "display_name": "Friend"},
                     ]),
                     reaction_counts => Vec::<serde_json::Value>::new(),
-                    hashtags => Vec::<serde_json::Value>::new(),
+                    tags => Vec::<serde_json::Value>::new(),
                     child_posts => Vec::<serde_json::Value>::new(),
                     post_community => json!(null),
                     parent_post_data => json!(null),
@@ -2588,7 +2588,7 @@ mod template_tests {
             "/about",
             "/collaborate",
             "/communities",
-            "/hashtags",
+            "/tags",
             // search.jinja: the shared post cards and the per-row control's
             // inline script, no bundle.
             "/search",
@@ -2678,15 +2678,15 @@ mod template_tests {
     }
 
     #[test]
-    fn the_hashtag_results_render_for_both_the_page_and_the_search_box() {
-        // Rendered inline by the page and standalone by /api/hashtags/cards.
+    fn the_tag_results_render_for_both_the_page_and_the_search_box() {
+        // Rendered inline by the page and standalone by /api/tags/cards.
         // The standalone call passes no `sort_by`, no `current_user` and no
         // chrome, so anything the fragment reaches for beyond its own three
         // keys would 500 the search box while the page stayed fine.
         let env = test_support::env();
         let template = env
-            .get_template("hashtag_results.jinja")
-            .unwrap_or_else(|e| panic!("hashtag_results.jinja loads: {e:#}"));
+            .get_template("tag_results.jinja")
+            .unwrap_or_else(|e| panic!("tag_results.jinja loads: {e:#}"));
 
         let tags = vec![json!({
             "name": "oekaki",
@@ -2696,47 +2696,47 @@ mod template_tests {
 
         let searched = template
             .render(context! {
-                hashtags => tags.clone(),
+                tags => tags.clone(),
                 search_query => Some("oek"),
                 ftl_lang => "en",
             })
             .unwrap_or_else(|e| panic!("renders a search: {e:#}"));
-        assert!(searched.contains("hashtag-search-info"));
-        assert!(searched.contains("/hashtags/oekaki"));
+        assert!(searched.contains("tag-search-info"));
+        assert!(searched.contains("/tags/oekaki"));
 
         let browsing = template
             .render(context! {
-                hashtags => tags,
+                tags => tags,
                 search_query => None::<String>,
                 ftl_lang => "en",
             })
             .unwrap_or_else(|e| panic!("renders while browsing: {e:#}"));
         assert!(
-            !browsing.contains("hashtag-search-info"),
+            !browsing.contains("tag-search-info"),
             "browsing is not a search and should not claim to be one"
         );
 
         let empty = template
             .render(context! {
-                hashtags => Vec::<serde_json::Value>::new(),
+                tags => Vec::<serde_json::Value>::new(),
                 search_query => Some("zzzz"),
                 ftl_lang => "en",
             })
             .unwrap_or_else(|e| panic!("renders no matches: {e:#}"));
-        assert!(empty.contains("no-hashtags-found"));
+        assert!(empty.contains("no-tags-found"));
     }
 
     #[test]
-    fn the_hashtag_page_draws_the_shared_post_cards() {
+    fn the_tag_page_draws_the_shared_post_cards() {
         // This page used to write its own <img> tags. That is how sensitive
         // drawings came to be blurred everywhere except here, and how it came
         // to load every thumbnail eagerly with no way to reach the next batch.
         let env = test_support::env();
         let rendered = env
-            .get_template("hashtag_view.jinja")
-            .unwrap_or_else(|e| panic!("hashtag_view.jinja loads: {e:#}"))
+            .get_template("tag_view.jinja")
+            .unwrap_or_else(|e| panic!("tag_view.jinja loads: {e:#}"))
             .render(context! {
-                hashtag => json!({
+                tag => json!({
                     "name": "oekaki",
                     "display_name": "Oekaki",
                     "post_count": 2,
@@ -2756,11 +2756,11 @@ mod template_tests {
                         "published_at": "2026-08-01T00:00:00Z",
                     }],
                     "has_more": true,
-                    "next_url": "/hashtags/oekaki/posts?offset=60&limit=60",
+                    "next_url": "/tags/oekaki/posts?offset=60&limit=60",
                 }),
                 ..chrome()
             })
-            .unwrap_or_else(|e| panic!("hashtag_view.jinja renders: {e:#}"));
+            .unwrap_or_else(|e| panic!("tag_view.jinja renders: {e:#}"));
 
         assert!(
             rendered.contains(r#"class="sensitive""#),
@@ -2770,61 +2770,61 @@ mod template_tests {
         // The autoescaper writes `/` as `&#x2f;` in attributes.
         let links_in = rendered.replace("&#x2f;", "/").replace("&amp;", "&");
         assert!(
-            links_in.contains("/hashtags/oekaki/posts?offset=60"),
+            links_in.contains("/tags/oekaki/posts?offset=60"),
             "the page needs the sentinel that loads the next batch"
         );
         // The count is passed separately from the tag now, because it is
         // counted over what this viewer can actually see.
-        assert!(rendered.contains("hashtag-post-count(count=2)"));
+        assert!(rendered.contains("tag-post-count(count=2)"));
     }
 
     #[test]
-    fn the_hashtag_page_names_the_tag_in_its_link_preview() {
+    fn the_tag_page_names_the_tag_in_its_link_preview() {
         let env = test_support::env();
         let rendered = env
-            .get_template("hashtag_view.jinja")
-            .unwrap_or_else(|e| panic!("hashtag_view.jinja loads: {e:#}"))
+            .get_template("tag_view.jinja")
+            .unwrap_or_else(|e| panic!("tag_view.jinja loads: {e:#}"))
             .render(context! {
                 // A tag in a non-Latin script has to survive being put in a URL.
-                hashtag => json!({ "name": "그림", "display_name": "그림", "post_count": 0 }),
+                tag => json!({ "name": "그림", "display_name": "그림", "post_count": 0 }),
                 post_count => 0,
                 feed => json!({ "posts": [], "has_more": false, "next_url": "" }),
                 ..chrome()
             })
-            .unwrap_or_else(|e| panic!("hashtag_view.jinja renders empty: {e:#}"));
+            .unwrap_or_else(|e| panic!("tag_view.jinja renders empty: {e:#}"));
 
         assert!(
             rendered.contains(
-                r#"content="https://oeee.test/hashtags/%EA%B7%B8%EB%A6%BC""#
+                r#"content="https://oeee.test/tags/%EA%B7%B8%EB%A6%BC""#
             ),
             "og:url should be the escaped canonical name, got: {}",
             &rendered[..rendered.find("</head>").unwrap_or(400)]
         );
-        assert!(rendered.contains("hashtag-no-posts"));
+        assert!(rendered.contains("tag-no-posts"));
     }
 
     #[test]
-    fn the_hashtag_suggestions_are_options_a_keyboard_can_reach() {
+    fn the_tag_suggestions_are_options_a_keyboard_can_reach() {
         // The menu used to be plain <li>s that only answered a click, inside a
         // container announcing itself as a listbox.
         let env = test_support::env();
         let rendered = env
-            .get_template("hashtag_autocomplete.jinja")
-            .unwrap_or_else(|e| panic!("hashtag_autocomplete.jinja loads: {e:#}"))
+            .get_template("tag_autocomplete.jinja")
+            .unwrap_or_else(|e| panic!("tag_autocomplete.jinja loads: {e:#}"))
             .render(context! {
-                hashtags => vec![json!({
+                tags => vec![json!({
                     "name": "oekaki",
                     "display_name": "Oekaki",
                     "post_count": 12,
                 })],
                 ftl_lang => "en",
             })
-            .unwrap_or_else(|e| panic!("hashtag_autocomplete.jinja renders: {e:#}"));
+            .unwrap_or_else(|e| panic!("tag_autocomplete.jinja renders: {e:#}"));
 
         assert!(rendered.contains(r#"role="option""#));
-        assert!(rendered.contains(r#"id="hashtag-option-0""#));
+        assert!(rendered.contains(r#"id="tag-option-0""#));
         assert!(rendered.contains(r#"aria-selected="false""#));
-        assert!(rendered.contains("hashtag-post-count(count=12)"));
+        assert!(rendered.contains("tag-post-count(count=12)"));
     }
 
     #[test]

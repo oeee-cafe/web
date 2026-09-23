@@ -177,9 +177,9 @@ post-reply-with-drawing = 用画回复
 post-reply-select-tool = 选择工具和画布尺寸
 post-child-posts = 回复
 post-replying-to = 回复给:
-post-hashtags = 标签
-post-hashtags-placeholder = 艺术, 绘画, 素描
-post-hashtags-hint = 用逗号或空格分隔标签
+post-tags = 标签
+post-tags-placeholder = 艺术, 绘画, 素描
+post-tags-hint = 用逗号或空格分隔标签
 post-reaction = 反应
 post-reactions = 反应
 post-share = 分享
@@ -203,18 +203,18 @@ draft-post = 草稿作品
 draft-posts-count = 个草稿
 draft-empty = 您还没有草稿
 
-# Hashtags
-hashtag-post-count = { $count } 篇作品
-hashtag-no-posts = 暂无使用此标签的作品
-hashtag-discovery = 标签
-hashtag-search-placeholder = 搜索标签...
+# Tags
+tag-post-count = { $count } 篇作品
+tag-no-posts = 暂无使用此标签的作品
+tag-discovery = 标签
+tag-search-placeholder = 搜索标签...
 search = 搜索
 searching = 搜索中…
 search-results-for = 搜索结果
 search-placeholder = 搜索作品
 search-posts = 作品
 search-no-results = 没有找到匹配的结果
-no-hashtags-found = 未找到标签
+no-tags-found = 未找到标签
 sort-by = 排序
 sort-trending = 热门
 sort-popular = 最多使用

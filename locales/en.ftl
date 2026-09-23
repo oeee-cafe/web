@@ -175,9 +175,9 @@ post-reply-with-drawing = Reply with Drawing
 post-reply-select-tool = Select tool and canvas size
 post-child-posts = Replies
 post-replying-to = Replying to:
-post-hashtags = Hashtags
-post-hashtags-placeholder = art, drawing, sketch
-post-hashtags-hint = Separate tags with commas or spaces
+post-tags = Tags
+post-tags-placeholder = art, drawing, sketch
+post-tags-hint = Separate tags with commas or spaces
 post-reaction = reaction
 post-reactions = reactions
 post-share = Share
@@ -201,22 +201,22 @@ draft-post = Draft post
 draft-posts-count = drafts
 draft-empty = You don't have any drafts yet
 
-# Hashtags
-hashtag-post-count =
+# Tags
+tag-post-count =
     { $count ->
         [one] { $count } post
        *[other] { $count } posts
     }
-hashtag-no-posts = No posts with this hashtag yet
-hashtag-discovery = Hashtags
-hashtag-search-placeholder = Search hashtags...
+tag-no-posts = No posts with this tag yet
+tag-discovery = Tags
+tag-search-placeholder = Search tags...
 search = Search
 searching = Searching…
 search-results-for = Search results for
 search-placeholder = Search drawings
 search-posts = Drawings
 search-no-results = Nothing matched your search
-no-hashtags-found = No hashtags found
+no-tags-found = No tags found
 sort-by = Sort by
 sort-trending = Trending
 sort-popular = Popular

@@ -177,9 +177,9 @@ post-reply-with-drawing = 그림으로 답글
 post-reply-select-tool = 도구와 캔버스 크기 선택
 post-child-posts = 답글
 post-replying-to = 답글 대상:
-post-hashtags = 해시태그
-post-hashtags-placeholder = 그림, 일러스트, 스케치
-post-hashtags-hint = 쉼표나 공백으로 태그 구분
+post-tags = 태그
+post-tags-placeholder = 그림, 일러스트, 스케치
+post-tags-hint = 쉼표나 공백으로 태그 구분
 post-reaction = 반응
 post-reactions = 반응
 post-share = 공유
@@ -203,18 +203,18 @@ draft-post = 임시 보관된 그림
 draft-posts-count = 개의 임시 보관함
 draft-empty = 아직 임시 보관된 그림이 없습니다
 
-# Hashtags
-hashtag-post-count = 게시물 { $count }개
-hashtag-no-posts = 이 해시태그가 달린 게시물이 아직 없습니다
-hashtag-discovery = 해시태그
-hashtag-search-placeholder = 해시태그 검색...
+# Tags
+tag-post-count = 게시물 { $count }개
+tag-no-posts = 이 태그가 달린 게시물이 아직 없습니다
+tag-discovery = 태그
+tag-search-placeholder = 태그 검색...
 search = 검색
 searching = 검색 중…
 search-results-for = 검색 결과
 search-placeholder = 그림 검색
 search-posts = 그림
 search-no-results = 검색 결과가 없습니다
-no-hashtags-found = 해시태그를 찾을 수 없습니다
+no-tags-found = 태그를 찾을 수 없습니다
 sort-by = 정렬
 sort-trending = 인기순
 sort-popular = 많이 사용된 순

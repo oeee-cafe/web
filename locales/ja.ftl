@@ -177,9 +177,9 @@ post-reply-with-drawing = 絵で返信
 post-reply-select-tool = ツールとキャンバスサイズを選択
 post-child-posts = 返信
 post-replying-to = 返信先:
-post-hashtags = ハッシュタグ
-post-hashtags-placeholder = イラスト, お絵かき, スケッチ
-post-hashtags-hint = カンマまたはスペースでタグを区切る
+post-tags = タグ
+post-tags-placeholder = イラスト, お絵かき, スケッチ
+post-tags-hint = カンマまたはスペースでタグを区切る
 post-reaction = リアクション
 post-reactions = リアクション
 post-share = 共有
@@ -203,18 +203,18 @@ draft-post = 一時保管された図
 draft-posts-count = 件の下書き
 draft-empty = まだ下書きがありません
 
-# Hashtags
-hashtag-post-count = { $count }件の投稿
-hashtag-no-posts = このハッシュタグがついた投稿はまだありません
-hashtag-discovery = ハッシュタグ
-hashtag-search-placeholder = ハッシュタグを検索...
+# Tags
+tag-post-count = { $count }件の投稿
+tag-no-posts = このタグがついた投稿はまだありません
+tag-discovery = タグ
+tag-search-placeholder = タグを検索...
 search = 検索
 searching = 検索中…
 search-results-for = 検索結果
 search-placeholder = 絵を検索
 search-posts = 絵
 search-no-results = 一致する結果がありませんでした
-no-hashtags-found = ハッシュタグが見つかりませんでした
+no-tags-found = タグが見つかりませんでした
 sort-by = 並べ替え
 sort-trending = トレンド
 sort-popular = 人気順

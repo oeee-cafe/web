@@ -4,14 +4,14 @@ use serde::Serialize;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
-/// A tag, with the counts the `hashtag_stats` view derives for it.
+/// A tag, with the counts the `tag_stats` view derives for it.
 ///
-/// `post_count` is not stored: `hashtags.post_count` is a leftover counter that
-/// nothing maintains any more (see the merge_and_normalize_hashtags migration).
+/// `post_count` is not stored: `tags.post_count` is a leftover counter that
+/// nothing maintains any more (see the merge_and_normalize_tags migration).
 /// Every query below reads the view instead, so the number a tag shows and the
 /// posts its page lists come from one definition of what a tag counts.
 #[derive(Clone, Debug, Serialize)]
-pub struct Hashtag {
+pub struct Tag {
     pub id: Uuid,
     pub name: String,
     pub display_name: String,
@@ -20,13 +20,13 @@ pub struct Hashtag {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Longest tag we keep. `hashtags.name` is varchar(255), so this is a product
+/// Longest tag we keep. `tags.name` is varchar(255), so this is a product
 /// decision rather than a storage one: past about this length a tag is a
 /// sentence, and truncating beats failing the publish it arrived with.
-pub const MAX_HASHTAG_LENGTH: usize = 60;
+pub const MAX_TAG_LENGTH: usize = 60;
 
 /// Most tags one post may carry. Anything past this is dropped.
-pub const MAX_HASHTAGS_PER_POST: usize = 30;
+pub const MAX_TAGS_PER_POST: usize = 30;
 
 /// True for the characters a tag may contain.
 ///
@@ -35,7 +35,7 @@ pub const MAX_HASHTAGS_PER_POST: usize = 30;
 /// Unicode-aware, so 그림, イラスト and рисунок are all tags; `/`, `?`, `#` and
 /// `%` — each of which used to produce a tag whose own link 404ed or 400ed —
 /// are not.
-fn is_hashtag_char(c: char) -> bool {
+fn is_tag_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
@@ -44,29 +44,29 @@ fn is_hashtag_char(c: char) -> bool {
 /// `#` is a separator rather than a character to strip, so `#art#drawing` and
 /// `#art` both come apart correctly — people type the hash, and it used to be
 /// kept, producing a tag named `#art` that rendered as `##art` and linked to
-/// `/hashtags/#art`, which is a fragment. The full-width comma, ideographic
+/// `/tags/#art`, which is a fragment. The full-width comma, ideographic
 /// comma and full-width hash are here because the placeholder text is
 /// translated into Japanese, Korean and Chinese and an IME does not emit the
 /// ASCII ones; `is_whitespace` covers U+3000 for the same reason.
-fn is_hashtag_separator(c: char) -> bool {
+fn is_tag_separator(c: char) -> bool {
     c.is_whitespace() || matches!(c, ',' | '，' | '、' | '#' | '＃')
 }
 
 /// Parse the tag field as typed into (normalized name, display name) pairs.
 ///
-/// Normalizing drops anything `is_hashtag_char` rejects rather than refusing
+/// Normalizing drops anything `is_tag_char` rejects rather than refusing
 /// the tag: this runs inside a publish, and losing a stray character is a much
 /// better outcome than losing the post. The pairs come back in the order they
 /// were typed, deduplicated by normalized name, so `Art art` is one tag.
-pub fn parse_hashtag_input(input: &str) -> Vec<(String, String)> {
+pub fn parse_tag_input(input: &str) -> Vec<(String, String)> {
     let mut parsed: Vec<(String, String)> = Vec::new();
 
-    for token in input.split(is_hashtag_separator) {
+    for token in input.split(is_tag_separator) {
         let display: String = token
             .replace('-', "_")
             .chars()
-            .filter(|c| is_hashtag_char(*c))
-            .take(MAX_HASHTAG_LENGTH)
+            .filter(|c| is_tag_char(*c))
+            .take(MAX_TAG_LENGTH)
             .collect();
         if display.is_empty() {
             continue;
@@ -76,7 +76,7 @@ pub fn parse_hashtag_input(input: &str) -> Vec<(String, String)> {
             continue;
         }
         parsed.push((name, display));
-        if parsed.len() == MAX_HASHTAGS_PER_POST {
+        if parsed.len() == MAX_TAGS_PER_POST {
             break;
         }
     }
@@ -85,13 +85,13 @@ pub fn parse_hashtag_input(input: &str) -> Vec<(String, String)> {
 }
 
 /// Normalize one tag that arrived from outside the tag field — a URL path
-/// segment, a search box — the same way `parse_hashtag_input` normalizes one it
-/// parsed, so `/hashtags/Art` and `/hashtags/art` are the same page.
-pub fn normalize_hashtag(raw: &str) -> String {
+/// segment, a search box — the same way `parse_tag_input` normalizes one it
+/// parsed, so `/tags/Art` and `/tags/art` are the same page.
+pub fn normalize_tag(raw: &str) -> String {
     raw.replace('-', "_")
         .chars()
-        .filter(|c| is_hashtag_char(*c))
-        .take(MAX_HASHTAG_LENGTH)
+        .filter(|c| is_tag_char(*c))
+        .take(MAX_TAG_LENGTH)
         .collect::<String>()
         .to_lowercase()
 }
@@ -101,7 +101,7 @@ pub fn normalize_hashtag(raw: &str) -> String {
 /// `None` leaves them alone, for an API client that predates the field;
 /// `Some("")` clears them. All three call sites that publish or edit a post go
 /// through here, so what the tag field means is decided once.
-pub async fn set_post_hashtags(
+pub async fn set_post_tags(
     tx: &mut Transaction<'_, Postgres>,
     post_id: Uuid,
     input: Option<&str>,
@@ -110,34 +110,34 @@ pub async fn set_post_hashtags(
         return Ok(());
     };
 
-    unlink_post_hashtags(tx, post_id).await?;
-    link_post_to_hashtags(tx, post_id, &parse_hashtag_input(input)).await
+    unlink_post_tags(tx, post_id).await?;
+    link_post_to_tags(tx, post_id, &parse_tag_input(input)).await
 }
 
 /// Link a post to tags, creating the ones that do not exist yet.
 ///
-/// Private, with `unlink` below: `set_post_hashtags` is the only way in, so
+/// Private, with `unlink` below: `set_post_tags` is the only way in, so
 /// there is one place that decides what replacing a post's tags means.
 ///
 /// One statement regardless of how many tags there are, and no counter to keep
 /// in step. It upserts rather than selecting-then-inserting because two people
 /// publishing the same new tag at the same moment used to race, and the loser's
 /// unique violation aborted their entire publish.
-async fn link_post_to_hashtags(
+async fn link_post_to_tags(
     tx: &mut Transaction<'_, Postgres>,
     post_id: Uuid,
-    hashtags: &[(String, String)], // (normalized_name, display_name), in the order typed
+    tags: &[(String, String)], // (normalized_name, display_name), in the order typed
 ) -> Result<()> {
-    if hashtags.is_empty() {
+    if tags.is_empty() {
         return Ok(());
     }
 
-    let names: Vec<String> = hashtags.iter().map(|(name, _)| name.clone()).collect();
-    let display_names: Vec<String> = hashtags
+    let names: Vec<String> = tags.iter().map(|(name, _)| name.clone()).collect();
+    let display_names: Vec<String> = tags
         .iter()
         .map(|(_, display_name)| display_name.clone())
         .collect();
-    let positions: Vec<i16> = (0..hashtags.len() as i16).collect();
+    let positions: Vec<i16> = (0..tags.len() as i16).collect();
 
     // `DO UPDATE`, not `DO NOTHING`: RETURNING skips the rows a DO NOTHING
     // conflict discarded, and the second insert needs an id for every tag,
@@ -150,16 +150,16 @@ async fn link_post_to_hashtags(
             FROM UNNEST($2::varchar[], $3::varchar[], $4::smallint[])
                 AS t(name, display_name, position)
         ), upserted AS (
-            INSERT INTO hashtags (name, display_name)
+            INSERT INTO tags (name, display_name)
             SELECT name, display_name FROM input
             ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
             RETURNING id, name
         )
-        INSERT INTO post_hashtags (post_id, hashtag_id, position)
+        INSERT INTO post_tags (post_id, tag_id, position)
         SELECT $1, upserted.id, input.position
         FROM upserted
         JOIN input USING (name)
-        ON CONFLICT (post_id, hashtag_id) DO NOTHING
+        ON CONFLICT (post_id, tag_id) DO NOTHING
         "#,
         post_id,
         &names,
@@ -179,8 +179,8 @@ async fn link_post_to_hashtags(
 /// in place — which is what lets a restored post keep the tags it was published
 /// with. It also means the three delete paths that never called this (a remote
 /// Delete, a community cascade, an account closing) no longer need to.
-async fn unlink_post_hashtags(tx: &mut Transaction<'_, Postgres>, post_id: Uuid) -> Result<()> {
-    sqlx::query!("DELETE FROM post_hashtags WHERE post_id = $1", post_id)
+async fn unlink_post_tags(tx: &mut Transaction<'_, Postgres>, post_id: Uuid) -> Result<()> {
+    sqlx::query!("DELETE FROM post_tags WHERE post_id = $1", post_id)
         .execute(&mut **tx)
         .await?;
     Ok(())
@@ -188,12 +188,12 @@ async fn unlink_post_hashtags(tx: &mut Transaction<'_, Postgres>, post_id: Uuid)
 
 /// One of a post's own tags.
 ///
-/// Deliberately not a `Hashtag`: a post page shows the tag's name and links to
+/// Deliberately not a `Tag`: a post page shows the tag's name and links to
 /// it, and never shows how many other posts carry it, so this runs on the most
 /// requested page on the site without joining the counts view to answer a
 /// question nobody asked.
 #[derive(Clone, Debug, Serialize)]
-pub struct PostHashtag {
+pub struct PostTag {
     pub id: Uuid,
     pub name: String,
     pub display_name: String,
@@ -205,16 +205,16 @@ pub struct PostHashtag {
 /// `created_at`, which is transaction time and therefore the same value for
 /// every tag on a post — so the tags came back in whatever order the rows
 /// happened to be read in, and the edit form handed them back reshuffled.
-pub async fn get_hashtags_for_post(
+pub async fn get_tags_for_post(
     tx: &mut Transaction<'_, Postgres>,
     post_id: Uuid,
-) -> Result<Vec<PostHashtag>> {
-    let hashtags = sqlx::query_as!(
-        PostHashtag,
+) -> Result<Vec<PostTag>> {
+    let tags = sqlx::query_as!(
+        PostTag,
         r#"
         SELECT h.id, h.name, h.display_name
-        FROM hashtags h
-        JOIN post_hashtags ph ON h.id = ph.hashtag_id
+        FROM tags h
+        JOIN post_tags ph ON h.id = ph.tag_id
         WHERE ph.post_id = $1
         ORDER BY ph.position ASC, ph.created_at ASC, h.name ASC
         "#,
@@ -222,7 +222,7 @@ pub async fn get_hashtags_for_post(
     )
     .fetch_all(&mut **tx)
     .await?;
-    Ok(hashtags)
+    Ok(tags)
 }
 
 /// One page of a tag's posts, plus how many there are in total for this viewer.
@@ -236,9 +236,9 @@ pub async fn get_hashtags_for_post(
 /// community, or no community at all. Personal posts used to be dropped by an
 /// inner join, which left every tag that had only ever been used on one showing
 /// an empty page from a link the post itself displayed.
-pub async fn find_posts_by_hashtag(
+pub async fn find_posts_by_tag(
     tx: &mut Transaction<'_, Postgres>,
-    hashtag_name: &str,
+    tag_name: &str,
     limit: i64,
     offset: i64,
     viewer_user_id: Option<Uuid>,
@@ -266,8 +266,8 @@ pub async fn find_posts_by_hashtag(
             posts.updated_at,
             count(*) OVER () AS "total!"
         FROM posts
-        JOIN post_hashtags ph ON posts.id = ph.post_id
-        JOIN hashtags h ON ph.hashtag_id = h.id
+        JOIN post_tags ph ON posts.id = ph.post_id
+        JOIN tags h ON ph.tag_id = h.id
         JOIN images ON posts.image_id = images.id
         JOIN users ON posts.author_id = users.id
         LEFT JOIN communities ON posts.community_id = communities.id
@@ -279,7 +279,7 @@ pub async fn find_posts_by_hashtag(
         ORDER BY posts.published_at DESC
         LIMIT $2 OFFSET $3
         "#,
-        hashtag_name,
+        tag_name,
         limit,
         offset,
         viewer_show_sensitive,
@@ -334,14 +334,14 @@ fn escape_like(query: &str) -> String {
 /// the tags that start with the query first. Only tags with visible posts:
 /// suggesting one with nothing behind it sends people to an empty page, and the
 /// browse listings have always hidden those.
-pub async fn search_hashtags(
+pub async fn search_tags(
     tx: &mut Transaction<'_, Postgres>,
     query: &str,
     limit: i64,
-) -> Result<Vec<Hashtag>> {
-    let escaped = escape_like(&normalize_hashtag(query));
-    let hashtags = sqlx::query_as!(
-        Hashtag,
+) -> Result<Vec<Tag>> {
+    let escaped = escape_like(&normalize_tag(query));
+    let tags = sqlx::query_as!(
+        Tag,
         r#"
         SELECT
             h.id,
@@ -350,8 +350,8 @@ pub async fn search_hashtags(
             s.post_count AS "post_count!",
             h.created_at,
             h.updated_at
-        FROM hashtags h
-        JOIN hashtag_stats s ON s.hashtag_id = h.id
+        FROM tags h
+        JOIN tag_stats s ON s.tag_id = h.id
         WHERE h.name LIKE '%' || $1 || '%' ESCAPE '\'
         ORDER BY (h.name LIKE $1 || '%' ESCAPE '\') DESC, s.post_count DESC, h.name ASC
         LIMIT $2
@@ -361,19 +361,19 @@ pub async fn search_hashtags(
     )
     .fetch_all(&mut **tx)
     .await?;
-    Ok(hashtags)
+    Ok(tags)
 }
 
 /// How a browse listing is ordered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HashtagSort {
+pub enum TagSort {
     Trending,
     Popular,
     Recent,
     Alphabetical,
 }
 
-impl HashtagSort {
+impl TagSort {
     /// Anything unrecognised browses the default rather than 400ing a URL
     /// someone shared.
     pub fn from_param(sort: Option<&str>) -> Self {
@@ -398,16 +398,16 @@ impl HashtagSort {
 /// Tags with posts, ordered as asked.
 ///
 /// Trending is how many posts a tag has had in the last week, then its total,
-/// then how recently it was used. The old score decayed on `hashtags.updated_at`
+/// then how recently it was used. The old score decayed on `tags.updated_at`
 /// — a column touched only when the post counter changed, which included a post
 /// being *deleted*, so removing a drawing made its tags trend.
-pub async fn browse_hashtags(
+pub async fn browse_tags(
     tx: &mut Transaction<'_, Postgres>,
-    sort: HashtagSort,
+    sort: TagSort,
     limit: i64,
-) -> Result<Vec<Hashtag>> {
-    let hashtags = sqlx::query_as!(
-        Hashtag,
+) -> Result<Vec<Tag>> {
+    let tags = sqlx::query_as!(
+        Tag,
         r#"
         SELECT
             h.id,
@@ -416,8 +416,8 @@ pub async fn browse_hashtags(
             s.post_count AS "post_count!",
             h.created_at,
             h.updated_at
-        FROM hashtags h
-        JOIN hashtag_stats s ON s.hashtag_id = h.id
+        FROM tags h
+        JOIN tag_stats s ON s.tag_id = h.id
         ORDER BY
             CASE WHEN $1 = 'trending' THEN s.recent_post_count END DESC,
             CASE WHEN $1 = 'trending' THEN s.post_count END DESC,
@@ -432,19 +432,19 @@ pub async fn browse_hashtags(
     )
     .fetch_all(&mut **tx)
     .await?;
-    Ok(hashtags)
+    Ok(tags)
 }
 
 /// A drawing on a tag's card in the directory.
 #[derive(Clone, Debug, Serialize)]
-pub struct HashtagCover {
-    pub hashtag_id: Uuid,
+pub struct TagCover {
+    pub tag_id: Uuid,
     pub image_filename: String,
     pub width: i32,
     pub height: i32,
 }
 
-/// The latest drawings behind each of `hashtag_ids`, up to three a tag, for
+/// The latest drawings behind each of `tag_ids`, up to three a tag, for
 /// the directory's cards: a tag is a set of drawings, and its name alone
 /// says little about them.
 ///
@@ -452,36 +452,36 @@ pub struct HashtagCover {
 /// public community or none -- and never a sensitive drawing: a cover is
 /// seen before anyone has chosen to open anything, so it is not the viewer's
 /// setting that decides but the drawing's.
-pub async fn hashtag_covers(
+pub async fn tag_covers(
     tx: &mut Transaction<'_, Postgres>,
-    hashtag_ids: &[Uuid],
-) -> Result<Vec<HashtagCover>> {
-    if hashtag_ids.is_empty() {
+    tag_ids: &[Uuid],
+) -> Result<Vec<TagCover>> {
+    if tag_ids.is_empty() {
         return Ok(Vec::new());
     }
     let covers = sqlx::query_as!(
-        HashtagCover,
+        TagCover,
         r#"
         SELECT
-            hashtag_id AS "hashtag_id!",
+            tag_id AS "tag_id!",
             image_filename AS "image_filename!",
             width AS "width!",
             height AS "height!"
         FROM (
             SELECT
-                ph.hashtag_id,
+                ph.tag_id,
                 images.image_filename,
                 images.width,
                 images.height,
                 row_number() OVER (
-                    PARTITION BY ph.hashtag_id
+                    PARTITION BY ph.tag_id
                     ORDER BY posts.published_at DESC
                 ) AS rank
-            FROM post_hashtags ph
+            FROM post_tags ph
             JOIN posts ON posts.id = ph.post_id
             JOIN images ON images.id = posts.image_id
             LEFT JOIN communities ON communities.id = posts.community_id
-            WHERE ph.hashtag_id = ANY($1)
+            WHERE ph.tag_id = ANY($1)
             AND posts.published_at IS NOT NULL
             AND posts.deleted_at IS NULL
             AND (communities.visibility = 'public' OR posts.community_id IS NULL)
@@ -489,9 +489,9 @@ pub async fn hashtag_covers(
             AND posts.is_explicit = false
         ) latest
         WHERE rank <= 3
-        ORDER BY hashtag_id, rank
+        ORDER BY tag_id, rank
         "#,
-        hashtag_ids
+        tag_ids
     )
     .fetch_all(&mut **tx)
     .await?;
@@ -500,12 +500,12 @@ pub async fn hashtag_covers(
 
 /// One tag by its normalized name. Tags with no visible posts still resolve:
 /// the page says so rather than 404ing on a link a post is still displaying.
-pub async fn find_hashtag_by_name(
+pub async fn find_tag_by_name(
     tx: &mut Transaction<'_, Postgres>,
     name: &str,
-) -> Result<Option<Hashtag>> {
-    let hashtag = sqlx::query_as!(
-        Hashtag,
+) -> Result<Option<Tag>> {
+    let tag = sqlx::query_as!(
+        Tag,
         r#"
         SELECT
             h.id,
@@ -514,15 +514,15 @@ pub async fn find_hashtag_by_name(
             COALESCE(s.post_count, 0) AS "post_count!",
             h.created_at,
             h.updated_at
-        FROM hashtags h
-        LEFT JOIN hashtag_stats s ON s.hashtag_id = h.id
+        FROM tags h
+        LEFT JOIN tag_stats s ON s.tag_id = h.id
         WHERE h.name = $1
         "#,
         name
     )
     .fetch_optional(&mut **tx)
     .await?;
-    Ok(hashtag)
+    Ok(tag)
 }
 
 #[cfg(test)]
@@ -530,7 +530,7 @@ mod tests {
     use super::*;
 
     fn names(input: &str) -> Vec<String> {
-        parse_hashtag_input(input)
+        parse_tag_input(input)
             .into_iter()
             .map(|(name, _)| name)
             .collect()
@@ -553,7 +553,7 @@ mod tests {
     #[test]
     fn the_hash_people_type_is_a_separator_not_a_character() {
         // `#art` used to be stored under the name `#art`: it rendered as
-        // `##art` and linked to `/hashtags/#art`, which is a fragment, so the
+        // `##art` and linked to `/tags/#art`, which is a fragment, so the
         // link went to the tag directory instead of the tag.
         assert_eq!(names("#art"), vec!["art"]);
         assert_eq!(names("#art #drawing"), vec!["art", "drawing"]);
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn drops_characters_that_would_break_the_tags_own_link() {
-        // `/hashtags/:name` is one path segment: a `/` in the name 404s, a `%`
+        // `/tags/:name` is one path segment: a `/` in the name 404s, a `%`
         // is a malformed escape and 400s, and `?` and `#` truncate the URL.
         assert_eq!(names("a/b"), vec!["ab"]);
         assert_eq!(names("100%"), vec!["100"]);
@@ -582,7 +582,7 @@ mod tests {
 
     #[test]
     fn folds_case_and_hyphens_but_shows_what_was_typed() {
-        let parsed = parse_hashtag_input("Oekaki-Time");
+        let parsed = parse_tag_input("Oekaki-Time");
         assert_eq!(
             parsed,
             vec![("oekaki_time".to_string(), "Oekaki_Time".to_string())]
@@ -598,17 +598,17 @@ mod tests {
 
     #[test]
     fn caps_length_and_count_rather_than_failing_the_publish() {
-        // `hashtags.name` is varchar(255): an over-long tag used to abort the
+        // `tags.name` is varchar(255): an over-long tag used to abort the
         // transaction the publish was running in, and the caller ignored the
         // error, so the reader got an unexplained 500 from a later query.
         let long = "a".repeat(400);
-        assert_eq!(names(&long), vec!["a".repeat(MAX_HASHTAG_LENGTH)]);
+        assert_eq!(names(&long), vec!["a".repeat(MAX_TAG_LENGTH)]);
 
-        let many = (0..MAX_HASHTAGS_PER_POST + 10)
+        let many = (0..MAX_TAGS_PER_POST + 10)
             .map(|i| format!("tag{i}"))
             .collect::<Vec<_>>()
             .join(" ");
-        assert_eq!(names(&many).len(), MAX_HASHTAGS_PER_POST);
+        assert_eq!(names(&many).len(), MAX_TAGS_PER_POST);
     }
 
     #[test]
@@ -621,10 +621,10 @@ mod tests {
 
     #[test]
     fn a_url_segment_normalizes_the_same_way_the_field_does() {
-        // Otherwise /hashtags/Art and the link on a post tagged `Art` disagree.
-        assert_eq!(normalize_hashtag("Oekaki-Time"), "oekaki_time");
-        assert_eq!(normalize_hashtag("#art"), "art");
-        assert_eq!(normalize_hashtag(&names("Oekaki-Time")[0]), "oekaki_time");
+        // Otherwise /tags/Art and the link on a post tagged `Art` disagree.
+        assert_eq!(normalize_tag("Oekaki-Time"), "oekaki_time");
+        assert_eq!(normalize_tag("#art"), "art");
+        assert_eq!(normalize_tag(&names("Oekaki-Time")[0]), "oekaki_time");
     }
 
     #[test]

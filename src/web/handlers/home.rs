@@ -8,7 +8,7 @@ use crate::models::comment::{
 use crate::models::community::{
     get_communities_members_count, get_public_communities, is_user_member, Community,
 };
-use crate::models::hashtag::{get_hashtags_for_post, set_post_hashtags};
+use crate::models::tag::{get_tags_for_post, set_post_tags};
 use crate::models::notification::{
     create_notification, get_notification_by_id, get_unread_count, send_push_for_notification,
     CreateNotificationParams, NotificationType,
@@ -547,9 +547,9 @@ pub async fn get_post_details_json(
     };
     let reactions = get_reaction_counts(&mut tx, post_id, user_actor_id).await?;
 
-    // Get hashtags for this post
-    let hashtags_data = get_hashtags_for_post(&mut tx, post_id).await?;
-    let hashtags: Vec<String> = hashtags_data.into_iter().map(|h| h.display_name).collect();
+    // Get tags for this post
+    let tags_data = get_tags_for_post(&mut tx, post_id).await?;
+    let tags: Vec<String> = tags_data.into_iter().map(|h| h.display_name).collect();
 
     tx.commit().await?;
 
@@ -588,7 +588,7 @@ pub async fn get_post_details_json(
             }),
             _ => None,
         },
-        hashtags,
+        tags,
     };
 
     let child_posts_response: Vec<ChildPostResponse> = child_posts
@@ -1080,7 +1080,7 @@ pub async fn delete_post_api(
             .into_response());
     }
 
-    // Tags are left on the post: see the note in models::hashtag::unlink.
+    // Tags are left on the post: see the note in models::tag::unlink.
     delete_post_with_activity(&mut tx, post_uuid, Some(&state)).await?;
 
     tx.commit().await?;
@@ -1092,7 +1092,7 @@ pub async fn delete_post_api(
 pub struct EditPostRequest {
     pub title: String,
     pub content: String,
-    pub hashtags: Option<String>,
+    pub tags: Option<String>,
     pub is_sensitive: bool,
     pub allow_relay: bool,
     /// Absent from a client that predates the field, which cannot have meant
@@ -1186,7 +1186,7 @@ pub async fn edit_post_api(
     // Absent leaves the tags alone, the same reading `allow_replay` above gets:
     // an edit from a client that predates the field used to unlink every tag
     // the post had and put none back.
-    set_post_hashtags(&mut tx, post_uuid, request.hashtags.as_deref()).await?;
+    set_post_tags(&mut tx, post_uuid, request.tags.as_deref()).await?;
 
     tx.commit().await?;
 
@@ -1459,9 +1459,9 @@ mod tests {
             );
             assert!(page.contains(r#"<a href="/">feed-recent</a>"#));
         }
-        // Home is the one section for all of them, and the hashtags are a
+        // Home is the one section for all of them, and the tags are a
         // section of their own.
-        assert!(recent.contains(r#"<a href="/hashtags">hashtag-discovery</a>"#));
+        assert!(recent.contains(r#"<a href="/tags">tag-discovery</a>"#));
     }
 
     /// A drawing fills its square, cropped from its longer side, so it is
