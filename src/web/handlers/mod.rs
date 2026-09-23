@@ -1671,7 +1671,7 @@ mod template_tests {
         let reader = json!({"login_name": "oeee", "display_name": "오이"});
 
         let selling = render(json!(true), reader.clone());
-        assert!(selling.contains(r#"class="toolbar-button toolbar-supporter" href="/supporter""#));
+        assert!(selling.contains(r#"class="toolbar-square toolbar-button toolbar-supporter" href="/supporter""#));
 
         // Nothing to sell: no heart for anyone.
         assert!(!render(json!(false), reader.clone()).contains("toolbar-supporter"));
@@ -1737,11 +1737,11 @@ mod template_tests {
 
         let out = render(json!(null));
         assert!(
-            out.contains(r#"<a class="toolbar-button toolbar-about" href="/about" aria-label="nav-about-menu" title="nav-about-menu"><svg"#),
+            out.contains(r#"<a class="toolbar-square toolbar-button toolbar-about" href="/about" aria-label="nav-about-menu" title="nav-about-menu"><svg"#),
             "signed out, About is its own button at the bar's end: a mark, with its words for its label"
         );
         assert!(
-            out.contains(r#"<a class="toolbar-draw toolbar-sign-in" href="/login" aria-label="sign-in" title="sign-in"><svg"#),
+            out.contains(r#"<a class="toolbar-square toolbar-draw toolbar-sign-in" href="/login" aria-label="sign-in" title="sign-in"><svg"#),
             "and signing in is the filled button, a mark with its words for its label"
         );
         // The theme square opens onto the three-way switch and nothing

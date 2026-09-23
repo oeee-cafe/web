@@ -22,7 +22,7 @@
      number is still in the label and the tooltip. #}
   {%- set unread = unread_notification_count is defined and unread_notification_count > 0 %}
   {%- set label = ftl_get_message("notifications") ~ (" (" ~ unread_notification_count ~ ")" if unread else "") %}
-  <a href="/notifications" class="toolbar-button toolbar-bell{% if unread %} toolbar-bell-unread{% endif %}"
+  <a href="/notifications" class="toolbar-square toolbar-button toolbar-bell{% if unread %} toolbar-bell-unread{% endif %}"
      aria-label="{{ label }}" title="{{ label }}">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16.5v-5.5a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 21.5h4"/></svg>
   </a>
