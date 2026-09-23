@@ -1224,9 +1224,8 @@ mod template_tests {
         }));
         assert!(signed_in.contains(r#"data-tauri-drag-region="deep" data-signed-in"#));
         // What the apps call on the page is on one object (app_bridge.jinja);
-        // the toolbar adds its two parts to it.
+        // the toolbar adds its commands to it.
         assert!(signed_in.contains("window.oeeeApp.command = command;"));
-        assert!(signed_in.contains("window.oeeeApp.restoreContent = restoreContent;"));
     }
 
     /// Only a drawing that is not blurred is offered to an app's long-press

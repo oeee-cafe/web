@@ -1,43 +1,39 @@
 {# Signing in, in an app, with a provider whose page cannot be shown there.
 
-   Apple's and Google's sign-ins are links to /auth/apple and /auth/google,
-   which in a browser go to the provider's page and come back. In the apps
-   neither can: Google refuses its own pages inside an embedded web view
-   (`disallowed_useragent`), and either page opened in a browser of the
-   app's answers there, into cookies that are not the web view's. So each
-   app stops the link and takes one of two ways round, and both are here --
-   each app used to carry its own copy of the page's half, and the copies
-   had drifted apart:
+   Apple's and Google's sign-in buttons (login.jinja, account.jinja) are
+   links to /auth/apple and /auth/google, which in a browser go to the
+   provider's page and come back. In the apps neither can: Google refuses
+   its own pages inside an embedded web view (`disallowed_useragent`), and
+   either page opened in a browser of the app's answers there, into cookies
+   that are not the web view's. So in an app the page takes the press itself
+   and goes one of two ways round, chosen here by which app it is in -- the
+   app never recognises the link, or knows these paths at all:
 
-   window.oeeeApp.signIn.native(provider, next)
-            The app has a sheet of the platform's own that answers with an
-            ID token for a nonce: Sign in with Apple on iOS and macOS,
-            Credential Manager on Android, ASWebAuthenticationSession for
-            Google on iOS and macOS.
-              1. the page asks the site for this sign-in's state and nonce
-                 (POST /auth/<provider>/start), which the site keeps in the
-                 web view's session;
-              2. it sends the app  signIn {provider, nonce}  on the bridge
-                 (app_bridge.jinja), and the app answers by calling
-                 window.oeeeApp.signIn.answer(told), where `told` is
-                 {id_token, user?} from the sheet, {cancelled: true} for a
-                 sheet put away, or {} for one that could not sign in;
-              3. the page posts the token and the state to /auth/<provider>
-                 with format=json, and the site checks both against the
-                 session (src/apple.rs, src/google.rs, identity.rs) and says
-                 where to go next.
+   A sheet of the platform's own, which answers with an ID token for a
+   nonce: Sign in with Apple on iOS and macOS, Credential Manager for Google
+   on Android, ASWebAuthenticationSession for Google on iOS and macOS.
+     1. the page asks the site for this sign-in's state and nonce (POST
+        /auth/<provider>/start), which the site keeps in the web view's
+        session;
+     2. it sends the app  signIn {provider, nonce}  on the bridge
+        (app_bridge.jinja), and the app answers by calling
+        window.oeeeApp.signIn.answer(told), where `told` is {id_token,
+        user?} from the sheet, {cancelled: true} for a sheet put away, or {}
+        for one that could not sign in;
+     3. the page posts the token and the state to /auth/<provider> with
+        format=json, and the site checks both against the session
+        (src/apple.rs, src/google.rs, identity.rs) and says where to go.
 
-   window.oeeeApp.signIn.browser(provider, next)
-            The app has no sheet, and hands the sign-in to the system's
-            browser instead: Apple on Android, both on Windows.
-              1. the page starts a handoff (POST /auth/handoff/start,
-                 src/handoff.rs) and sends the app  browse {url}  on the
-                 bridge; the app checks the URL is this site's and opens it
-                 in the browser, or calls window.oeeeApp.signIn.unopened();
-              2. the page asks the site (POST /auth/handoff/claim) until the
-                 browser has finished, at which point the site signs *this*
-                 session in; the app calls window.oeeeApp.signIn.resume() when
-                 it is brought back to the front, so the page asks at once.
+   The system's browser, where there is no sheet: Apple on Android, both on
+   Windows.
+     1. the page starts a handoff (POST /auth/handoff/start, src/handoff.rs)
+        and sends the app  browse {url}  on the bridge; the app checks the
+        URL is this site's and opens it in the browser, or calls
+        window.oeeeApp.signIn.unopened();
+     2. the page asks the site (POST /auth/handoff/claim) until the browser
+        has finished, at which point the site signs *this* session in; the
+        app calls window.oeeeApp.signIn.resume() when it is brought back to
+        the front, so the page asks at once.
 
    Every request is made from here, in the page, so each carries the page's
    cookie and origin. The app never holds the session, sees the handoff's
@@ -65,14 +61,6 @@
       });
     }
 
-    // Shows the page as it was before the link was pressed. The toolbar
-    // leaves it alone for an app (toolbar.jinja), but a page from before it
-    // knew that slid a skeleton in for the page it thought was coming, and
-    // nothing is coming.
-    function stay() {
-      if (window.oeeeApp.restoreContent) window.oeeeApp.restoreContent();
-    }
-
     // Replaced, not followed: the page signed in from is not left in the
     // history behind the one it lands on, so Back does not return to a
     // sign-in form for an account already signed in. The site's notice is
@@ -93,18 +81,15 @@
         .then(function (started) {
           if (!started || !started.state || !started.nonce) {
             asked = null;
-            stay();
             return;
           }
           asked.state = started.state;
           if (!window.oeeeApp.post("signIn", { provider: provider, nonce: started.nonce }, true)) {
             asked = null;
-            stay();
           }
         })
         .catch(function () {
           asked = null;
-          stay();
         });
     }
 
@@ -113,11 +98,8 @@
       asked = null;
       if (!request || !request.state) return;
       told = told || {};
-      if (told.cancelled) {
-        // Put away without signing in: nothing went wrong, so nothing is said.
-        stay();
-        return;
-      }
+      // Put away without signing in: nothing went wrong, so nothing is said.
+      if (told.cancelled) return;
       // Without a token the site is still asked, with an error, so that it
       // says it could not confirm who this is in the reader's own language.
       var fields = told.id_token
@@ -126,9 +108,8 @@
       post("/auth/" + request.provider, fields)
         .then(function (where) {
           if (where) go(where.next);
-          else stay();
         })
-        .catch(stay);
+        .catch(function () {});
     }
 
     // -- The system's browser, and back ------------------------------------
@@ -155,7 +136,6 @@
         asking = null;
       }
       pending = null;
-      stay();
     }
 
     function ask(confirmed) {
@@ -201,10 +181,7 @@
       if (pending) return;
       post("/auth/handoff/start", { provider: provider, next: next })
         .then(function (started) {
-          if (!started || !started.id || !started.secret || !started.url) {
-            stay();
-            return;
-          }
+          if (!started || !started.id || !started.secret || !started.url) return;
           pending = started;
           if (!window.oeeeApp.post("browse", { url: new URL(started.url, document.baseURI).href }, true)) {
             stop();
@@ -215,13 +192,42 @@
             if (pending === started) stop();
           }, GIVE_UP_AFTER);
         })
-        .catch(stay);
+        .catch(function () {});
+    }
+
+    // -- Which way, and when -----------------------------------------------
+
+    // How each app signs in with each provider: a sheet of its own where the
+    // platform has one, the system's browser where it does not. The app is
+    // the one the root is marked for (theme_head.jinja).
+    var WAYS = {
+      ios: { apple: native, google: native },
+      macos: { apple: native, google: native },
+      android: { apple: browser, google: native },
+      windows: { apple: browser, google: browser }
+    };
+    var root = document.documentElement;
+    var ways = WAYS[root.getAttribute("data-app") || root.getAttribute("data-desktop")];
+
+    // The sign-in buttons (login.jinja, account.jinja) are links to the
+    // provider's page, which is where a browser goes. In an app the page
+    // takes the press itself and goes one of the ways above; the app never
+    // has to recognise the link, and the toolbar lays no skeleton for it.
+    if (ways) {
+      document.addEventListener("click", function (event) {
+        if (event.defaultPrevented || event.button !== 0) return;
+        var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+        if (!link || link.origin !== new URL(document.baseURI).origin) return;
+        var provider = (/^\/auth\/(apple|google)$/.exec(link.pathname) || [])[1];
+        if (!provider || !ways[provider]) return;
+        event.preventDefault();
+        var next = new URL(link.href).searchParams.get("next");
+        ways[provider](provider, next);
+      }, true);
     }
 
     window.oeeeApp.signIn = {
-      native: native,
       answer: answer,
-      browser: browser,
       // Back in front, probably from the browser: ask now rather than at the
       // next turn of the clock.
       resume: function () {

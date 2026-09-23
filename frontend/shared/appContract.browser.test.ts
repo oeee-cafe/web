@@ -48,9 +48,7 @@ type PageWindow = Window &
       feel(name: string): void;
       wouldLoseWork(): boolean;
       signIn: {
-        native(provider: string, next: string | null): void;
         answer(told: Record<string, unknown>): void;
-        browser(provider: string, next: string | null): void;
         resume(): void;
         unopened(): void;
       };
@@ -127,7 +125,9 @@ async function open(options: Options = {}): Promise<Page> {
       <a id="nav-notifications" data-unread="${options.unread ?? 0}"></a>
     </nav>
     <a href="/@artist/9c881320"><img data-oeee-drawing width="300" height="200"
-       src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></a>`;
+       src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></a>
+    <a class="auth-apple" href="/auth/apple?next=%2Fafter">Apple</a>
+    <a class="auth-google" href="/auth/google?next=%2Fafter">Google</a>`;
   const html = `<!doctype html><html><head>${before}
     <style>:root { --ds-ground: #ccccff; --ds-grid: #bbbbff; } body { background: rgb(255, 255, 255); }</style>
     ${presence}${HEAD}</head><body>${body}</body></html>`;
@@ -186,14 +186,12 @@ describe("what the site tells the apps", () => {
     expect(last(page, "unread")).toEqual({ v: 1, type: "unread", count: 12 });
   });
 
-  it("gives the theme, the colours at the edges, and the design system's ground", async () => {
+  it("gives the theme's choice and the design system's ground", async () => {
     const page = await open();
     const message = last(page, "theme");
-    expect(keys(message)).toEqual(["bottom", "choice", "grid", "ground", "top", "type", "v"]);
+    expect(keys(message)).toEqual(["choice", "grid", "ground", "type", "v"]);
     expect(message).toMatchObject({
       choice: "system",
-      top: "rgb(250, 250, 252)",
-      bottom: "rgb(255, 255, 255)",
       ground: "#ccccff",
       grid: "#bbbbff",
     });
@@ -252,22 +250,38 @@ describe("what the site tells the apps", () => {
 });
 
 describe("signing in for an app", () => {
-  it("is on oeeeApp with everything else an app calls, and nowhere else", async () => {
+  /** Presses a sign-in button, and says whether the page took the press. */
+  function press(page: Page, provider: "apple" | "google"): boolean {
+    const link = page.window.document.querySelector(`.auth-${provider}`)!;
+    let taken = false;
+    // Last to hear the click: records whether the page took it, and keeps
+    // the test page where it is either way.
+    const after = (event: Event) => {
+      taken = event.defaultPrevented;
+      event.preventDefault();
+    };
+    page.window.addEventListener("click", after);
+    link.dispatchEvent(new page.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    page.window.removeEventListener("click", after);
+    return taken;
+  }
+
+  it("leaves the app only the answers to call", async () => {
     const page = await open();
-    const signIn = page.window.oeeeApp.signIn;
-    for (const name of ["native", "answer", "browser", "resume", "unopened"] as const) {
-      expect(typeof signIn[name], name).toBe("function");
-    }
+    expect(Object.keys(page.window.oeeeApp.signIn).sort()).toEqual(["answer", "resume", "unopened"]);
+    expect("restoreContent" in page.window.oeeeApp).toBe(false);
     for (const retired of ["oeeeSignIn", "oeeeCommand", "oeeeRestoreContent", "oeeeStorePrices", "oeeePainter"]) {
       expect(retired in page.window, retired).toBe(false);
     }
   });
 
-  it("asks for a token for the site's nonce, and posts what the app answers", async () => {
+  it("takes the press itself, and asks the app for a token for the site's nonce", async () => {
+    // Android: Google has Credential Manager.
     const page = await open({ answers: { "/auth/google/start": { state: "S", nonce: "N" } } });
-    page.window.oeeeApp.signIn.native("google", "/after");
+    expect(press(page, "google")).toBe(true);
     await settle();
     await settle();
+    expect(Object.fromEntries(new URLSearchParams(page.asked[0].body))).toEqual({ next: "/after" });
     expect(last(page, "signIn")).toEqual({ v: 1, type: "signIn", provider: "google", nonce: "N" });
 
     page.window.oeeeApp.signIn.answer({ id_token: "T", user: '{"name":{}}' });
@@ -282,10 +296,11 @@ describe("signing in for an app", () => {
   });
 
   it("asks the app to open the handoff's page in a browser, as an absolute URL", async () => {
+    // Android: Apple has no sheet there.
     const page = await open({
       answers: { "/auth/handoff/start": { id: "I", secret: "X", url: "/auth/apple?handoff=I" } },
     });
-    page.window.oeeeApp.signIn.browser("apple", "/after");
+    expect(press(page, "apple")).toBe(true);
     await settle();
     await settle();
     const message = last(page, "browse");
@@ -293,6 +308,29 @@ describe("signing in for an app", () => {
     expect(message.url).toBe(new URL("/auth/apple?handoff=I", page.window.document.baseURI).href);
     expect(message.url).toMatch(/^https?:\/\/[^/]+\/auth\/apple\?handoff=I$/);
     page.window.oeeeApp.signIn.unopened();
+  });
+
+  it("goes the way each app signs in with each provider", async () => {
+    const ways: [string, "apple" | "google", string][] = [
+      ["Mozilla/5.0 OeeeCafeiOS", "apple", "/auth/apple/start"],
+      ["Mozilla/5.0 OeeeCafeiOS", "google", "/auth/google/start"],
+      ["Mozilla/5.0 OeeeCafeMac", "apple", "/auth/apple/start"],
+      ["Mozilla/5.0 OeeeCafeWindows", "google", "/auth/handoff/start"],
+      ["Mozilla/5.0 OeeeCafeWindows", "apple", "/auth/handoff/start"],
+    ];
+    for (const [userAgent, provider, asked] of ways) {
+      const page = await open({ userAgent });
+      expect(press(page, provider), `${userAgent} ${provider}`).toBe(true);
+      await settle();
+      expect(page.asked[0]?.url, `${userAgent} ${provider}`).toBe(asked);
+    }
+  });
+
+  it("leaves the buttons to a browser, which does go to the provider", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 Firefox/56.0" });
+    expect(press(page, "apple")).toBe(false);
+    expect(press(page, "google")).toBe(false);
+    expect(page.asked).toEqual([]);
   });
 });
 
