@@ -1202,6 +1202,44 @@ mod template_tests {
         assert!(card.contains("sensitive{% endif %}"), "the card no longer marks sensitive drawings");
     }
 
+    /// The words the apps say over the page (app_bridge.jinja) come from the
+    /// site's catalogues, and a missing one is not an error anywhere: the
+    /// real ftl_get_message answers with the message's id, which an app
+    /// would put in a dialog as it is. So every one is looked for in every
+    /// language, and the head that carries them is rendered.
+    #[test]
+    fn the_apps_are_given_their_words_in_every_language() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let bridge = std::fs::read_to_string(root.join("templates/app_bridge.jinja")).unwrap();
+        let ids: Vec<&str> = bridge
+            .split("ftl_get_message(\"")
+            .skip(1)
+            .filter_map(|rest| rest.split('"').next())
+            .collect();
+        assert!(ids.len() >= 14, "{ids:?}");
+        for lang in ["en", "ko", "ja", "zh"] {
+            let ftl = std::fs::read_to_string(root.join(format!("locales/{lang}.ftl"))).unwrap();
+            for id in &ids {
+                assert!(
+                    ftl.lines()
+                        .any(|line| line.starts_with(&format!("{id} = "))),
+                    "{id} is missing from {lang}.ftl"
+                );
+            }
+        }
+
+        let head = test_support::env()
+            .get_template("theme_head.jinja")
+            .unwrap()
+            .render(context! { ftl_lang => "en" })
+            .unwrap();
+        // A string the page hands a script is a JSON literal, not text
+        // pasted between quotes.
+        assert!(head.contains(r#"leaveTitle: "app-leave-title","#), "{head}");
+        assert!(head.contains("window.oeeeSignIn = {"));
+        assert!(head.contains(r#"[/OeeeCafeWindows/, "data-desktop", "windows"]"#));
+    }
+
     /// What app_bridge.jinja tells the apps is read from marks the templates
     /// make, and an app sees nothing wrong when one goes missing: it is just
     /// told 0, or nothing. So the marks are pinned here.
@@ -1234,7 +1272,7 @@ mod template_tests {
             "display_name": "Reader",
             "email_verified_at": "2026-01-01",
         }));
-        assert!(signed_in.contains(r#"hx-boost:inherited="true" data-signed-in"#));
+        assert!(signed_in.contains(r#"data-tauri-drag-region="deep" data-signed-in"#));
     }
 
     /// Only a drawing that is not blurred is offered to an app's long-press
@@ -2806,20 +2844,11 @@ mod template_tests {
         search_query: Option<&str>,
         posts: Vec<crate::web::handlers::search::SearchPostRow>,
     ) -> String {
-        render_search_in(false, search_query, posts)
-    }
-
-    fn render_search_in(
-        native_search_field: bool,
-        search_query: Option<&str>,
-        posts: Vec<crate::web::handlers::search::SearchPostRow>,
-    ) -> String {
         test_support::env()
             .get_template("search.jinja")
             .unwrap_or_else(|e| panic!("search.jinja loads: {e:#}"))
             .render(context! {
                 search_query,
-                native_search_field,
                 posts,
                 ..chrome()
             })
@@ -2867,19 +2896,15 @@ mod template_tests {
     #[test]
     fn search_page_in_the_apps_leaves_the_form_to_their_own_field() {
         // The page's own form, not every form in the document: the toolbar
-        // carries one to /search on every page, and the apps put that out
-        // of sight in CSS rather than out of the markup (ds.css,
-        // `html[data-app] .toolbar-search`).
-        let blank = render_search_in(true, None, vec![]);
-        assert!(!blank.contains("communities-filters"));
-        assert!(!blank.contains("communities-search"));
-
-        let none = render_search_in(true, Some("zzz"), vec![]);
-        assert!(!none.contains("communities-filters"));
-        assert!(!none.contains("communities-search"));
-        assert!(none.contains("search-no-results"));
+        // carries one to /search on every page. Both are put out of sight
+        // under the apps' native field by the stylesheet, keyed on the mark
+        // theme_head.jinja gives the root, and not left out by the server,
+        // which would have to recognise the apps a second time.
+        let page = render_search(Some("zzz"), vec![]);
+        assert!(page.contains(r#"class="communities-bar search-page-form""#));
+        assert!(page.contains("search-no-results"));
+        let ds = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/ds.css"))
+            .expect("ds.css is there");
+        assert!(ds.contains("html[data-app] .search-page-form"));
     }
 }
-
-
-

@@ -543,3 +543,19 @@ profile-tabs-label = 그림
 profile-tab-public = 공개 커뮤니티
 profile-tab-private = 비공개 커뮤니티
 profile-private-community-posts-note = 비공개 커뮤니티에서 그린 그림은 공개 프로필에 보이지 않습니다.
+
+# Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
+app-leave-title = 이 페이지를 떠날까요?
+app-leave-body = 저장하지 않은 내용은 사라집니다.
+app-leave = 떠나기
+app-stay = 머무르기
+app-ok = 확인
+app-cancel = 취소
+app-save-image = 이미지 저장
+app-copy-image = 이미지 복사
+app-share = 공유…
+app-copy-link = 링크 복사
+app-saved-image = 사진에 저장했습니다
+app-saved-file = 다운로드에 저장했습니다
+app-save-failed = 저장하지 못했습니다
+app-steam-sign-in-failed = Steam으로 로그인하지 못했습니다. Steam이 실행 중인지 확인하고 다시 시도해 주세요.

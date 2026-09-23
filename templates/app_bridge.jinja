@@ -35,11 +35,27 @@
             The number on the bell (nav_notifications.jinja): unread
             notifications and invitations waiting, together. Sent whenever it
             changes, which is when a request swaps the bell.
-   theme    {choice, dark, top, bottom}
+   theme    {choice, dark, top, bottom, ground, grid}
             `choice` is "light", "dark" or "system"; `dark` what that comes
             to now. `top` and `bottom` are the colours at the page's two
             edges, as CSS colours, for the bars an app draws against them --
             or null where nothing there has a colour, the app's own then.
+            `ground` and `grid` are the design system's --ds-ground and
+            --ds-grid (ds.css): the field behind every page and the lines
+            ruled on it every 14px, for an app that draws the same field
+            where the page does not reach -- under an overscroll, behind the
+            window before the page arrives -- and would otherwise have to
+            keep its own copy of NEO's colours in step with this one.
+   words    {leaveTitle, leaveBody, leave, stay, ok, cancel, saveImage,
+             copyImage, share, copyLink, savedImage, savedFile, saveFailed,
+             steamSignInFailed}
+            What an app says in dialogs and menus of its own over the page
+            -- the leave prompt, the long press on a drawing, the right-click
+            menu -- in the page's language, from the site's catalogues
+            (locales/*.ftl, the app-* messages). Sent once a page, since the
+            reader can change language between pages. An app keeps words of
+            its own only for what it says with no page to speak for it: a
+            site that cannot be reached, the tabs before the first page.
    haptic   {name}
             "light", "medium", "selection", "success", "warning" or "error":
             a control that is felt as well as seen.
@@ -50,7 +66,7 @@
             `link` is the post's page, or "" on the post page itself.
    painter  {state: "ready"}
             The painter can be driven: window.oeeePainter.command(name) and
-            .preferPen() (frontend/painter/iosApp.ts).
+            .preferPen() (frontend/shared/appBridge.ts).
    prices   {store, products}
             What these cost, asked as /supporter opens: `products` are the
             App Store product ids or Steam app ids on the page. The app
@@ -76,6 +92,30 @@
             It gives a pack back to whoever is signed in and never makes a
             second one. Steam needs none of this -- it says what an account
             owns every time it is asked.
+   signIn   {provider, nonce}
+   browse   {url}
+            A sign-in the page is carrying for an app that stopped the link
+            to /auth/apple or /auth/google: make an ID token for `nonce`
+            with the platform's own sheet, or open this site's `url` in the
+            system's browser (app_sign_in.jinja).
+   share    {title, text}
+   download {name, mime, data}
+            What Android's web view cannot do itself (app_polyfills.jinja).
+
+   The apps are told apart by what each adds to its web view's user agent,
+   in one place (theme_head.jinja), which marks the root before the page
+   paints: `data-app="ios"` or `"android"` for the phone apps, whose pages
+   scroll whole under a native tab bar, and `data-desktop="macos"` or
+   `"windows"` for the desktop windows, whose toolbar is the title bar. The
+   site owns what those marks change, the room kept for a window's own
+   controls included (ds.css); an app says what it is and nothing about the
+   site's layout.
+
+   window.oeeeApp.wouldLoseWork() is whether leaving now would lose
+   something: the page's own `beforeunload` handlers, asked the way a
+   browser asks them, which neither WKWebView nor a window being closed
+   asks by itself. The painter answers only for a drawing with something in
+   it, and not while it is being saved -- which `painting` above cannot say.
 
    A build that can sell says so by marking the root element
    `data-store="apple"` or `data-store="steam"` before the page paints --
@@ -108,11 +148,19 @@
     function post(type, data, always) {
       var target = channel();
       if (!target) return false;
-      var message = { v: 1, type: type };
+      // The envelope is written last, so a field of the message's own that
+      // happens to share its name -- a file's MIME type, say -- can never
+      // make it another kind of message.
+      var message = {};
       for (var key in data) message[key] = data[key];
+      message.v = 1;
+      message.type = type;
       var text = JSON.stringify(message);
-      if (!always && last[type] === text) return true;
-      last[type] = text;
+      // Only what is compared is kept: a download can be megabytes.
+      if (!always) {
+        if (last[type] === text) return true;
+        last[type] = text;
+      }
       try {
         target.postMessage(text);
       } catch (error) {
@@ -158,12 +206,38 @@
         choice: choice,
         dark: choice === "dark" || (choice === "system" && !!system),
         top: document.body ? colourAt(document.querySelector(".nav-bar") || document.body) : null,
-        bottom: document.body ? colourAt(document.body) : null
+        bottom: document.body ? colourAt(document.body) : null,
+        ground: token("--ds-ground"),
+        grid: token("--ds-grid")
       };
     }
+    // A design-system colour as the root resolves it now, theme included;
+    // null on a page without the design system's stylesheet.
+    function token(name) {
+      var value = getComputedStyle(root).getPropertyValue(name);
+      return value ? value.trim() || null : null;
+    }
+
+    var WORDS = {
+      leaveTitle: {{ ftl_get_message("app-leave-title")|tojson }},
+      leaveBody: {{ ftl_get_message("app-leave-body")|tojson }},
+      leave: {{ ftl_get_message("app-leave")|tojson }},
+      stay: {{ ftl_get_message("app-stay")|tojson }},
+      ok: {{ ftl_get_message("app-ok")|tojson }},
+      cancel: {{ ftl_get_message("app-cancel")|tojson }},
+      saveImage: {{ ftl_get_message("app-save-image")|tojson }},
+      copyImage: {{ ftl_get_message("app-copy-image")|tojson }},
+      share: {{ ftl_get_message("app-share")|tojson }},
+      copyLink: {{ ftl_get_message("app-copy-link")|tojson }},
+      savedImage: {{ ftl_get_message("app-saved-image")|tojson }},
+      savedFile: {{ ftl_get_message("app-saved-file")|tojson }},
+      saveFailed: {{ ftl_get_message("app-save-failed")|tojson }},
+      steamSignInFailed: {{ ftl_get_message("app-steam-sign-in-failed")|tojson }}
+    };
 
     function report() {
       if (!channel()) return;
+      post("words", WORDS);
       post("page", pageState());
       post("theme", themeState());
       var bell = document.getElementById("nav-notifications");
@@ -223,7 +297,21 @@
         if (legacy && legacy.postMessage) legacy.postMessage(name);
       },
       // Said again after something the page changed by itself.
-      report: report
+      report: report,
+      // Whether the page would stop a browser from leaving it. Its value is
+      // the answer, so an app evaluates the call and reads it.
+      wouldLoseWork: function () {
+        var event;
+        try {
+          event = document.createEvent("BeforeUnloadEvent");
+          event.initEvent("beforeunload", false, true);
+        } catch (error) {
+          event = new Event("beforeunload", { cancelable: true });
+        }
+        window.dispatchEvent(event);
+        return event.defaultPrevented ||
+          (typeof event.returnValue === "string" && event.returnValue !== "");
+      }
     };
   })();
 </script>

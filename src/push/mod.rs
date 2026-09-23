@@ -101,31 +101,33 @@ impl PushService {
         // Get user's tokens from database
         let mut tx = self.db_pool.begin().await?;
 
-        // Send to iOS devices
+        // Send to the iPhones, iPads and Macs, all through APNs.
         if self.apns_client.is_some() {
-            let ios_devices =
-                get_user_devices_by_platform(&mut tx, user_id, PlatformType::Ios).await?;
-            for token in ios_devices {
-                match self
-                    .send_to_apns(&token.device_token, title, body, badge, data.clone())
-                    .await
-                {
-                    Ok(_) => {}
-                    Err(PushError::InvalidToken) => {
-                        tracing::info!("Removing invalid APNs token: {}", token.device_token);
-                        let _ = delete_invalid_device(
-                            &mut tx,
-                            token.device_token.clone(),
-                            PlatformType::Ios,
-                        )
-                        .await;
-                    }
-                    Err(PushError::Other(e)) => {
-                        tracing::warn!(
-                            "Failed to send APNs notification to token {}: {}",
-                            token.device_token,
-                            e
-                        );
+            for platform in [PlatformType::Ios, PlatformType::Macos] {
+                let devices =
+                    get_user_devices_by_platform(&mut tx, user_id, platform.clone()).await?;
+                for token in devices {
+                    match self
+                        .send_to_apns(&token.device_token, title, body, badge, data.clone())
+                        .await
+                    {
+                        Ok(_) => {}
+                        Err(PushError::InvalidToken) => {
+                            tracing::info!("Removing invalid APNs token: {}", token.device_token);
+                            let _ = delete_invalid_device(
+                                &mut tx,
+                                token.device_token.clone(),
+                                platform.clone(),
+                            )
+                            .await;
+                        }
+                        Err(PushError::Other(e)) => {
+                            tracing::warn!(
+                                "Failed to send APNs notification to token {}: {}",
+                                token.device_token,
+                                e
+                            );
+                        }
                     }
                 }
             }
