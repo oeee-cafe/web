@@ -579,6 +579,13 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   transition: opacity 0.15s 0.1s, transform 12s cubic-bezier(0.1, 0.6, 0.15, 1) 0.1s;
 }
 
+/* Before a page load, which on iOS stops the page being painted: shown at
+   once, since it has to be on the screen before the load begins. */
+.ds-loading-bar.is-loading.is-now {
+  -webkit-transition-delay: 0s;
+  transition-delay: 0s;
+}
+
 .ds-loading-bar.is-done {
   opacity: 0;
   -webkit-transform: scaleX(1);

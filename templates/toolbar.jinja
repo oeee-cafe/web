@@ -411,7 +411,8 @@
       }
       function go(path) {
         loading(path);
-        location.href = path;
+        if (window.oeeeLoadingBar) window.oeeeLoadingBar.leave(function () { location.href = path; });
+        else location.href = path;
       }
       function profilePath() {
         var link = document.querySelector('.toolbar-menu-items a[href^="/@"]');
@@ -458,7 +459,8 @@
         "new-drawing": function () {
           var draw = document.getElementById("nav-draw-button");
           if (draw && draw.form) {
-            draw.form.submit();
+            if (window.oeeeLoadingBar) window.oeeeLoadingBar.leave(function () { draw.form.submit(); });
+            else draw.form.submit();
           } else {
             go("/login");
           }
