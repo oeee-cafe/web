@@ -101,7 +101,6 @@
                      alt="{{ following.display_name }} (@{{ following.login_name }})"
                      loading="lazy"
                      decoding="async"
-                     draggable="false"
                      src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
               </a>
             {% endfor %}
@@ -163,7 +162,7 @@
             {% for post in public_community_posts %}
               <div class="posts-grid-item">
                 <a href="/@{{ user.login_name }}/{{ post.id }}">
-                  <img draggable="false" class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
+                  <img class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
                        width="{{ post.image_width }}"
                        height="{{ post.image_height }}"
                        alt="{{ post.title }}"
@@ -184,7 +183,7 @@
               {% for post in private_community_posts %}
                 <div class="posts-grid-item">
                   <a href="/@{{ user.login_name }}/{{ post.id }}">
-                    <img draggable="false" class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
+                    <img class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
                          width="{{ post.image_width }}"
                          height="{{ post.image_height }}"
                          alt="{{ post.title }}"

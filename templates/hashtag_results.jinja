@@ -23,7 +23,6 @@
             <span class="community-card-cell">
               <img src="{{ r2_public_endpoint_url }}/image/{{ cover.image_filename[:2] }}/{{ cover.image_filename }}"
                    alt=""
-                   draggable="false"
                    class="{% if cover.width > 300 and cover.height > 300 %}drawing-downscaled{% endif %}"
                    width="{{ cover.width }}"
                    height="{{ cover.height }}"

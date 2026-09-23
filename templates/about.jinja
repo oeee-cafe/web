@@ -74,7 +74,6 @@
                    alt="{{ user.display_name }} (@{{ user.login_name }})"
                    loading="lazy"
                    decoding="async"
-                   draggable="false"
                    src="{{ r2_public_endpoint_url }}/image/{{ user.banner_image_filename[:2] }}/{{ user.banner_image_filename }}" />
             </a>
           {% endfor %}

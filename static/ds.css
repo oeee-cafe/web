@@ -266,35 +266,42 @@ html[data-form="desktop"] .ds-page {
   overscroll-behavior: none;
 }
 
-.ds-page {
+/* In a browser the site is a web page, and selects and drags like one.
+   In the apps (data-app) it is the window's content, so its chrome --
+   buttons, tabs, labels, drawings, the toolbar -- does not select or drag
+   out, and a stray drag across it leaves no selection behind. Text still
+   selects there: what anyone wrote, and every other word on the page, is
+   something someone may want to copy. */
+html[data-app] .ds-page {
   cursor: default;
+}
+
+html[data-app] .ds-page button,
+html[data-app] .ds-page select,
+html[data-app] .ds-page label,
+html[data-app] .ds-page img,
+html[data-app] .ds-page [role="button"],
+html[data-app] .ds-page [role="tab"],
+html[data-app] .ds-page [role="menuitem"],
+html[data-app] .ds-page .ds-button,
+html[data-app] .ds-page .ds-segmented,
+html[data-app] .ds-page .ds-badge,
+html[data-app] .ds-page .nav-bar {
   -moz-user-select: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* A long press on a link or a drawing raises iOS's own preview and menu,
+   which the app does not want -- except on the drawings below. */
+html[data-app] .ds-page a,
+html[data-app] .ds-page img {
   -webkit-touch-callout: none;
 }
 
-.ds-page input,
-.ds-page textarea,
-.ds-page select,
-.ds-page [contenteditable],
-.ds-selectable,
-.ds-page .post-title,
-.ds-page .post-content,
-.ds-page .comment-content,
-.ds-page .guestbook-entry pre,
-.ds-page .guestbook-reply pre,
-.ds-page .community-description,
-.ds-page .draft-description {
-  -moz-user-select: text;
-  -webkit-user-select: text;
-  user-select: text;
-  -webkit-touch-callout: default;
-}
-
-.ds-page input,
-.ds-page textarea,
-.ds-page [contenteditable] {
+html[data-app] .ds-page input,
+html[data-app] .ds-page textarea,
+html[data-app] .ds-page [contenteditable] {
   cursor: text;
 }
 
@@ -322,8 +329,11 @@ html[data-app="ios"] .ds-page img[data-oeee-drawing] {
   color: var(--ds-link);
 }
 
-.ds-page img,
-.ds-page a {
+/* Every app's view is WebKit or Chromium, which both read this, so the
+   templates need no `draggable` of their own -- and a browser keeps its
+   dragging, of drawings to the desktop included. */
+html[data-app] .ds-page img,
+html[data-app] .ds-page a {
   -webkit-user-drag: none;
 }
 
@@ -712,9 +722,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   font-size: var(--ds-text-m);
   line-height: 1.5;
   view-transition-name: toolbar;
-  -moz-user-select: none;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 #menubar {
@@ -1134,8 +1141,9 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-  /* The bar takes the pointer's selection away from every label in it;
-     a field is the one thing here that is meant to be selected in. */
+  /* In the apps the bar takes the pointer's selection away from every
+     label in it; a field is the one thing here that is meant to be
+     selected in. */
   -moz-user-select: text;
   -webkit-user-select: text;
   user-select: text;

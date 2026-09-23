@@ -13,7 +13,7 @@
     {% set banner = banner_tuple[0] %}
     {% set image_url = banner_tuple[1] %}
     <div class="ds-card banner-card{% if banner.is_active %} is-active{% endif %}">
-      <span class="banner-frame"><img src="{{ image_url }}" alt="" width="200" height="40" draggable="false" /></span>
+      <span class="banner-frame"><img src="{{ image_url }}" alt="" width="200" height="40" /></span>
       <div class="banner-card-meta">
         <span title="{{ banner.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ ftl_get_message("banner-management-created") }} {{ banner.created_at|ago }}</span>
         {% if banner.is_active %}
