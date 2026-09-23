@@ -9,7 +9,7 @@
    each app used to carry its own copy of the page's half, and the copies
    had drifted apart:
 
-   window.oeeeSignIn.native(provider, next)
+   window.oeeeApp.signIn.native(provider, next)
             The app has a sheet of the platform's own that answers with an
             ID token for a nonce: Sign in with Apple on iOS and macOS,
             Credential Manager on Android, ASWebAuthenticationSession for
@@ -19,7 +19,7 @@
                  web view's session;
               2. it sends the app  signIn {provider, nonce}  on the bridge
                  (app_bridge.jinja), and the app answers by calling
-                 window.oeeeSignIn.answer(told), where `told` is
+                 window.oeeeApp.signIn.answer(told), where `told` is
                  {id_token, user?} from the sheet, {cancelled: true} for a
                  sheet put away, or {} for one that could not sign in;
               3. the page posts the token and the state to /auth/<provider>
@@ -27,16 +27,16 @@
                  session (src/apple.rs, src/google.rs, identity.rs) and says
                  where to go next.
 
-   window.oeeeSignIn.browser(provider, next)
+   window.oeeeApp.signIn.browser(provider, next)
             The app has no sheet, and hands the sign-in to the system's
             browser instead: Apple on Android, both on Windows.
               1. the page starts a handoff (POST /auth/handoff/start,
                  src/handoff.rs) and sends the app  browse {url}  on the
                  bridge; the app checks the URL is this site's and opens it
-                 in the browser, or calls window.oeeeSignIn.unopened();
+                 in the browser, or calls window.oeeeApp.signIn.unopened();
               2. the page asks the site (POST /auth/handoff/claim) until the
                  browser has finished, at which point the site signs *this*
-                 session in; the app calls window.oeeeSignIn.resume() when
+                 session in; the app calls window.oeeeApp.signIn.resume() when
                  it is brought back to the front, so the page asks at once.
 
    Every request is made from here, in the page, so each carries the page's
@@ -70,7 +70,7 @@
     // knew that slid a skeleton in for the page it thought was coming, and
     // nothing is coming.
     function stay() {
-      if (window.oeeeRestoreContent) window.oeeeRestoreContent();
+      if (window.oeeeApp.restoreContent) window.oeeeApp.restoreContent();
     }
 
     // Replaced, not followed: the page signed in from is not left in the
@@ -218,7 +218,7 @@
         .catch(stay);
     }
 
-    window.oeeeSignIn = {
+    window.oeeeApp.signIn = {
       native: native,
       answer: answer,
       browser: browser,

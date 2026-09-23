@@ -1189,7 +1189,7 @@ mod template_tests {
         // A string the page hands a script is a JSON literal, not text
         // pasted between quotes.
         assert!(head.contains(r#"leaveTitle: "app-leave-title","#), "{head}");
-        assert!(head.contains("window.oeeeSignIn = {"));
+        assert!(head.contains("window.oeeeApp.signIn = {"));
         assert!(head.contains(r#"[/OeeeCafeWindows/, "data-desktop", "windows"]"#));
     }
 
@@ -1223,6 +1223,10 @@ mod template_tests {
             "email_verified_at": "2026-01-01",
         }));
         assert!(signed_in.contains(r#"data-tauri-drag-region="deep" data-signed-in"#));
+        // What the apps call on the page is on one object (app_bridge.jinja);
+        // the toolbar adds its two parts to it.
+        assert!(signed_in.contains("window.oeeeApp.command = command;"));
+        assert!(signed_in.contains("window.oeeeApp.restoreContent = restoreContent;"));
     }
 
     /// Only a drawing that is not blurred is offered to an app's long-press
@@ -1513,7 +1517,7 @@ mod template_tests {
         assert!(squashed
             .contains(r#"<span class="supporter-price" data-product="cafe.oeee.supporter.2026"></span>"#));
         assert!(squashed.contains(r#"<span class="supporter-price" data-product="481"></span>"#));
-        assert!(both.contains("window.oeeeStorePrices"));
+        assert!(both.contains("window.oeeeApp.storePrices = "));
 
         // Nothing for this year yet: the page says so instead.
         let nothing = render(

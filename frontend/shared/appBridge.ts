@@ -15,18 +15,22 @@ import type { PainterCommand, PainterHandle } from "neo-cucumber";
  */
 export function offerPainterToApp(painter: PainterHandle): () => void {
   const host = window as unknown as {
-    oeeePainter?: { command(name: PainterCommand): void; preferPen(): void };
-    oeeeApp?: { post(type: string, data: Record<string, unknown>): boolean };
+    oeeeApp?: {
+      post(type: string, data: Record<string, unknown>): boolean;
+      painter?: { command(name: PainterCommand): void; preferPen(): void };
+    };
   };
+  const app = host.oeeeApp;
+  if (!app) return () => {};
   const offered = {
     command: (name: PainterCommand) => painter.command(name),
     preferPen: () => painter.preferPen(),
   };
-  host.oeeePainter = offered;
+  app.painter = offered;
   // Said once the painter can be driven, so the app never has to guess when
   // that is (app_bridge.jinja).
-  host.oeeeApp?.post("painter", { state: "ready" });
+  app.post("painter", { state: "ready" });
   return () => {
-    if (host.oeeePainter === offered) delete host.oeeePainter;
+    if (app.painter === offered) delete app.painter;
   };
 }

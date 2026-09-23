@@ -47,12 +47,13 @@ type PageWindow = Window &
       report(): void;
       feel(name: string): void;
       wouldLoseWork(): boolean;
-    };
-    oeeeSignIn: {
-      native(provider: string, next: string | null): void;
-      answer(told: Record<string, unknown>): void;
-      browser(provider: string, next: string | null): void;
-      unopened(): void;
+      signIn: {
+        native(provider: string, next: string | null): void;
+        answer(told: Record<string, unknown>): void;
+        browser(provider: string, next: string | null): void;
+        resume(): void;
+        unopened(): void;
+      };
     };
   };
 
@@ -252,14 +253,25 @@ describe("what the site tells the apps", () => {
 });
 
 describe("signing in for an app", () => {
+  it("is on oeeeApp with everything else an app calls, and nowhere else", async () => {
+    const page = await open();
+    const signIn = page.window.oeeeApp.signIn;
+    for (const name of ["native", "answer", "browser", "resume", "unopened"] as const) {
+      expect(typeof signIn[name], name).toBe("function");
+    }
+    for (const retired of ["oeeeSignIn", "oeeeCommand", "oeeeRestoreContent", "oeeeStorePrices", "oeeePainter"]) {
+      expect(retired in page.window, retired).toBe(false);
+    }
+  });
+
   it("asks for a token for the site's nonce, and posts what the app answers", async () => {
     const page = await open({ answers: { "/auth/google/start": { state: "S", nonce: "N" } } });
-    page.window.oeeeSignIn.native("google", "/after");
+    page.window.oeeeApp.signIn.native("google", "/after");
     await settle();
     await settle();
     expect(last(page, "signIn")).toEqual({ v: 1, type: "signIn", provider: "google", nonce: "N" });
 
-    page.window.oeeeSignIn.answer({ id_token: "T", user: '{"name":{}}' });
+    page.window.oeeeApp.signIn.answer({ id_token: "T", user: '{"name":{}}' });
     await settle();
     const posted = page.asked.find((request) => request.url === "/auth/google")!;
     expect(Object.fromEntries(new URLSearchParams(posted.body))).toEqual({
@@ -274,14 +286,14 @@ describe("signing in for an app", () => {
     const page = await open({
       answers: { "/auth/handoff/start": { id: "I", secret: "X", url: "/auth/apple?handoff=I" } },
     });
-    page.window.oeeeSignIn.browser("apple", "/after");
+    page.window.oeeeApp.signIn.browser("apple", "/after");
     await settle();
     await settle();
     const message = last(page, "browse");
     expect(keys(message)).toEqual(["type", "url", "v"]);
     expect(message.url).toBe(new URL("/auth/apple?handoff=I", page.window.document.baseURI).href);
     expect(message.url).toMatch(/^https?:\/\/[^/]+\/auth\/apple\?handoff=I$/);
-    page.window.oeeeSignIn.unopened();
+    page.window.oeeeApp.signIn.unopened();
   });
 });
 

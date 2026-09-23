@@ -65,12 +65,12 @@
             that opens its own menu on a long press knows which in time.
             `link` is the post's page, or "" on the post page itself.
    painter  {state: "ready"}
-            The painter can be driven: window.oeeePainter.command(name) and
+            The painter can be driven: oeeeApp.painter.command(name) and
             .preferPen() (frontend/shared/appBridge.ts).
    prices   {store, products}
             What these cost, asked as /supporter opens: `products` are the
             App Store product ids or Steam app ids on the page. The app
-            answers by calling window.oeeeStorePrices({product: price}) with
+            answers by calling oeeeApp.storePrices({product: price}) with
             the store's own formatted strings -- StoreKit's `displayPrice`,
             Steam's `price_overview.final_formatted` -- in the reader's
             currency, which only the store knows. It may call it again when
@@ -127,9 +127,28 @@
    desktop app is not the Steam one. A build that says nothing is offered
    nothing to press.
 
-   The other way, the apps call the page: window.oeeeCommand(name)
-   (toolbar.jinja), window.oeeeStorePrices(prices) (supporter.jinja),
-   window.oeeePainter, and --oeee-text-scale on the root.
+   The other way, the apps call the page, and everything they call is on
+   one object, window.oeeeApp, which this template makes. The parts of the
+   page that answer an app add themselves to it as they load, and a page
+   without them simply lacks the member, so an app asks for one it may not
+   find as `window.oeeeApp && oeeeApp.command && oeeeApp.command(name)`:
+
+     wouldLoseWork()         here; see below
+     signIn.*                app_sign_in.jinja
+     command(name)           toolbar.jinja: the site's menu commands and keys,
+                             true when the page knew the name
+     restoreContent()        toolbar.jinja: takes the loading skeleton back
+                             down after a link the app stopped
+     storePrices(prices)     supporter.jinja
+     painter.command(name), painter.preferPen()
+                             frontend/shared/appBridge.ts, on a drawing page
+
+   And --oeee-text-scale on the root, which is CSS rather than a call.
+
+   The Mac app's own window chrome (MacWindow.js in oeee-cafe-apple) posts
+   on the same channel -- {v:1, type:"window", action:"drag"|"zoom"} when
+   the toolbar's empty space is pressed -- so every app has one channel to
+   listen on; nothing in the site sends it.
 
    There is no other channel. The web-view apps were never released before
    this contract; the builds people have from before it are the native

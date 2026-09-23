@@ -115,7 +115,7 @@
       // Defined before the asking, so an app that answers at once is heard.
       // Called again whenever the app knows better -- a currency that
       // arrived late, a price that changed while the page was open.
-      window.oeeeStorePrices = function (prices) {
+      if (window.oeeeApp) window.oeeeApp.storePrices = function (prices) {
         if (!prices) return;
         var spans = document.querySelectorAll(".supporter-price");
         for (var i = 0; i < spans.length; i++) {
