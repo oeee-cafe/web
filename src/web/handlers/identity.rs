@@ -286,6 +286,9 @@ pub async fn link_pending_identity(
 #[derive(Deserialize)]
 pub struct NextQuery {
     next: Option<String>,
+    /// A handoff this sign-in is being made on behalf of an app for
+    /// (`crate::handoff`). Absent for an ordinary browser sign-in.
+    handoff: Option<String>,
 }
 
 /// `/auth/steam/app` is a link only the Oeee Cafe app on Steam can follow:
@@ -533,6 +536,7 @@ pub async fn apple_sign_in(
         return Ok(Redirect::to(back_for(&auth_session)).into_response());
     };
 
+    remember_handoff(&session, &state, query.handoff.as_deref()).await;
     let request = AppleRequest {
         state: random_token(),
         nonce: random_token(),
@@ -681,6 +685,9 @@ pub async fn do_apple_sign_in(
         }
     };
 
+    if let Some(done) = handed_off(&session, &state, &identity).await {
+        return Ok(done);
+    }
     sign_in_with(
         &mut auth_session,
         &session,
@@ -726,6 +733,7 @@ pub async fn google_sign_in(
         return Ok(Redirect::to(back_for(&auth_session)).into_response());
     };
 
+    remember_handoff(&session, &state, query.handoff.as_deref()).await;
     let request = GoogleRequest {
         state: random_token(),
         nonce: random_token(),
@@ -982,7 +990,196 @@ async fn finish_google_sign_in(
         }
     };
 
+    if let Some(done) = handed_off(session, state, &identity).await {
+        return Ok(done);
+    }
     sign_in_with(auth_session, session, messages, bundle, state, identity, next).await
+}
+
+const HANDOFF_KEY: &str = "identity.handoff";
+
+/// Remembers, for the length of this browser's sign-in, which handoff it is
+/// being done on behalf of. Only an id that names a handoff still waiting is
+/// kept: a made-up one is ignored rather than carried to the provider and
+/// back for nothing.
+async fn remember_handoff(session: &Session, state: &AppState, handoff: Option<&str>) {
+    let Some(id) = handoff else { return };
+    match crate::handoff::is_pending(&state.redis_pool, id).await {
+        Ok(true) => {
+            let _ = session.insert(HANDOFF_KEY, id.to_string()).await;
+        }
+        Ok(false) => {}
+        Err(error) => tracing::warn!("A handoff could not be looked up: {error:#}"),
+    }
+}
+
+/// Hands what the provider just said to the app waiting for it, if one is,
+/// and answers where to leave the browser when it did.
+///
+/// Called as soon as an identity is verified and *before* anything is done
+/// with it: a browser signing in on an app's behalf signs nobody in here,
+/// makes no account and links nothing. It carries a message and stops. What
+/// to do about the identity is the app session's to decide, in
+/// [`handoff_claim`], where the person deciding is the one already signed
+/// in there.
+async fn handed_off(
+    session: &Session,
+    state: &AppState,
+    identity: &VerifiedIdentity,
+) -> Option<Response> {
+    let id: String = session.remove(HANDOFF_KEY).await.ok().flatten()?;
+    match crate::handoff::verified(&state.redis_pool, &id, identity).await {
+        // Claimed already, or waited too long: nothing is listening, so the
+        // browser carries on as an ordinary sign-in.
+        Ok(false) => None,
+        Ok(true) => Some(Redirect::to("/auth/handoff/done").into_response()),
+        Err(error) => {
+            tracing::error!("A sign-in could not be handed to the app: {error:#}");
+            None
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct HandoffStartForm {
+    provider: String,
+    next: Option<String>,
+}
+
+/// Starts a handoff for the page in an app's web view: see `crate::handoff`.
+///
+/// The page keeps `secret` and opens `url` in a browser of the system's --
+/// on Android that has to be a Custom Tab, or the app catches its own link.
+pub async fn handoff_start(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HandoffStartForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    // Only a provider this site actually offers, so an app is never sent to
+    // a sign-in that would turn it away on arrival.
+    let configured = match Provider::parse(&form.provider) {
+        Some(Provider::Apple) => state.config.apple.is_some(),
+        Some(Provider::Google) => state.config.google.is_some(),
+        // Steam signs in from inside the app already; it needs no browser.
+        Some(Provider::Steam) | None => false,
+    };
+    if !configured {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    }
+
+    let next = local_next(form.next.as_deref());
+    let started = crate::handoff::start(&state.redis_pool, next.clone()).await?;
+    let url = format!(
+        "{}/auth/{}?handoff={}",
+        state.config.base_url.trim_end_matches('/'),
+        form.provider,
+        started.id
+    );
+    Ok(axum::Json(serde_json::json!({
+        "id": started.id,
+        "secret": started.secret,
+        "url": url,
+    }))
+    .into_response())
+}
+
+#[derive(Deserialize)]
+pub struct HandoffClaimForm {
+    id: String,
+    secret: String,
+    /// Sent on the second ask, once the person has seen what will be linked.
+    confirm: Option<String>,
+}
+
+/// Claims a handoff: takes what the provider said in the browser and does
+/// with it, here, what an ordinary sign-in would have done -- which is how
+/// linking stays safe. The session that acts is this one, the app's, the one
+/// holding the secret; a browser that merely knew the id could put an
+/// identity into the handoff but can never make this session accept it
+/// unseen.
+///
+/// Without `confirm`, a handoff that would be *linked* to the account
+/// already signed in here is only described, not acted on, so the app can
+/// show whose account it is about to attach and let it be refused. Signing
+/// in as nobody in particular needs no such question.
+pub async fn handoff_claim(
+    mut auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HandoffClaimForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let say = |status: &str| axum::Json(serde_json::json!({ "status": status })).into_response();
+
+    let looked = crate::handoff::peek(&state.redis_pool, &form.id, &form.secret).await?;
+    let (identity, next) = match looked {
+        crate::handoff::Claim::Waiting => return Ok(say("waiting")),
+        crate::handoff::Claim::Unknown => return Ok(say("unknown")),
+        crate::handoff::Claim::Ready { identity, next } => (*identity, next),
+    };
+
+    // Linking to the account already signed in here: say what it is and
+    // wait to be told to go ahead. The handoff is left unspent, so refusing
+    // costs nothing and asking again is free.
+    if auth_session.user.is_some() && form.confirm.is_none() {
+        return Ok(axum::Json(serde_json::json!({
+            "status": "confirm",
+            "provider": identity.provider.display_name(),
+            "account": identity.name.clone().or_else(|| identity.email.clone()),
+        }))
+        .into_response());
+    }
+
+    // Spent before it is acted on: a handoff answers once, and two claims
+    // racing must not both sign in.
+    if !crate::handoff::spend(&state.redis_pool, &form.id, &form.secret).await? {
+        return Ok(say("unknown"));
+    }
+
+    let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+    let response = sign_in_with(
+        &mut auth_session,
+        &session,
+        &messages,
+        &bundle,
+        &state,
+        identity,
+        next.clone(),
+    )
+    .await?;
+    // `sign_in_with` answers with a redirect -- to `next`, to /account, or
+    // to /auth/welcome when there is no account yet and one has to be named.
+    // The page follows it itself, so it is told where rather than sent.
+    let go = response
+        .headers()
+        .get(axum::http::header::LOCATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("/")
+        .to_string();
+    Ok(axum::Json(serde_json::json!({ "status": "ready", "next": go })).into_response())
+}
+
+/// What the browser is left on once it has signed in for an app. The app is
+/// going on by itself; there is nothing more to do in this window.
+pub async fn handoff_done(
+    messages: Messages,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+) -> Result<Html<String>, AppError> {
+    let template = state.env.get_template("identity_handoff_done.jinja")?;
+    let rendered = template.render(context! {
+        messages => messages.into_iter().collect::<Vec<_>>(),
+        ftl_lang,
+    })?;
+    Ok(Html(rendered))
 }
 
 /// A handle as the `users` table's own constraint allows it:

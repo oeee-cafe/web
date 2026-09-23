@@ -1,0 +1,16 @@
+{% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("handoff-done-title") }}
+{% endblock title %}
+{% block content %}
+  {# Where a browser is left after signing in on an app's behalf
+     (src/handoff.rs). Nothing was signed in here: this window carried what
+     the provider said back to the app, which is going on by itself. So
+     there is nothing to press -- saying so is the whole page. #}
+  <div class="auth-page">
+    <div class="ds-card auth-card">
+      <h1 class="auth-title">{{ ftl_get_message("handoff-done-title") }}</h1>
+      <p class="auth-lede">{{ ftl_get_message("handoff-done-body") }}</p>
+    </div>
+  </div>
+{% endblock content %}
