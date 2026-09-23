@@ -87,21 +87,22 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3 5.2 13.5a4.5 4.5 0 0 1 6.8-5.9 4.5 4.5 0 0 1 6.8 5.9z"/></svg>
         </a>
       {% endif %}
-      {# Search, signed in or out: a magnifier at rest, which opens a field
-         out of its left side when anything gives it focus -- a press on
-         the glass, a Tab into it, or `/` -- and closes when it loses it.
-         A word here is the width that pushes a phone's first row into its
-         compact steps; the field takes none of the bar's, since it lies
-         over it rather than in it (ds.css).
+      {# Search, signed in or out: the glass's own square button at rest,
+         which opens leftward into a pill with the glass at its left and
+         the field after it, when anything gives the field focus -- a press
+         on the glass, a Tab into it, or `/` -- and closes again when it
+         loses it. A word here is the width that pushes a phone's first row
+         into its compact steps; the pill takes none of the bar's, since it
+         opens over the bar rather than in it (ds.css).
 
          Enter goes to /search, which is still where results are read and
          where the apps' own search fields land: this is a faster way to a
          field than going there to find one, not a second search.
 
          No script holds any of it up. The glass is the field's <label>, so
-         pressing it focuses the field; the opening is :focus-within; and a
-         form with a single field submits on Enter by itself. Hidden in the
-         phone apps, whose own search tabs are the native field
+         pressing it focuses the field; the pill opens on :focus-within;
+         and a form with a single field submits on Enter by itself. Hidden
+         in the phone apps, whose own search tabs are the native field
          (theme_head.jinja marks the root). #}
       {# Unboosted, like the two forms below and for a plainer reason than
          theirs: htmx 4 takes a boosted form's submit, sends the request --
@@ -111,18 +112,20 @@
          the way it goes with no script at all; the skeleton is laid by
          hand below, where a boosted link would have had one for free. #}
       <form class="toolbar-search" method="get" action="/search" role="search" hx-boost="false">
-        <label class="toolbar-search-glass" for="toolbar-search-field" title="{{ ftl_get_message("search") }} (/)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
-        </label>
-        <input class="toolbar-search-field"
-               id="toolbar-search-field"
-               type="search"
-               name="q"
-               placeholder="{{ ftl_get_message("search-placeholder") }}"
-               aria-label="{{ ftl_get_message("search-placeholder") }}"
-               autocomplete="off"
-               autocapitalize="none"
-               spellcheck="false" />
+        <span class="toolbar-search-pill">
+          <label class="toolbar-search-glass" for="toolbar-search-field" title="{{ ftl_get_message("search") }} (/)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+          </label>
+          <input class="toolbar-search-field"
+                 id="toolbar-search-field"
+                 type="search"
+                 name="q"
+                 placeholder="{{ ftl_get_message("search-placeholder") }}"
+                 aria-label="{{ ftl_get_message("search-placeholder") }}"
+                 autocomplete="off"
+                 autocapitalize="none"
+                 spellcheck="false" />
+        </span>
       </form>
       {% if current_user %}
         {% include "nav_notifications.jinja" %}

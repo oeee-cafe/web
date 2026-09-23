@@ -851,62 +851,91 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   margin: 2px;
 }
 
-/* Search is a form rather than one of those links: the glass is the
-   field's label and wears their square, and the field beside it is nothing
-   wide until something focuses it. Its own rules throughout -- a label
-   matches none of the layout steps' `> a` and `.toolbar-button` selectors,
+/* Search is a form rather than one of those links, and its button is a
+   pill that opens rather than a square that is pressed: the glass is the
+   field's label and sits at the pill's left, the field comes after it,
+   and the pill is only as wide as the two of them are. Closed, that is
+   the glass's own 30px square, the same square as the icon buttons above
+   -- which is why none of this needs their rules: a <label> and a <span>
+   match none of the layout steps' `> a` and `.toolbar-button` selectors,
    so the square keeps its 4px at every width without having to outrank
-   them the way the icons above do. */
+   them.
+
+   The form is the slot the pill sits in and never changes size; the pill
+   is out of flow inside it, anchored at its right, so opening grows it
+   leftward over the bar rather than widening the bar. fitToolbar measures
+   the bar to decide how many rows it needs, and a pill that widened it
+   would have it restacking under whoever was typing -- and the stacked
+   layout below lays the pill across the row, which takes the width away
+   again and unstacks it. Out of flow there is nothing to oscillate
+   about. */
 .toolbar-end .toolbar-search {
   position: relative;
-  display: flex;
   flex: none;
-  align-items: center;
+  width: 30px;
+  height: 30px;
 }
 
-.toolbar-end .toolbar-search-glass {
-  display: inline-block;
-  flex: none;
-  padding: 4px;
+.toolbar-end .toolbar-search-pill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  height: 30px;
   border: 1px solid var(--ds-line-strong);
   border-radius: 6px;
   background-color: var(--ds-surface);
-  color: var(--ds-ink);
   box-shadow: var(--ds-shadow-raise);
-  line-height: 0;
+  overflow: hidden;
+  transition: border-radius 160ms ease, background-color 160ms ease;
 }
 
-.toolbar-end .toolbar-search-glass:hover {
+.toolbar-end .toolbar-search-pill:hover {
   background-color: var(--ds-ground);
 }
 
-/* The field opens leftward out of the glass, and never in the row's
-   flow: it is absolute against the form, its right edge against the
-   glass's left, so the bar is the same width open or closed. fitToolbar
-   measures the bar to decide how many rows it needs, and a field that
-   grew the bar would have it measuring a bar that is only that wide while
-   someone is typing -- restacking under the field, and, once stacked, the
-   overlay below takes the width away again and it unstacks. Out of flow,
-   there is nothing to oscillate about.
+/* Open: the square rounds into the pill, and wears the field's fill and
+   the focus ring, because from here on it is a field and not a button.
+   :focus-within is what opens it and there is no second way -- the pill
+   keeps what overflows it, so a field that grew inside a pill that did
+   not would be a field nobody could see. Firefox 52 for that selector
+   against 56 for this file, so the floor has it. */
+.toolbar-end .toolbar-search-pill:focus-within {
+  border-radius: 15px;
+  background-color: var(--ds-field);
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 1px;
+}
 
-   Closed it is nothing: no width, no padding, no edge. Opening moves all
-   of those at once, which is the whole of the animation. */
+/* The glass: inside the pill now, so the pill carries the edge and the
+   fill and this carries only the mark. */
+.toolbar-end .toolbar-search-glass {
+  display: block;
+  flex: none;
+  padding: 4px;
+  color: var(--ds-ink);
+  line-height: 0;
+}
+
+/* Closed, the field is nothing: no width and no padding, so the pill
+   shrinks to the glass alone. Opening it is the whole of the animation --
+   the pill has no width of its own to animate. */
 .toolbar-end .toolbar-search-field {
-  position: absolute;
-  top: 0;
-  right: 100%;
-  z-index: 70;
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
   width: 0;
-  height: 30px;
+  height: 28px;
   min-width: 0;
   margin: 0;
   padding: 0;
-  border: 0 solid var(--ds-line-strong);
-  border-radius: 6px;
-  background-color: var(--ds-field);
+  border: 0;
+  background: none;
   color: var(--ds-ink);
   opacity: 0;
   font-family: var(--ds-font);
@@ -920,24 +949,16 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   -moz-user-select: text;
   -webkit-user-select: text;
   user-select: text;
-  transition: width 160ms ease, opacity 120ms ease, margin-right 160ms ease,
-    padding 160ms ease, border-width 160ms ease;
+  transition: width 160ms ease, opacity 120ms ease, padding 160ms ease;
 }
 
-/* Open. The field's own :focus, not the form's :focus-within: the form
-   holds nothing else that can take focus, so there is nothing the wider
-   selector would catch, and this one is as old as focus is. The ring goes
-   here too -- around the field rather than around the glass, which is a
-   label and not a control. */
+/* The ring is the pill's, so the field has none of its own to draw
+   inside it. */
 .toolbar-end .toolbar-search-field:focus {
-  width: 200px;
-  margin-right: 6px;
-  padding: 4px 10px;
-  border-width: 1px;
-  outline: 2px solid var(--ds-focus);
-  outline-offset: 1px;
+  width: 190px;
+  padding-right: 12px;
+  outline: 0;
   opacity: 1;
-  box-shadow: var(--ds-shadow-raise);
 }
 
 /* WebKit dresses a search field with a well and a clear button of its
@@ -952,11 +973,12 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   -webkit-appearance: none;
 }
 
-/* Stacked, there is no 200px to the glass's left -- it is a phone, or a
-   window as narrow as one -- so the field takes the first row instead,
-   from edge to edge. Handing the form back `position: static` is what
-   moves it: the field then measures against #menubar, which is the row.
-   What it covers comes back when it closes. */
+/* Stacked, there is no 190px to the glass's left -- it is a phone, or a
+   window as narrow as one -- so the pill opens across the first row
+   instead of out of the glass, edge to edge. Closed it goes back into
+   the flow of its slot, which is the square where it belongs; open, the
+   form is static and the row is what it measures against. What it covers
+   comes back when it closes. */
 .nav-bar.is-stacked #menubar {
   position: relative;
 }
@@ -965,25 +987,35 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   position: static;
 }
 
-.nav-bar.is-stacked .toolbar-search-field:focus {
+.nav-bar.is-stacked .toolbar-search-pill {
+  position: static;
+}
+
+.nav-bar.is-stacked .toolbar-search-pill:focus-within {
+  position: absolute;
   top: 11px;
   right: 16px;
   left: 16px;
+}
+
+.nav-bar.is-stacked .toolbar-search-field:focus {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
   width: auto;
-  margin-right: 0;
 }
 
 @media (max-width: 374px) {
-  .nav-bar.is-stacked .toolbar-search-field:focus {
+  .nav-bar.is-stacked .toolbar-search-pill:focus-within {
     right: 12px;
     left: 12px;
   }
 }
 
-/* A field that opens by sliding is worth having; one that opens by
+/* A pill that opens by widening is worth having; one that opens by
    appearing is what someone who asked for less motion gets. */
 @media (prefers-reduced-motion: reduce) {
-  .toolbar-end .toolbar-search-field {
+  .toolbar-end .toolbar-search-field,
+  .toolbar-end .toolbar-search-pill {
     transition: none;
   }
 }

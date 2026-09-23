@@ -1609,6 +1609,10 @@ mod template_tests {
         // sit there looking as though the search had not been pressed.
         assert!(bar.contains(r#"role="search" hx-boost="false""#));
         assert!(bar.contains(r#"for="toolbar-search-field""#), "the glass labels it");
+        assert!(
+            bar.contains(r#"<span class="toolbar-search-pill">"#),
+            "the glass and the field share the pill that opens"
+        );
         assert!(bar.contains(r#"id="toolbar-search-field""#));
         assert!(bar.contains(r#"type="search""#) && bar.contains(r#"name="q""#));
         assert!(
@@ -2876,5 +2880,6 @@ mod template_tests {
         assert!(none.contains("search-no-results"));
     }
 }
+
 
 
