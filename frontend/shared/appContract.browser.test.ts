@@ -72,7 +72,7 @@ interface Page {
 
 interface Options {
   userAgent?: string;
-  /** The store the build sells through, marked before the page's scripts run. */
+  /** The store the build sells through, named in its user agent as the builds name it. */
   store?: "apple" | "microsoft" | "steam";
   signedIn?: boolean;
   presence?: string;
@@ -114,9 +114,8 @@ async function open(options: Options = {}): Promise<Page> {
       return /^(blob|data):/.test(String(url)) ? ownFetch(url, init) : parent.__appContract.fetch(String(url), init);
     };
     Object.defineProperty(navigator, "userAgent", { get: function () { return ${JSON.stringify(
-      options.userAgent ?? "Mozilla/5.0 OeeeCafeAndroid",
+      (options.userAgent ?? "Mozilla/5.0 OeeeCafe/android") + (options.store ? ` store/${options.store}` : ""),
     )}; } });
-    ${options.store ? `document.documentElement.setAttribute("data-store", ${JSON.stringify(options.store)});` : ""}
     // Desktop Chromium has Web Share, which Android's web view does not.
     delete Navigator.prototype.share;
     delete Navigator.prototype.canShare;
@@ -241,17 +240,34 @@ describe("what the site tells the apps", () => {
     expect(page.window.oeeeApp.wouldLoseWork()).toBe(true);
   });
 
-  it("marks the root for the app the user agent names", async () => {
-    const cases: [string, string, string][] = [
-      ["Mozilla/5.0 OeeeCafeiOS", "data-app", "ios"],
-      ["Mozilla/5.0 OeeeCafeAndroid", "data-app", "android"],
-      ["Mozilla/5.0 OeeeCafeMac", "data-desktop", "macos"],
-      ["Mozilla/5.0 Edg/120 OeeeCafeWindows", "data-desktop", "windows"],
+  it("marks the root with which app, what kind of device, and where it sells, from the user agent", async () => {
+    const marks = (root: HTMLElement) =>
+      ["data-app", "data-form", "data-store"].map((name) => root.getAttribute(name));
+    const cases: [string, (string | null)[]][] = [
+      ["Mozilla/5.0 OeeeCafe/ios store/apple", ["ios", "handheld", "apple"]],
+      ["Mozilla/5.0 OeeeCafe/android", ["android", "handheld", null]],
+      ["Mozilla/5.0 OeeeCafe/macos store/apple", ["macos", "desktop", "apple"]],
+      ["Mozilla/5.0 Edg/120 OeeeCafe/windows store/steam", ["windows", "desktop", "steam"]],
+      ["Mozilla/5.0 Edg/120 OeeeCafe/windows", ["windows", "desktop", null]],
+      // A browser, and a store named with no app to be in.
+      ["Mozilla/5.0 Firefox/56.0", [null, null, null]],
+      ["Mozilla/5.0 store/apple", [null, null, null]],
+      // Only the names these are.
+      ["Mozilla/5.0 OeeeCafe/tv store/nowhere", [null, null, null]],
     ];
-    for (const [userAgent, attribute, value] of cases) {
+    for (const [userAgent, expected] of cases) {
       const page = await open({ userAgent });
-      expect(page.window.document.documentElement.getAttribute(attribute), userAgent).toBe(value);
+      expect(marks(page.window.document.documentElement), userAgent).toEqual(expected);
     }
+  });
+
+  it("sends haptics to any app listening, whatever it is on", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/macos" });
+    const button = page.window.document.createElement("button");
+    button.setAttribute("data-haptic", "light");
+    page.window.document.body.appendChild(button);
+    button.click();
+    expect(last(page, "haptic")).toEqual({ v: 1, type: "haptic", name: "light" });
   });
 });
 
@@ -272,8 +288,8 @@ describe("push notifications for an app", () => {
 
   it("names each app's platform as the site's devices do", async () => {
     for (const [userAgent, platform] of [
-      ["Mozilla/5.0 OeeeCafeiOS", "ios"],
-      ["Mozilla/5.0 OeeeCafeMac", "macos"],
+      ["Mozilla/5.0 OeeeCafe/ios", "ios"],
+      ["Mozilla/5.0 OeeeCafe/macos", "macos"],
     ]) {
       const page = await open({ userAgent, signedIn: true, answers: { "/api/v1/devices": {} } });
       page.window.oeeeApp.pushToken("T");
@@ -306,7 +322,7 @@ describe("what a store gives an app", () => {
   }
 
   it("tells the site each proof, at the build's own store, and answers with the ones it took", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeiOS", store: "apple" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/ios", store: "apple" });
     takingOnly(page, "A");
     expect(await page.window.oeeeApp.store.purchased(["A", "B", 3, ""])).toEqual(["A"]);
     expect(page.asked.map((request) => [request.url, request.body])).toEqual([
@@ -316,7 +332,7 @@ describe("what a store gives an app", () => {
   });
 
   it("goes the same way for every store", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeWindows", store: "steam" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "steam" });
     takingOnly(page, "ab12");
     expect(await page.window.oeeeApp.store.purchased(["ab12"])).toEqual(["ab12"]);
     expect(page.asked.map((request) => request.url)).toEqual(["/store/steam/purchases"]);
@@ -331,7 +347,7 @@ describe("what a store gives an app", () => {
   });
 
   it("signs in with Steam from the page's own button, in the Steam build only", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeWindows", store: "steam" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "steam" });
     const link = page.window.document.querySelector(".auth-steam")!;
     const pressed = new page.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
     link.dispatchEvent(pressed);
@@ -347,7 +363,7 @@ describe("what a store gives an app", () => {
     expect(posted.map((form) => form.getAttribute("action"))).toEqual(["/auth/steam"]);
     expect(Object.fromEntries(new page.window.FormData(posted[0]))).toEqual({ ticket: "ab12", next: "/after" });
 
-    const elsewhere = await open({ userAgent: "Mozilla/5.0 OeeeCafeWindows", store: "microsoft" });
+    const elsewhere = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "microsoft" });
     const there = new elsewhere.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
     elsewhere.window.addEventListener("click", (event: Event) => event.preventDefault());
     elsewhere.window.document.querySelector(".auth-steam")!.dispatchEvent(there);
@@ -355,7 +371,7 @@ describe("what a store gives an app", () => {
   });
 
   it("says so when Steam gives no ticket", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeWindows", store: "steam" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "steam" });
     const said: string[] = [];
     page.window.alert = (message?: string) => {
       said.push(String(message));
@@ -429,11 +445,11 @@ describe("signing in for an app", () => {
 
   it("goes the way each app signs in with each provider", async () => {
     const ways: [string, "apple" | "google", string][] = [
-      ["Mozilla/5.0 OeeeCafeiOS", "apple", "/auth/apple/start"],
-      ["Mozilla/5.0 OeeeCafeiOS", "google", "/auth/google/start"],
-      ["Mozilla/5.0 OeeeCafeMac", "apple", "/auth/apple/start"],
-      ["Mozilla/5.0 OeeeCafeWindows", "google", "/auth/handoff/start"],
-      ["Mozilla/5.0 OeeeCafeWindows", "apple", "/auth/handoff/start"],
+      ["Mozilla/5.0 OeeeCafe/ios", "apple", "/auth/apple/start"],
+      ["Mozilla/5.0 OeeeCafe/ios", "google", "/auth/google/start"],
+      ["Mozilla/5.0 OeeeCafe/macos", "apple", "/auth/apple/start"],
+      ["Mozilla/5.0 OeeeCafe/windows", "google", "/auth/handoff/start"],
+      ["Mozilla/5.0 OeeeCafe/windows", "apple", "/auth/handoff/start"],
     ];
     for (const [userAgent, provider, asked] of ways) {
       const page = await open({ userAgent });
@@ -474,7 +490,7 @@ describe("what Android's web view cannot do", () => {
   });
 
   it("leaves the other apps' web views to do both themselves", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeiOS" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/ios" });
     const link = page.window.document.createElement("a");
     link.download = "drawing.png";
     link.href = "data:image/png;base64,iVBORw0KGgo=";

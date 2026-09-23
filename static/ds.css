@@ -178,21 +178,24 @@
   display: none !important;
 }
 
-/* In the phone apps the reader's text size is the site's: the app says how
-   much larger or smaller than the system's default it is, as
-   --oeee-text-scale on the root (WebTabController.swift in oeee-cafe-apple,
-   SiteBridge.kt in oeee-cafe-android), and every step of the type scale
-   follows it. Text grows and shrinks; pictures, the spaces between things
-   and the painter do not, as in the system's own apps.
+/* In the apps the reader's text size can be the site's: an app that follows
+   the system's setting says how much larger or smaller than the default it
+   is, as --oeee-text-scale on the root (WebTabController.swift in
+   oeee-cafe-apple, SiteBridge.kt in oeee-cafe-android), and every step of
+   the type scale follows it. Text grows and shrinks; pictures, the spaces
+   between things and the painter do not, as in the system's own apps.
+
+   It is keyed on any app rather than on the phones, and an app that says
+   nothing -- the Mac and Windows windows, or any app before it has said --
+   is drawn at 1, since everything that scales reads --ds-text-scale with a
+   fallback of 1. So a tablet, or a desktop app that one day follows its
+   system's text size, needs nothing here.
 
    The app says the system's scale as it is, and --ds-text-scale is that
-   kept within 0.8 and 2, as far as these layouts were drawn to go -- a
-   limit each app used to apply for itself. Everything that scales reads
-   --ds-text-scale with a fallback of 1, so a page outside the apps, and an
-   app that has not said yet, is drawn at 1. `clamp()` is newer than the
-   Firefox 56 floor, which is why it is only ever inside this rule: no
-   browser but an app's web view carries data-app, and a custom property's
-   value is not parsed until it is used. */
+   kept within 0.8 and 2, as far as these layouts were drawn to go.
+   `clamp()` is newer than the Firefox 56 floor, which is why it is only
+   ever inside this rule: no browser carries data-app, and a custom
+   property's value is not parsed until it is used. */
 html[data-app] {
   --ds-text-scale: clamp(0.8, var(--oeee-text-scale, 1), 2);
   --ds-text-xs: calc(11px * var(--ds-text-scale, 1));
@@ -242,9 +245,10 @@ html {
   background-color: var(--ds-ground);
 }
 
-/* `data-app` marks the phone apps' pages (theme_head.jinja). */
-html:not([data-app]),
-html:not([data-app]) .ds-page {
+/* `data-form="handheld"` marks the phone and tablet apps' pages, which
+   bounce as their own screens do (theme_head.jinja). */
+html:not([data-form="handheld"]),
+html:not([data-form="handheld"]) .ds-page {
   overscroll-behavior: none;
 }
 
@@ -374,25 +378,25 @@ html[data-app="ios"] .ds-page img[data-oeee-drawing] {
    There they are the design system's: a thin rounded thumb in the line
    colour on no track, a little stronger under the pointer. macOS draws its
    own overlay scrollbars and is left alone. */
-html[data-desktop="windows"] ::-webkit-scrollbar {
+html[data-app="windows"] ::-webkit-scrollbar {
   width: 12px;
   height: 12px;
   background: transparent;
 }
 
-html[data-desktop="windows"] ::-webkit-scrollbar-thumb {
+html[data-app="windows"] ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 6px;
   background-clip: padding-box;
   background-color: var(--ds-line-strong);
 }
 
-html[data-desktop="windows"] ::-webkit-scrollbar-thumb:hover {
+html[data-app="windows"] ::-webkit-scrollbar-thumb:hover {
   background-color: var(--ds-frame);
 }
 
-html[data-desktop="windows"] ::-webkit-scrollbar-corner,
-html[data-desktop="windows"] ::-webkit-scrollbar-track {
+html[data-app="windows"] ::-webkit-scrollbar-corner,
+html[data-app="windows"] ::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -412,7 +416,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    sticky (below), so the toolbar is in reach at every width, as it is in a
    window.
 
-   The phone apps keep the page scrolling at every width too. There the page
+   The handheld apps (data-form) keep the page scrolling at every width too. There the page
    is the app's scroll view, and only it gives the platform's manners:
    pulling down to refresh, and a tap on the status bar to go back to the
    top. Both apps ask the web view
@@ -454,11 +458,11 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
 }
 
 @media (min-width: 601px) {
-  html:not([data-app]) {
+  html:not([data-form="handheld"]) {
     height: 100%;
   }
 
-  html:not([data-app]) .ds-page {
+  html:not([data-form="handheld"]) .ds-page {
     display: -webkit-box;
     display: flex;
     -webkit-box-orient: vertical;
@@ -468,11 +472,11 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
     overflow: hidden;
   }
 
-  html:not([data-app]) .ds-page > header {
+  html:not([data-form="handheld"]) .ds-page > header {
     flex: 0 0 auto;
   }
 
-  html:not([data-app]) .ds-page > main.ds-content {
+  html:not([data-form="handheld"]) .ds-page > main.ds-content {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
@@ -521,11 +525,11 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
 }
 
 @media (min-width: 601px) {
-  html[data-desktop="macos"] .ds-page {
+  html[data-app="macos"] .ds-page {
     position: relative;
   }
 
-  html[data-desktop="macos"] .ds-page > header {
+  html[data-app="macos"] .ds-page > header {
     position: absolute;
     top: 0;
     right: 0;
@@ -540,7 +544,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
     background-image: none;
   }
 
-  html[data-desktop="macos"] .ds-page > header::before {
+  html[data-app="macos"] .ds-page > header::before {
     content: "";
     position: absolute;
     top: 0;
@@ -553,18 +557,18 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
     backdrop-filter: saturate(1.8) blur(20px);
   }
 
-  html[data-desktop="macos"] .ds-page > header .nav-bar {
+  html[data-app="macos"] .ds-page > header .nav-bar {
     background-color: transparent;
   }
 
   /* A jump to an anchor lands below the toolbar, not under it. */
-  html[data-desktop="macos"] .ds-page > main.ds-content {
+  html[data-app="macos"] .ds-page > main.ds-content {
     scroll-padding-top: var(--ds-header-height, 53px);
   }
 }
 
 @media (min-width: 601px) and (prefers-reduced-transparency: reduce) {
-  html[data-desktop="macos"] .ds-page > header::before {
+  html[data-app="macos"] .ds-page > header::before {
     background-color: var(--ds-ground);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -1445,20 +1449,20 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    two of those broke silently as this bar changed. Only the first row
    needs to clear them: the sections' row, when the bar stacks, reaches
    back under them to the usual 16px. */
-html[data-desktop="macos"] .nav-bar #menubar {
+html[data-app="macos"] .nav-bar #menubar {
   padding-left: 96px;
 }
 
-html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
+html[data-app="macos"] .nav-bar.is-stacked .toolbar-links {
   width: calc(100% + 80px);
   margin-left: -80px;
 }
 
-html[data-desktop="windows"] .nav-bar #menubar {
+html[data-app="windows"] .nav-bar #menubar {
   padding-right: 150px;
 }
 
-html[data-desktop="windows"] .nav-bar.is-stacked .toolbar-links {
+html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   width: calc(100% + 138px);
   margin-right: -138px;
 }
@@ -1709,7 +1713,7 @@ html[data-desktop="windows"] .nav-bar.is-stacked .toolbar-links {
     font-size: 16px !important;
   }
 
-  /* Larger in the phone apps when the reader's text is, and never smaller. */
+  /* Larger in an app when the reader's text is, and never smaller. */
   html[data-app] input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
   html[data-app] textarea,
   html[data-app] select {

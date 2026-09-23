@@ -259,7 +259,7 @@
       windows: { apple: browser, google: browser }
     };
     var root = document.documentElement;
-    var ways = WAYS[root.getAttribute("data-app") || root.getAttribute("data-desktop")];
+    var ways = WAYS[root.getAttribute("data-app")];
     if (root.getAttribute("data-store") === "steam") {
       ways = ways || {};
       ways.steam = steam;

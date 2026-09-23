@@ -83,7 +83,7 @@
     <script>
       (function () {
         var root = document.documentElement;
-        if (root.getAttribute("data-desktop") !== "macos" || !window.ResizeObserver) return;
+        if (root.getAttribute("data-app") !== "macos" || !window.ResizeObserver) return;
         var header = document.querySelector(".ds-page > header");
         function measure() {
           root.style.setProperty("--ds-header-height", header.offsetHeight + "px");
