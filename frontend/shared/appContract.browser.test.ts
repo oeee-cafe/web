@@ -189,7 +189,7 @@ describe("what the site tells the apps", () => {
   it("gives the theme, the colours at the edges, and the design system's ground", async () => {
     const page = await open();
     const message = last(page, "theme");
-    expect(keys(message)).toEqual(["bottom", "choice", "dark", "grid", "ground", "top", "type", "v"]);
+    expect(keys(message)).toEqual(["bottom", "choice", "grid", "ground", "top", "type", "v"]);
     expect(message).toMatchObject({
       choice: "system",
       top: "rgb(250, 250, 252)",
@@ -197,7 +197,6 @@ describe("what the site tells the apps", () => {
       ground: "#ccccff",
       grid: "#bbbbff",
     });
-    expect(typeof message.dark).toBe("boolean");
   });
 
   it("gives every word an app says over the page, as strings", async () => {
