@@ -2761,35 +2761,131 @@ nav a:visited,
   margin: 0;
 }
 
-.profile-chips,
-.profile-allies {
+.profile-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-}
-
-.profile-chips {
   margin-top: var(--ds-space-3);
 }
 
-/* Following, those with a banner: /about's banners (.about-banner), as many
-   to a row as fit at 140px or wider -- two on the narrowest phone, more as
-   the window grows. Banners are 200px; much smaller and their pixel art
-   stops reading. */
-.profile-ally-banners {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  grid-gap: 8px;
-  gap: 8px;
-}
-
-.profile-ally-banners + .profile-allies {
-  margin-top: var(--ds-space-2);
-}
-
-.profile-chips > *,
-.profile-allies > * {
+.profile-chips > * {
   margin: 0 6px 6px 0;
+}
+
+/* A person's card: a row of their banner, who they are and what you can
+   do about them, which wraps as the window narrows, and their achievements
+   under it. Rows, where a community's card (the same .profile-card) is
+   one. */
+.profile-card.profile-person {
+  display: block;
+}
+
+.profile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.profile-head .profile-name {
+  font-size: var(--ds-text-2xl);
+  line-height: 1.15;
+}
+
+/* The banner at exactly twice its size, so a 200 by 40 drawing stays hard
+   pixels -- any other factor makes some pixels one screen pixel wide and
+   some two. Once at 1x where the window has no room for 2x. */
+.profile-banner {
+  display: block;
+  flex: none;
+  width: 400px;
+  height: 80px;
+  margin: 0 var(--ds-space-5) var(--ds-space-3) 0;
+  border-radius: 2px;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--ds-frame);
+  line-height: 0;
+}
+
+.profile-banner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
+}
+
+a.profile-banner:hover {
+  box-shadow: 0 0 0 1px var(--ds-ink);
+}
+
+/* On your own profile with no banner yet: its place, and the way to fill it. */
+.profile-banner.profile-banner-blank,
+.profile-banner.profile-banner-blank:visited {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  border: 1px dashed var(--ds-line-strong);
+  background-color: var(--ds-ground);
+  box-shadow: none;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.profile-banner.profile-banner-blank:hover {
+  border-color: var(--ds-ink);
+  color: var(--ds-ink);
+}
+
+@media (max-width: 900px) {
+  .profile-banner {
+    width: 200px;
+    height: 40px;
+    margin-right: var(--ds-space-4);
+  }
+}
+
+@media (max-width: 600px) {
+  .profile-head {
+    display: block;
+  }
+}
+
+/* Report, behind the actions' last button. A .toolbar-menu for the
+   toolbar's closing script; the square is a .ds-button of its own. */
+.profile-more summary .profile-more-button {
+  width: var(--ds-control-height);
+  padding: 0;
+  -webkit-box-pack: center;
+  justify-content: center;
+}
+
+.profile-more-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: transparent;
+  color: var(--ds-ink);
+  font: inherit;
+  font-size: var(--ds-text-m);
+  text-align: left;
+}
+
+.profile-more-item:hover {
+  background-color: var(--ds-hover);
+}
+
+.profile-more .toolbar-menu-items {
+  min-width: 160px;
 }
 
 .profile-chip,
@@ -2925,25 +3021,41 @@ html[data-store] .supporter-elsewhere {
   margin-bottom: var(--ds-space-1);
 }
 
-/* Achievements: a card each, name over what it was for, and when. A grid,
-   so they line up however many there are; grid-gap for Firefox 56. */
+/* Achievements: a badge each along the foot of the card, edge to edge
+   under a rule; what each was for, and when, is its tooltip. */
 .profile-achievements {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  grid-gap: 8px;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: var(--ds-space-3) calc(-1 * var(--ds-space-4)) calc(-1 * var(--ds-space-4));
+  padding: 10px var(--ds-space-4) 4px;
+  border-top: 1px solid var(--ds-line);
   list-style: none;
 }
 
+.profile-achievements > li {
+  margin: 0 6px 6px 0;
+}
+
+.profile-achievements-label {
+  margin-right: 10px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+  font-weight: 600;
+}
+
 .profile-achievement {
-  display: flex;
-  align-items: flex-start;
-  padding: var(--ds-space-3);
+  display: -webkit-inline-box;
+  display: inline-flex;
+  -webkit-box-align: center;
+  align-items: center;
+  padding: 2px 10px 2px 2px;
   border: 1px solid var(--ds-line);
-  border-radius: var(--ds-radius-s);
-  background-color: var(--ds-surface);
+  border-radius: 8px;
+  background-color: var(--ds-field);
+  font-size: var(--ds-text-s);
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 /* The badge at the start, the words beside it. */
@@ -2955,10 +3067,10 @@ html[data-store] .supporter-elsewhere {
   -webkit-box-pack: center;
   justify-content: center;
   flex: none;
-  width: 40px;
-  height: 40px;
-  margin-right: var(--ds-space-3);
-  border-radius: 10px;
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+  border-radius: 6px;
   background-color: var(--ds-accent);
   box-shadow: inset 0 0 0 1px var(--ds-accent-line);
   color: var(--ds-accent-ink);
@@ -2966,31 +3078,128 @@ html[data-store] .supporter-elsewhere {
 
 .achievement-icon svg {
   display: block;
+  width: 15px;
+  height: 15px;
 }
 
-.profile-achievement-text {
+/* How many are behind a tab, after its name. */
+.profile-tab-count {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background-color: var(--ds-selected);
+  font-size: var(--ds-text-xs);
+  line-height: 16px;
+}
+
+/* Everyone they follow, the same shape whether they have drawn a banner or
+   not: the banner at 1x, framed, their name under it. */
+.profile-follows {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(226px, 1fr));
+  grid-gap: 8px;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-follow,
+.profile-follow:visited {
+  display: -webkit-box;
   display: flex;
+  -webkit-box-orient: vertical;
   flex-direction: column;
-  min-width: 0;
+  -webkit-box-align: center;
+  align-items: center;
+  height: 100%;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  color: var(--ds-ink);
+  text-decoration: none;
 }
 
-.profile-achievement-name {
+.profile-follow:hover {
+  border-color: var(--ds-line-strong);
+  background-color: var(--ds-ground);
+}
+
+.profile-follow-banner {
+  display: block;
+  flex: none;
+  width: 200px;
+  height: 40px;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--ds-frame);
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
+}
+
+.profile-follow-blank {
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 0 8px;
+  border: 1px dashed var(--ds-line-strong);
+  background-color: var(--ds-ground);
+  box-shadow: none;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-base);
   font-weight: 700;
+  line-height: 38px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.profile-achievement-description {
-  margin-top: 2px;
-  /* Korean breaks between words, not inside them. */
-  word-break: keep-all;
-  overflow-wrap: break-word;
-  font-size: var(--ds-text-m);
-  line-height: 1.4;
-}
-
-.profile-achievement-date {
+.profile-follow-text {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-orient: vertical;
+  flex-direction: column;
+  -webkit-box-align: center;
+  align-items: center;
+  max-width: 100%;
   margin-top: var(--ds-space-2);
+  line-height: 1.3;
+}
+
+.profile-follow-name,
+.profile-follow-handle {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-follow-name {
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+}
+
+.profile-follow-handle {
   color: var(--ds-muted);
   font-size: var(--ds-text-s);
+}
+
+/* A phone: a list, the banner beside the name. */
+@media (max-width: 600px) {
+  .profile-follow,
+  .profile-follow:visited {
+    -webkit-box-orient: horizontal;
+    flex-direction: row;
+  }
+
+  .profile-follow-text {
+    -webkit-box-align: start;
+    align-items: flex-start;
+    min-width: 0;
+    margin: 0 0 0 var(--ds-space-3);
+  }
 }
 
 .profile-empty {
@@ -3003,81 +3212,6 @@ html[data-store] .supporter-elsewhere {
     width: 100%;
     margin: var(--ds-space-3) 0 0;
   }
-}
-
-/* A person as one chip: their banner, then their name over their handle
-   (user_pill_macro.jinja). A rounded rectangle rather than a capsule, so the
-   banner -- drawn as a rectangle -- sits whole inside it, corners and all.
-   It stays at its own 40px: a banner is pixel art, and a fraction of its
-   size would smear it. */
-.user-pill,
-.user-pill:visited {
-  display: -webkit-inline-box;
-  display: inline-flex;
-  -webkit-box-align: center;
-  align-items: center;
-  max-width: 100%;
-  padding: 4px 14px 4px 4px;
-  border: 1px solid var(--ds-line-strong);
-  border-radius: 8px;
-  background-color: var(--ds-surface);
-  box-shadow: var(--ds-shadow-raise);
-  color: var(--ds-ink);
-  vertical-align: middle;
-}
-
-a.user-pill:hover {
-  background-color: var(--ds-ground);
-}
-
-.user-pill-banner {
-  display: block;
-  flex: 0 0 auto;
-  height: 40px;
-  width: auto;
-  border-radius: 3px;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: pixelated;
-}
-
-.user-pill-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  margin-left: 10px;
-  line-height: 1.25;
-}
-
-.user-pill-name {
-  overflow: hidden;
-  font-size: var(--ds-text-m);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-pill-handle {
-  overflow: hidden;
-  color: var(--ds-muted);
-  font-size: var(--ds-text-s);
-  font-weight: 400;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The person a page is about. */
-.user-pill.large .user-pill-name {
-  font-size: var(--ds-text-xl);
-  font-weight: 700;
-}
-
-.user-pill.large .user-pill-handle {
-  font-size: var(--ds-text-m);
-}
-
-.profile-name-pill {
-  margin: 0;
-  font-size: inherit;
 }
 
 /* ---------------------------------------------------------------------------

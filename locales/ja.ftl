@@ -553,8 +553,10 @@ account-supporter-mark = 名前の横に表示するマーク
 account-show-in-credits = 概要ページに名前を載せる
 account-supporter-see-credits = サポーター一覧
 profile-tabs-label = 絵
-profile-tab-public = 公開コミュニティ
-profile-tab-private = プライベートコミュニティ
+profile-tab-public = 公開
+profile-tab-private = 非公開
+profile-tab-drawings = 絵
+profile-more = その他
 profile-private-community-posts-note = プライベートコミュニティで描いた絵は公開プロフィールに表示されません。
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)

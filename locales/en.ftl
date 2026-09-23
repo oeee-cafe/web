@@ -557,6 +557,8 @@ account-supporter-see-credits = See the supporters
 profile-tabs-label = Drawings
 profile-tab-public = Public
 profile-tab-private = Private
+profile-tab-drawings = Drawings
+profile-more = More
 profile-private-community-posts-note = Drawings from private communities are not shown on your public profile.
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
