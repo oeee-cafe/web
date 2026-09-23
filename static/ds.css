@@ -895,18 +895,23 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    (nav_notifications.jinja).
 
    The Supporter Pack's heart is the third of them, shown only in an app
-   that can sell one (style.css). A square icon button added without being
+   that can sell one (style.css), and signed out the info mark and the
+   sign in door are two more. A square icon button added without being
    named here keeps the worded buttons' 4px 11px and their 20px line height,
    and comes out 40x26 sitting 2px below its neighbours. */
 .nav-bar .toolbar-end a.toolbar-button.toolbar-bell,
-.nav-bar .toolbar-end a.toolbar-button.toolbar-supporter {
+.nav-bar .toolbar-end a.toolbar-button.toolbar-supporter,
+.nav-bar .toolbar-end a.toolbar-button.toolbar-about,
+.nav-bar .toolbar-end a.toolbar-draw.toolbar-sign-in {
   padding: 4px;
   line-height: 0;
 }
 
 .toolbar-end .toolbar-search svg,
 .toolbar-end .toolbar-bell svg,
-.toolbar-end .toolbar-supporter svg {
+.toolbar-end .toolbar-supporter svg,
+.toolbar-end .toolbar-about svg,
+.toolbar-end .toolbar-sign-in svg {
   margin: 2px;
 }
 
@@ -1114,6 +1119,11 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .toolbar-draw svg {
   margin-right: 6px;
   vertical-align: -2px;
+}
+
+/* Signing in is only its mark: none of the room Draw keeps for a word. */
+.toolbar-end .toolbar-sign-in svg {
+  vertical-align: baseline;
 }
 
 /* Only the form's own vertical margins: its left one is the gap to the
@@ -1424,20 +1434,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .nav-bar.is-compact .toolbar-draw {
   padding-right: 8px;
   padding-left: 8px;
-}
-
-/* The signed-out "what is this?" at its shortest, a step before the name
-   would have to go (fitToolbar, toolbar.jinja). */
-.toolbar-about-mark {
-  display: none;
-}
-
-.nav-bar.is-brief .toolbar-about-words {
-  display: none;
-}
-
-.nav-bar.is-brief .toolbar-about-mark {
-  display: inline;
 }
 
 .nav-bar.is-bare .toolbar-name-text {
