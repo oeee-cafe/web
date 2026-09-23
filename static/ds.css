@@ -1680,7 +1680,6 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 
 .ds-button-primary,
 .ds-button-primary:visited {
-  border-color: var(--ds-accent-line);
   background-color: var(--ds-accent);
   color: var(--ds-accent-ink);
   font-weight: 600;
@@ -2226,7 +2225,6 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page form input[type="submit"]:not([class]),
 .ds-page form button[type="submit"]:not([class]),
 .ds-page form button:not([type]):not([class]) {
-  border-color: var(--ds-accent-line);
   background-color: var(--ds-accent);
   color: var(--ds-accent-ink);
   font-weight: 600;

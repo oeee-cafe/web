@@ -1362,7 +1362,6 @@ nav a:visited,
 }
 
 .reaction-button.reacted {
-  border-color: var(--ds-accent-line);
   background-color: var(--ds-accent);
   color: var(--ds-accent-ink);
   font-weight: 600;
