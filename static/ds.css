@@ -546,6 +546,66 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   to { opacity: 0.55; }
 }
 
+/* The loading bar (loading_bar.jinja): in the apps, a line along the
+   header's bottom edge while the next page is on its way. It creeps most of
+   the way across and slows as it goes, never arriving by itself; the page
+   arriving runs it to the end and lets it fade. It shows only after a
+   moment, so a page fetched ahead, which arrives at once, never flashes it.
+   Fixed, with `top` set by the script, because it lives on <html>, out of
+   reach of a swap of the body. */
+.ds-loading-bar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 51;
+  height: 3px;
+  background-color: var(--ds-accent);
+  box-shadow: 0 1px 0 var(--ds-accent-line);
+  opacity: 0;
+  pointer-events: none;
+  -webkit-transform: scaleX(0);
+  transform: scaleX(0);
+  -webkit-transform-origin: 0 0;
+  transform-origin: 0 0;
+}
+
+.ds-loading-bar.is-loading {
+  opacity: 1;
+  -webkit-transform: scaleX(0.9);
+  transform: scaleX(0.9);
+  -webkit-transition: opacity 0.15s 0.1s, -webkit-transform 12s cubic-bezier(0.1, 0.6, 0.15, 1) 0.1s;
+  transition: opacity 0.15s 0.1s, transform 12s cubic-bezier(0.1, 0.6, 0.15, 1) 0.1s;
+}
+
+.ds-loading-bar.is-done {
+  opacity: 0;
+  -webkit-transform: scaleX(1);
+  transform: scaleX(1);
+  -webkit-transition: opacity 0.3s 0.2s, -webkit-transform 0.2s ease-out;
+  transition: opacity 0.3s 0.2s, transform 0.2s ease-out;
+}
+
+/* Held still: the bar is simply there, across, while the page is coming. */
+@media (prefers-reduced-motion: reduce) {
+  .ds-loading-bar,
+  .ds-loading-bar.is-loading,
+  .ds-loading-bar.is-done {
+    -webkit-transform: none;
+    transform: none;
+  }
+
+  .ds-loading-bar.is-loading {
+    -webkit-transition: opacity 0.15s 0.1s;
+    transition: opacity 0.15s 0.1s;
+  }
+
+  .ds-loading-bar.is-done {
+    -webkit-transition: opacity 0.3s;
+    transition: opacity 0.3s;
+  }
+}
+
 /* The macOS app: the toolbar is a window's toolbar there, and like Finder's
    or Safari's it is frosted glass the content scrolls under, rather than a
    strip the content stops at. So the header floats over the content area,

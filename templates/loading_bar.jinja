@@ -1,0 +1,121 @@
+{# The loading bar: a thin line under the header while the next page is on
+   its way, so a tap is seen to have been taken.
+
+   Only in the apps (data-app, theme_head.jinja). A browser shows a page
+   load in its own chrome, and the trips it cannot see -- htmx's -- already
+   answer at the press: the toolbar's links with a skeleton, a page's pills
+   by dimming the content. In an app there is no chrome, and a link inside a
+   page keeps that page up, unchanged, until the next has come.
+
+   The bar is added to <html> rather than to the header, because a boosted
+   swap replaces everything in <body> and would take a bar that is still
+   going with it. It is fixed, laid at the header's bottom edge when it
+   starts, since the header's height is whatever the toolbar and its notices
+   make it. It creeps towards the end and never reaches it on its own
+   (ds.css, "The loading bar"); what finishes it is the page arriving --
+   htmx's swap, or for a page load, the new document -- or, for a trip that
+   never lands (a download, a cancelled load), a timeout.
+
+   Included by toolbar.jinja, so the painter pages have it as well. A
+   boosted swap runs this again; the document listeners are added once. #}
+<script>
+  (function () {
+    if (!document.documentElement.getAttribute("data-app")) return;
+    if (window.oeeeLoadingBar) return;
+
+    var bar = null;
+    var source = null;
+    var request = null;
+    var sent = null;
+    var timeout = null;
+    var clearing = null;
+
+    function reset() {
+      clearTimeout(timeout);
+      clearTimeout(clearing);
+      source = null;
+      request = null;
+      if (bar) bar.className = "ds-loading-bar";
+    }
+    function start(from) {
+      if (navigator.onLine === false) return;
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.setAttribute("aria-hidden", "true");
+        document.documentElement.appendChild(bar);
+      }
+      reset();
+      var header = document.querySelector(".ds-page > header") || document.querySelector(".nav-bar");
+      bar.style.top = (header ? Math.max(0, header.getBoundingClientRect().bottom) : 0) + "px";
+      // Read back once, so the step to .is-loading is a transition from
+      // nothing rather than from wherever the last trip left it.
+      void bar.offsetWidth;
+      bar.className = "ds-loading-bar is-loading";
+      source = from || null;
+      if (source && sent && sent.sourceElement === source && sent.status === "issuing") request = sent;
+      timeout = setTimeout(done, 20000);
+    }
+    function done() {
+      if (!bar || bar.className.indexOf("is-loading") < 0) return;
+      clearTimeout(timeout);
+      source = null;
+      request = null;
+      bar.className = "ds-loading-bar is-done";
+      clearing = setTimeout(reset, 600);
+    }
+    window.oeeeLoadingBar = { start: start, done: done };
+
+    document.addEventListener("click", function (event) {
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+      if (!link || link.target || link.hasAttribute("download")) return;
+      // htmx cancels the click on a boosted link and fetches the page
+      // itself; any other cancelled click is a script keeping the page.
+      var boosted = link.closest('[hx-boost\\:inherited="true"]') && !link.closest('[hx-boost="false"]');
+      if (event.defaultPrevented && !boosted) return;
+      if (link.origin !== location.origin) return;
+      if (link.pathname === location.pathname && link.search === location.search) return;
+      start(boosted ? link : null);
+    });
+    // A form that is sent as a page load, and a boosted one (the toolbar's)
+    // that htmx sends. Forms of htmx's own -- a follow, a comment -- change
+    // the page they are on and answer for themselves.
+    document.addEventListener("submit", function (event) {
+      var form = event.target;
+      if (!form || !form.getAttribute || form.target) return;
+      if ((form.getAttribute("method") || "").toLowerCase() === "dialog") return;
+      if (form.hasAttribute("hx-post") || form.hasAttribute("hx-get") ||
+          form.hasAttribute("hx-put") || form.hasAttribute("hx-delete")) return;
+      var boosted = form.closest('[hx-boost\\:inherited="true"]') && !form.closest('[hx-boost="false"]');
+      if (event.defaultPrevented && !boosted) return;
+      start(boosted ? form : null);
+    });
+    // Back to a page htmx has not kept: it is fetched again.
+    document.addEventListener("htmx:before:history:restore", function () {
+      start(document.body);
+    });
+
+    // htmx's request for the trip that started the bar is the one that ends
+    // it, however it ends. The source element can be swapped away before
+    // the end, so the request is remembered by its context once it is sent.
+    // htmx's own click handler is on the link, so it usually sends the
+    // request before the click reaches the document and starts the bar:
+    // the last request sent is kept for start() to claim.
+    document.addEventListener("htmx:before:request", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      if (!ctx) return;
+      sent = ctx;
+      if (source && ctx.sourceElement === source) request = ctx;
+    });
+    document.addEventListener("htmx:finally:request", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      if (!ctx || !(source || request)) return;
+      if (ctx === request || ctx.sourceElement === source) done();
+    });
+    // Back to a page kept in memory, left with the bar still going.
+    window.addEventListener("pageshow", function (event) {
+      if (event.persisted) reset();
+    });
+  })();
+</script>
