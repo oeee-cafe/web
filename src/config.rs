@@ -81,11 +81,12 @@ pub struct AppConfig {
     #[serde(default)]
     pub apple: Option<AppleConfig>,
 
-    /// The App Store's side of the iOS app, as an `[app_store]` table: what
-    /// the Supporter Pack is sold as, and the key that asks Apple about a
-    /// purchase. Separate from `[apple]`, which signs people in with
-    /// different credentials entirely. Unset means the app sells nothing and
-    /// `/auth/apple/purchase` answers every transaction with a 404.
+    /// The App Store's side of the iOS and macOS apps, as an `[app_store]`
+    /// table: what the Supporter Pack is sold as, and the key that asks
+    /// Apple about a purchase. Separate from `[apple]`, which signs people in
+    /// with different credentials entirely. Unset means the apps sell
+    /// nothing and `/store/apple/purchases` answers every transaction with a
+    /// 404.
     #[serde(default)]
     pub app_store: Option<AppStoreConfig>,
 

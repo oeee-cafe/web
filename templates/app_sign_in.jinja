@@ -35,6 +35,12 @@
         app calls window.oeeeApp.signIn.resume() when it is brought back to
         the front, so the page asks at once.
 
+   Steam, in the build that sells through Steam (data-store="steam"): the
+   page sends  signIn {provider: "steam"}, with no nonce, and the app answers
+   with window.oeeeApp.signIn.answer({ticket}) -- a Web API ticket, which the
+   page posts to /auth/steam -- or {} when Steam would not give one, which
+   the page says so about itself.
+
    Every request is made from here, in the page, so each carries the page's
    cookie and origin. The app never holds the session, sees the handoff's
    secret, or decides where the page goes after. #}
@@ -93,11 +99,57 @@
         });
     }
 
+    // -- Steam --------------------------------------------------------------
+
+    // Only the build that sells through Steam can ask Steam for a ticket
+    // (data-store="steam"), and its button is a link to /auth/steam/app,
+    // which a browser follows to be told so. No nonce: the ticket names the
+    // site's own identity ("oeee-cafe", steam/client.rs in oeee-cafe-desktop)
+    // and the site asks Steam about it (src/steam.rs).
+    var steamNext;
+    var askedSteam = false;
+    var STEAM_FAILED = {{ ftl_get_message("app-steam-sign-in-failed")|tojson }};
+
+    function steam(provider, next) {
+      if (askedSteam) return;
+      askedSteam = window.oeeeApp.post("signIn", { provider: "steam" }, true);
+      steamNext = next;
+    }
+
+    // The ticket is posted as a form, so the site's answer is a page and its
+    // notices come with it, as they would from any sign-in.
+    function steamAnswered(told) {
+      askedSteam = false;
+      if (told.cancelled) return;
+      if (!told.ticket) {
+        window.alert(STEAM_FAILED);
+        return;
+      }
+      var post = document.createElement("form");
+      post.method = "post";
+      post.action = "/auth/steam";
+      var fields = { ticket: told.ticket, next: steamNext };
+      for (var name in fields) {
+        if (!fields[name]) continue;
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = fields[name];
+        post.appendChild(input);
+      }
+      document.body.appendChild(post);
+      post.submit();
+    }
+
     function answer(told) {
+      told = told || {};
+      if (askedSteam) {
+        steamAnswered(told);
+        return;
+      }
       var request = asked;
       asked = null;
       if (!request || !request.state) return;
-      told = told || {};
       // Put away without signing in: nothing went wrong, so nothing is said.
       if (told.cancelled) return;
       // Without a token the site is still asked, with an error, so that it
@@ -208,6 +260,10 @@
     };
     var root = document.documentElement;
     var ways = WAYS[root.getAttribute("data-app") || root.getAttribute("data-desktop")];
+    if (root.getAttribute("data-store") === "steam") {
+      ways = ways || {};
+      ways.steam = steam;
+    }
 
     // The sign-in buttons (login.jinja, account.jinja) are links to the
     // provider's page, which is where a browser goes. In an app the page
@@ -218,7 +274,7 @@
         if (event.defaultPrevented || event.button !== 0) return;
         var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
         if (!link || link.origin !== new URL(document.baseURI).origin) return;
-        var provider = (/^\/auth\/(apple|google)$/.exec(link.pathname) || [])[1];
+        var provider = (/^\/auth\/(apple|google)$|^\/auth\/(steam)\/app$/.exec(link.pathname) || []).filter(Boolean)[1];
         if (!provider || !ways[provider]) return;
         event.preventDefault();
         var next = new URL(link.href).searchParams.get("next");

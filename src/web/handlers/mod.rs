@@ -50,6 +50,7 @@ pub mod privacy;
 pub mod profile;
 pub mod report;
 pub mod search;
+pub mod store;
 pub mod supporter;
 pub mod well_known;
 
@@ -1163,8 +1164,8 @@ mod template_tests {
     #[test]
     fn the_apps_are_given_their_words_in_every_language() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        // app_store.jinja says the one thing the page says for the Steam app.
-        let bridge = ["app_bridge.jinja", "app_store.jinja"]
+        // app_sign_in.jinja says the one thing the page says for the Steam app.
+        let bridge = ["app_bridge.jinja", "app_sign_in.jinja"]
             .map(|name| std::fs::read_to_string(root.join("templates").join(name)).unwrap())
             .join("\n");
         let ids: Vec<&str> = bridge

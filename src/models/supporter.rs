@@ -17,8 +17,8 @@
 //! link anything for the mark to appear.
 //!
 //! **A purchase is one row, whoever holds it.** `supporter_purchases` is
-//! keyed by the purchase as the platform knows it -- the provider, the
-//! account or transaction that owns it, and the product -- so restoring it
+//! keyed by the purchase as the store knows it -- the store, the account or
+//! transaction that owns it, and the product -- so restoring it
 //! in the iOS app, or signing into a different Oeee Cafe account inside the
 //! Steam app, moves that row rather than making another. Restoring can give
 //! a pack back; it cannot make two.
@@ -30,6 +30,13 @@
 //! once a day for every purchase it has told us about
 //! (`app_store::recheck_supporters`). Either way a purchase or a refund
 //! shows within a day whether or not anyone signs in.
+//!
+//! **A store is not a sign-in.** Where a pack was bought is a [`Store`],
+//! never an identity [`Provider`]: Google signs people in and sells nothing,
+//! the Microsoft Store will sell and signs nobody in, and the App Store's
+//! name for a purchase is a transaction rather than an Apple ID. The one
+//! place the two meet is Steam, whose purchases are keyed by the same Steam
+//! account a Steam sign-in names ([`Store::identity`]).
 
 use std::collections::HashMap;
 
@@ -40,6 +47,60 @@ use sqlx::types::Uuid;
 use sqlx::{query, query_scalar, Postgres, Transaction};
 
 use super::identity::Provider;
+
+/// Where a Supporter Pack was bought: the name stored in
+/// `supporter_purchases.store` and `users.supporter_mark`, and the one in
+/// `/store/:store/purchases`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Store {
+    /// The App Store, which the iOS and macOS apps sell through.
+    Apple,
+    /// The Microsoft Store, which the Windows app will sell through. Named
+    /// so the database and the page can say it; nothing records a purchase
+    /// from it yet.
+    Microsoft,
+    /// Steam, which the Steam build of the desktop app sells through.
+    Steam,
+}
+
+impl Store {
+    pub const ALL: [Store; 3] = [Store::Apple, Store::Microsoft, Store::Steam];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Store::Apple => "apple",
+            Store::Microsoft => "microsoft",
+            Store::Steam => "steam",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        Store::ALL.into_iter().find(|store| store.as_str() == value)
+    }
+
+    /// The sign-in provider whose identities are the same accounts this
+    /// store keys its purchases by, where there is one. Only Steam's are: a
+    /// Steam purchase's owner is a SteamID64, which is also a Steam
+    /// identity's subject, so linking Steam is enough for the site to ask
+    /// about that account's packs. An App Store purchase's owner is a
+    /// transaction id, which no Apple ID names, and the Microsoft Store
+    /// signs nobody in here.
+    pub fn identity(self) -> Option<Provider> {
+        match self {
+            Store::Steam => Some(Provider::Steam),
+            Store::Apple | Store::Microsoft => None,
+        }
+    }
+
+    /// The other way about: the store whose purchases a provider's identity
+    /// owns, which is only ever Steam's (see [`Store::identity`]).
+    pub fn owned_by_identity(provider: Provider) -> Option<Self> {
+        Store::ALL
+            .into_iter()
+            .find(|store| store.identity() == Some(provider))
+    }
+}
 
 /// One Supporter Pack, as the platform names it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,7 +119,7 @@ pub fn current_year() -> i32 {
     Utc::now().with_timezone(&chrono_tz::Asia::Seoul).year()
 }
 
-/// Records everything `owner` owns on `provider` now, and nothing else, for
+/// Records everything `owner` owns in `store` now, and nothing else, for
 /// `user_id`: a pack that was owned and is not in `owned` has been refunded,
 /// and is revoked.
 ///
@@ -68,27 +129,30 @@ pub fn current_year() -> i32 {
 pub async fn record_owned_products(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
-    provider: Provider,
+    store: Store,
     owner: &str,
     owned: &[OwnedProduct],
 ) -> Result<()> {
     for pack in owned {
-        record_purchase(tx, user_id, provider, owner, pack, true).await?;
+        record_purchase(tx, user_id, store, owner, pack, true).await?;
     }
     let kept: Vec<String> = owned.iter().map(|pack| pack.product.clone()).collect();
     query!(
         r#"
         UPDATE supporter_purchases
         SET revoked_at = COALESCE(revoked_at, now()), checked_at = now()
-        WHERE provider = $1 AND owner = $2 AND product <> ALL($3)
+        WHERE store = $1 AND owner = $2 AND product <> ALL($3)
         "#,
-        provider.as_str(),
+        store.as_str(),
         owner,
         &kept,
     )
     .execute(&mut **tx)
     .await?;
-    touch_identity_check(tx, provider, owner).await
+    match store.identity() {
+        Some(provider) => touch_identity_check(tx, provider, owner).await,
+        None => Ok(()),
+    }
 }
 
 /// One pack, owned or not, held by `user_id`.
@@ -100,16 +164,16 @@ pub async fn record_owned_products(
 pub async fn record_purchase(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
-    provider: Provider,
+    store: Store,
     owner: &str,
     pack: &OwnedProduct,
     owned: bool,
 ) -> Result<()> {
     query!(
         r#"
-        INSERT INTO supporter_purchases (user_id, provider, owner, product, year, revoked_at)
+        INSERT INTO supporter_purchases (user_id, store, owner, product, year, revoked_at)
         VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN NULL ELSE now() END)
-        ON CONFLICT (provider, owner, product) DO UPDATE
+        ON CONFLICT (store, owner, product) DO UPDATE
         SET user_id = EXCLUDED.user_id,
             year = EXCLUDED.year,
             revoked_at = CASE
@@ -125,7 +189,7 @@ pub async fn record_purchase(
             checked_at = now()
         "#,
         user_id,
-        provider.as_str(),
+        store.as_str(),
         owner,
         pack.product,
         pack.year,
@@ -140,7 +204,7 @@ pub async fn record_purchase(
 /// about who holds it. Asking Apple again is not a claim on anyone's behalf.
 pub async fn record_recheck(
     tx: &mut Transaction<'_, Postgres>,
-    provider: Provider,
+    store: Store,
     owner: &str,
     product: &str,
     owned: bool,
@@ -157,9 +221,9 @@ pub async fn record_recheck(
                 ELSE purchased_at
             END,
             checked_at = now()
-        WHERE provider = $1 AND owner = $2 AND product = $3
+        WHERE store = $1 AND owner = $2 AND product = $3
         "#,
-        provider.as_str(),
+        store.as_str(),
         owner,
         product,
         owned,
@@ -170,7 +234,8 @@ pub async fn record_recheck(
 }
 
 /// The clock the Steam recheck works through, kept on the identity where
-/// there is one so a linked account that owns nothing is not asked about
+/// there is one -- a Steam purchase's owner is a Steam identity's subject
+/// ([`Store::identity`]) -- so a linked account that owns nothing is not asked about
 /// every ten minutes for ever.
 async fn touch_identity_check(
     tx: &mut Transaction<'_, Postgres>,
@@ -213,7 +278,7 @@ pub async fn steam_accounts_due_for_check(
             UNION ALL
             SELECT owner, user_id, checked_at
             FROM supporter_purchases
-            WHERE provider = 'steam'
+            WHERE store = 'steam'
         ) due
         GROUP BY steam_id, user_id
         HAVING min(checked_at) IS NULL OR min(checked_at) < now() - interval '1 day'
@@ -250,7 +315,7 @@ pub async fn apple_purchases_due_for_check(
         r#"
         SELECT owner, product
         FROM supporter_purchases
-        WHERE provider = 'apple' AND checked_at < now() - interval '1 day'
+        WHERE store = 'apple' AND checked_at < now() - interval '1 day'
         ORDER BY checked_at
         LIMIT $1
         "#,
@@ -271,7 +336,10 @@ pub async fn apple_purchases_due_for_check(
 /// profile lists every one of them, whichever mark they wear now.
 #[derive(Clone, Debug, Serialize)]
 pub struct Standing {
-    pub provider: String,
+    /// The store's name. Serialized as `provider`, which is what
+    /// supporter.jinja and profile.jinja read it as.
+    #[serde(rename = "provider")]
+    pub store: String,
     pub year: i32,
     pub since: DateTime<Utc>,
 }
@@ -282,10 +350,10 @@ pub struct Standing {
 pub async fn standings(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) -> Result<Vec<Standing>> {
     let rows = query!(
         r#"
-        SELECT provider, year, purchased_at
+        SELECT store, year, purchased_at
         FROM supporter_purchases
         WHERE user_id = $1 AND revoked_at IS NULL
-        ORDER BY year, provider
+        ORDER BY year, store
         "#,
         user_id,
     )
@@ -294,32 +362,33 @@ pub async fn standings(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) -> Res
     Ok(rows
         .into_iter()
         .map(|row| Standing {
-            provider: row.provider,
+            store: row.store,
             year: row.year,
             since: row.purchased_at,
         })
         .collect())
 }
 
-/// The mark `user_id` wears now: the platform they bought this year's pack
-/// on, or `None` for anyone who has not bought it.
+/// The mark `user_id` wears now: the store they bought this year's pack in,
+/// or `None` for anyone who has not bought it.
 ///
 /// The choice they made on their account page is honoured only while that
-/// platform is one they bought this year's pack on: the ordering below
-/// prefers the platform they named and falls back to whichever they bought
+/// store is one they bought this year's pack in: `users.supporter_mark`
+/// names a store, and the ordering below prefers the purchase whose store it
+/// names and falls back to whichever they bought
 /// first, so a refund moves the mark rather than leaving them wearing a
 /// store they no longer own.
 pub async fn mark_for(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) -> Result<Option<String>> {
     let mark = query_scalar!(
         r#"
-        SELECT purchases.provider
+        SELECT purchases.store
         FROM users
         JOIN supporter_purchases purchases ON purchases.user_id = users.id
         WHERE users.id = $1
           AND users.deleted_at IS NULL
           AND purchases.revoked_at IS NULL
           AND purchases.year = $2
-        ORDER BY COALESCE(purchases.provider = users.supporter_mark, false) DESC,
+        ORDER BY COALESCE(purchases.store = users.supporter_mark, false) DESC,
                  purchases.purchased_at
         LIMIT 1
         "#,
@@ -331,19 +400,19 @@ pub async fn mark_for(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) -> Resu
     Ok(mark)
 }
 
-/// Which platform's mark to wear. `None` goes back to the default: the
-/// platform they bought this year's pack on first. Taking a [`Provider`]
-/// rather than a name is what keeps an unknown one from reaching
+/// Which store's mark to wear. `None` goes back to the default: the store
+/// they bought this year's pack in first. Taking a [`Store`] rather than a
+/// name is what keeps an unknown one from reaching
 /// `users_supporter_mark_check`.
 pub async fn set_mark(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
-    mark: Option<Provider>,
+    mark: Option<Store>,
 ) -> Result<()> {
     query!(
         "UPDATE users SET supporter_mark = $2 WHERE id = $1",
         user_id,
-        mark.map(|provider| provider.as_str()),
+        mark.map(|store| store.as_str()),
     )
     .execute(&mut **tx)
     .await?;
@@ -360,7 +429,7 @@ pub async fn supporter_marks_on_post(
 ) -> Result<HashMap<String, String>> {
     let rows = query!(
         r#"
-        SELECT DISTINCT ON (users.id) users.login_name, purchases.provider
+        SELECT DISTINCT ON (users.id) users.login_name, purchases.store
         FROM users
         JOIN supporter_purchases purchases ON purchases.user_id = users.id
         WHERE purchases.revoked_at IS NULL
@@ -383,7 +452,7 @@ pub async fn supporter_marks_on_post(
             )
           )
         ORDER BY users.id,
-                 COALESCE(purchases.provider = users.supporter_mark, false) DESC,
+                 COALESCE(purchases.store = users.supporter_mark, false) DESC,
                  purchases.purchased_at
         "#,
         post_id,
@@ -393,7 +462,7 @@ pub async fn supporter_marks_on_post(
     .await?;
     Ok(rows
         .into_iter()
-        .map(|row| (row.login_name, row.provider))
+        .map(|row| (row.login_name, row.store))
         .collect())
 }
 
@@ -426,7 +495,7 @@ pub async fn list_credits(tx: &mut Transaction<'_, Postgres>) -> Result<Vec<Cred
             SELECT DISTINCT ON (users.id)
                 users.login_name,
                 users.display_name,
-                purchases.provider AS mark,
+                purchases.store AS mark,
                 (
                     SELECT min(first.purchased_at)
                     FROM supporter_purchases first
@@ -439,7 +508,7 @@ pub async fn list_credits(tx: &mut Transaction<'_, Postgres>) -> Result<Vec<Cred
               AND users.deleted_at IS NULL
               AND users.show_in_credits
             ORDER BY users.id,
-                     COALESCE(purchases.provider = users.supporter_mark, false) DESC,
+                     COALESCE(purchases.store = users.supporter_mark, false) DESC,
                      purchases.purchased_at
         ) resolved
         ORDER BY since, login_name
@@ -541,7 +610,7 @@ mod tests {
         let steam_id = "76561190000000101";
         assert_eq!(marks(&mut tx, id).await, None);
 
-        record_owned_products(&mut tx, id, Provider::Steam, steam_id, &[pack(this_year())])
+        record_owned_products(&mut tx, id, Store::Steam, steam_id, &[pack(this_year())])
             .await
             .unwrap();
         assert_eq!(marks(&mut tx, id).await.as_deref(), Some("steam"));
@@ -555,7 +624,7 @@ mod tests {
         );
 
         // Refunded: Steam says it owns nothing now.
-        record_owned_products(&mut tx, id, Provider::Steam, steam_id, &[])
+        record_owned_products(&mut tx, id, Store::Steam, steam_id, &[])
             .await
             .unwrap();
         assert_eq!(marks(&mut tx, id).await, None);
@@ -575,7 +644,7 @@ mod tests {
         record_owned_products(
             &mut tx,
             id,
-            Provider::Steam,
+            Store::Steam,
             "76561190000000102",
             &[pack(this_year() - 1)],
         )
@@ -601,7 +670,7 @@ mod tests {
         record_owned_products(
             &mut tx,
             id,
-            Provider::Steam,
+            Store::Steam,
             "76561190000000102",
             &[pack(this_year() - 1), pack(this_year())],
         )
@@ -631,14 +700,14 @@ mod tests {
         let transaction = "2000000000000001";
         let bought = pack(this_year());
 
-        record_purchase(&mut tx, first, Provider::Apple, transaction, &bought, true)
+        record_purchase(&mut tx, first, Store::Apple, transaction, &bought, true)
             .await
             .unwrap();
         assert_eq!(marks(&mut tx, first).await.as_deref(), Some("apple"));
 
         // Restored on the same account: nothing changes, and nothing is
         // added.
-        record_purchase(&mut tx, first, Provider::Apple, transaction, &bought, true)
+        record_purchase(&mut tx, first, Store::Apple, transaction, &bought, true)
             .await
             .unwrap();
         assert_eq!(standings(&mut tx, first).await.unwrap().len(), 1);
@@ -646,7 +715,7 @@ mod tests {
         // Restored on another account: the pack moves, and the first
         // account is left with none. Two supporters out of one purchase is
         // what the key on the table exists to prevent.
-        record_purchase(&mut tx, second, Provider::Apple, transaction, &bought, true)
+        record_purchase(&mut tx, second, Store::Apple, transaction, &bought, true)
             .await
             .unwrap();
         assert_eq!(marks(&mut tx, second).await.as_deref(), Some("apple"));
@@ -663,7 +732,7 @@ mod tests {
         let id = user(&mut tx, "supporter_test_e").await;
         let transaction = "2000000000000002";
         let bought = pack(this_year());
-        record_purchase(&mut tx, id, Provider::Apple, transaction, &bought, true)
+        record_purchase(&mut tx, id, Store::Apple, transaction, &bought, true)
             .await
             .unwrap();
 
@@ -674,7 +743,7 @@ mod tests {
         );
         query!(
             "UPDATE supporter_purchases SET checked_at = now() - interval '2 days'
-             WHERE provider = 'apple' AND owner = $1",
+             WHERE store = 'apple' AND owner = $1",
             transaction,
         )
         .execute(&mut *tx)
@@ -688,19 +757,13 @@ mod tests {
         assert_eq!(mine.product, bought.product);
 
         // Refunded.
-        record_recheck(
-            &mut tx,
-            Provider::Apple,
-            transaction,
-            &bought.product,
-            false,
-        )
-        .await
-        .unwrap();
+        record_recheck(&mut tx, Store::Apple, transaction, &bought.product, false)
+            .await
+            .unwrap();
         assert_eq!(marks(&mut tx, id).await, None);
 
         // And bought again.
-        record_recheck(&mut tx, Provider::Apple, transaction, &bought.product, true)
+        record_recheck(&mut tx, Store::Apple, transaction, &bought.product, true)
             .await
             .unwrap();
         assert_eq!(marks(&mut tx, id).await.as_deref(), Some("apple"));
@@ -714,7 +777,7 @@ mod tests {
         let Some(mut tx) = tx().await else { return };
         let id = user(&mut tx, "supporter_test_f").await;
         let steam_id = "76561190000000103";
-        record_owned_products(&mut tx, id, Provider::Steam, steam_id, &[pack(this_year())])
+        record_owned_products(&mut tx, id, Store::Steam, steam_id, &[pack(this_year())])
             .await
             .unwrap();
         assert_eq!(marks(&mut tx, id).await.as_deref(), Some("steam"));
@@ -732,7 +795,7 @@ mod tests {
         record_purchase(
             &mut tx,
             id,
-            Provider::Apple,
+            Store::Apple,
             "2000000000000003",
             &pack(this_year()),
             true,
@@ -741,14 +804,14 @@ mod tests {
         .unwrap();
         assert_eq!(marks(&mut tx, id).await.as_deref(), Some("steam"));
 
-        set_mark(&mut tx, id, Some(Provider::Apple)).await.unwrap();
+        set_mark(&mut tx, id, Some(Store::Apple)).await.unwrap();
         assert_eq!(marks(&mut tx, id).await.as_deref(), Some("apple"));
 
         // Refunded on the platform they chose: the mark moves rather than
         // leaving them wearing a store they no longer own.
         record_recheck(
             &mut tx,
-            Provider::Apple,
+            Store::Apple,
             "2000000000000003",
             &pack(this_year()).product,
             false,
@@ -809,7 +872,7 @@ mod tests {
         record_owned_products(
             &mut tx,
             id,
-            Provider::Steam,
+            Store::Steam,
             "76561190000000105",
             &[pack(this_year())],
         )
@@ -843,14 +906,14 @@ mod tests {
             (author, "76561190000000106"),
             (bystander, "76561190000000107"),
         ] {
-            record_owned_products(&mut tx, id, Provider::Steam, steam_id, &[pack(this_year())])
+            record_owned_products(&mut tx, id, Store::Steam, steam_id, &[pack(this_year())])
                 .await
                 .unwrap();
         }
         record_purchase(
             &mut tx,
             commenter,
-            Provider::Apple,
+            Store::Apple,
             "2000000000000004",
             &pack(this_year()),
             true,
@@ -936,7 +999,7 @@ mod tests {
         record_owned_products(
             &mut tx,
             unlinked,
-            Provider::Steam,
+            Store::Steam,
             "76561190000000109",
             &[pack(this_year())],
         )
@@ -973,11 +1036,11 @@ mod tests {
         tx.rollback().await.unwrap();
     }
 
-    /// The marks someone may choose between and the providers a purchase may
-    /// come from are the same list: the platforms that sell a pack. Each has
-    /// to be a provider an identity can come from as well, though that list
-    /// is longer -- Google signs people in and sells nothing, which is why
-    /// this names the sellers rather than every [`Provider`].
+    /// The marks someone may choose between and the stores a purchase may
+    /// come from are the same list, and it is [`Store::ALL`]. A store is not
+    /// a sign-in, so nothing here asks that list to match the providers an
+    /// identity can come from: Google signs people in and sells nothing, and
+    /// the Microsoft Store sells and signs nobody in.
     #[tokio::test]
     async fn the_marks_are_what_the_database_allows() {
         let Some(mut tx) = tx().await else { return };
@@ -1003,31 +1066,41 @@ mod tests {
         let marks = named(&mut tx, "users_supporter_mark_check").await;
         assert_eq!(
             marks,
-            named(&mut tx, "supporter_purchases_provider_check").await
+            named(&mut tx, "supporter_purchases_store_check").await
         );
 
-        let mut sells = [Provider::Steam, Provider::Apple]
-            .map(|provider| provider.as_str().to_string())
-            .to_vec();
-        sells.sort();
+        let mut stores = Store::ALL.map(|store| store.as_str().to_string()).to_vec();
+        stores.sort();
         assert_eq!(
-            marks, sells,
-            "a seller the code knows and the database does not, or the other way about"
+            marks, stores,
+            "a store the code knows and the database does not, or the other way about"
         );
-        assert!(
-            !marks.contains(&Provider::Google.as_str().to_string()),
-            "Google sells no pack yet; giving it one is a migration, not a mark"
-        );
-
-        let signs_in = named(&mut tx, "user_identities_provider_check").await;
-        for mark in &marks {
-            assert!(
-                signs_in.contains(mark),
-                "{mark} sells packs and cannot sign anyone in"
-            );
+        for store in Store::ALL {
+            assert_eq!(Store::parse(store.as_str()), Some(store));
         }
+        assert_eq!(Store::parse("google"), None);
         tx.rollback().await.unwrap();
     }
+
+    /// Only Steam's purchases are owned by an account a sign-in names, and
+    /// the link runs both ways.
+    #[test]
+    fn only_a_steam_identity_owns_a_stores_purchases() {
+        assert_eq!(Store::Steam.identity(), Some(Provider::Steam));
+        assert_eq!(Store::Apple.identity(), None);
+        assert_eq!(Store::Microsoft.identity(), None);
+        assert_eq!(
+            Store::owned_by_identity(Provider::Steam),
+            Some(Store::Steam)
+        );
+        assert_eq!(Store::owned_by_identity(Provider::Apple), None);
+        assert_eq!(Store::owned_by_identity(Provider::Google), None);
+    }
+
+    /// The stores that sell a pack now, each of which needs its mark worded
+    /// and drawn. The Microsoft Store joins them when it sells: until then
+    /// nothing records a purchase from it, so no one can wear its mark.
+    const SELLING: [Store; 2] = [Store::Steam, Store::Apple];
 
     #[test]
     fn every_platform_mark_is_worded_in_every_locale() {
@@ -1038,8 +1111,8 @@ mod tests {
                 text.lines()
                     .any(|line| line.starts_with(&format!("{id} = ")))
             };
-            for provider in [Provider::Steam, Provider::Apple] {
-                let id = format!("supporter-badge-{}", provider.as_str());
+            for store in SELLING {
+                let id = format!("supporter-badge-{}", store.as_str());
                 assert!(has(&id), "{locale}.ftl has no {id}");
             }
             for id in ["supporter-year", "account-supporter-mark"] {
@@ -1056,13 +1129,13 @@ mod tests {
             "/templates/supporter_badge_macro.jinja"
         ))
         .unwrap();
-        for provider in [Provider::Steam, Provider::Apple] {
-            let branch = format!("mark == \"{}\"", provider.as_str());
+        for store in SELLING {
+            let branch = format!("mark == \"{}\"", store.as_str());
             assert_eq!(
                 macro_file.matches(&branch).count(),
                 2,
                 "{} wants artwork and a name",
-                provider.as_str()
+                store.as_str()
             );
         }
     }

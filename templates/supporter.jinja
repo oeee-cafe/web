@@ -48,7 +48,6 @@
                       class="ds-button ds-button-primary supporter-buy"
                       data-store="apple"
                       data-product="{{ apple_pack }}"
-                      data-year="{{ this_year }}"
                       data-haptic="medium">{{ ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ apple_pack }}"></span></button>
             {% endif %}
             {% if steam_pack and "steam" not in (bought_in or []) %}
@@ -56,7 +55,6 @@
                       class="ds-button ds-button-primary supporter-buy"
                       data-store="steam"
                       data-product="{{ steam_pack }}"
-                      data-year="{{ this_year }}"
                       data-haptic="medium">{{ ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ steam_pack }}"></span></button>
             {% endif %}
             {# Restoring is the App Store's word for it: the same purchase
@@ -126,24 +124,20 @@
         }
       };
 
-      var buttons = document.querySelectorAll(".supporter-buy");
+      // Only the products of the store this build sells through: the app
+      // is that store, so nothing it is asked needs to say which.
+      var store = document.documentElement.getAttribute("data-store");
+      var buttons = store ? document.querySelectorAll('.supporter-buy[data-store="' + store + '"]') : [];
       if (buttons.length) {
-        var wanted = {};
-        for (var i = 0; i < buttons.length; i++) {
-          var store = buttons[i].getAttribute("data-store");
-          (wanted[store] = wanted[store] || []).push(buttons[i].getAttribute("data-product"));
-        }
-        for (var which in wanted) ask("prices", { store: which, products: wanted[which] });
+        var products = [];
+        for (var i = 0; i < buttons.length; i++) products.push(buttons[i].getAttribute("data-product"));
+        ask("prices", { products: products });
       }
 
       document.addEventListener("click", function (event) {
         var buy = event.target.closest && event.target.closest(".supporter-buy");
         if (buy) {
-          ask("purchase", {
-            store: buy.getAttribute("data-store"),
-            product: buy.getAttribute("data-product"),
-            year: Number(buy.getAttribute("data-year"))
-          });
+          ask("purchase", { product: buy.getAttribute("data-product") });
           return;
         }
         var restore = event.target.closest && event.target.closest(".supporter-restore");

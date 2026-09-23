@@ -385,7 +385,7 @@ pub async fn sync_achievements(db: sqlx::PgPool, config: SteamConfig) {
 /// Both colours run this for a moment during a deploy, and asking twice is
 /// harmless.
 pub async fn recheck_supporters(db: sqlx::PgPool, config: SteamConfig) {
-    use crate::models::supporter::{record_owned_products, steam_accounts_due_for_check};
+    use crate::models::supporter::{record_owned_products, steam_accounts_due_for_check, Store};
 
     let mut every = tokio::time::interval(Duration::from_secs(10 * 60));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -416,7 +416,7 @@ pub async fn recheck_supporters(db: sqlx::PgPool, config: SteamConfig) {
                 record_owned_products(
                     &mut tx,
                     account.user_id,
-                    Provider::Steam,
+                    Store::Steam,
                     &account.steam_id,
                     &owned,
                 )

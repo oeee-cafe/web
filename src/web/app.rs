@@ -1,6 +1,7 @@
 use super::state::{AppState, Shutdown};
 use crate::models::user::Backend;
 use crate::web::handlers::about::{about, design};
+use crate::web::handlers::store::do_store_purchase;
 use crate::web::handlers::supporter::supporter_page;
 use crate::web::handlers::account::{
     account, delete_account, delete_account_htmx, edit_account, edit_password, get_account_json,
@@ -23,10 +24,10 @@ use crate::web::handlers::auth::{
     api_login, api_logout, api_me, api_signup, do_login, do_logout, do_signup, login, signup,
 };
 use crate::web::handlers::identity::{
-    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_purchase,
-    do_apple_sign_in, do_google_sign_in, do_identity_welcome, do_steam_refresh, do_steam_sign_in,
-    do_unlink_identity, google_callback, google_sign_in, google_start, handoff_claim,
-    handoff_done, handoff_start, identity_welcome, steam_app_only,
+    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_sign_in,
+    do_google_sign_in, do_identity_welcome, do_steam_sign_in, do_unlink_identity, google_callback,
+    google_sign_in, google_start, handoff_claim, handoff_done, handoff_start, identity_welcome,
+    steam_app_only,
 };
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
@@ -632,6 +633,9 @@ impl App {
             .route("/collaboration/:uuid/meta", get(get_collaboration_meta))
             .route("/about", get(about))
             .route("/supporter", get(supporter_page))
+            // What a store sold, handed over by the page in an app that
+            // sells through it. See handlers/store.rs.
+            .route("/store/:store/purchases", post(do_store_purchase))
             .route("/design", get(design))
             .route("/privacy", get(privacy))
             .route("/policy", get(policy))
@@ -641,12 +645,10 @@ impl App {
             .route("/login", post(do_login))
             .route("/auth/steam/app", get(steam_app_only))
             .route("/auth/steam", post(do_steam_sign_in))
-            .route("/auth/steam/refresh", post(do_steam_refresh))
             .route("/auth/apple", get(apple_sign_in))
             .route("/auth/apple", post(do_apple_sign_in))
             .route("/auth/apple/callback", post(apple_callback))
             .route("/auth/apple/start", post(apple_start))
-            .route("/auth/apple/purchase", post(do_apple_purchase))
             .route("/auth/google", get(google_sign_in))
             .route("/auth/google", post(do_google_sign_in))
             .route("/auth/google/callback", get(google_callback))

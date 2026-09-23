@@ -2845,10 +2845,11 @@ html[data-app="android"][data-push]::view-transition-new(root) {
    somebody reading in a browser is how they find out the pack exists at
    all. What is gated is the paying: only an app can take the money, and
    only for its own store, so a buy button waits until an app that can sell
-   marks the root `data-store` before anything is drawn, as the Steam app
-   marks `data-steam-app` above. A browser gets the page, the years already
-   bought, and the line saying where the pack is sold. */
+   marks the root `data-store` -- "apple", "microsoft" or "steam" -- before
+   anything is drawn. A browser gets the page, the years already bought,
+   and the line saying where the pack is sold. */
 html:not([data-store="apple"]) .supporter-buy[data-store="apple"],
+html:not([data-store="microsoft"]) .supporter-buy[data-store="microsoft"],
 html:not([data-store="steam"]) .supporter-buy[data-store="steam"],
 html:not([data-store="apple"]) .supporter-restore {
   display: none;
@@ -3663,14 +3664,14 @@ a.user-pill:hover {
   font-size: var(--ds-text-m);
 }
 
-/* Signing in with Steam is a link only the Oeee Cafe app on Steam can
-   follow, so it shows only there: the app marks the page's root element
-   before anything is drawn. */
+/* Signing in with Steam takes a ticket only the Oeee Cafe app on Steam can
+   ask Steam for, so it shows only there: the build that sells through
+   Steam marks the page's root element before anything is drawn. */
 .auth-steam {
   display: none;
 }
 
-html[data-steam-app] .auth-steam {
+html[data-store="steam"] .auth-steam {
   display: block;
 }
 
