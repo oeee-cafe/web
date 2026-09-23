@@ -766,7 +766,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  padding: 1px 1px 2px;
+  padding: 3px;
   border: 1px solid var(--ds-line);
   border-radius: 8px;
   background-color: var(--ds-track);
@@ -774,6 +774,14 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 
 .toolbar-sections > * + * {
   margin-left: 2px;
+}
+
+/* Two pixels shorter and a tighter corner than the toolbar's other links,
+   for the 3px of track around them (.ds-segmented). */
+.nav-bar .toolbar-sections a {
+  padding-top: 2px;
+  padding-bottom: 2px;
+  border-radius: var(--ds-radius-s);
 }
 
 .toolbar-links > * + * {
@@ -933,7 +941,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .nav-bar .toolbar-sections a[aria-current="page"],
 .nav-bar .toolbar-sections a[aria-current="page"]:hover {
   background-color: var(--ds-thumb);
-  box-shadow: var(--ds-shadow-raise);
+  box-shadow: none;
   font-weight: 600;
 }
 
@@ -1413,8 +1421,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 }
 
 .toolbar-theme .ds-segmented {
-  display: block;
-  text-align: center;
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-pack: center;
+  justify-content: center;
 }
 
 .toolbar-menu summary svg {
@@ -2693,17 +2703,26 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
    --------------------------------------------------------------------------- */
 
 /* A segmented control: two to five choices of one thing. The chosen one is
-   marked by aria-pressed, aria-current or `.is-selected`. */
-/* The track's edge is a border, not an inset shadow, and the raised choice
-   has no ring: both were drawn inside the 2px between them, and with the
-   choice's drop shadow below them that left half a pixel of track above it
-   and none under it. Now the padding is the gap, a pixel more at the foot
-   for the drop shadow to take, so the track shows the same 1px all round. */
+   marked by aria-pressed, aria-current or `.is-selected`.
+
+   The chosen one sits the same 3px from the track's edge on every side:
+   - The edge is a border, so the padding is the gap. An inset shadow, and a
+     ring round the choice, were both drawn inside it.
+   - The choice is raised by its colour alone. A drop shadow is only ever
+     under a thing, and made the foot read differently from the rest -- a
+     dark line against the border in light, more gap in dark.
+   - The track is a flex box. Inline blocks sat on a line box taller than
+     they were, lower than the padding put them where the page's line
+     height is larger, and a space apart wherever the markup had one.
+   The corners nest: the track's 8px is the choice's 4px plus the 3px and
+   the border. */
 .ds-segmented {
-  display: inline-block;
-  padding: 1px 1px 2px;
+  display: -webkit-inline-box;
+  display: inline-flex;
+  vertical-align: middle;
+  padding: 3px;
   border: 1px solid var(--ds-line);
-  border-radius: 7px;
+  border-radius: 8px;
   background-color: var(--ds-track);
   white-space: nowrap;
 }
@@ -2714,9 +2733,9 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page .ds-segmented > button {
   display: inline-block;
   margin: 0;
-  padding: 3px 12px;
+  padding: 1px 12px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--ds-radius-s);
   background: none;
   color: var(--ds-ink);
   font-family: var(--ds-font);
@@ -2744,7 +2763,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page .ds-segmented > button[aria-pressed="true"],
 .ds-page .ds-segmented > button[aria-pressed="true"]:hover {
   background-color: var(--ds-thumb);
-  box-shadow: var(--ds-shadow-raise);
+  box-shadow: none;
   font-weight: 600;
 }
 
@@ -2772,14 +2791,10 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   height: var(--thumb-h);
   -webkit-transform: translate(var(--thumb-x), var(--thumb-y));
   transform: translate(var(--thumb-x), var(--thumb-y));
-  border-radius: 5px;
+  border-radius: var(--ds-radius-s);
   background-color: var(--ds-thumb);
-  box-shadow: var(--ds-shadow-raise);
+  box-shadow: none;
   pointer-events: none;
-}
-
-.toolbar-sections.has-thumb::before {
-  border-radius: 6px;
 }
 
 .ds-segmented.thumb-moves::before,
