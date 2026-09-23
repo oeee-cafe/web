@@ -1198,7 +1198,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    their height: an inset shadow drew the same line 2px shorter. */
 .toolbar-end .toolbar-draw,
 .toolbar-end a.toolbar-draw:visited {
-  border: 1px solid var(--ds-accent-line);
+  border: 1px solid var(--ds-line-strong);
   background-color: var(--ds-accent);
   color: var(--ds-accent-ink);
   box-shadow: var(--ds-shadow-raise);
