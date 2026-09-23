@@ -1540,8 +1540,8 @@ mod template_tests {
             json!(481),
             json!(["apple"]),
             json!([
-                {"provider": "steam", "year": 2025, "since": "2025-03-02T00:00:00Z"},
-                {"provider": "apple", "year": 2026, "since": "2026-01-08T00:00:00Z"},
+                {"store": "steam", "year": 2025, "since": "2025-03-02T00:00:00Z"},
+                {"store": "apple", "year": 2026, "since": "2026-01-08T00:00:00Z"},
             ]),
         );
         assert!(owned.contains("supporter-pack-have(year=2026)"));
@@ -2168,8 +2168,8 @@ mod template_tests {
                 .expect("profile renders")
         };
         let supporter = render(json!([
-            {"provider": "steam", "year": 2026, "since": "2026-09-22T00:00:00Z"},
-            {"provider": "apple", "year": 2027, "since": "2027-01-04T00:00:00Z"},
+            {"store": "steam", "year": 2026, "since": "2026-09-22T00:00:00Z"},
+            {"store": "apple", "year": 2027, "since": "2027-01-04T00:00:00Z"},
         ]));
         let chip = supporter.find("supporter-chip").expect("a supporter chip");
         assert!(chip < supporter.find("/@oeee/guestbook").unwrap(), "before the guestbook");

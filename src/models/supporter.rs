@@ -336,9 +336,7 @@ pub async fn apple_purchases_due_for_check(
 /// profile lists every one of them, whichever mark they wear now.
 #[derive(Clone, Debug, Serialize)]
 pub struct Standing {
-    /// The store's name. Serialized as `provider`, which is what
-    /// supporter.jinja and profile.jinja read it as.
-    #[serde(rename = "provider")]
+    /// The store that sold it: "apple", "microsoft" or "steam".
     pub store: String,
     pub year: i32,
     pub since: DateTime<Utc>,

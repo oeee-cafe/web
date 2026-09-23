@@ -78,7 +78,7 @@
         <div class="profile-chips">
           {% for standing in supporter_standings %}
             <span class="profile-chip supporter-chip"
-                  title="{{ supporter_mark_name(standing.provider) }}">{{ supporter_mark(standing.provider) }}{{ standing.year }}</span>
+                  title="{{ supporter_mark_name(standing.store) }}">{{ supporter_mark(standing.store) }}{{ standing.year }}</span>
           {% endfor %}
         </div>
         <p class="ds-help">{{ ftl_get_message("supporter-pack-years-help") }}</p>
