@@ -3947,6 +3947,12 @@ html[data-store="steam"] .auth-steam {
   justify-content: space-between;
 }
 
+/* One row per linked account, each with its own button, stacked in one
+   card. */
+.settings-row + .settings-row {
+  margin-top: var(--ds-space-3);
+}
+
 .settings-row-text {
   color: var(--ds-muted);
   font-size: var(--ds-text-m);
