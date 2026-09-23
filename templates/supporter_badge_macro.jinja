@@ -1,6 +1,7 @@
 {# The mark a supporter wears beside their name wherever a page prints it:
    the mark of the platform they bought this year's Supporter Pack on. A
-   gamepad for the Steam DLC, an apple for an App Store purchase (see
+   gamepad for the Steam DLC, an apple for an App Store purchase, the
+   Microsoft Store's own shopping bag for one bought there (see
    models/supporter.rs, which is also where the year comes in -- a pack is a
    year's, and the years someone has bought are on their profile). It leads
    to the thanks on /about.
@@ -22,6 +23,8 @@
     <span class="supporter-mark" aria-hidden="true">🎮</span>
   {%- elif mark == "apple" -%}
     <span class="supporter-mark" aria-hidden="true">🍎</span>
+  {%- elif mark == "microsoft" -%}
+    <span class="supporter-mark" aria-hidden="true">🛍️</span>
   {%- endif -%}
 {%- endmacro %}
 
@@ -31,6 +34,8 @@
     {{ ftl_get_message("supporter-badge-steam") }}
   {%- elif mark == "apple" -%}
     {{ ftl_get_message("supporter-badge-apple") }}
+  {%- elif mark == "microsoft" -%}
+    {{ ftl_get_message("supporter-badge-microsoft") }}
   {%- endif -%}
 {%- endmacro %}
 

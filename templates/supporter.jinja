@@ -5,17 +5,20 @@
 {% endblock title %}
 {% block content %}
   {# The Supporter Pack, laid out as /about lays the site out: what it is
-     first, then this year's pack and the one button that buys it, then the
+     first, then this year's pack and the buttons that buy it, then the
      years already bought.
 
-     Only an app can take the money, and only the app this page is being
-     read in front of: the buttons are marked with the store they belong to
-     and hidden by `html[data-store]` in style.css, so a browser sees the
-     page and no button rather than a button that would do nothing. What it
-     sees instead is supporter-pack-elsewhere, which names no store: the
-     macOS app marks no store either, and an Apple app that pointed at Steam
-     is the steering App Review reads for. Whoever is holding an app knows
-     which one it is. #}
+     Only an app can take the money, and only through the store it was built
+     for, so the server draws that store's buttons and no other's
+     (handlers/supporter.rs): `store` is what the request's user agent names,
+     read the way theme_head.jinja reads it for `data-store`, and `offers`
+     are that store's products on sale for this year, from the catalogue
+     staff keep at /admin/store -- a button each, in the product's own words
+     where it has some. A browser names no store and sees the page with no
+     button rather than a button that would do nothing. What it sees
+     instead is supporter-pack-elsewhere, which names no store: an Apple app
+     that pointed at Steam is the steering App Review reads for, and
+     whoever is holding an app knows which one it is. #}
   <div class="profile about-page">
     <section class="profile-card ds-card about-card">
       <div class="profile-identity">
@@ -43,28 +46,23 @@
           <p class="ds-help supporter-elsewhere">{{ ftl_get_message("supporter-pack-elsewhere") }}</p>
         {% else %}
           <div class="supporter-actions">
-            {% if apple_pack and "apple" not in (bought_in or []) %}
+            {% for offer in offers %}
               <button type="button"
                       class="ds-button ds-button-primary supporter-buy"
-                      data-store="apple"
-                      data-product="{{ apple_pack }}"
-                      data-haptic="medium">{{ ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ apple_pack }}"></span></button>
-            {% endif %}
-            {% if steam_pack and "steam" not in (bought_in or []) %}
-              <button type="button"
-                      class="ds-button ds-button-primary supporter-buy"
-                      data-store="steam"
-                      data-product="{{ steam_pack }}"
-                      data-haptic="medium">{{ ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ steam_pack }}"></span></button>
-            {% endif %}
+                      data-product="{{ offer.product }}"
+                      data-haptic="medium">{{ offer.label or ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ offer.product }}"></span></button>
+            {% endfor %}
             {# Restoring is the App Store's word for it: the same purchase
                handed over again, which gives a pack back to whoever is
                signed in without ever making a second one. Steam has no such
                thing -- it says what an account owns every time it is
-               asked. #}
-            <button type="button" class="ds-button supporter-restore">{{ ftl_get_message("supporter-pack-restore") }}</button>
+               asked -- and the Microsoft Store build hands its key over
+               again by itself. #}
+            {% if restorable %}
+              <button type="button" class="ds-button supporter-restore">{{ ftl_get_message("supporter-pack-restore") }}</button>
+            {% endif %}
           </div>
-          {% if not apple_pack and not steam_pack %}
+          {% if nothing_this_year %}
             <p class="ds-help">{{ ftl_format_pattern("supporter-pack-none", {"year": this_year}) }}</p>
           {% endif %}
           <p class="ds-help supporter-elsewhere">{{ ftl_get_message("supporter-pack-elsewhere") }}</p>
@@ -124,10 +122,10 @@
         }
       };
 
-      // Only the products of the store this build sells through: the app
-      // is that store, so nothing it is asked needs to say which.
-      var store = document.documentElement.getAttribute("data-store");
-      var buttons = store ? document.querySelectorAll('.supporter-buy[data-store="' + store + '"]') : [];
+      // Every button here is the store's this build sells through -- the
+      // server drew no other -- so nothing the app is asked needs to say
+      // which.
+      var buttons = document.querySelectorAll(".supporter-buy");
       if (buttons.length) {
         var products = [];
         for (var i = 0; i < buttons.length; i++) products.push(buttons[i].getAttribute("data-product"));

@@ -1,7 +1,8 @@
 use super::state::{AppState, Shutdown};
+use crate::models::store_product;
 use crate::models::user::Backend;
 use crate::web::handlers::about::{about, design};
-use crate::web::handlers::store::do_store_purchase;
+use crate::web::handlers::store::{do_store_purchase, do_store_ticket};
 use crate::web::handlers::supporter::supporter_page;
 use crate::web::handlers::account::{
     account, delete_account, delete_account_htmx, edit_account, edit_password, get_account_json,
@@ -16,7 +17,8 @@ use crate::web::handlers::activitypub::{
 use crate::web::handlers::admin::{
     admin_banners, admin_banners_fragment, admin_collaborative_sessions, admin_communities,
     admin_community_posts, admin_flag_banner, admin_flag_post, admin_post_detail, admin_posts,
-    admin_posts_fragment, admin_user_posts, admin_users, collaborative_archive_manifest,
+    admin_add_store_product, admin_posts_fragment, admin_set_store_product_on_sale, admin_store,
+    admin_user_posts, admin_users, collaborative_archive_manifest,
     collaborative_session_chat, download_collaborative_archive, download_collaborative_diagnostics,
     replay_collaborative_session,
 };
@@ -160,6 +162,17 @@ impl App {
     pub async fn new(state: AppState) -> Result<Self, Box<dyn std::error::Error>> {
         sqlx::migrate!().run(&state.db_pool).await?;
 
+        // The packs the config still lists, into the catalogue that has
+        // replaced it: added where missing, and never changing a product
+        // already there (`store_product::import_configured`). Before
+        // anything is served, so the first boot of this release sells what
+        // the last one did.
+        let imported = store_product::import_configured(&state.db_pool, &state.config).await?;
+        if imported > 0 {
+            tracing::info!("added {imported} products from the config to the store catalogue");
+        }
+        store_product::refresh_any_on_sale(&state.db_pool).await?;
+
         Ok(Self { state })
     }
 
@@ -191,24 +204,22 @@ impl App {
                 self.state.db_pool.clone(),
                 steam.clone(),
             ));
-            // Supporter standing, from what Steam says each account owns.
-            if !steam.supporter_apps.is_empty() {
-                tokio::task::spawn(crate::steam::recheck_supporters(
-                    self.state.db_pool.clone(),
-                    steam,
-                ));
-            }
+            // Supporter standing, from what Steam says each account owns of
+            // the catalogue's Steam products -- read each time round, so
+            // one added at /admin/store is asked about without a restart.
+            tokio::task::spawn(crate::steam::recheck_supporters(
+                self.state.db_pool.clone(),
+                steam,
+            ));
         }
 
         // The same, for what the App Store says about the purchases the iOS
         // app has handed over: a refund takes the mark away within a day.
         if let Some(app_store) = self.state.config.app_store.clone() {
-            if !app_store.supporter_products.is_empty() {
-                tokio::task::spawn(crate::app_store::recheck_supporters(
-                    self.state.db_pool.clone(),
-                    app_store,
-                ));
-            }
+            tokio::task::spawn(crate::app_store::recheck_supporters(
+                self.state.db_pool.clone(),
+                app_store,
+            ));
         }
 
         let session_layer = SessionManagerLayer::new(session_store)
@@ -359,6 +370,11 @@ impl App {
             .route(
                 "/admin/banners/:banner_id/explicit",
                 post(admin_flag_banner),
+            )
+            .route("/admin/store", get(admin_store).post(admin_add_store_product))
+            .route(
+                "/admin/store/:store/:product/on-sale",
+                post(admin_set_store_product_on_sale),
             )
             .route_layer(login_required!(Backend, login_url = "/login"));
 
@@ -636,6 +652,7 @@ impl App {
             // What a store sold, handed over by the page in an app that
             // sells through it. See handlers/store.rs.
             .route("/store/:store/purchases", post(do_store_purchase))
+            .route("/store/:store/tickets", post(do_store_ticket))
             .route("/design", get(design))
             .route("/privacy", get(privacy))
             .route("/policy", get(policy))

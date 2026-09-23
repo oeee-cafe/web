@@ -533,6 +533,7 @@ supporter-pack-years = Years you have supported
 supporter-pack-years-help = A pack is bought once and is yours; the mark beside your name is this year's.
 supporter-badge-steam = Steam Supporter
 supporter-badge-apple = App Store Supporter
+supporter-badge-microsoft = Microsoft Store Supporter
 supporter-year = { $platform }, { $year }
 about-supporters = Supporters
 about-supporters-thanks = They bought this year's Supporter Pack, and keep Oeee Cafe running for everyone. Thank you.

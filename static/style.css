@@ -2844,17 +2844,11 @@ html[data-app="android"][data-push]::view-transition-new(root) {
    The heart is always there -- it leads to a page, not to a payment, and
    somebody reading in a browser is how they find out the pack exists at
    all. What is gated is the paying: only an app can take the money, and
-   only for its own store, so a buy button waits until an app that can sell
-   marks the root `data-store` -- "apple", "microsoft" or "steam" -- before
-   anything is drawn. A browser gets the page, the years already bought,
-   and the line saying where the pack is sold. */
-html:not([data-store="apple"]) .supporter-buy[data-store="apple"],
-html:not([data-store="microsoft"]) .supporter-buy[data-store="microsoft"],
-html:not([data-store="steam"]) .supporter-buy[data-store="steam"],
-html:not([data-store="apple"]) .supporter-restore {
-  display: none;
-}
-
+   only for its own store, so the server draws the buy buttons of the store
+   the request's user agent names and no other (handlers/supporter.rs). A
+   browser gets the page, the years already bought, and the line saying
+   where the pack is sold -- which an app that sells, marked `data-store`
+   before paint, has no need of. */
 html[data-store] .supporter-elsewhere {
   display: none;
 }

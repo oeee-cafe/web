@@ -1461,26 +1461,29 @@ mod template_tests {
     }
 
     /// The Supporter Pack's page: what there is to press depends on who is
-    /// reading and on what this deployment sells. Which store the reader is
-    /// in front of is the stylesheet's business, so every button that could
-    /// be pressed is in the markup, each marked with the store it belongs
-    /// to.
+    /// reading and on which store their app sells through. The handler
+    /// chooses the buttons (handlers/supporter.rs) -- the reader's store's
+    /// products on sale this year -- and the page draws exactly those, with
+    /// Restore only for the App Store.
     #[test]
     fn the_supporter_page_offers_what_there_is_to_buy() {
         let env = test_support::env();
         let render = |current_user: serde_json::Value,
-                      apple_pack: serde_json::Value,
-                      steam_pack: serde_json::Value,
-                      bought_in: serde_json::Value,
+                      store: serde_json::Value,
+                      offers: serde_json::Value,
+                      nothing_this_year: bool,
                       supporter_standings: serde_json::Value| {
             env.get_template("supporter.jinja")
                 .expect("supporter loads")
                 .render(context! {
                     this_year => 2026,
-                    apple_pack,
-                    steam_pack,
-                    supports_this_year => !bought_in.as_array().is_some_and(|in_| in_.is_empty()),
-                    bought_in,
+                    restorable => store == json!("apple"),
+                    store,
+                    offers,
+                    nothing_this_year,
+                    supports_this_year => supporter_standings
+                        .as_array()
+                        .is_some_and(|standings| standings.iter().any(|s| s["year"] == json!(2026))),
                     supporter_standings,
                     worn_mark => json!("steam"),
                     ..context! { current_user, ..chrome() }
@@ -1489,69 +1492,91 @@ mod template_tests {
         };
         let signed_in = json!({"login_name": "oeee", "display_name": "오이"});
         let none = json!(null);
+        let pack = |product: &str, label: Option<&str>| json!({"product": product, "label": label});
 
         // Signed out: somewhere to sign in, and nothing to buy with.
         let out = render(
             none.clone(),
-            json!("cafe.oeee.supporter.2026"),
-            none.clone(),
+            json!("apple"),
             json!([]),
+            false,
             json!([]),
         );
         assert!(out.contains(r#"href="/login?next=/supporter""#));
         // The buttons themselves, not the script that listens for them.
         assert!(!out.contains(r#"data-product="#));
+        assert!(!out.contains(r#"class="ds-button supporter-restore""#));
 
-        // Both stores selling: a button apiece, each naming its own.
-        let both = render(
+        // In the App Store: a button per product, in its own words where it
+        // has some, and Restore.
+        let apple = render(
             signed_in.clone(),
-            json!("cafe.oeee.supporter.2026"),
-            json!(481),
-            json!([]),
+            json!("apple"),
+            json!([
+                pack("cafe.oeee.supporter.2026", None),
+                pack("cafe.oeee.supporter.2026.more", Some("Support twice as much")),
+            ]),
+            false,
             json!([]),
         );
-        let squashed = both.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(squashed.contains(r#"data-store="apple" data-product="cafe.oeee.supporter.2026""#));
-        assert!(squashed.contains(r#"data-store="steam" data-product="481""#));
-        assert!(both.contains("supporter-restore"));
-        assert!(both.contains("supporter-pack-buy(year=2026)"));
+        let squashed = apple.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert_eq!(apple.matches(r#"class="ds-button ds-button-primary supporter-buy""#).count(), 2);
+        assert!(squashed.contains(r#"data-product="cafe.oeee.supporter.2026" data-haptic="medium">supporter-pack-buy(year=2026)<span"#));
+        assert!(squashed.contains(r#"data-haptic="medium">Support twice as much<span"#));
+        assert!(apple.contains(r#"class="ds-button supporter-restore""#));
         // Room for the price the app will fill in, keyed by the product it
         // belongs to, and empty until then.
         assert!(squashed
             .contains(r#"<span class="supporter-price" data-product="cafe.oeee.supporter.2026"></span>"#));
-        assert!(squashed.contains(r#"<span class="supporter-price" data-product="481"></span>"#));
-        assert!(both.contains("(app.store = app.store || {}).prices = "));
+        assert!(apple.contains("(app.store = app.store || {}).prices = "));
+        assert!(!apple.contains("supporter-pack-none"));
+
+        // On Steam, and in the Microsoft Store: no Restore, which only the
+        // App Store has.
+        for store in ["steam", "microsoft"] {
+            let page = render(
+                signed_in.clone(),
+                json!(store),
+                json!([pack("481", None)]),
+                false,
+                json!([]),
+            );
+            assert!(page.contains(r#"data-product="481""#), "{store}");
+            assert!(!page.contains(r#"class="ds-button supporter-restore""#), "{store}");
+        }
+
+        // A browser: no store, no button, and the line saying where the
+        // pack is sold.
+        let browser = render(signed_in.clone(), none.clone(), json!([]), false, json!([]));
+        assert!(!browser.contains(r#"data-product="#));
+        assert!(!browser.contains(r#"class="ds-button supporter-restore""#));
+        assert!(browser.contains("supporter-pack-elsewhere"));
 
         // Nothing for this year yet: the page says so instead.
-        let nothing = render(
-            signed_in.clone(),
-            none.clone(),
-            none.clone(),
-            json!([]),
-            json!([]),
-        );
+        let nothing = render(signed_in.clone(), json!("steam"), json!([]), true, json!([]));
         assert!(!nothing.contains(r#"data-product="#));
         assert!(nothing.contains("supporter-pack-none(year=2026)"));
 
-        // Already bought, and the years before it.
+        // Already bought, and the years before it: the handler offers
+        // nothing more in the store it was bought in.
         let owned = render(
             signed_in,
-            json!("cafe.oeee.supporter.2026"),
-            json!(481),
-            json!(["apple"]),
+            json!("apple"),
+            json!([]),
+            false,
             json!([
                 {"store": "steam", "year": 2025, "since": "2025-03-02T00:00:00Z"},
                 {"store": "apple", "year": 2026, "since": "2026-01-08T00:00:00Z"},
+                {"store": "microsoft", "year": 2026, "since": "2026-02-08T00:00:00Z"},
             ]),
         );
         assert!(owned.contains("supporter-pack-have(year=2026)"));
-        // Bought in the App Store already: that button goes, and Steam's --
-        // a second pack for the same year, supporting twice -- stays.
-        assert!(!owned.contains(r#"data-store="apple""#));
-        assert!(owned.contains(r#"data-store="steam""#));
-        assert_eq!(owned.matches("supporter-chip").count(), 2, "one per year");
+        assert!(!owned.contains(r#"data-product="#));
+        assert!(!owned.contains("supporter-pack-none"));
+        assert_eq!(owned.matches("supporter-chip").count(), 3, "one per year");
         assert!(owned.contains("🎮</span>2025"));
         assert!(owned.contains("🍎</span>2026"));
+        assert!(owned.contains("🛍️</span>2026"));
     }
 
     /// The heart in the toolbar is there when this deployment sells a pack

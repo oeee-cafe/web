@@ -25,7 +25,10 @@
   //               "desktop" for the Mac and Windows windows, whose title bar
   //               is the site's toolbar
   //   data-store  where the build sells: "apple", "microsoft" or "steam";
-  //               absent in one that does not (app_store.jinja)
+  //               absent in one that does not (app_store.jinja). The server
+  //               reads the same words by the same rule to choose
+  //               /supporter's buttons (Store::from_user_agent), so the two
+  //               change together.
   //
   // A browser has none of them. Only ever about what to show: nothing is
   // trusted for being marked, and a purchase is checked with the store.

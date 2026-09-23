@@ -19,5 +19,6 @@ pub mod password_reset_challenge;
 pub mod post;
 pub mod reaction;
 pub mod sitemap;
+pub mod store_product;
 pub mod supporter;
 pub mod user;

@@ -48,7 +48,10 @@ type PageWindow = Window &
       feel(name: string): void;
       wouldLoseWork(): boolean;
       pushToken(token: string): void;
-      store: { purchased(proofs: unknown): Promise<string[]> };
+      store: {
+        purchased(proofs: unknown): Promise<string[]>;
+        ticket(): Promise<{ ticket: string; user: string } | null>;
+      };
       signIn: {
         answer(told: Record<string, unknown>): void;
         resume(): void;
@@ -248,12 +251,18 @@ describe("what the site tells the apps", () => {
       ["Mozilla/5.0 OeeeCafe/android", ["android", "handheld", null]],
       ["Mozilla/5.0 OeeeCafe/macos store/apple", ["macos", "desktop", "apple"]],
       ["Mozilla/5.0 Edg/120 OeeeCafe/windows store/steam", ["windows", "desktop", "steam"]],
+      ["Mozilla/5.0 Edg/120 OeeeCafe/windows store/microsoft", ["windows", "desktop", "microsoft"]],
       ["Mozilla/5.0 Edg/120 OeeeCafe/windows", ["windows", "desktop", null]],
       // A browser, and a store named with no app to be in.
       ["Mozilla/5.0 Firefox/56.0", [null, null, null]],
       ["Mozilla/5.0 store/apple", [null, null, null]],
-      // Only the names these are.
+      // Only the names these are, and only as words of their own. The
+      // server reads the same cases the same way (Store::from_user_agent).
       ["Mozilla/5.0 OeeeCafe/tv store/nowhere", [null, null, null]],
+      ["Mozilla/5.0 OeeeCafe/iosx store/apple", [null, null, null]],
+      ["Mozilla/5.0 OeeeCafe/ios store/applesauce", ["ios", "handheld", null]],
+      ["Mozilla/5.0 OeeeCafe/ios mystore/apple", ["ios", "handheld", null]],
+      ["Mozilla/5.0 XOeeeCafe/ios store/apple", [null, null, null]],
     ];
     for (const [userAgent, expected] of cases) {
       const page = await open({ userAgent });
@@ -344,6 +353,44 @@ describe("what a store gives an app", () => {
     expect(page.asked).toEqual([]);
     const selling = await open({ store: "apple" });
     expect(await selling.window.oeeeApp.store.purchased(null)).toEqual([]);
+  });
+
+  it("gets the Microsoft Store build a ticket and a user for its Store ID key", async () => {
+    const told = { ticket: "eyJ0eXAi.eyJhdWQi.c2ln", user: "5f0b6a2e-1d3c-4b7a-9e8f-0a1b2c3d4e5f" };
+    const page = await open({
+      userAgent: "Mozilla/5.0 Edg/120 OeeeCafe/windows",
+      store: "microsoft",
+      answers: { "/store/microsoft/tickets": { ...told, extra: "dropped" } },
+    });
+    expect(await page.window.oeeeApp.store.ticket()).toEqual(told);
+    expect(page.asked).toEqual([{ url: "/store/microsoft/tickets", body: "" }]);
+  });
+
+  it("gives no ticket where there is none to give", async () => {
+    // Signed out, unconfigured or unreachable: the site says anything but 200.
+    const refused = await open({ userAgent: "Mozilla/5.0 Edg/120 OeeeCafe/windows", store: "microsoft" });
+    expect(await refused.window.oeeeApp.store.ticket()).toBeNull();
+
+    // An answer missing either string is no answer.
+    for (const answer of [{ ticket: "t" }, { ticket: "", user: "u" }, { ticket: 1, user: "u" }, null]) {
+      const page = await open({
+        userAgent: "Mozilla/5.0 Edg/120 OeeeCafe/windows",
+        store: "microsoft",
+        answers: { "/store/microsoft/tickets": answer },
+      });
+      expect(await page.window.oeeeApp.store.ticket(), JSON.stringify(answer)).toBeNull();
+    }
+
+    // Every other build, and a browser, never asks.
+    for (const store of ["apple", "steam", undefined] as const) {
+      const page = await open({
+        userAgent: "Mozilla/5.0 OeeeCafe/windows",
+        store,
+        answers: { "/store/microsoft/tickets": { ticket: "t", user: "u" } },
+      });
+      expect(await page.window.oeeeApp.store.ticket(), String(store)).toBeNull();
+      expect(page.asked, String(store)).toEqual([]);
+    }
   });
 
   it("signs in with Steam from the page's own button, in the Steam build only", async () => {

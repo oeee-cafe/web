@@ -8,6 +8,14 @@
    through one store only, so nothing the page asks says which: the app is
    that store.
 
+   What a store sells is the site's catalogue, which staff keep at
+   /admin/store (models/store_product.rs): each product by the store's own
+   id, with the Supporter Pack year it counts for. The server reads the
+   same user agent and draws /supporter's buttons itself -- that store's
+   products on sale this year, and nothing of any other store's
+   (handlers/supporter.rs) -- so every product the page asks about is one
+   the app can sell.
+
    An app does only what a store can -- sell, restore, hand over proof of
    what was bought -- and the page does the rest. Every store goes the same
    way:
@@ -23,14 +31,30 @@
                    finding transactions StoreKit has not seen finished
         steam      a Web API ticket -- after Steam says a DLC was installed;
                    the site asks Steam what the ticket's account owns
-        microsoft  to be settled when the Microsoft Store sells
+        microsoft  a Microsoft Store ID key -- after a sale, and whenever
+                   the app finds add-ons the site has not taken; the site
+                   asks the Store's collections API what the key's account
+                   owns. The app makes the key itself, from a ticket the
+                   page gets it:
+
+          window.oeeeApp.store.ticket()
+
+                   resolves to {ticket, user}, two strings, from POST
+                   /store/microsoft/tickets -- or to null outside the
+                   Microsoft Store build, signed out, or when the site could
+                   not make one. The app passes both to
+                   StoreContext.GetCustomerCollectionsIdAsync(ticket, user)
+                   and hands the key it gets to purchased(). A ticket
+                   lasts minutes, not days, so it is asked for afresh each
+                   time a key is wanted.
 
         Each is posted to /store/<store>/purchases, which asks the store
-        itself (src/app_store.rs, src/steam.rs) -- nothing the page or the
-        app says records a purchase. The promise answers with the proofs the
-        site took; the app finishes those and only those where its store
-        has finishing (StoreKit), and anything else is offered again. The
-        page reloads once, after answering, if the site took any. #}
+        itself (src/app_store.rs, src/steam.rs, src/microsoft_store.rs) --
+        nothing the page or the app says records a purchase. The promise
+        answers with the proofs the site took; the app finishes those and
+        only those where its store has finishing (StoreKit), and anything
+        else is offered again. The page reloads once, after answering, if
+        the site took any. #}
 <script>
   (function () {
     var app = window.oeeeApp;
@@ -61,6 +85,24 @@
         // page it came from goes away.
         if (taken.length) setTimeout(function () { location.reload(); }, 0);
         return taken;
+      });
+    };
+    app.store.ticket = function () {
+      if (document.documentElement.getAttribute("data-store") !== "microsoft") {
+        return Promise.resolve(null);
+      }
+      return fetch("/store/microsoft/tickets", {
+        method: "POST",
+        credentials: "same-origin"
+      }).then(function (response) {
+        return response.status === 200 ? response.json() : null;
+      }).then(function (told) {
+        // Exactly the two strings the Store is to be given, or nothing.
+        return told && typeof told.ticket === "string" && told.ticket &&
+          typeof told.user === "string" && told.user
+          ? { ticket: told.ticket, user: told.user } : null;
+      }, function () {
+        return null;
       });
     };
   })();

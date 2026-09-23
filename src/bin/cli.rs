@@ -100,11 +100,14 @@ async fn main() -> Result<()> {
             "issuer {}, key {}, app {}",
             store.issuer_id, store.key_id, store.bundle_id
         );
-        if store.supporter_products.is_empty() {
-            println!("no packs: [[app_store.supporter_products]] is empty");
-        }
+        // The packs themselves are the catalogue's now (/admin/store), which
+        // this does not open a database to read. What the config still
+        // lists is only imported into it on boot.
         for pack in &store.supporter_products {
-            println!("  {} -> {}", pack.year, pack.product_id);
+            println!(
+                "  {} -> {} (deprecated in the config; imported on boot)",
+                pack.year, pack.product_id
+            );
         }
         match oeee_cafe::app_store::check(store).await {
             Ok(()) => println!("the App Store accepted the key"),
