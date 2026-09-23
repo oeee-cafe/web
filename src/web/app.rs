@@ -64,7 +64,8 @@ use crate::web::handlers::home::{
     add_reaction_api, create_comment_api, delete_comment_api, delete_post_api, edit_post_api,
     get_active_communities_json, get_latest_comments_json, get_post_comments_api,
     get_post_details_json, get_post_reactions_by_emoji_json, home, load_more_public_posts,
-    load_more_public_posts_json, load_more_timeline_posts, my_timeline, remove_reaction_api,
+    load_more_community_feed_posts, load_more_popular_posts, load_more_public_posts_json,
+    load_more_timeline_posts, my_communities_feed, my_timeline, popular, remove_reaction_api,
 };
 use crate::web::handlers::notifications::{
     api_delete_notification, api_list_notifications, api_mark_notification_read,
@@ -233,7 +234,12 @@ impl App {
 
         let protected_router = Router::new()
             .route("/home", get(my_timeline))
+            .route("/home/communities", get(my_communities_feed))
             .route("/api/timeline/posts", get(load_more_timeline_posts))
+            .route(
+                "/api/home/communities/posts",
+                get(load_more_community_feed_posts),
+            )
             .route("/notifications", get(list_notifications))
             .route("/api/notifications/items", get(notifications_fragment))
             .route(
@@ -411,6 +417,7 @@ impl App {
 
         let app = Router::new()
             .route("/", get(home))
+            .route("/popular", get(popular))
             .route("/health", get(health))
             .route("/robots.txt", get(robots_txt))
             .route("/sitemap.xml", get(sitemap_xml))
@@ -420,6 +427,7 @@ impl App {
             )
             .route("/.well-known/assetlinks.json", get(android_assetlinks))
             .route("/api/home/posts", get(load_more_public_posts))
+            .route("/api/popular/posts", get(load_more_popular_posts))
             .route("/api/collaborate/posts", get(load_more_collaborative_posts))
             .route("/api/communities/cards", get(communities_fragment))
             .route(

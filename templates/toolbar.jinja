@@ -64,10 +64,12 @@
        they take a second row of the bar, sharing its width. #}
     <div class="toolbar-links">
       <div class="toolbar-sections">
-        {# Home is both of the feeds, Recent and Following: which one is
-           a switch on the page (feed_switch.jinja). #}
+        {# Home is all of the feeds -- Recent, Popular, Following,
+           Communities: which one is a switch on the page
+           (feed_switch.jinja). #}
         <a href="/">{{ ftl_get_message("nav-home") }}</a>
         <a href="/communities">{{ ftl_get_message("community") }}</a>
+        <a href="/hashtags">{{ ftl_get_message("hashtag-discovery") }}</a>
       </div>
       {# Drawing together, live: its own button beside the sections rather
          than one of them, with a pulsing light in the mark's green, since what is behind it
@@ -263,12 +265,13 @@
       // Also called with the path being gone to, the moment it is asked for,
       // so the tab moves on the click rather than when the page arrives --
       // and with the page's own path again if it never does.
+      var HOME = /^\/(popular|home|home\/communities)?$/;
       window.oeeeMarkCurrent = function (here) {
         var links = document.querySelectorAll("#menubar a[href]");
         for (var i = 0; i < links.length; i++) {
           var path = links[i].getAttribute("href");
-          // Home is / and /home, the feed's two orders (feed_switch.jinja).
-          if (path === "/" ? here === "/" || here === "/home" : here === path || here.indexOf(path + "/") === 0) {
+          // Home is every one of its feeds (feed_switch.jinja).
+          if (path === "/" ? HOME.test(here) : here === path || here.indexOf(path + "/") === 0) {
             links[i].setAttribute("aria-current", "page");
           } else {
             links[i].removeAttribute("aria-current");
@@ -601,8 +604,8 @@
         return html;
       }
       var SHAPES = [
-        // Recent, following: a heading, Per row, the grid.
-        [/^\/(home)?$/, function () {
+        // Home's feeds: the switch, Per row, the grid.
+        [/^\/(popular|home|home\/communities)?$/, function () {
           return '<div class="center-wide"><div class="feed-header">' + bar("180px", 22) +
             (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + postGrid() + "</div>";
         }],

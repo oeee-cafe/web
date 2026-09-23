@@ -15,7 +15,8 @@ use crate::models::notification::{
 };
 use crate::models::post::{
     build_thread_tree, delete_post_with_activity, edit_post, find_following_posts_by_user_id,
-    find_post_by_id, find_post_detail_for_json, find_public_posts,
+    find_member_community_posts, find_popular_posts, find_post_by_id, find_post_detail_for_json,
+    find_public_posts,
     find_recent_posts_by_communities, SerializableThreadedPost,
 };
 use crate::models::reaction::{
@@ -72,45 +73,135 @@ pub(crate) fn feed_context(
     }
 }
 
-pub async fn home(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    messages: Messages,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
+/// Home's feeds: one grid of drawings in four orders, switched between
+/// by the pill where the feed's heading would be (feed_switch.jinja). Each
+/// is its own address and its own batch endpoint for the infinite scroll.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Feed {
+    /// `/`: every public drawing, newest first.
+    Recent,
+    /// `/popular`: the past week's, the most reacted to first.
+    Popular,
+    /// `/home`: the people the reader follows.
+    Following,
+    /// `/home/communities`: the communities the reader is a member of.
+    Communities,
+}
 
+impl Feed {
+    /// What feed_switch.jinja calls it.
+    fn name(self) -> &'static str {
+        match self {
+            Feed::Recent => "recent",
+            Feed::Popular => "popular",
+            Feed::Following => "following",
+            Feed::Communities => "communities",
+        }
+    }
+
+    /// Where the next batch comes from.
+    fn batch_path(self) -> &'static str {
+        match self {
+            Feed::Recent => "/api/home/posts",
+            Feed::Popular => "/api/popular/posts",
+            Feed::Following => "/api/timeline/posts",
+            Feed::Communities => "/api/home/communities/posts",
+        }
+    }
+
+    /// One batch. Following and Communities are the reader's own, so
+    /// nobody signed in has either.
+    async fn posts(
+        self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        viewer: Option<&crate::models::user::User>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<crate::models::post::SerializablePostForHome>, AppError> {
+        let viewer_id = viewer.map(|user| user.id);
+        let show_sensitive = viewer.map_or(false, |user| user.show_sensitive_content);
+        Ok(match self {
+            Feed::Recent => find_public_posts(tx, limit, offset, viewer_id, show_sensitive).await?,
+            Feed::Popular => find_popular_posts(tx, limit, offset, viewer_id, show_sensitive).await?,
+            Feed::Following => {
+                let user = viewer.ok_or(AppError::Unauthorized)?;
+                find_following_posts_by_user_id(tx, user.id, show_sensitive, limit, offset).await?
+            }
+            Feed::Communities => {
+                let user = viewer.ok_or(AppError::Unauthorized)?;
+                find_member_community_posts(tx, user.id, show_sensitive, limit, offset).await?
+            }
+        })
+    }
+}
+
+/// A feed's page: its first batch in the one template all four share.
+async fn feed_page(
+    feed: Feed,
+    auth_session: AuthSession,
+    state: AppState,
+    ftl_lang: String,
+    messages: Messages,
+) -> Result<axum::response::Response, AppError> {
+    let mut tx = state.db_pool.begin().await?;
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-
-    let (viewer_user_id, viewer_show_sensitive) = if let Some(ref user) = auth_session.user {
-        (Some(user.id), user.show_sensitive_content)
-    } else {
-        (None, false)
-    };
-
-    let posts = find_public_posts(
-        &mut tx,
-        HOME_POSTS_PER_BATCH,
-        0,
-        viewer_user_id,
-        viewer_show_sensitive,
-    )
-    .await?;
+    let posts = feed
+        .posts(&mut tx, auth_session.user.as_ref(), HOME_POSTS_PER_BATCH, 0)
+        .await?;
     tx.commit().await?;
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("home.jinja")?;
     let rendered = template.render(context! {
         current_user => auth_session.user,
         messages => messages.into_iter().collect::<Vec<_>>(),
-        feed => feed_context(posts, "/api/home/posts", 0),
+        feed_switch => feed.name(),
+        feed => feed_context(posts, feed.batch_path(), 0),
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang
     })?;
-
     Ok(Html(rendered).into_response())
+}
+
+/// A feed's next batch of cards, and the sentinel for the one after.
+async fn feed_batch(
+    feed: Feed,
+    auth_session: AuthSession,
+    state: AppState,
+    query: LoadMoreQuery,
+) -> Result<axum::response::Response, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let posts = feed
+        .posts(&mut tx, auth_session.user.as_ref(), query.limit, query.offset)
+        .await?;
+    tx.commit().await?;
+
+    let template: minijinja::Template<'_, '_> =
+        state.env.get_template("post_feed_fragment.jinja")?;
+    let rendered = template.render(context! {
+        feed => feed_context(posts, feed.batch_path(), query.offset),
+        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+    })?;
+    Ok(Html(rendered).into_response())
+}
+
+pub async fn home(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    messages: Messages,
+) -> Result<impl IntoResponse, AppError> {
+    feed_page(Feed::Recent, auth_session, state, ftl_lang, messages).await
+}
+
+pub async fn popular(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    messages: Messages,
+) -> Result<impl IntoResponse, AppError> {
+    feed_page(Feed::Popular, auth_session, state, ftl_lang, messages).await
 }
 
 pub async fn my_timeline(
@@ -119,37 +210,16 @@ pub async fn my_timeline(
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     messages: Messages,
 ) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
+    feed_page(Feed::Following, auth_session, state, ftl_lang, messages).await
+}
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-
-    let user = auth_session
-        .user
-        .as_ref()
-        .ok_or(AppError::Unauthorized)?
-        .clone();
-    let posts = find_following_posts_by_user_id(
-        &mut tx,
-        user.id,
-        user.show_sensitive_content,
-        HOME_POSTS_PER_BATCH,
-        0,
-    )
-    .await?;
-
-    let template: minijinja::Template<'_, '_> = state.env.get_template("timeline.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        feed => feed_context(posts, "/api/timeline/posts", 0),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
-
-    Ok(Html(rendered).into_response())
+pub async fn my_communities_feed(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    messages: Messages,
+) -> Result<impl IntoResponse, AppError> {
+    feed_page(Feed::Communities, auth_session, state, ftl_lang, messages).await
 }
 
 #[derive(Deserialize)]
@@ -181,65 +251,34 @@ pub async fn load_more_public_posts(
     State(state): State<AppState>,
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let (viewer_user_id, viewer_show_sensitive) = if let Some(ref user) = auth_session.user {
-        (Some(user.id), user.show_sensitive_content)
-    } else {
-        (None, false)
-    };
-
-    let posts = find_public_posts(
-        &mut tx,
-        query.limit,
-        query.offset,
-        viewer_user_id,
-        viewer_show_sensitive,
-    )
-    .await?;
-
-    tx.commit().await?;
-
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("post_feed_fragment.jinja")?;
-    let rendered = template.render(context! {
-        feed => feed_context(posts, "/api/home/posts", query.offset),
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-    })?;
-
-    Ok(Html(rendered).into_response())
+    feed_batch(Feed::Recent, auth_session, state, query).await
 }
 
-/// GET /api/timeline/posts — one batch of following-feed cards plus the next
-/// sentinel. Same shape as load_more_public_posts; only the query differs.
+/// GET /api/popular/posts
+pub async fn load_more_popular_posts(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Query(query): Query<LoadMoreQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    feed_batch(Feed::Popular, auth_session, state, query).await
+}
+
+/// GET /api/timeline/posts
 pub async fn load_more_timeline_posts(
     auth_session: AuthSession,
     State(state): State<AppState>,
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
+    feed_batch(Feed::Following, auth_session, state, query).await
+}
 
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-    let posts = find_following_posts_by_user_id(
-        &mut tx,
-        user.id,
-        user.show_sensitive_content,
-        query.limit,
-        query.offset,
-    )
-    .await?;
-    tx.commit().await?;
-
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("post_feed_fragment.jinja")?;
-    let rendered = template.render(context! {
-        feed => feed_context(posts, "/api/timeline/posts", query.offset),
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-    })?;
-
-    Ok(Html(rendered).into_response())
+/// GET /api/home/communities/posts
+pub async fn load_more_community_feed_posts(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Query(query): Query<LoadMoreQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    feed_batch(Feed::Communities, auth_session, state, query).await
 }
 
 pub async fn load_more_public_posts_json(
@@ -1377,6 +1416,7 @@ mod tests {
                 ),
             },
             current_user => json!(null),
+            feed_switch => "recent",
             messages => Vec::<serde_json::Value>::new(),
             draft_post_count => 0,
             unread_notification_count => 0,
@@ -1406,42 +1446,48 @@ mod tests {
         assert!(!rendered.contains("--page-width"));
     }
 
-    /// Recent and Following are two orders of the one feed Home shows, so
-    /// they are a switch where its heading was rather than two tabs in the
-    /// toolbar. Signed out there is only the one, and it keeps its heading.
+    /// Home's feeds are orders of one feed, so they are a switch where its
+    /// heading was rather than tabs in the toolbar: Recent and Popular for
+    /// anyone, Following and Communities too for someone signed in.
     #[test]
-    fn home_switches_between_recent_and_following_in_place_of_its_heading() {
+    fn home_switches_between_its_feeds_in_place_of_a_heading() {
         let env = test_support::env();
         let home = env.get_template("home.jinja").expect("template loads");
 
         let signed_out = home
             .render(home_context(vec![sample_post()], false))
             .expect("home.jinja renders");
-        assert!(!signed_out.contains("feed-switch"), "one feed signed out, no switch");
-        assert!(signed_out.contains(r#"<h2 class="home-section-title">recent-drawings</h2>"#));
+        assert!(signed_out.contains(r#"<a href="/" aria-current="page">feed-recent</a>"#));
+        assert!(signed_out.contains(r#"<a href="/popular">feed-popular</a>"#));
+        assert!(!signed_out.contains(r#"href="/home""#), "nobody's own feeds signed out");
+        assert!(!signed_out.contains("home-section-title"), "the switch is the heading");
 
-        let signed_in = home
-            .render(context! {
+        let signed_in = |feed_switch: &str| {
+            home.render(context! {
                 current_user => json!({"login_name": "someone"}),
+                feed_switch,
                 ..home_context(vec![sample_post()], false)
             })
-            .expect("home.jinja renders");
-        assert!(signed_in.contains(r#"<a href="/" aria-current="page">feed-recent</a>"#));
-        assert!(signed_in.contains(r#"<a href="/home">feed-following</a>"#));
-        assert!(!signed_in.contains("home-section-title"), "the switch is the heading");
-        // Home is the one section for both: no toolbar tab for /home.
-        assert!(!signed_in.contains(r#"<a href="/home">timeline</a>"#));
-
-        let timeline = env
-            .get_template("timeline.jinja")
-            .expect("template loads")
-            .render(context! {
-                current_user => json!({"login_name": "someone"}),
-                ..home_context(vec![sample_post()], false)
-            })
-            .expect("timeline.jinja renders");
-        assert!(timeline.contains(r#"<a href="/">feed-recent</a>"#));
-        assert!(timeline.contains(r#"<a href="/home" aria-current="page">feed-following</a>"#));
+            .expect("home.jinja renders")
+        };
+        let recent = signed_in("recent");
+        assert!(recent.contains(r#"<a href="/home">feed-following</a>"#));
+        assert!(recent.contains(r#"<a href="/home/communities">feed-communities</a>"#));
+        for (feed, path) in [
+            ("popular", "/popular"),
+            ("following", "/home"),
+            ("communities", "/home/communities"),
+        ] {
+            let page = signed_in(feed);
+            assert!(
+                page.contains(&format!(r#"<a href="{path}" aria-current="page">feed-{feed}</a>"#)),
+                "{feed} is the one marked"
+            );
+            assert!(page.contains(r#"<a href="/">feed-recent</a>"#));
+        }
+        // Home is the one section for all of them, and the hashtags are a
+        // section of their own.
+        assert!(recent.contains(r#"<a href="/hashtags">hashtag-discovery</a>"#));
     }
 
     /// A drawing fills its square, cropped from its longer side, so it is
@@ -1540,14 +1586,15 @@ mod tests {
     }
 
     #[test]
-    fn timeline_matches_the_home_feed_chrome() {
+    fn following_matches_the_home_feed_chrome() {
         // /home and / share the head, controls, grid id and card fragment; the
         // only difference is where the sentinel points.
         let env = test_support::env();
-        let template = env.get_template("timeline.jinja").expect("template loads");
+        let template = env.get_template("home.jinja").expect("template loads");
         let rendered = template
             .render(context! {
                 current_user => json!({"login_name": "someone"}),
+                feed_switch => "following",
                 messages => Vec::<serde_json::Value>::new(),
                 feed => context! {
                     posts => vec![sample_post()],
@@ -1558,7 +1605,7 @@ mod tests {
                 unread_notification_count => 0,
                 ftl_lang => "en",
             })
-            .expect("timeline.jinja renders");
+            .expect("home.jinja renders");
         assert!(rendered.contains("class=\"center-wide\""));
         assert!(!rendered.contains("--page-width"));
         assert!(rendered.contains("id=\"post-cols\""));
@@ -1571,12 +1618,13 @@ mod tests {
     }
 
     #[test]
-    fn timeline_shows_the_empty_state_without_the_control() {
+    fn an_empty_feed_says_so_without_the_control() {
         let env = test_support::env();
-        let template = env.get_template("timeline.jinja").expect("template loads");
+        let template = env.get_template("home.jinja").expect("template loads");
         let rendered = template
             .render(context! {
                 current_user => json!({"login_name": "someone"}),
+                feed_switch => "communities",
                 messages => Vec::<serde_json::Value>::new(),
                 feed => context! {
                     posts => Vec::<serde_json::Value>::new(),
@@ -1588,7 +1636,7 @@ mod tests {
                 ftl_lang => "en",
             })
             .expect("renders");
-        assert!(rendered.contains("timeline-empty"));
+        assert!(rendered.contains("feed-communities-empty"));
         assert!(!rendered.contains("id=\"post-cols\""));
     }
 

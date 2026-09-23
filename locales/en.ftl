@@ -20,10 +20,13 @@ keyboard-shortcuts-then = then
 nav-home = Home
 feed-switch = Feed
 feed-recent = Recent
+feed-popular = Popular
 feed-following = Following
-timeline = Timeline
-timeline-my = My timeline
-timeline-empty = Your timeline is empty. Discover and follow other people from <a href="/communities">communities</a>!
+feed-communities = Communities
+feed-recent-empty = Nothing has been drawn yet.
+feed-popular-empty = Nothing drawn in the past week yet. See what is <a href="/">recent</a>.
+feed-following-empty = Your timeline is empty. Discover and follow other people from <a href="/communities">communities</a>!
+feed-communities-empty = Nothing new in your communities. Find one to join in <a href="/communities">communities</a>!
 
 draw = Draw!
 collaborate = Collaborate

@@ -22,10 +22,13 @@ keyboard-shortcuts-then = の次に
 nav-home = ホーム
 feed-switch = フィード
 feed-recent = 新着
+feed-popular = 人気
 feed-following = 同盟
-timeline = タイムライン
-timeline-my = 私のタイムライン
-timeline-empty = タイムラインが空です。 <a href="/communities">コミュニティ</a>で他の人と同盟を結びましょう！
+feed-communities = コミュニティ
+feed-recent-empty = まだお絵かきがありません。
+feed-popular-empty = この一週間のお絵かきはまだありません。<a href="/">新着</a>を見てみましょう。
+feed-following-empty = タイムラインが空です。 <a href="/communities">コミュニティ</a>で他の人と同盟を結びましょう！
+feed-communities-empty = 参加しているコミュニティに新しいお絵かきはありません。<a href="/communities">コミュニティ</a>で参加先を探しましょう！
 
 draw = 描きましょう！
 collaborate = 一緒に描く
