@@ -2823,13 +2823,6 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   background-color: var(--ds-skeleton-drawing);
 }
 
-/* A post's drawing: its size is unknown until it arrives, so the common
-   one, 300px, standing where the drawing will. */
-.ds-skeleton-stage {
-  width: 300px;
-  max-width: 100%;
-}
-
 .ds-skeleton .posts-grid-item .post-card-meta {
   padding-top: 10px;
 }

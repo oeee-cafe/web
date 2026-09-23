@@ -604,11 +604,7 @@
           return '<div class="center-wide"><div class="feed-header">' + bar("180px", 22) +
             (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + postGrid() + "</div>";
         }],
-        // A tag: the card saying what it is, then its drawings -- and the
-        // tag directory, whose cards are the community directory's.
-        [/^\/hashtags\/[^/]+$/, function () {
-          return '<div class="profile">' + identityCard(false) + '<section class="profile-section">' + gridHeader("120px") + postGrid(2) + "</section></div>";
-        }],
+        // The tag directory, whose cards are the community directory's.
         [/^\/hashtags$/, function () {
           var html = '<div class="center-wide communities-page"><div class="communities-bar">' +
             bar("300px", 30, "ds-skeleton-button") + bar("240px", 30, "ds-skeleton-button") + "</div><div class=\"community-grid\">";
@@ -639,32 +635,13 @@
             bar("80px", 30, "ds-skeleton-button") + "</div>" +
             '<section class="profile-section">' + gridHeader("100px") + postGrid(2) + "</section></div>";
         }],
-        // A community, a person, drafts: the identity card, then the grid.
-        [/^\/communities\/@[^/]+$/, function () {
-          return '<div class="profile">' + identityCard(false) + '<section class="profile-section">' + gridHeader("120px") + postGrid(2) + "</section></div>";
-        }],
+        // A person, drafts: the identity card, then the grid.
         [/^\/@[^/]+$/, function () {
           return '<div class="profile">' + identityCard(true) + '<section class="profile-section">' + gridHeader("160px") + postGrid(2) + "</section></div>";
         }],
         [/^\/posts\/drafts$/, function () {
           return '<div class="profile"><section class="profile-section"><div class="grid-header"><div>' + bar("120px", 26) + bar("80px", 13, "ds-skeleton-gap") +
             "</div></div>" + postGrid(2) + "</section></div>";
-        }],
-        // A post: the drawing on the stage, the inspector card beside it.
-        [/^\/@[^/]+\/[0-9a-fA-F-]{8,}$/, function () {
-          // The drawing's own size, when the link that was followed showed
-          // it -- a card's thumbnail carries it -- so the stage is the shape
-          // it will be; sized to the page's zoom once it is in place.
-          var hint = window.oeeeSkeletonHint || {};
-          var w = hint.width || 300, h = hint.height || 300;
-          return '<div class="post-page"><div class="post-stage"><div class="ds-skeleton-stage" data-width="' + w + '" data-height="' + h + '">' +
-            '<div class="ds-skeleton-square" style="padding-top:' + (h / w * 100) + '%"></div></div></div>' +
-            '<div class="post-side"><section class="ds-card post-inspector">' +
-            bar("40%", 13) + bar("70%", 24, "ds-skeleton-gap") + bar("95%", 13, "ds-skeleton-gap-l") + bar("60%", 13, "ds-skeleton-gap") +
-            '<div class="ds-skeleton-row">' + bar("64px", 24, "ds-skeleton-chip") + bar("52px", 24, "ds-skeleton-chip") + "</div>" +
-            '<div class="post-inspector-facts">' + bar("70px", 12) + bar("60px", 12) + bar("70px", 12) + bar("90px", 12) + bar("70px", 12) + bar("140px", 12) + "</div>" +
-            '<div class="post-inspector-actions">' + bar("150px", 30, "ds-skeleton-button") + bar("70px", 30, "ds-skeleton-button") + bar("70px", 30, "ds-skeleton-button") + "</div>" +
-            '</section><section class="ds-card">' + bar("90px", 13) + bar("85%", 13, "ds-skeleton-gap-l") + bar("55%", 13, "ds-skeleton-gap") + "</section></div></div>";
         }]
       ];
       function skeletonFor(path) {
@@ -683,7 +660,7 @@
         skeleton.innerHTML = html + "</div>";
         return skeleton;
       }
-      function loading(path, over) {
+      function loading(path) {
         // Offline, the next page is not coming: the browser says so, or the
         // app puts up its own "can't be reached" (Unreachable.swift and the
         // rest), and the page that was here stays as it was rather than
@@ -692,47 +669,20 @@
         window.oeeeMarkCurrent(path || location.pathname);
         var content = document.querySelector("main.ds-content");
         if (!content || content.querySelector(".ds-skeleton")) return;
-        // Over the page (the handheld apps, the click handler below), the
-        // skeleton is laid where the reader is, and the page is hidden
-        // rather than taken out, so nothing is scrolled: coming back finds
-        // the page where it was left, which is also where the web view
-        // remembers it.
-        var property = over ? "visibility" : "display";
         var kept = [];
         for (var c = 0; c < content.children.length; c++) {
           var child = content.children[c];
-          kept.push([child, child.style[property]]);
-          child.style[property] = over ? "hidden" : "none";
+          kept.push([child, child.style.display]);
+          child.style.display = "none";
         }
         var skeleton = skeletonFor(path || location.pathname);
-        window.oeeeSkeletonHint = null;
-        var position = content.style.position;
-        if (over) {
-          content.style.position = "relative";
-          skeleton.style.position = "absolute";
-          skeleton.style.top = Math.max(0, -content.getBoundingClientRect().top) + "px";
-          skeleton.style.right = "0";
-          skeleton.style.left = "0";
-        }
         content.appendChild(skeleton);
-        // The same whole-step zoom post_view.jinja gives the drawing.
-        var stage = skeleton.querySelector(".ds-skeleton-stage");
-        if (stage) {
-          var sw = parseInt(stage.getAttribute("data-width"), 10);
-          var sh = parseInt(stage.getAttribute("data-height"), 10);
-          var room = stage.parentNode.clientWidth;
-          var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 190, sh) : Infinity;
-          var zoom = Math.max(1, Math.min(Math.floor(room / sw), Math.floor(tall / sh), 4));
-          if (sw * zoom > room) zoom = 1;
-          stage.style.width = (sw * zoom) + "px";
-        }
         content.scrollTop = 0;
         function restore() {
           if (!skeleton.parentNode) return;
           skeleton.parentNode.removeChild(skeleton);
           window.oeeeMarkCurrent(location.pathname);
-          for (var k = 0; k < kept.length; k++) kept[k][0].style[property] = kept[k][1];
-          content.style.position = position;
+          for (var k = 0; k < kept.length; k++) kept[k][0].style.display = kept[k][1];
         }
         restoring = restore;
         setTimeout(restore, 10000);
@@ -764,23 +714,15 @@
         if (event.defaultPrevented && !boosted) return;
         if (link.origin !== location.origin) return;
         if (link.pathname === location.pathname && link.search === location.search) return;
-        var thumb = link.querySelector("img[width][height]");
-        window.oeeeSkeletonHint = thumb ? {
-          width: parseInt(thumb.getAttribute("width"), 10),
-          height: parseInt(thumb.getAttribute("height"), 10)
-        } : null;
-        // A page's pill switches the page in place, the pill left standing
-        // and the content dimmed rather than skeletoned while it comes
+        // Only the toolbar's links -- its sections, the apps' tabs, and its
+        // menus -- lay the next page's skeleton down: each is a section of
+        // the site of its own, drawn at the press. A link inside a page is
+        // an ordinary trip to the next, the page it is on kept up until that
+        // one has come, so nothing about where the reader was is disturbed
+        // for coming back to it. The page's own pills switch it in place
         // (pill_macro.jinja).
-        if (link.closest("main .ds-segmented")) return;
-        // In the handheld apps the page itself scrolls, and a skeleton in
-        // its place would take its height away and the reader's place with
-        // it: coming back from the back-forward cache would find the page at
-        // its top. So a page opened from inside another is laid over it
-        // instead, the page kept where it is under it. The toolbar's
-        // sections, the app's tabs, start their pages at the top anyway.
-        var handheld = document.documentElement.getAttribute("data-form") === "handheld";
-        loading(link.pathname, handheld && !link.closest(".nav-bar") && link.pathname !== location.pathname);
+        if (!link.closest(".nav-bar")) return;
+        loading(link.pathname);
       });
       // A search is a trip to /search, and the bar's links to it lay a
       // skeleton down while they go; submitting the field is the same trip
