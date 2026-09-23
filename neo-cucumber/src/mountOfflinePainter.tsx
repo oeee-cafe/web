@@ -6,6 +6,7 @@ import Painter from "./Painter";
 import { DefaultI18n } from "./components/DefaultI18n";
 import { setupI18n } from "./utils/i18n";
 import { PainterLabelContext } from "./hooks/usePainterLabels";
+import { presetToPalette } from "./constants/palettePresets";
 import type { ImageSource, PainterError, PainterHandle } from "./public";
 
 export function mountOfflinePainter(
@@ -22,6 +23,20 @@ export function mountOfflinePainter(
   ) {
     const error = new Error(
       "Painter dimensions must be integers between 1×1 and 1024×800",
+    ) as PainterError;
+    error.code = "invalid-options";
+    throw error;
+  }
+
+  const invalidPreset = config.palettePresets?.find(
+    (preset) =>
+      typeof preset?.name !== "string" ||
+      !Array.isArray(preset.colors) ||
+      presetToPalette(preset.colors) === null,
+  );
+  if (invalidPreset) {
+    const error = new Error(
+      "Each palette preset needs a name and fourteen #rrggbb colours",
     ) as PainterError;
     error.code = "invalid-options";
     throw error;

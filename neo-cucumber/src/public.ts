@@ -15,6 +15,9 @@ export type {
   PainterSessionArchive,
 } from "./operations";
 
+export type { PalettePreset } from "./constants/palettePresets";
+import type { PalettePreset } from "./constants/palettePresets";
+
 /**
  * NEO's chrome as class names, for controls the host renders beside the
  * painter. They name rules carried by `neo-cucumber/style.css`; see
@@ -148,6 +151,17 @@ export interface PainterOptions {
    * choose them. Anything left out keeps the painter's; see `painterLabels`.
    */
   labels?: import("./neo/labels").PainterLabelOverrides;
+  /**
+   * Sets of fourteen swatches the toolbox offers to swap in at once, as
+   * POTI-board does with its `palette.txt`. Colours are in NEO's order -- the
+   * order `Neo.getColors` returns and `palette.txt` is written in -- so a set
+   * copied off a board works unchanged.
+   *
+   * Replaces the painter's own list, which is NEO's palette followed by the
+   * sets POTI-board ships. An empty list offers none, and takes the button
+   * away with it. Ignored in two-tone mode, whose palette is its two pens.
+   */
+  palettePresets?: readonly PalettePreset[];
   /**
    * Whether to record a `.pch` replay of this drawing. On by default.
    *

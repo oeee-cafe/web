@@ -45,11 +45,26 @@ msgctxt "painter tool"
 msgid "Bezier"
 msgstr "BZ曲線"
 
+#: src/constants/palettePresets.ts:91
+msgctxt "palette preset"
+msgid "blue"
+msgstr "青系"
+
 #. NEO ぼかし
 #: src/neo/labels.ts:57
 msgctxt "painter tool"
 msgid "Blur"
 msgstr "ぼかし"
+
+#: src/components/NeoPalettePresetsPanel.tsx:97
+msgctxt "palette effect"
+msgid "Bright"
+msgstr "明＋"
+
+#: src/constants/palettePresets.ts:103
+msgctxt "palette preset"
+msgid "character"
+msgstr "人物"
 
 #. NEO 全消し, erase the layer
 #: src/neo/labels.ts:75
@@ -73,10 +88,20 @@ msgctxt "painter tool"
 msgid "Dark"
 msgstr "焼き込み"
 
+#: src/components/NeoPalettePresetsPanel.tsx:98
+msgctxt "palette effect"
+msgid "Dark"
+msgstr "明－"
+
 #: src/components/SimplifiedToolbox.tsx:221
 #: src/components/ToolboxPanel.tsx:333
 #~ msgid "Dark"
 #~ msgstr "ダーク"
+
+#: src/constants/palettePresets.ts:71
+msgctxt "palette preset"
+msgid "Default"
+msgstr "標準"
 
 #. NEO 逆加算
 #: src/neo/labels.ts:93
@@ -99,8 +124,8 @@ msgctxt "painter tool"
 msgid "Fill"
 msgstr "塗り潰し"
 
-#: src/components/ToolboxPanel.tsx:178
-#: src/components/ToolboxPanel.tsx:179
+#: src/components/ToolboxPanel.tsx:184
+#: src/components/ToolboxPanel.tsx:185
 msgid "Fit canvas"
 msgstr "キャンバスに合わせる"
 
@@ -128,6 +153,36 @@ msgctxt "painter tool"
 msgid "Freehan"
 msgstr "手書き"
 
+#: src/components/NeoPalettePresetsPanel.tsx:203
+msgctxt "palette window"
+msgid "GRADATION"
+msgstr "グラデーション"
+
+#: src/components/NeoPalettePresetsPanel.tsx:211
+#: src/components/NeoPalettePresetsPanel.tsx:212
+msgid "Gradation end"
+msgstr "グラデーションの終点"
+
+#: src/components/NeoPalettePresetsPanel.tsx:207
+#: src/components/NeoPalettePresetsPanel.tsx:208
+msgid "Gradation start"
+msgstr "グラデーションの始点"
+
+#: src/constants/palettePresets.ts:111
+msgctxt "palette preset"
+msgid "grass"
+msgstr "草原の大地"
+
+#: src/constants/palettePresets.ts:119
+msgctxt "palette preset"
+msgid "grayscale"
+msgstr "モノクロ"
+
+#: src/constants/palettePresets.ts:87
+msgctxt "palette preset"
+msgid "green"
+msgstr "緑系"
+
 #. NEO トーン
 #: src/neo/labels.ts:56
 msgctxt "painter tool"
@@ -142,6 +197,11 @@ msgstr "{0}のレイヤーを隠す"
 #: src/components/neo/NeoParticipantLayers.tsx:127
 msgid "Hide these layers"
 msgstr "このレイヤーを隠す"
+
+#: src/components/NeoPalettePresetsPanel.tsx:99
+msgctxt "palette effect"
+msgid "Invert"
+msgstr "反転"
 
 #. NEO Layer0
 #: src/neo/labels.ts:105
@@ -206,11 +266,32 @@ msgstr "通常"
 msgid "Off"
 msgstr "オフ"
 
+#: src/components/NeoPalettePresetsPanel.tsx:222
+msgctxt "palette window"
+msgid "Ok"
+msgstr "OK"
+
+#: src/constants/palettePresets.ts:83
+msgctxt "palette preset"
+msgid "orange"
+msgstr "黄・橙系"
+
 #. NEO 楕円, the filled ellipse
 #: src/neo/labels.ts:63
 msgctxt "painter tool"
 msgid "Oval"
 msgstr "楕円"
+
+#: src/components/NeoPalettePresetsPanel.tsx:160
+msgctxt "palette window"
+msgid "PALETTE"
+msgstr "パレット"
+
+#: src/components/NeoPalettePresetsPanel.tsx:169
+#: src/components/ToolboxPanel.tsx:261
+#: src/components/ToolboxPanel.tsx:262
+msgid "Palettes"
+msgstr "パレット"
 
 #: src/neo/labels.ts:84
 msgctxt "painter tool"
@@ -222,18 +303,28 @@ msgctxt "painter tool"
 msgid "Paste"
 msgstr "貼り付け"
 
+#: src/constants/palettePresets.ts:107
+msgctxt "palette preset"
+msgid "pastel"
+msgstr "パステル"
+
 #: src/components/SimplifiedToolbox.tsx:87
 msgid "Pen size"
 msgstr "ペンサイズ"
 
-#: src/components/ToolboxPanel.tsx:240
-#: src/components/ToolboxPanel.tsx:241
+#: src/components/ToolboxPanel.tsx:246
+#: src/components/ToolboxPanel.tsx:247
 msgid "Pick a colour"
 msgstr "色を選ぶ"
 
-#: src/components/ToolboxPanel.tsx:306
+#: src/components/ToolboxPanel.tsx:330
 msgid "Pick a colour from the drawing with the next click"
 msgstr "次のクリックで絵から色を取り込みます"
+
+#: src/constants/palettePresets.ts:95
+msgctxt "palette preset"
+msgid "purple"
+msgstr "紫系"
 
 #. NEO 四角, the filled rectangle
 #: src/neo/labels.ts:61
@@ -241,9 +332,14 @@ msgctxt "painter tool"
 msgid "Rect"
 msgstr "四角"
 
+#: src/constants/palettePresets.ts:79
+msgctxt "palette preset"
+msgid "red"
+msgstr "赤系"
+
 #: src/components/SimplifiedToolbox.tsx:89
 #: src/components/SimplifiedToolbox.tsx:199
-#: src/components/ToolboxPanel.tsx:260
+#: src/components/ToolboxPanel.tsx:284
 msgid "Redo"
 msgstr "やり直し"
 
@@ -257,11 +353,11 @@ msgctxt "painter mask mode"
 msgid "ReMask"
 msgstr "逆ﾏｽｸ"
 
-#: src/components/ToolboxPanel.tsx:209
+#: src/components/ToolboxPanel.tsx:215
 msgid "Reset zoom"
 msgstr "ズームを戻す"
 
-#: src/components/ToolboxPanel.tsx:307
+#: src/components/ToolboxPanel.tsx:331
 msgid "Right click"
 msgstr "右クリック"
 
@@ -271,13 +367,23 @@ msgctxt "painter tool"
 msgid "rotate"
 msgstr "傾け"
 
-#: src/components/ToolboxPanel.tsx:344
+#: src/constants/palettePresets.ts:115
+msgctxt "palette preset"
+msgid "sakura"
+msgstr "萌えサクラ"
+
+#: src/components/ToolboxPanel.tsx:368
 msgid "Save"
 msgstr "保存"
 
-#: src/components/ToolboxPanel.tsx:332
+#: src/components/ToolboxPanel.tsx:356
 msgid "Save drawing to gallery"
 msgstr "描画をギャラリーに保存"
+
+#: src/constants/palettePresets.ts:99
+msgctxt "palette preset"
+msgid "sepia"
+msgstr "セピア"
 
 #: src/components/SimplifiedToolbox.tsx:206
 msgid "Shortcuts"
@@ -291,6 +397,11 @@ msgstr "{0}のレイヤーを表示"
 #: src/components/neo/NeoParticipantLayers.tsx:127
 msgid "Show these layers"
 msgstr "このレイヤーを表示"
+
+#: src/constants/palettePresets.ts:75
+msgctxt "palette preset"
+msgid "skin"
+msgstr "肌色系"
 
 #. NEO 鉛筆
 #: src/neo/labels.ts:52
@@ -318,7 +429,8 @@ msgctxt "painter tool"
 msgid "Text"
 msgstr "ﾃｷｽﾄ"
 
-#: src/Painter.tsx:999
+#: src/Painter.tsx:1035
+#: src/Painter.tsx:1036
 msgid "Time's up."
 msgstr "設定時間が経過しました。"
 
@@ -330,13 +442,13 @@ msgstr "タイマー"
 msgid "Timer off"
 msgstr "タイマー：オフ"
 
-#: src/components/ToolboxPanel.tsx:222
+#: src/components/ToolboxPanel.tsx:228
 msgid "Toggle horizontal flip"
 msgstr "左右反転を切り替え"
 
 #: src/components/SimplifiedToolbox.tsx:88
 #: src/components/SimplifiedToolbox.tsx:191
-#: src/components/ToolboxPanel.tsx:251
+#: src/components/ToolboxPanel.tsx:275
 msgid "Undo"
 msgstr "元に戻す"
 
@@ -358,10 +470,10 @@ msgctxt "painter tool"
 msgid "WhiteRe"
 msgstr "消し四角"
 
-#: src/components/ToolboxPanel.tsx:201
+#: src/components/ToolboxPanel.tsx:207
 msgid "Zoom in"
 msgstr "拡大"
 
-#: src/components/ToolboxPanel.tsx:193
+#: src/components/ToolboxPanel.tsx:199
 msgid "Zoom out"
 msgstr "縮小"

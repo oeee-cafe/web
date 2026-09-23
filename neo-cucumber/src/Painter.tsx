@@ -18,6 +18,7 @@ import { ALL_TOOLS } from "./constants/drawing";
 import { SimplifiedToolbox } from "./components/SimplifiedToolbox";
 import { useOfflineDrawing } from "./hooks/useOfflineDrawing";
 import { useDrawingState } from "./hooks/useDrawingState";
+import { usePalettePresets } from "./hooks/usePalettePresets";
 import { useDrawingTimer } from "./hooks/useDrawingTimer";
 import { useTwoToneShortcuts } from "./hooks/useTwoToneShortcuts";
 import { usePainterShortcuts } from "./hooks/usePainterShortcuts";
@@ -111,6 +112,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     paletteColors,
     setDrawingState,
     setSelectedPaletteIndex,
+    setPaletteColors,
     updateBrushType,
     updateColor,
     setPaletteColor,
@@ -120,6 +122,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     setPenSize,
     adjustPenSize,
   } = useDrawingState();
+  const palettePresets = usePalettePresets(config.palettePresets);
 
   // Initialize two-tone palette immediately if in two-tone mode
   // Use useLayoutEffect to ensure synchronous execution before first paint
@@ -1223,6 +1226,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
                 onUpdateColor={updateColor}
                 onSetSelectedPaletteIndex={setSelectedPaletteIndex}
                 onSetPaletteColor={setPaletteColor}
+                palettePresets={palettePresets}
+                onApplyPalette={setPaletteColors}
                 onZoomIn={() => handleZoomIn()}
                 onZoomOut={() => handleZoomOut()}
                 onZoomReset={handleZoomReset}
