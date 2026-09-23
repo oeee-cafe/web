@@ -69,11 +69,12 @@
       <a class="toolbar-live" href="/collaborate"><span class="toolbar-live-dot" aria-hidden="true"></span>{{ ftl_get_message("collaborate") }}</a>
     </div>
     <div class="toolbar-end">
-      {# The Supporter Pack, where it can be bought: a heart, before search,
-         leading to /supporter. Only an app can take the money, so the
-         button is hidden until an app that can sell marks the root
-         `data-store` -- and left out of the markup entirely when this
-         deployment has no pack for sale.
+      {# The Supporter Pack: a heart, before search, leading to /supporter.
+         Shown wherever the page is read -- it leads to a page and not to a
+         payment, and a browser is where most people will find out the pack
+         exists. Which store can take the money is the page's business
+         (style.css). Left out of the markup entirely when this deployment
+         has no pack for sale.
 
          Drawn as its neighbours are: no fill, a 2px round stroke, 16px in
          a 30px square (ds.css names it beside them). The filled weight in
