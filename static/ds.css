@@ -1101,6 +1101,14 @@ html[data-app] .toolbar-search {
   border-bottom: 1px solid var(--ds-line);
 }
 
+/* Signed out the switch is the whole menu -- what the site is has its own
+   button in the bar -- so there is nothing under the rule to divide from. */
+.toolbar-menu-items .toolbar-theme:last-child {
+  margin-bottom: 0;
+  padding-bottom: 6px;
+  border-bottom: 0;
+}
+
 /* When one row will not hold the name, the sections and the account --
    on a phone, and on any window too narrow for them in its language -- the
    name and the account keep the first line and the sections get a second

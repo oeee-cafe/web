@@ -109,8 +109,15 @@
           </button>
         </form>
       {% else %}
-        {# The same places as signed in: where the bell is, signing in;
-           where Draw is, the one filled button. #}
+        {# What the site is, first: signed in it is the last thing in the
+           account menu, but signed out the only square at the bar's end is
+           the theme's, and nobody looks under a sun for what a site is. It
+           costs a button's width on a narrow window, which fitToolbar
+           spends on the steps below rather than on hiding this.
+
+           Then the same places as signed in: where the bell is, signing
+           in; where Draw is, the one filled button. #}
+        <a class="toolbar-about" href="/about">{{ ftl_get_message("nav-about-menu") }}</a>
         <a class="toolbar-signin" href="/login">{{ ftl_get_message("sign-in") }}</a>
         <a class="toolbar-draw" href="/signup">{{ ftl_get_message("sign-up") }}</a>
       {% endif %}
@@ -156,8 +163,9 @@
         </details>
       {% else %}
         {# Where your initial would be, the theme in use, opening onto the
-           same foot as the account menu: the three-way switch, then what
-           the site is. #}
+           three-way switch and nothing else: what the site is has its own
+           button in the bar above, since a theme square is not where
+           anyone would look for it. #}
         <details class="toolbar-menu toolbar-theme-menu">
           <summary aria-label="{{ ftl_get_message("theme") }}" title="{{ ftl_get_message("theme") }}">
             <span class="toolbar-avatar toolbar-avatar-guest" aria-hidden="true">
@@ -168,7 +176,6 @@
           </summary>
           <div class="toolbar-menu-items">
             {{ theme_choices() }}
-            <a class="toolbar-menu-about" href="/about">{{ ftl_get_message("nav-about-menu") }}</a>
           </div>
         </details>
       {% endif %}

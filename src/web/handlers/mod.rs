@@ -1577,6 +1577,47 @@ mod template_tests {
         assert!(!render(json!(null)).contains("toolbar-supporter"));
     }
 
+    /// What the site is stays somewhere a reader would look for it. Signed
+    /// in that is the foot of the account menu, under their own name;
+    /// signed out there is no such menu, and the only square at the bar's
+    /// end is the theme's — so it is a button in the bar, not a line under
+    /// a sun. `/about` is reachable from the toolbar and nowhere else, so
+    /// the menu it is hidden in is the whole way in.
+    #[test]
+    fn about_is_in_the_bar_signed_out_and_in_the_account_menu_signed_in() {
+        let env = test_support::env();
+        let render = |current_user: serde_json::Value| {
+            env.get_template("toolbar.jinja")
+                .expect("toolbar loads")
+                .render(context! {
+                    current_user,
+                    messages => Vec::<serde_json::Value>::new(),
+                    draft_post_count => 0,
+                    unread_notification_count => 0,
+                    ftl_lang => "en",
+                })
+                .expect("toolbar renders")
+        };
+
+        let out = render(json!(null));
+        assert!(
+            out.contains(r#"<a class="toolbar-about" href="/about">"#),
+            "signed out, About is its own button at the bar's end"
+        );
+        // The theme square opens onto the three-way switch and nothing
+        // else: one link to `/about` in the whole bar, and it is not that
+        // menu's. (The desktop app's Help menu also reaches it, by script.)
+        assert_eq!(out.matches(r#"href="/about""#).count(), 1);
+        assert!(!out.contains("toolbar-menu-about"));
+
+        let signed_in = render(json!({"login_name": "oeee", "display_name": "오이"}));
+        assert!(
+            signed_in.contains(r#"<a class="toolbar-menu-about" href="/about">"#),
+            "signed in, About is the last item of the account menu"
+        );
+        assert_eq!(signed_in.matches(r#"href="/about""#).count(), 1);
+    }
+
     /// Which platform's mark to wear is only a question for someone who
     /// supports on more than one, and the answer they gave is the one
     /// selected.
@@ -2787,3 +2828,4 @@ mod template_tests {
         assert!(none.contains("search-no-results"));
     }
 }
+
