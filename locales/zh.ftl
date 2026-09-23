@@ -480,6 +480,7 @@ handoff-confirm-link = 将此 { $provider } 账户（{ $account }）关联到当
 handoff-confirm-link-unnamed = 将此 { $provider } 账户关联到当前登录的账户吗？
 handoff-done-title = 已登录
 handoff-done-body = 可以关闭此窗口，返回 Oeee Cafe。
+handoff-done-return = 返回 Oeee Cafe
 identity-sign-in-failed = 无法连接到 { $provider }。请稍后再试。
 identity-sign-in-invalid = { $provider } 无法确认你的身份。请再试一次。
 identity-linked = 已关联你的 { $provider } 账户。

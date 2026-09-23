@@ -480,6 +480,7 @@ handoff-confirm-link = 이 { $provider } 계정({ $account })을 지금 로그�
 handoff-confirm-link-unnamed = 이 { $provider } 계정을 지금 로그인한 계정에 연결할까요?
 handoff-done-title = 로그인했습니다
 handoff-done-body = 이 창을 닫고 오이카페로 돌아가세요.
+handoff-done-return = 오이카페로 돌아가기
 identity-sign-in-failed = { $provider }에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.
 identity-sign-in-invalid = { $provider }에서 본인 확인을 하지 못했습니다. 다시 시도해 주세요.
 identity-linked = { $provider } 계정이 연결되었습니다.

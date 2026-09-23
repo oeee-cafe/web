@@ -482,6 +482,7 @@ handoff-confirm-link = Link this { $provider } account ({ $account }) to the acc
 handoff-confirm-link-unnamed = Link this { $provider } account to the account you are signed in to?
 handoff-done-title = Signed in
 handoff-done-body = You can close this window and go back to Oeee Cafe.
+handoff-done-return = Back to Oeee Cafe
 identity-sign-in-failed = Could not reach { $provider }. Please try again in a moment.
 identity-sign-in-invalid = { $provider } could not confirm who you are. Please try again.
 identity-linked = Your { $provider } account is now linked.
