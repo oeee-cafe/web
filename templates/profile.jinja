@@ -57,6 +57,18 @@
         <div class="profile-identity">
           <h1 class="profile-name">{{ user.display_name }}</h1>
           <div class="profile-handle">@{{ user.login_name }}@{{ domain }}</div>
+          {# The month they joined, in Seoul time like every other date on
+             the site. Year and month go to the locale as numbers, so each
+             language words and orders them itself. #}
+          {% set joined_tz = "Asia/Seoul" %}
+          <div class="profile-joined">
+            <time datetime="{{ user.created_at|dateformat(format='[year]-[month]', tz=joined_tz) }}">
+              {{- ftl_format_pattern("profile-member-since", {
+                    "year": user.created_at|dateformat(format="[year]", tz=joined_tz)|int,
+                    "month": user.created_at|dateformat(format="[month padding:none]", tz=joined_tz)|int,
+                  }) -}}
+            </time>
+          </div>
           {% if supporter_standings or links %}
             <div class="profile-chips">
               {% for standing in supporter_standings %}

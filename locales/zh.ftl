@@ -558,6 +558,7 @@ profile-tab-private = 私密
 profile-tab-drawings = 作品
 profile-more = 更多
 profile-private-community-posts-note = 私密社区的作品不会显示在你的公开个人资料中。
+profile-member-since = { $year }年{ $month }月加入
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = 要离开此页面吗？

@@ -2122,6 +2122,7 @@ mod template_tests {
                         "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
                         "login_name": "oeee",
                         "display_name": "오이",
+                        "created_at": "2024-03-05T12:00:00Z",
                     }),
                     banner => json!(null),
                     links => Vec::<serde_json::Value>::new(),
@@ -2157,6 +2158,43 @@ mod template_tests {
         let at = |needle: &str| with.find(needle).unwrap_or_else(|| panic!("no {needle}"));
         assert!(at("profile-achievements") < at("data-profile-tab=\"public\""));
         assert!(at("data-profile-panel=\"public\"") < at("data-profile-panel=\"following\""));
+    }
+
+    /// Under the handle, the month they joined -- in Seoul, so an account
+    /// made on the evening of 29 February UTC joined in March. The locale is
+    /// handed numbers, not a formatted date, and the `<time>` carries the
+    /// machine-readable month.
+    #[test]
+    fn the_profile_says_when_its_owner_joined() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("profile.jinja")
+            .expect("profile loads")
+            .render(context! {
+                user => json!({
+                    "id": "u1",
+                    "login_name": "oeee",
+                    "display_name": "오이",
+                    // What chrono's serde writes for a `DateTime<Utc>`.
+                    "created_at": "2024-02-29T16:30:00.123456Z",
+                }),
+                banner => json!(null),
+                links => Vec::<serde_json::Value>::new(),
+                followings => Vec::<serde_json::Value>::new(),
+                achievements => Vec::<serde_json::Value>::new(),
+                public_community_posts => Vec::<serde_json::Value>::new(),
+                private_community_posts => Vec::<serde_json::Value>::new(),
+                domain => "oeee.cafe",
+                is_following => false,
+                ..chrome()
+            })
+            .expect("profile renders");
+        assert!(
+            rendered.contains(r#"<time datetime="2024-03">profile-member-since(month=3,year=2024)</time>"#),
+            "{rendered}"
+        );
+        let at = |needle: &str| rendered.find(needle).unwrap_or_else(|| panic!("no {needle}"));
+        assert!(at("profile-handle") < at("profile-joined"));
     }
 
     /// A comment as `build_comment_thread_tree` serializes one.
@@ -2255,7 +2293,7 @@ mod template_tests {
             env.get_template("profile.jinja")
                 .expect("profile loads")
                 .render(context! {
-                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이"}),
+                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
                     banner => json!(null),
                     links => Vec::<serde_json::Value>::new(),
                     followings => Vec::<serde_json::Value>::new(),
@@ -2328,7 +2366,7 @@ mod template_tests {
             env.get_template("profile.jinja")
                 .expect("profile loads")
                 .render(context! {
-                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이"}),
+                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
                     banner => json!(null),
                     links => Vec::<serde_json::Value>::new(),
                     followings,
@@ -2373,7 +2411,7 @@ mod template_tests {
             env.get_template("profile.jinja")
                 .expect("profile loads")
                 .render(context! {
-                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이"}),
+                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
                     banner => json!({"image_filename": "abcdef.png", "width": 200, "height": 40}),
                     links => Vec::<serde_json::Value>::new(),
                     followings => Vec::<serde_json::Value>::new(),

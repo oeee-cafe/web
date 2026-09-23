@@ -2745,6 +2745,12 @@ nav a:visited,
   font-size: var(--ds-text-m);
 }
 
+.profile-joined {
+  margin-top: 2px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
 .profile-actions {
   display: flex;
   flex-wrap: wrap;
