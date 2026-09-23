@@ -1245,7 +1245,7 @@ mod template_tests {
             .skip(1)
             .filter_map(|rest| rest.split('"').next())
             .collect();
-        assert!(ids.len() >= 14, "{ids:?}");
+        assert!(ids.len() >= 12, "{ids:?}");
         for lang in ["en", "ko", "ja", "zh"] {
             let ftl = std::fs::read_to_string(root.join(format!("locales/{lang}.ftl"))).unwrap();
             for id in &ids {

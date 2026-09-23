@@ -46,8 +46,8 @@
             window before the page arrives -- rather than keep its own copy
             of NEO's colours in step with this one. Null on a page without
             the design system's stylesheet.
-   words    {leaveTitle, leaveBody, leave, stay, ok, cancel, saveImage,
-             copyImage, share, copyLink, savedImage, savedFile, saveFailed}
+   words    {leaveTitle, leaveBody, leave, stay, saveImage, copyImage,
+             share, copyLink, savedImage, savedFile, saveFailed}
             What an app says in dialogs and menus of its own over the page
             -- the leave prompt, the long press on a drawing, the right-click
             menu -- in the page's language, from the site's catalogues
@@ -228,8 +228,6 @@
       leaveBody: {{ ftl_get_message("app-leave-body")|tojson }},
       leave: {{ ftl_get_message("app-leave")|tojson }},
       stay: {{ ftl_get_message("app-stay")|tojson }},
-      ok: {{ ftl_get_message("app-ok")|tojson }},
-      cancel: {{ ftl_get_message("app-cancel")|tojson }},
       saveImage: {{ ftl_get_message("app-save-image")|tojson }},
       copyImage: {{ ftl_get_message("app-copy-image")|tojson }},
       share: {{ ftl_get_message("app-share")|tojson }},

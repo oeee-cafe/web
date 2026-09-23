@@ -246,7 +246,7 @@ describe("what the site tells the apps", () => {
     const message = last(page, "words");
     expect(keys(message)).toEqual(
       [
-        "cancel", "copyImage", "copyLink", "leave", "leaveBody", "leaveTitle", "ok", "saveFailed",
+        "copyImage", "copyLink", "leave", "leaveBody", "leaveTitle", "saveFailed",
         "saveImage", "savedFile", "savedImage", "share", "stay", "type", "v",
       ],
     );
