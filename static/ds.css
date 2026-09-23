@@ -55,8 +55,9 @@
   --ds-grid-solid: #bbbbff;
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
   --ds-surface: #f2f2ff;
-  /* The toolbar as a floating bar in the handheld apps: the surface, a
-     little clear so the page passing under it shows, and lifted off it. */
+  /* The toolbar as a floating bar (everywhere but the desktop apps): the
+     surface, a little clear so the page passing under it shows, and
+     lifted off it. */
   --ds-bar: rgba(242, 242, 255, 0.88);
   --ds-shadow-bar: 0 8px 24px rgba(40, 40, 90, 0.18), 0 1px 2px rgba(40, 40, 90, 0.12);
   --ds-field: #ffffff;
@@ -465,32 +466,38 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-size: 14px 14px;
 }
 
-/* In the handheld apps the toolbar is a bar on the page, not the screen's
-   top edge. Fused to the edge, with its ground running up under the status
-   bar, it read as part of the screen; and a screen's edge cannot move, so
-   when the page bounced at the top, or was pulled down to reload, the edge
-   came away from the top of the screen and a gap opened above it. Inset
-   from the sides and below the status bar, with corners and a shadow, it
-   is a card like any other on the page: it can come down with the page,
-   which lets the apps keep their own bounce and their own pull to reload.
+/* The toolbar is a bar on the page, not the screen's top edge -- except in
+   the Mac and Windows apps (data-form="desktop"), whose windows have no
+   title bar of their own: there the toolbar is the title bar, fused to the
+   top, with the window's controls on it.
+
+   Fused to the edge on a phone, its ground running up under the status bar,
+   it read as part of the screen, and a screen's edge cannot move: when the
+   page bounced, or was pulled down to reload, the edge came away from the
+   top and a gap opened above it. Inset from the sides and below the status
+   bar, with corners and a shadow, it is a card like any other on the page,
+   which can come down with the page -- so the apps and the browsers keep
+   their own bounce and their own pull to reload. Everywhere else it is the
+   same bar, so the site looks one way wherever it is read.
 
    The header stays what sticks, so the bar stays in reach while the page
-   passes under it, clear through the bar. Its strips around the bar are
-   the page's, not the header's: they let taps through to what passes
-   under them. Only here: a browser, and the Mac and Windows windows --
-   which do not bounce -- keep the toolbar fused to the top, where in a
-   window it is the title bar. */
-html[data-form="handheld"] .ds-page > header {
+   passes under it, clear through the bar. Its strips around the bar are the
+   page's, not the header's: they let taps through to what passes under
+   them. Below the status bar where the page runs under it (viewport-fit,
+   base.jinja) -- a separate declaration, which an engine without env(),
+   Firefox 56 among them, drops alone. */
+html:not([data-form="desktop"]) .ds-page > header {
   padding: 6px 8px 0;
+  padding-top: calc(6px + env(safe-area-inset-top, 0px));
   background: none;
   pointer-events: none;
 }
 
-html[data-form="handheld"] .ds-page > header > * {
+html:not([data-form="desktop"]) .ds-page > header > * {
   pointer-events: auto;
 }
 
-html[data-form="handheld"] .ds-page > header .nav-bar {
+html:not([data-form="desktop"]) .ds-page > header .nav-bar {
   position: relative;
   top: auto;
   padding-top: 0;
@@ -506,13 +513,13 @@ html[data-form="handheld"] .ds-page > header .nav-bar {
    squeeze the site's name out beside the mark on a phone signed out
    (toolbar.jinja fits the bar in steps); the bar's own inner margin gives
    it back. */
-html[data-form="handheld"] .ds-page > header .nav-bar #menubar {
+html:not([data-form="desktop"]) .ds-page > header .nav-bar #menubar {
   padding-right: 8px;
   padding-left: 8px;
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  html[data-form="handheld"] .ds-page > header .nav-bar {
+  html:not([data-form="desktop"]) .ds-page > header .nav-bar {
     background-color: var(--ds-surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
