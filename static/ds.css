@@ -765,10 +765,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  padding: 2px;
+  padding: 1px 1px 2px;
+  border: 1px solid var(--ds-line);
   border-radius: 8px;
   background-color: var(--ds-track);
-  box-shadow: inset 0 0 0 1px var(--ds-line);
 }
 
 .toolbar-sections > * + * {
@@ -932,7 +932,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .nav-bar .toolbar-sections a[aria-current="page"],
 .nav-bar .toolbar-sections a[aria-current="page"]:hover {
   background-color: var(--ds-thumb);
-  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
+  box-shadow: var(--ds-shadow-raise);
   font-weight: 600;
 }
 
@@ -2693,12 +2693,17 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 
 /* A segmented control: two to five choices of one thing. The chosen one is
    marked by aria-pressed, aria-current or `.is-selected`. */
+/* The track's edge is a border, not an inset shadow, and the raised choice
+   has no ring: both were drawn inside the 2px between them, and with the
+   choice's drop shadow below them that left half a pixel of track above it
+   and none under it. Now the padding is the gap, a pixel more at the foot
+   for the drop shadow to take, so the track shows the same 1px all round. */
 .ds-segmented {
   display: inline-block;
-  padding: 2px;
+  padding: 1px 1px 2px;
+  border: 1px solid var(--ds-line);
   border-radius: 7px;
   background-color: var(--ds-track);
-  box-shadow: inset 0 0 0 1px var(--ds-line);
   white-space: nowrap;
 }
 
@@ -2738,7 +2743,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page .ds-segmented > button[aria-pressed="true"],
 .ds-page .ds-segmented > button[aria-pressed="true"]:hover {
   background-color: var(--ds-thumb);
-  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
+  box-shadow: var(--ds-shadow-raise);
   font-weight: 600;
 }
 
@@ -2768,7 +2773,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   transform: translate(var(--thumb-x), var(--thumb-y));
   border-radius: 5px;
   background-color: var(--ds-thumb);
-  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
+  box-shadow: var(--ds-shadow-raise);
   pointer-events: none;
 }
 
