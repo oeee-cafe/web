@@ -1,0 +1,241 @@
+{# Signing in, in an app, with a provider whose page cannot be shown there.
+
+   Apple's and Google's sign-ins are links to /auth/apple and /auth/google,
+   which in a browser go to the provider's page and come back. In the apps
+   neither can: Google refuses its own pages inside an embedded web view
+   (`disallowed_useragent`), and either page opened in a browser of the
+   app's answers there, into cookies that are not the web view's. So each
+   app stops the link and takes one of two ways round, and both are here --
+   each app used to carry its own copy of the page's half, and the copies
+   had drifted apart:
+
+   window.oeeeSignIn.native(provider, next)
+            The app has a sheet of the platform's own that answers with an
+            ID token for a nonce: Sign in with Apple on iOS and macOS,
+            Credential Manager on Android, ASWebAuthenticationSession for
+            Google on iOS and macOS.
+              1. the page asks the site for this sign-in's state and nonce
+                 (POST /auth/<provider>/start), which the site keeps in the
+                 web view's session;
+              2. it sends the app  signIn {provider, nonce}  on the bridge
+                 (app_bridge.jinja), and the app answers by calling
+                 window.oeeeSignIn.answer(told), where `told` is
+                 {id_token, user?} from the sheet, {cancelled: true} for a
+                 sheet put away, or {} for one that could not sign in;
+              3. the page posts the token and the state to /auth/<provider>
+                 with format=json, and the site checks both against the
+                 session (src/apple.rs, src/google.rs, identity.rs) and says
+                 where to go next.
+
+   window.oeeeSignIn.browser(provider, next)
+            The app has no sheet, and hands the sign-in to the system's
+            browser instead: Apple on Android, both on Windows.
+              1. the page starts a handoff (POST /auth/handoff/start,
+                 src/handoff.rs) and sends the app  browse {url}  on the
+                 bridge; the app checks the URL is this site's and opens it
+                 in the browser, or calls window.oeeeSignIn.unopened();
+              2. the page asks the site (POST /auth/handoff/claim) until the
+                 browser has finished, at which point the site signs *this*
+                 session in; the app calls window.oeeeSignIn.resume() when
+                 it is brought back to the front, so the page asks at once.
+
+   Every request is made from here, in the page, so each carries the page's
+   cookie and origin. The app never holds the session, sees the handoff's
+   secret, or decides where the page goes after.
+
+   Builds of the apps from before this carry their own halves under other
+   names -- window.oeeeHandoffAuth and window.oeeeGoogleAuth, injected, and
+   AppleSignIn.swift's evaluated scripts -- and keep using them; nothing here
+   touches those names. #}
+<script>
+  (function () {
+    if (!window.oeeeApp) return;
+
+    function form(fields) {
+      var body = new URLSearchParams();
+      for (var name in fields) {
+        if (fields[name]) body.set(name, fields[name]);
+      }
+      return body.toString();
+    }
+
+    function post(path, fields) {
+      return fetch(path, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form(fields)
+      }).then(function (response) {
+        return response.ok ? response.json() : null;
+      });
+    }
+
+    // Shows the page as it was before the link was pressed. The toolbar
+    // leaves it alone for an app (toolbar.jinja), but a page from before it
+    // knew that slid a skeleton in for the page it thought was coming, and
+    // nothing is coming.
+    function stay() {
+      if (window.oeeeRestoreContent) window.oeeeRestoreContent();
+    }
+
+    // Replaced, not followed: the page signed in from is not left in the
+    // history behind the one it lands on, so Back does not return to a
+    // sign-in form for an account already signed in. The site's notice is
+    // waiting in the session and is shown by the page this replaces with.
+    function go(next) {
+      location.replace(next || "/");
+    }
+
+    // -- A sheet of the platform's own -------------------------------------
+
+    // The sign-in under way: its provider and state. One at a time.
+    var asked = null;
+
+    function native(provider, next) {
+      if (asked) return;
+      asked = { provider: provider, state: null };
+      post("/auth/" + provider + "/start", { next: next })
+        .then(function (started) {
+          if (!started || !started.state || !started.nonce) {
+            asked = null;
+            stay();
+            return;
+          }
+          asked.state = started.state;
+          if (!window.oeeeApp.post("signIn", { provider: provider, nonce: started.nonce }, true)) {
+            asked = null;
+            stay();
+          }
+        })
+        .catch(function () {
+          asked = null;
+          stay();
+        });
+    }
+
+    function answer(told) {
+      var request = asked;
+      asked = null;
+      if (!request || !request.state) return;
+      told = told || {};
+      if (told.cancelled) {
+        // Put away without signing in: nothing went wrong, so nothing is said.
+        stay();
+        return;
+      }
+      // Without a token the site is still asked, with an error, so that it
+      // says it could not confirm who this is in the reader's own language.
+      var fields = told.id_token
+        ? { state: request.state, id_token: told.id_token, user: told.user, format: "json" }
+        : { state: request.state, error: "failed", format: "json" };
+      post("/auth/" + request.provider, fields)
+        .then(function (where) {
+          if (where) go(where.next);
+          else stay();
+        })
+        .catch(stay);
+    }
+
+    // -- The system's browser, and back ------------------------------------
+
+    // The handoff under way: its id, its secret, and its URL.
+    var pending = null;
+    var asking = null;
+    // Whether an ask is in flight. Two at once can spend the handoff between
+    // them: one gets the sign-in and the other "there is no such handoff",
+    // and whichever lands second decides what the page does -- which once
+    // left a successful sign-in on the floor, because the failure arrived
+    // first and cleared `pending` out from under it.
+    var inFlight = false;
+
+    // How often to ask whether the browser has finished, and for how long.
+    // The site forgets a handoff after fifteen minutes (src/handoff.rs), so
+    // there is nothing to find after that.
+    var ASK_EVERY = 2000;
+    var GIVE_UP_AFTER = 15 * 60 * 1000;
+
+    function stop() {
+      if (asking) {
+        clearInterval(asking);
+        asking = null;
+      }
+      pending = null;
+      stay();
+    }
+
+    function ask(confirmed) {
+      if (!pending || inFlight) return;
+      inFlight = true;
+      var fields = { id: pending.id, secret: pending.secret };
+      if (confirmed) fields.confirm = "1";
+      post("/auth/handoff/claim", fields)
+        .then(function (claimed) {
+          inFlight = false;
+          // No answer decides nothing, and neither does "failed": the handoff
+          // is still good, so keep asking rather than give up on a sign-in
+          // that may well have taken.
+          if (!claimed || !pending) return;
+          if (claimed.status === "waiting" || claimed.status === "failed") return;
+          if (claimed.status === "confirm") {
+            // Linking the browser's account to the one signed in here. The
+            // site words the question, in the reader's language, and the app
+            // draws window.confirm as a dialog of its own.
+            if (window.confirm(claimed.message)) ask(true);
+            else stop();
+            return;
+          }
+          if (claimed.status === "ready") {
+            var next = claimed.next;
+            if (asking) clearInterval(asking);
+            asking = null;
+            pending = null;
+            go(next);
+            return;
+          }
+          // "unknown", or anything a later site says that this does not know:
+          // the sign-in is not going to arrive.
+          stop();
+        })
+        .catch(function () {
+          // A request that did not land says nothing either way; the next will.
+          inFlight = false;
+        });
+    }
+
+    function browser(provider, next) {
+      if (pending) return;
+      post("/auth/handoff/start", { provider: provider, next: next })
+        .then(function (started) {
+          if (!started || !started.id || !started.secret || !started.url) {
+            stay();
+            return;
+          }
+          pending = started;
+          if (!window.oeeeApp.post("browse", { url: new URL(started.url, location.href).href }, true)) {
+            stop();
+            return;
+          }
+          asking = setInterval(function () { ask(false); }, ASK_EVERY);
+          setTimeout(function () {
+            if (pending === started) stop();
+          }, GIVE_UP_AFTER);
+        })
+        .catch(stay);
+    }
+
+    window.oeeeSignIn = {
+      native: native,
+      answer: answer,
+      browser: browser,
+      // Back in front, probably from the browser: ask now rather than at the
+      // next turn of the clock.
+      resume: function () {
+        if (pending) ask(false);
+      },
+      // The app went to open the browser and could not.
+      unopened: function () {
+        if (pending) stop();
+      }
+    };
+  })();
+</script>

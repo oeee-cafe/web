@@ -545,3 +545,19 @@ profile-tabs-label = Drawings
 profile-tab-public = Public
 profile-tab-private = Private
 profile-private-community-posts-note = Drawings from private communities are not shown on your public profile.
+
+# Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
+app-leave-title = Leave this page?
+app-leave-body = Anything you have not saved will be lost.
+app-leave = Leave
+app-stay = Stay
+app-ok = OK
+app-cancel = Cancel
+app-save-image = Save image
+app-copy-image = Copy image
+app-share = Share…
+app-copy-link = Copy link
+app-saved-image = Saved to Pictures
+app-saved-file = Saved to Downloads
+app-save-failed = Couldn't save
+app-steam-sign-in-failed = Steam could not sign you in. Make sure Steam is running and try again.

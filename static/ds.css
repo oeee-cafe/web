@@ -180,17 +180,28 @@
 
 /* In the phone apps the reader's text size is the site's: the app says how
    much larger or smaller than the system's default it is, as
-   --oeee-text-scale on the root (WebTab.swift in oeee-cafe-apple, WebTab.kt in oeee-cafe-android; an app that
-   has not said yet gets 1), and every step of the type scale follows it. Text grows and shrinks; pictures, the spaces between things and
-   the painter do not, as in the system's own apps. */
+   --oeee-text-scale on the root (WebTabController.swift in oeee-cafe-apple,
+   SiteBridge.kt in oeee-cafe-android), and every step of the type scale
+   follows it. Text grows and shrinks; pictures, the spaces between things
+   and the painter do not, as in the system's own apps.
+
+   The app says the system's scale as it is, and --ds-text-scale is that
+   kept within 0.8 and 2, as far as these layouts were drawn to go -- a
+   limit each app used to apply for itself. Everything that scales reads
+   --ds-text-scale with a fallback of 1, so a page outside the apps, and an
+   app that has not said yet, is drawn at 1. `clamp()` is newer than the
+   Firefox 56 floor, which is why it is only ever inside this rule: no
+   browser but an app's web view carries data-app, and a custom property's
+   value is not parsed until it is used. */
 html[data-app] {
-  --ds-text-xs: calc(11px * var(--oeee-text-scale, 1));
-  --ds-text-s: calc(12px * var(--oeee-text-scale, 1));
-  --ds-text-m: calc(13px * var(--oeee-text-scale, 1));
-  --ds-text-base: calc(14px * var(--oeee-text-scale, 1));
-  --ds-text-l: calc(16px * var(--oeee-text-scale, 1));
-  --ds-text-xl: calc(20px * var(--oeee-text-scale, 1));
-  --ds-text-2xl: calc(26px * var(--oeee-text-scale, 1));
+  --ds-text-scale: clamp(0.8, var(--oeee-text-scale, 1), 2);
+  --ds-text-xs: calc(11px * var(--ds-text-scale, 1));
+  --ds-text-s: calc(12px * var(--ds-text-scale, 1));
+  --ds-text-m: calc(13px * var(--ds-text-scale, 1));
+  --ds-text-base: calc(14px * var(--ds-text-scale, 1));
+  --ds-text-l: calc(16px * var(--ds-text-scale, 1));
+  --ds-text-xl: calc(20px * var(--ds-text-scale, 1));
+  --ds-text-2xl: calc(26px * var(--ds-text-scale, 1));
 }
 
 /* ---------------------------------------------------------------------------
@@ -621,7 +632,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   font-size: var(--ds-text-l);
   font-weight: 700;
   letter-spacing: -0.01em;
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
 }
 
 /* Each group stays on one line; when the bar is too narrow for them, the
@@ -784,7 +795,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   font: inherit;
   font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
   text-decoration: none;
   white-space: nowrap;
 }
@@ -832,7 +843,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   color: var(--ds-ink);
   font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
   text-decoration: none;
   white-space: nowrap;
 }
@@ -983,7 +994,7 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   opacity: 0;
   font-family: var(--ds-font);
   font-size: var(--ds-text-m);
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -1068,7 +1079,12 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   fill: currentColor;
 }
 
-html[data-app] .toolbar-search {
+/* The phone apps' search tab has a native field above the page, which
+   stands in for both the toolbar's search and the search page's own form
+   (search.jinja). Hidden here rather than left out by the server, which
+   would have to recognise the apps a second time. */
+html[data-app] .toolbar-search,
+html[data-app] .search-page-form {
   display: none;
 }
 
@@ -1207,7 +1223,7 @@ html[data-app] .toolbar-search {
   border-bottom: 1px solid var(--ds-line);
   margin-bottom: 4px;
   font-size: var(--ds-text-m);
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
 .toolbar-menu-who span {
@@ -1415,12 +1431,31 @@ html[data-app] .toolbar-search {
   display: none;
 }
 
-/* In the desktop app on macOS the window's controls take the first 96px of
-   the bar (the app pads it), which only the first row needs to clear: the
-   sections' row reaches back to the usual 16px. */
+/* In the desktop apps the toolbar is the window's title bar, and the
+   window's own controls sit on it: the traffic lights over its first 96px
+   on macOS (SiteView.swift in oeee-cafe-apple, laid out to this bar's 52px
+   first row), and on Windows the three caption buttons, 46px each, over
+   its last 150px (caption.js in oeee-cafe-desktop). The room is kept here,
+   where the bar is drawn, and not by each app's own stylesheet over it --
+   two of those broke silently as this bar changed. Only the first row
+   needs to clear them: the sections' row, when the bar stacks, reaches
+   back under them to the usual 16px. */
+html[data-desktop="macos"] .nav-bar #menubar {
+  padding-left: 96px;
+}
+
 html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   width: calc(100% + 80px);
   margin-left: -80px;
+}
+
+html[data-desktop="windows"] .nav-bar #menubar {
+  padding-right: 150px;
+}
+
+html[data-desktop="windows"] .nav-bar.is-stacked .toolbar-links {
+  width: calc(100% + 138px);
+  margin-right: -138px;
 }
 
 /* The narrowest phones (360px): the same rows, a little closer, so the
@@ -1505,7 +1540,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   font-family: var(--ds-font);
   font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
   text-align: center;
   text-decoration: none;
   vertical-align: middle;
@@ -1565,7 +1600,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   min-height: 24px;
   padding: 2px 9px;
   font-size: var(--ds-text-s);
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
 .ds-button[disabled],
@@ -1598,13 +1633,13 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
   font-family: var(--ds-font);
   font-size: var(--ds-text-base);
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
 .ds-textarea,
 .ds-page textarea:not([class]) {
   padding: 8px 10px;
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
 }
 
 /* Native drop-downs, drawn to match: the closed control is ours, the open
@@ -1627,7 +1662,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
   font-family: var(--ds-font);
   font-size: var(--ds-text-m);
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -1673,7 +1708,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   html[data-app] input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
   html[data-app] textarea,
   html[data-app] select {
-    font-size: max(16px, calc(16px * var(--oeee-text-scale, 1))) !important;
+    font-size: max(16px, calc(16px * var(--ds-text-scale, 1))) !important;
   }
 }
 
@@ -1966,7 +2001,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
   font-size: var(--ds-text-l);
   font-weight: 700;
-  line-height: calc(22px * var(--oeee-text-scale, 1));
+  line-height: calc(22px * var(--ds-text-scale, 1));
 }
 
 .ds-fieldset > legend + *,
@@ -2193,7 +2228,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   box-shadow: 0 0 0 1px var(--ds-line);
   color: var(--ds-ink);
   font-weight: 600;
-  line-height: calc(22px * var(--oeee-text-scale, 1));
+  line-height: calc(22px * var(--ds-text-scale, 1));
   text-align: center;
   font-variant-numeric: tabular-nums;
   -moz-box-sizing: border-box;
@@ -2228,7 +2263,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   font-family: var(--ds-font);
   font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
   min-height: 0;
   box-shadow: none;
   text-decoration: none;
@@ -2322,7 +2357,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   color: var(--ds-ink);
   font-family: var(--ds-font);
   font-size: var(--ds-text-base);
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
   overflow-wrap: break-word;
   word-wrap: break-word;
 }
@@ -2339,7 +2374,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   flex: 0 0 auto;
   width: 8px;
   height: 8px;
-  margin: calc(6px * var(--oeee-text-scale, 1)) var(--ds-space-2) 0 0;
+  margin: calc(6px * var(--ds-text-scale, 1)) var(--ds-space-2) 0 0;
   border-radius: 50%;
   background-color: var(--ds-muted);
 }
@@ -2388,7 +2423,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   -webkit-box-flex: 0;
   flex: 0 0 auto;
   width: 20px;
-  height: calc(20px * var(--oeee-text-scale, 1));
+  height: calc(20px * var(--ds-text-scale, 1));
   min-height: 0;
   margin: 0 calc(-1 * var(--ds-space-1)) 0 var(--ds-space-2);
   padding: 0;
@@ -2589,7 +2624,7 @@ html[data-desktop="macos"] .nav-bar.is-stacked .toolbar-links {
   font-family: var(--ds-font);
   font-size: var(--ds-text-s);
   font-weight: 600;
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
   text-align: center;
 }
 

@@ -8,11 +8,11 @@
   {% include "post_feed_head.jinja" %}
   {# Site search: the form, then the drawings it matched.
      GET /search is also where the apps' native search fields land; they
-     have their own field above the page, so they get no form here. #}
+     have their own field above the page, and ds.css hides this one under
+     it (html[data-app] .search-page-form). #}
   <div class="center-wide communities-page search-page">
     <h1 class="collaborate-title">{{ ftl_get_message("search") }}</h1>
-    {% if not native_search_field %}
-    <div class="communities-bar">
+    <div class="communities-bar search-page-form">
       <form method="get" action="/search" class="communities-filters" role="search">
         <input type="search"
                name="q"
@@ -27,7 +27,6 @@
         <button type="submit" class="ds-button">{{ ftl_get_message("search") }}</button>
       </form>
     </div>
-    {% endif %}
 
     {% if search_query %}
       <p class="hashtag-search-info">

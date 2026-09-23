@@ -1,0 +1,79 @@
+{# What Android's web view leaves out, and the Android app does instead.
+
+   Android System WebView has no navigator.share, and drops a download of a
+   blob: or data: URL without a word -- its download listener is handed a
+   URL only the page can read. The site uses both: sharePost (post_view.jinja)
+   shares a post's link, and the painter and a collaborative session save
+   their PNG as a link to a blob clicked with `download`. So on Android the
+   page does its half here and hands the app the rest on the bridge
+   (app_bridge.jinja):
+
+   share     {title, text}
+             Text and links only, for the system's share sheet.
+   download  {name, mime, data}
+             The file, read by the page, as a data: URL; the app writes it to
+             Pictures or Downloads.
+
+   The other apps' web views do both themselves: WKWebView has Web Share and
+   WKDownload, and WebView2 has both.
+
+   Android builds from before this inject their own copies (share.js and
+   download.js in oeee-cafe-android), which run first and are left alone:
+   navigator.share is already there, and `__oeeeDownload` is already set. #}
+<script>
+  (function () {
+    var app = window.oeeeApp;
+    if (!app || document.documentElement.getAttribute("data-app") !== "android" || !app.connected()) return;
+
+    if (!navigator.share) {
+      var shareable = function (data) {
+        return !!data && !(data.files && data.files.length) && !!(data.url || data.text || data.title);
+      };
+      navigator.share = function (data) {
+        if (!shareable(data)) return Promise.reject(new TypeError("Nothing this app can share"));
+        var text = [data.text, data.url].filter(Boolean).join("\n");
+        app.post("share", { title: data.title || "", text: text || data.title }, true);
+        return Promise.resolve();
+      };
+      navigator.canShare = shareable;
+    }
+
+    if (!window.__oeeeDownload) {
+      window.__oeeeDownload = true;
+      var local = function (link) {
+        return link.hasAttribute("download") && /^(blob|data):/i.test(link.href);
+      };
+      // Read now, inside the click: the painter revokes the blob's URL the
+      // moment after it.
+      var save = function (link) {
+        var name = link.getAttribute("download") || "";
+        fetch(link.href)
+          .then(function (response) { return response.blob(); })
+          .then(function (blob) {
+            var reader = new FileReader();
+            reader.onload = function () {
+              app.post("download", { name: name, mime: blob.type || "", data: reader.result }, true);
+            };
+            reader.readAsDataURL(blob);
+          });
+      };
+      // A link made and clicked from script, never put in the page, as the
+      // painter's is.
+      var click = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        if (local(this)) {
+          save(this);
+          return;
+        }
+        return click.apply(this, arguments);
+      };
+      // A link in the page, pressed by a finger.
+      document.addEventListener("click", function (event) {
+        var link = event.target && event.target.closest ? event.target.closest("a[download]") : null;
+        if (!link || !local(link) || event.defaultPrevented) return;
+        event.preventDefault();
+        save(link);
+      }, true);
+    }
+  })();
+</script>

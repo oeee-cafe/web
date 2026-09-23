@@ -543,3 +543,19 @@ profile-tabs-label = 絵
 profile-tab-public = 公開コミュニティ
 profile-tab-private = プライベートコミュニティ
 profile-private-community-posts-note = プライベートコミュニティで描いた絵は公開プロフィールに表示されません。
+
+# Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
+app-leave-title = このページを離れますか？
+app-leave-body = 保存していない内容は失われます。
+app-leave = 離れる
+app-stay = とどまる
+app-ok = OK
+app-cancel = キャンセル
+app-save-image = 画像を保存
+app-copy-image = 画像をコピー
+app-share = 共有…
+app-copy-link = リンクをコピー
+app-saved-image = ピクチャに保存しました
+app-saved-file = ダウンロードに保存しました
+app-save-failed = 保存できませんでした
+app-steam-sign-in-failed = Steamでログインできませんでした。Steamが起動しているか確認して、もう一度お試しください。

@@ -40,8 +40,17 @@
    Written for Firefox 56 like the rest of static/style.css, which no
    build step touches: flex without `gap`, and the account menu is a
    <details>, so it opens with no script at all. #}
-{# data-signed-in is how the apps are told whether anyone is (app_bridge.jinja). #}
-<nav class="nav-bar" hx-boost:inherited="true"{% if current_user %} data-signed-in{% endif %}>
+{# data-signed-in is how the apps are told whether anyone is (app_bridge.jinja).
+
+   data-window-drag says this bar moves the window in the desktop apps: a
+   press on its empty space drags it and a double click zooms it, while its
+   links, buttons and fields stay the page's. The Mac app reads it
+   (MacWindow.js); the Windows app's webview (Tauri) reads its own spelling
+   of the same thing, data-tauri-drag-region="deep", where "deep" is what
+   lets the bar's children drag too. Both are in the markup, so they arrive
+   with every page and every boosted swap, and nothing in an app has to go
+   looking for this bar by its class. #}
+<nav class="nav-bar" hx-boost:inherited="true" data-window-drag data-tauri-drag-region="deep"{% if current_user %} data-signed-in{% endif %}>
   <div id="menubar">
     {# The mark -- the cucumber slice the site's icon is -- and the site's
        name beside it, in the page's language: home. Its box is the buttons'

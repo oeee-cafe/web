@@ -8,13 +8,32 @@
    root element, so the mark survives it. #}
 {% include "app_bridge.jinja" %}
 <script>
-  // The apps' web views name themselves in the user agent (WebTab.swift on
-  // iOS, WebTab.kt on Android), and the server matches the same two
-  // (APP_USER_AGENT_MARKERS in search.rs). Marked here, before paint, so the toolbar's
-  // search button -- which the apps' native search tabs stand in for -- never
-  // flashes up and away.
-  if (/OeeeCafeiOS/.test(navigator.userAgent)) {
-    document.documentElement.setAttribute("data-app", "ios");
+  // Which app, if any, this page is in -- the one place anything asks. Each
+  // app's web view adds its name to the user agent (WebTabController.swift,
+  // WebTabController.kt, webview2.rs in oeee-cafe-desktop), and each name marks
+  // the root one way, here, before the page paints, so nothing an app
+  // stands in for -- the toolbar's search button, the search page's own
+  // field, both under the phone apps' native search tab -- flashes up and
+  // away. The server does not look: what differs is all in the stylesheet
+  // and in script, keyed on these marks.
+  //
+  // The desktop apps also mark the root themselves, as they did before
+  // they named themselves; a build from then still says the same thing.
+  (function () {
+    var APPS = [
+      [/OeeeCafeiOS/, "data-app", "ios"],
+      [/OeeeCafeAndroid/, "data-app", "android"],
+      [/OeeeCafeMac/, "data-desktop", "macos"],
+      [/OeeeCafeWindows/, "data-desktop", "windows"]
+    ];
+    for (var i = 0; i < APPS.length; i++) {
+      if (APPS[i][0].test(navigator.userAgent)) {
+        document.documentElement.setAttribute(APPS[i][1], APPS[i][2]);
+        return;
+      }
+    }
+  })();
+  if (document.documentElement.getAttribute("data-app") === "ios") {
     // Going back in the app is the web view's edge swipe, which already
     // moved the page; a cross-fade after it would move it twice. Listened
     // for here, in the head, so it is heard before the page first paints.
@@ -30,8 +49,6 @@
         event.viewTransition.skipTransition();
       }
     });
-  } else if (/OeeeCafeAndroid/.test(navigator.userAgent)) {
-    document.documentElement.setAttribute("data-app", "android");
   }
   if (document.documentElement.hasAttribute("data-app")) {
     // Controls are felt as well as seen, as the apps' own are: "light",
@@ -95,4 +112,43 @@
   } catch (error) {
     // Storage refused: the system setting decides, as it does by default.
   }
+</script>
+{% include "app_sign_in.jinja" %}
+{% include "app_polyfills.jinja" %}
+<script>
+  // A page htmx could not fetch is fetched again as an ordinary navigation.
+  //
+  // htmx fetches the site's pages itself (hx-boost, toolbar.jinja). When
+  // nothing answers it does nothing at all, and when a gateway answers in
+  // the site's place -- a proxy's 502, 503 or 504 during a deploy,
+  // Cloudflare's 52x and 530 when the Mac mini is out of reach -- it swaps
+  // the gateway's page into the body. Either way the reader is left on a
+  // page that is not the one they asked for and cannot tell why. Asked
+  // again as a navigation, the failure is the browser's to show -- and in
+  // the apps, each of which puts up its own "can't be reached" screen when
+  // a page fails to load (Unreachable.swift, Unreachable.kt, offline.rs in
+  // oeee-cafe-desktop), the app's. Each app used to watch htmx for this
+  // itself, or not at all.
+  //
+  // Only a page: the whole body, by GET. A part of a page that fails is the
+  // page's to show, and an error page of the site's own -- a 404, a 500 --
+  // is the site speaking, and is swapped in as usual.
+  (function () {
+    var GATEWAY = [502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 530];
+    function page(ctx) {
+      return !!ctx && ctx.target === document.body && !!ctx.request &&
+        String(ctx.request.method).toUpperCase() === "GET";
+    }
+    document.addEventListener("htmx:before:swap", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      if (!page(ctx) || !ctx.response || GATEWAY.indexOf(ctx.response.status) < 0) return;
+      event.preventDefault();
+      location.assign(ctx.request.action);
+    });
+    document.addEventListener("htmx:error", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      if (!page(ctx) || ctx.response) return;
+      location.assign(ctx.request.action);
+    });
+  })();
 </script>

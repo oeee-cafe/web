@@ -5,7 +5,6 @@ use crate::web::handlers::ExtractFtlLang;
 use crate::web::responses::{SearchPostResult, SearchResponse};
 use crate::web::state::AppState;
 use axum::extract::Query;
-use axum::http::{header, HeaderMap};
 use axum::response::{Html, IntoResponse};
 use axum::{extract::State, response::Json};
 use chrono::{DateTime, Utc};
@@ -150,30 +149,15 @@ pub async fn search_json(
     Ok(Json(SearchResponse { posts: posts_typed }))
 }
 
-/// What the iOS and Android apps add to their web views' user agent. The
-/// same two are matched in the browser by theme_head.jinja, which marks the
-/// root data-app; a third phone app has to be added to both.
-const APP_USER_AGENT_MARKERS: [&str; 2] = ["OeeeCafeiOS", "OeeeCafeAndroid"];
-
-/// Whether the page is shown in one of the apps, whose search tab has a native
-/// search field above the page.
-fn has_native_search_field(headers: &HeaderMap) -> bool {
-    headers
-        .get(header::USER_AGENT)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|ua| APP_USER_AGENT_MARKERS.iter().any(|marker| ua.contains(marker)))
-}
-
 /// GET /search — drawings matching `q`, under the form that asked.
 ///
 /// A missing or blank `q` is the form alone rather than a 404, since the apps'
 /// search tabs and a bare visit both land here with nothing typed yet. The apps
-/// bring their own search field, so they get the results without the form.
+/// bring their own search field, and the stylesheet hides this one under it.
 pub async fn search_page(
     auth_session: AuthSession,
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    headers: HeaderMap,
     Query(params): Query<SearchPageQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     let search_query = params
@@ -212,7 +196,6 @@ pub async fn search_page(
     let rendered = template.render(context! {
         current_user => auth_session.user,
         search_query,
-        native_search_field => has_native_search_field(&headers),
         posts,
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,

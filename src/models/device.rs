@@ -10,6 +10,9 @@ use uuid::Uuid;
 pub enum PlatformType {
     Ios,
     Android,
+    /// The Mac app. Its tokens are APNs's, as the phones' are
+    /// (src/push/mod.rs); it said "ios" before it had a name of its own.
+    Macos,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

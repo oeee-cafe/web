@@ -30,14 +30,14 @@
 }
 
 /* In the phone apps these follow the reader's text size too, as the design
-   system's do (ds.css, --oeee-text-scale). */
+   system's do (ds.css, --ds-text-scale). */
 html[data-app] {
-  --text-xs: calc(0.75rem * var(--oeee-text-scale, 1));
-  --text-sm: calc(0.875rem * var(--oeee-text-scale, 1));
-  --text-base: calc(1rem * var(--oeee-text-scale, 1));
-  --text-lg: calc(1.125rem * var(--oeee-text-scale, 1));
-  --text-xl: calc(1.375rem * var(--oeee-text-scale, 1));
-  --text-2xl: calc(1.75rem * var(--oeee-text-scale, 1));
+  --text-xs: calc(0.75rem * var(--ds-text-scale, 1));
+  --text-sm: calc(0.875rem * var(--ds-text-scale, 1));
+  --text-base: calc(1rem * var(--ds-text-scale, 1));
+  --text-lg: calc(1.125rem * var(--ds-text-scale, 1));
+  --text-xl: calc(1.375rem * var(--ds-text-scale, 1));
+  --text-2xl: calc(1.75rem * var(--ds-text-scale, 1));
 }
 
 /* The site's older names for its colours, now the design system's: NEO's
@@ -441,7 +441,7 @@ html[data-app="android"][data-push]::view-transition-new(root) {
 .post-card-meta {
   padding: 8px 1px 0;
   font-size: var(--ds-text-s);
-  line-height: calc(16px * var(--oeee-text-scale, 1));
+  line-height: calc(16px * var(--ds-text-scale, 1));
   color: var(--ds-muted);
 }
 
@@ -450,7 +450,7 @@ html[data-app="android"][data-push]::view-transition-new(root) {
   color: var(--ds-ink);
   font-size: var(--ds-text-m);
   font-weight: 600;
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
 .post-card-title,
@@ -1378,7 +1378,7 @@ html[data-app="android"][data-push]::view-transition-new(root) {
   color: var(--ds-ink);
   font: inherit;
   font-size: var(--ds-text-m);
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -2173,7 +2173,7 @@ html[data-app="android"][data-push]::view-transition-new(root) {
 .community-card-body {
   display: block;
   padding: 10px 12px 12px;
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
 .community-card-name,
@@ -2519,7 +2519,7 @@ html[data-app="android"][data-push]::view-transition-new(root) {
   color: #ffffff;
   font-size: var(--ds-text-s);
   font-weight: 600;
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
 .session-live-dot {
@@ -2832,7 +2832,7 @@ html[data-app="android"][data-push]::view-transition-new(root) {
   background-color: var(--ds-surface);
   color: var(--ds-ink);
   font-size: var(--ds-text-m);
-  line-height: calc(18px * var(--oeee-text-scale, 1));
+  line-height: calc(18px * var(--ds-text-scale, 1));
   white-space: nowrap;
 }
 
@@ -3529,7 +3529,7 @@ a.user-pill:hover {
   font: inherit;
   font-size: var(--ds-text-m);
   font-weight: 500;
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
 }
 
 .ds-page .post-stage-replay .neo-cucumber-replay-button:hover {
@@ -3558,7 +3558,7 @@ a.user-pill:hover {
   font: inherit;
   font-size: var(--ds-text-s);
   font-weight: 500;
-  line-height: calc(20px * var(--oeee-text-scale, 1));
+  line-height: calc(20px * var(--ds-text-scale, 1));
   text-decoration: none;
 }
 

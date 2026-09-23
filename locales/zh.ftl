@@ -543,3 +543,19 @@ profile-tabs-label = 作品
 profile-tab-public = 公开社区
 profile-tab-private = 私密社区
 profile-private-community-posts-note = 私密社区的作品不会显示在你的公开个人资料中。
+
+# Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
+app-leave-title = 要离开此页面吗？
+app-leave-body = 未保存的内容将会丢失。
+app-leave = 离开
+app-stay = 留下
+app-ok = 确定
+app-cancel = 取消
+app-save-image = 保存图片
+app-copy-image = 复制图片
+app-share = 分享…
+app-copy-link = 复制链接
+app-saved-image = 已保存到图片
+app-saved-file = 已保存到下载
+app-save-failed = 无法保存
+app-steam-sign-in-failed = 无法通过 Steam 登录。请确认 Steam 正在运行，然后重试。
