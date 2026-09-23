@@ -54,17 +54,47 @@
         answers with the proofs the site took; the app finishes those and
         only those where its store has finishing (StoreKit), and anything
         else is offered again. The page reloads once, after answering, if
-        the site took any. #}
+        the site took any.
+
+   What happens to a press is the page's to say, since only the page hears
+   the site's answer (supporter.jinja). So purchased() tells the page as
+   well as the app, and an app whose store can end a press without proof --
+   a sale cancelled or left waiting for a parent, one that failed, a
+   Restore that found nothing -- says so with
+
+          window.oeeeApp.store.ended(outcome)
+
+   where outcome is "cancelled", "pending", "failed" or "nothing". Both
+   reach the page as an `oeee:store` event on the document, whose detail
+   is one of
+          {state: "checking"}                   proofs are with the site
+          {state: "checked", taken, refused}    how many it took, and the
+                                                statuses of those it did not
+          {state: "ended", outcome}             from ended() #}
 <script>
   (function () {
     var app = window.oeeeApp;
     if (!app) return;
 
+    function tell(detail) {
+      var event;
+      try {
+        event = new CustomEvent("oeee:store", { detail: detail });
+      } catch (error) {
+        return;
+      }
+      document.dispatchEvent(event);
+    }
+
     app.store = app.store || {};
+    app.store.ended = function (outcome) {
+      tell({ state: "ended", outcome: String(outcome) });
+    };
     app.store.purchased = function (proofs) {
       var store = document.documentElement.getAttribute("data-store");
       var list = Array.isArray(proofs) ? proofs.filter(function (proof) { return typeof proof === "string" && proof; }) : [];
       if (!store) list = [];
+      if (list.length) tell({ state: "checking" });
       return Promise.all(list.map(function (proof) {
         return fetch("/store/" + store + "/purchases", {
           method: "POST",
@@ -75,12 +105,19 @@
           // A plain yes only. Nobody signed in (401), too many at once (429)
           // and the store out of reach (502) are all worth offering again,
           // so none of them lets the app finish.
-          return response.status === 204 ? proof : null;
+          return { proof: proof, status: response.status };
         }, function () {
-          return null;
+          // Never reached the site: as good as a store out of reach.
+          return { proof: proof, status: 0 };
         });
       })).then(function (answers) {
-        var taken = answers.filter(Boolean);
+        var taken = [];
+        var refused = [];
+        answers.forEach(function (answer) {
+          if (answer.status === 204) taken.push(answer.proof);
+          else refused.push(answer.status);
+        });
+        if (list.length) tell({ state: "checked", taken: taken.length, refused: refused });
         // After the answer has gone back, so the app hears it before the
         // page it came from goes away.
         if (taken.length) setTimeout(function () { location.reload(); }, 0);

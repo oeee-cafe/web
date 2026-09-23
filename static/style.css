@@ -2844,6 +2844,15 @@ html[data-store] .supporter-elsewhere {
   opacity: 0.85;
 }
 
+/* What became of the last press: the store's answer, or the site's. */
+.supporter-status {
+  margin-top: var(--ds-space-3);
+}
+
+.supporter-status-error {
+  color: var(--ds-danger-text);
+}
+
 /* The thanks, with this year's mark before it. */
 .supporter-thanks .supporter-mark {
   margin-right: 4px;

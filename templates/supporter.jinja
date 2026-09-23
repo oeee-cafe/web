@@ -62,6 +62,9 @@
               <button type="button" class="ds-button supporter-restore">{{ ftl_get_message("supporter-pack-restore") }}</button>
             {% endif %}
           </div>
+          {# What became of the last press, once the store or the site has
+             answered it (the script below). #}
+          <p class="ds-help supporter-status" role="status" aria-live="polite" hidden></p>
           {% if nothing_this_year %}
             <p class="ds-help">{{ ftl_format_pattern("supporter-pack-none", {"year": this_year}) }}</p>
           {% endif %}
@@ -132,14 +135,96 @@
         ask("prices", { products: products });
       }
 
+      // What became of a press, said under the buttons. A pack bought is
+      // said by the page the site reloads to, which has it; a Restore
+      // might give back nothing that page shows differently, so it leaves
+      // a note for the page after it to say.
+      var WORDS = {
+        checking: {{ ftl_get_message("supporter-pack-checking")|tojson }},
+        restored: {{ ftl_get_message("supporter-pack-restored")|tojson }},
+        nothing: {{ ftl_get_message("supporter-pack-nothing-to-restore")|tojson }},
+        pending: {{ ftl_get_message("supporter-pack-pending")|tojson }},
+        failed: {{ ftl_get_message("supporter-pack-failed")|tojson }},
+        refused: {{ ftl_get_message("supporter-pack-refused")|tojson }},
+        later: {{ ftl_get_message("supporter-pack-later")|tojson }},
+        signIn: {{ ftl_get_message("supporter-pack-sign-in")|tojson }}
+      };
+      var NOTE = "oeee-supporter-note";
+      var status = document.querySelector(".supporter-status");
+      function say(words, error) {
+        if (!status) return;
+        status.textContent = words || "";
+        status.hidden = !words;
+        status.classList.toggle("supporter-status-error", !!error);
+      }
+      function busy(on) {
+        var controls = document.querySelectorAll(".supporter-buy, .supporter-restore");
+        for (var i = 0; i < controls.length; i++) controls[i].disabled = on;
+      }
+      try {
+        if (sessionStorage.getItem(NOTE) === "restored") say(WORDS.restored);
+        sessionStorage.removeItem(NOTE);
+      } catch (error) {
+        // Storage refused: the page after a Restore says nothing of it.
+      }
+
+      // What was last pressed, while its answer is outstanding. Proof the
+      // app hands over unasked -- a purchase it found unfinished as the
+      // page opened -- is checked quietly, and is shown by the reload when
+      // the site takes it.
+      var pressed = null;
+      document.addEventListener("oeee:store", function (event) {
+        var told = event.detail || {};
+        if (!pressed) return;
+        if (told.state === "checking") {
+          busy(true);
+          say(WORDS.checking);
+          return;
+        }
+        var was = pressed;
+        pressed = null;
+        busy(false);
+        if (told.state === "checked") {
+          if (told.taken) {
+            if (was === "restore") {
+              try {
+                sessionStorage.setItem(NOTE, "restored");
+              } catch (error) {
+                // Nothing to leave the note in; the reload says it alone.
+              }
+            }
+            say(WORDS.checking);
+            return;
+          }
+          var refused = told.refused || [];
+          if (refused.indexOf(401) !== -1) say(WORDS.signIn, true);
+          // Proof the store does not know, or a site not set up to ask it:
+          // offering it again would be answered the same way.
+          else if (refused.every(function (code) { return code === 400 || code === 404; })) say(WORDS.refused, true);
+          else say(WORDS.later, true);
+          return;
+        }
+        if (told.state === "ended") {
+          if (told.outcome === "pending") say(WORDS.pending);
+          else if (told.outcome === "nothing") say(WORDS.nothing);
+          else if (told.outcome === "failed") say(WORDS.failed, true);
+          else say("");
+        }
+      });
+
       document.addEventListener("click", function (event) {
         var buy = event.target.closest && event.target.closest(".supporter-buy");
         if (buy) {
-          ask("purchase", { product: buy.getAttribute("data-product") });
+          if (buy.disabled) return;
+          say("");
+          if (ask("purchase", { product: buy.getAttribute("data-product") })) pressed = "purchase";
           return;
         }
         var restore = event.target.closest && event.target.closest(".supporter-restore");
-        if (restore) ask("restore", {});
+        if (restore && !restore.disabled) {
+          say("");
+          if (ask("restore", {})) pressed = "restore";
+        }
       });
     })();
   </script>
