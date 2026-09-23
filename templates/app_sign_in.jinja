@@ -41,12 +41,7 @@
 
    Every request is made from here, in the page, so each carries the page's
    cookie and origin. The app never holds the session, sees the handoff's
-   secret, or decides where the page goes after.
-
-   Builds of the apps from before this carry their own halves under other
-   names -- window.oeeeHandoffAuth and window.oeeeGoogleAuth, injected, and
-   AppleSignIn.swift's evaluated scripts -- and keep using them; nothing here
-   touches those names. #}
+   secret, or decides where the page goes after. #}
 <script>
   (function () {
     if (!window.oeeeApp) return;
@@ -211,7 +206,7 @@
             return;
           }
           pending = started;
-          if (!window.oeeeApp.post("browse", { url: new URL(started.url, location.href).href }, true)) {
+          if (!window.oeeeApp.post("browse", { url: new URL(started.url, document.baseURI).href }, true)) {
             stop();
             return;
           }
