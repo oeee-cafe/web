@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
 import App from "./App";
-import { DefaultI18n } from "./components/DefaultI18n";
+import { DefaultI18n } from "neo-cucumber";
 import { setupI18n } from "./i18n";
 import { encodePainterOperation, MSG_TYPE } from "./binaryProtocol";
 import type { PainterOperation } from "neo-cucumber";

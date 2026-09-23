@@ -14,39 +14,6 @@
  * installed package.
  */
 @import "neo-cucumber/style.css";
+/* Nothing on the page is selectable but the fields; see the file for why. */
+@import "../shared/selection.css";
 @source ".";
-
-/*
- * A drawing page has nothing to read.
- *
- * Dragging across text selects it, and a selection is a mode: while one is up
- * the browser spends the next press dismissing it -- and on a touch screen the
- * one after that on the handles and the callout it has drawn beside them. One
- * stray drag across the toolbox, which is a thing you do constantly while
- * moving panels around a canvas, and every button on the page stopped
- * answering until something cleared it. Nothing on a page of buttons and
- * canvas ever does.
- *
- * This is NEO's own answer, and it is worth saying that it is: `.NEO` carries
- * `user-select: none` and `-webkit-touch-callout: none`, and then
- * `container.js` widens it to `*` for the whole page at startup. The callout
- * is not decoration -- on iOS a long press raises the copy menu, which is the
- * same mode arriving by a different door.
- *
- * NEO's exception is `*[contenteditable]`, and ours is the same list plus the
- * fields it has none of: somewhere you type is somewhere you have to be able
- * to select, which includes the painter's own text tool.
- */
-body {
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-}
-
-input,
-textarea,
-[contenteditable] {
-  user-select: text;
-  -webkit-user-select: text;
-  -webkit-touch-callout: default;
-}

@@ -95,6 +95,20 @@ export {
 export { Icon, type IconProps } from "./components/Icon";
 
 /**
+ * Lingui, set up the way the painter sets itself up, for a host with catalogs
+ * of its own.
+ *
+ * `activateLocale` loads a catalog into the `i18n` it is given and activates
+ * it, with English for any language the catalogs lack; `DefaultI18n` is the
+ * element the painter renders its `<Trans>` text into. A host rendering its
+ * own messages beside the painter's takes both, so the two agree on what an
+ * unsupported language falls back to and on what a message is wrapped in.
+ * The catalogs stay the host's: the package's are loaded by `mount`.
+ */
+export { activateLocale, type Catalogs } from "./utils/activateLocale";
+export { DefaultI18n } from "./components/DefaultI18n";
+
+/**
  * Public API for neo-cucumber.
  *
  * This file is deliberately host- and framework-neutral. It is the contract
