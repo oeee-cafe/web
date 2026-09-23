@@ -5,7 +5,7 @@ import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
 import * as Sentry from "@sentry/react";
 import { setupI18n, fetchPreferredLocale } from "./i18n";
-import { DefaultI18n } from "./components/DefaultI18n";
+import { DefaultI18n } from "neo-cucumber";
 
 Sentry.init({
   dsn: "https://930f2aecbd98603e4dd1651924c1004a@o4504757655764992.ingest.us.sentry.io/4510046135582720",

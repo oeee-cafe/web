@@ -9,6 +9,8 @@
     "dist-lib/types/operations.d.ts",
     "dist-lib/types/styles.d.ts",
     "dist-lib/types/components/Icon.d.ts",
+    "dist-lib/types/components/DefaultI18n.d.ts",
+    "dist-lib/types/utils/activateLocale.d.ts",
     "dist-lib/types/components/neo/neoClasses.d.ts",
     "dist-lib/types/utils/windowDrag.d.ts"
   ],

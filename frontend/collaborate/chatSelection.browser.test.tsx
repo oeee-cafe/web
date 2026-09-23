@@ -3,9 +3,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
-import { NEO_BUTTON } from "neo-cucumber";
+import { DefaultI18n, NEO_BUTTON } from "neo-cucumber";
 import { Chat } from "./components/Chat";
-import { DefaultI18n } from "./components/DefaultI18n";
 import { setupI18n } from "./i18n";
 import "./app.css";
 

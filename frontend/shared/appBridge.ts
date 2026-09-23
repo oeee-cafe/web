@@ -7,6 +7,10 @@ import type { PainterCommand, PainterHandle } from "neo-cucumber";
  * when the system's "Only Draw with Apple Pencil" is on. Anywhere else nothing
  * is listening, and nothing happens.
  *
+ * Both drawing pages make the offer, the painter's and the collaborative
+ * session's, which is why it lives beside them rather than in either: a pen
+ * does not stop being a pen because other people are drawing too.
+ *
  * Returns the offer's withdrawal, for a host that unmounts its painter.
  */
 export function offerPainterToApp(painter: PainterHandle): () => void {

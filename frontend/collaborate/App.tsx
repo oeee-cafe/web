@@ -20,7 +20,7 @@ import {
   type PainterCheckpointLayers,
   type PainterHandle,
 } from "neo-cucumber";
-import { offerPainterToApp } from "../painter/iosApp";
+import { offerPainterToApp } from "../shared/appBridge";
 import "./app.css";
 import { Chat } from "./components/Chat";
 import { SessionExpiredModal } from "./components/SessionExpiredModal";

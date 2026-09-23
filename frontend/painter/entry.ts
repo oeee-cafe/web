@@ -7,7 +7,7 @@ import {
   type PainterMode,
   type PainterHandle,
 } from "neo-cucumber";
-import { offerPainterToApp } from "./iosApp";
+import { offerPainterToApp } from "../shared/appBridge";
 // The chrome this adapter borrows below lives in the package's stylesheet,
 // which a library build keeps out of the JavaScript bundle. It is imported
 // through this adapter's own file so that the utilities named here are compiled

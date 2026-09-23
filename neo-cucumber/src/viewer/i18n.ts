@@ -14,6 +14,8 @@
  */
 import { msg } from "@lingui/core/macro";
 import { i18n } from "@lingui/core";
+// By path, not through the package's entry: that would bring the painter.
+import { activateLocale } from "../utils/activateLocale";
 import { messages as enMessages } from "./locales/en/messages";
 import { messages as jaMessages } from "./locales/ja/messages";
 import { messages as koMessages } from "./locales/ko/messages";
@@ -28,9 +30,7 @@ const catalogs = {
 
 /** Activate a locale, falling back to English for anything untranslated. */
 export function setupViewerI18n(locale: string): void {
-  const language = locale in catalogs ? (locale as keyof typeof catalogs) : "en";
-  i18n.load(language, catalogs[language]);
-  i18n.activate(language);
+  activateLocale(i18n, catalogs, locale);
 }
 
 /**
