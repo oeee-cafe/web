@@ -766,9 +766,9 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--ds-line);
-  border-radius: 8px;
+  border-radius: 7px;
   background-color: var(--ds-track);
 }
 
@@ -776,11 +776,11 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   margin-left: 2px;
 }
 
-/* Two pixels shorter and a tighter corner than the toolbar's other links,
-   for the 3px of track around them (.ds-segmented). */
+/* A pixel shorter and a tighter corner than the toolbar's other links,
+   for the 2px of track around them (.ds-segmented). */
 .nav-bar .toolbar-sections a {
-  padding-top: 2px;
-  padding-bottom: 2px;
+  padding-top: 3px;
+  padding-bottom: 3px;
   border-radius: var(--ds-radius-s);
 }
 
@@ -2780,7 +2780,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 /* A segmented control: two to five choices of one thing. The chosen one is
    marked by aria-pressed, aria-current or `.is-selected`.
 
-   The chosen one sits the same 3px from the track's edge on every side:
+   The chosen one sits the same 2px from the track's edge on every side:
    - The edge is a border, so the padding is the gap. An inset shadow, and a
      ring round the choice, were both drawn inside it.
    - The choice's edge is drawn inside it, the same on all four sides. A
@@ -2790,15 +2790,15 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
    - The track is a flex box. Inline blocks sat on a line box taller than
      they were, lower than the padding put them where the page's line
      height is larger, and a space apart wherever the markup had one.
-   The corners nest: the track's 8px is the choice's 4px plus the 3px and
+   The corners nest: the track's 7px is the choice's 4px plus the 2px and
    the border. */
 .ds-segmented {
   display: -webkit-inline-box;
   display: inline-flex;
   vertical-align: middle;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--ds-line);
-  border-radius: 8px;
+  border-radius: 7px;
   background-color: var(--ds-track);
   white-space: nowrap;
 }
@@ -2809,7 +2809,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page .ds-segmented > button {
   display: inline-block;
   margin: 0;
-  padding: 1px 12px;
+  padding: 2px 12px;
   border: 0;
   border-radius: var(--ds-radius-s);
   background: none;
