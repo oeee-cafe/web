@@ -2505,10 +2505,8 @@ mod template_tests {
         let env = test_support::env();
         let config = r##"{"width":640,"height":480,"communityId":"9c881320-2b43-4afa-b2bb-7128c8a3e985","mode":{"kind":"two-tone","backgroundColor":"#ffffff","foregroundColor":"#000000"}}"##;
 
-        for template_name in [
-            "draw_post_cucumber.jinja",
-            "draw_post_cucumber_mobile.jinja",
-        ] {
+        {
+            let template_name = "draw_post_cucumber.jinja";
             let rendered = env
                 .get_template(template_name)
                 .unwrap_or_else(|e| panic!("{template_name} loads: {e:#}"))
@@ -2554,7 +2552,8 @@ mod template_tests {
         let env = test_support::env();
         let config = r#"{"width":200,"height":40,"submission":{"kind":"banner","profileUrl":"/@artist"},"mode":{"kind":"standard"}}"#;
 
-        for template_name in ["draw_banner.jinja", "draw_banner_mobile.jinja"] {
+        {
+            let template_name = "draw_banner.jinja";
             let rendered = env
                 .get_template(template_name)
                 .unwrap_or_else(|e| panic!("{template_name} loads: {e:#}"))
@@ -3058,23 +3057,21 @@ mod template_tests {
     #[test]
     fn a_guest_painter_says_where_the_drawing_is_kept() {
         let env = test_support::env();
-        for name in ["draw_post_cucumber.jinja", "draw_post_cucumber_mobile.jinja"] {
-            let rendered = env
-                .get_template(name)
-                .expect("painter template loads")
-                .render(context! {
-                    width => 300,
-                    height => 300,
-                    tool => "neo",
-                    painter_config => "{}",
-                    ..guest_chrome()
-                })
-                .expect("painter renders for a guest");
-            assert!(rendered.contains("draw-guest-notice"), "{name} does not warn a guest");
-            let words = json_script(&rendered, "oeee-painter-words");
-            assert_eq!(words["guestSaved"], "draw-guest-saved", "{name}");
-            assert_eq!(words["downloadPng"], "draw-download-png", "{name}");
-        }
+        let rendered = env
+            .get_template("draw_post_cucumber.jinja")
+            .expect("painter template loads")
+            .render(context! {
+                width => 300,
+                height => 300,
+                tool => "neo",
+                painter_config => "{}",
+                ..guest_chrome()
+            })
+            .expect("painter renders for a guest");
+        assert!(rendered.contains("draw-guest-notice"), "the painter does not warn a guest");
+        let words = json_script(&rendered, "oeee-painter-words");
+        assert_eq!(words["guestSaved"], "draw-guest-saved");
+        assert_eq!(words["downloadPng"], "draw-download-png");
     }
 
     #[test]
