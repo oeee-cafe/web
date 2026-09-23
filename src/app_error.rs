@@ -19,6 +19,9 @@ pub mod error_codes {
     pub const INVALID_VERIFICATION_CODE: &str = "INVALID_VERIFICATION_CODE";
     pub const FORBIDDEN: &str = "FORBIDDEN";
     pub const CONFLICT: &str = "CONFLICT";
+    /// A drawing sent for a community this account may not post in. The
+    /// painter's drafts page reads it to offer posting it without one.
+    pub const COMMUNITY_NOT_ALLOWED: &str = "COMMUNITY_NOT_ALLOWED";
 }
 
 /// Check if an error should be filtered from Sentry reporting.

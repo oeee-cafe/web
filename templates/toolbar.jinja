@@ -50,7 +50,7 @@
    lets the bar's children drag too. Both are in the markup, so they arrive
    with every page and every boosted swap, and nothing in an app has to go
    looking for this bar by its class. #}
-<nav class="nav-bar" hx-boost:inherited="true" data-window-drag data-tauri-drag-region="deep"{% if current_user %} data-signed-in{% endif %}>
+<nav class="nav-bar" hx-boost:inherited="true" data-window-drag data-tauri-drag-region="deep"{% if current_user %} data-signed-in data-user-id="{{ current_user.id }}"{% endif %}>
   <div id="menubar">
     {# The mark -- the cucumber slice the site's icon is -- and the site's
        name beside it, in the page's language: home. Its box is the buttons'
@@ -137,9 +137,26 @@
       {% endif %}
       {% if current_user %}
         {% include "nav_notifications.jinja" %}
+      {% else %}
+        {# What the site is, first: signed in it is the last thing in the
+           account menu, but signed out the only other square at the bar's
+           end is the theme's, and nobody looks under a sun for what a site
+           is. An info mark, square like its neighbours, with its words for
+           its label and tooltip.
+
+           Then signing in, as a mark: a door with the arrow going in.
+           Draw, after it, is the filled button signed out as it is signed
+           in -- a guest can draw, and keeps the drawing in this browser.
+           Signing up has no button of its own: the sign in page offers it,
+           so one button covers both. Both marks are Material Symbols
+           (info-outline, login; Apache 2.0; THIRD-PARTY-NOTICES.md). #}
+        <a class="toolbar-square toolbar-button toolbar-about" href="/about" aria-label="{{ ftl_get_message("nav-about-menu") }}" title="{{ ftl_get_message("nav-about-menu") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 17h2v-6h-2zm1-8q.425 0 .713-.288T13 8t-.288-.712T12 7t-.712.288T11 8t.288.713T12 9m0 13q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg></a>
+        <a class="toolbar-square toolbar-button toolbar-sign-in" href="/login" aria-label="{{ ftl_get_message("sign-in") }}" title="{{ ftl_get_message("sign-in") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21v-2h7V5h-7V3h7q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21zm-2-4l-1.375-1.45l2.55-2.55H3v-2h8.175l-2.55-2.55L10 7l5 5z"/></svg></a>
+      {% endif %}
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
-           again.
+           again. Signed out too: a guest can draw, and the drawing is kept
+           in this browser until they have an account to post it from.
 
            Only its brush, square like the icons beside it: its words are
            its label and tooltip. It keeps the lime fill, the one filled
@@ -152,21 +169,6 @@
             {# material-symbols:brush (Apache 2.0; THIRD-PARTY-NOTICES.md). #}<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 21q-1.125 0-2.225-.55T2 19q.65 0 1.325-.513T4 17q0-1.25.875-2.125T7 14t2.125.875T10 17q0 1.65-1.175 2.825T6 21m5.75-6L9 12.25l8.95-8.95q.275-.275.688-.288t.712.288l1.35 1.35q.3.3.3.7t-.3.7z"/></svg>
           </button>
         </form>
-      {% else %}
-        {# What the site is, first: signed in it is the last thing in the
-           account menu, but signed out the only other square at the bar's
-           end is the theme's, and nobody looks under a sun for what a site
-           is. An info mark, square like its neighbours, with its words for
-           its label and tooltip.
-
-           Then signing in, as the one filled button where Draw is when
-           signed in, and as a mark too: a door with the arrow going in.
-           Signing up has no button of its own: the sign in page offers it,
-           so one button covers both. Both marks are Material Symbols
-           (info-outline, login; Apache 2.0; THIRD-PARTY-NOTICES.md). #}
-        <a class="toolbar-square toolbar-button toolbar-about" href="/about" aria-label="{{ ftl_get_message("nav-about-menu") }}" title="{{ ftl_get_message("nav-about-menu") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 17h2v-6h-2zm1-8q.425 0 .713-.288T13 8t-.288-.712T12 7t-.712.288T11 8t.288.713T12 9m0 13q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg></a>
-        <a class="toolbar-square toolbar-draw toolbar-sign-in" href="/login" aria-label="{{ ftl_get_message("sign-in") }}" title="{{ ftl_get_message("sign-in") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21v-2h7V5h-7V3h7q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21zm-2-4l-1.375-1.45l2.55-2.55H3v-2h8.175l-2.55-2.55L10 7l5 5z"/></svg></a>
-      {% endif %}
       {% if current_user %}
         <details class="toolbar-menu">
           <summary aria-label="{{ current_user.display_name or current_user.login_name }}">
@@ -185,7 +187,10 @@
               <span>@{{ current_user.login_name }}</span>
             </div>
             <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>
-            <a href="/posts/drafts">{{ ftl_get_message("drafts") }}
+            {# Unboosted: the drafts page lists the drawings kept in this
+               browser with a module bundle, which a boosted visit would not
+               run a second time. The script below adds those to the count. #}
+            <a href="/posts/drafts" hx-boost="false" class="toolbar-menu-drafts" data-server-count="{{ draft_post_count }}">{{ ftl_get_message("drafts") }}
               {%- if draft_post_count > 0 %} <span class="toolbar-badge">{{ draft_post_count }}</span>{% endif -%}
             </a>
             <a href="/account">{{ ftl_get_message("account") }}
@@ -221,6 +226,11 @@
             </span>
           </summary>
           <div class="toolbar-menu-items">
+            {# Drawings saved in this browser while signed out, which is
+               the only place they are. Shown by the script below, with a
+               dot on this square, only when there are some. Unboosted for
+               the reason the account menu's is. #}
+            <a href="/posts/drafts" hx-boost="false" class="toolbar-menu-drafts" data-server-count="0" hidden>{{ ftl_get_message("drafts") }}</a>
             {{ theme_choices() }}
           </div>
         </details>
@@ -772,6 +782,59 @@
         // Back to a page kept in memory: it is shown as it was left.
         if (event.persisted) restoreContent();
       });
+    })();
+  </script>
+  {# Drawings kept in this browser (frontend/shared/localDrafts.ts), added
+     to what the server counted: the account's own and every guest's, since
+     those are what the drafts page offers to post. The database is opened
+     without being made -- a first visit aborts the upgrade that would create
+     it, so the painter still gets to create it with its store. #}
+  <script>
+    (function () {
+      var link = document.querySelector(".nav-bar .toolbar-menu-drafts");
+      if (!link || !window.indexedDB) return;
+      var nav = link.closest ? link.closest(".nav-bar") : null;
+      var userId = (nav && nav.getAttribute("data-user-id")) || "";
+      var opening;
+      try { opening = indexedDB.open("oeee-local-drafts", 1); } catch (e) { return; }
+      opening.onupgradeneeded = function () { opening.transaction.abort(); };
+      opening.onerror = function (event) { if (event.preventDefault) event.preventDefault(); };
+      opening.onsuccess = function () {
+        var db = opening.result;
+        var index;
+        try { index = db.transaction("drafts", "readonly").objectStore("drafts").index("owner"); }
+        catch (e) { db.close(); return; }
+        var owners = userId ? ["", userId] : [""];
+        var local = 0, pending = owners.length;
+        owners.forEach(function (owner) {
+          var counting = index.count(owner);
+          counting.onsuccess = function () {
+            local += counting.result;
+            if (--pending === 0) { db.close(); show(local); }
+          };
+        });
+      };
+      function show(local) {
+        if (!local) return;
+        var total = (parseInt(link.getAttribute("data-server-count"), 10) || 0) + local;
+        link.hidden = false;
+        var badge = link.querySelector(".toolbar-badge");
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "toolbar-badge";
+          link.appendChild(document.createTextNode(" "));
+          link.appendChild(badge);
+        }
+        badge.textContent = String(total);
+        var summary = link.closest ? link.closest(".toolbar-menu") : null;
+        summary = summary && summary.querySelector("summary");
+        if (summary && !summary.querySelector(".toolbar-dot")) {
+          var dot = document.createElement("span");
+          dot.className = "toolbar-dot toolbar-dot-drafts";
+          dot.title = link.textContent.replace(/\s+\d+\s*$/, "").trim();
+          summary.appendChild(dot);
+        }
+      }
     })();
   </script>
   {% include "loading_bar.jinja" %}

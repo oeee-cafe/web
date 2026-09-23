@@ -11,6 +11,36 @@
      other, so the page does not repeat it. #}
   {% include "post_feed_head.jinja" %}
   <div class="profile drafts-page">
+    {# Drawings kept in this browser (frontend/shared/localDrafts.ts): a
+       guest's, waiting for an account to be posted from, and any of this
+       account's whose upload did not go through. Nothing the server knows
+       about, so it arrives empty and hidden and frontend/drafts/entry.ts
+       fills it in. #}
+    <section class="profile-section local-drafts" id="local-drafts" hidden
+             aria-labelledby="local-drafts-heading"
+             data-user-id="{% if current_user %}{{ current_user.id }}{% endif %}">
+      <div class="grid-header drafts-header">
+        <div>
+          <h2 id="local-drafts-heading" class="profile-name">{{ ftl_get_message("drafts-local-heading") }}</h2>
+          <div class="profile-handle">{% if current_user %}{{ ftl_get_message("drafts-local-note") }}{% else %}{{ ftl_get_message("drafts-local-guest-note") }}{% endif %}</div>
+        </div>
+      </div>
+      <div class="posts-grid" id="local-drafts-grid"></div>
+    </section>
+    <script id="local-drafts-words" type="application/json">{{ {
+      "untitled": ftl_get_message("post-untitled"),
+      "personal": ftl_get_message("personal-post"),
+      "post": ftl_get_message("drafts-local-post"),
+      "signIn": ftl_get_message("sign-in"),
+      "download": ftl_get_message("draw-download-png"),
+      "delete": ftl_get_message("delete"),
+      "deleteConfirm": ftl_get_message("drafts-local-delete-confirm"),
+      "communityDenied": ftl_get_message("drafts-local-community-denied"),
+      "postFailed": ftl_get_message("drafts-local-post-failed"),
+      "unavailable": ftl_get_message("drafts-local-unavailable"),
+    }|tojson }}</script>
+    <script type="module" src="{{ '/static/neo-cucumber/drafts.js' | cachebuster | safe }}"></script>
+    {% if current_user %}
     <section class="profile-section" aria-labelledby="drafts-heading">
       <div class="grid-header drafts-header">
         <div>
@@ -67,5 +97,12 @@
       {% endif %}
       </div>
     </section>
+    {% else %}
+    {# Signed out there are no drafts but this browser's; this says so
+       until the script above finds some, or finds it cannot look. #}
+    <div class="ds-card drafts-empty" id="local-drafts-empty">
+      <p class="profile-empty">{{ ftl_get_message("draft-empty") }}</p>
+    </div>
+    {% endif %}
   </div>
 {% endblock content %}

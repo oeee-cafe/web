@@ -36,6 +36,7 @@
          in the document before the painter mounts, so the area the painter
          measures is already the one it will keep. */
       #oeee-painter-page > .nav-bar { flex: 0 0 auto; position: relative; }
+      #oeee-painter-page > .ds-notices { flex: 0 0 auto; }
       #neo-cucumber-root { flex: 1 1 auto; min-height: 0; }
     </style>
   </head>
@@ -46,6 +47,13 @@
        has no toolbar, keeps its bar. #}
     <div id="oeee-painter-page">
       {% include "toolbar.jinja" %}
+      {# A guest learns before drawing where the drawing will be kept: in this
+         browser, until they sign in and post it from their drafts. #}
+      {% if not current_user %}
+        <ul class="ds-notices">
+          <li class="ds-notice">{{ ftl_get_message("draw-guest-notice") }}&nbsp;<a href="/login?next=%2Fposts%2Fdrafts">{{ ftl_get_message("sign-in") }}</a></li>
+        </ul>
+      {% endif %}
       <div id="neo-cucumber-root"></div>
     </div>
     <button id="oeee-painter-save" type="button" disabled
@@ -54,6 +62,21 @@
             style="position:fixed;top:61px;right:8px;z-index:80">{{ ftl_get_message("save") }}</button>
     {% include "confirm_dialog.jinja" %}
     <script id="neo-cucumber-config" type="application/json">{{ painter_config | safe }}</script>
+    {# What saving says, beyond the button's own words; read by the adapter
+       (frontend/painter/entry.ts). #}
+    <script id="oeee-painter-words" type="application/json">{{ {
+      "guestSaveConfirm": ftl_get_message("draw-guest-save-confirm"),
+      "guestSavedTitle": ftl_get_message("draw-guest-saved-title"),
+      "guestSaved": ftl_get_message("draw-guest-saved"),
+      "localSaveFailed": ftl_get_message("draw-local-save-failed"),
+      "uploadFailedKept": ftl_get_message("draw-upload-failed-kept"),
+      "uploadFailedLost": ftl_get_message("draw-upload-failed-lost"),
+      "signIn": ftl_get_message("sign-in"),
+      "signUp": ftl_get_message("sign-up"),
+      "downloadPng": ftl_get_message("draw-download-png"),
+      "done": ftl_get_message("draw-done"),
+      "keepDrawing": ftl_get_message("draw-keep-drawing"),
+    }|tojson }}</script>
     <script type="module"
             src="{{ '/static/neo-cucumber/offline.js' | cachebuster | safe }}"></script>
   </body>

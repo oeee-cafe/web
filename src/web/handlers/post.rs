@@ -1297,11 +1297,12 @@ pub async fn draft_posts(
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
-    let posts = find_draft_posts_by_author_id(
-        &mut tx,
-        auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id,
-    )
-    .await?;
+    // A guest has no drafts here, only the ones kept on their device, which
+    // the page lists itself.
+    let posts = match auth_session.user.as_ref() {
+        Some(user) => find_draft_posts_by_author_id(&mut tx, user.id).await?,
+        None => Vec::new(),
+    };
 
     tx.commit().await?;
 

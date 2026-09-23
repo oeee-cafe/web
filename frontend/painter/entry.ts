@@ -9,6 +9,20 @@ import {
 } from "neo-cucumber";
 import { offerPainterToApp } from "../shared/appBridge";
 import { say } from "../shared/siteDialog";
+import {
+  blobToArrayBuffer,
+  deleteLocalDraft,
+  GUEST_OWNER,
+  newDraftId,
+  putLocalDraft,
+  type LocalDraft,
+} from "../shared/localDrafts";
+import {
+  blobToDataUrl,
+  downloadPng,
+  postDrawing,
+  uploadLocalDraft,
+} from "../shared/drawingUpload";
 // The chrome this adapter borrows below lives in the package's stylesheet,
 // which a library build keeps out of the JavaScript bundle. It is imported
 // through this adapter's own file so that the utilities named here are compiled
@@ -20,7 +34,10 @@ interface OeeePainterConfig {
   height: number;
   locale?: string;
   communityId?: string | null;
+  communityName?: string | null;
   parentPostId?: string | null;
+  /** The account drawing, or null for a guest; see `LocalDraft.owner`. */
+  userId?: string | null;
   initialImageUrl?: string | null;
   submission?:
     | { kind: "post" }
@@ -63,18 +80,34 @@ function postNative(message: NativeMessage): void {
   }
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("Failed to read PNG"));
-    reader.readAsDataURL(blob);
-  });
+/** The page's words for what saving says, rendered by the server. */
+interface PainterWords {
+  guestSaveConfirm: string;
+  guestSavedTitle: string;
+  guestSaved: string;
+  localSaveFailed: string;
+  uploadFailedKept: string;
+  uploadFailedLost: string;
+  signIn: string;
+  signUp: string;
+  downloadPng: string;
+  done: string;
+  keepDrawing: string;
 }
 
-async function submit(
+/** Where a guest's drawing waits for them, and where signing in returns to. */
+const DRAFTS_PATH = "/posts/drafts";
+
+/**
+ * One id for every save this page makes. A drawing saved again -- after a
+ * failed upload, or by a guest who kept drawing -- replaces its earlier copy
+ * in this browser rather than sitting beside it.
+ */
+const draftId = newDraftId();
+
+async function submitBanner(
   painter: PainterHandle,
-  config: OeeePainterConfig,
+  profileUrl: string,
   startedAt: number,
   onSaved: () => void,
 ): Promise<void> {
@@ -84,42 +117,74 @@ async function submit(
   form.append("animation", snapshot.replay);
   form.append("width", String(snapshot.width));
   form.append("height", String(snapshot.height));
-  form.append("security_timer", String(startedAt));
+  form.append("paint_duration_ms", String(Date.now() - startedAt));
   form.append("security_count", String(snapshot.strokeCount));
 
-  const submission = config.submission ?? { kind: "post" as const };
-  if (submission.kind === "post") {
-    form.append(
-      "tool",
-      config.mode.kind === "two-tone" ? "cucumber" : "neo-cucumber-offline",
-    );
-    if (config.communityId) form.append("community_id", config.communityId);
-    if (config.parentPostId) form.append("parent_post_id", config.parentPostId);
-  }
-
-  const response = await fetch(
-    submission.kind === "banner" ? "/banners/draw/finish" : "/draw/finish",
-    { method: "POST", body: form },
+  const result = await postDrawing<{ banner_id: string; image_url: string }>(
+    "/banners/draw/finish",
+    form,
   );
-  const result = await response.json();
-  if (!response.ok || result?.error) {
-    throw new Error(result?.error ?? `Upload failed: ${response.status}`);
+  onSaved();
+  if (nativeAvailable()) {
+    postNative({
+      type: "banner_complete",
+      bannerId: result.banner_id,
+      imageUrl: result.image_url,
+    });
+  } else {
+    window.location.href = profileUrl;
+  }
+}
+
+/**
+ * Save a post: into this browser first, then to the server for someone signed
+ * in. What happens next is the caller's -- `kept` says whether this browser
+ * has it, `posted` whether the server does.
+ */
+async function submitPost(
+  painter: PainterHandle,
+  config: OeeePainterConfig,
+  startedAt: number,
+  onPosted: () => void,
+): Promise<{ draft: LocalDraft; kept: boolean; posted: boolean }> {
+  const snapshot = await painter.save();
+  const draft: LocalDraft = {
+    id: draftId,
+    owner: config.userId ?? GUEST_OWNER,
+    savedAt: Date.now(),
+    png: await blobToArrayBuffer(snapshot.png),
+    replay: await blobToArrayBuffer(snapshot.replay),
+    width: snapshot.width,
+    height: snapshot.height,
+    tool: config.mode.kind === "two-tone" ? "cucumber" : "neo-cucumber-offline",
+    paintDurationMs: Date.now() - startedAt,
+    strokeCount: snapshot.strokeCount,
+    communityId: config.communityId ?? null,
+    communityName: config.communityName ?? null,
+    parentPostId: config.parentPostId ?? null,
+  };
+
+  let kept = false;
+  try {
+    await putLocalDraft(draft);
+    kept = true;
+  } catch (error) {
+    console.error("Could not keep the drawing in this browser", error);
   }
 
-  // Saved: the drawing is on the server, so leaving is no longer a loss.
-  onSaved();
+  if (!config.userId) return { draft, kept, posted: false };
 
-  if (submission.kind === "banner") {
-    if (nativeAvailable()) {
-      postNative({
-        type: "banner_complete",
-        bannerId: result.banner_id,
-        imageUrl: result.image_url,
-      });
-    } else {
-      window.location.href = submission.profileUrl;
-    }
-  } else if (nativeAvailable()) {
+  const result = await uploadLocalDraft(draft).catch((error: unknown) => {
+    console.error(error);
+    return null;
+  });
+  if (!result) return { draft, kept, posted: false };
+
+  // On the server now; the copy here would only offer to post it again.
+  if (kept) await deleteLocalDraft(draft.id).catch(console.error);
+
+  onPosted();
+  if (nativeAvailable()) {
     postNative({
       type: "drawing_complete",
       postId: result.post_id,
@@ -129,6 +194,7 @@ async function submit(
   } else {
     window.location.href = `/posts/${result.post_id}/publish`;
   }
+  return { draft, kept, posted: true };
 }
 
 const root = document.getElementById("neo-cucumber-root");
@@ -142,6 +208,8 @@ const painterRoot = root;
 const pageSaveButton = saveButton;
 
 const config = JSON.parse(configElement.textContent) as OeeePainterConfig;
+const wordsElement = document.getElementById("oeee-painter-words");
+const words = JSON.parse(wordsElement?.textContent || "{}") as Partial<PainterWords>;
 
 /** What the page calls saving, in the reader's language. */
 const saveLabel = pageSaveButton.textContent?.trim() || "Save";
@@ -186,6 +254,17 @@ function buildHeader(): void {
     left.append(where);
   }
 
+  // A guest is told up front where their drawing will go: this browser. It
+  // gives way to the title on a narrow phone, and says the rest on hover.
+  if (bar.dataset.notice) {
+    const notice = document.createElement("a");
+    notice.href = bar.dataset.noticeHref || "/login";
+    notice.className = "min-w-0 truncate text-[11px] underline";
+    notice.textContent = bar.dataset.notice;
+    notice.title = bar.dataset.notice;
+    left.append(notice);
+  }
+
   const right = document.createElement("div");
   right.className = "flex shrink-0 items-center gap-[6px] text-[11px]";
   if (bar.dataset.size) {
@@ -210,8 +289,15 @@ buildHeader();
  * baseline: it is not zero, because setting the canvas up is itself recorded.
  */
 let baselineStrokes: number | null = null;
+let latestStrokes = 0;
 let hasUnsavedWork = false;
 let leaving = false;
+
+/** What is on the canvas now is kept somewhere; leaving loses nothing yet. */
+function markKept(): void {
+  baselineStrokes = latestStrokes;
+  hasUnsavedWork = false;
+}
 
 window.addEventListener("beforeunload", (event) => {
   if (leaving || !hasUnsavedWork) return;
@@ -229,6 +315,7 @@ const painter = mount(root, {
   controls: { kind: "toolbox" },
   onChange: ({ strokeCount }) => {
     if (baselineStrokes === null) baselineStrokes = strokeCount;
+    latestStrokes = strokeCount;
     hasUnsavedWork = strokeCount > baselineStrokes;
   },
 });
@@ -288,7 +375,20 @@ void painter.ready
  * and its words come off the button the page rendered -- the page is the only
  * thing here that knows the reader's language.
  */
-function confirmSave(): Promise<boolean> {
+interface DialogChoice {
+  key: string;
+  label: string;
+}
+
+/**
+ * A question in the painter's own chrome, answered with the key of the
+ * button pressed, or null for Escape or a click outside it.
+ */
+function askInPainter(
+  title: string,
+  text: string,
+  choices: DialogChoice[],
+): Promise<string | null> {
   return new Promise((resolve) => {
     const backdrop = document.createElement("div");
     backdrop.className =
@@ -299,30 +399,19 @@ function confirmSave(): Promise<boolean> {
 
     const titleBar = document.createElement("div");
     titleBar.className = `${NEO_TITLEBAR} px-[4px] text-[11px] leading-[14px]`;
-    titleBar.textContent = saveLabel;
+    titleBar.textContent = title;
 
     const body = document.createElement("div");
     body.className = "p-[12px] text-center";
 
     const message = document.createElement("p");
     message.className = "m-0 mb-[12px]";
-    message.textContent =
-      pageSaveButton.dataset.confirm || "Save this drawing?";
+    message.textContent = text;
 
     const actions = document.createElement("div");
-    actions.className = "flex justify-center gap-[6px]";
+    actions.className = "flex flex-wrap justify-center gap-[6px]";
 
-    const cancelButton = document.createElement("button");
-    cancelButton.type = "button";
-    cancelButton.className = NEO_BUTTON;
-    cancelButton.textContent = pageSaveButton.dataset.cancel || "Cancel";
-
-    const confirmButton = document.createElement("button");
-    confirmButton.type = "button";
-    confirmButton.className = NEO_BUTTON;
-    confirmButton.textContent = saveLabel;
-
-    const close = (answer: boolean) => {
+    const close = (answer: string | null) => {
       document.removeEventListener("keydown", onKeyDown, true);
       backdrop.remove();
       resolve(answer);
@@ -333,38 +422,144 @@ function confirmSave(): Promise<boolean> {
       // dialog and nothing else.
       event.stopPropagation();
       event.preventDefault();
-      close(false);
+      close(null);
     }
 
-    document.addEventListener("keydown", onKeyDown, true);
-    backdrop.addEventListener("click", () => close(false));
-    panel.addEventListener("click", (event) => event.stopPropagation());
-    cancelButton.addEventListener("click", () => close(false));
-    confirmButton.addEventListener("click", () => close(true));
+    const buttons = choices.map((choice) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = NEO_BUTTON;
+      button.textContent = choice.label;
+      button.addEventListener("click", () => close(choice.key));
+      return button;
+    });
 
-    actions.append(cancelButton, confirmButton);
+    document.addEventListener("keydown", onKeyDown, true);
+    backdrop.addEventListener("click", () => close(null));
+    panel.addEventListener("click", (event) => event.stopPropagation());
+
+    actions.append(...buttons);
     body.append(message, actions);
     panel.append(titleBar, body);
     backdrop.append(panel);
     document.body.append(backdrop);
-    confirmButton.focus();
+    buttons[buttons.length - 1]?.focus();
   });
+}
+
+/**
+ * Asked before a drawing is sent.
+ *
+ * Saving is the end of this page for someone signed in: the drawing goes to
+ * the server and the browser leaves for the post or the profile, so there is
+ * no coming back to add the line that was still missing. The button that
+ * does it sits in the toolbox among the drawing tools, one stray tap from
+ * whichever of them was actually meant, which is exactly the mistake
+ * `beforeunload` above already guards the header's link against.
+ *
+ * Its chrome is the painter's own, from the class names neo-cucumber exports,
+ * and its words come off the button the page rendered -- the page is the only
+ * thing here that knows the reader's language.
+ */
+async function confirmSave(): Promise<boolean> {
+  const guest = !config.userId && config.submission?.kind !== "banner";
+  const question = guest
+    ? words.guestSaveConfirm || "Save this drawing in this browser?"
+    : pageSaveButton.dataset.confirm || "Save this drawing?";
+  const answer = await askInPainter(saveLabel, question, [
+    { key: "cancel", label: pageSaveButton.dataset.cancel || "Cancel" },
+    { key: "save", label: saveLabel },
+  ]);
+  return answer === "save";
+}
+
+/**
+ * What a guest is told once their drawing is saved: that it is in this
+ * browser and nowhere else, and what they can do about that. Closing it goes
+ * back to the canvas; the drawing is kept either way.
+ */
+async function afterGuestSave(draft: LocalDraft, kept: boolean): Promise<void> {
+  const png = new Blob([draft.png], { type: "image/png" });
+  if (!kept) {
+    const answer = await askInPainter(saveLabel, words.localSaveFailed || "This browser can't keep drawings.", [
+      { key: "keep-drawing", label: words.keepDrawing || "Keep drawing" },
+      { key: "download", label: words.downloadPng || "Download PNG" },
+    ]);
+    if (answer === "download") downloadPng(png, draft.savedAt);
+    return;
+  }
+
+  markKept();
+  for (;;) {
+    const answer = await askInPainter(
+      words.guestSavedTitle || saveLabel,
+      words.guestSaved || "This drawing is only in this browser.",
+      [
+        { key: "download", label: words.downloadPng || "Download PNG" },
+        { key: "sign-up", label: words.signUp || "Sign up" },
+        { key: "sign-in", label: words.signIn || "Sign in" },
+        { key: "done", label: words.done || "Done" },
+      ],
+    );
+    if (answer === "download") {
+      downloadPng(png, draft.savedAt);
+      // Still worth saying where the drawing is, and offering the rest.
+      continue;
+    }
+    const next = `?next=${encodeURIComponent(DRAFTS_PATH)}`;
+    const destination =
+      answer === "sign-up"
+        ? `/signup${next}`
+        : answer === "sign-in"
+          ? `/login${next}`
+          : answer === "done"
+            ? DRAFTS_PATH
+            : null;
+    if (destination) {
+      leaving = true;
+      window.location.href = destination;
+    }
+    return;
+  }
 }
 
 saveButton.addEventListener("click", () => {
   saveButton.disabled = true;
-  void confirmSave()
-    .then((confirmed) => {
-      if (!confirmed) {
-        saveButton.disabled = false;
-        return;
-      }
-      return submit(painter, config, startedAt, () => {
+  void confirmSave().then(async (confirmed) => {
+    if (!confirmed) {
+      saveButton.disabled = false;
+      return;
+    }
+    const submission = config.submission ?? { kind: "post" as const };
+    if (submission.kind === "banner") {
+      await submitBanner(painter, submission.profileUrl, startedAt, () => {
         leaving = true;
       }).catch((error) => {
         console.error(error);
         say("Failed to save drawing. Please try again.");
-        saveButton.disabled = false;
       });
-    });
+      saveButton.disabled = false;
+      return;
+    }
+
+    try {
+      const { draft, kept, posted } = await submitPost(painter, config, startedAt, () => {
+        leaving = true;
+      });
+      if (posted) return;
+      if (!config.userId) {
+        await afterGuestSave(draft, kept);
+      } else if (kept) {
+        // Signed in, but the upload failed: it waits in the drafts page.
+        markKept();
+        say(words.uploadFailedKept || "Couldn't post this drawing. It's kept in your drafts in this browser.");
+      } else {
+        say(words.uploadFailedLost || "Failed to save drawing. Please try again.");
+      }
+    } catch (error) {
+      console.error(error);
+      say("Failed to save drawing. Please try again.");
+    }
+    saveButton.disabled = false;
+  });
 });
