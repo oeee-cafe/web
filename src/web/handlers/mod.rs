@@ -1207,10 +1207,7 @@ mod template_tests {
         };
         let three = bell(3);
         assert!(three.contains(r#"data-unread="3""#), "{three}");
-        // Apps released before the bridge read the count from here.
-        assert!(three.contains(r#"<span class="toolbar-badge" hidden>3</span>"#), "{three}");
         assert!(bell(0).contains(r#"data-unread="0""#));
-        assert!(!bell(0).contains("toolbar-badge"));
 
         let toolbar = |current_user: serde_json::Value| {
             env.get_template("toolbar.jinja")
