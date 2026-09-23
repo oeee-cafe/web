@@ -1590,6 +1590,29 @@ mod template_tests {
         assert!(!render(json!(true), json!(null)).contains("toolbar-supporter"));
     }
 
+    /// Search in the bar is a form now, not a link to the page that holds
+    /// one: a field the glass opens, because the glass is its label. One
+    /// field and no button, which is what lets Enter submit it, and no
+    /// link to /search left in the bar to go there instead.
+    #[test]
+    fn the_bar_holds_the_search_field_rather_than_a_way_to_one() {
+        let env = test_support::env();
+        let bar = env
+            .get_template("toolbar.jinja")
+            .expect("toolbar loads")
+            .render(chrome())
+            .expect("toolbar renders");
+
+        assert!(bar.contains(r#"class="toolbar-search" method="get" action="/search""#));
+        assert!(bar.contains(r#"for="toolbar-search-field""#), "the glass labels it");
+        assert!(bar.contains(r#"id="toolbar-search-field""#));
+        assert!(bar.contains(r#"type="search""#) && bar.contains(r#"name="q""#));
+        assert!(
+            !bar.contains(r#"href="/search""#),
+            "going to /search for a field is the thing this replaces"
+        );
+    }
+
     /// What the site is stays somewhere a reader would look for it. Signed
     /// in that is the foot of the account menu, under their own name;
     /// signed out there is no such menu, and the only square at the bar's
@@ -2799,9 +2822,12 @@ mod template_tests {
     fn search_page_renders_form_empty_state_and_results() {
         use crate::web::handlers::search::SearchPostRow;
 
-        // Nothing asked yet: the form alone.
+        // Nothing asked yet: the form alone. Asserted on the page's own
+        // form, `communities-filters` -- the toolbar in every page has a
+        // form to /search of its own now, so `action="/search"` alone no
+        // longer says this page has one.
         let blank = render_search(None, vec![]);
-        assert!(blank.contains(r#"action="/search""#) && blank.contains(r#"name="q""#));
+        assert!(blank.contains("communities-filters") && blank.contains(r#"name="q""#));
         assert!(!blank.contains("search-no-results"));
 
         // Asked, and nothing matched.
@@ -2832,13 +2858,19 @@ mod template_tests {
 
     #[test]
     fn search_page_in_the_apps_leaves_the_form_to_their_own_field() {
+        // The page's own form, not every form in the document: the toolbar
+        // carries one to /search on every page, and the apps put that out
+        // of sight in CSS rather than out of the markup (ds.css,
+        // `html[data-app] .toolbar-search`).
         let blank = render_search_in(true, None, vec![]);
-        assert!(!blank.contains(r#"action="/search""#));
+        assert!(!blank.contains("communities-filters"));
+        assert!(!blank.contains("communities-search"));
 
         let none = render_search_in(true, Some("zzz"), vec![]);
-        assert!(!none.contains(r#"action="/search""#));
+        assert!(!none.contains("communities-filters"));
         assert!(!none.contains("communities-search"));
         assert!(none.contains("search-no-results"));
     }
 }
+
 
