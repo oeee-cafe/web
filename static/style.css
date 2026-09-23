@@ -103,6 +103,25 @@ html {
   background-size: 14px 14px;
 }
 
+/* The grid comes in over the top of the page rather than starting at full
+   strength against the top edge. Above the page is something plain: iOS
+   Safari's own band under the status bar while the page is at its top,
+   the apps' status bar strip -- each only the ground's colour, with no
+   grid, and a grid starting hard against it made a seam that read as the
+   page coming apart from the top of the screen. A fade from bare ground
+   to the grid over the page's first 120px lets the one run into the other.
+   It belongs to the top of the page, so it scrolls away with it.
+
+   Not in the Mac and Windows apps, where the page's top is under the
+   toolbar, which is the window's title bar. */
+html:not([data-form="desktop"]) {
+  background-image: linear-gradient(var(--ds-ground), transparent 120px),
+    linear-gradient(var(--ds-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
+  background-repeat: no-repeat, repeat, repeat;
+  background-size: 100% 120px, 14px 14px, 14px 14px;
+}
+
 body {
   margin: 0;
   color: var(--main-text-color);
