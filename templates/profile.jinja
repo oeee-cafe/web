@@ -60,8 +60,8 @@
                year's, this is what they gave. #}
             <a class="profile-chip supporter-chip"
                href="/about#supporters"
-               aria-label="{{ ftl_format_pattern('supporter-year', {'platform': supporter_mark_name(standing.provider), 'year': standing.year}) }}"
-               title="{{ supporter_mark_name(standing.provider) }}">{{ supporter_mark(standing.provider) }}{{ standing.year }}</a>
+               aria-label="{{ ftl_format_pattern('supporter-year', {'platform': supporter_mark_name(standing.store), 'year': standing.year}) }}"
+               title="{{ supporter_mark_name(standing.store) }}">{{ supporter_mark(standing.store) }}{{ standing.year }}</a>
           {% endfor %}
           <a class="profile-chip" href="/@{{ user.login_name }}/guestbook">{{ ftl_get_message("profile-guestbook") }}</a>
           {% for link, target in links %}
