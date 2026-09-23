@@ -606,7 +606,7 @@
       var SHAPES = [
         // Home's feeds: the switch, Per row, the grid.
         [/^\/(popular|following|joined)?$/, function () {
-          return '<div class="center-wide"><div class="feed-header">' + bar("180px", 22) +
+          return '<div class="center-wide"><div class="feed-header">' + bar("180px", 22, "ds-skeleton-pill") +
             (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + postGrid() + "</div>";
         }],
         // A tag: the card saying what it is, then its drawings -- and the
@@ -615,8 +615,8 @@
           return '<div class="profile">' + identityCard(false) + '<section class="profile-section">' + gridHeader("120px") + postGrid(2) + "</section></div>";
         }],
         [/^\/hashtags$/, function () {
-          var html = '<div class="center-wide communities-page">' + bar("200px", 26) + '<div class="communities-bar ds-skeleton-gap-l">' +
-            bar("300px", 30, "ds-skeleton-button") + bar("240px", 30, "ds-skeleton-button") + "</div><div class=\"community-grid\">";
+          var html = '<div class="center-wide communities-page"><div class="communities-bar">' +
+            bar("300px", 30, "ds-skeleton-button ds-skeleton-pill") + bar("240px", 30, "ds-skeleton-button") + "</div><div class=\"community-grid\">";
           for (var i = 0; i < 8; i++) {
             html += '<div class="community-card"><span class="community-card-cover"><span class="ds-skeleton-fill"></span></span>' +
               '<span class="community-card-body">' + bar("55%", 15) + bar("35%", 12, "ds-skeleton-gap") + "</span></div>";
@@ -688,7 +688,7 @@
         skeleton.innerHTML = html + "</div>";
         return skeleton;
       }
-      function loading(path, over) {
+      function loading(path, over, pill) {
         // Offline, the next page is not coming: the browser says so, or the
         // app puts up its own "can't be reached" (Unreachable.swift and the
         // rest), and the page that was here stays as it was rather than
@@ -719,6 +719,16 @@
           skeleton.style.left = "0";
         }
         content.appendChild(skeleton);
+        // A pill pressed on the page stands in for its own skeleton, where
+        // the shape has one (ds-skeleton-pill), or above it, and goes back
+        // where it was if the page never comes.
+        var pillHome = null;
+        if (pill) {
+          pillHome = [pill.parentNode, pill.nextSibling];
+          var slot = skeleton.querySelector(".ds-skeleton-pill");
+          if (slot) slot.parentNode.replaceChild(pill, slot);
+          else skeleton.insertBefore(pill, skeleton.firstChild);
+        }
         // The same whole-step zoom post_view.jinja gives the drawing.
         var stage = skeleton.querySelector(".ds-skeleton-stage");
         if (stage) {
@@ -733,6 +743,7 @@
         content.scrollTop = 0;
         function restore() {
           if (!skeleton.parentNode) return;
+          if (pillHome) pillHome[0].insertBefore(pill, pillHome[1]);
           skeleton.parentNode.removeChild(skeleton);
           window.oeeeMarkCurrent(location.pathname);
           for (var k = 0; k < kept.length; k++) kept[k][0].style[property] = kept[k][1];
@@ -768,10 +779,14 @@
           height: parseInt(thumb.getAttribute("height"), 10)
         } : null;
         // The toolbar's sections are the app's tabs, and a page's own
-        // variations -- a filter, a sort, the next page -- are the same
-        // screen; anything else is a new screen.
-        if (!link.closest(".nav-bar") && link.pathname !== location.pathname) push(link.pathname);
-        else loading(link.pathname);
+        // variations -- a filter, a sort, the next page, another of the
+        // choices in one of its pills (Home's feeds among them) -- are the
+        // same screen; anything else is a new screen. A pill stays up over
+        // the skeleton, so its choice can be seen sliding across to the
+        // one pressed (segmented.jinja).
+        var pill = link.closest("main .ds-segmented");
+        if (!link.closest(".nav-bar") && !pill && link.pathname !== location.pathname) push(link.pathname);
+        else loading(link.pathname, false, pill);
       });
       // A search is a trip to /search, and the bar's links to it lay a
       // skeleton down while they go; submitting the field is the same trip
