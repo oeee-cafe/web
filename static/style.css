@@ -172,10 +172,17 @@ main {
   }
 }
 
+/* And the same for a page's skeleton (toolbar.jinja), which is the page's
+   column one level down: a pill carried over from the page into it has to
+   sit where it sat, or it drops by the margin this takes away. */
 main > .center > :first-child,
 main > .center > :first-child > :first-child,
 main > .center-wide > :first-child,
-main > .center-wide > :first-child > :first-child {
+main > .center-wide > :first-child > :first-child,
+main > .ds-skeleton > .center > :first-child,
+main > .ds-skeleton > .center > :first-child > :first-child,
+main > .ds-skeleton > .center-wide > :first-child,
+main > .ds-skeleton > .center-wide > :first-child > :first-child {
   margin-top: 0;
 }
 

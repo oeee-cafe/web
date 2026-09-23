@@ -80,7 +80,7 @@ pub(crate) fn feed_context(
 pub(crate) enum Feed {
     /// `/`: every public drawing, newest first.
     Recent,
-    /// `/popular`: the past six months', the most reacted to first.
+    /// `/popular`: Reddit's "hot", liked and recent together.
     Popular,
     /// `/following`: the people the reader follows.
     Following,

@@ -1532,16 +1532,21 @@ pub async fn find_public_posts(
         .collect())
 }
 
-/// The public feed's drawings from the past six months, the ones the most
-/// people reacted to first -- Home's Popular. Half a year rather than all
-/// time: reactions only ever add up, so without a window the oldest
-/// favourites would hold the top for good and nothing new could reach it;
-/// a week, on a site this size, left a handful. The same drawings
-/// `find_public_posts` shows, so the same rules: public or no community,
-/// published, not deleted, sensitive only for a viewer who asked or its
-/// author, and no drawings saved out of a collaborative session. Counted by who reacted rather than by
-/// reactions, so one person's five emoji are one vote. Ties, most often at
-/// nobody at all, go newest first.
+/// The public feed's drawings in Reddit's "hot" order -- Home's Popular.
+///
+/// Reddit's formula, with the people who reacted as its votes (there is no
+/// voting down here): log10 of the votes, floored at one, plus the seconds
+/// since Reddit's epoch (1134028003, 2005-12-08) over 45000. Time only adds,
+/// and every 12.5 hours is worth the same as ten times the votes, so a
+/// drawing climbs by being liked and sinks by getting older, and the oldest
+/// favourites cannot hold the top for good as they would on a count alone.
+/// Counted by who reacted rather than by reactions, so one person's five
+/// emoji are one vote.
+///
+/// The same drawings `find_public_posts` shows, so the same rules: public or
+/// no community, published, not deleted, sensitive only for a viewer who
+/// asked or its author, and no drawings saved out of a collaborative
+/// session.
 pub async fn find_popular_posts(
     tx: &mut Transaction<'_, Postgres>,
     limit: i64,
@@ -1576,15 +1581,17 @@ pub async fn find_popular_posts(
             WHERE (communities.visibility = 'public' OR posts.community_id IS NULL)
             AND posts.parent_post_id IS NULL
             AND posts.published_at IS NOT NULL
-            AND posts.published_at > now() - interval '6 months'
             AND posts.deleted_at IS NULL
             AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $3 = true OR posts.author_id = $4)
             AND NOT EXISTS (
                 SELECT 1 FROM collaborative_sessions cs WHERE cs.saved_post_id = posts.id
             )
-            ORDER BY (
-                SELECT count(DISTINCT reactions.actor_id) FROM reactions WHERE reactions.post_id = posts.id
-            ) DESC, posts.published_at DESC, posts.id
+            ORDER BY
+                log(greatest(1, (
+                    SELECT count(DISTINCT reactions.actor_id) FROM reactions WHERE reactions.post_id = posts.id
+                )))
+                + (extract(epoch FROM posts.published_at) - 1134028003) / 45000 DESC,
+                posts.id
             LIMIT $1
             OFFSET $2
         ",

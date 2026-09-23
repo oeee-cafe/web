@@ -2351,6 +2351,9 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   position: relative;
 }
 
+/* The thumb is what says which is chosen, so the choice keeps its
+   neighbours' weight: a bolder word is a wider one, and every item after it
+   shifted as the choice moved. */
 .ds-segmented.has-thumb > [aria-pressed="true"],
 .ds-segmented.has-thumb > [aria-current="page"],
 .ds-segmented.has-thumb > .is-selected,
@@ -2360,6 +2363,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .nav-bar .toolbar-sections.has-thumb a[aria-current="page"]:hover {
   background-color: transparent;
   box-shadow: none;
+  font-weight: 500;
 }
 
 .ds-badge {
@@ -2709,10 +2713,6 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
    at the reader's own count a row, or a title and lines. It breathes rather
    than spins, and holds still for reduced motion.
    --------------------------------------------------------------------------- */
-.ds-skeleton {
-  padding-top: 2px;
-}
-
 /* Blocks are drawn in their own ink, strong enough to read on the grid
    ground and on a card alike: the hover wash they used vanished into the
    lavender. Where a drawing will be, a drawing's shape -- a pale square in
