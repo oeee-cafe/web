@@ -397,7 +397,9 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
 
    Phones keep the page scrolling: a scrolling area inside the page stops a
    phone browser from tucking its address bar away, which costs more screen
-   than the toolbar staying put would save.
+   than an inner area would save. The header stays put all the same -- it is
+   sticky (below), so the toolbar is in reach at every width, as it is in a
+   window.
 
    The phone apps keep the page scrolling at every width too. There the page
    is the app's scroll view, and only it gives the platform's manners:
@@ -412,6 +414,34 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    area, so infinite scroll is unchanged; where you were on a page is kept by
    toolbar.jinja, since browsers only restore the window's own scroll.
    --------------------------------------------------------------------------- */
+
+/* The toolbar is a window's toolbar at every width, so the header holds its
+   place while the page scrolls under it. `.nav-bar` is sticky itself, but a
+   sticky box can only move within its own parent, and the header is that
+   parent: on a phone, where the page is what scrolls, the two went over the
+   top together. Sticking the header is what pins it to the screen, and it
+   carries the notices with it, which is where they already sit on a wider
+   screen -- there the header is a row of the page's column and never scrolls
+   at all, so this changes nothing above 600px. The macOS app's floating
+   header overrides it with `position: absolute`, being the more specific
+   rule.
+
+   Opaque, because the content now passes beneath: the ground and its grid,
+   the same pair the body carries, so a notice sits on what it sat on before.
+   The grid holds the body's phase until the page moves, and only the strip
+   around a notice ever shows it -- the toolbar has its own ground, and with
+   no notice up the header is the toolbar's height exactly. */
+.ds-page > header {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: var(--ds-ground);
+  background-image: linear-gradient(var(--ds-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
 @media (min-width: 601px) {
   html:not([data-app]) {
     height: 100%;
@@ -490,6 +520,13 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
     right: 0;
     left: 0;
     z-index: 50;
+    /* Not the sticky header's ground: the glass below is a layer inside
+       this element, and a stacking context paints its own background before
+       even a negative layer. An opaque header would be all the backdrop
+       filter had left to blur, and the frost would come out flat. Here the
+       content area itself is what shows through. */
+    background-color: transparent;
+    background-image: none;
   }
 
   html[data-desktop="macos"] .ds-page > header::before {
