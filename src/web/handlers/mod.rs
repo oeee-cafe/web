@@ -2112,6 +2112,40 @@ mod template_tests {
         }
     }
 
+    /// The author's own comment carries a delete button, and it asks the
+    /// site's route -- `/api/v1/comments/:id` went with the apps' JSON API.
+    #[test]
+    fn a_comment_deletes_itself_through_the_sites_own_route() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("post_comments.jinja")
+            .expect("post_comments loads")
+            .render(context! {
+                comments => json!([{
+                    "id": "0c8f0000-0000-0000-0000-000000000001",
+                    "actor_name": "Someone",
+                    "actor_handle": "@someone@oeee.cafe",
+                    "actor_login_name": "someone",
+                    "actor_url": "/@someone",
+                    "is_local": true,
+                    "content": "hello",
+                    "content_html": null,
+                    "created_at": "2026-01-02T03:04:05Z",
+                    "deleted_at": null,
+                    "children": [],
+                }]),
+                current_user => json!({"login_name": "someone"}),
+                supporters => json!({}),
+                ftl_lang => "en",
+            })
+            .expect("post_comments renders");
+        assert!(
+            rendered.contains(r#"hx-delete="/comments/0c8f0000-0000-0000-0000-000000000001""#),
+            "{rendered}"
+        );
+        assert!(!rendered.contains("/api/v1"));
+    }
+
     /// Achievements along the foot of the profile card, a badge each, named,
     /// with what it was for in its tooltip; no strip at all for someone with
     /// none.

@@ -5,9 +5,9 @@ use crate::web::handlers::about::{about, design};
 use crate::web::handlers::store::{do_store_purchase, do_store_ticket};
 use crate::web::handlers::supporter::supporter_page;
 use crate::web::handlers::account::{
-    account, delete_account, delete_account_htmx, edit_account, edit_password, get_account_json,
-    request_email_verification_code, request_email_verification_json, save_language,
-    save_show_sensitive_content, save_supporter_settings, verify_email_code_json, verify_email_verification_code,
+    account, delete_account_htmx, edit_account, edit_password, request_email_verification_code,
+    save_language, save_show_sensitive_content, save_supporter_settings,
+    verify_email_verification_code,
 };
 use crate::web::handlers::activitypub::{
     activitypub_get_community, activitypub_get_post, activitypub_get_user,
@@ -18,13 +18,11 @@ use crate::web::handlers::admin::{
     admin_banners, admin_banners_fragment, admin_collaborative_sessions, admin_communities,
     admin_community_posts, admin_flag_banner, admin_flag_post, admin_post_detail, admin_posts,
     admin_add_store_product, admin_posts_fragment, admin_set_store_product_on_sale, admin_store,
-    admin_user_posts, admin_users, collaborative_archive_manifest,
-    collaborative_session_chat, download_collaborative_archive, download_collaborative_diagnostics,
+    admin_user_posts, admin_users, collaborative_archive_manifest, collaborative_session_chat,
+    download_collaborative_archive, download_collaborative_diagnostics,
     replay_collaborative_session,
 };
-use crate::web::handlers::auth::{
-    api_login, api_logout, api_me, api_signup, do_login, do_logout, do_signup, login, signup,
-};
+use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, signup};
 use crate::web::handlers::identity::{
     apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_sign_in,
     do_google_sign_in, do_identity_welcome, do_steam_sign_in, do_unlink_identity, google_callback,
@@ -33,26 +31,20 @@ use crate::web::handlers::identity::{
 };
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
-    create_collaborative_session, create_collaborative_session_form, get_active_sessions_json,
-    get_auth_info, get_collaboration_meta, load_more_collaborative_posts,
-    report_session_diagnostics, save_collaborative_session, serve_collaborative_app,
-    serve_session_preview, upload_session_preview, websocket_collaborate_handler,
+    create_collaborative_session_form, get_auth_info, get_collaboration_meta,
+    load_more_collaborative_posts, report_session_diagnostics, save_collaborative_session,
+    serve_collaborative_app, serve_session_preview, upload_session_preview,
+    websocket_collaborate_handler,
 };
 use crate::web::handlers::collaborate_cleanup::cleanup_collaborative_sessions;
 use crate::web::handlers::community::{
-    communities, communities_fragment, community, community_comments, community_detail_json,
-    community_iframe, create_community_form, create_community_json, delete_community_json,
-    do_accept_invitation, do_create_community, do_leave_community, do_reject_invitation,
-    get_communities_list_json, get_community_invitations_json, get_community_members_json,
-    get_members, get_public_communities_json, get_user_invitations_json, hx_delete_community,
-    hx_do_edit_community, hx_edit_community, invite_user, invite_user_json, leave_community_json,
-    load_more_community_posts, members_page, redirect_community_to_unified, remove_member,
-    remove_member_json, retract_invitation, retract_invitation_json,
-    search_public_communities_json, update_community_json,
+    communities, communities_fragment, community, community_comments, community_iframe,
+    create_community_form, do_accept_invitation, do_create_community, do_leave_community,
+    do_reject_invitation, get_members, hx_delete_community, hx_do_edit_community, hx_edit_community,
+    invite_user, load_more_community_posts, members_page, redirect_community_to_unified,
+    remove_member, retract_invitation,
 };
-use crate::web::handlers::devices::{
-    delete_device_handler, list_devices_handler, register_device_handler,
-};
+use crate::web::handlers::devices::register_device_handler;
 use crate::web::handlers::draw::{
     banner_draw_finish, draw_finish, start_banner_draw, start_draw, start_draw_get,
 };
@@ -60,17 +52,12 @@ use crate::web::handlers::tag::{
     tag_autocomplete, tag_cards, tag_discovery, tag_view, load_more_tag_posts,
 };
 use crate::web::handlers::home::{
-    add_reaction_api, create_comment_api, delete_comment_api, delete_post_api, edit_post_api,
-    get_active_communities_json, get_latest_comments_json, get_post_comments_api,
-    get_post_details_json, get_post_reactions_by_emoji_json, home, load_more_public_posts,
-    load_more_community_feed_posts, load_more_public_posts_json,
-    load_more_timeline_posts, my_communities_feed, my_timeline, remove_reaction_api,
+    do_delete_comment, home, load_more_public_posts, load_more_community_feed_posts,
+    load_more_timeline_posts, my_communities_feed, my_timeline,
 };
 use crate::web::handlers::notifications::{
-    api_delete_notification, api_list_notifications, api_mark_notification_read,
     delete_notification_handler, get_unread_notification_count, hx_mark_all_notifications_read,
-    list_notifications, mark_all_notifications_read, mark_notification_read,
-    notifications_fragment,
+    list_notifications, mark_notification_read, notifications_fragment,
 };
 use crate::web::handlers::password_reset::{
     password_reset_request, password_reset_request_page, password_reset_verify,
@@ -78,26 +65,21 @@ use crate::web::handlers::password_reset::{
 };
 use crate::web::handlers::policy::policy;
 use crate::web::handlers::post::{
-    add_reaction, do_create_comment, do_post_edit_community, draft_posts, draft_posts_api,
-    get_movable_communities_api, hx_delete_post, hx_do_edit_post, hx_edit_post,
-    move_post_community_api, post_edit_community, post_publish, post_publish_form,
+    add_reaction, do_create_comment, do_post_edit_community, draft_posts, hx_delete_post,
+    hx_do_edit_post, hx_edit_post, post_edit_community, post_publish, post_publish_form,
     post_reactions_detail, post_relay_view, post_relay_view_by_login_name,
-    post_replay_view_by_login_name, post_view_by_login_name,
-    redirect_post_to_login_name, remove_reaction,
+    post_replay_view_by_login_name, post_view_by_login_name, redirect_post_to_login_name,
+    remove_reaction,
 };
 use crate::web::handlers::privacy::privacy;
 use crate::web::handlers::profile::{
-    activate_banner_api, banner_management, delete_banner_api, do_activate_banner, do_add_link,
-    do_delete_banner, do_delete_guestbook_entry, do_delete_link, do_follow_profile,
-    do_move_link_down, do_move_link_up, do_reply_guestbook_entry, do_unfollow_profile,
-    do_write_guestbook_entry, follow_profile_api, guestbook, list_banners_json,
-    profile_banners_iframe, profile_followings_json, profile_iframe, profile_json,
-    profile_or_community, profile_settings, unfollow_profile_api,
+    banner_management, do_activate_banner, do_add_link, do_delete_banner, do_delete_guestbook_entry,
+    do_delete_link, do_follow_profile, do_move_link_down, do_move_link_up, do_reply_guestbook_entry,
+    do_unfollow_profile, do_write_guestbook_entry, guestbook, profile_banners_iframe,
+    profile_iframe, profile_or_community, profile_settings,
 };
-use crate::web::handlers::report::{
-    hx_report_post, hx_report_profile, report_post_api, report_profile_api,
-};
-use crate::web::handlers::search::{search_json, search_page};
+use crate::web::handlers::report::{hx_report_post, hx_report_profile};
+use crate::web::handlers::search::search_page;
 use crate::web::handlers::well_known::{
     android_assetlinks, apple_app_site_association, robots_txt, sitemap_xml,
 };
@@ -324,8 +306,8 @@ impl App {
                 "/@:login_name/guestbook/:entry_id/reply",
                 post(do_reply_guestbook_entry),
             )
-            .route("/api/v1/devices", post(register_device_handler))
-            .route("/api/v1/devices", get(list_devices_handler))
+            // The push token the app handed the page (app_bridge.jinja).
+            .route("/devices", post(register_device_handler))
             // Staff-only. These live inside the login-gated router so signed-out
             // visitors are redirected to /login; the AdminUser extractor on each
             // handler is what rejects signed-in non-admins with a 403.
@@ -429,145 +411,12 @@ impl App {
                 "/api/communities/@:slug/posts",
                 get(load_more_community_posts),
             )
-            .route("/api/v1/posts/public", get(load_more_public_posts_json))
-            .route("/api/v1/posts/drafts", get(draft_posts_api))
-            .route("/api/v1/posts/:post_id", get(get_post_details_json))
-            .route("/api/v1/posts/:post_id", delete(delete_post_api))
-            .route("/api/v1/posts/:post_id", put(edit_post_api))
-            .route("/api/v1/posts/:post_id/report", post(report_post_api))
             // The site's own report modals. Same work, HTML back.
             .route("/posts/:post_id/report", post(hx_report_post))
             .route("/@:login_name/report", post(hx_report_profile))
-            .route(
-                "/api/v1/posts/:post_id/comments",
-                get(get_post_comments_api),
-            )
-            .route("/api/v1/posts/:post_id/comments", post(create_comment_api))
-            .route("/api/v1/comments/:comment_id", delete(delete_comment_api))
-            .route(
-                "/api/v1/posts/:post_id/reactions/:emoji",
-                get(get_post_reactions_by_emoji_json),
-            )
-            .route(
-                "/api/v1/posts/:post_id/reactions/:emoji",
-                post(add_reaction_api),
-            )
-            .route(
-                "/api/v1/posts/:post_id/reactions/:emoji",
-                delete(remove_reaction_api),
-            )
-            .route(
-                "/api/v1/posts/:post_id/movable-communities",
-                get(get_movable_communities_api),
-            )
-            .route(
-                "/api/v1/posts/:post_id/community",
-                put(move_post_community_api),
-            )
-            .route("/api/v1/search", get(search_json))
-            .route(
-                "/api/v1/devices/:device_token",
-                delete(delete_device_handler),
-            )
-            .route("/api/v1/profiles/:login_name", get(profile_json))
-            .route(
-                "/api/v1/profiles/:login_name/followings",
-                get(profile_followings_json),
-            )
-            .route(
-                "/api/v1/profiles/:login_name/follow",
-                post(follow_profile_api),
-            )
-            .route(
-                "/api/v1/profiles/:login_name/unfollow",
-                post(unfollow_profile_api),
-            )
-            .route(
-                "/api/v1/profiles/:login_name/report",
-                post(report_profile_api),
-            )
-            .route("/api/v1/banners", get(list_banners_json))
-            .route(
-                "/api/v1/banners/:banner_id/activate",
-                post(activate_banner_api),
-            )
-            .route("/api/v1/banners/:banner_id", delete(delete_banner_api))
-            .route(
-                "/api/v1/communities/active",
-                get(get_active_communities_json),
-            )
-            .route(
-                "/api/v1/communities/search",
-                get(search_public_communities_json),
-            )
-            .route(
-                "/api/v1/communities/public",
-                get(get_public_communities_json),
-            )
-            .route("/api/v1/communities", get(get_communities_list_json))
-            .route("/api/v1/communities", post(create_community_json))
-            .route("/api/v1/communities/:slug", get(community_detail_json))
-            .route("/api/v1/communities/:slug", put(update_community_json))
-            .route("/api/v1/communities/:slug", delete(delete_community_json))
-            .route(
-                "/api/v1/communities/:slug/members",
-                get(get_community_members_json),
-            )
-            .route("/api/v1/communities/:slug/members", post(invite_user_json))
-            .route(
-                "/api/v1/communities/:slug/members/:user_id",
-                delete(remove_member_json),
-            )
-            .route(
-                "/api/v1/communities/:slug/leave",
-                post(leave_community_json),
-            )
-            .route(
-                "/api/v1/communities/:slug/invitations",
-                get(get_community_invitations_json),
-            )
-            .route(
-                "/api/v1/communities/:slug/invitations/:invitation_id",
-                delete(retract_invitation_json),
-            )
-            .route("/api/v1/invitations", get(get_user_invitations_json))
-            .route("/api/v1/comments/latest", get(get_latest_comments_json))
-            .route(
-                "/api/v1/collaborate/sessions",
-                get(get_active_sessions_json),
-            )
-            .route(
-                "/api/v1/collaborate/sessions",
-                post(create_collaborative_session),
-            )
-            .route("/api/v1/auth/login", post(api_login))
-            .route("/api/v1/auth/logout", post(api_logout))
-            .route("/api/v1/auth/signup", post(api_signup))
-            .route("/api/v1/auth/me", get(api_me))
-            .route("/api/v1/account", get(get_account_json))
-            .route("/api/v1/account", delete(delete_account))
-            .route(
-                "/api/v1/account/request-verify-email",
-                post(request_email_verification_json),
-            )
-            .route("/api/v1/account/verify-email", post(verify_email_code_json))
-            .route("/api/v1/notifications", get(api_list_notifications))
-            .route(
-                "/api/v1/notifications/unread-count",
-                get(get_unread_notification_count),
-            )
-            .route(
-                "/api/v1/notifications/mark-all-read",
-                post(mark_all_notifications_read),
-            )
-            .route(
-                "/api/v1/notifications/:notification_id/mark-read",
-                post(api_mark_notification_read),
-            )
-            .route(
-                "/api/v1/notifications/:notification_id",
-                delete(api_delete_notification),
-            )
+            // Answers for itself when nobody is signed in, like the rest of
+            // this router, rather than sending the button to /login.
+            .route("/comments/:comment_id", delete(do_delete_comment))
             .route("/communities", get(communities))
             .route("/communities", post(do_create_community))
             .route("/communities/@:slug", get(redirect_community_to_unified))

@@ -12,12 +12,6 @@ pub struct CreateSessionRequest {
 }
 
 #[derive(Serialize)]
-pub struct CreateSessionResponse {
-    pub session_id: String,
-    pub url: String,
-}
-
-#[derive(Serialize)]
 pub struct SaveSessionResponse {
     pub post_id: String,
     pub owner_login_name: String,

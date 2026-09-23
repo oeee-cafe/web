@@ -94,24 +94,6 @@ pub struct FollowingInfo {
     pub banner_image_height: Option<i32>,
 }
 
-pub async fn count_followings_by_user_id(
-    tx: &mut Transaction<'_, Postgres>,
-    user_id: Uuid,
-) -> Result<i64> {
-    let follower_actor_id = get_actor_id_by_user_id(tx, user_id).await?;
-
-    let result = query!(
-        r#"SELECT COUNT(*) as "count!"
-        FROM follows
-        WHERE follower_actor_id = $1"#,
-        follower_actor_id
-    )
-    .fetch_one(&mut **tx)
-    .await?;
-
-    Ok(result.count)
-}
-
 pub async fn find_followings_by_user_id(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,

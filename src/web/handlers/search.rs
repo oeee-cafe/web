@@ -2,11 +2,10 @@ use crate::app_error::AppError;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
 use crate::web::handlers::ExtractFtlLang;
-use crate::web::responses::{SearchPostResult, SearchResponse};
 use crate::web::state::AppState;
 use axum::extract::Query;
 use axum::response::{Html, IntoResponse};
-use axum::{extract::State, response::Json};
+use axum::extract::State;
 use chrono::{DateTime, Utc};
 use minijinja::context;
 use serde::{Deserialize, Serialize};
@@ -16,13 +15,6 @@ use uuid::Uuid;
 /// Matches of each kind shown on `/search`, which has no load-more: the most
 /// the JSON endpoint will hand out in one go.
 const SEARCH_PAGE_LIMIT: i64 = 50;
-
-#[derive(Deserialize)]
-pub struct SearchQuery {
-    q: String,
-    #[serde(default)]
-    limit: Option<i64>,
-}
 
 #[derive(Deserialize)]
 pub struct SearchPageQuery {
@@ -46,8 +38,7 @@ pub struct SearchPostRow {
     pub published_at: Option<DateTime<Utc>>,
 }
 
-/// Posts by title or content, as the viewer is allowed to see them. Shared by `/search` and `/api/v1/search`
-/// so the page and the app's JSON cannot disagree about what matches.
+/// Posts by title or content, as the viewer is allowed to see them.
 pub async fn search(
     tx: &mut Transaction<'_, Postgres>,
     q: &str,
@@ -100,53 +91,6 @@ fn viewer(auth_session: &AuthSession) -> (Option<Uuid>, bool) {
         Some(ref user) => (Some(user.id), user.show_sensitive_content),
         None => (None, false),
     }
-}
-
-pub async fn search_json(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Query(query): Query<SearchQuery>,
-) -> Result<Json<SearchResponse>, AppError> {
-    let mut tx = state.db_pool.begin().await?;
-    let limit = query.limit.unwrap_or(20).min(50);
-    let (viewer_user_id, viewer_show_sensitive) = viewer(&auth_session);
-
-    let posts = search(
-        &mut tx,
-        &query.q,
-        limit,
-        viewer_user_id,
-        viewer_show_sensitive,
-    )
-    .await?;
-
-    tx.commit().await?;
-
-    // Minimal fields for thumbnails
-    let posts_typed: Vec<SearchPostResult> = posts
-        .into_iter()
-        .map(|post| {
-            let image_url = if let Some(ref filename) = post.image_filename {
-                let image_prefix = &filename[..2];
-                format!(
-                    "{}/image/{}/{}",
-                    state.config.r2_public_endpoint_url, image_prefix, filename
-                )
-            } else {
-                String::new()
-            };
-
-            SearchPostResult {
-                id: post.id,
-                image_url,
-                image_width: post.image_width,
-                image_height: post.image_height,
-                is_sensitive: post.is_sensitive,
-            }
-        })
-        .collect();
-
-    Ok(Json(SearchResponse { posts: posts_typed }))
 }
 
 /// GET /search — drawings matching `q`, under the form that asked.

@@ -7,8 +7,9 @@
 //!
 //! The handlers behind those controls answer with a bare status and no body
 //! (`hx_edit_post` returns `StatusCode::FORBIDDEN` and nothing else), and
-//! `AppError` answers with JSON, because the same error type serves the mobile
-//! API. Neither is something we would want swapped into the page.
+//! `AppError` answers with JSON, because the same error type serves what the
+//! page fetches for itself -- the painter's save, the push token's
+//! registration. Neither is something we would want swapped into the page.
 //!
 //! So this layer translates on the way out: when a request that came from htmx
 //! is about to be answered with an error, the body is replaced with a short
@@ -210,7 +211,7 @@ mod tests {
 
         assert!(
             response.headers().get("HX-Retarget").is_none(),
-            "the mobile API reads the JSON body and must keep getting it"
+            "a fetch() reads the JSON body and must keep getting it"
         );
         assert_eq!(body_string(response).await, "");
     }

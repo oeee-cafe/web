@@ -1,4 +1,4 @@
-use crate::app_error::{error_codes, AppError};
+use crate::app_error::AppError;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -22,10 +22,7 @@ use crate::{
     web::{
         context::CommonContext,
         handlers::ExtractFtlLang,
-        responses::{
-            ErrorResponse, MarkAllReadResponse, MarkNotificationReadResponse, NotificationItem,
-            NotificationsListResponse, UnreadCountResponse,
-        },
+        responses::UnreadCountResponse,
         state::AppState,
     },
 };
@@ -202,33 +199,9 @@ pub async fn mark_notification_read(
     }
 }
 
-/// Mark all notifications as read for the current user
-pub async fn mark_all_notifications_read(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-) -> Result<Json<MarkAllReadResponse>, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let user = auth_session
-        .user
-        .as_ref()
-        .ok_or(AppError::Unauthorized)?
-        .clone();
-
-    let count = mark_all_notifications_as_read(&mut tx, user.id).await?;
-
-    tx.commit().await?;
-
-    Ok(Json(MarkAllReadResponse {
-        count: count as i64,
-    }))
-}
-
 /// POST /notifications/mark-all-read — the button on the notifications page.
 ///
-/// The JSON twin above still serves `/api/v1/...` for the phone. This one
-/// answers in three pieces: the re-rendered list as the main swap, and
+/// It answers in three pieces: the re-rendered list as the main swap, and
 /// partials for the badge in the header and for the button itself, which has
 /// to disappear now that nothing is unread. It replaces a `hx-swap="none"`
 /// that called `window.location.reload()` — a full document fetch, all its
@@ -333,209 +306,6 @@ pub async fn delete_notification_handler(
         Ok(Html(badge).into_response())
     } else {
         Ok((StatusCode::NOT_FOUND, Html("".to_string())).into_response())
-    }
-}
-
-// ============================================================================
-// JSON API Handlers for mobile/API consumption
-// ============================================================================
-
-#[derive(Debug, Deserialize)]
-pub struct NotificationQueryParams {
-    #[serde(default = "default_limit")]
-    pub limit: i64,
-    #[serde(default)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    50
-}
-
-/// API: List notifications with pagination (JSON response)
-pub async fn api_list_notifications(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Query(params): Query<NotificationQueryParams>,
-) -> Result<Json<NotificationsListResponse>, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let user = auth_session
-        .user
-        .as_ref()
-        .ok_or(AppError::Unauthorized)?
-        .clone();
-
-    // Fetch notifications with pagination
-    let notifications = fetch_notifications(&mut tx, user.id, params.limit, params.offset).await?;
-
-    // Get total unread count to determine if there are more
-    let total_count = get_unread_count(&mut tx, user.id).await?;
-    let has_more = (params.offset + params.limit) < total_count;
-
-    tx.commit().await?;
-
-    // Convert notifications to typed structs
-    let r2_base_url = &state.config.r2_public_endpoint_url;
-    let notifications_typed: Vec<NotificationItem> = notifications
-        .into_iter()
-        .map(|n| {
-            // Build full image URL if filename exists
-            let post_image_url = n
-                .post_image_filename
-                .as_ref()
-                .map(|filename| format!("{}/image/{}/{}", r2_base_url, &filename[0..2], filename));
-
-            NotificationItem {
-                id: n.id,
-                recipient_id: n.recipient_id,
-                actor_id: n.actor_id,
-                actor_name: n.actor_name,
-                actor_handle: n.actor_handle,
-                actor_login_name: n.actor_login_name,
-                notification_type: n.notification_type,
-                post_id: n.post_id,
-                comment_id: n.comment_id,
-                reaction_iri: n.reaction_iri,
-                reaction_emoji: n.reaction_emoji,
-                guestbook_entry_id: n.guestbook_entry_id,
-                read_at: n.read_at,
-                created_at: n.created_at,
-                post_title: n.post_title,
-                post_author_login_name: n.post_author_login_name,
-                post_image_filename: n.post_image_filename,
-                post_image_url,
-                post_image_width: n.post_image_width,
-                post_image_height: n.post_image_height,
-                comment_content: n.comment_content,
-                comment_content_html: n.comment_content_html,
-                guestbook_content: n.guestbook_content,
-            }
-        })
-        .collect();
-
-    Ok(Json(NotificationsListResponse {
-        notifications: notifications_typed,
-        total: total_count as usize,
-        has_more,
-    }))
-}
-
-/// API: Mark a specific notification as read (JSON response)
-pub async fn api_mark_notification_read(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Path(notification_id): Path<Uuid>,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let user = auth_session
-        .user
-        .as_ref()
-        .ok_or(AppError::Unauthorized)?
-        .clone();
-
-    let success = mark_notification_as_read(&mut tx, notification_id, user.id).await?;
-
-    if !success {
-        tx.rollback().await?;
-        return Ok((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse::new(
-                error_codes::NOT_FOUND,
-                "Notification not found",
-            )),
-        )
-            .into_response());
-    }
-
-    // Fetch the updated notification
-    let notification = get_notification_by_id(&mut tx, notification_id, user.id).await?;
-
-    tx.commit().await?;
-
-    if let Some(n) = notification {
-        // Build full image URL if filename exists
-        let r2_base_url = &state.config.r2_public_endpoint_url;
-        let post_image_url = n
-            .post_image_filename
-            .as_ref()
-            .map(|filename| format!("{}/image/{}/{}", r2_base_url, &filename[0..2], filename));
-
-        let notification_item = NotificationItem {
-            id: n.id,
-            recipient_id: n.recipient_id,
-            actor_id: n.actor_id,
-            actor_name: n.actor_name,
-            actor_handle: n.actor_handle,
-            actor_login_name: n.actor_login_name,
-            notification_type: n.notification_type,
-            post_id: n.post_id,
-            comment_id: n.comment_id,
-            reaction_iri: n.reaction_iri,
-            reaction_emoji: n.reaction_emoji,
-            guestbook_entry_id: n.guestbook_entry_id,
-            read_at: n.read_at,
-            created_at: n.created_at,
-            post_title: n.post_title,
-            post_author_login_name: n.post_author_login_name,
-            post_image_filename: n.post_image_filename,
-            post_image_url,
-            post_image_width: n.post_image_width,
-            post_image_height: n.post_image_height,
-            comment_content: n.comment_content,
-            comment_content_html: n.comment_content_html,
-            guestbook_content: n.guestbook_content,
-        };
-
-        Ok(Json(MarkNotificationReadResponse {
-            notification: notification_item,
-        })
-        .into_response())
-    } else {
-        Ok((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse::new(
-                error_codes::NOT_FOUND,
-                "Notification not found",
-            )),
-        )
-            .into_response())
-    }
-}
-
-/// API: Delete a specific notification (JSON response)
-pub async fn api_delete_notification(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Path(notification_id): Path<Uuid>,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let user = auth_session
-        .user
-        .as_ref()
-        .ok_or(AppError::Unauthorized)?
-        .clone();
-
-    let success = delete_notification(&mut tx, notification_id, user.id).await?;
-
-    tx.commit().await?;
-
-    if success {
-        Ok(StatusCode::NO_CONTENT.into_response())
-    } else {
-        Ok((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse::new(
-                error_codes::NOT_FOUND,
-                "Notification not found",
-            )),
-        )
-            .into_response())
     }
 }
 

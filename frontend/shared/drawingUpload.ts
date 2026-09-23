@@ -3,8 +3,6 @@ import { draftPng, draftReplay, type LocalDraft } from "./localDrafts";
 /** What /draw/finish answers a post with. */
 export interface DrawFinishResult {
   post_id: string;
-  community_id: string | null;
-  image_url: string;
 }
 
 /**
