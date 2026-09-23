@@ -1532,11 +1532,14 @@ pub async fn find_public_posts(
         .collect())
 }
 
-/// The public feed's drawings from the past week, the ones the most people
-/// reacted to first -- Home's Popular. The same drawings `find_public_posts`
-/// shows, so the same rules: public or no community, published, not deleted,
-/// sensitive only for a viewer who asked or its author, and no drawings saved
-/// out of a collaborative session. Counted by who reacted rather than by
+/// The public feed's drawings from the past six months, the ones the most
+/// people reacted to first -- Home's Popular. Half a year rather than all
+/// time: reactions only ever add up, so without a window the oldest
+/// favourites would hold the top for good and nothing new could reach it;
+/// a week, on a site this size, left a handful. The same drawings
+/// `find_public_posts` shows, so the same rules: public or no community,
+/// published, not deleted, sensitive only for a viewer who asked or its
+/// author, and no drawings saved out of a collaborative session. Counted by who reacted rather than by
 /// reactions, so one person's five emoji are one vote. Ties, most often at
 /// nobody at all, go newest first.
 pub async fn find_popular_posts(
@@ -1573,7 +1576,7 @@ pub async fn find_popular_posts(
             WHERE (communities.visibility = 'public' OR posts.community_id IS NULL)
             AND posts.parent_post_id IS NULL
             AND posts.published_at IS NOT NULL
-            AND posts.published_at > now() - interval '7 days'
+            AND posts.published_at > now() - interval '6 months'
             AND posts.deleted_at IS NULL
             AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $3 = true OR posts.author_id = $4)
             AND NOT EXISTS (
