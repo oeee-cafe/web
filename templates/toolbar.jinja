@@ -224,7 +224,7 @@
     </div>
   </div>
   {# The keyboard shortcuts, listed. Hidden until `?` or the desktop app's
-     Help menu asks for it; see oeeeCommand below. #}
+     Help menu asks for it; see oeeeApp.command below. #}
   <div class="ds-shortcuts" id="ds-shortcuts" hidden>
     <div class="ds-shortcuts-panel" role="dialog" aria-modal="true" aria-labelledby="ds-shortcuts-title">
       <div class="ds-shortcuts-head">
@@ -395,7 +395,7 @@
       }
 
       // Commands, by name: what the keyboard shortcuts below do, and what the
-      // desktop app's menu bar asks for (it calls window.oeeeCommand). Going
+      // apps' menus and keys ask for (they call window.oeeeApp.command). Going
       // somewhere is a plain page load, so a page that holds a drawing still
       // asks before it is left.
       function setTheme(choice) {
@@ -466,11 +466,12 @@
         "theme-system": function () { setTheme("system"); },
         "shortcuts": function () { toggleShortcuts(); },
       };
-      window.oeeeCommand = function (name) {
-        var command = commands[name];
-        if (command) command();
-        return !!command;
-      };
+      function command(name) {
+        var run = commands[name];
+        if (run) run();
+        return !!run;
+      }
+      if (window.oeeeApp) window.oeeeApp.command = command;
 
       // The keys. Only on the site's own pages -- the painter and the drawing
       // app have keys of their own -- and never while typing, or with a
@@ -496,7 +497,7 @@
           var name = goKeys[key.toLowerCase()];
           if (name) {
             event.preventDefault();
-            window.oeeeCommand(name);
+            command(name);
           }
           return;
         }
@@ -506,14 +507,14 @@
           toggleShortcuts();
         } else if (key === "/") {
           event.preventDefault();
-          window.oeeeCommand("search");
+          command("search");
         } else if (key === "g" || key === "G") {
           awaitingGo = true;
           goTimer = setTimeout(function () { awaitingGo = false; }, 1500);
         } else if (key === "n" || key === "N") {
           if (document.getElementById("nav-draw-button")) {
             event.preventDefault();
-            window.oeeeCommand("new-drawing");
+            command("new-drawing");
           }
         }
       });
@@ -728,11 +729,19 @@
           for (var k = 0; k < kept.length; k++) kept[k][0].style[property] = kept[k][1];
           content.style.position = position;
         }
-        window.oeeeRestoreContent = restore;
+        restoring = restore;
         setTimeout(restore, 10000);
       }
+      // Takes the skeleton back down, if one is up, for a page that is not
+      // coming after all -- the apps call it when a link they stopped goes
+      // nowhere (oeeeApp.restoreContent, app_bridge.jinja).
+      var restoring = null;
+      function restoreContent() {
+        if (restoring) restoring();
+      }
+      if (window.oeeeApp) window.oeeeApp.restoreContent = restoreContent;
       // For looking at a page's skeleton from the console without leaving:
-      // oeeeShowSkeleton("/communities"), then oeeeRestoreContent().
+      // oeeeShowSkeleton("/communities"), then oeeeApp.restoreContent().
       window.oeeeShowSkeleton = loading;
       document.addEventListener("click", function (event) {
         if (event.button !== 0) return;
@@ -822,7 +831,7 @@
       });
       window.addEventListener("pageshow", function (event) {
         // Back to a page kept in memory: it is shown as it was left.
-        if (event.persisted && window.oeeeRestoreContent) window.oeeeRestoreContent();
+        if (event.persisted) restoreContent();
       });
     })();
   </script>
