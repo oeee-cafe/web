@@ -1,6 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Icon, NEO_BUTTON } from "neo-cucumber";
 import { ModalWrapper } from "./modals/ModalWrapper";
+import { say } from "../../shared/siteDialog";
 
 export interface SessionExpiredModalProps {
   isOpen: boolean;
@@ -40,11 +41,11 @@ export const SessionExpiredModal = ({
         error instanceof Error &&
         error.message.includes("already been saved")
       ) {
-        alert(
+        say(
           t`This session has already been saved. You can only download it as a PNG.`
         );
       } else {
-        alert(
+        say(
           t`Failed to save session. Please try downloading as PNG instead.`
         );
       }

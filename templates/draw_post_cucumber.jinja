@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8">
     {% include "theme_head.jinja" %}
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# Held at its own scale: the painter zooms its canvas itself, and a pinch
+       that starts off the canvas -- on a panel, or a room's chat -- would
+       otherwise zoom the whole page, panels and all. WKWebView and Android's
+       WebView honour this; Safari overrides it, which is its call. #}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     {% include "presence_meta.jinja" %}
     <title>
       {% if parent_post %}Re: {{ parent_post.title }}{% else %}{{ ftl_get_message("community-drawing-new") }}{% endif %}

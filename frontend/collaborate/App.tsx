@@ -21,6 +21,7 @@ import {
   type PainterHandle,
 } from "neo-cucumber";
 import { offerPainterToApp } from "../shared/appBridge";
+import { say } from "../shared/siteDialog";
 import "./app.css";
 import { Chat } from "./components/Chat";
 import { SessionExpiredModal } from "./components/SessionExpiredModal";
@@ -968,7 +969,7 @@ export default function App() {
       // comes back must not strand the owner on a session that is over.
       window.setTimeout(() => window.location.assign(result.post_url), SAVE_CONFIRMATION_TIMEOUT_MS);
     } catch (error) {
-      alert(error instanceof Error ? error.message : String(error));
+      say(error instanceof Error ? error.message : String(error));
       setIsSaving(false);
       setSessionEnding(false);
     }

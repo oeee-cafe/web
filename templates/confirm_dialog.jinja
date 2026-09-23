@@ -63,9 +63,31 @@
       opener = document.activeElement;
       message.textContent = detail.ctx.confirm;
       ok.textContent = labelFor(event.target);
+      ok.classList.add("ds-button-danger");
+      ok.classList.remove("ds-button-primary");
       dialog.style.display = "flex";
       cancel.focus();
     });
+
+    // The same question from a script of the site's own, in place of the
+    // browser's confirm(): the page's question, and what saying yes does
+    // (`action`, or Delete), with Cancel focused. Resolves to whether it was
+    // yes. A question still open when another is asked is answered no.
+    // `tone` "plain" is a question that destroys nothing, whose yes is the
+    // primary button rather than the red one.
+    window.dsConfirm = function (text, action, tone) {
+      return new Promise(function (resolve) {
+        if (pending) pending(false);
+        pending = resolve;
+        opener = document.activeElement;
+        message.textContent = text;
+        ok.textContent = action || fallbackLabel;
+        ok.classList.toggle("ds-button-danger", tone !== "plain");
+        ok.classList.toggle("ds-button-primary", tone === "plain");
+        dialog.style.display = "flex";
+        cancel.focus();
+      });
+    };
 
     cancel.addEventListener("click", function () { close(false); });
     ok.addEventListener("click", function () { close(true); });

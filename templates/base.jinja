@@ -25,8 +25,10 @@
     <script src="https://unpkg.com/htmx.org@4.0.0/dist/ext/hx-history-cache.min.js"
             integrity="sha384-e1wwPpjN1qgXFpaQz+GhbURx/wQofDpeAB9F3m8nxLi7CVxm1w2bpiNi3hECpDPg"
             crossorigin="anonymous"></script>
-    <meta name="viewport"
-          content="width=device-width,initial-scale=1.0,minimum-scale=1.0,viewport-fit=cover" />
+    {% block viewport %}
+      <meta name="viewport"
+            content="width=device-width,initial-scale=1.0,minimum-scale=1.0,viewport-fit=cover" />
+    {% endblock viewport %}
     <meta name="keywords" content="오이카페, 오에카키, 커뮤니티, お絵かき" />
     <meta name="description" content="오이카페는 오에카키 커뮤니티입니다. お絵かできるOEEEカフェです。" />
     <link rel="icon" type="image/png" href="/static/favicon.png" />
