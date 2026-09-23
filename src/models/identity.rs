@@ -54,7 +54,7 @@ impl Provider {
 
 /// Who a provider says someone is, once what the client sent has been
 /// checked with that provider.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifiedIdentity {
     pub provider: Provider,
     /// The provider's stable id for the person: a SteamID64, Apple's or
