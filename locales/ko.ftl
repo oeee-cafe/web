@@ -24,9 +24,9 @@ feed-switch = 피드
 feed-recent = 최신
 feed-popular = 인기
 feed-following = 동맹
-feed-communities = 커뮤니티
+feed-communities = 커뮤
 feed-recent-empty = 아직 그려진 그림이 없습니다.
-feed-popular-empty = 지난 6개월 동안 그려진 그림이 아직 없습니다. <a href="/">최신</a> 그림을 둘러보세요.
+feed-popular-empty = 아직 그려진 그림이 없습니다.
 feed-following-empty = 동맹이 비어 있습니다. <a href="/communities">커뮤니티</a>에서 다른 사람과 동맹을 맺어 보세요!
 feed-communities-empty = 내 커뮤니티에 새 그림이 없습니다. <a href="/communities">커뮤니티</a>에서 가입할 곳을 찾아보세요!
 
@@ -34,7 +34,7 @@ draw = 그리기!
 collaborate = 넷캔
 drafts = 임시 보관함
 profile = 프로필
-community = 커뮤니티
+community = 커뮤
 notifications = 알림
 
 no-notifications = 아직 알림이 없습니다.
@@ -225,7 +225,7 @@ sort-alphabetical = 가나다순
 # Collaborative drawing
 collaborate-title = 넷캔 세션
 collaborate-create-session = 새 세션 만들기
-collaborate-community-label = 커뮤니티
+collaborate-community-label = 커뮤
 collaborate-canvas-size-label = 캔버스 크기
 collaborate-session-title-label = 세션 제목 (선택사항)
 collaborate-session-title-placeholder = 세션 제목을 입력하세요

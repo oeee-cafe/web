@@ -49,11 +49,14 @@
       } else {
         group.classList.remove("thumb-moves");
       }
+      // Marked before it is measured: the choice is drawn at its
+      // neighbours' weight once the thumb is under it (ds.css), and the
+      // thumb is to fit that.
+      group.classList.add("has-thumb");
       group.style.setProperty("--thumb-x", item.offsetLeft + "px");
       group.style.setProperty("--thumb-y", item.offsetTop + "px");
       group.style.setProperty("--thumb-w", item.offsetWidth + "px");
       group.style.setProperty("--thumb-h", item.offsetHeight + "px");
-      group.classList.add("has-thumb");
     }
 
     function settle() {
