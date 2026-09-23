@@ -188,12 +188,13 @@
   display: none !important;
 }
 
-/* In the apps the reader's text size can be the site's: an app that follows
-   the system's setting says how much larger or smaller than the default it
-   is, as --oeee-text-scale on the root (WebTabController.swift in
-   oeee-cafe-apple, SiteBridge.kt in oeee-cafe-android), and every step of
-   the type scale follows it. Text grows and shrinks; pictures, the spaces
-   between things and the painter do not, as in the system's own apps.
+/* In the apps the reader's text size can be the site's: how much larger or
+   smaller than the default the system's setting is arrives as
+   --oeee-text-scale on the root -- on iOS the page measures it itself
+   (theme_head.jinja), and on Android the app sets it (SiteBridge.kt in
+   oeee-cafe-android) -- and every step of the type scale follows it. Text
+   grows and shrinks; pictures, the spaces between things and the painter
+   do not, as in the system's own apps.
 
    It is keyed on any app rather than on the phones, and an app that says
    nothing -- the Mac and Windows windows, or any app before it has said --
@@ -201,7 +202,7 @@
    fallback of 1. So a tablet, or a desktop app that one day follows its
    system's text size, needs nothing here.
 
-   The app says the system's scale as it is, and --ds-text-scale is that
+   The scale arrives as the system has it, and --ds-text-scale is that
    kept within 0.8 and 2, as far as these layouts were drawn to go.
    `clamp()` is newer than the Firefox 56 floor, which is why it is only
    ever inside this rule: no browser carries data-app, and a custom
@@ -1486,9 +1487,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    window's own controls sit on it: the traffic lights over its first 96px
    on macOS (SiteView.swift in oeee-cafe-apple, laid out to this bar's 52px
    first row), and on Windows the three caption buttons, 46px each, over
-   its last 150px (caption.js in oeee-cafe-desktop). The room is kept here,
-   where the bar is drawn, and not by each app's own stylesheet over it --
-   two of those broke silently as this bar changed. Only the first row
+   its last 150px (app_caption.jinja, drawn by the page and asking the app
+   with `window` and `caption` messages on the bridge). The room is kept
+   here, where the bar is drawn, and not by each app's own stylesheet over
+   it -- two of those broke silently as this bar changed. Only the first row
    needs to clear them: the sections' row, when the bar stacks, reaches
    back under them to the usual 16px. */
 html[data-app="macos"] .nav-bar #menubar {

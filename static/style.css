@@ -3802,12 +3802,10 @@ html[data-store="steam"] .auth-steam {
   display: block;
 }
 
-/* Signing in with Apple goes to Apple's page and back, which the apps'
-   web views would open in a browser of their own, away from the session
-   the answer has to come back to. So it is a browser's only -- and the iOS
-   app's, which signs in natively and says so in its user agent
-   (theme_head.jinja). Black on
-   light and white on dark, as Apple asks of its sign-in buttons. */
+/* Signing in with Apple, offered everywhere: a browser goes to Apple's page
+   and back, and in the apps the page takes the press itself
+   (app_sign_in.jinja). Black on light and white on dark, as Apple asks of
+   its sign-in buttons. */
 .ds-button.auth-apple,
 .ds-button.auth-apple:visited {
   border-color: #000;
@@ -3846,13 +3844,11 @@ html[data-store="steam"] .auth-steam {
   background-color: #e5e5e5;
 }
 
-/* Signing in with Google. Google refuses its own sign-in pages inside an
-   embedded web view (`disallowed_useragent`), so this is a browser's -- and
-   the phone apps', which stop the link and sign in some other way, saying so
-   in their user agent (theme_head.jinja): Credential Manager on Android, a
-   browser of the system's on iOS. White
-   with a grey edge in light and Google's dark grey in dark, as Google asks
-   of its sign-in buttons. */
+/* Signing in with Google, offered everywhere. Google refuses its own
+   sign-in pages inside an embedded web view (`disallowed_useragent`), so in
+   the apps the page takes the press itself and goes round some other way
+   (app_sign_in.jinja). White with a grey edge in light and Google's dark
+   grey in dark, as Google asks of its sign-in buttons. */
 .ds-button.auth-google,
 .ds-button.auth-google:visited {
   border-color: #747775;

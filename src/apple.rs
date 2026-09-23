@@ -7,10 +7,11 @@
 //! the token was made for this site (`aud`) and for this sign-in (`nonce`),
 //! and takes nothing else Apple's post says on its word.
 //!
-//! The iOS app signs in natively instead (`ASAuthorizationAppleIDProvider`),
-//! with a state and nonce it asks the site for from inside its web view, and
-//! posts the token it gets to the same place. Its token names the app's
-//! bundle ID as audience; the rest is checked the same way.
+//! The iOS and Mac apps sign in natively instead
+//! (`ASAuthorizationAppleIDProvider`): the page in their web view asks the
+//! site for a state and nonce, hands the nonce to the app, and posts the
+//! token the app gets back to the same place (app_sign_in.jinja). Its token
+//! names the app's bundle ID as audience; the rest is checked the same way.
 //!
 //! Apple says nothing here about what anyone has bought -- an ID token names
 //! a person and nothing else, which is why `purchased` is always `None`

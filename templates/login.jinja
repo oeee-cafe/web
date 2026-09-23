@@ -44,17 +44,18 @@
             <a class="ds-button auth-secondary auth-steam" href="/auth/steam/app{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-steam") }}</a>
           {% endif %}
           {% if apple_enabled %}
-            {# Apple's sign-in page, and back. Not offered inside the apps,
-               which open another site's pages in a browser of their own, where
-               the answer would arrive without this sign-in's session -- except
-               the iOS app, which stops the navigation and signs in natively. #}
+            {# Apple's sign-in page, and back, in a browser. In every app the
+               page takes the press itself (app_sign_in.jinja): a sheet of the
+               platform's own on iOS and macOS, and elsewhere the browser, with
+               the answer handed back to this session. #}
             <a class="ds-button auth-secondary auth-apple" href="/auth/apple{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-apple") }}</a>
           {% endif %}
           {% if google_enabled %}
-            {# Google's sign-in page, and back. Google refuses its own pages in
-               an embedded web view, so in the apps this is the phone apps' only,
-               which stop the navigation and sign in some other way: Credential
-               Manager on Android, a browser of the system's on iOS. #}
+            {# Google's sign-in page, and back, in a browser. Google refuses
+               its own pages in an embedded web view, so in every app the page
+               takes the press itself (app_sign_in.jinja): Credential Manager
+               on Android, a browser of the system's on iOS and macOS, and on
+               Windows the browser, with the answer handed back. #}
             <a class="ds-button auth-secondary auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-google") }}</a>
           {% endif %}
         </div>
