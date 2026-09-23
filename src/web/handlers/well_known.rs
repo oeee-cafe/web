@@ -94,7 +94,8 @@ pub async fn robots_txt(State(state): State<AppState>) -> impl IntoResponse {
          Disallow: /api/\n\
          Disallow: /ap/\n\
          Disallow: /draw\n\
-         Disallow: /home\n\
+         Disallow: /following\n\
+         Disallow: /joined\n\
          Disallow: /login\n\
          Disallow: /logout\n\
          Disallow: /notifications\n\

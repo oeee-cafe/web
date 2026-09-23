@@ -1,15 +1,15 @@
 {# Which of Home's feeds is showing, where the feed's heading would be:
    Recent (/), every public drawing as it arrives; Popular (/popular), the
    past week's, the most reacted to first; and for someone signed in
-   Following (/home), the people they follow, and Communities
-   (/home/communities), the communities they are a member of. Orders of
+   Following (/following), the people they follow, and Communities
+   (/joined), the communities they are a member of. Orders of
    one feed rather than places, so a switch on the feed rather than tabs
    in the toolbar -- which marks Home on all of them (oeeeMarkCurrent,
    toolbar.jinja). Links, so each is still its own address to go back to
    and to share. `feed_switch` is the one showing (handlers/home.rs). #}
 {% set feeds = [("recent", "/"), ("popular", "/popular")] %}
 {% if current_user %}
-  {% set feeds = feeds + [("following", "/home"), ("communities", "/home/communities")] %}
+  {% set feeds = feeds + [("following", "/following"), ("communities", "/joined")] %}
 {% endif %}
 <nav class="ds-segmented feed-switch" aria-label="{{ ftl_get_message("feed-switch") }}">
   {% for name, path in feeds %}

@@ -2467,7 +2467,9 @@ mod template_tests {
             // search.jinja: the shared post cards and the per-row control's
             // inline script, no bundle.
             "/search",
-            "/home",
+            "/popular",
+            "/following",
+            "/joined",
             "/notifications",
             "/account",
             "/login",

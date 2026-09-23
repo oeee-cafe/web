@@ -233,13 +233,10 @@ impl App {
         let static_router = static_router();
 
         let protected_router = Router::new()
-            .route("/home", get(my_timeline))
-            .route("/home/communities", get(my_communities_feed))
-            .route("/api/timeline/posts", get(load_more_timeline_posts))
-            .route(
-                "/api/home/communities/posts",
-                get(load_more_community_feed_posts),
-            )
+            .route("/following", get(my_timeline))
+            .route("/joined", get(my_communities_feed))
+            .route("/api/following/posts", get(load_more_timeline_posts))
+            .route("/api/joined/posts", get(load_more_community_feed_posts))
             .route("/notifications", get(list_notifications))
             .route("/api/notifications/items", get(notifications_fragment))
             .route(

@@ -1,5 +1,5 @@
 {# One batch of post cards plus the sentinel that pulls the next batch.
-   Shared by / and /home: both pass a `feed` object built by feed_context() in
+   Shared by Home's feeds: each passes a `feed` object built by feed_context() in
    handlers/home.rs, so the sentinel points at whichever load-more endpoint
    that feed uses. Rendered inline for the first batch and standalone by the
    load-more handlers for the rest, so it must not depend on anything those

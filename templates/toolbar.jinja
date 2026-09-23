@@ -265,7 +265,7 @@
       // Also called with the path being gone to, the moment it is asked for,
       // so the tab moves on the click rather than when the page arrives --
       // and with the page's own path again if it never does.
-      var HOME = /^\/(popular|home|home\/communities)?$/;
+      var HOME = /^\/(popular|following|joined)?$/;
       window.oeeeMarkCurrent = function (here) {
         var links = document.querySelectorAll("#menubar a[href]");
         for (var i = 0; i < links.length; i++) {
@@ -430,7 +430,7 @@
       }
       var commands = {
         "recent": function () { go("/"); },
-        "following": function () { go("/home"); },
+        "following": function () { go("/following"); },
         "communities": function () { go("/communities"); },
         "together": function () { go("/collaborate"); },
         "hashtags": function () { go("/hashtags"); },
@@ -605,7 +605,7 @@
       }
       var SHAPES = [
         // Home's feeds: the switch, Per row, the grid.
-        [/^\/(popular|home|home\/communities)?$/, function () {
+        [/^\/(popular|following|joined)?$/, function () {
           return '<div class="center-wide"><div class="feed-header">' + bar("180px", 22) +
             (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + postGrid() + "</div>";
         }],
