@@ -55,6 +55,10 @@
   --ds-grid-solid: #bbbbff;
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
   --ds-surface: #f2f2ff;
+  /* The chosen segment of a segmented control, raised out of its track
+     (--ds-hover over the ground): the card's colour where that is lighter
+     than the track, as it is here. */
+  --ds-thumb: #f2f2ff;
   --ds-field: #ffffff;
   /* Ink, in three strengths. Muted is 5.4:1 on the ground; faint is for
      placeholders and disabled text only. */
@@ -106,6 +110,8 @@
     --ds-grid: #22223f;
     --ds-grid-solid: #22223f;
     --ds-surface: #23233c;
+    /* The card is darker than the track here, so it would sink, not rise. */
+    --ds-thumb: #3a3a62;
     --ds-field: #1d1d33;
     --ds-ink: #dcdcea;
     --ds-muted: #a3a3bd;
@@ -141,6 +147,7 @@
   --ds-grid: #22223f;
   --ds-grid-solid: #22223f;
   --ds-surface: #23233c;
+  --ds-thumb: #3a3a62;
   --ds-field: #1d1d33;
   --ds-ink: #dcdcea;
   --ds-muted: #a3a3bd;
@@ -824,8 +831,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 /* The sections only: 넷캔 stays as it is on its own pages. */
 .nav-bar .toolbar-sections a[aria-current="page"],
 .nav-bar .toolbar-sections a[aria-current="page"]:hover {
-  background-color: var(--ds-surface);
-  box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
+  background-color: var(--ds-thumb);
+  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
   font-weight: 600;
 }
 
@@ -2293,8 +2300,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-segmented > .is-selected,
 .ds-page .ds-segmented > button[aria-pressed="true"],
 .ds-page .ds-segmented > button[aria-pressed="true"]:hover {
-  background-color: var(--ds-surface);
-  box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
+  background-color: var(--ds-thumb);
+  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
   font-weight: 600;
 }
 
@@ -2323,8 +2330,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   -webkit-transform: translate(var(--thumb-x), var(--thumb-y));
   transform: translate(var(--thumb-x), var(--thumb-y));
   border-radius: 5px;
-  background-color: var(--ds-surface);
-  box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
+  background-color: var(--ds-thumb);
+  box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
   pointer-events: none;
 }
 
