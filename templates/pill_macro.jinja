@@ -9,10 +9,14 @@
    ahead on hover or touch (hx-preload); the content area dims while a
    fetch that was not ahead is on its way (hx-indicator, ds.css). The
    address is pushed as for any boosted link, and going back is htmx's,
-   from its history cache where it has the page.
+   from its history cache where it has the page. And nothing is scrolled
+   (show:none): htmx gives every boosted swap `show:top`, which calls
+   scrollIntoView on the content area and moves the page under the sticky
+   header by however far it is from the top -- the pill slipping up behind
+   the toolbar at every switch.
 
    htmx 4 is too new for the oldest browsers the site serves (Firefox 56),
    and there these are ordinary links. #}
 {% macro in_place() -%}
-hx-boost:inherited="true" hx-target:inherited="main.ds-content" hx-select:inherited="main.ds-content" hx-swap:inherited="outerMorph" hx-indicator:inherited="main.ds-content" hx-preload:inherited="mouseover, touchstart" hx-morph-skip
+hx-boost:inherited="true" hx-target:inherited="main.ds-content" hx-select:inherited="main.ds-content" hx-swap:inherited="outerMorph show:none" hx-indicator:inherited="main.ds-content" hx-preload:inherited="mouseover, touchstart" hx-morph-skip
 {%- endmacro %}
