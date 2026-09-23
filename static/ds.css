@@ -839,7 +839,6 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
    that can sell one (style.css). A square icon button added without being
    named here keeps the worded buttons' 4px 11px and their 20px line height,
    and comes out 40x26 sitting 2px below its neighbours. */
-.nav-bar .toolbar-end a.toolbar-button.toolbar-search,
 .nav-bar .toolbar-end a.toolbar-button.toolbar-bell,
 .nav-bar .toolbar-end a.toolbar-button.toolbar-supporter {
   padding: 4px;
@@ -850,6 +849,143 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
 .toolbar-end .toolbar-bell svg,
 .toolbar-end .toolbar-supporter svg {
   margin: 2px;
+}
+
+/* Search is a form rather than one of those links: the glass is the
+   field's label and wears their square, and the field beside it is nothing
+   wide until something focuses it. Its own rules throughout -- a label
+   matches none of the layout steps' `> a` and `.toolbar-button` selectors,
+   so the square keeps its 4px at every width without having to outrank
+   them the way the icons above do. */
+.toolbar-end .toolbar-search {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.toolbar-end .toolbar-search-glass {
+  display: inline-block;
+  flex: none;
+  padding: 4px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 6px;
+  background-color: var(--ds-surface);
+  color: var(--ds-ink);
+  box-shadow: var(--ds-shadow-raise);
+  line-height: 0;
+}
+
+.toolbar-end .toolbar-search-glass:hover {
+  background-color: var(--ds-ground);
+}
+
+/* The field opens leftward out of the glass, and never in the row's
+   flow: it is absolute against the form, its right edge against the
+   glass's left, so the bar is the same width open or closed. fitToolbar
+   measures the bar to decide how many rows it needs, and a field that
+   grew the bar would have it measuring a bar that is only that wide while
+   someone is typing -- restacking under the field, and, once stacked, the
+   overlay below takes the width away again and it unstacks. Out of flow,
+   there is nothing to oscillate about.
+
+   Closed it is nothing: no width, no padding, no edge. Opening moves all
+   of those at once, which is the whole of the animation. */
+.toolbar-end .toolbar-search-field {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  z-index: 70;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  width: 0;
+  height: 30px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0 solid var(--ds-line-strong);
+  border-radius: 6px;
+  background-color: var(--ds-field);
+  color: var(--ds-ink);
+  opacity: 0;
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-m);
+  line-height: calc(20px * var(--oeee-text-scale, 1));
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  /* The bar takes the pointer's selection away from every label in it;
+     a field is the one thing here that is meant to be selected in. */
+  -moz-user-select: text;
+  -webkit-user-select: text;
+  user-select: text;
+  transition: width 160ms ease, opacity 120ms ease, margin-right 160ms ease,
+    padding 160ms ease, border-width 160ms ease;
+}
+
+/* Open. The field's own :focus, not the form's :focus-within: the form
+   holds nothing else that can take focus, so there is nothing the wider
+   selector would catch, and this one is as old as focus is. The ring goes
+   here too -- around the field rather than around the glass, which is a
+   label and not a control. */
+.toolbar-end .toolbar-search-field:focus {
+  width: 200px;
+  margin-right: 6px;
+  padding: 4px 10px;
+  border-width: 1px;
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 1px;
+  opacity: 1;
+  box-shadow: var(--ds-shadow-raise);
+}
+
+/* WebKit dresses a search field with a well and a clear button of its
+   own, over the shape this bar gives every control. One rule each: a
+   selector list dies whole on the one part an engine cannot parse, and
+   these are exactly the spellings Gecko cannot. */
+.toolbar-search-field::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+.toolbar-search-field::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* Stacked, there is no 200px to the glass's left -- it is a phone, or a
+   window as narrow as one -- so the field takes the first row instead,
+   from edge to edge. Handing the form back `position: static` is what
+   moves it: the field then measures against #menubar, which is the row.
+   What it covers comes back when it closes. */
+.nav-bar.is-stacked #menubar {
+  position: relative;
+}
+
+.nav-bar.is-stacked .toolbar-search {
+  position: static;
+}
+
+.nav-bar.is-stacked .toolbar-search-field:focus {
+  top: 11px;
+  right: 16px;
+  left: 16px;
+  width: auto;
+  margin-right: 0;
+}
+
+@media (max-width: 374px) {
+  .nav-bar.is-stacked .toolbar-search-field:focus {
+    right: 12px;
+    left: 12px;
+  }
+}
+
+/* A field that opens by sliding is worth having; one that opens by
+   appearing is what someone who asked for less motion gets. */
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-end .toolbar-search-field {
+    transition: none;
+  }
 }
 
 .toolbar-end .toolbar-bell-unread svg {

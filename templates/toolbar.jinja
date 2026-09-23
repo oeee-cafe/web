@@ -87,15 +87,36 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3 5.2 13.5a4.5 4.5 0 0 1 6.8-5.9 4.5 4.5 0 0 1 6.8 5.9z"/></svg>
         </a>
       {% endif %}
-      {# Search, signed in or out: a button like its neighbours, holding a
-         magnifier rather than a word, since a word here is the width that
-         pushes a phone's first row into its compact steps. Hidden in the
+      {# Search, signed in or out: a magnifier at rest, which opens a field
+         out of its left side when anything gives it focus -- a press on
+         the glass, a Tab into it, or `/` -- and closes when it loses it.
+         A word here is the width that pushes a phone's first row into its
+         compact steps; the field takes none of the bar's, since it lies
+         over it rather than in it (ds.css).
+
+         Enter goes to /search, which is still where results are read and
+         where the apps' own search fields land: this is a faster way to a
+         field than going there to find one, not a second search.
+
+         No script holds any of it up. The glass is the field's <label>, so
+         pressing it focuses the field; the opening is :focus-within; and a
+         form with a single field submits on Enter by itself. Hidden in the
          phone apps, whose own search tabs are the native field
          (theme_head.jinja marks the root). #}
-      <a class="toolbar-button toolbar-search" href="/search"
-         aria-label="{{ ftl_get_message("search") }}" title="{{ ftl_get_message("search") }} (/)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
-      </a>
+      <form class="toolbar-search" method="get" action="/search" role="search">
+        <label class="toolbar-search-glass" for="toolbar-search-field" title="{{ ftl_get_message("search") }} (/)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+        </label>
+        <input class="toolbar-search-field"
+               id="toolbar-search-field"
+               type="search"
+               name="q"
+               placeholder="{{ ftl_get_message("search-placeholder") }}"
+               aria-label="{{ ftl_get_message("search-placeholder") }}"
+               autocomplete="off"
+               autocapitalize="none"
+               spellcheck="false" />
+      </form>
       {% if current_user %}
         {% include "nav_notifications.jinja" %}
         {# The one control in this nav that loads a module bundle.
@@ -389,9 +410,17 @@
         "communities": function () { go("/communities"); },
         "together": function () { go("/collaborate"); },
         "hashtags": function () { go("/hashtags"); },
-        // Already there, the field is what was wanted, not a reload.
+        // A field is what was wanted, not a reload. The bar's own opens
+        // wherever you are -- unless it is not shown at all, which is the
+        // phone apps, where /search is the native field's page and the one
+        // to go to. `offsetParent` is null for a control `display: none`
+        // hides and not for the closed field, which is merely 0 wide.
         "search": function () {
-          var field = location.pathname === "/search" && document.querySelector('.search-page input[name="q"]');
+          var field = document.getElementById("toolbar-search-field");
+          if (!field || field.offsetParent === null) {
+            field = location.pathname === "/search" &&
+              document.querySelector('.search-page input[name="q"]');
+          }
           if (field) {
             field.focus();
             field.select();
@@ -497,6 +526,18 @@
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") closeMenus(null);
       });
+      // Escape gives up on a search: the field empties and lets go, and
+      // letting go is what closes it (ds.css). The keys above leave a field
+      // being typed in alone, so this is its own listener rather than a
+      // case there. Delegated from the document, since a boosted swap
+      // replaces the bar and this script does not run again.
+      document.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        var field = event.target;
+        if (!field || field.id !== "toolbar-search-field") return;
+        field.value = "";
+        field.blur();
+      });
 
       // The page that was asked for is drawn at once, before it arrives: the
       // content area swaps to a skeleton of it -- a grid of empty squares
@@ -566,6 +607,17 @@
               '<span class="community-card-body">' + bar("65%", 15) + bar("35%", 12, "ds-skeleton-gap") + bar("80%", 11, "ds-skeleton-gap") + "</span></div>";
           }
           return html + "</div></div>";
+        }],
+        // A search: its title and its own field, then the drawings it
+        // matched. It used to fall through to the column of text below,
+        // which was a page of the wrong shape entirely -- the grid landed
+        // on lines. A search reached from the bar's field is the commonest
+        // way here now, so it is worth its own.
+        [/^\/search$/, function () {
+          return '<div class="center-wide communities-page search-page">' + bar("120px", 26) +
+            '<div class="communities-bar ds-skeleton-gap-l">' + bar("300px", 30, "ds-skeleton-button") +
+            bar("80px", 30, "ds-skeleton-button") + "</div>" +
+            '<section class="profile-section">' + gridHeader("100px") + postGrid(2) + "</section></div>";
         }],
         // A community, a person, drafts: the identity card, then the grid.
         [/^\/communities\/@[^/]+$/, function () {
@@ -692,6 +744,16 @@
         // screen; anything else is a new screen.
         if (!link.closest(".nav-bar") && link.pathname !== location.pathname) push(link.pathname);
         else loading(link.pathname);
+      });
+      // A search is a trip to /search, and the bar's links to it lay a
+      // skeleton down while they go; submitting the field is the same trip
+      // and gets the same one. It is the nav's, so it is boosted, and a
+      // boosted request's swap takes the skeleton away exactly as a
+      // boosted link's does.
+      document.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!form || !form.classList || !form.classList.contains("toolbar-search")) return;
+        loading("/search");
       });
       // In the phone apps a page opened from the one showing is pushed, as a
       // screen is onto a navigation stack: its skeleton comes in over the
