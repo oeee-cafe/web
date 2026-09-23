@@ -553,8 +553,10 @@ account-supporter-mark = 名字旁边显示的标记
 account-show-in-credits = 在关于页面列出我的名字
 account-supporter-see-credits = 查看支持者
 profile-tabs-label = 作品
-profile-tab-public = 公开社区
-profile-tab-private = 私密社区
+profile-tab-public = 公开
+profile-tab-private = 私密
+profile-tab-drawings = 作品
+profile-more = 更多
 profile-private-community-posts-note = 私密社区的作品不会显示在你的公开个人资料中。
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)

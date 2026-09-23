@@ -1,5 +1,4 @@
 {% from "follow_macro.jinja" import follow_button, unfollow_button %} {% extends "base.jinja" %}
-{% from "user_pill_macro.jinja" import user_pill %}
 {% from "achievement_icon_macro.jinja" import achievement_icon %}
 {% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
 {% from "per_row_macro.jinja" import per_row %}
@@ -33,129 +32,116 @@
         href="https://{{ domain }}/ap/users/{{ user.id }}" />
 {% endblock head %}
 {% block content %}
-  {# A profile, laid out as an application lays out a person: a card with
-     who they are and what you can do about them, their links as chips under
-     their name, their allies as one strip, and their drawings -- with no
-     headings over bulleted lists, which is what made it read as a page. #}
+  {# A profile in two parts. First one card: their banner at twice its size,
+     their name, their links, what they have earned, and what you can do
+     about them. Then one switch and the one grid it chooses -- their
+     drawings, or the people they follow -- so the drawings come straight
+     after the card rather than under every other list the page has. #}
   {% include "post_feed_head.jinja" %}
+  {% set is_owner = current_user and user.id == current_user.id %}
   <div class="profile">
-    <section class="profile-card ds-card">
-      <div class="profile-identity">
+    <section class="profile-card profile-person ds-card">
+      <div class="profile-head">
         {% if banner %}
-          {# Their banner and their name, as one: who they are here. On your
-             own profile the pill leads to redrawing the banner. #}
-          <h1 class="profile-name-pill">
-            {{ user_pill("/banners/draw" if user.id == current_user.id else none, banner.image_filename, banner.width, banner.height, user.display_name, "@" ~ user.login_name ~ "@" ~ domain, r2_public_endpoint_url, "large") }}
-          </h1>
-        {% else %}
+          {# On your own profile the banner leads to redrawing it. #}
+          {% if is_owner %}<a class="profile-banner" href="/banners/draw" title="{{ ftl_get_message('profile-draw-banner') }}">{% else %}<span class="profile-banner">{% endif %}
+            <img width="{{ banner.width }}"
+                 height="{{ banner.height }}"
+                 alt=""
+                 src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
+          {% if is_owner %}</a>{% else %}</span>{% endif %}
+        {% elif is_owner %}
+          {# Where the banner will go, holding its place until there is one. #}
+          <a class="profile-banner profile-banner-blank" href="/banners/draw">{{ ftl_get_message("profile-draw-banner") }}</a>
+        {% endif %}
+        <div class="profile-identity">
           <h1 class="profile-name">{{ user.display_name }}</h1>
           <div class="profile-handle">@{{ user.login_name }}@{{ domain }}</div>
-        {% endif %}
-        <div class="profile-chips">
-          {% for standing in supporter_standings %}
-            {# First, and on the accent: the chips that are a thank-you. One
-               for every year they have supported, earliest first, on the
-               platform that year's pack was bought on. A year that has
-               passed stays here -- the mark beside their name is this
-               year's, this is what they gave. #}
-            <a class="profile-chip supporter-chip"
-               href="/about#supporters"
-               aria-label="{{ ftl_format_pattern('supporter-year', {'platform': supporter_mark_name(standing.store), 'year': standing.year}) }}"
-               title="{{ supporter_mark_name(standing.store) }}">{{ supporter_mark(standing.store) }}{{ standing.year }}</a>
-          {% endfor %}
-          <a class="profile-chip" href="/@{{ user.login_name }}/guestbook">{{ ftl_get_message("profile-guestbook") }}</a>
-          {% for link, target in links %}
-            <a class="profile-chip" href="{{ link.url }}" target="{{ target }}" rel="noopener">{{ link.description }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
-          {% endfor %}
+          {% if supporter_standings or links %}
+            <div class="profile-chips">
+              {% for standing in supporter_standings %}
+                {# First, and on the accent: the chips that are a thank-you. One
+                   for every year they have supported, earliest first, on the
+                   platform that year's pack was bought on. A year that has
+                   passed stays here -- the mark beside their name is this
+                   year's, this is what they gave. #}
+                <a class="profile-chip supporter-chip"
+                   href="/about#supporters"
+                   aria-label="{{ ftl_format_pattern('supporter-year', {'platform': supporter_mark_name(standing.store), 'year': standing.year}) }}"
+                   title="{{ supporter_mark_name(standing.store) }}">{{ supporter_mark(standing.store) }}{{ standing.year }}</a>
+              {% endfor %}
+              {% for link, target in links %}
+                <a class="profile-chip" href="{{ link.url }}" target="{{ target }}" rel="noopener">{{ link.description }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        {# What you can do about them. The guestbook is for anyone; reporting
+           is rare, so it waits behind the menu rather than sitting beside
+           Follow at the same weight. #}
+        <div class="profile-actions">
+          {% if current_user and not is_owner %}
+            {% if is_following %}{{ unfollow_button() }}{% else %}{{ follow_button() }}{% endif %}
+          {% endif %}
+          <a href="/@{{ user.login_name }}/guestbook" class="ds-button">{{ ftl_get_message("profile-guestbook") }}</a>
+          {% if is_owner %}
+            <a href="/@{{ user.login_name }}/settings" class="ds-button">{{ ftl_get_message("profile-manage") }}</a>
+          {% elif current_user %}
+            {# A .toolbar-menu, so the toolbar's script closes it on a click
+               elsewhere and on Escape. #}
+            <details class="toolbar-menu profile-more">
+              <summary aria-label="{{ ftl_get_message('profile-more') }}" title="{{ ftl_get_message('profile-more') }}">
+                <span class="ds-button profile-more-button" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M6 14q-.825 0-1.412-.587T4 12t.588-1.412T6 10t1.413.588T8 12t-.587 1.413T6 14m6 0q-.825 0-1.412-.587T10 12t.588-1.412T12 10t1.413.588T14 12t-.587 1.413T12 14m6 0q-.825 0-1.412-.587T16 12t.588-1.412T18 10t1.413.588T20 12t-.587 1.413T18 14"/></svg></span>
+              </summary>
+              <div class="toolbar-menu-items">
+                <button type="button" class="profile-more-item" onclick="this.closest('details').removeAttribute('open'); showProfileReportModal()">{{ ftl_get_message("profile-report") }}</button>
+              </div>
+            </details>
+          {% endif %}
         </div>
       </div>
-      <div class="profile-actions">
-        {% if current_user %}
-          {% if user.id == current_user.id %}
-            {% if not banner %}
-              <a href="/banners/draw" class="ds-button">{{ ftl_get_message("profile-draw-banner") }}</a>
-            {% endif %}
-            <a href="/@{{ user.login_name }}/settings" class="ds-button">{{ ftl_get_message("profile-manage") }}</a>
-          {% else %}
-            {% if is_following %}{{ unfollow_button() }}{% else %}{{ follow_button() }}{% endif %}
-            <button type="button" class="ds-button ds-button-quiet" onclick="showProfileReportModal()">{{ ftl_get_message("profile-report") }}</button>
-          {% endif %}
-        {% endif %}
-      </div>
-    </section>
 
-    {% if followings|length > 0 %}
-      <section class="profile-section">
-        <div class="profile-section-label">{{ ftl_get_message("profile-following") }}</div>
-        {# Those with a banner as /about shows banners -- framed, in hard
-           pixels, the name on hover -- more to a row the wider the window;
-           those without, as chips after them. #}
-        {% set with_banner = followings|selectattr("banner_image_filename")|list %}
-        {% set without_banner = followings|rejectattr("banner_image_filename")|list %}
-        {% if with_banner %}
-          <div class="profile-ally-banners">
-            {% for following in with_banner %}
-              <a class="about-banner" href="/@{{ following.login_name }}" title="{{ following.display_name }} (@{{ following.login_name }})">
-                <img width="200"
-                     height="40"
-                     alt="{{ following.display_name }} (@{{ following.login_name }})"
-                     loading="lazy"
-                     decoding="async"
-                     src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
-              </a>
-            {% endfor %}
-          </div>
-        {% endif %}
-        {% if without_banner %}
-          <div class="profile-allies">
-            {% for following in without_banner %}
-              <a class="profile-chip" href="/@{{ following.login_name }}" title="@{{ following.login_name }}">{{ following.display_name }}</a>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </section>
-    {% endif %}
-
-    {% if achievements %}
-      {# What they have done here: a first drawing, a first relay, a first
-         collaboration, buying the Steam app. The same achievements as on
-         Steam, earned on the site whatever they drew in. #}
-      <section class="profile-section">
-        <div class="profile-section-label">{{ ftl_get_message("profile-achievements") }}</div>
-        <ul class="profile-achievements">
+      {% if achievements %}
+        {# What they have done here: a first drawing, a first relay, a first
+           collaboration, buying the Steam app. The same achievements as on
+           Steam, earned on the site whatever they drew in. A badge each,
+           along the foot of the card; what it was for and when is its
+           tooltip. #}
+        <ul class="profile-achievements" aria-label="{{ ftl_get_message('profile-achievements') }}">
+          <li class="profile-achievements-label" aria-hidden="true">{{ ftl_get_message("profile-achievements") }}</li>
           {% for earned in achievements %}
-            <li class="profile-achievement">
+            <li class="profile-achievement"
+                title="{{ ftl_get_message('achievement-' ~ earned.key ~ '-description') }} · {{ earned.earned_at|dateformat(format='short', tz='Asia/Seoul') }}">
               {{ achievement_icon(earned.key) }}
-              <span class="profile-achievement-text">
-                <span class="profile-achievement-name">{{ ftl_get_message("achievement-" ~ earned.key) }}</span>
-                <span class="profile-achievement-description">{{ ftl_get_message("achievement-" ~ earned.key ~ "-description") }}</span>
-                <time class="profile-achievement-date" datetime="{{ earned.earned_at }}">{{ earned.earned_at|dateformat(format="short", tz="Asia/Seoul") }}</time>
-              </span>
+              <span class="profile-achievement-name">{{ ftl_get_message("achievement-" ~ earned.key) }}</span>
             </li>
           {% endfor %}
         </ul>
-      </section>
-    {% endif %}
+      {% endif %}
+    </section>
 
     <section class="profile-section">
-      {% if user.id == current_user.id %}
-        {# Their own profile holds both: what everyone sees, and what only
-           they do. One grid at a time, chosen like any other view. The tabs
-           are named short so both fit a phone's width beside each other;
-           what the private one means is said inside it. #}
-        <div class="grid-header">
+      {# One switch, one grid. Everyone sees their drawings and, when there
+         are any, who they follow; on their own profile the drawings are
+         split in two -- what everyone sees, and what only they do. With
+         nothing to switch between, the one grid is simply named. #}
+      {% set tab_count = 1 + (1 if is_owner else 0) + (1 if followings else 0) %}
+      <div class="grid-header">
+        {% if tab_count > 1 %}
           <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-tabs-label') }}">
-            <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-tab-public") }}</button>
-            <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-tab-private") }}</button>
+            <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-tab-public" if is_owner else "profile-tab-drawings") }}<span class="profile-tab-count">{{ public_community_posts|length }}</span></button>
+            {% if is_owner %}
+              <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-tab-private") }}<span class="profile-tab-count">{{ private_community_posts|length }}</span></button>
+            {% endif %}
+            {% if followings %}
+              <button type="button" aria-pressed="false" data-profile-tab="following">{{ ftl_get_message("profile-following") }}<span class="profile-tab-count">{{ followings|length }}</span></button>
+            {% endif %}
           </div>
-          {{ per_row() }}
-        </div>
-      {% else %}
-        <div class="grid-header">
-          <div class="profile-section-label">{{ ftl_get_message("profile-public-community-posts") }}</div>
-          {% if public_community_posts %}{{ per_row() }}{% endif %}
-        </div>
-      {% endif %}
+        {% else %}
+          <div class="profile-section-label">{{ ftl_get_message("profile-tab-drawings") }}</div>
+        {% endif %}
+        {% if public_community_posts or is_owner %}<div data-profile-per-row>{{ per_row() }}</div>{% endif %}
+      </div>
       <div data-profile-panel="public">
         {% if public_community_posts %}
           <div class="posts-grid">
@@ -175,7 +161,7 @@
           <p class="profile-empty">{{ ftl_get_message("profile-public-community-posts-nil") }}</p>
         {% endif %}
       </div>
-      {% if user.id == current_user.id %}
+      {% if is_owner %}
         <div data-profile-panel="private" hidden>
           <p class="profile-panel-note">{{ ftl_get_message("profile-private-community-posts-note") }}</p>
           {% if private_community_posts %}
@@ -196,9 +182,42 @@
             <p class="profile-empty">{{ ftl_get_message("profile-private-community-posts-nil") }}</p>
           {% endif %}
         </div>
+      {% endif %}
+      {% if followings %}
+        {# Everyone they follow as the same shape: their banner framed in
+           hard pixels, or where they have none, a frame of the same size
+           with their name in it -- one list, not banners and then chips. #}
+        <div data-profile-panel="following" hidden>
+          <ul class="profile-follows">
+            {% for following in followings %}
+              <li>
+                <a class="profile-follow" href="/@{{ following.login_name }}">
+                  {% if following.banner_image_filename %}
+                    <img class="profile-follow-banner"
+                         width="200"
+                         height="40"
+                         alt=""
+                         loading="lazy"
+                         decoding="async"
+                         src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
+                  {% else %}
+                    <span class="profile-follow-banner profile-follow-blank" aria-hidden="true">{{ following.display_name }}</span>
+                  {% endif %}
+                  <span class="profile-follow-text">
+                    <span class="profile-follow-name">{{ following.display_name }}</span>
+                    <span class="profile-follow-handle">@{{ following.login_name }}</span>
+                  </span>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+      {% if tab_count > 1 %}
         <script>
           (function () {
             var tabs = document.querySelectorAll("[data-profile-tab]");
+            var perRow = document.querySelector("[data-profile-per-row]");
             for (var i = 0; i < tabs.length; i++) {
               tabs[i].addEventListener("click", function () {
                 var chosen = this.getAttribute("data-profile-tab");
@@ -209,6 +228,8 @@
                 for (var k = 0; k < panels.length; k++) {
                   panels[k].hidden = panels[k].getAttribute("data-profile-panel") !== chosen;
                 }
+                // How many a row is a question about drawings only.
+                if (perRow) perRow.hidden = chosen === "following";
               });
             }
           })();

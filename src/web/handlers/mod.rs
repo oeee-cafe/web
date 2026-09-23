@@ -2108,8 +2108,9 @@ mod template_tests {
         }
     }
 
-    /// Achievements under the profile card, each named, explained and dated;
-    /// no section at all for someone with none.
+    /// Achievements along the foot of the profile card, a badge each, named,
+    /// with what it was for in its tooltip; no strip at all for someone with
+    /// none.
     #[test]
     fn the_profile_shows_what_its_owner_has_achieved() {
         let env = test_support::env();
@@ -2143,19 +2144,19 @@ mod template_tests {
             {"achievement": "STEAM_SUPPORTER", "key": "steam-supporter", "earned_at": "2026-09-22T01:00:00Z"},
         ]));
         assert!(with.contains("profile-achievements"));
-        assert!(with.contains("achievement-first-drawing-description"));
+        assert!(with.contains(r#"title="achievement-first-drawing-description"#));
         assert!(with.contains("achievement-steam-supporter"));
-        assert!(with.contains(r#"datetime="2026-09-22T00:00:00Z""#));
         // Each with its own Material Symbols icon: the brush for a first
         // drawing, the game controller for buying on Steam.
         assert_eq!(with.matches(r#"class="achievement-icon""#).count(), 2);
         assert!(with.contains(r#"d="M6 21q-1.125 0-2.225-.55T2 19"#));
         assert!(with.contains(r#"d="M4.55 19q-1.275 0-1.975-.888"#));
         assert!(!render(json!([])).contains("profile-achievements"));
-        // Under the banners of those they follow, over their drawings.
+        // In the card, over the switch; those they follow are behind it,
+        // after their drawings, not stacked above them.
         let at = |needle: &str| with.find(needle).unwrap_or_else(|| panic!("no {needle}"));
-        assert!(at("profile-ally-banners") < at("profile-achievements"));
-        assert!(at("profile-achievements") < at("data-profile-panel=\"public\""));
+        assert!(at("profile-achievements") < at("data-profile-tab=\"public\""));
+        assert!(at("data-profile-panel=\"public\"") < at("data-profile-panel=\"following\""));
     }
 
     /// A comment as `build_comment_thread_tree` serializes one.
@@ -2315,10 +2316,13 @@ mod template_tests {
         assert!(!render(json!([])).contains(r#"id="supporters""#));
     }
 
-    /// Following: those with a banner framed as /about frames them, the rest
-    /// as chips after, and a group left out when nobody is in it.
+    /// Following, behind its own tab with its count: everyone the same
+    /// shape, a banner where they have drawn one and a frame of the same
+    /// size holding their name where they have not. No tab at all for
+    /// someone who follows nobody, and with nothing to switch between, no
+    /// switch.
     #[test]
-    fn the_profile_shows_following_banners_as_about_does() {
+    fn the_profile_shows_everyone_followed_the_same_way() {
         let env = test_support::env();
         let render = |followings: serde_json::Value| {
             env.get_template("profile.jinja")
@@ -2344,14 +2348,63 @@ mod template_tests {
         let plain = json!({"login_name": "b", "display_name": "비", "banner_image_filename": null});
 
         let both = render(json!([banner, plain]));
-        assert!(both.contains(r#"class="profile-ally-banners""#));
-        assert!(both.contains(r#"<a class="about-banner" href="/@a""#));
+        assert!(both.contains(r#"data-profile-tab="following">profile-following<span class="profile-tab-count">2</span>"#));
+        assert!(both.contains(r#"data-profile-panel="following" hidden"#));
+        assert_eq!(both.matches(r#"class="profile-follow""#).count(), 2);
+        assert!(both.contains(r#"<a class="profile-follow" href="/@a""#));
         assert!(both.contains("/image/ab/abcdef.png"));
-        assert!(both.contains(r#"<a class="profile-chip" href="/@b""#));
-        assert!(!both.contains(r#"href="/@b" title="비"#), "bannerless stay chips");
+        assert!(both.contains(r#"<a class="profile-follow" href="/@b""#));
+        assert!(both.contains(r#"profile-follow-blank" aria-hidden="true">비</span>"#));
 
-        assert!(!render(json!([plain])).contains("profile-ally-banners"));
-        assert!(!render(json!([banner])).contains(r#"class="profile-allies""#));
+        let nobody = render(json!([]));
+        assert!(!nobody.contains("data-profile-tab"), "one grid, no switch");
+        assert!(!nobody.contains("profile-follows"));
+        assert!(nobody.contains(r#"<div class="profile-section-label">profile-tab-drawings</div>"#));
+    }
+
+    /// What a visitor can do about someone: follow them and sign their
+    /// guestbook side by side, and report them from the menu after -- never
+    /// a button at Follow's weight. Someone signed out gets the guestbook
+    /// and nothing that needs an account.
+    #[test]
+    fn a_profile_keeps_reporting_behind_its_menu() {
+        let env = test_support::env();
+        let render = |current_user: serde_json::Value| {
+            env.get_template("profile.jinja")
+                .expect("profile loads")
+                .render(context! {
+                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이"}),
+                    banner => json!({"image_filename": "abcdef.png", "width": 200, "height": 40}),
+                    links => Vec::<serde_json::Value>::new(),
+                    followings => Vec::<serde_json::Value>::new(),
+                    achievements => Vec::<serde_json::Value>::new(),
+                    public_community_posts => Vec::<serde_json::Value>::new(),
+                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    domain => "oeee.cafe",
+                    is_following => false,
+                    r2_public_endpoint_url => "https://images.example",
+                    current_user,
+                    ..chrome()
+                })
+                .expect("profile renders")
+        };
+        let visitor = render(json!({"id": "u2", "login_name": "fan", "display_name": "Fan"}));
+        let at = |needle: &str| visitor.find(needle).unwrap_or_else(|| panic!("no {needle}"));
+        assert!(at("/@oeee/follow") < at("/@oeee/guestbook"));
+        assert!(at("/@oeee/guestbook") < at(r#"<details class="toolbar-menu profile-more">"#));
+        assert!(at("profile-more") < at("showProfileReportModal()"));
+        // Their banner, not a link for someone who cannot redraw it.
+        assert!(visitor.contains(r#"<span class="profile-banner">"#));
+
+        let owner = render(json!({"id": "u1", "login_name": "oeee", "display_name": "오이"}));
+        assert!(!owner.contains("profile-more"));
+        assert!(owner.contains(r#"<a class="profile-banner" href="/banners/draw""#));
+        assert!(owner.contains(r#"data-profile-tab="private""#));
+
+        let signed_out = render(json!(null));
+        assert!(signed_out.contains("/@oeee/guestbook"));
+        assert!(!signed_out.contains("/@oeee/follow"));
+        assert!(!signed_out.contains("profile-more"));
     }
 
     /// What the Steam app reads to tell friends what someone is doing: the

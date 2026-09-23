@@ -553,8 +553,10 @@ account-supporter-mark = 이름 옆에 표시할 표식
 account-show-in-credits = 오이카페 소개 페이지에 내 이름 싣기
 account-supporter-see-credits = 후원자 보기
 profile-tabs-label = 그림
-profile-tab-public = 공개 커뮤니티
-profile-tab-private = 비공개 커뮤니티
+profile-tab-public = 공개
+profile-tab-private = 비공개
+profile-tab-drawings = 그림
+profile-more = 더 보기
 profile-private-community-posts-note = 비공개 커뮤니티에서 그린 그림은 공개 프로필에 보이지 않습니다.
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
