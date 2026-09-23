@@ -61,7 +61,7 @@ pub async fn supporter_page(
     let bought_in: Vec<String> = supporter_standings
         .iter()
         .filter(|standing| standing.year == year)
-        .map(|standing| standing.provider.clone())
+        .map(|standing| standing.store.clone())
         .collect();
     let supports_this_year = !bought_in.is_empty();
 

@@ -8,9 +8,9 @@ use crate::models::user::{
     update_user_preferred_language, update_user_show_sensitive_content, update_user_with_activity,
     AuthSession, DeleteConfirmation, Language,
 };
-use crate::models::identity::{list_identities_for_user, Provider};
+use crate::models::identity::list_identities_for_user;
 use crate::models::supporter::{
-    current_year, mark_for, set_mark, set_show_in_credits, shows_in_credits, standings,
+    current_year, mark_for, set_mark, set_show_in_credits, shows_in_credits, standings, Store,
 };
 use crate::web::context::CommonContext;
 use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
@@ -64,7 +64,7 @@ pub async fn account(
             .await?
             .into_iter()
             .filter(|standing| standing.year == current_year())
-            .map(|standing| standing.provider)
+            .map(|standing| standing.store)
             .collect(),
         None => Vec::new(),
     };
@@ -168,7 +168,7 @@ pub async fn save_show_sensitive_content(
 #[derive(Deserialize)]
 pub struct SupporterForm {
     pub show_in_credits: Option<String>,
-    /// Which platform's mark to wear: a provider's name, or empty for the
+    /// Which store's mark to wear: a store's name, or empty for the
     /// default. Absent -- which is what a page rendered by the other colour
     /// mid-deploy posts -- leaves the choice alone rather than clearing a
     /// mark it never showed.
@@ -176,8 +176,8 @@ pub struct SupporterForm {
 }
 
 /// What a supporter is asked: whether they are thanked by name on /about,
-/// and which platform's mark goes beside their name. Their mark stays
-/// either way; a name that is not a provider is ignored.
+/// and which store's mark goes beside their name. Their mark stays
+/// either way; a name that is not a store is ignored.
 pub async fn save_supporter_settings(
     auth_session: AuthSession,
     State(state): State<AppState>,
@@ -194,8 +194,8 @@ pub async fn save_supporter_settings(
     match form.mark.as_deref() {
         Some("") => set_mark(&mut tx, user.id, None).await?,
         Some(name) => {
-            if let Some(provider) = Provider::parse(name) {
-                set_mark(&mut tx, user.id, Some(provider)).await?;
+            if let Some(store) = Store::parse(name) {
+                set_mark(&mut tx, user.id, Some(store)).await?;
             }
         }
         None => {}

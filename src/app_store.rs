@@ -269,8 +269,7 @@ pub async fn check(config: &AppStoreConfig) -> Result<()> {
 /// Both colours run this for a moment during a deploy, and asking twice is
 /// harmless.
 pub async fn recheck_supporters(db: sqlx::PgPool, config: AppStoreConfig) {
-    use crate::models::identity::Provider;
-    use crate::models::supporter::{apple_purchases_due_for_check, record_recheck};
+    use crate::models::supporter::{apple_purchases_due_for_check, record_recheck, Store};
 
     let mut every = tokio::time::interval(Duration::from_secs(10 * 60));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -300,14 +299,8 @@ pub async fn recheck_supporters(db: sqlx::PgPool, config: AppStoreConfig) {
             };
             let recorded = async {
                 let mut tx = db.begin().await?;
-                record_recheck(
-                    &mut tx,
-                    Provider::Apple,
-                    &due.transaction,
-                    &due.product,
-                    owned,
-                )
-                .await?;
+                record_recheck(&mut tx, Store::Apple, &due.transaction, &due.product, owned)
+                    .await?;
                 tx.commit().await?;
                 anyhow::Ok(())
             };

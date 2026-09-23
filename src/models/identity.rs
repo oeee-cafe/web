@@ -295,15 +295,13 @@ pub async fn refresh_standing(
     user_id: Uuid,
     identity: &VerifiedIdentity,
 ) -> Result<()> {
-    if let Some(packs) = identity.purchased.as_deref() {
-        super::supporter::record_owned_products(
-            tx,
-            user_id,
-            identity.provider,
-            &identity.subject,
-            packs,
-        )
-        .await?;
+    // Only a provider whose identities are also a store's accounts can say
+    // what they own -- Steam, whose purchases are keyed by the SteamID64 its
+    // sign-in names (supporter::Store::identity).
+    let store = super::supporter::Store::owned_by_identity(identity.provider);
+    if let (Some(packs), Some(store)) = (identity.purchased.as_deref(), store) {
+        super::supporter::record_owned_products(tx, user_id, store, &identity.subject, packs)
+            .await?;
     }
     if let Some(achievement) = identity.supporter_achievement() {
         super::achievement::grant_achievement(tx, user_id, achievement).await?;
