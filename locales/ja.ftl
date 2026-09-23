@@ -480,6 +480,7 @@ handoff-confirm-link = この{ $provider }アカウント（{ $account }）を�
 handoff-confirm-link-unnamed = この{ $provider }アカウントを、サインイン中のアカウントに連携しますか？
 handoff-done-title = サインインしました
 handoff-done-body = このウィンドウを閉じて、オイカフェに戻ってください。
+handoff-done-return = オイカフェに戻る
 identity-sign-in-failed = { $provider }に接続できませんでした。しばらくしてからもう一度お試しください。
 identity-sign-in-invalid = { $provider }で本人確認ができませんでした。もう一度お試しください。
 identity-linked = { $provider }アカウントを連携しました。
