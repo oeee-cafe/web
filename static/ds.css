@@ -55,11 +55,6 @@
   --ds-grid-solid: #bbbbff;
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
   --ds-surface: #f2f2ff;
-  /* The toolbar as a floating bar (everywhere but the desktop apps): the
-     surface, a little clear so the page passing under it shows, and
-     lifted off it. */
-  --ds-bar: rgba(242, 242, 255, 0.88);
-  --ds-shadow-bar: 0 6px 14px -6px rgba(40, 40, 90, 0.28), 0 1px 2px rgba(40, 40, 90, 0.12);
   --ds-field: #ffffff;
   /* Ink, in three strengths. Muted is 5.4:1 on the ground; faint is for
      placeholders and disabled text only. */
@@ -111,8 +106,6 @@
     --ds-grid: #22223f;
     --ds-grid-solid: #22223f;
     --ds-surface: #23233c;
-    --ds-bar: rgba(35, 35, 60, 0.88);
-    --ds-shadow-bar: 0 6px 14px -6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
     --ds-field: #1d1d33;
     --ds-ink: #dcdcea;
     --ds-muted: #a3a3bd;
@@ -148,8 +141,6 @@
   --ds-grid: #22223f;
   --ds-grid-solid: #22223f;
   --ds-surface: #23233c;
-  --ds-bar: rgba(35, 35, 60, 0.88);
-  --ds-shadow-bar: 0 6px 14px -6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
   --ds-field: #1d1d33;
   --ds-ink: #dcdcea;
   --ds-muted: #a3a3bd;
@@ -470,109 +461,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-size: 14px 14px;
 }
 
-/* The toolbar is a bar on the page, not the screen's top edge -- except in
-   the Mac and Windows apps (data-form="desktop"), whose windows have no
-   title bar of their own: there the toolbar is the title bar, fused to the
-   top, with the window's controls on it.
-
-   Fused to the edge on a phone, its ground running up under the status bar,
-   it read as part of the screen, and a screen's edge cannot move: when the
-   page bounced, or was pulled down to reload, the edge came away from the
-   top and a gap opened above it. Inset from the sides and below the status
-   bar, with corners and a shadow, it is a card like any other on the page,
-   which can come down with the page -- so the apps and the browsers keep
-   their own bounce and their own pull to reload. Everywhere else it is the
-   same bar, so the site looks one way wherever it is read.
-
-   The header stays what sticks, so the bar stays in reach while the page
-   passes under it, clear through the bar. Its strips around the bar are the
-   page's, not the header's: they let taps through to what passes under
-   them. Below the status bar where the page runs under it (viewport-fit,
-   base.jinja) -- a separate declaration, which an engine without env(),
-   Firefox 56 among them, drops alone. */
-html:not([data-form="desktop"]) .ds-page > header {
-  padding: 6px 8px 0;
-  padding-top: calc(6px + env(safe-area-inset-top, 0px));
-  background: none;
-  pointer-events: none;
-}
-
-html:not([data-form="desktop"]) .ds-page > header > * {
-  pointer-events: auto;
-}
-
-html:not([data-form="desktop"]) .ds-page > header .nav-bar {
-  position: relative;
-  top: auto;
-  padding-top: 0;
-  border: 1px solid var(--ds-line-strong);
-  border-radius: 16px;
-  background-color: var(--ds-bar);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: var(--ds-shadow-bar);
-}
-
-/* Inset, the bar is 18px narrower than the screen, which was enough to
-   squeeze the site's name out beside the mark on a phone signed out
-   (toolbar.jinja fits the bar in steps); the bar's own inner margin gives
-   it back. */
-html:not([data-form="desktop"]) .ds-page > header .nav-bar #menubar {
-  padding-right: 8px;
-  padding-left: 8px;
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  html:not([data-form="desktop"]) .ds-page > header .nav-bar {
-    background-color: var(--ds-surface);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-}
-
-/* What scrolls up past the bar fades into the ground as it passes under
-   it, and is gone by the bar's top edge, rather than being cut off at the
-   top of the screen: the iOS app's page stops at the status bar, which is
-   plain ground, and a line of drawings sliced through against it looked
-   torn. A fixed wash, under the bar (so the bar stays sharp) and over
-   everything else: nothing at the bar's bottom edge, the whole ground at
-   its top edge and above. `--ds-header-height` is the header's, which
-   ends where the bar does, kept by base.jinja; before it is measured, and
-   in an engine with nothing to measure it by, the bar's usual height. At
-   rest there is nothing under it but the top of the page, whose grid
-   already comes in from the ground the same way (style.css).
-
-   On a phone's screen and anything held in the hand -- not on a desktop
-   browser, where the top of the window is the window's own edge and the
-   wash would dim the top of the content area's scrollbar. Taps go through. */
-@media (max-width: 600px), (hover: none) {
-  html:not([data-form="desktop"]) .ds-page::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    right: 0;
-    left: 0;
-    z-index: 49;
-    height: 66px;
-    height: var(--ds-header-height, calc(env(safe-area-inset-top, 0px) + 66px));
-    background-image: linear-gradient(var(--ds-ground) 6px, transparent);
-    background-image: linear-gradient(var(--ds-ground) calc(env(safe-area-inset-top, 0px) + 6px), transparent);
-    pointer-events: none;
-  }
-}
-
-html[data-form="handheld"] .ds-page::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  right: 0;
-  left: 0;
-  z-index: 49;
-  height: var(--ds-header-height, calc(env(safe-area-inset-top, 0px) + 66px));
-  background-image: linear-gradient(var(--ds-ground) calc(env(safe-area-inset-top, 0px) + 6px), transparent);
-  pointer-events: none;
-}
-
 @media (min-width: 601px) {
   html:not([data-form="handheld"]) {
     height: 100%;
@@ -606,18 +494,6 @@ html[data-form="handheld"] .ds-page::before {
     background-size: 14px 14px;
     background-attachment: local;
   }
-
-  /* In a browser the grid comes in over the top of the page here, as it
-     does on a phone (style.css) -- on the content area, since that is what
-     scrolls, and it is what shows around the bar floating over it. On the
-     root it stood still while the grid beside it moved. */
-  html:not([data-form]) .ds-page > main.ds-content {
-    background-image: linear-gradient(var(--ds-ground), transparent 120px),
-      linear-gradient(var(--ds-grid) 1px, transparent 1px),
-      linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
-    background-repeat: no-repeat, repeat, repeat;
-    background-size: 100% 120px, 14px 14px, 14px 14px;
-  }
 }
 
 .ds-content:focus {
@@ -632,17 +508,12 @@ html[data-form="handheld"] .ds-page::before {
    a stacked toolbar or a message makes it taller. Its scrollbar runs from
    under the toolbar, as a Mac's does.
 
-   A browser wider than a phone does the same with its floating bar, for
-   the same reason and one more: the strip around the bar is the content
-   area's own grid, scrolling with it, rather than the page's standing
-   still beside it.
-
    The glass is a layer behind the header rather than the header itself: a
    backdrop filter makes its element the frame for everything fixed inside
    it, and the keyboard shortcuts panel is fixed inside the toolbar. With
    reduced transparency asked for, the toolbar is solid again.
 
-   On Windows and on phones, nothing here applies. */
+   On the website, on Windows and on phones, nothing here applies. */
 :root {
   --ds-bar: rgba(204, 204, 255, 0.72);
 }
@@ -658,13 +529,11 @@ html[data-form="handheld"] .ds-page::before {
 }
 
 @media (min-width: 601px) {
-  html[data-app="macos"] .ds-page,
-  html:not([data-form]) .ds-page {
+  html[data-app="macos"] .ds-page {
     position: relative;
   }
 
-  html[data-app="macos"] .ds-page > header,
-  html:not([data-form]) .ds-page > header {
+  html[data-app="macos"] .ds-page > header {
     position: absolute;
     top: 0;
     right: 0;
@@ -697,8 +566,7 @@ html[data-form="handheld"] .ds-page::before {
   }
 
   /* A jump to an anchor lands below the toolbar, not under it. */
-  html[data-app="macos"] .ds-page > main.ds-content,
-  html:not([data-form]) .ds-page > main.ds-content {
+  html[data-app="macos"] .ds-page > main.ds-content {
     scroll-padding-top: var(--ds-header-height, 53px);
   }
 }
