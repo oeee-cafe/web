@@ -561,3 +561,7 @@ app-saved-image = ピクチャに保存しました
 app-saved-file = ダウンロードに保存しました
 app-save-failed = 保存できませんでした
 app-steam-sign-in-failed = Steamでログインできませんでした。Steamが起動しているか確認して、もう一度お試しください。
+window-minimize = 最小化
+window-maximize = 最大化
+window-restore = 元のサイズに戻す
+window-close = 閉じる

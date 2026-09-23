@@ -146,10 +146,21 @@
    And --oeee-text-scale on the root, which is CSS rather than a call: the
    Android app sets it; on iOS the page measures it itself (theme_head.jinja).
 
-   In the Mac app the page also sends
-     window    {action}  "drag" or "zoom": the toolbar's empty space was
-               pressed, or double-clicked, as a title bar is
-               (theme_head.jinja)
+   In the desktop apps, whose toolbar is the window's title bar, the page
+   also sends
+     window    {action}  the Mac's "drag" or "zoom": the toolbar's empty
+               space pressed, or double-clicked, as a title bar is
+               (theme_head.jinja); Windows's "minimize", "maximize" (to
+               restore, too) and "close", its caption buttons
+               (app_caption.jinja)
+     caption   {place}   Windows: where the maximise button is, in the
+               window's pixels ({x, y, width, height}, or null), for the
+               app's Snap Layouts stand-in
+   and the Windows app answers with
+     caption({maximized, pointer})
+                             app_caption.jinja: whether the window is
+                             maximised, and "hot" or "pressed" while the
+                             pointer is on the stand-in, "" when not
 
    There is no other channel. The web-view apps were never released before
    this contract; the builds people have from before it are the native
