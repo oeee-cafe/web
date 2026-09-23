@@ -168,7 +168,7 @@ describe("what the site tells the apps", () => {
     const page = await open({ signedIn: true, presence: "collaborating" });
     const message = last(page, "page");
     expect(keys(message)).toEqual(
-      ["community", "group", "painting", "path", "presence", "signedIn", "type", "v"],
+      ["community", "group", "painting", "path", "presence", "refreshable", "signedIn", "type", "v"],
     );
     expect(message).toMatchObject({
       v: 1,
@@ -177,6 +177,7 @@ describe("what the site tells the apps", () => {
       community: '오이카페 "모에화"',
       group: "0123456789abcdef",
       painting: true,
+      refreshable: false,
     });
     expect(typeof message.path).toBe("string");
   });
@@ -185,7 +186,7 @@ describe("what the site tells the apps", () => {
     const page = await open();
     page.window.document.querySelector(".nav-bar")!.remove();
     page.window.oeeeApp.report();
-    expect(last(page, "page")).toMatchObject({ signedIn: null, presence: null, painting: false });
+    expect(last(page, "page")).toMatchObject({ signedIn: null, presence: null, painting: false, refreshable: true });
   });
 
   it("gives the unread count as a number", async () => {
@@ -545,110 +546,5 @@ describe("what Android's web view cannot do", () => {
     link.click();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(page.sent.some((message) => message.type === "download")).toBe(false);
-  });
-});
-
-describe("pulling a page down to reload it", () => {
-  /** A page laid out as the site's are: a sticky header, and the content under it. */
-  function laidOut(page: Page) {
-    const document = page.window.document;
-    const layout = document.createElement("div");
-    layout.className = "ds-page";
-    layout.innerHTML = '<header style="height: 52px">toolbar</header><main class="ds-content">content</main>';
-    document.body.appendChild(layout);
-    return {
-      header: layout.querySelector("header")!,
-      content: layout.querySelector("main")!,
-    };
-  }
-
-  /** A finger put down on `target`, drawn `by` pixels down, and lifted. */
-  function pull(page: Page, target: Element, by: number, lift = true) {
-    const w = page.window;
-    const at = (y: number) => new w.Touch({ identifier: 1, target, clientX: 100, clientY: y });
-    const send = (type: string, y: number) => {
-      const touch = at(y);
-      const event = new w.TouchEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        touches: type === "touchend" ? [] : [touch],
-        changedTouches: [touch],
-      });
-      target.dispatchEvent(event);
-      return event;
-    };
-    send("touchstart", 100);
-    const moved = send("touchmove", 100 + by);
-    if (lift) send("touchend", 100 + by);
-    return moved;
-  }
-
-  it("brings the content down from under a still toolbar, with a cucumber between them", async () => {
-    const page = await open();
-    const { header, content } = laidOut(page);
-    const moved = pull(page, content, 120, false);
-    // The web view neither scrolls nor bounces while the page is pulled.
-    expect(moved.defaultPrevented).toBe(true);
-    expect(content.style.transform).toBe("translateY(60px)");
-    expect(header.style.transform).toBe("");
-    const cucumber = page.window.document.querySelector(".ds-refresh")!;
-    expect(cucumber.textContent).toBe("\u{1F952}");
-    expect(cucumber.getAttribute("aria-hidden")).toBe("true");
-  });
-
-  it("reloads a page let go far enough, spinning the cucumber", async () => {
-    const page = await open();
-    const { content } = laidOut(page);
-    let reloading = false;
-    page.window.addEventListener("beforeunload", () => {
-      reloading = true;
-    });
-    pull(page, content, 200);
-    expect(reloading).toBe(true);
-    expect(page.window.document.querySelector(".ds-refresh")!.classList.contains("is-spinning")).toBe(true);
-    expect(last(page, "haptic")).toEqual({ v: 1, type: "haptic", name: "medium" });
-  });
-
-  it("puts a page let go too soon back, and reloads nothing", async () => {
-    const page = await open();
-    const { content } = laidOut(page);
-    let reloading = false;
-    page.window.addEventListener("beforeunload", () => {
-      reloading = true;
-    });
-    pull(page, content, 60);
-    expect(reloading).toBe(false);
-    expect(content.style.transform).toBe("");
-  });
-
-  it("leaves the painter and replays alone, and the desktop windows and browsers", async () => {
-    for (const options of [
-      { presence: "drawing" },
-      { presence: "watching-replay" },
-      { userAgent: "Mozilla/5.0 OeeeCafe/macos" },
-      { userAgent: "Mozilla/5.0 OeeeCafe/windows" },
-      { userAgent: "Mozilla/5.0 Firefox/56.0" },
-    ]) {
-      const page = await open(options);
-      const { content } = laidOut(page);
-      const moved = pull(page, content, 200, false);
-      expect(moved.defaultPrevented, JSON.stringify(options)).toBe(false);
-      expect(content.style.transform, JSON.stringify(options)).toBe("");
-    }
-  });
-
-  it("is not a pull that starts in a field, or goes sideways", async () => {
-    const page = await open();
-    const { content } = laidOut(page);
-    const field = page.window.document.createElement("textarea");
-    content.appendChild(field);
-    expect(pull(page, field, 200, false).defaultPrevented).toBe(false);
-
-    const w = page.window;
-    const touch = (x: number, y: number) => new w.Touch({ identifier: 2, target: content, clientX: x, clientY: y });
-    content.dispatchEvent(new w.TouchEvent("touchstart", { bubbles: true, touches: [touch(100, 100)] }));
-    const sideways = new w.TouchEvent("touchmove", { bubbles: true, cancelable: true, touches: [touch(300, 140)] });
-    content.dispatchEvent(sideways);
-    expect(sideways.defaultPrevented).toBe(false);
   });
 });
