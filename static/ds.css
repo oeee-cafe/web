@@ -56,9 +56,14 @@
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
   --ds-surface: #f2f2ff;
   /* The chosen segment of a segmented control, raised out of its track
-     (--ds-hover over the ground): the card's colour where that is lighter
-     than the track, as it is here. */
+     (--ds-track): the card's colour where that is lighter than the track,
+     as it is here. */
   --ds-thumb: #f2f2ff;
+  /* And the track it slides in: solid, and a step below the ground, so a
+     segmented control reads as one against the page and its grid. A wash
+     of --ds-hover came out a shade off the ground and let the grid show
+     through. */
+  --ds-track: #b6b6ee;
   --ds-field: #ffffff;
   /* Ink, in three strengths. Muted is 5.4:1 on the ground; faint is for
      placeholders and disabled text only. */
@@ -112,6 +117,7 @@
     --ds-surface: #23233c;
     /* The card is darker than the track here, so it would sink, not rise. */
     --ds-thumb: #3a3a62;
+    --ds-track: #25253c;
     --ds-field: #1d1d33;
     --ds-ink: #dcdcea;
     --ds-muted: #a3a3bd;
@@ -148,6 +154,7 @@
   --ds-grid-solid: #22223f;
   --ds-surface: #23233c;
   --ds-thumb: #3a3a62;
+  --ds-track: #25253c;
   --ds-field: #1d1d33;
   --ds-ink: #dcdcea;
   --ds-muted: #a3a3bd;
@@ -668,7 +675,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   align-items: center;
   padding: 2px;
   border-radius: 8px;
-  background-color: var(--ds-hover);
+  background-color: var(--ds-track);
+  box-shadow: inset 0 0 0 1px var(--ds-line);
 }
 
 .toolbar-sections > * + * {
@@ -2261,7 +2269,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   display: inline-block;
   padding: 2px;
   border-radius: 7px;
-  background-color: var(--ds-hover);
+  background-color: var(--ds-track);
+  box-shadow: inset 0 0 0 1px var(--ds-line);
   white-space: nowrap;
 }
 
