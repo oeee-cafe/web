@@ -3903,8 +3903,22 @@ html[data-store="steam"] .auth-steam {
 /* ---------------------------------------------------------------------------
    About, and the documents the site keeps
    --------------------------------------------------------------------------- */
+/* One size of type and one rhythm for the whole page: every section is its
+   label, 12px, its row, and 32px to the next; chips and buttons are one
+   height, so the rows line up. A row's items carry their
+   spacing below them so a wrapped line is spaced like the first, and the
+   row gives the last line's back. */
 .about-page {
   max-width: 820px;
+}
+
+.about-page .about-card {
+  padding: var(--ds-space-5);
+  margin-bottom: var(--ds-space-6);
+}
+
+.about-page .profile-name {
+  font-size: var(--ds-text-2xl);
 }
 
 .about-lede {
@@ -3913,6 +3927,133 @@ html[data-store="steam"] .auth-steam {
   color: var(--ds-ink);
   font-size: var(--ds-text-l);
   line-height: 1.5;
+}
+
+.about-page .profile-section {
+  margin-bottom: var(--ds-space-6);
+}
+
+.about-page .profile-section-label {
+  margin-bottom: var(--ds-space-3);
+  font-size: var(--ds-text-base);
+}
+
+.about-page .profile-chips,
+.about-page .about-buttons,
+.about-stores {
+  margin-top: 0;
+  margin-bottom: calc(-1 * var(--ds-space-2));
+}
+
+.about-page .profile-chips > *,
+.about-buttons > *,
+.about-stores > * {
+  margin: 0 var(--ds-space-2) var(--ds-space-2) 0;
+}
+
+.about-page .profile-chip,
+.about-page .profile-chip:visited {
+  padding: 4px 12px;
+  border-radius: 15px;
+  font-size: var(--ds-text-base);
+  line-height: calc(20px * var(--ds-text-scale, 1));
+}
+
+.about-page .ds-button {
+  font-size: var(--ds-text-base);
+}
+
+.about-supporters-thanks {
+  margin: 0 0 var(--ds-space-3);
+  max-width: 60ch;
+  font-size: var(--ds-text-base);
+  line-height: 1.5;
+}
+
+/* The stores' badges: the store's mark, a small line naming the devices
+   and the store's name under it. Black on light and white on dark, as the
+   stores draw their own. */
+.about-stores {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: var(--ds-space-4);
+}
+
+html[data-app] .about-stores {
+  display: none;
+}
+
+.about-store,
+.about-store:visited {
+  display: flex;
+  align-items: center;
+  min-width: 170px;
+  padding: 7px 16px 7px 12px;
+  border: 1px solid #000;
+  border-radius: var(--ds-radius-m);
+  background-color: #000;
+  color: #fff;
+  text-decoration: none;
+}
+
+.about-store:hover {
+  border-color: #333;
+  background-color: #333;
+}
+
+.about-store:active {
+  filter: brightness(0.9);
+}
+
+.about-store-mark {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin-right: 10px;
+}
+
+.about-store-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.about-store-for {
+  font-size: var(--ds-text-s);
+  line-height: 1.2;
+  opacity: 0.85;
+}
+
+.about-store-name {
+  font-size: var(--ds-text-xl);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .about-store,
+  :root:not([data-theme="light"]) .about-store:visited {
+    border-color: #fff;
+    background-color: #fff;
+    color: #000;
+  }
+
+  :root:not([data-theme="light"]) .about-store:hover {
+    border-color: #e5e5e5;
+    background-color: #e5e5e5;
+  }
+}
+
+:root[data-theme="dark"] .about-store,
+:root[data-theme="dark"] .about-store:visited {
+  border-color: #fff;
+  background-color: #fff;
+  color: #000;
+}
+
+:root[data-theme="dark"] .about-store:hover {
+  border-color: #e5e5e5;
+  background-color: #e5e5e5;
 }
 
 /* Four banners a row at every width, each scaled to a quarter of it in
@@ -3959,10 +4100,6 @@ html[data-store="steam"] .auth-steam {
 .about-buttons {
   display: flex;
   flex-wrap: wrap;
-}
-
-.about-buttons > * {
-  margin: 0 var(--ds-space-2) var(--ds-space-2) 0;
 }
 
 .doc-page {
