@@ -4,10 +4,10 @@
 {% endblock title %}
 {% block content %}
   {# Signing in as an application's sheet asks for it: one card, the two
-     fields, the one button that does it, and the two other things a person
-     at this door may need -- a password they have forgotten, or an account
-     they do not have yet -- as buttons of their own rather than a line of
-     small print under the form. #}
+     fields, the one button that does it, and the other things a person at
+     this door may need -- another way in, a password they have forgotten,
+     or an account they do not have yet -- each a section of its own under a
+     question, rather than a line of small print under the form. #}
   <div class="auth-page">
     <form method="post" class="ds-card auth-card">
       <h1 class="auth-title">{{ ftl_get_message("sign-in") }}</h1>
@@ -28,30 +28,40 @@
       </div>
       {% if next %}<input type="hidden" name="next" value="{{ next }}" />{% endif %}
       <button type="submit" class="ds-button ds-button-primary auth-submit">{{ ftl_get_message("sign-in") }}</button>
-      <a class="ds-button auth-secondary" href="/password-reset">{{ ftl_get_message("forgot-password") }}</a>
-      {% if steam_enabled and not linking_provider %}
-        {# Only the Oeee Cafe app on Steam can follow this: it stops the
-           navigation, asks Steam for a ticket and posts it to /auth/steam.
-           Hidden everywhere else, where following it would only say so. #}
-        <a class="ds-button auth-secondary auth-steam" href="/auth/steam/app{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-steam") }}</a>
-      {% endif %}
-      {% if apple_enabled and not linking_provider %}
-        {# Apple's sign-in page, and back. Not offered inside the apps,
-           which open another site's pages in a browser of their own, where
-           the answer would arrive without this sign-in's session -- except
-           the iOS app, which stops the navigation and signs in natively. #}
-        <a class="ds-button auth-secondary auth-apple" href="/auth/apple{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-apple") }}</a>
-      {% endif %}
-      {% if google_enabled and not linking_provider %}
-        {# Google's sign-in page, and back. Google refuses its own pages in
-           an embedded web view, so in the apps this is the phone apps' only,
-           which stop the navigation and sign in some other way: Credential
-           Manager on Android, a browser of the system's on iOS. #}
-        <a class="ds-button auth-secondary auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-google") }}</a>
-      {% endif %}
       {% if linking_provider %}
         <button type="submit" form="identity-cancel" class="ds-button auth-secondary">{{ ftl_get_message("identity-cancel") }}</button>
       {% endif %}
+
+      {% if not linking_provider and (steam_enabled or apple_enabled or google_enabled) %}
+        {# A section of its own, like signing up. Steam alone shows only in
+           the Steam app, so a section holding nothing else hides with it. #}
+        <div class="auth-social{% if steam_enabled and not apple_enabled and not google_enabled %} auth-steam{% endif %}">
+          <div class="auth-divider"><span>{{ ftl_get_message("sign-in-other-ways") }}</span></div>
+          {% if steam_enabled %}
+            {# Only the Oeee Cafe app on Steam can follow this: it stops the
+               navigation, asks Steam for a ticket and posts it to /auth/steam.
+               Hidden everywhere else, where following it would only say so. #}
+            <a class="ds-button auth-secondary auth-steam" href="/auth/steam/app{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-steam") }}</a>
+          {% endif %}
+          {% if apple_enabled %}
+            {# Apple's sign-in page, and back. Not offered inside the apps,
+               which open another site's pages in a browser of their own, where
+               the answer would arrive without this sign-in's session -- except
+               the iOS app, which stops the navigation and signs in natively. #}
+            <a class="ds-button auth-secondary auth-apple" href="/auth/apple{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-apple") }}</a>
+          {% endif %}
+          {% if google_enabled %}
+            {# Google's sign-in page, and back. Google refuses its own pages in
+               an embedded web view, so in the apps this is the phone apps' only,
+               which stop the navigation and sign in some other way: Credential
+               Manager on Android, a browser of the system's on iOS. #}
+            <a class="ds-button auth-secondary auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-google") }}</a>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="auth-divider"><span>{{ ftl_get_message("forgot-password") }}</span></div>
+      <a class="ds-button auth-secondary" href="/password-reset">{{ ftl_get_message("find-password") }}</a>
 
       <div class="auth-divider"><span>{{ ftl_get_message("sign-in-no-account") }}</span></div>
       {# Carries where the reader was going, so signing up from here ends

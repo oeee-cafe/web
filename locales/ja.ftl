@@ -98,6 +98,7 @@ message-incorrect-credentials = IDまたはパスワードが間違っていま�
 login-name-conflict-error = このIDはすでにコミュニティで使用されています。別のIDを選択してください。
 
 forgot-password = パスワードをお忘れですか？
+find-password = パスワード再設定
 
 password-reset-title = パスワード再設定
 password-reset-description = メールアドレスを入力すると、パスワード再設定用のリンクをお送りします。
@@ -462,6 +463,7 @@ nav-about = 概要
 nav-about-menu = OEEEカフェ？
 post-move-to = { $communityName }に移動
 post-move-choose = 移動先を選んでください
+sign-in-other-ways = 他の方法でログイン
 sign-in-no-account = アカウントをお持ちでない方
 signup-agree = コミュニティガイドラインとプライバシーポリシーに同意します。
 signup-agree-required = 登録するには、コミュニティガイドラインとプライバシーポリシーに同意してください。
