@@ -245,11 +245,65 @@ html {
   background-color: var(--ds-ground);
 }
 
-/* `data-form="handheld"` marks the phone and tablet apps' pages, which
-   bounce as their own screens do (theme_head.jinja). */
-html:not([data-form="handheld"]),
-html:not([data-form="handheld"]) .ds-page {
+/* No page bounces, the apps' included. A bounce at the top in an app
+   pulled the site's toolbar down with the page; pulling a page down there
+   is the page's own now (app_refresh.jinja), which keeps the toolbar still
+   and brings the content down from under it. */
+html,
+.ds-page {
   overscroll-behavior: none;
+}
+
+/* The cucumber that comes out from under the toolbar as a page is pulled
+   down to reload (app_refresh.jinja): turned by the pull, and spinning
+   once let go far enough. Under the toolbar (z-index 50), so it appears
+   from behind it; the emoji is the site's mark, drawn by the system's
+   font. */
+.ds-refresh {
+  position: fixed;
+  left: 50%;
+  z-index: 40;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px;
+  font-size: 26px;
+  line-height: 40px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.ds-refresh span {
+  display: inline-block;
+}
+
+.ds-refresh.is-spinning span {
+  animation: ds-refresh-spin 0.7s linear infinite;
+}
+
+.ds-refresh.is-settling,
+.ds-page > main.ds-content.is-settling {
+  transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+}
+
+@keyframes ds-refresh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-refresh.is-spinning span {
+    animation-duration: 2.8s;
+  }
+
+  .ds-refresh.is-settling,
+  .ds-page > main.ds-content.is-settling {
+    transition: none;
+  }
 }
 
 .ds-page {
