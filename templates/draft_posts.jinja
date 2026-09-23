@@ -15,12 +15,13 @@
       <div class="grid-header drafts-header">
         <div>
           <h1 id="drafts-heading" class="profile-name">{{ ftl_get_message("drafts") }}</h1>
-          <div class="profile-handle"><span data-drafts-count>{{ posts|length }}</span> {{ ftl_get_message("draft-posts-count") }}</div>
+          <div class="profile-handle"><span id="drafts-count">{{ posts|length }}</span> {{ ftl_get_message("draft-posts-count") }}</div>
         </div>
-        <div class="drafts-tools">
+        <div id="drafts-tools" class="drafts-tools">
           {% if posts %}{{ per_row() }}{% endif %}
         </div>
       </div>
+      <div id="drafts-body">
       {% if posts %}
         <div class="posts-grid" id="post-feed-grid">
           {% for post in posts %}
@@ -59,29 +60,12 @@
             </div>
           {% endfor %}
         </div>
+      {% else %}
+        <div class="ds-card drafts-empty">
+          <p class="profile-empty">{{ ftl_get_message("draft-empty") }}</p>
+        </div>
       {% endif %}
-      <div class="ds-card drafts-empty" data-drafts-empty {% if posts %}hidden{% endif %}>
-        <p class="profile-empty">{{ ftl_get_message("draft-empty") }}</p>
       </div>
     </section>
   </div>
-  {# The count follows the grid as drafts are thrown away, and the last one
-     going leaves the empty state rather than an empty grid. #}
-  <script>
-    (function () {
-      var grid = document.getElementById("post-feed-grid");
-      if (!grid || !window.MutationObserver) return;
-      new MutationObserver(function () {
-        var left = grid.querySelectorAll(".draft-item").length;
-        var count = document.querySelector("[data-drafts-count]");
-        if (count) count.textContent = left;
-        if (!left) {
-          grid.hidden = true;
-          var tools = document.querySelector(".drafts-tools .ds-per-row");
-          if (tools) tools.hidden = true;
-          document.querySelector("[data-drafts-empty]").hidden = false;
-        }
-      }).observe(grid, { childList: true });
-    })();
-  </script>
 {% endblock content %}

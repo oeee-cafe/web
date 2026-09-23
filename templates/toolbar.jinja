@@ -317,9 +317,10 @@
       window.oeeeFitToolbar();
       // The content area scrolls, not the window, and browsers only restore
       // the window's own scroll when you go back -- so where you were is
-      // kept here, per page, and put back on a return to it: a full load
-      // that came from the history, or htmx restoring a boosted page after
-      // a popstate. And the content area takes the keyboard's focus when
+      // kept here, per page, and put back on a full load that came from the
+      // history. Going back within the site is htmx's history cache
+      // (base.jinja), which keeps every scrolled element's place itself.
+      // And the content area takes the keyboard's focus when
       // nothing else has it, so Page Down scrolls it without a click first.
       // The toolbar comes before <main> in the page, so on a full load this
       // waits for it; after a boosted swap it is already there.
@@ -329,9 +330,7 @@
         var key = "oeee-scroll:" + location.pathname + location.search;
         var entry = window.performance && performance.getEntriesByType
           ? performance.getEntriesByType("navigation")[0] : null;
-        var returning = window.oeeeHistoryStep ||
-          (!window.oeeeSettledOnce && entry && entry.type === "back_forward");
-        window.oeeeHistoryStep = false;
+        var returning = !window.oeeeSettledOnce && entry && entry.type === "back_forward";
         window.oeeeSettledOnce = true;
         if (returning) {
           try {
@@ -527,9 +526,6 @@
         if (target.closest("[data-shortcuts-close]") || target.id === "ds-shortcuts") {
           toggleShortcuts(false);
         }
-      });
-      window.addEventListener("popstate", function () {
-        window.oeeeHistoryStep = true;
       });
       document.addEventListener("click", function (event) {
         var button = event.target && event.target.closest ? event.target.closest("[data-theme-choice]") : null;

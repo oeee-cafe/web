@@ -19,8 +19,8 @@ use crate::models::notification::{
 };
 use crate::models::post::{
     build_thread_tree, delete_post_with_activity, edit_post, edit_post_community,
-    find_draft_posts_by_author_id, find_post_by_id, increment_post_viewer_count, publish_post,
-    SerializableThreadedPost,
+    find_draft_posts_by_author_id, find_post_by_id, get_draft_post_count,
+    increment_post_viewer_count, publish_post, SerializableThreadedPost,
 };
 use crate::models::reaction::{
     create_reaction, delete_reaction, find_reactions_by_post_id, get_reaction_counts, ReactionDraft,
@@ -2216,7 +2216,8 @@ pub async fn hx_do_edit_post(
 }
 
 /// `?in_place=1`: the page asking stays where it is -- the drafts list takes
-/// the card away itself -- instead of being sent to where the post lived.
+/// the card away itself, and is told what else that changes
+/// (draft_delete_oob.jinja) -- instead of being sent to where the post lived.
 #[derive(Deserialize, Default)]
 pub struct DeletePostQuery {
     in_place: Option<String>,
@@ -2225,6 +2226,7 @@ pub struct DeletePostQuery {
 pub async fn hx_delete_post(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Path(id): Path<String>,
     axum::extract::Query(query): axum::extract::Query<DeletePostQuery>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -2361,10 +2363,18 @@ pub async fn hx_delete_post(
     // take back: a Delete for it would only tell them it had existed.
     let was_published = post.get("published_at").and_then(|v| v.as_ref()).is_some();
     delete_post_with_activity(&mut tx, post_uuid, was_published.then_some(&state)).await?;
+    let remaining = match (&query.in_place, &auth_session.user) {
+        (Some(_), Some(user)) => Some(get_draft_post_count(&mut tx, user.id).await?),
+        _ => None,
+    };
     tx.commit().await?;
 
-    if query.in_place.is_some() {
-        return Ok(Html(String::new()).into_response());
+    if let Some(remaining) = remaining {
+        let rendered = state
+            .env
+            .get_template("draft_delete_oob.jinja")?
+            .render(context! { remaining, ftl_lang })?;
+        return Ok(Html(rendered).into_response());
     }
     Ok(([("HX-Redirect", &redirect_url)],).into_response())
 }

@@ -20,7 +20,8 @@
             hx-post="/@{{ user.login_name }}/guestbook"
             hx-target="#guestbook-entries"
             hx-swap="afterbegin"
-            hx-disable="find button">
+            hx-disable="find button"
+            hx-on::after-request="if (event.detail.ctx.response && event.detail.ctx.response.status < 400) this.reset()">
         <textarea class="ds-textarea" name="content" rows="3" required
                   aria-label="{{ ftl_get_message("guestbook") }}"></textarea>
         <div class="guestbook-form-actions">
@@ -28,27 +29,13 @@
         </div>
       </form>
     {% endif %}
-    <div class="member-list guestbook-list" id="guestbook-entries"{% if guestbook_entries|length == 0 %} hidden{% endif %}>
+    {# The list and the note that it is empty, one showing at a time by CSS
+       alone (style.css), so a first entry arriving, or the last one going,
+       needs nothing said about it. The list's whitespace is trimmed so an
+       empty list is :empty. #}
+    <div class="member-list guestbook-list" id="guestbook-entries">
       {%- for entry in guestbook_entries %}{{ guestbook_entry(entry) }}{% endfor -%}
     </div>
-    {% if guestbook_entries|length == 0 %}
-      <div class="ds-card notifications-empty" id="guestbook-empty"><p>{{ ftl_get_message("guestbook-empty") }}</p></div>
-    {% endif %}
+    <div class="ds-card notifications-empty guestbook-empty"><p>{{ ftl_get_message("guestbook-empty") }}</p></div>
   </div>
-  <script>
-    (function () {
-      // Once the new entry is in the list: the list shows, the empty note
-      // goes, and the field is cleared for the next.
-      function afterSwap(e) {
-        if (!e.target || e.target.id !== "guestbook-entries") return;
-        e.target.hidden = false;
-        var empty = document.getElementById("guestbook-empty");
-        if (empty) empty.parentNode.removeChild(empty);
-        var form = document.getElementById("guestbook-compose");
-        if (form) form.reset();
-      }
-      document.addEventListener("htmx:after:swap", afterSwap);
-      document.addEventListener("htmx:afterSwap", afterSwap);
-    })();
-  </script>
 {% endblock content %}

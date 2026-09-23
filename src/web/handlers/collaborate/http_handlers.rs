@@ -470,6 +470,7 @@ pub async fn collaborate_lobby(
     Ok(Html(rendered).into_response())
 }
 
+/// POST /api/v1/collaborate/sessions: a session, from the apps' JSON.
 pub async fn create_collaborative_session(
     auth_session: AuthSession,
     State(state): State<AppState>,
@@ -478,6 +479,67 @@ pub async fn create_collaborative_session(
     let user = auth_session
         .user
         .ok_or_else(|| anyhow::anyhow!("Authentication required"))?;
+    let session_id = insert_session(&state, user.id, request).await?;
+    Ok(Json(CreateSessionResponse {
+        session_id: session_id.to_string(),
+        url: format!("/collaborate/{}", session_id),
+    }))
+}
+
+/// The lobby's new-session form, as the browser sends it: the canvas as one
+/// "WxH" choice, the checkbox present or absent.
+#[derive(serde::Deserialize)]
+pub struct CreateSessionForm {
+    title: Option<String>,
+    #[serde(rename = "canvas-size")]
+    canvas_size: String,
+    is_public: Option<String>,
+    max_participants: i32,
+    community_id: Option<String>,
+}
+
+/// POST /collaborate: a session, from the lobby's form. Sent by htmx
+/// (collaborate_lobby.jinja), which is told where the new session is with
+/// HX-Redirect; sent without script, an ordinary redirect there. A refusal
+/// is htmx's error banner's to show (web::htmx).
+pub async fn create_collaborative_session_form(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    axum::Form(form): axum::Form<CreateSessionForm>,
+) -> Result<Response, AppError> {
+    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
+    let (width, height) = form
+        .canvas_size
+        .split_once('x')
+        .and_then(|(w, h)| Some((w.trim().parse().ok()?, h.trim().parse().ok()?)))
+        .ok_or_else(|| {
+            AppError::InvalidFormData(format!("unsupported canvas size {}", form.canvas_size))
+        })?;
+    let request = CreateSessionRequest {
+        title: form.title.filter(|title| !title.trim().is_empty()),
+        width,
+        height,
+        is_public: form.is_public.is_some(),
+        max_participants: form.max_participants,
+        community_id: form.community_id,
+    };
+    let session_id = insert_session(&state, user.id, request).await?;
+    let url = format!("/collaborate/{}", session_id);
+    if headers.get("HX-Request").is_some() {
+        Ok(([("HX-Redirect", url)],).into_response())
+    } else {
+        Ok(axum::response::Redirect::to(&url).into_response())
+    }
+}
+
+/// Checks a session's settings against what this server offers and who may
+/// post where, and records it.
+async fn insert_session(
+    state: &AppState,
+    user_id: Uuid,
+    request: CreateSessionRequest,
+) -> Result<Uuid, AppError> {
 
     // A canvas and a seat count this server did not offer are not a matter of
     // taste: both bound how large a checkpoint of this session can be, and the
@@ -510,7 +572,7 @@ pub async fn create_collaborative_session(
     // which would put a drawing into a private community the caller is not a
     // member of.
     if let Some(community_id) = community_id {
-        let allowed = crate::models::post::get_movable_communities(&mut tx, user.id)
+        let allowed = crate::models::post::get_movable_communities(&mut tx, user_id)
             .await?
             .into_iter()
             .any(|community| community.id == community_id);
@@ -527,7 +589,7 @@ pub async fn create_collaborative_session(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         "#,
         session_id,
-        user.id,
+        user_id,
         request.title,
         request.width,
         request.height,
@@ -539,11 +601,7 @@ pub async fn create_collaborative_session(
     .await?;
 
     tx.commit().await?;
-
-    Ok(Json(CreateSessionResponse {
-        session_id: session_id.to_string(),
-        url: format!("/collaborate/{}", session_id),
-    }))
+    Ok(session_id)
 }
 
 pub async fn save_collaborative_session(
@@ -1218,8 +1276,10 @@ mod tests {
     }
 
     #[test]
-    fn create_form_carries_translated_failure_messages() {
-        // Regression: the submit handler alerted two hardcoded English strings.
+    fn create_form_is_sent_by_htmx_with_a_translated_network_failure() {
+        // The form is htmx's to send, and a refusal is the error banner's to
+        // show; a request that got no answer is the one it says itself, in
+        // the reader's language (it once alerted hardcoded English).
         let env = test_support::env();
         let template = env
             .get_template("collaborate_lobby.jinja")
@@ -1227,7 +1287,7 @@ mod tests {
         let rendered = template
             .render(lobby_context(true, vec![]))
             .expect("renders signed in");
-        assert!(rendered.contains("data-error=\"collaborate-create-error\""));
+        assert!(rendered.contains("hx-post=\"/collaborate\""));
         assert!(rendered.contains("data-network-error=\"collaborate-create-network-error\""));
         assert!(!rendered.contains("Failed to create session"));
     }

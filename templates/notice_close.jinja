@@ -1,7 +1,11 @@
-{# The button that puts a notice away (ds.css, "Notices"; base.jinja does
-   the removing). web::htmx::error_banner writes the same markup by hand. #}
+{# The button that puts a notice away (ds.css, "Notices"), doing it itself:
+   the notice goes, and a list left with nothing in it is emptied outright,
+   so `:empty` takes the list away too. Its own onclick rather than
+   hx-on, so it closes where htmx does not run (Firefox 56).
+   web::htmx::error_banner writes the same markup by hand. #}
 <button class="ds-notice-close"
         type="button"
+        onclick="var n=this.parentNode,l=n.parentNode;l.removeChild(n);if(!l.querySelector('.ds-notice'))l.innerHTML=''"
         aria-label="{{ ftl_get_message('close') }}"
         title="{{ ftl_get_message('close') }}">
   <svg viewBox="0 0 12 12" aria-hidden="true">

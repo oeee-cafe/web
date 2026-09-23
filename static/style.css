@@ -4374,3 +4374,10 @@ html[data-store="steam"] .auth-steam {
   right: 12px;
   margin: 0;
 }
+
+/* A guestbook's entries, or the note that there are none: whichever has
+   something to say (guestbook.jinja). */
+.guestbook-list:empty,
+.guestbook-list:not(:empty) + .guestbook-empty {
+  display: none;
+}

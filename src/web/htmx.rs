@@ -84,7 +84,8 @@ pub async fn error_banner(req: Request, next: Next) -> Response {
         concat!(
             r#"<div class="ds-notice ds-notice-error htmx-error-message" role="alert">"#,
             r#"<span class="ds-notice-body">{message}</span>"#,
-            r#"<button class="ds-notice-close" type="button" aria-label="{close}" title="{close}">"#,
+            r#"<button class="ds-notice-close" type="button" aria-label="{close}" title="{close}" "#,
+            r#"onclick="var n=this.parentNode,l=n.parentNode;l.removeChild(n);if(!l.querySelector('.ds-notice'))l.innerHTML=''">"#,
             r#"<svg viewBox="0 0 12 12" aria-hidden="true">"#,
             r#"<path d="M2.5 2.5l7 7m0-7l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />"#,
             r#"</svg></button></div>"#,

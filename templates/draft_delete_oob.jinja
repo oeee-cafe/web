@@ -1,0 +1,13 @@
+{# What throwing a draft away from the drafts page (draft_posts.jinja)
+   changes besides its own card, which the button's swap takes away: the
+   count, and once none are left, the empty state in the grid's place and
+   no per-row control with nothing to arrange. Out of band, by id. #}
+<span id="drafts-count" hx-swap-oob="true">{{ remaining }}</span>
+{% if remaining == 0 %}
+  <div id="drafts-tools" class="drafts-tools" hx-swap-oob="true"></div>
+  <div id="drafts-body" hx-swap-oob="true">
+    <div class="ds-card drafts-empty">
+      <p class="profile-empty">{{ ftl_get_message("draft-empty") }}</p>
+    </div>
+  </div>
+{% endif %}
