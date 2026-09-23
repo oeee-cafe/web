@@ -52,7 +52,7 @@ use minijinja::context;
 /// case to a single extra fetch rather than eliminating it.
 pub(crate) const HOME_POSTS_PER_BATCH: i64 = 60;
 
-/// Context every post feed hands to the shared card fragment. `/`, `/home` and
+/// Context every post feed hands to the shared card fragment. Home's feeds and
 /// the collaborate lobby differ only in which query fills `posts` and where the
 /// sentinel points, so everything else lives here rather than being written
 /// three times.
@@ -82,9 +82,9 @@ pub(crate) enum Feed {
     Recent,
     /// `/popular`: the past week's, the most reacted to first.
     Popular,
-    /// `/home`: the people the reader follows.
+    /// `/following`: the people the reader follows.
     Following,
-    /// `/home/communities`: the communities the reader is a member of.
+    /// `/joined`: the communities the reader is a member of.
     Communities,
 }
 
@@ -104,8 +104,8 @@ impl Feed {
         match self {
             Feed::Recent => "/api/home/posts",
             Feed::Popular => "/api/popular/posts",
-            Feed::Following => "/api/timeline/posts",
-            Feed::Communities => "/api/home/communities/posts",
+            Feed::Following => "/api/following/posts",
+            Feed::Communities => "/api/joined/posts",
         }
     }
 
@@ -263,7 +263,7 @@ pub async fn load_more_popular_posts(
     feed_batch(Feed::Popular, auth_session, state, query).await
 }
 
-/// GET /api/timeline/posts
+/// GET /api/following/posts
 pub async fn load_more_timeline_posts(
     auth_session: AuthSession,
     State(state): State<AppState>,
@@ -272,7 +272,7 @@ pub async fn load_more_timeline_posts(
     feed_batch(Feed::Following, auth_session, state, query).await
 }
 
-/// GET /api/home/communities/posts
+/// GET /api/joined/posts
 pub async fn load_more_community_feed_posts(
     auth_session: AuthSession,
     State(state): State<AppState>,
@@ -1459,7 +1459,8 @@ mod tests {
             .expect("home.jinja renders");
         assert!(signed_out.contains(r#"<a href="/" aria-current="page">feed-recent</a>"#));
         assert!(signed_out.contains(r#"<a href="/popular">feed-popular</a>"#));
-        assert!(!signed_out.contains(r#"href="/home""#), "nobody's own feeds signed out");
+        assert!(!signed_out.contains(r#"href="/following""#), "nobody's own feeds signed out");
+        assert!(!signed_out.contains(r#"href="/joined""#));
         assert!(!signed_out.contains("home-section-title"), "the switch is the heading");
 
         let signed_in = |feed_switch: &str| {
@@ -1471,12 +1472,12 @@ mod tests {
             .expect("home.jinja renders")
         };
         let recent = signed_in("recent");
-        assert!(recent.contains(r#"<a href="/home">feed-following</a>"#));
-        assert!(recent.contains(r#"<a href="/home/communities">feed-communities</a>"#));
+        assert!(recent.contains(r#"<a href="/following">feed-following</a>"#));
+        assert!(recent.contains(r#"<a href="/joined">feed-communities</a>"#));
         for (feed, path) in [
             ("popular", "/popular"),
-            ("following", "/home"),
-            ("communities", "/home/communities"),
+            ("following", "/following"),
+            ("communities", "/joined"),
         ] {
             let page = signed_in(feed);
             assert!(
@@ -1587,7 +1588,7 @@ mod tests {
 
     #[test]
     fn following_matches_the_home_feed_chrome() {
-        // /home and / share the head, controls, grid id and card fragment; the
+        // /following and / share the head, controls, grid id and card fragment; the
         // only difference is where the sentinel points.
         let env = test_support::env();
         let template = env.get_template("home.jinja").expect("template loads");
@@ -1599,7 +1600,7 @@ mod tests {
                 feed => context! {
                     posts => vec![sample_post()],
                     has_more => true,
-                    next_url => "/api/timeline/posts?offset=60&limit=60",
+                    next_url => "/api/following/posts?offset=60&limit=60",
                 },
                 draft_post_count => 0,
                 unread_notification_count => 0,
@@ -1613,7 +1614,7 @@ mod tests {
         assert!(rendered.contains("class=\"feed-header\""));
         assert!(rendered.contains("post-card-byline"));
         // Sentinel must target the timeline endpoint, not the public feed.
-        assert!(rendered.contains("&#x2f;api&#x2f;timeline&#x2f;posts"));
+        assert!(rendered.contains("&#x2f;api&#x2f;following&#x2f;posts"));
         assert!(!rendered.contains("api&#x2f;home&#x2f;posts"));
     }
 

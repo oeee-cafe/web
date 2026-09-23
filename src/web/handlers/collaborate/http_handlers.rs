@@ -332,7 +332,7 @@ pub async fn collaborate_sessions_fragment(
 }
 
 /// GET /api/collaborate/posts — one batch of finished-collaboration cards plus
-/// the sentinel that pulls the next. Same contract as the / and /home feeds.
+/// the sentinel that pulls the next. Same contract as Home's feeds.
 pub async fn load_more_collaborative_posts(
     auth_session: AuthSession,
     State(state): State<AppState>,
@@ -443,7 +443,7 @@ pub async fn collaborate_lobby(
         viewer_sessions => viewer_sessions,
         active_sessions => active_sessions,
         // Shared card fragment contract, sentinel included: the gallery pages
-        // through /api/collaborate/posts the way / and /home page through
+        // through /api/collaborate/posts the way Home's feeds page through
         // theirs.
         feed => crate::web::handlers::home::feed_context(
             collaborative_posts,
@@ -961,7 +961,7 @@ mod tests {
 
     #[test]
     fn lobby_gallery_is_the_shared_drawing_grid() {
-        // The same grid and per-row control as / and /home, so the number a
+        // The same grid and per-row control as Home's feeds, so the number a
         // reader chose applies here too.
         let env = test_support::env();
         let template = env
@@ -1183,7 +1183,7 @@ mod tests {
             })
             .expect("renders");
         // An empty batch is short of a full one, so no sentinel — the contract
-        // the shared fragment already enforces for / and /home.
+        // the shared fragment already enforces for Home's feeds.
         assert!(!rendered.contains("infinite-scroll-sentinel"));
 
         let fragment = env
