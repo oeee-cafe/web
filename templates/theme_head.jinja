@@ -32,14 +32,6 @@
     });
   } else if (/OeeeCafeAndroid/.test(navigator.userAgent)) {
     document.documentElement.setAttribute("data-app", "android");
-  } else if (/OeeeCafeMac/.test(navigator.userAgent)) {
-    // The Mac app is a web view too, but not a phone: it takes none of the
-    // behaviour `data-app` turns on, so it is marked on its own. It also
-    // marks itself `data-desktop="macos"` (MacWindow.js), which the Windows
-    // app does too, and this is what tells the two apart -- the Mac app
-    // signs in with Apple and Google itself, and the Windows one cannot
-    // (style.css).
-    document.documentElement.setAttribute("data-mac-app", "");
   }
   if (document.documentElement.hasAttribute("data-app")) {
     // Controls are felt as well as seen, as the apps' own are: "light",

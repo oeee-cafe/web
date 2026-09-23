@@ -3709,19 +3709,6 @@ html[data-steam-app] .auth-steam {
   background-color: #e5e5e5;
 }
 
-/* Everywhere but the Windows app, which cannot finish either of these.
-   The phone apps and the Mac app sign in with Apple and with Google
-   themselves -- natively, or out to a browser and back through a handoff --
-   and a browser needs no help at all. The Windows app (on Steam and in the
-   Microsoft Store) opens these pages in a browser of its own, where the
-   answer arrives without the session it belongs to, so it is offered
-   neither; it is the one that marks `data-desktop` without `data-mac-app`,
-   since the Mac app marks both (theme_head.jinja). */
-html[data-desktop]:not([data-mac-app]) .auth-apple,
-html[data-desktop]:not([data-mac-app]) .auth-google {
-  display: none;
-}
-
 /* Signing in with Google. Google refuses its own sign-in pages inside an
    embedded web view (`disallowed_useragent`), so this is a browser's -- and
    the phone apps', which stop the link and sign in some other way, saying so
