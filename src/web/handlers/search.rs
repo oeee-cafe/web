@@ -151,9 +151,8 @@ pub async fn search_json(
 
 /// GET /search — drawings matching `q`, under the form that asked.
 ///
-/// A missing or blank `q` is the form alone rather than a 404, since the apps'
-/// search tabs and a bare visit both land here with nothing typed yet. The apps
-/// bring their own search field, and the stylesheet hides this one under it.
+/// A missing or blank `q` is the form alone rather than a 404, since a bare
+/// visit lands here with nothing typed yet.
 pub async fn search_page(
     auth_session: AuthSession,
     State(state): State<AppState>,

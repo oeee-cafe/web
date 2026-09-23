@@ -11,11 +11,9 @@
   // Which app, if any, this page is in -- the one place anything asks. Each
   // app's web view adds its name to the user agent (WebTabController.swift,
   // WebTabController.kt, webview2.rs in oeee-cafe-desktop), and each name marks
-  // the root one way, here, before the page paints, so nothing an app
-  // stands in for -- the toolbar's search button, the search page's own
-  // field, both under the phone apps' native search tab -- flashes up and
-  // away. The server does not look: what differs is all in the stylesheet
-  // and in script, keyed on these marks.
+  // the root one way, here, before the page paints, so nothing that differs
+  // in an app flashes up and away. The server does not look: what differs is
+  // all in the stylesheet and in script, keyed on these marks.
   //
   // The desktop apps also mark the root themselves, as they did before
   // they named themselves; a build from then still says the same thing.

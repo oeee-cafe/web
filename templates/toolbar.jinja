@@ -111,9 +111,7 @@
 
          No script holds any of it up. The glass is the field's <label>, so
          pressing it focuses the field; the pill opens on :focus-within;
-         and a form with a single field submits on Enter by itself. Hidden
-         in the phone apps, whose own search tabs are the native field
-         (theme_head.jinja marks the root). #}
+         and a form with a single field submits on Enter by itself. #}
       {# Unboosted, like the two forms below and for a plainer reason than
          theirs: htmx 4 takes a boosted form's submit, sends the request --
          GET /search?q=… , 200, the right page -- and swaps nothing in. The
@@ -431,10 +429,10 @@
         "together": function () { go("/collaborate"); },
         "hashtags": function () { go("/hashtags"); },
         // A field is what was wanted, not a reload. The bar's own opens
-        // wherever you are -- unless it is not shown at all, which is the
-        // phone apps, where /search is the native field's page and the one
-        // to go to. `offsetParent` is null for a control `display: none`
-        // hides and not for the closed field, which is merely 0 wide.
+        // wherever you are -- unless it is not shown at all, and then /search
+        // is the one to go to. `offsetParent` is null for a control
+        // `display: none` hides and not for the closed field, which is
+        // merely 0 wide.
         "search": function () {
           var field = document.getElementById("toolbar-search-field");
           if (!field || field.offsetParent === null) {

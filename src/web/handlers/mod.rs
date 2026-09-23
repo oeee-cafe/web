@@ -2834,19 +2834,4 @@ mod template_tests {
         assert!(found.contains("/image/ab/abcdef0123.png"));
         assert!(!found.contains("search-no-results"));
     }
-
-    #[test]
-    fn search_page_in_the_apps_leaves_the_form_to_their_own_field() {
-        // The page's own form, not every form in the document: the toolbar
-        // carries one to /search on every page. Both are put out of sight
-        // under the apps' native field by the stylesheet, keyed on the mark
-        // theme_head.jinja gives the root, and not left out by the server,
-        // which would have to recognise the apps a second time.
-        let page = render_search(Some("zzz"), vec![]);
-        assert!(page.contains(r#"class="communities-bar search-page-form""#));
-        assert!(page.contains("search-no-results"));
-        let ds = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/ds.css"))
-            .expect("ds.css is there");
-        assert!(ds.contains("html[data-app] .search-page-form"));
-    }
 }
