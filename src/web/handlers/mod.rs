@@ -1560,21 +1560,34 @@ mod template_tests {
     }
 
     /// The heart in the toolbar is there when this deployment sells a pack
-    /// at all; which store the reader is in front of hides or shows it
-    /// before paint, and is not the template's business.
+    /// at all *and* the reader is signed in -- the pack is bought against an
+    /// account. Which store they are in front of hides or shows it before
+    /// paint, and is not the template's business.
     #[test]
-    fn the_toolbar_has_a_heart_only_where_a_pack_is_sold() {
+    fn the_toolbar_has_a_heart_only_for_a_signed_in_reader_where_a_pack_is_sold() {
         let env = test_support::env();
-        let render = |on_sale: serde_json::Value| {
+        let render = |on_sale: serde_json::Value, current_user: serde_json::Value| {
             env.get_template("toolbar.jinja")
                 .expect("toolbar loads")
-                .render(context! { supporter_packs_on_sale => on_sale, ..chrome() })
+                .render(context! {
+                    supporter_packs_on_sale => on_sale,
+                    current_user,
+                    ..chrome()
+                })
                 .expect("toolbar renders")
         };
-        let selling = render(json!(true));
+        let reader = json!({"login_name": "oeee", "display_name": "오이"});
+
+        let selling = render(json!(true), reader.clone());
         assert!(selling.contains(r#"class="toolbar-button toolbar-supporter" href="/supporter""#));
-        assert!(!render(json!(false)).contains("toolbar-supporter"));
-        assert!(!render(json!(null)).contains("toolbar-supporter"));
+
+        // Nothing to sell: no heart for anyone.
+        assert!(!render(json!(false), reader.clone()).contains("toolbar-supporter"));
+        assert!(!render(json!(null), reader).contains("toolbar-supporter"));
+
+        // Selling, but nobody to sell to yet: /supporter is still there to
+        // read, it is just not in the bar.
+        assert!(!render(json!(true), json!(null)).contains("toolbar-supporter"));
     }
 
     /// What the site is stays somewhere a reader would look for it. Signed

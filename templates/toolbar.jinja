@@ -70,17 +70,18 @@
     </div>
     <div class="toolbar-end">
       {# The Supporter Pack: a heart, before search, leading to /supporter.
-         Shown wherever the page is read -- it leads to a page and not to a
-         payment, and a browser is where most people will find out the pack
-         exists. Which store can take the money is the page's business
-         (style.css). Left out of the markup entirely when this deployment
-         has no pack for sale.
+         For someone signed in only: the pack is bought against an account,
+         and the bar signed out is already asking for two other things.
+         Someone reading without one meets it after joining, on the page
+         rather than in the bar. Which store can take the money is the
+         page's business (style.css). Left out of the markup entirely when
+         this deployment has no pack for sale.
 
          Drawn as its neighbours are: no fill, a 2px round stroke, 16px in
          a 30px square (ds.css names it beside them). The filled weight in
          this bar is the Draw button's, and belongs to the one control that
          is filled in. #}
-      {% if supporter_packs_on_sale %}
+      {% if supporter_packs_on_sale and current_user %}
         <a class="toolbar-button toolbar-supporter" href="/supporter"
            aria-label="{{ ftl_get_message("supporter-pack") }}" title="{{ ftl_get_message("supporter-pack") }}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3 5.2 13.5a4.5 4.5 0 0 1 6.8-5.9 4.5 4.5 0 0 1 6.8 5.9z"/></svg>
