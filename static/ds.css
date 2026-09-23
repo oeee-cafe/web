@@ -414,8 +414,8 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
 
    The phone apps keep the page scrolling at every width too. There the page
    is the app's scroll view, and only it gives the platform's manners:
-   pulling down to refresh, a tap on the status bar to go back to the top,
-   and the tab bar's second tap scrolling up. Both apps ask the web view
+   pulling down to refresh, and a tap on the status bar to go back to the
+   top. Both apps ask the web view
    whether it has scrolled, so on a tablet or a phone held sideways an inner
    area would leave them told it is always at the top -- Android's pull to
    refresh firing halfway down a list.
@@ -1077,15 +1077,6 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
 .toolbar-end .toolbar-bell-unread svg {
   color: var(--ds-badge);
   fill: currentColor;
-}
-
-/* The phone apps' search tab has a native field above the page, which
-   stands in for both the toolbar's search and the search page's own form
-   (search.jinja). Hidden here rather than left out by the server, which
-   would have to recognise the apps a second time. */
-html[data-app] .toolbar-search,
-html[data-app] .search-page-form {
-  display: none;
 }
 
 .toolbar-end .toolbar-icon .toolbar-badge {

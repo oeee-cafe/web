@@ -6,13 +6,10 @@
   {# The per-row choice applies to the drawings grid below, as on every other
      grid of drawings. #}
   {% include "post_feed_head.jinja" %}
-  {# Site search: the form, then the drawings it matched.
-     GET /search is also where the apps' native search fields land; they
-     have their own field above the page, and ds.css hides this one under
-     it (html[data-app] .search-page-form). #}
+  {# Site search: the form, then the drawings it matched. #}
   <div class="center-wide communities-page search-page">
     <h1 class="collaborate-title">{{ ftl_get_message("search") }}</h1>
-    <div class="communities-bar search-page-form">
+    <div class="communities-bar">
       <form method="get" action="/search" class="communities-filters" role="search">
         <input type="search"
                name="q"

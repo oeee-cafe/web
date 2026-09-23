@@ -54,7 +54,7 @@
             (locales/*.ftl, the app-* messages). Sent once a page, since the
             reader can change language between pages. An app keeps words of
             its own only for what it says with no page to speak for it: a
-            site that cannot be reached, the tabs before the first page.
+            site that cannot be reached.
    haptic   {name}
             "light", "medium", "selection", "success", "warning" or "error":
             a control that is felt as well as seen.
@@ -87,8 +87,9 @@
    The apps are told apart by what each adds to its web view's user agent,
    in one place (theme_head.jinja), which marks the root before the page
    paints: `data-app="ios"` or `"android"` for the phone apps, whose pages
-   scroll whole under a native tab bar, and `data-desktop="macos"` or
-   `"windows"` for the desktop windows, whose toolbar is the title bar. The
+   scroll whole with the site's toolbar as their only navigation, and
+   `data-desktop="macos"` or `"windows"` for the desktop windows, whose
+   toolbar is the title bar. The
    site owns what those marks change, the room kept for a window's own
    controls included (ds.css); an app says what it is and nothing about the
    site's layout.
