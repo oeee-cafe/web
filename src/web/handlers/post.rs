@@ -779,17 +779,6 @@ pub async fn post_view(
     }
 }
 
-/// Whether the replay is watched on the post's own page, in place of the
-/// drawing: every NEO recording is, and post_view.jinja starts it when the
-/// address ends in `#replay`, which is where the replay routes now send
-/// someone once they have been let in. Tegaki's player takes the whole
-/// window, so its recordings keep a page of their own.
-fn plays_inline(post: &std::collections::HashMap<String, Option<String>>) -> bool {
-    post.get("replay_filename")
-        .and_then(|name| name.as_deref())
-        .is_some_and(|name| name.ends_with(".pch"))
-}
-
 /// Whether this viewer may watch the post's replay.
 ///
 /// The recording is kept either way — `allow_replay` says who may watch it, and
@@ -900,199 +889,6 @@ mod replay_visibility_tests {
         // closed replay -- that would hide every replay on the site.
         assert!(may_watch_replay(&post(Uuid::new_v4(), None), None));
     }
-}
-
-pub async fn post_replay_view(
-    auth_session: AuthSession,
-    headers: HeaderMap,
-    ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    messages: Messages,
-) -> Result<impl IntoResponse, AppError> {
-    let uuid = match parse_id_with_legacy_support(&id, "/posts", &state)? {
-        ParsedId::Uuid(uuid) => uuid,
-        ParsedId::Redirect(redirect) => return Ok(redirect.into_response()),
-        ParsedId::InvalidId(error_response) => return Ok(error_response),
-    };
-    let db = &state.db_pool;
-    let mut tx: sqlx::Transaction<'_, sqlx::Postgres> = db.begin().await?;
-    let post = find_post_by_id(&mut tx, uuid).await?;
-    if post.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
-    }
-    let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
-
-    // Check if post is in a private community and if user has access
-    let community_id = post
-        .get("community_id")
-        .and_then(|v| v.as_ref())
-        .and_then(|s| Uuid::parse_str(s).ok());
-
-    if let Some(cid) = community_id {
-        let community = find_community_by_id(&mut tx, cid).await?;
-        if let Some(ref comm) = community {
-            // If community is private, check if user is a member
-            if comm.visibility == crate::models::community::CommunityVisibility::Private {
-                match &auth_session.user {
-                    Some(user) => {
-                        let user_role =
-                            get_user_role_in_community(&mut tx, user.id, comm.id).await?;
-                        if user_role.is_none() {
-                            // User is not a member of this private community
-                            let accept_language = headers
-                                .get(axum::http::header::ACCEPT_LANGUAGE)
-                                .cloned()
-                                .unwrap_or_else(|| axum::http::HeaderValue::from_static(""));
-                            let user_preferred_language = user.preferred_language.clone();
-                            let bundle = get_bundle(&accept_language, user_preferred_language);
-                            let error_message =
-                                safe_get_message(&bundle, "private-community-no-access");
-                            messages.error(error_message);
-                            return Ok(Redirect::to("/").into_response());
-                        }
-                    }
-                    None => {
-                        // Not logged in, cannot access private community - redirect to login
-                        return Ok(redirect_to_login(&format!("/posts/{}/replay", id)));
-                    }
-                }
-            }
-        }
-    }
-    // Personal posts (community_id is None) are always accessible
-
-    if !may_watch_replay(&post, auth_session.user.as_ref()) {
-        // Logged out, this may be the author on another device; otherwise the
-        // replay is simply not there to be watched.
-        if auth_session.user.is_none() {
-            return Ok(redirect_to_login(&format!("/posts/{}/replay", id)));
-        }
-        return Ok(StatusCode::NOT_FOUND.into_response());
-    }
-
-    if plays_inline(&post) {
-        return Ok(Redirect::to(&format!("/posts/{}#replay", id)).into_response());
-    }
-
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-
-    let community_id = community_id.map(|id| id.to_string());
-
-    let template_filename = match post.get("replay_filename") {
-        Some(replay_filename) => {
-            let replay_filename = replay_filename
-                .as_ref()
-                .ok_or_else(|| AppError::InvalidFormData("Missing replay_filename".to_string()))?;
-            if replay_filename.ends_with(".pch") {
-                "post_replay_view_pch.jinja"
-            } else if replay_filename.ends_with(".tgkr") {
-                "post_replay_view_tgkr.jinja"
-            } else {
-                "post_replay_view_pch.jinja"
-            }
-        }
-        None => "post_replay_view_pch.jinja",
-    };
-
-    let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
-    let rendered = template
-        .render(context! {
-            presence => Presence::new(Activity::WatchingReplay),
-            current_user => auth_session.user,
-                post => Some(&post),
-            post_id => post.get("id")
-                    .and_then(|v| v.as_ref())
-                    .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
-                    .clone(),
-            community_id,
-            draft_post_count => common_ctx.draft_post_count,
-            unread_notification_count => common_ctx.unread_notification_count,
-            ftl_lang,
-        })
-        .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
-    Ok(Html(rendered).into_response())
-}
-
-pub async fn post_replay_view_mobile(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    Path(id): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
-    let uuid = match parse_id_with_legacy_support(&id, "/posts", &state)? {
-        ParsedId::Uuid(uuid) => uuid,
-        ParsedId::Redirect(redirect) => return Ok(redirect.into_response()),
-        ParsedId::InvalidId(error_response) => return Ok(error_response),
-    };
-    let db = &state.db_pool;
-    let mut tx: sqlx::Transaction<'_, sqlx::Postgres> = db.begin().await?;
-    let post = find_post_by_id(&mut tx, uuid).await?;
-    if post.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
-    }
-    let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
-
-    // Check if post is in a private community and if user has access
-    let community_id = post
-        .get("community_id")
-        .and_then(|v| v.as_ref())
-        .and_then(|s| Uuid::parse_str(s).ok());
-
-    if let Some(cid) = community_id {
-        let community = find_community_by_id(&mut tx, cid).await?;
-        if let Some(ref comm) = community {
-            // If community is private, check if user is a member
-            if comm.visibility == crate::models::community::CommunityVisibility::Private {
-                match &auth_session.user {
-                    Some(user) => {
-                        let user_role =
-                            get_user_role_in_community(&mut tx, user.id, comm.id).await?;
-                        if user_role.is_none() {
-                            // User is not a member of this private community
-                            return Ok(StatusCode::FORBIDDEN.into_response());
-                        }
-                    }
-                    None => {
-                        // Not logged in, cannot access private community
-                        return Ok(StatusCode::FORBIDDEN.into_response());
-                    }
-                }
-            }
-        }
-    }
-    // Personal posts (community_id is None) are always accessible
-
-    if !may_watch_replay(&post, auth_session.user.as_ref()) {
-        return Ok(StatusCode::NOT_FOUND.into_response());
-    }
-
-    let template_filename = match post.get("replay_filename") {
-        Some(replay_filename) => {
-            let replay_filename = replay_filename
-                .as_ref()
-                .ok_or_else(|| AppError::InvalidFormData("Missing replay_filename".to_string()))?;
-            if replay_filename.ends_with(".pch") {
-                "post_replay_view_pch_mobile.jinja"
-            } else if replay_filename.ends_with(".tgkr") {
-                "post_replay_view_tgkr_mobile.jinja"
-            } else {
-                "post_replay_view_pch_mobile.jinja"
-            }
-        }
-        None => "post_replay_view_pch_mobile.jinja",
-    };
-
-    let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
-    let rendered = template
-        .render(context! {
-            post => Some(&post),
-            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-            ftl_lang,
-        })
-        .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
-    Ok(Html(rendered).into_response())
 }
 
 pub async fn post_publish_form(
@@ -3153,8 +2949,16 @@ pub async fn post_replay_view_by_login_name(
         .and_then(|id| id.as_ref())
         .and_then(|id_str| Uuid::parse_str(id_str).ok());
 
-    if plays_inline(&post) {
-        return Ok(Redirect::to(&format!("/@{}/{}#replay", login_name, post_id)).into_response());
+    // Only Tegaki's recordings have a page of their own: its player takes
+    // the whole window. A NEO replay plays on the post page, in place of the
+    // drawing, and this address is never linked for one, so an old link to
+    // it finds nothing.
+    let is_tegaki = post
+        .get("replay_filename")
+        .and_then(|name| name.as_deref())
+        .is_some_and(|name| name.ends_with(".tgkr"));
+    if !is_tegaki {
+        return Ok(StatusCode::NOT_FOUND.into_response());
     }
 
     let common_ctx =
@@ -3162,23 +2966,8 @@ pub async fn post_replay_view_by_login_name(
 
     let community_id = community_id.map(|id| id.to_string());
 
-    let template_filename = match post.get("replay_filename") {
-        Some(replay_filename) => {
-            let replay_filename = replay_filename
-                .as_ref()
-                .ok_or_else(|| AppError::InvalidFormData("Missing replay_filename".to_string()))?;
-            if replay_filename.ends_with(".pch") {
-                "post_replay_view_pch.jinja"
-            } else if replay_filename.ends_with(".tgkr") {
-                "post_replay_view_tgkr.jinja"
-            } else {
-                "post_replay_view_pch.jinja"
-            }
-        }
-        None => "post_replay_view_pch.jinja",
-    };
-
-    let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
+    let template: minijinja::Template<'_, '_> =
+        state.env.get_template("post_replay_view_tgkr.jinja")?;
     let rendered = template
         .render(context! {
             presence => Presence::new(Activity::WatchingReplay),

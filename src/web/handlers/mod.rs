@@ -1053,53 +1053,6 @@ mod template_tests {
         })
     }
 
-    fn render_replay(template: &str) -> String {
-        let env = test_support::env();
-        env.get_template(template)
-            .unwrap_or_else(|e| panic!("{template} loads: {e:#}"))
-            .render(context! {
-                post => replay_post(),
-                post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
-                community_id => json!(null),
-                ..chrome()
-            })
-            .unwrap_or_else(|e| panic!("{template} renders: {e:#}"))
-    }
-
-    #[test]
-    fn replay_pages_render_and_mount_the_viewer() {
-        for template in [
-            "post_replay_view_pch.jinja",
-            "post_replay_view_pch_mobile.jinja",
-        ] {
-            let rendered = render_replay(template);
-
-            assert!(
-                rendered.contains("NeoCucumberReplay.mount"),
-                "{template} should mount the viewer"
-            );
-            assert!(
-                rendered.contains("/static/viewer/neo-cucumber-replay.js"),
-                "{template} should load the viewer bundle"
-            );
-            // The dimensions reach the mount call as numbers, not as the
-            // strings the context holds.
-            assert!(
-                rendered.contains("width: 640") && rendered.contains("height: 480"),
-                "{template} should pass numeric dimensions, got: {}",
-                rendered
-                    .lines()
-                    .filter(|l| l.contains("width") || l.contains("height"))
-                    .collect::<Vec<_>>()
-                    .join(" | ")
-            );
-            assert!(
-                rendered.contains("/replay/30/30ca3f59"),
-                "{template} should build the replay URL from the filename"
-            );
-        }
-    }
-
     /// The post page's own view of a post, string-valued like the real
     /// context, with the replay switch and author left to the caller.
     fn post_page(allow_replay: &str, author_id: &str) -> serde_json::Value {
@@ -2050,20 +2003,6 @@ mod template_tests {
         }
     }
 
-    #[test]
-    fn replay_pages_do_not_load_the_retired_applet() {
-        for template in [
-            "post_replay_view_pch.jinja",
-            "post_replay_view_pch_mobile.jinja",
-        ] {
-            let rendered = render_replay(template);
-            assert!(
-                !rendered.contains("neo.js"),
-                "{template} still loads the NEO applet"
-            );
-        }
-    }
-
     /// Achievements under the profile card, each named, explained and dated;
     /// no section at all for someone with none.
     #[test]
@@ -2325,7 +2264,6 @@ mod template_tests {
         for template_name in [
             "draw_post_cucumber.jinja",
             "collaborate_chrome_head.jinja",
-            "post_replay_view_pch.jinja",
         ] {
             let render = |presence: serde_json::Value| {
                 env.get_template(template_name)

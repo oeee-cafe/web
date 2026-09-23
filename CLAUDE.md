@@ -75,7 +75,7 @@ DATABASE_URL=postgresql:///oeee_cafe cargo test --lib template_tests
 `every_template_parses` covers syntax for all of them. Parsing is not enough on
 its own: the context hands templates strings, so `{{ post.image_width + 24 }}`
 parses fine and fails at render. Catching that needs a fixture whose types
-match the real context, as in `replay_pages_render_and_mount_the_viewer`. Add
+match the real context, as in `a_replay_is_on_the_stage_and_the_drawing_is_not_a_link`. Add
 one when a template starts doing more than interpolate.
 
 When connecting to PostgreSQL via command line, use `psql oeee_cafe`.
@@ -85,8 +85,8 @@ When connecting to PostgreSQL via command line, use `psql oeee_cafe`.
 Don't try to run the development server. Just run `pnpm run build` if you need to check if the code compiles.
 
 `dist/`, `dist-viewer/`, `dist-offline/`, and `dist-replay/` are build output and are not tracked. The Rust
-server serves `neo-cucumber/dist-viewer` at `/static/viewer/`, which the replay
-templates request, so a checkout that has never been built will 404 there until
+server serves `neo-cucumber/dist-viewer` at `/static/viewer/`, which the post
+page's inline replay requests, so a checkout that has never been built will 404 there until
 `pnpm run build:viewer` has run once. The normal drawing routes similarly serve
 `neo-cucumber/dist-offline` at `/static/neo-cucumber/`, and the staff-only
 session replay viewer serves `neo-cucumber/dist-replay` at `/static/replay/`;
