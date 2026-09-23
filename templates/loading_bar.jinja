@@ -94,7 +94,18 @@
     // Android and Windows apps, keeps painting the page until the next one
     // arrives, so there nothing is held back.
     var holds = /^(ios|macos)$/.test(document.documentElement.getAttribute("data-app"));
+    // A page that asks before it is left -- a drawing not yet saved, a
+    // collaborative session drawn in -- may be stayed on, and nothing tells
+    // the page it was: the question is the browser's or the app's, and
+    // "stay" simply cancels the load. A bar started at the press would then
+    // creep under the header of a page going nowhere until its timeout. So
+    // the page is asked first, the way the apps ask it (app_bridge.jinja),
+    // and a load it would question goes without the bar.
+    function wouldAsk() {
+      return !!(window.oeeeApp && window.oeeeApp.wouldLoseWork && window.oeeeApp.wouldLoseWork());
+    }
     function leave(go) {
+      if (wouldAsk()) return go();
       if (!holds || !window.requestAnimationFrame) {
         start(null);
         return go();
@@ -120,6 +131,7 @@
       if (link.origin !== location.origin) return;
       if (link.pathname === location.pathname && link.search === location.search) return;
       if (boosted) return start(link);
+      if (wouldAsk()) return;
       if (!holds) return start(null);
       event.preventDefault();
       var href = link.href;
@@ -137,6 +149,7 @@
       var boosted = form.closest('[hx-boost\\:inherited="true"]') && !form.closest('[hx-boost="false"]');
       if (event.defaultPrevented && !boosted) return;
       if (boosted) return start(form);
+      if (wouldAsk()) return;
       if (!holds) return start(null);
       // Sent again by hand once the bar is up. form.submit() leaves out the
       // button that was pressed, which some forms read, so it goes along as
@@ -203,7 +216,9 @@
     // next one commits. Looked at once every listener has had its say: a
     // page that asks whether to leave (a drawing not yet saved) may be
     // stayed on, and the bar would hang there, so it is left without.
+    // The question put by wouldAsk() above, and by the apps, is not a load.
     window.addEventListener("beforeunload", function (event) {
+      if (event.isTrusted === false) return;
       setTimeout(function () {
         if (event.defaultPrevented) return;
         if (typeof event.returnValue === "string" && event.returnValue !== "") return;

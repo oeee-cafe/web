@@ -672,6 +672,9 @@
         // rest), and the page that was here stays as it was rather than
         // hidden behind the skeleton of one that never arrives.
         if (navigator.onLine === false) return;
+        // Nor for a page that asks before it is left, which may be stayed
+        // on without a word to it (loading_bar.jinja, wouldAsk).
+        if (window.oeeeApp && window.oeeeApp.wouldLoseWork && window.oeeeApp.wouldLoseWork()) return;
         window.oeeeMarkCurrent(path || location.pathname);
         var content = document.querySelector("main.ds-content");
         if (!content || content.querySelector(".ds-skeleton")) return;
