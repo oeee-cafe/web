@@ -1130,10 +1130,27 @@ pub async fn handoff_claim(
     // wait to be told to go ahead. The handoff is left unspent, so refusing
     // costs nothing and asking again is free.
     if auth_session.user.is_some() && form.confirm.is_none() {
+        let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+        let account = identity
+            .name
+            .clone()
+            .or_else(|| identity.email.clone())
+            .unwrap_or_default();
+        let mut args = FluentArgs::new();
+        args.set("provider", FluentValue::from(identity.provider.display_name()));
+        args.set("account", FluentValue::from(account.clone()));
+        // Worded here, where the reader's language is known: the page asking
+        // is a script in an app's assets and has no messages of its own.
+        let key = if account.is_empty() {
+            "handoff-confirm-link-unnamed"
+        } else {
+            "handoff-confirm-link"
+        };
         return Ok(axum::Json(serde_json::json!({
             "status": "confirm",
             "provider": identity.provider.display_name(),
-            "account": identity.name.clone().or_else(|| identity.email.clone()),
+            "account": account,
+            "message": safe_format_message(&bundle, key, Some(&args)),
         }))
         .into_response());
     }
