@@ -607,6 +607,11 @@ pub struct AppleAnswer {
     /// JSON with the person's name, the first time only.
     user: Option<String>,
     error: Option<String>,
+    /// "json" from an app's page, which goes where this says rather than
+    /// being sent ([`where_it_went`]). Absent from Apple's own post, which
+    /// is a browser and is redirected.
+    #[serde(default)]
+    format: Option<String>,
 }
 
 /// Where Apple posts its answer. The post comes from appleid.apple.com, so it
@@ -628,13 +633,37 @@ pub async fn apple_callback(
 }
 
 pub async fn do_apple_sign_in(
+    auth_session: AuthSession,
+    session: Session,
+    accept_language: ExtractAcceptLanguage,
+    messages: Messages,
+    state: State<AppState>,
+    headers: HeaderMap,
+    Form(answer): Form<AppleAnswer>,
+) -> Result<Response, AppError> {
+    let asked = asked_where(answer.format.as_deref());
+    let went = apple_sign_in_going(
+        auth_session,
+        session,
+        accept_language,
+        messages,
+        state,
+        headers,
+        answer,
+    )
+    .await?;
+    Ok(if asked { where_it_went(went) } else { went })
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn apple_sign_in_going(
     mut auth_session: AuthSession,
     session: Session,
     ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     messages: Messages,
     State(state): State<AppState>,
     headers: HeaderMap,
-    Form(answer): Form<AppleAnswer>,
+    answer: AppleAnswer,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
         return Ok(StatusCode::FORBIDDEN.into_response());
@@ -893,17 +922,44 @@ pub struct GoogleNativeAnswer {
     state: Option<String>,
     id_token: Option<String>,
     error: Option<String>,
+    /// "json" from an app's page; see [`where_it_went`].
+    #[serde(default)]
+    format: Option<String>,
 }
 
 /// An ID token a phone app signed in for, posted from the page.
 pub async fn do_google_sign_in(
+    auth_session: AuthSession,
+    session: Session,
+    accept_language: ExtractAcceptLanguage,
+    messages: Messages,
+    state: State<AppState>,
+    headers: HeaderMap,
+    Form(answer): Form<GoogleNativeAnswer>,
+) -> Result<Response, AppError> {
+    let asked = asked_where(answer.format.as_deref());
+    let went = google_sign_in_going(
+        auth_session,
+        session,
+        accept_language,
+        messages,
+        state,
+        headers,
+        answer,
+    )
+    .await?;
+    Ok(if asked { where_it_went(went) } else { went })
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn google_sign_in_going(
     mut auth_session: AuthSession,
     session: Session,
     ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     messages: Messages,
     State(state): State<AppState>,
     headers: HeaderMap,
-    Form(answer): Form<GoogleNativeAnswer>,
+    answer: GoogleNativeAnswer,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
         return Ok(StatusCode::FORBIDDEN.into_response());
@@ -1060,6 +1116,31 @@ async fn handed_off(
             None
         }
     }
+}
+
+/// Where a redirect was going, for an app's page to go there itself.
+///
+/// An app posts a sign-in from the page it is on and asks for this rather
+/// than being redirected, so the page can `location.replace` instead of
+/// following: the page signed in from is then not left in the history behind
+/// the one it lands on, which is a Back that goes to the sign-in form of an
+/// account already signed in.
+///
+/// The notice waits in the session either way -- nothing has rendered yet --
+/// so it is shown by the page the app replaces with, once.
+fn where_it_went(response: Response) -> Response {
+    let next = response
+        .headers()
+        .get(axum::http::header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("/")
+        .to_string();
+    axum::Json(serde_json::json!({ "next": next })).into_response()
+}
+
+/// Whether an app asked to be told where to go instead of being sent.
+fn asked_where(format: Option<&str>) -> bool {
+    format == Some("json")
 }
 
 #[derive(Deserialize)]
