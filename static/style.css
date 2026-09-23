@@ -180,7 +180,15 @@ main {
   }
 }
 
-/* And the same for a page's skeleton (toolbar.jinja), which is the page's
+/* A page's skeleton (toolbar.jinja) is laid over the page it replaces,
+   absolutely, with its top at the toolbar's edge -- so main's padding, which
+   is what spaces a page from the toolbar and from the screen's sides, does
+   not reach it, and it carries that padding itself. */
+main > .ds-skeleton {
+  padding: var(--space-5) var(--space-3) 0;
+}
+
+/* And the same for a page's skeleton, which is the page's
    column one level down: a pill carried over from the page into it has to
    sit where it sat, or it drops by the margin this takes away. */
 main > .center > :first-child,
