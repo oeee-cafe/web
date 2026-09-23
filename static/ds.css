@@ -941,7 +941,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .nav-bar .toolbar-sections a[aria-current="page"],
 .nav-bar .toolbar-sections a[aria-current="page"]:hover {
   background-color: var(--ds-thumb);
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--ds-line-strong);
   font-weight: 600;
 }
 
@@ -2783,9 +2783,10 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
    The chosen one sits the same 3px from the track's edge on every side:
    - The edge is a border, so the padding is the gap. An inset shadow, and a
      ring round the choice, were both drawn inside it.
-   - The choice is raised by its colour alone. A drop shadow is only ever
-     under a thing, and made the foot read differently from the rest -- a
-     dark line against the border in light, more gap in dark.
+   - The choice's edge is drawn inside it, the same on all four sides. A
+     drop shadow is only ever under a thing, and made the foot read
+     differently from the rest -- a dark line against the border in light,
+     more gap in dark -- and a ring outside it took from the gap.
    - The track is a flex box. Inline blocks sat on a line box taller than
      they were, lower than the padding put them where the page's line
      height is larger, and a space apart wherever the markup had one.
@@ -2838,7 +2839,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page .ds-segmented > button[aria-pressed="true"],
 .ds-page .ds-segmented > button[aria-pressed="true"]:hover {
   background-color: var(--ds-thumb);
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--ds-line-strong);
   font-weight: 600;
 }
 
@@ -2868,7 +2869,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   transform: translate(var(--thumb-x), var(--thumb-y));
   border-radius: var(--ds-radius-s);
   background-color: var(--ds-thumb);
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--ds-line-strong);
   pointer-events: none;
 }
 
