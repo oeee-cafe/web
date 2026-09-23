@@ -11,12 +11,17 @@
        moved off home. Cards, controls and page chrome are shared with /home so
        the two feeds stay identical. #}
     {% if feed.posts and feed.posts|length > 0 %}
-      <section role="region" aria-labelledby="post-feed-heading">
+      <section role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
         {# Short view label rather than naming the visibility rule the query
            uses. Reuses the key the hashtag and community pages already put
            above their drawing grids. #}
         <div class="feed-header">
-          <h2 id="post-feed-heading" class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
+          {% if current_user %}
+            {% set feed_switch = "recent" %}
+            {% include "feed_switch.jinja" %}
+          {% else %}
+            <h2 class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
+          {% endif %}
           {% include "post_feed_controls.jinja" %}
         </div>
         <div class="posts-grid" id="post-feed-grid">

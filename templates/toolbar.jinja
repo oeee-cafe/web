@@ -64,10 +64,9 @@
        they take a second row of the bar, sharing its width. #}
     <div class="toolbar-links">
       <div class="toolbar-sections">
+        {# Home is both of the feeds, Recent and Following: which one is
+           a switch on the page (feed_switch.jinja). #}
         <a href="/">{{ ftl_get_message("nav-home") }}</a>
-        {% if current_user %}
-          <a href="/home">{{ ftl_get_message("timeline") }}</a>
-        {% endif %}
         <a href="/communities">{{ ftl_get_message("community") }}</a>
       </div>
       {# Drawing together, live: its own button beside the sections rather
@@ -238,7 +237,7 @@
         <dt><kbd>/</kbd></dt><dd>{{ ftl_get_message("search") }}</dd>
         <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>R</kbd></dt><dd>{{ ftl_get_message("nav-home") }}</dd>
         {% if current_user %}
-          <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>F</kbd></dt><dd>{{ ftl_get_message("timeline") }}</dd>
+          <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>F</kbd></dt><dd>{{ ftl_get_message("feed-following") }}</dd>
         {% endif %}
         <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>C</kbd></dt><dd>{{ ftl_get_message("community") }}</dd>
         <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>T</kbd></dt><dd>{{ ftl_get_message("collaborate") }}</dd>
@@ -268,7 +267,8 @@
         var links = document.querySelectorAll("#menubar a[href]");
         for (var i = 0; i < links.length; i++) {
           var path = links[i].getAttribute("href");
-          if (path === "/" ? here === "/" : here === path || here.indexOf(path + "/") === 0) {
+          // Home is / and /home, the feed's two orders (feed_switch.jinja).
+          if (path === "/" ? here === "/" || here === "/home" : here === path || here.indexOf(path + "/") === 0) {
             links[i].setAttribute("aria-current", "page");
           } else {
             links[i].removeAttribute("aria-current");
