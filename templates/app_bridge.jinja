@@ -143,12 +143,13 @@
      painter.command(name), painter.preferPen()
                              frontend/shared/appBridge.ts, on a drawing page
 
-   And --oeee-text-scale on the root, which is CSS rather than a call.
+   And --oeee-text-scale on the root, which is CSS rather than a call: the
+   Android app sets it; on iOS the page measures it itself (theme_head.jinja).
 
-   The Mac app's own window chrome (MacWindow.js in oeee-cafe-apple) posts
-   on the same channel -- {v:1, type:"window", action:"drag"|"zoom"} when
-   the toolbar's empty space is pressed -- so every app has one channel to
-   listen on; nothing in the site sends it.
+   In the Mac app the page also sends
+     window    {action}  "drag" or "zoom": the toolbar's empty space was
+               pressed, or double-clicked, as a title bar is
+               (theme_head.jinja)
 
    There is no other channel. The web-view apps were never released before
    this contract; the builds people have from before it are the native

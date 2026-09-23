@@ -8,6 +8,7 @@ import {
   type PainterHandle,
 } from "neo-cucumber";
 import { offerPainterToApp } from "../shared/appBridge";
+import { say } from "../shared/siteDialog";
 // The chrome this adapter borrows below lives in the package's stylesheet,
 // which a library build keeps out of the JavaScript bundle. It is imported
 // through this adapter's own file so that the utilities named here are compiled
@@ -60,17 +61,6 @@ function postNative(message: NativeMessage): void {
   } else if (window.OeeeCafe?.postMessage) {
     window.OeeeCafe.postMessage(JSON.stringify(message));
   }
-}
-
-/**
- * Something the page has to say, through the site's own alert
- * (confirm_dialog.jinja) where the page has one: the browser's is titled with
- * the site's address, and in the apps it is the web view's box.
- */
-function say(message: string): void {
-  const site = (window as unknown as { dsAlert?: (message: string) => void }).dsAlert;
-  if (site) site(message);
-  else window.alert(message);
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {

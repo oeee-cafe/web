@@ -164,6 +164,42 @@ function keys(message: Message): string[] {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("what the site tells the apps", () => {
+  it("moves and zooms the Mac window from the toolbar, and keeps the browser's menu quiet", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/macos store/apple" });
+    const bar = page.window.document.querySelector(".nav-bar")!;
+    const press = (detail: number) => {
+      const event = new page.window.MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, detail });
+      bar.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(press(1)).toBe(true);
+    expect(press(1)).toBe(true);
+    expect(press(2)).toBe(true);
+    const window = page.sent.filter((message) => message.type === "window");
+    // Every press is heard, the same one twice included.
+    expect(window.map((message) => message.action)).toEqual(["drag", "drag", "zoom"]);
+    expect(keys(window[0])).toEqual(["action", "type", "v"]);
+
+    // A link on the bar is the page's, not the window's.
+    const link = page.window.document.querySelector("#nav-notifications")!;
+    link.dispatchEvent(new page.window.MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    expect(page.sent.filter((message) => message.type === "window")).toHaveLength(3);
+
+    const menu = (target: Element) => {
+      const event = new page.window.MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(menu(bar)).toBe(true);
+    expect(menu(page.window.document.querySelector("img")!)).toBe(false);
+
+    // Not in a browser, nor in the other apps.
+    const browser = await open({ userAgent: "Mozilla/5.0" });
+    const plain = new browser.window.MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    browser.window.document.querySelector(".nav-bar")!.dispatchEvent(plain);
+    expect(plain.defaultPrevented).toBe(false);
+  });
+
   it("says who is signed in, what they are doing, and what they may do", async () => {
     const page = await open({ signedIn: true, presence: "collaborating" });
     const message = last(page, "page");
@@ -427,6 +463,19 @@ describe("what a store gives an app", () => {
     page.window.oeeeApp.signIn.answer({});
     expect(said).toEqual(["app-steam-sign-in-failed"]);
   });
+
+  it("says it in the site's own alert where the page has one", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "steam" });
+    const said: string[] = [];
+    const site = page.window as unknown as { dsAlert: (message: string) => void };
+    site.dsAlert = (message: string) => said.push(message);
+    page.window.alert = () => {
+      throw new Error("the browser's alert");
+    };
+    page.window.document.querySelector<HTMLElement>(".auth-steam")!.click();
+    page.window.oeeeApp.signIn.answer({});
+    expect(said).toEqual(["app-steam-sign-in-failed"]);
+  });
 });
 
 describe("signing in for an app", () => {
@@ -489,6 +538,43 @@ describe("signing in for an app", () => {
     expect(message.url).toMatch(/^https?:\/\/[^/]+\/auth\/apple\?handoff=I$/);
     page.window.oeeeApp.signIn.unopened();
   });
+
+  it("asks before linking in the site's own dialog, and asks the site nothing more until answered", async () => {
+    const page = await open({
+      answers: {
+        "/auth/handoff/start": { id: "I", secret: "X", url: "/auth/apple?handoff=I" },
+        "/auth/handoff/claim": { status: "confirm", message: "Link these?" },
+      },
+    });
+    const questions: [string, string, string][] = [];
+    let answer: (yes: boolean) => void = () => {};
+    const site = page.window as unknown as {
+      dsConfirm: (text: string, action: string, tone: string) => Promise<boolean>;
+    };
+    site.dsConfirm = (text, action, tone) => {
+      questions.push([text, action, tone]);
+      return new Promise<boolean>((resolve) => (answer = resolve));
+    };
+    page.window.confirm = () => {
+      throw new Error("the browser's confirm");
+    };
+    const claims = () => page.asked.filter((request) => request.url.includes("/auth/handoff/claim"));
+    expect(press(page, "apple")).toBe(true);
+    // The page asks whether the browser has finished every two seconds.
+    await new Promise((resolve) => setTimeout(resolve, 2300));
+    expect(questions).toEqual([["Link these?", "ok", "plain"]]);
+    expect(claims()).toHaveLength(1);
+    // Left open through another round: not asked again, nor the site.
+    await new Promise((resolve) => setTimeout(resolve, 2300));
+    expect(questions).toHaveLength(1);
+    expect(claims()).toHaveLength(1);
+    answer(true);
+    await settle();
+    await settle();
+    expect(claims()).toHaveLength(2);
+    expect(Object.fromEntries(new URLSearchParams(claims()[1].body))).toMatchObject({ confirm: "1" });
+    page.window.oeeeApp.signIn.unopened();
+  }, 10000);
 
   it("goes the way each app signs in with each provider", async () => {
     const ways: [string, "apple" | "google", string][] = [

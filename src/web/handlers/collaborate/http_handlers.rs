@@ -706,7 +706,10 @@ pub async fn serve_collaborative_app(
         .env
         .get_template("collaborate_chrome_head.jinja")?
         .render(&chrome)?;
-    let toolbar = state.env.get_template("toolbar.jinja")?.render(&chrome)?;
+    // The site's alert and confirmation, which the room says its failures
+    // through (frontend/shared/siteDialog.ts), with the toolbar.
+    let toolbar = state.env.get_template("toolbar.jinja")?.render(&chrome)?
+        + &state.env.get_template("confirm_dialog.jinja")?.render(&chrome)?;
 
     Ok(Html(with_site_chrome(&html, &head, &toolbar)).into_response())
 }

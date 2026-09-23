@@ -43,6 +43,27 @@
     if (store) root.setAttribute("data-store", store[1]);
   })();
   if (document.documentElement.getAttribute("data-app") === "ios") {
+    // The reader's text size (Dynamic Type), for the design system's type
+    // scale to follow (--oeee-text-scale): WebKit gives the page the
+    // system's own body style as a font, 17px at the default size, so its
+    // size over 17 is the setting. Measured again when the app comes back to the front,
+    // which is how the reader returns from changing it. The Android app says
+    // it itself (SiteBridge.kt in oeee-cafe-android).
+    (function () {
+      var root = document.documentElement;
+      function measure() {
+        var probe = document.createElement("span");
+        probe.style.cssText = "position:absolute;visibility:hidden;font:-apple-system-body";
+        root.appendChild(probe);
+        var size = parseFloat(getComputedStyle(probe).fontSize);
+        root.removeChild(probe);
+        if (size > 0) root.style.setProperty("--oeee-text-scale", String(size / 17));
+      }
+      measure();
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") measure();
+      });
+    })();
     // Going back in the app is the web view's edge swipe, which already
     // moved the page; a cross-fade after it would move it twice. Listened
     // for here, in the head, so it is heard before the page first paints.
@@ -57,6 +78,37 @@
       if (fromCache || (entry && entry.type === "back_forward")) {
         event.viewTransition.skipTransition();
       }
+    });
+  }
+  if (document.documentElement.getAttribute("data-app") === "macos") {
+    // The Mac app's window has no title bar of its own: the toolbar is it.
+    // A press on the toolbar's empty space (data-window-drag, toolbar.jinja)
+    // moves the window, and a double click zooms it, as a title bar's do --
+    // asked of the app on the bridge (a `window` message, app_bridge.jinja),
+    // which alone can move a window. Its links, buttons and fields stay the
+    // page's. From the head, so it is heard on every page, the painter's and
+    // the collaborative room's included.
+    window.addEventListener("mousedown", function (event) {
+      if (event.button !== 0 || event.defaultPrevented) return;
+      var target = event.target;
+      if (!target || !target.closest || !target.closest("[data-window-drag]")) return;
+      if (target.closest("a, button, input, select, textarea, label, summary, details, [role], [contenteditable], [tabindex], [hx-get], [hx-post]")) return;
+      if (!window.oeeeApp || !window.oeeeApp.post) return;
+      event.preventDefault();
+      window.oeeeApp.post("window", { action: event.detail === 2 ? "zoom" : "drag" }, true);
+    });
+    // And the browser's own right-click menu -- Back, Reload, Open in New
+    // Window -- is the plainest sign that a window is a browser, so it is
+    // kept to text fields, a selection and pictures. Anywhere else a right
+    // click does nothing, unless the page has a use of its own for it, as
+    // the painter does. (Windows prunes WebView2's menu item by item
+    // instead, context_menu.rs in oeee-cafe-desktop.)
+    window.addEventListener("contextmenu", function (event) {
+      if (event.defaultPrevented) return;
+      var target = event.target;
+      if (target && target.closest && target.closest("input, textarea, select, [contenteditable], img")) return;
+      if (window.getSelection && String(window.getSelection()) !== "") return;
+      event.preventDefault();
     });
   }
   if (window.oeeeApp && window.oeeeApp.connected()) {

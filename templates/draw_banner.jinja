@@ -1,5 +1,10 @@
 {% extends "base.jinja" %}
 {% block title %}{{ super() }} | {{ ftl_get_message("profile-draw-banner") }}{% endblock title %}
+{# Held at its own scale, as every painter page is (draw_post_cucumber.jinja). #}
+{% block viewport %}
+  <meta name="viewport"
+        content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover" />
+{% endblock viewport %}
 {% block content %}
   <div class="center"><h2>{{ ftl_get_message("profile-draw-banner") }}</h2></div>
   <link rel="stylesheet"

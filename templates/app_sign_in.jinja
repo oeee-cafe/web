@@ -109,6 +109,7 @@
     var steamNext;
     var askedSteam = false;
     var STEAM_FAILED = {{ ftl_get_message("app-steam-sign-in-failed")|tojson }};
+    var OK = {{ ftl_get_message("ok")|tojson }};
 
     function steam(provider, next) {
       if (askedSteam) return;
@@ -122,7 +123,8 @@
       askedSteam = false;
       if (told.cancelled) return;
       if (!told.ticket) {
-        window.alert(STEAM_FAILED);
+        if (window.dsAlert) window.dsAlert(STEAM_FAILED);
+        else window.alert(STEAM_FAILED);
         return;
       }
       var post = document.createElement("form");
@@ -175,12 +177,21 @@
     // left a successful sign-in on the floor, because the failure arrived
     // first and cleared `pending` out from under it.
     var inFlight = false;
+    // Whether the reader is being asked something, which the asking waits on.
+    var deciding = false;
 
     // How often to ask whether the browser has finished, and for how long.
     // The site forgets a handoff after fifteen minutes (src/handoff.rs), so
     // there is nothing to find after that.
     var ASK_EVERY = 2000;
     var GIVE_UP_AFTER = 15 * 60 * 1000;
+
+    // A yes or no from the reader, in the site's own dialog where the page
+    // has one, as a plain question rather than a destructive one.
+    function agree(message) {
+      if (window.dsConfirm) return window.dsConfirm(message, OK, "plain");
+      return Promise.resolve(window.confirm(message));
+    }
 
     function stop() {
       if (asking) {
@@ -191,7 +202,7 @@
     }
 
     function ask(confirmed) {
-      if (!pending || inFlight) return;
+      if (!pending || inFlight || deciding) return;
       inFlight = true;
       var fields = { id: pending.id, secret: pending.secret };
       if (confirmed) fields.confirm = "1";
@@ -205,10 +216,16 @@
           if (claimed.status === "waiting" || claimed.status === "failed") return;
           if (claimed.status === "confirm") {
             // Linking the browser's account to the one signed in here. The
-            // site words the question, in the reader's language, and the app
-            // draws window.confirm as a dialog of its own.
-            if (window.confirm(claimed.message)) ask(true);
-            else stop();
+            // site words the question, in the reader's language, and asks it
+            // in its own dialog (confirm_dialog.jinja), which unlike the
+            // browser's does not stop the page: nothing is asked of the site
+            // again until it is answered.
+            deciding = true;
+            agree(claimed.message).then(function (yes) {
+              deciding = false;
+              if (yes) ask(true);
+              else stop();
+            });
             return;
           }
           if (claimed.status === "ready") {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { NEO_BUTTON, NEO_FIELD, NEO_WELL } from "neo-cucumber";
 import { encodeChat } from "../binaryProtocol";
+import { say } from "../../shared/siteDialog";
 import { Trans, useLingui } from "@lingui/react/macro";
 
 const getUserColors = (username: string) => {
@@ -114,7 +115,7 @@ export const Chat = ({
     try {
       const message = inputValue.trim();
       if (message.length > 500) {
-        alert(t`Message too long (max 500 characters)`);
+        say(t`Message too long (max 500 characters)`);
         return;
       }
 
