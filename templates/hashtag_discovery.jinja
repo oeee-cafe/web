@@ -4,9 +4,10 @@
 {% endblock title %}
 {% block content %}
   {# The tag directory, laid out as the community directory is: one bar --
-     the order as a segmented control, then search -- over a grid of cards. #}
+     the order as a segmented control, then search -- over a grid of cards,
+     and no heading above them, since the toolbar's Hashtags already says
+     where this is. #}
   <div class="center-wide communities-page">
-    <h1 class="collaborate-title hashtag-directory-title">{{ ftl_get_message("hashtag-discovery") }}</h1>
     {# Each order keeps the search it was chosen from, so reordering results
        does not silently throw the query away. #}
     {% set search_suffix = "&q=" ~ (search_query|urlencode) if search_query else "" %}
