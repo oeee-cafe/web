@@ -160,76 +160,10 @@ const words = JSON.parse(wordsElement?.textContent || "{}") as Partial<PainterWo
 const saveLabel = pageSaveButton.textContent?.trim() || "Save";
 
 /**
- * Fill the bar above the painter.
- *
- * The page says what goes in it and this says what it looks like, using the
- * class names neo-cucumber publishes rather than a copy of their values kept
- * here -- the bar sits inches from the toolbox, so anything merely close to
- * NEO's chrome reads as broken rather than as different.
- *
- * It is built before the painter mounts. The panels and the opening zoom are
- * both measured from the painter's area, and a bar that appears afterwards
- * would move that area out from under them.
- */
-function buildHeader(): void {
-  const bar = document.getElementById("oeee-painter-header");
-  if (!bar) return;
-
-  bar.className = `${NEO_PANEL} flex shrink-0 items-center justify-between gap-[8px] px-[6px] py-[4px]`;
-
-  const left = document.createElement("div");
-  left.className = "flex min-w-0 items-center gap-[8px]";
-
-  // The only way off this page that is not the back button.
-  const home = document.createElement("a");
-  home.href = bar.dataset.home || "/";
-  home.className = "text-[18px] hover:opacity-70";
-  home.textContent = "🥒";
-  left.append(home);
-
-  const title = document.createElement("h1");
-  title.className = "m-0 truncate text-[14px] font-bold";
-  title.textContent = bar.dataset.title ?? "";
-  left.append(title);
-
-  if (bar.dataset.subtitle) {
-    const where = document.createElement("div");
-    where.className = "shrink-0 text-[11px] opacity-70";
-    where.textContent = bar.dataset.subtitle;
-    left.append(where);
-  }
-
-  // A guest is told up front where their drawing will go: this browser. It
-  // gives way to the title on a narrow phone, and says the rest on hover.
-  if (bar.dataset.notice) {
-    const notice = document.createElement("a");
-    notice.href = bar.dataset.noticeHref || "/login";
-    notice.className = "min-w-0 truncate text-[11px] underline";
-    notice.textContent = bar.dataset.notice;
-    notice.title = bar.dataset.notice;
-    left.append(notice);
-  }
-
-  const right = document.createElement("div");
-  right.className = "flex shrink-0 items-center gap-[6px] text-[11px]";
-  if (bar.dataset.size) {
-    const size = document.createElement("div");
-    size.className = "tabular-nums opacity-70";
-    size.textContent = bar.dataset.size;
-    right.append(size);
-  }
-
-  bar.append(left, right);
-}
-
-buildHeader();
-
-/**
  * Losing a drawing to a stray tap.
  *
- * Until now this page had no way off it but the back button, so nothing here
- * guarded against leaving. The header adds a link, which makes an accidental
- * exit a click away, so the browser now asks first -- but only once something
+ * The toolbar above the painter is a row of links, which makes an accidental
+ * exit a click away, so the browser asks first -- but only once something
  * has actually been drawn. The count the painter reports at rest is the
  * baseline: it is not zero, because setting the canvas up is itself recorded.
  */
@@ -314,7 +248,7 @@ void painter.ready
  * add the line that was still missing. The button that does it sits in the
  * toolbox among the drawing tools, one stray tap from whichever of them was
  * actually meant, which is exactly the mistake `beforeunload` above already
- * guards the header's link against.
+ * guards the toolbar's links against.
  *
  * Its chrome is the painter's own, from the class names neo-cucumber exports,
  * and its words come off the button the page rendered -- the page is the only

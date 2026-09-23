@@ -2077,40 +2077,38 @@ mod template_tests {
 
     /// The painter pages carry the site's toolbar, so every window has the
     /// same title bar and the desktop app can seat its controls in it. It has
-    /// to come before the painter's own header -- it is the page's first row
-    /// -- and its stylesheet after the painter's, whose reset would otherwise
-    /// restyle it.
+    /// to come before the painter -- it is the page's first row -- and its
+    /// stylesheet after the painter's, whose reset would otherwise restyle it.
     #[test]
     fn the_painter_pages_carry_the_toolbar() {
         let env = test_support::env();
-        for name in ["draw_post_cucumber.jinja"] {
-            let rendered = env
-                .get_template(name)
-                .unwrap_or_else(|e| panic!("{name} loads: {e:#}"))
-                .render(context! {
-                    width => 300,
-                    height => 300,
-                    community_id => json!(null),
-                    painter_config => "{}",
-                    current_user => json!({"login_name": "someone", "display_name": "Someone"}),
-                    messages => Vec::<serde_json::Value>::new(),
-                    draft_post_count => 2,
-                    unread_notification_count => 3,
-                    ftl_lang => "en",
-                })
-                .unwrap_or_else(|e| panic!("{name} renders: {e:#}"));
-            let nav = rendered
-                .find("<nav class=\"nav-bar\"")
-                .unwrap_or_else(|| panic!("{name} has no toolbar"));
-            assert!(rendered.contains("/static/ds.css"), "{name}");
-            assert!(rendered.contains("toolbar-bell-unread"), "{name} unread bell");
-            if let Some(header) = rendered.find("id=\"oeee-painter-header\"") {
-                assert!(nav < header, "the toolbar is the painter page's first row");
-            }
-            if let Some(painter_css) = rendered.find("offline.css") {
-                let ds_css = rendered.find("ds.css").unwrap();
-                assert!(painter_css < ds_css, "ds.css loads after the painter's reset");
-            }
+        let rendered = env
+            .get_template("draw_post_cucumber.jinja")
+            .expect("painter template loads")
+            .render(context! {
+                width => 300,
+                height => 300,
+                community_id => json!(null),
+                painter_config => "{}",
+                current_user => json!({"login_name": "someone", "display_name": "Someone"}),
+                messages => Vec::<serde_json::Value>::new(),
+                draft_post_count => 2,
+                unread_notification_count => 3,
+                ftl_lang => "en",
+            })
+            .expect("painter renders");
+        let nav = rendered
+            .find("<nav class=\"nav-bar\"")
+            .expect("the painter page has the toolbar");
+        assert!(rendered.contains("/static/ds.css"));
+        assert!(rendered.contains("toolbar-bell-unread"), "unread bell");
+        assert!(
+            nav < rendered.find("id=\"neo-cucumber-root\"").unwrap(),
+            "the toolbar is the painter page's first row"
+        );
+        if let Some(painter_css) = rendered.find("offline.css") {
+            let ds_css = rendered.find("ds.css").unwrap();
+            assert!(painter_css < ds_css, "ds.css loads after the painter's reset");
         }
     }
 
