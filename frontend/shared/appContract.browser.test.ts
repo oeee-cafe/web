@@ -43,7 +43,11 @@ type Message = { v: number; type: string } & Record<string, unknown>;
 /** The page's window, with what the head defines on it. */
 type PageWindow = Window &
   typeof globalThis & {
-    oeeeApp: { report(): void; feel(name: string): void; wouldLoseWork(): boolean };
+    oeeeApp: {
+      report(): void;
+      feel(name: string): void;
+      wouldLoseWork(): boolean;
+    };
     oeeeSignIn: {
       native(provider: string, next: string | null): void;
       answer(told: Record<string, unknown>): void;
