@@ -47,6 +47,7 @@ type PageWindow = Window &
       report(): void;
       feel(name: string): void;
       wouldLoseWork(): boolean;
+      pushToken(token: string): void;
       signIn: {
         answer(told: Record<string, unknown>): void;
         resume(): void;
@@ -246,6 +247,46 @@ describe("what the site tells the apps", () => {
       const page = await open({ userAgent });
       expect(page.window.document.documentElement.getAttribute(attribute), userAgent).toBe(value);
     }
+  });
+});
+
+describe("push notifications for an app", () => {
+  it("registers the app's token for whoever is signed in, once, with the platform its user agent names", async () => {
+    const page = await open({ signedIn: true, answers: { "/api/v1/devices": { id: "D" } } });
+    page.window.oeeeApp.pushToken("T1");
+    page.window.oeeeApp.pushToken("T1");
+    await settle();
+    const posted = page.asked.filter((request) => request.url === "/api/v1/devices");
+    expect(posted.map((request) => JSON.parse(request.body))).toEqual([{ device_token: "T1", platform: "android" }]);
+
+    // A token the app was given since is registered too.
+    page.window.oeeeApp.pushToken("T2");
+    await settle();
+    expect(page.asked.filter((request) => request.url === "/api/v1/devices")).toHaveLength(2);
+  });
+
+  it("names each app's platform as the site's devices do", async () => {
+    for (const [userAgent, platform] of [
+      ["Mozilla/5.0 OeeeCafeiOS", "ios"],
+      ["Mozilla/5.0 OeeeCafeMac", "macos"],
+    ]) {
+      const page = await open({ userAgent, signedIn: true, answers: { "/api/v1/devices": {} } });
+      page.window.oeeeApp.pushToken("T");
+      expect(JSON.parse(page.asked[0].body).platform, userAgent).toBe(platform);
+    }
+  });
+
+  it("registers nothing for nobody, and tries again after a failure", async () => {
+    const out = await open();
+    out.window.oeeeApp.pushToken("T");
+    expect(out.asked).toEqual([]);
+
+    const failing = await open({ signedIn: true });
+    failing.window.oeeeApp.pushToken("T");
+    await settle();
+    failing.window.oeeeApp.pushToken("T");
+    await settle();
+    expect(failing.asked).toHaveLength(2);
   });
 });
 
