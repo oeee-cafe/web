@@ -107,12 +107,21 @@ function card(draft: LocalDraft): HTMLElement {
   item.className = "posts-grid-item draft-item local-draft-item";
 
   const png = draftPng(draft);
+  const pngUrl = URL.createObjectURL(png);
+  // The grid draws a drawing absolutely inside a square frame, and the frame
+  // is the item's first link (style.css, .posts-grid-item > a:first-child);
+  // an image without one fills the page. Opening it shows it full size.
+  const frame = document.createElement("a");
+  frame.href = pngUrl;
+  frame.target = "_blank";
+  frame.rel = "noopener";
   const image = document.createElement("img");
   image.width = draft.width;
   image.height = draft.height;
   image.alt = words.untitled || "Untitled";
   image.decoding = "async";
-  image.src = URL.createObjectURL(png);
+  image.src = pngUrl;
+  frame.append(image);
   if (draft.width > 300 && draft.height > 300) image.className = "drawing-downscaled";
 
   const meta = document.createElement("div");
@@ -158,7 +167,7 @@ function card(draft: LocalDraft): HTMLElement {
   actions.append(downloadButton, deleteButton);
 
   meta.append(title, byline, actions);
-  item.append(image, meta);
+  item.append(frame, meta);
   return item;
 }
 
