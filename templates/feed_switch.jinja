@@ -1,17 +1,15 @@
-{# Which of Home's feeds is showing, where the feed's heading would be:
-   Recent (/), every public drawing as it arrives; Popular (/popular), in
-   Reddit's "hot" order, liked and recent together; and for someone signed in
-   Following (/following), the people they follow, and Communities
-   (/joined), the communities they are a member of. Orders of
+{# Which of Home's feeds is showing, for someone signed in, where the
+   feed's heading would be: Recent (/), every public drawing as it arrives;
+   Following (/following), the people they follow; and Communities
+   (/joined), the communities they are a member of. Signed out there is
+   only Recent, and home.jinja gives it its heading instead. Orders of
    one feed rather than places, so a switch on the feed rather than tabs
    in the toolbar -- which marks Home on all of them (oeeeMarkCurrent,
    toolbar.jinja). Links, so each is still its own address to go back to
    and to share. `feed_switch` is the one showing (handlers/home.rs). #}
-{% set feeds = [("recent", "/"), ("popular", "/popular")] %}
-{% if current_user %}
-  {% set feeds = feeds + [("following", "/following"), ("communities", "/joined")] %}
-{% endif %}
-<nav class="ds-segmented feed-switch" aria-label="{{ ftl_get_message("feed-switch") }}">
+{% set feeds = [("recent", "/"), ("following", "/following"), ("communities", "/joined")] %}
+{% import "pill_macro.jinja" as pill %}
+<nav class="ds-segmented feed-switch" aria-label="{{ ftl_get_message("feed-switch") }}" {{ pill.in_place() }}>
   {% for name, path in feeds %}
     <a href="{{ path|safe }}"{% if feed_switch == name %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-" ~ name) }}</a>
   {% endfor %}

@@ -1,4 +1,5 @@
 {% extends "base.jinja" %}
+{% import "pill_macro.jinja" as pill %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("hashtag-discovery") }}
 {% endblock title %}
@@ -12,7 +13,7 @@
        does not silently throw the query away. #}
     {% set search_suffix = "&q=" ~ (search_query|urlencode) if search_query else "" %}
     <div class="communities-bar">
-      <nav class="ds-segmented" aria-label="{{ ftl_get_message("sort-by") }}">
+      <nav class="ds-segmented" aria-label="{{ ftl_get_message("sort-by") }}" {{ pill.in_place() }}>
         {% for key, label in [("trending", "sort-trending"), ("popular", "sort-popular"), ("recent", "sort-recent"), ("alphabetical", "sort-alphabetical")] %}
           <a href="/hashtags?sort={{ key }}{{ search_suffix }}"{% if sort_by == key %} aria-current="page"{% endif %}>{{ ftl_get_message(label) }}</a>
         {% endfor %}

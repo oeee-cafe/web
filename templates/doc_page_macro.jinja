@@ -3,10 +3,11 @@
    title, then the text in a card, selectable, in a measure the eye can
    follow. The text is one message per language with its paragraphs as
    blank lines, so it is set pre-line. #}
+{% import "pill_macro.jinja" as pill %}
 {% macro doc_page(current, title_key, content_key) %}
   <div class="doc-page">
     <div class="doc-bar">
-      <nav class="ds-segmented" aria-label="{{ ftl_get_message('about-documents') }}">
+      <nav class="ds-segmented" aria-label="{{ ftl_get_message('about-documents') }}" {{ pill.in_place() }}>
         <a href="/policy"{% if current == "policy" %} aria-current="page"{% endif %}>{{ ftl_get_message("community-guidelines") }}</a>
         <a href="/privacy"{% if current == "privacy" %} aria-current="page"{% endif %}>{{ ftl_get_message("privacy-policy") }}</a>
       </nav>
