@@ -666,13 +666,14 @@
         if (event.defaultPrevented && !boosted) return;
         if (link.origin !== location.origin) return;
         if (link.pathname === location.pathname && link.search === location.search) return;
-        // The iOS app stops this link and signs in with Apple's own sheet
-        // (WebTab.swift): the page stays, so nothing slides in over it.
-        if (link.classList.contains("auth-apple") &&
-            document.documentElement.hasAttribute("data-native-apple-sign-in")) return;
-        // Both phone apps do the same for Google (GoogleSignIn.kt, GoogleSignIn.swift).
-        if (link.classList.contains("auth-google") &&
-            document.documentElement.hasAttribute("data-native-google-sign-in")) return;
+        // The apps stop these two links and sign in themselves -- Apple's own
+        // sheet, Credential Manager, a browser of the system's -- so the page
+        // stays where it is and nothing should slide in over it. A browser
+        // really does leave for the provider, and is given the skeleton.
+        var root = document.documentElement;
+        var signsInItself = root.hasAttribute("data-app") || root.hasAttribute("data-mac-app");
+        if (signsInItself &&
+            (link.classList.contains("auth-apple") || link.classList.contains("auth-google"))) return;
         var thumb = link.querySelector("img[width][height]");
         window.oeeeSkeletonHint = thumb ? {
           width: parseInt(thumb.getAttribute("width"), 10),
