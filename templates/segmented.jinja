@@ -6,10 +6,10 @@
 
    It moves when the choice does, whoever changes it: a page's own script
    pressing a tab, the toolbar marking the section being gone to
-   (oeeeMarkCurrent), or a press here on a link to another page, which is
-   marked chosen at once so the thumb is on its way while the page is --
-   the toolbar keeps the pill on screen over the page's skeleton for it
-   (loading, toolbar.jinja). Anything else that moves the items -- a page
+   (oeeeMarkCurrent), or a press here on a link in a page's pill, which is
+   marked chosen at once and switched to in place (below) -- the toolbar
+   keeps the pill on screen over the page's skeleton meanwhile (loading,
+   toolbar.jinja). Anything else that moves the items -- a page
    arriving, a font loading, the window resizing, a menu opening on a group
    that was hidden -- puts it in place without sliding.
 
@@ -84,9 +84,104 @@
       });
     }
 
-    // A link in a pill that goes to another page: chosen now, so the thumb
-    // slides while that page loads. After the toolbar's own click handler,
-    // which is the one that lays the skeleton and moves the pill into it.
+    // A link in a page's pill -- one of Home's feeds, an order of the
+    // hashtags, one of the documents -- is another view of the same page,
+    // so it is switched to in place rather than loaded as a page: the pill
+    // is chosen at once and its thumb slides, the content area alone is
+    // fetched and replaced under it, and the pill carries over into the new
+    // content as it is, mid-slide. The address still changes, pushed as an
+    // htmx entry so going back and forward is htmx's own restore, like any
+    // boosted page.
+    //
+    // Fetched early: at the pointer's hover or press, which is most of the
+    // round trip before the click lands, and kept for a minute, so going
+    // back and forth between two is instant. A pill link pressed before
+    // the page has come shows the page's skeleton meanwhile (loading, in
+    // toolbar.jinja, which has already laid it by the time this runs).
+    //
+    // Anything that goes wrong -- no htmx (an engine too old for it), an
+    // error, a redirect elsewhere, say to sign in -- is an ordinary trip
+    // to the page instead.
+    var FRESH = 60000;
+    var fetched = {};
+    var canSwap = !!(window.fetch && window.DOMParser && window.history && history.pushState);
+
+    function pillLink(target) {
+      var link = target && target.closest ? target.closest("a[href]") : null;
+      if (!link || link.target || link.origin !== location.origin) return null;
+      var group = link.parentNode;
+      if (!isGroup(group) || !link.closest("main")) return null;
+      return link;
+    }
+
+    function fetchPage(href) {
+      var entry = fetched[href];
+      if (entry && Date.now() - entry.at < FRESH) return entry.page;
+      var page = fetch(href, { credentials: "same-origin" }).then(function (response) {
+        if (!response.ok || response.redirected) throw new Error("not the page");
+        return response.text();
+      });
+      fetched[href] = { at: Date.now(), page: page };
+      page.catch(function () {
+        if (fetched[href] && fetched[href].page === page) delete fetched[href];
+      });
+      return page;
+    }
+
+    function prefetch(event) {
+      if (!canSwap || !window.htmx) return;
+      var link = pillLink(event.target);
+      if (link && link.getAttribute("aria-current") !== "page") fetchPage(link.href);
+    }
+    document.addEventListener("mouseover", prefetch);
+    document.addEventListener("mousedown", prefetch);
+    document.addEventListener("touchstart", prefetch, { passive: true });
+
+    // The new page's own scripts, run as the page would have run them.
+    function runScripts(container) {
+      var scripts = container.querySelectorAll("script");
+      for (var i = 0; i < scripts.length; i++) {
+        var old = scripts[i];
+        var fresh = document.createElement("script");
+        for (var a = 0; a < old.attributes.length; a++) fresh.setAttribute(old.attributes[a].name, old.attributes[a].value);
+        fresh.text = old.text;
+        old.parentNode.replaceChild(fresh, old);
+      }
+    }
+
+    function switchTo(link, group, href) {
+      var content = document.querySelector("main.ds-content");
+      var groups = content ? content.querySelectorAll(".ds-segmented") : [];
+      var index = Array.prototype.indexOf.call(groups, group);
+      fetchPage(href).then(function (text) {
+        // Somewhere else by now: this is not the page being looked at.
+        if (!content.isConnected || !group.isConnected) return;
+        var next = new DOMParser().parseFromString(text, "text/html");
+        var incoming = next.querySelector("main.ds-content");
+        if (!incoming) throw new Error("not a page");
+        var nodes = document.createDocumentFragment();
+        while (incoming.firstChild) nodes.appendChild(document.adoptNode(incoming.firstChild));
+        // The pill that is here, mid-slide, in the place of the new page's.
+        var theirs = nodes.querySelectorAll(".ds-segmented")[index];
+        if (theirs) theirs.parentNode.replaceChild(group, theirs);
+        while (content.firstChild) content.removeChild(content.firstChild);
+        content.appendChild(nodes);
+        runScripts(content);
+        if (window.htmx && htmx.process) htmx.process(content);
+        if (next.title) document.title = next.title;
+        history.pushState({ htmx: true }, "", href);
+        if (window.oeeeMarkCurrent) window.oeeeMarkCurrent(location.pathname);
+        content.scrollTop = 0;
+        window.scrollTo(0, 0);
+        settle();
+      }).catch(function () {
+        location.href = href;
+      });
+    }
+
+    // Chosen now, so the thumb slides while the page comes. After the
+    // toolbar's own click handler, which lays the skeleton and moves the
+    // pill into it.
     document.addEventListener("click", function (event) {
       if (event.button !== 0 || event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -100,6 +195,11 @@
       group.oeeeWas = was;
       if (was) was.removeAttribute("aria-current");
       link.setAttribute("aria-current", "page");
+      if (canSwap && window.htmx && link.closest("main")) {
+        event.preventDefault();
+        delete group.oeeeWas;
+        switchTo(link, group, link.href);
+      }
     });
 
     // Back to a page kept in memory: the choice is the one it was left with.
