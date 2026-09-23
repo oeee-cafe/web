@@ -44,9 +44,10 @@
 
    data-window-drag says this bar moves the window in the desktop apps: a
    press on its empty space drags it and a double click zooms it, while its
-   links, buttons and fields stay the page's. The Mac app reads it
-   (MacWindow.js); the Windows app's webview (Tauri) reads its own spelling
-   of the same thing, data-tauri-drag-region="deep", where "deep" is what
+   links, buttons and fields stay the page's. On the Mac the page reads it
+   itself and asks the app to move the window (theme_head.jinja, a `window`
+   message on the bridge); the Windows app's webview (Tauri) reads its own
+   spelling of the same thing, data-tauri-drag-region="deep", where "deep" is what
    lets the bar's children drag too. Both are in the markup, so they arrive
    with every page and every boosted swap, and nothing in an app has to go
    looking for this bar by its class. #}
