@@ -23,14 +23,14 @@
    `type`. The apps ignore types they do not know and fields they do not
    know, so the site can add either without a release of any of them.
 
-   page     {path, signedIn, presence, community, group, painting, refreshable}
+   page     {path, signedIn, presence, community, group, painting}
             On every page, and again whenever any of it changes: a boosted
             navigation, a back swipe that restored the page. `signedIn` is
             null on a page without the toolbar, which cannot tell. `presence`
             is presence_meta.jinja's activity, or null for browsing;
-            `painting` is whether leaving would lose a drawing in progress,
-            and `refreshable` whether pulling down may reload the page --
-            neither a painter nor a replay may be.
+            and `painting` is whether leaving would lose a drawing in
+            progress. Pulling a page down to reload it is the page's own
+            (app_refresh.jinja), so no app is told which pages may be.
    unread   {count}
             The number on the bell (nav_notifications.jinja): unread
             notifications and invitations waiting, together. Sent whenever it
@@ -203,8 +203,7 @@
         presence: presence,
         community: (meta && meta.getAttribute("data-community")) || null,
         group: (meta && meta.getAttribute("data-group")) || null,
-        painting: PAINTING.test(presence || ""),
-        refreshable: !presence
+        painting: PAINTING.test(presence || "")
       };
     }
 
@@ -320,6 +319,12 @@
       // Said again after something the page changed by itself.
       report: report,
       pushToken: pushToken,
+      // Whether pulling the page down may reload it: not a painter or a
+      // replay, or anything else with an activity of its own. The page's,
+      // for app_refresh.jinja; no app calls it.
+      refreshable: function () {
+        return !pageState().presence;
+      },
       // Whether the page would stop a browser from leaving it. Its value is
       // the answer, so an app evaluates the call and reads it.
       wouldLoseWork: function () {

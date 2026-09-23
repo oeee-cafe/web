@@ -1,0 +1,138 @@
+{# Pulling a page down to reload it, in the handheld apps.
+
+   The apps used to do this themselves -- a refresh control on iOS, a swipe
+   layout on Android -- and on iOS it pulled the whole scroll view down, the
+   site's toolbar with it, since the toolbar is part of the page. Here the
+   page does it: the toolbar stays where it is, the content comes down from
+   under it, and a cucumber comes out between them, turning as it is pulled
+   and spinning once let go far enough, while the page reloads.
+
+   Only in the handheld apps (data-form, theme_head.jinja): a browser has
+   its own, and the desktop windows have none. Only on a page that may be
+   reloaded -- not the painter or a replay, which oeeeApp.refreshable()
+   says (app_bridge.jinja) -- and only for a pull that starts with the page
+   at its top, on something that is not itself a field or a scrolled box.
+   The page does not bounce (ds.css), so nothing else moves while it is
+   pulled. #}
+<script>
+  (function () {
+    var root = document.documentElement;
+    var app = window.oeeeApp;
+    if (root.getAttribute("data-form") !== "handheld" || !app) return;
+
+    // How far the content has to come down, after the pull is damped, to
+    // reload when let go; and how far it can come at all.
+    var RELOAD_AT = 72;
+    var FURTHEST = 110;
+
+    var startX = null;
+    var startY = null;
+    var pulled = 0;
+    var content = null;
+    var cucumber = null;
+
+    function atTop() {
+      return (window.pageYOffset || root.scrollTop || 0) <= 0;
+    }
+
+    // Something under the finger that scrolls by itself and is not at its
+    // own top is what the finger is pulling.
+    function scrolledInside(element) {
+      for (; element && element !== document.body; element = element.parentElement) {
+        if (element.scrollTop > 0) return true;
+      }
+      return false;
+    }
+
+    function place(distance, turning) {
+      content.style.transform = distance ? "translateY(" + distance + "px)" : "";
+      var header = document.querySelector(".ds-page > header");
+      var below = header ? header.getBoundingClientRect().bottom : 0;
+      cucumber.style.top = below + "px";
+      cucumber.style.transform = "translateY(" + (distance - 40) + "px)";
+      cucumber.style.opacity = distance ? Math.min(1, distance / RELOAD_AT) : 0;
+      if (turning) cucumber.firstChild.style.transform = "rotate(" + distance * 4 + "deg)";
+    }
+
+    function settle() {
+      if (!content) return;
+      content.classList.add("is-settling");
+      cucumber.classList.add("is-settling");
+      place(0, true);
+      var settled = content;
+      setTimeout(function () {
+        settled.classList.remove("is-settling");
+        if (cucumber) cucumber.classList.remove("is-settling");
+      }, 250);
+    }
+
+    document.addEventListener("touchstart", function (event) {
+      startY = null;
+      if (event.touches.length !== 1 || !atTop()) return;
+      if (app.refreshable && !app.refreshable()) return;
+      var target = event.target;
+      if (target && target.closest && target.closest("input, textarea, select, [contenteditable], dialog[open]")) return;
+      if (scrolledInside(target)) return;
+      content = document.querySelector(".ds-page > main.ds-content");
+      if (!content) return;
+      if (!cucumber) {
+        cucumber = document.createElement("div");
+        cucumber.className = "ds-refresh";
+        cucumber.setAttribute("aria-hidden", "true");
+        cucumber.appendChild(document.createElement("span")).textContent = "🥒";
+        document.body.appendChild(cucumber);
+      }
+      startX = event.touches[0].clientX;
+      startY = event.touches[0].clientY;
+      pulled = 0;
+    }, { passive: true });
+
+    document.addEventListener("touchmove", function (event) {
+      if (startY === null) return;
+      var dx = event.touches[0].clientX - startX;
+      var dy = event.touches[0].clientY - startY;
+      // Sideways first, or upward, or the page has moved: not a pull.
+      if (!pulled && (dy <= 0 || Math.abs(dx) > dy)) {
+        startY = null;
+        return;
+      }
+      if (!atTop()) {
+        startY = null;
+        settle();
+        return;
+      }
+      // Ours from here: the web view neither scrolls nor bounces under it.
+      event.preventDefault();
+      pulled = Math.max(0, Math.min(FURTHEST, dy * 0.5));
+      place(pulled, true);
+    }, { passive: false });
+
+    function letGo() {
+      if (startY === null) return;
+      startY = null;
+      if (pulled < RELOAD_AT) {
+        settle();
+        return;
+      }
+      app.feel("medium");
+      content.classList.add("is-settling");
+      place(RELOAD_AT, false);
+      cucumber.classList.add("is-spinning");
+      location.reload();
+    }
+    document.addEventListener("touchend", letGo);
+    document.addEventListener("touchcancel", function () {
+      if (startY === null) return;
+      startY = null;
+      settle();
+    });
+
+    // A page back from the back-forward cache comes back as it was left,
+    // which may be mid-reload: put it back at rest.
+    window.addEventListener("pageshow", function (event) {
+      if (!event.persisted || !content) return;
+      if (cucumber) cucumber.classList.remove("is-spinning");
+      place(0, true);
+    });
+  })();
+</script>
