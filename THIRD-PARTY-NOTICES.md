@@ -37,8 +37,9 @@ The painter draws its tools with Material Symbols through the
 `templates/achievement_icon_macro.jinja` are the same artwork -- `brush`,
 `reply`, `group`, `sports-esports` and `star` -- with their path data copied
 from that package into the template, since server-rendered pages cannot load
-it. The toolbar's Draw button in `templates/toolbar.jinja` uses `brush` the
-same way. They are unmodified.
+it. The toolbar in `templates/toolbar.jinja` uses `brush` (its Draw button),
+`info-outline` (what the site is) and `login` (signing in) the same way.
+They are unmodified.
 
 ## PaintBBS NEO
 

@@ -150,20 +150,18 @@
         </form>
       {% else %}
         {# What the site is, first: signed in it is the last thing in the
-           account menu, but signed out the only square at the bar's end is
-           the theme's, and nobody looks under a sun for what a site is. It
-           costs a button's width on a narrow window, which fitToolbar
-           spends on the steps below rather than on hiding this -- though on
-           a phone, when it is that or the site's name beside the mark, it
-           says only "?", keeping its words for its label and tooltip: the
-           question is still asked, and the name it asks about is there to
-           read.
+           account menu, but signed out the only other square at the bar's
+           end is the theme's, and nobody looks under a sun for what a site
+           is. An info mark, square like its neighbours, with its words for
+           its label and tooltip.
 
            Then signing in, as the one filled button where Draw is when
-           signed in. Signing up has no button of its own: the sign in page
-           offers it, so one button covers both. #}
-        <a class="toolbar-about" href="/about" aria-label="{{ ftl_get_message("nav-about-menu") }}" title="{{ ftl_get_message("nav-about-menu") }}"><span class="toolbar-about-words">{{ ftl_get_message("nav-about-menu") }}</span><span class="toolbar-about-mark" aria-hidden="true">?</span></a>
-        <a class="toolbar-draw" href="/login">{{ ftl_get_message("sign-in") }}</a>
+           signed in, and as a mark too: a door with the arrow going in.
+           Signing up has no button of its own: the sign in page offers it,
+           so one button covers both. Both marks are Material Symbols
+           (info-outline, login; Apache 2.0; THIRD-PARTY-NOTICES.md). #}
+        <a class="toolbar-button toolbar-about" href="/about" aria-label="{{ ftl_get_message("nav-about-menu") }}" title="{{ ftl_get_message("nav-about-menu") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 17h2v-6h-2zm1-8q.425 0 .713-.288T13 8t-.288-.712T12 7t-.712.288T11 8t.288.713T12 9m0 13q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg></a>
+        <a class="toolbar-draw toolbar-sign-in" href="/login" aria-label="{{ ftl_get_message("sign-in") }}" title="{{ ftl_get_message("sign-in") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21v-2h7V5h-7V3h7q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21zm-2-4l-1.375-1.45l2.55-2.55H3v-2h8.175l-2.55-2.55L10 7l5 5z"/></svg></a>
       {% endif %}
       {% if current_user %}
         <details class="toolbar-menu">
@@ -293,7 +291,7 @@
         var links = bar.querySelector(".toolbar-links");
         var end = bar.querySelector(".toolbar-end");
         if (!name || !links || !end) return;
-        nav.classList.remove("is-stacked", "is-compact", "is-brief", "is-bare");
+        nav.classList.remove("is-stacked", "is-compact", "is-bare");
         var line = name.getBoundingClientRect();
         var sections = links.getBoundingClientRect();
         var account = end.getBoundingClientRect();
@@ -303,20 +301,15 @@
         nav.classList.add("is-stacked");
         // Stacked, the first line still has to hold the name and the
         // account. If it does not, first Draw keeps only its pencil and the
-        // buttons close up; then, signed out, the question of what the site
-        // is shrinks to its "?"; then, if even that wraps, the name steps
-        // aside and the mark stays, still the way home. Each step only where
-        // it is needed.
+        // buttons close up; then, if even that wraps, the name steps aside
+        // and the mark stays, still the way home. Each step only where it is
+        // needed.
         function wrapped() {
           return end.getBoundingClientRect().top >= name.getBoundingClientRect().bottom;
         }
         if (!wrapped()) return;
         nav.classList.add("is-compact");
         if (!wrapped()) return;
-        if (bar.querySelector(".toolbar-about")) {
-          nav.classList.add("is-brief");
-          if (!wrapped()) return;
-        }
         nav.classList.add("is-bare");
       };
       window.oeeeFitToolbar();
