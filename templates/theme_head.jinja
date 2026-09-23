@@ -9,27 +9,35 @@
 {% include "app_bridge.jinja" %}
 <script>
   // Which app, if any, this page is in -- the one place anything asks. Each
-  // app's web view adds its name to the user agent (WebTabController.swift,
-  // WebTabController.kt, webview2.rs in oeee-cafe-desktop), and each name marks
-  // the root one way, here, before the page paints, so nothing that differs
-  // in an app flashes up and away. The server does not look: what differs is
-  // all in the stylesheet and in script, keyed on these marks.
+  // app's web view ends its user agent with a token of one shape,
   //
-  // The desktop apps also mark the root themselves, as they did before
-  // they named themselves; a build from then still says the same thing.
+  //   OeeeCafe/<app> [store/<store>]
+  //
+  // (WebTabController.swift, WebTabController.kt, chrome.rs in
+  // oeee-cafe-desktop), and it marks the root here, before the page paints,
+  // so nothing that differs in an app flashes up and away. Three marks, one
+  // question each:
+  //
+  //   data-app    which app: "ios", "android", "macos" or "windows"
+  //   data-form   the kind of device it is on: "handheld" for the phone and
+  //               tablet apps, full screen under native gestures, where the
+  //               page scrolls whole and a new page is pushed like a screen;
+  //               "desktop" for the Mac and Windows windows, whose title bar
+  //               is the site's toolbar
+  //   data-store  where the build sells: "apple", "microsoft" or "steam";
+  //               absent in one that does not (app_store.jinja)
+  //
+  // A browser has none of them. Only ever about what to show: nothing is
+  // trusted for being marked, and a purchase is checked with the store.
   (function () {
-    var APPS = [
-      [/OeeeCafeiOS/, "data-app", "ios"],
-      [/OeeeCafeAndroid/, "data-app", "android"],
-      [/OeeeCafeMac/, "data-desktop", "macos"],
-      [/OeeeCafeWindows/, "data-desktop", "windows"]
-    ];
-    for (var i = 0; i < APPS.length; i++) {
-      if (APPS[i][0].test(navigator.userAgent)) {
-        document.documentElement.setAttribute(APPS[i][1], APPS[i][2]);
-        return;
-      }
-    }
+    var ua = navigator.userAgent;
+    var app = /\bOeeeCafe\/(ios|android|macos|windows)\b/.exec(ua);
+    if (!app) return;
+    var root = document.documentElement;
+    root.setAttribute("data-app", app[1]);
+    root.setAttribute("data-form", app[1] === "ios" || app[1] === "android" ? "handheld" : "desktop");
+    var store = /\bstore\/(apple|microsoft|steam)\b/.exec(ua);
+    if (store) root.setAttribute("data-store", store[1]);
   })();
   if (document.documentElement.getAttribute("data-app") === "ios") {
     // Going back in the app is the web view's edge swipe, which already
@@ -48,11 +56,12 @@
       }
     });
   }
-  if (document.documentElement.hasAttribute("data-app")) {
+  if (window.oeeeApp && window.oeeeApp.connected()) {
     // Controls are felt as well as seen, as the apps' own are: "light",
     // "medium", "selection", "success", "warning", "error", sent to the app
-    // as a haptic message (app_bridge.jinja). An app that cannot feel them
-    // ignores them.
+    // as a haptic message (app_bridge.jinja). Sent to any app listening, not
+    // to a kind of device: one that has nothing to feel them with -- a Mac,
+    // Windows -- ignores them, as it ignores any message it does not use.
     function feel(name) {
       window.oeeeApp.feel(name);
     }

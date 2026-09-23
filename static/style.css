@@ -29,8 +29,8 @@
   --leading-normal: 1.5;
 }
 
-/* In the phone apps these follow the reader's text size too, as the design
-   system's do (ds.css, --ds-text-scale). */
+/* In an app that says the reader's text size, these follow it too, as the
+   design system's do (ds.css, --ds-text-scale). */
 html[data-app] {
   --text-xs: calc(0.75rem * var(--ds-text-scale, 1));
   --text-sm: calc(0.875rem * var(--ds-text-scale, 1));
@@ -163,11 +163,11 @@ main {
 /* In the macOS app the toolbar floats over the content (ds.css, after "The
    content area"), so the page starts below it, and so does what sticks. */
 @media (min-width: 601px) {
-  html[data-desktop="macos"] .ds-page > main.ds-content {
+  html[data-app="macos"] .ds-page > main.ds-content {
     padding-top: calc(var(--ds-header-height, 53px) + var(--space-5));
   }
 
-  html[data-desktop="macos"] .post-stage {
+  html[data-app="macos"] .post-stage {
     top: calc(var(--ds-header-height, 53px) + var(--ds-space-4));
   }
 }
@@ -278,7 +278,7 @@ nav a:visited,
   navigation: auto;
 }
 
-/* In the phone apps, a page opened from the one showing is pushed onto it
+/* In the handheld apps, a page opened from the one showing is pushed onto it
    (toolbar.jinja, push): it slides in from the right edge while the page it
    came from gives way a third of its width and dims, and the toolbar -- the
    app's navigation bar -- holds still. Over each other rather than blended,

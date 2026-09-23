@@ -84,15 +84,14 @@
    download {name, mime, data}
             What Android's web view cannot do itself (app_polyfills.jinja).
 
-   The apps are told apart by what each adds to its web view's user agent,
-   in one place (theme_head.jinja), which marks the root before the page
-   paints: `data-app="ios"` or `"android"` for the phone apps, whose pages
-   scroll whole with the site's toolbar as their only navigation, and
-   `data-desktop="macos"` or `"windows"` for the desktop windows, whose
-   toolbar is the title bar. The
+   Each app ends its web view's user agent with  OeeeCafe/<app>, and a build
+   that sells with  store/<store>  after it. theme_head.jinja reads that in
+   one place and marks the root before the page paints: `data-app` (which
+   app: "ios", "android", "macos", "windows"), `data-form` (the kind of
+   device: "handheld" or "desktop") and `data-store` (where it sells). The
    site owns what those marks change, the room kept for a window's own
    controls included (ds.css); an app says what it is and nothing about the
-   site's layout.
+   site's layout, and injects nothing to say it.
 
    window.oeeeApp.wouldLoseWork() is whether leaving now would lose
    something: the page's own `beforeunload` handlers, asked the way a
@@ -100,13 +99,14 @@
    asks by itself. The painter answers only for a drawing with something in
    it, and not while it is being saved -- which `painting` above cannot say.
 
-   A build that sells says which store it sells through by marking the root
-   element before the page paints: `data-store="apple"` (the App Store),
-   `"microsoft"` (the Microsoft Store) or `"steam"` -- early enough that the
-   buttons on /supporter, and Steam's sign-in, are never drawn in a build
-   that would do nothing with them. It is the build that says so, not the
-   platform: the Microsoft Store build of the Windows app is not the Steam
-   one. A build that says nothing is offered nothing to press.
+   A build that sells says which store it sells through in its user agent
+   -- store/apple (the App Store), store/microsoft (the Microsoft Store) or
+   store/steam -- so `data-store` is on the root before the page paints,
+   early enough that the buttons on /supporter, and Steam's sign-in, are
+   never drawn in a build that would do nothing with them. It is the build
+   that says so, not the platform: the Microsoft Store build of the Windows
+   app is not the Steam one. A build that says nothing is offered nothing
+   to press.
 
    The other way, the apps call the page, and everything they call is on
    one object, window.oeeeApp, which this template makes. The parts of the
@@ -284,7 +284,7 @@
       if (typeof token !== "string" || !token || registered === token) return;
       var bar = document.querySelector(".nav-bar");
       if (!bar || !bar.hasAttribute("data-signed-in")) return;
-      var platform = PLATFORMS[root.getAttribute("data-app") || root.getAttribute("data-desktop")];
+      var platform = PLATFORMS[root.getAttribute("data-app")];
       if (!platform) return;
       registered = token;
       fetch("/api/v1/devices", {

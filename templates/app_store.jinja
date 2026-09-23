@@ -2,8 +2,9 @@
 
    A store is "apple" (the App Store: the iOS and macOS apps), "microsoft"
    (the Microsoft Store build of the Windows app) or "steam" (the Steam
-   build). A build that sells marks the root with its store, data-store,
-   before the page paints; one that does not marks nothing. Each build sells
+   build). A build that sells names its store in its user agent, and the
+   root is marked data-store before the page paints (theme_head.jinja); one
+   that does not sells nothing. Each build sells
    through one store only, so nothing the page asks says which: the app is
    that store.
 
