@@ -131,9 +131,9 @@
    (toolbar.jinja), window.oeeeStorePrices(prices) (supporter.jinja),
    window.oeeePainter, and --oeee-text-scale on the root.
 
-   Builds of the apps from before this contract listen on channels of their
-   own (oeeeHaptic, oeeePainter), and the site keeps talking to those when
-   there is no oeeeBridge. #}
+   There is no other channel. The web-view apps were never released before
+   this contract; the builds people have from before it are the native
+   apps, which never load these pages. #}
 <script>
   (function () {
     var root = document.documentElement;
@@ -286,15 +286,9 @@
       // Whether an app is listening at all.
       connected: function () { return !!channel(); },
       post: post,
-      // A control felt as well as seen. An app from before the bridge has
-      // oeeeHaptic instead: a message handler on iOS, a web message listener
-      // on Android.
+      // A control felt as well as seen.
       feel: function (name) {
-        if (!name) return;
-        if (post("haptic", { name: name }, true)) return;
-        var handlers = window.webkit && window.webkit.messageHandlers;
-        var legacy = (handlers && handlers.oeeeHaptic) || window.oeeeHaptic;
-        if (legacy && legacy.postMessage) legacy.postMessage(name);
+        if (name) post("haptic", { name: name }, true);
       },
       // Said again after something the page changed by itself.
       report: report,
