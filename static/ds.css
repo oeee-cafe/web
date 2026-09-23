@@ -917,11 +917,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   margin-left: 8px;
 }
 
-.toolbar-links a,
-.toolbar-end > a,
-.toolbar-end .toolbar-icon,
-.toolbar-menu summary,
-.toolbar-draw {
+.toolbar-links a {
   display: inline-block;
   margin-top: 0;
   margin-bottom: 0;
@@ -943,11 +939,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   color: var(--ds-ink);
 }
 
-.toolbar-links a:hover,
-.toolbar-end > a:hover,
-.toolbar-end .toolbar-icon:hover,
-.toolbar-menu summary:hover,
-.toolbar-menu[open] summary {
+.toolbar-links a:hover {
   background-color: var(--ds-hover);
 }
 
@@ -959,101 +951,84 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   font-weight: 600;
 }
 
-/* A plain link at the toolbar's end -- notifications, drafts, signing in,
-   the site's about page -- is drawn as a button, since that is what it is
-   there. */
-.toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon),
+/* The bar's end is squares, all of them: search, the Supporter Pack, the
+   notifications bell, Draw, signed out the info mark and the sign in door,
+   and the account's initial or the theme's mark in the menu square.
+
+   Each is 30px on a side -- 16px of mark, 6px of padding and a 1px
+   border -- and is a box around a block, with no line of text in it
+   anywhere. A square that sat on a line box was placed by that line's
+   baseline and strut, which differ with where it is: the brush in its
+   form came out a quarter pixel above the squares beside it, the bell in
+   its span made the whole row half a pixel taller, and the space between
+   the initial and its dot made the account square 33.5px wide. What each
+   of them looks like -- border colour, fill -- is its own kind's rule
+   below; its size and where its mark sits are only this.
+
+   And everything the bar's end holds is its flex item, directly: a
+   wrapper (the draw form, the notifications span) is a flex box too, so
+   what is inside is placed by the same align-items as its neighbours and
+   not on a line of its own. <details> is left a block, since a flex
+   <details> is not something every engine here will lay out; its summary
+   and square are blocks, which have no line either. */
+.toolbar-end > form,
+.toolbar-end > span {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+  align-items: center;
+}
+
+.toolbar-square {
+  display: block;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+/* Tailwind's reset, on the painter pages, makes every svg a block, which
+   is what the squares want everywhere. */
+.nav-bar svg {
+  display: inline-block;
+}
+
+.nav-bar .toolbar-square svg,
+.nav-bar .toolbar-search-glass svg {
+  display: block;
+}
+
 .toolbar-end .toolbar-button {
   border: 1px solid var(--ds-line-strong);
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-raise);
+  color: var(--ds-ink);
 }
 
-.toolbar-end > a:not(.toolbar-draw):not(.toolbar-icon):hover,
 .toolbar-end .toolbar-button:hover {
   background-color: var(--ds-ground);
-}
-
-.toolbar-end .toolbar-button {
-  display: inline-block;
-  padding: 4px 11px;
-  border-radius: 6px;
-  color: var(--ds-ink);
-  font-size: var(--ds-text-m);
-  font-weight: 500;
-  line-height: calc(20px * var(--ds-text-scale, 1));
-  text-decoration: none;
-  white-space: nowrap;
 }
 
 .toolbar-end .toolbar-button:visited {
   color: var(--ds-ink);
 }
 
-.toolbar-end .toolbar-button .toolbar-badge {
-  margin-left: 4px;
-  vertical-align: 1px;
-}
-
-.toolbar-end .toolbar-icon {
-  position: relative;
-  padding: 5px 8px 3px;
-}
-
-/* Tailwind's reset, on the painter pages, makes every svg and img a block;
-   the toolbar's icons sit in a line of text. */
-.nav-bar svg {
-  display: inline-block;
-}
-
-.toolbar-icon svg {
-  vertical-align: top;
-}
-
-/* Search and notifications: square, and the buttons' 30px tall -- 16px of
-   icon, 2px of margin, 4px of padding and the border, the same on every
-   side at every width, where the worded buttons only lose width they have
-   to spare.
-
-   Each layout's step trims the worded buttons' side padding with a rule
-   of its own (.is-stacked, .is-compact, the narrowest phones), and each of
-   those outranked a plain `.toolbar-end .toolbar-search`: search came out
-   42px wide on a phone, the bell 38px once compact. So this is written to
-   outrank all of them, rather than listing every layout and missing the
-   next one added. Unread fills the bell in the badge's orange: the shape
-   changes as well as the colour, and the width does not
-   (nav_notifications.jinja).
-
-   The Supporter Pack's heart is the third of them, shown only in an app
-   that can sell one (style.css), and signed out the info mark and the
-   sign in door are two more. A square icon button added without being
-   named here keeps the worded buttons' 4px 11px and their 20px line height,
-   and comes out 40x26 sitting 2px below its neighbours. */
-.nav-bar .toolbar-end a.toolbar-button.toolbar-bell,
-.nav-bar .toolbar-end a.toolbar-button.toolbar-supporter,
-.nav-bar .toolbar-end a.toolbar-button.toolbar-about,
-.nav-bar .toolbar-end a.toolbar-draw.toolbar-sign-in {
-  padding: 4px;
-  line-height: 0;
-}
-
-.toolbar-end .toolbar-search svg,
-.toolbar-end .toolbar-bell svg,
-.toolbar-end .toolbar-supporter svg,
-.toolbar-end .toolbar-about svg,
-.toolbar-end .toolbar-sign-in svg {
-  margin: 2px;
+/* Unread fills the bell in the badge's orange: the shape changes as well
+   as the colour, and the width does not (nav_notifications.jinja). */
+.toolbar-end .toolbar-bell-unread svg {
+  color: var(--ds-badge);
+  fill: currentColor;
 }
 
 /* Search is a form rather than one of those links, and its button is a
    pill that opens rather than a square that is pressed: the glass is the
    field's label and sits at the pill's left, the field comes after it,
    and the pill is only as wide as the two of them are. Closed, that is
-   the glass's own 30px square, the same square as the icon buttons above
-   -- which is why none of this needs their rules: a <label> and a <span>
-   match none of the layout steps' `> a` and `.toolbar-button` selectors,
-   so the square keeps its 4px at every width without having to outrank
-   them.
+   the glass's own 30px square, the same square as the others above: the
+   pill's border and the glass's 6px of padding round its 16px mark.
 
    The form is the slot the pill sits in and never changes size; the pill
    is out of flow inside it, anchored at its right, so opening grows it
@@ -1114,9 +1089,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .toolbar-end .toolbar-search-glass {
   display: block;
   flex: none;
-  padding: 4px;
+  padding: 6px;
   color: var(--ds-ink);
-  line-height: 0;
 }
 
 /* Closed, the field is nothing: no width and no padding, so the pill
@@ -1218,18 +1192,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   }
 }
 
-.toolbar-end .toolbar-bell-unread svg {
-  color: var(--ds-badge);
-  fill: currentColor;
-}
-
-.toolbar-end .toolbar-icon .toolbar-badge {
-  position: absolute;
-  top: -2px;
-  right: -4px;
-  margin-left: 0;
-}
-
 /* Drawing is what the site is for, so it is the one filled control: the
    cucumber's lime, with dark ink in both themes. */
 /* Its edge is a border, as every other button in the bar has, so it is
@@ -1240,21 +1202,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-color: var(--ds-accent);
   color: var(--ds-accent-ink);
   box-shadow: var(--ds-shadow-raise);
-  font-weight: 600;
 }
 
 .toolbar-end .toolbar-draw:hover {
   background-color: var(--ds-accent-hover);
-}
-
-.toolbar-draw svg {
-  margin-right: 6px;
-  vertical-align: -2px;
-}
-
-/* Signing in is only its mark: none of the room Draw keeps for a word. */
-.toolbar-end .toolbar-sign-in svg {
-  vertical-align: baseline;
 }
 
 /* Only the form's own vertical margins: its left one is the gap to the
@@ -1262,6 +1213,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .toolbar-end form {
   margin-top: 0;
   margin-bottom: 0;
+}
+
+.toolbar-end form > .toolbar-square {
+  margin: 0;
 }
 
 .toolbar-badge {
@@ -1284,31 +1239,14 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    a square with the same border, fill and corners as every other button in
    the bar, holding your initial or the theme's icon. */
 .toolbar-avatar {
-  display: inline-block;
-  width: 30px;
-  height: 30px;
   border: 1px solid var(--ds-line-strong);
-  border-radius: 6px;
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-raise);
   color: var(--ds-ink);
   font-size: 13px;
   font-weight: 700;
-  line-height: 28px;
+  line-height: 16px;
   text-align: center;
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-}
-
-/* The square is the button: no padded hover area around it. */
-.nav-bar .toolbar-menu summary {
-  padding: 0;
-  line-height: 0;
-}
-
-.nav-bar .toolbar-menu summary:hover,
-.nav-bar .toolbar-menu[open] summary {
-  background: none;
 }
 
 .toolbar-menu summary:hover .toolbar-avatar,
@@ -1316,14 +1254,15 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-color: var(--ds-ground);
 }
 
+/* On the square's top right corner, over it rather than beside it. */
 .toolbar-dot {
-  display: inline-block;
+  position: absolute;
+  top: 0;
+  right: 0;
   width: 8px;
   height: 8px;
-  margin-left: -8px;
   border-radius: 4px;
   background-color: var(--ds-danger);
-  vertical-align: top;
 }
 
 .toolbar-dot-drafts {
@@ -1334,9 +1273,11 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   position: relative;
 }
 
+/* The square is the button: no padded hover area around it. */
 .toolbar-menu summary {
+  position: relative;
   display: block;
-  padding: 4px;
+  padding: 0;
   list-style: none;
 }
 
@@ -1442,16 +1383,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   justify-content: center;
 }
 
-.toolbar-menu summary svg {
-  vertical-align: middle;
-}
-
-/* The theme menu wears the avatar's shape, so the two squares at the
-   bar's end match. */
-.toolbar-avatar-guest svg {
-  vertical-align: middle;
-}
-
 /* The theme menu's square shows the theme in use. */
 .nav-bar .toolbar-theme-menu svg {
   display: none;
@@ -1460,7 +1391,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 :root[data-theme="light"] .nav-bar .toolbar-theme-menu .toolbar-theme-light,
 :root[data-theme="dark"] .nav-bar .toolbar-theme-menu .toolbar-theme-dark,
 :root:not([data-theme]) .nav-bar .toolbar-theme-menu .toolbar-theme-system {
-  display: inline-block;
+  display: block;
 }
 
 /* The switch, then a rule, then what the site is. */
@@ -1540,33 +1471,11 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   margin-left: 6px;
 }
 
-.nav-bar.is-stacked .toolbar-end > a,
-.nav-bar.is-stacked .toolbar-draw {
-  padding-right: 10px;
-  padding-left: 10px;
-}
-
-/* Too narrow for the name and the account on one line even stacked: Draw
-   keeps its pencil and loses its word, and the buttons close up. Narrower
-   still, the name steps aside and the mark stays (toolbar.jinja,
-   oeeeFitToolbar). */
-.nav-bar.is-compact .toolbar-draw span {
-  display: none;
-}
-
-.nav-bar.is-compact .toolbar-draw svg {
-  margin-right: 0;
-}
-
+/* Too narrow for the name and the account on one line even stacked: the
+   buttons close up. Narrower still, the name steps aside and the mark
+   stays (toolbar.jinja, oeeeFitToolbar). */
 .nav-bar.is-compact .toolbar-end > * + * {
   margin-left: 4px;
-}
-
-.nav-bar.is-compact .toolbar-end > a,
-.nav-bar.is-compact .toolbar-end .toolbar-button,
-.nav-bar.is-compact .toolbar-draw {
-  padding-right: 8px;
-  padding-left: 8px;
 }
 
 .nav-bar.is-bare .toolbar-name-text {
@@ -1684,12 +1593,6 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 
   .nav-bar.is-stacked .toolbar-end > * + * {
     margin-left: 4px;
-  }
-
-  .nav-bar.is-stacked .toolbar-end > a,
-  .nav-bar.is-stacked .toolbar-draw {
-    padding-right: 8px;
-    padding-left: 8px;
   }
 }
 
@@ -2130,11 +2033,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-segmented > *:active,
 .ds-page .ds-segmented > button:active,
 .toolbar-links a:active,
-.toolbar-end > a:active,
-.toolbar-end .toolbar-icon:active,
-.toolbar-end .toolbar-button:active,
-.toolbar-menu summary:active,
-.toolbar-draw:active,
+.toolbar-end .toolbar-square:active,
 .toolbar-menu-items a:active,
 .toolbar-menu-signout:active {
   background-image: linear-gradient(var(--ds-press), var(--ds-press));
@@ -2153,8 +2052,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page input[type="submit"]:not([class]):active,
 .ds-page input[type="button"]:not([class]):active,
 .ds-page input[type="reset"]:not([class]):active,
-.toolbar-end > a:not(.toolbar-icon):active,
-.toolbar-end .toolbar-button:active {
+.toolbar-end .toolbar-square:active {
   box-shadow: none;
 }
 
