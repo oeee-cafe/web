@@ -59,7 +59,7 @@
      surface, a little clear so the page passing under it shows, and
      lifted off it. */
   --ds-bar: rgba(242, 242, 255, 0.88);
-  --ds-shadow-bar: 0 8px 24px rgba(40, 40, 90, 0.18), 0 1px 2px rgba(40, 40, 90, 0.12);
+  --ds-shadow-bar: 0 6px 14px -6px rgba(40, 40, 90, 0.28), 0 1px 2px rgba(40, 40, 90, 0.12);
   --ds-field: #ffffff;
   /* Ink, in three strengths. Muted is 5.4:1 on the ground; faint is for
      placeholders and disabled text only. */
@@ -112,7 +112,7 @@
     --ds-grid-solid: #22223f;
     --ds-surface: #23233c;
     --ds-bar: rgba(35, 35, 60, 0.88);
-    --ds-shadow-bar: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.4);
+    --ds-shadow-bar: 0 6px 14px -6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
     --ds-field: #1d1d33;
     --ds-ink: #dcdcea;
     --ds-muted: #a3a3bd;
@@ -149,7 +149,7 @@
   --ds-grid-solid: #22223f;
   --ds-surface: #23233c;
   --ds-bar: rgba(35, 35, 60, 0.88);
-  --ds-shadow-bar: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ds-shadow-bar: 0 6px 14px -6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
   --ds-field: #1d1d33;
   --ds-ink: #dcdcea;
   --ds-muted: #a3a3bd;
@@ -563,6 +563,18 @@ html:not([data-form="desktop"]) .ds-page > header .nav-bar #menubar {
     background-size: 14px 14px;
     background-attachment: local;
   }
+
+  /* In a browser the grid comes in over the top of the page here, as it
+     does on a phone (style.css) -- on the content area, since that is what
+     scrolls, and it is what shows around the bar floating over it. On the
+     root it stood still while the grid beside it moved. */
+  html:not([data-form]) .ds-page > main.ds-content {
+    background-image: linear-gradient(var(--ds-ground), transparent 120px),
+      linear-gradient(var(--ds-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
+    background-repeat: no-repeat, repeat, repeat;
+    background-size: 100% 120px, 14px 14px, 14px 14px;
+  }
 }
 
 .ds-content:focus {
@@ -577,12 +589,17 @@ html:not([data-form="desktop"]) .ds-page > header .nav-bar #menubar {
    a stacked toolbar or a message makes it taller. Its scrollbar runs from
    under the toolbar, as a Mac's does.
 
+   A browser wider than a phone does the same with its floating bar, for
+   the same reason and one more: the strip around the bar is the content
+   area's own grid, scrolling with it, rather than the page's standing
+   still beside it.
+
    The glass is a layer behind the header rather than the header itself: a
    backdrop filter makes its element the frame for everything fixed inside
    it, and the keyboard shortcuts panel is fixed inside the toolbar. With
    reduced transparency asked for, the toolbar is solid again.
 
-   On the website, on Windows and on phones, nothing here applies. */
+   On Windows and on phones, nothing here applies. */
 :root {
   --ds-bar: rgba(204, 204, 255, 0.72);
 }
@@ -598,11 +615,13 @@ html:not([data-form="desktop"]) .ds-page > header .nav-bar #menubar {
 }
 
 @media (min-width: 601px) {
-  html[data-app="macos"] .ds-page {
+  html[data-app="macos"] .ds-page,
+  html:not([data-form]) .ds-page {
     position: relative;
   }
 
-  html[data-app="macos"] .ds-page > header {
+  html[data-app="macos"] .ds-page > header,
+  html:not([data-form]) .ds-page > header {
     position: absolute;
     top: 0;
     right: 0;
@@ -635,7 +654,8 @@ html:not([data-form="desktop"]) .ds-page > header .nav-bar #menubar {
   }
 
   /* A jump to an anchor lands below the toolbar, not under it. */
-  html[data-app="macos"] .ds-page > main.ds-content {
+  html[data-app="macos"] .ds-page > main.ds-content,
+  html:not([data-form]) .ds-page > main.ds-content {
     scroll-padding-top: var(--ds-header-height, 53px);
   }
 }
