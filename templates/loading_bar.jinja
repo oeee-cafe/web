@@ -18,7 +18,10 @@
    htmx's swap, or for a page load, the new document -- or, for a trip that
    never lands (a download, a cancelled load), a timeout.
 
-   Clicks and submits start it at the press. Any page load that is neither
+   Clicks and submits start it at the press. In the apps built on WebKit, a
+   press that loads a page holds the load back a frame, until the bar is on
+   the screen (leave(), below).
+   Any page load that is neither
    -- a script's, or back to a page not kept -- is caught as the page is
    about to be left (beforeunload, below). htmx's own trips are only ever
    the first kind.
@@ -55,7 +58,7 @@
       if (bar.parentNode !== header) header.appendChild(bar);
       return true;
     }
-    function start(from) {
+    function start(from, now) {
       if (navigator.onLine === false) return;
       if (!bar) {
         bar = document.createElement("div");
@@ -66,7 +69,7 @@
       // Read back once, so the step to .is-loading is a transition from
       // nothing rather than from wherever the last trip left it.
       void bar.offsetWidth;
-      bar.className = "ds-loading-bar is-loading";
+      bar.className = "ds-loading-bar is-loading" + (now ? " is-now" : "");
       source = from || null;
       if (source && sent && sent.sourceElement === source && sent.status === "issuing") request = sent;
       timeout = setTimeout(done, 20000);
@@ -79,9 +82,33 @@
       bar.className = "ds-loading-bar is-done";
       clearing = setTimeout(reset, 600);
     }
-    window.oeeeLoadingBar = { start: start, done: done };
+    // A page load, as opposed to one of htmx's trips. WebKit stops putting
+    // the page on the screen the moment a load begins -- scripts go on
+    // running, but nothing they change is shown again -- so a bar started in
+    // the same turn as the load is never seen. Measured in the simulator: the
+    // page's own clock stopped at the tap. So in the apps built on it, the
+    // bar goes up first, at once rather than after the usual moment, and the
+    // load is begun a frame later, once it has been painted; what is on the
+    // screen is then frozen with the bar in it, and its creep runs on the
+    // compositor, which the freeze does not stop. Chromium, under the
+    // Android and Windows apps, keeps painting the page until the next one
+    // arrives, so there nothing is held back.
+    var holds = /^(ios|macos)$/.test(document.documentElement.getAttribute("data-app"));
+    function leave(go) {
+      if (!holds || !window.requestAnimationFrame) {
+        start(null);
+        return go();
+      }
+      start(null, true);
+      requestAnimationFrame(function () { go(); });
+    }
+    window.oeeeLoadingBar = { start: start, done: done, leave: leave };
 
-    document.addEventListener("click", function (event) {
+    // On the window, so it is heard after every listener on the document:
+    // those that do something with a link the page is leaving by (a
+    // segmented control's thumb sliding to it, segmented.jinja) see a click
+    // nobody has cancelled yet, and what they cancel is seen here.
+    window.addEventListener("click", function (event) {
       if (event.button !== 0) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
@@ -92,12 +119,16 @@
       if (event.defaultPrevented && !boosted) return;
       if (link.origin !== location.origin) return;
       if (link.pathname === location.pathname && link.search === location.search) return;
-      start(boosted ? link : null);
+      if (boosted) return start(link);
+      if (!holds) return start(null);
+      event.preventDefault();
+      var href = link.href;
+      leave(function () { location.href = href; });
     });
     // A form that is sent as a page load, and a boosted one (the toolbar's)
     // that htmx sends. Forms of htmx's own -- a follow, a comment -- change
     // the page they are on and answer for themselves.
-    document.addEventListener("submit", function (event) {
+    window.addEventListener("submit", function (event) {
       var form = event.target;
       if (!form || !form.getAttribute || form.target) return;
       if ((form.getAttribute("method") || "").toLowerCase() === "dialog") return;
@@ -105,7 +136,25 @@
           form.hasAttribute("hx-put") || form.hasAttribute("hx-delete")) return;
       var boosted = form.closest('[hx-boost\\:inherited="true"]') && !form.closest('[hx-boost="false"]');
       if (event.defaultPrevented && !boosted) return;
-      start(boosted ? form : null);
+      if (boosted) return start(form);
+      if (!holds) return start(null);
+      // Sent again by hand once the bar is up. form.submit() leaves out the
+      // button that was pressed, which some forms read, so it goes along as
+      // a field of its own.
+      event.preventDefault();
+      var submitter = event.submitter;
+      leave(function () {
+        var carried = null;
+        if (submitter && submitter.name && form.contains(submitter)) {
+          carried = document.createElement("input");
+          carried.type = "hidden";
+          carried.name = submitter.name;
+          carried.value = submitter.value;
+          form.appendChild(carried);
+        }
+        HTMLFormElement.prototype.submit.call(form);
+        if (carried) setTimeout(function () { if (carried.parentNode) carried.parentNode.removeChild(carried); }, 0);
+      });
     });
     // Back to a page htmx has not kept: it is fetched again.
     document.addEventListener("htmx:before:history:restore", function () {
