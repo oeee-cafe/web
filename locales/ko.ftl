@@ -26,7 +26,7 @@ feed-popular = 인기
 feed-following = 동맹
 feed-communities = 커뮤니티
 feed-recent-empty = 아직 그려진 그림이 없습니다.
-feed-popular-empty = 지난 한 주 동안 그려진 그림이 아직 없습니다. <a href="/">최신</a> 그림을 둘러보세요.
+feed-popular-empty = 지난 6개월 동안 그려진 그림이 아직 없습니다. <a href="/">최신</a> 그림을 둘러보세요.
 feed-following-empty = 동맹이 비어 있습니다. <a href="/communities">커뮤니티</a>에서 다른 사람과 동맹을 맺어 보세요!
 feed-communities-empty = 내 커뮤니티에 새 그림이 없습니다. <a href="/communities">커뮤니티</a>에서 가입할 곳을 찾아보세요!
 
