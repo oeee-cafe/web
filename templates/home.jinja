@@ -1,33 +1,36 @@
 {% extends "base.jinja" %}
 {% block title %}
-  {{ ftl_get_message("brand") }}
+  {% if feed_switch == "recent" %}
+    {{ ftl_get_message("brand") }}
+  {% else %}
+    {{ super() }} | {{ ftl_get_message("feed-" ~ feed_switch) }}
+  {% endif %}
 {% endblock title %}
 {% block head %}
 {% endblock head %}
 {% block content %}
   {% include "post_feed_head.jinja" %}
   <div class="center-wide">
-    {# The public post grid is the whole page: communities and recent comments
-       moved off home. Cards, controls and page chrome are shared with /home so
-       the two feeds stay identical. #}
-    {% if feed.posts and feed.posts|length > 0 %}
-      <section role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
-        {# Short view label rather than naming the visibility rule the query
-           uses. Reuses the key the hashtag and community pages already put
-           above their drawing grids. #}
-        <div class="feed-header">
-          {% if current_user %}
-            {% set feed_switch = "recent" %}
-            {% include "feed_switch.jinja" %}
-          {% else %}
-            <h2 class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
-          {% endif %}
+    {# Home's feeds, all four on this one page: the grid of drawings is the
+       whole of it, and which drawings, in which order, is the switch at its
+       head (feed_switch.jinja). Cards, controls and the infinite scroll are
+       the same for every one; only the query behind `feed` differs
+       (handlers/home.rs, Feed). #}
+    <section role="region" aria-label="{{ ftl_get_message("feed-" ~ feed_switch) }}">
+      <div class="feed-header">
+        {% include "feed_switch.jinja" %}
+        {# Only with drawings to arrange: an empty feed has no columns to set. #}
+        {% if feed.posts and feed.posts|length > 0 %}
           {% include "post_feed_controls.jinja" %}
-        </div>
+        {% endif %}
+      </div>
+      {% if feed.posts and feed.posts|length > 0 %}
         <div class="posts-grid" id="post-feed-grid">
           {% include "post_feed_fragment.jinja" %}
         </div>
-      </section>
-    {% endif %}
+      {% else %}
+        <p>{{ ftl_get_message("feed-" ~ feed_switch ~ "-empty")|safe }}</p>
+      {% endif %}
+    </section>
   </div>
 {% endblock content %}

@@ -1532,6 +1532,169 @@ pub async fn find_public_posts(
         .collect())
 }
 
+/// The public feed's drawings from the past week, the ones the most people
+/// reacted to first -- Home's Popular. The same drawings `find_public_posts`
+/// shows, so the same rules: public or no community, published, not deleted,
+/// sensitive only for a viewer who asked or its author, and no drawings saved
+/// out of a collaborative session. Counted by who reacted rather than by
+/// reactions, so one person's five emoji are one vote. Ties, most often at
+/// nobody at all, go newest first.
+pub async fn find_popular_posts(
+    tx: &mut Transaction<'_, Postgres>,
+    limit: i64,
+    offset: i64,
+    viewer_user_id: Option<Uuid>,
+    viewer_show_sensitive: bool,
+) -> Result<Vec<SerializablePostForHome>> {
+    let result = query!(
+        "
+            SELECT
+                posts.id,
+                posts.title,
+                posts.author_id,
+                users.login_name,
+                images.paint_duration,
+                images.stroke_count,
+                images.image_filename,
+                images.width,
+                images.height,
+                images.replay_filename,
+                posts.viewer_count,
+                (posts.is_sensitive OR posts.is_explicit) AS \"is_sensitive!\",
+                communities.slug AS \"community_slug?\",
+                communities.name AS \"community_name?\",
+                posts.published_at,
+                posts.created_at,
+                posts.updated_at
+            FROM posts
+            LEFT JOIN images ON posts.image_id = images.id
+            LEFT JOIN communities ON posts.community_id = communities.id
+            LEFT JOIN users ON posts.author_id = users.id
+            WHERE (communities.visibility = 'public' OR posts.community_id IS NULL)
+            AND posts.parent_post_id IS NULL
+            AND posts.published_at IS NOT NULL
+            AND posts.published_at > now() - interval '7 days'
+            AND posts.deleted_at IS NULL
+            AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $3 = true OR posts.author_id = $4)
+            AND NOT EXISTS (
+                SELECT 1 FROM collaborative_sessions cs WHERE cs.saved_post_id = posts.id
+            )
+            ORDER BY (
+                SELECT count(DISTINCT reactions.actor_id) FROM reactions WHERE reactions.post_id = posts.id
+            ) DESC, posts.published_at DESC, posts.id
+            LIMIT $1
+            OFFSET $2
+        ",
+        limit,
+        offset,
+        viewer_show_sensitive,
+        viewer_user_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(result
+        .into_iter()
+        .map(|row| SerializablePostForHome {
+            id: row.id,
+            title: row.title,
+            author_id: row.author_id,
+            user_login_name: row.login_name,
+            paint_duration: row.paint_duration.microseconds.to_string(),
+            stroke_count: row.stroke_count,
+            image_filename: row.image_filename,
+            image_width: row.width,
+            image_height: row.height,
+            replay_filename: row.replay_filename,
+            is_sensitive: row.is_sensitive,
+            community_slug: row.community_slug,
+            community_name: row.community_name,
+            viewer_count: row.viewer_count,
+            published_at: row.published_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        })
+        .collect())
+}
+
+/// New drawings in the communities the viewer is a member of -- Home's
+/// Communities. Whatever the community's visibility, since a member reads its
+/// drawings on its own page anyway; otherwise the public feed's rules, newest
+/// first.
+pub async fn find_member_community_posts(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    viewer_show_sensitive: bool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<SerializablePostForHome>> {
+    let result = query!(
+        "
+            SELECT
+                posts.id,
+                posts.title,
+                posts.author_id,
+                users.login_name,
+                images.paint_duration,
+                images.stroke_count,
+                images.image_filename,
+                images.width,
+                images.height,
+                images.replay_filename,
+                posts.viewer_count,
+                (posts.is_sensitive OR posts.is_explicit) AS \"is_sensitive!\",
+                communities.slug AS \"community_slug?\",
+                communities.name AS \"community_name?\",
+                posts.published_at,
+                posts.created_at,
+                posts.updated_at
+            FROM posts
+            JOIN community_members
+                ON community_members.community_id = posts.community_id
+                AND community_members.user_id = $1
+            LEFT JOIN images ON posts.image_id = images.id
+            LEFT JOIN communities ON posts.community_id = communities.id
+            LEFT JOIN users ON posts.author_id = users.id
+            WHERE posts.parent_post_id IS NULL
+            AND posts.published_at IS NOT NULL
+            AND posts.deleted_at IS NULL
+            AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $2 = true OR posts.author_id = $1)
+            AND NOT EXISTS (
+                SELECT 1 FROM collaborative_sessions cs WHERE cs.saved_post_id = posts.id
+            )
+            ORDER BY posts.published_at DESC
+            LIMIT $3 OFFSET $4
+        ",
+        user_id,
+        viewer_show_sensitive,
+        limit,
+        offset
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(result
+        .into_iter()
+        .map(|row| SerializablePostForHome {
+            id: row.id,
+            title: row.title,
+            author_id: row.author_id,
+            user_login_name: row.login_name,
+            paint_duration: row.paint_duration.microseconds.to_string(),
+            stroke_count: row.stroke_count,
+            image_filename: row.image_filename,
+            image_width: row.width,
+            image_height: row.height,
+            replay_filename: row.replay_filename,
+            is_sensitive: row.is_sensitive,
+            community_slug: row.community_slug,
+            community_name: row.community_name,
+            viewer_count: row.viewer_count,
+            published_at: row.published_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        })
+        .collect())
+}
+
 /// Finished collaborative drawings — the posts saved sessions turned into.
 /// Same shape as `find_public_posts`, so the collaborate lobby renders through
 /// the shared feed card and paginates through the shared sentinel.
