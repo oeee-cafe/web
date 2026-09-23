@@ -1,0 +1,147 @@
+{# What a store gives an app, handed to the page, which tells the site.
+
+   An app can do what only a store can -- sell through StoreKit, ask Steam
+   for a ticket -- and nothing else: which of the site's addresses hears
+   about it, in what shape, what its answers mean, and what the page does
+   after are all here. Neither app knows a route of the site's.
+
+   window.oeeeApp.store.purchased(ids)
+            iOS and macOS, after a sale, a Restore, or finding transactions
+            StoreKit has not seen finished (supporter.jinja asks for these
+            with `purchase`, `restore` and `prices` on the bridge). `ids` are
+            StoreKit transaction ids, as strings. Each is posted to
+            /auth/apple/purchase, which asks Apple about it itself
+            (src/app_store.rs) -- nothing the page or the app says records a
+            purchase. The promise answers with the ids the site took, and
+            the app finishes those and only those: anything else stays
+            unfinished and is offered again the next time /supporter asks
+            for prices. The page reloads once, after answering, if the site
+            took any.
+   window.oeeeApp.store.prices(prices)
+            supporter.jinja: what each product costs, in the store's words.
+
+   The Steam app (Windows, marked data-steam-app):
+   steamTicket {}
+            On the bridge: the page needs a Web API ticket
+            (GetAuthTicketForWebApi, identity "oeee-cafe"). The app answers
+            with window.oeeeApp.steam.ticket(hex), or ticket(null) when
+            Steam would not give one.
+   window.oeeeApp.steam.dlcInstalled()
+            Steam says a DLC was installed -- a Supporter Pack, bought in the
+            overlay or the store while the app was open. The page asks for a
+            ticket and posts it to /auth/steam/refresh, which asks Steam what
+            the account owns (src/steam.rs), and shows /supporter again if
+            that is where it is.
+
+   And "Sign in with Steam" (login.jinja, account.jinja): the page takes
+   the press itself, asks for a ticket, and posts it to /auth/steam as the
+   form a browser has no way to fill in. #}
+<script>
+  (function () {
+    var app = window.oeeeApp;
+    if (!app) return;
+
+    function form(fields) {
+      var body = new URLSearchParams();
+      for (var name in fields) {
+        if (fields[name]) body.set(name, fields[name]);
+      }
+      return body.toString();
+    }
+
+    // -- StoreKit -----------------------------------------------------------
+
+    app.store = app.store || {};
+    app.store.purchased = function (ids) {
+      var list = Array.isArray(ids) ? ids.filter(function (id) { return typeof id === "string" && id; }) : [];
+      return Promise.all(list.map(function (id) {
+        return fetch("/auth/apple/purchase", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form({ transaction_id: id })
+        }).then(function (response) {
+          // A plain yes only. Nobody signed in (401), too many at once (429)
+          // and Apple out of reach (502) are all worth offering again, so
+          // none of them lets the app finish the transaction.
+          return response.status === 204 ? id : null;
+        }, function () {
+          return null;
+        });
+      })).then(function (answers) {
+        var taken = answers.filter(Boolean);
+        // After the answer has gone back, so the app hears it before the
+        // page it came from goes away.
+        if (taken.length) setTimeout(function () { location.reload(); }, 0);
+        return taken;
+      });
+    };
+
+    // -- Steam --------------------------------------------------------------
+
+    if (!document.documentElement.hasAttribute("data-steam-app")) return;
+
+    // Who is waiting for a ticket. One ticket answers all of them: a Web API
+    // ticket is good for as many checks as are made while it is fresh.
+    var waiting = [];
+    function withTicket(then) {
+      waiting.push(then);
+      if (waiting.length === 1 && !app.post("steamTicket", {}, true)) app.steam.ticket(null);
+    }
+
+    app.steam = {
+      ticket: function (hex) {
+        var callbacks = waiting;
+        waiting = [];
+        for (var i = 0; i < callbacks.length; i++) callbacks[i](typeof hex === "string" && hex ? hex : null);
+      },
+      dlcInstalled: function () {
+        withTicket(function (ticket) {
+          if (!ticket) return;
+          fetch("/auth/steam/refresh", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: form({ ticket: ticket })
+          }).then(function (response) {
+            if (response.ok && location.pathname === "/supporter") location.reload();
+          }, function () {});
+        });
+      }
+    };
+
+    var FAILED = {{ ftl_get_message("app-steam-sign-in-failed")|tojson }};
+
+    // The page's Steam buttons are links to /auth/steam/app, which a browser
+    // follows to be told only the Steam app can sign in that way.
+    document.addEventListener("click", function (event) {
+      if (event.defaultPrevented || event.button !== 0) return;
+      var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+      if (!link || link.origin !== new URL(document.baseURI).origin || link.pathname !== "/auth/steam/app") return;
+      event.preventDefault();
+      var next = new URL(link.href).searchParams.get("next");
+      withTicket(function (ticket) {
+        if (!ticket) {
+          window.alert(FAILED);
+          return;
+        }
+        // Posted as a form, so the site's answer is a page and its notices
+        // come with it, as they would from any sign-in.
+        var post = document.createElement("form");
+        post.method = "post";
+        post.action = "/auth/steam";
+        var fields = { ticket: ticket, next: next };
+        for (var name in fields) {
+          if (!fields[name]) continue;
+          var input = document.createElement("input");
+          input.type = "hidden";
+          input.name = name;
+          input.value = fields[name];
+          post.appendChild(input);
+        }
+        document.body.appendChild(post);
+        post.submit();
+      });
+    }, true);
+  })();
+</script>

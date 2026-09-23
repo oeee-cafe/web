@@ -47,8 +47,7 @@
             of NEO's colours in step with this one. Null on a page without
             the design system's stylesheet.
    words    {leaveTitle, leaveBody, leave, stay, ok, cancel, saveImage,
-             copyImage, share, copyLink, savedImage, savedFile, saveFailed,
-             steamSignInFailed}
+             copyImage, share, copyLink, savedImage, savedFile, saveFailed}
             What an app says in dialogs and menus of its own over the page
             -- the leave prompt, the long press on a drawing, the right-click
             menu -- in the page's language, from the site's catalogues
@@ -70,7 +69,7 @@
    prices   {store, products}
             What these cost, asked as /supporter opens: `products` are the
             App Store product ids or Steam app ids on the page. The app
-            answers by calling oeeeApp.storePrices({product: price}) with
+            answers by calling oeeeApp.store.prices({product: price}) with
             the store's own formatted strings -- StoreKit's `displayPrice`,
             Steam's `price_overview.final_formatted` -- in the reader's
             currency, which only the store knows. It may call it again when
@@ -80,18 +79,21 @@
             Sell this year's Supporter Pack, pressed on /supporter:
             `store` is "apple" or "steam", `product` the App Store product
             id or the Steam app id of that year's pack. The app sells it and
-            posts what it got back to the site --
-            /auth/apple/purchase with the StoreKit transaction id, or
-            /auth/steam/refresh with a Web API ticket -- and reloads the
-            page when the site answers. Nothing the page says records a
-            purchase; the site asks the store itself (src/app_store.rs,
-            src/steam.rs).
+            hands the store's answer back to the page -- the StoreKit
+            transaction to oeeeApp.store.purchased, or on Steam, a DLC
+            installed to oeeeApp.steam.dlcInstalled -- which tells the site
+            (app_store.jinja). Nothing the page says records a purchase; the
+            site asks the store itself (src/app_store.rs, src/steam.rs).
    restore  {}
             The same, for a purchase already made: StoreKit hands the
-            transaction over again and the app posts it to the same place.
-            It gives a pack back to whoever is signed in and never makes a
-            second one. Steam needs none of this -- it says what an account
-            owns every time it is asked.
+            transactions over again, and the app hands them to the page the
+            same way. It gives a pack back to whoever is signed in and never
+            makes a second one. Steam needs none of this -- it says what an
+            account owns every time it is asked.
+   steamTicket {}
+            The Steam app: a Web API ticket, for signing in or for asking
+            Steam what the account owns, answered with
+            oeeeApp.steam.ticket(hex | null) (app_store.jinja).
    signIn   {provider, nonce}
    browse   {url}
             A sign-in the page is carrying for an app that stopped the link
@@ -146,7 +148,11 @@
                              app_sign_in.jinja
      command(name)           toolbar.jinja: the site's menu commands and keys,
                              true when the page knew the name
-     storePrices(prices)     supporter.jinja
+     store.prices(prices)    supporter.jinja
+     store.purchased(ids)    app_store.jinja: StoreKit transaction ids,
+                             answered with the ids the site took
+     steam.ticket(hex), steam.dlcInstalled()
+                             app_store.jinja, in the Steam app
      painter.command(name), painter.preferPen()
                              frontend/shared/appBridge.ts, on a drawing page
 
@@ -242,8 +248,7 @@
       copyLink: {{ ftl_get_message("app-copy-link")|tojson }},
       savedImage: {{ ftl_get_message("app-saved-image")|tojson }},
       savedFile: {{ ftl_get_message("app-saved-file")|tojson }},
-      saveFailed: {{ ftl_get_message("app-save-failed")|tojson }},
-      steamSignInFailed: {{ ftl_get_message("app-steam-sign-in-failed")|tojson }}
+      saveFailed: {{ ftl_get_message("app-save-failed")|tojson }}
     };
 
     function report() {

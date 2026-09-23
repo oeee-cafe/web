@@ -1163,7 +1163,10 @@ mod template_tests {
     #[test]
     fn the_apps_are_given_their_words_in_every_language() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let bridge = std::fs::read_to_string(root.join("templates/app_bridge.jinja")).unwrap();
+        // app_store.jinja says the one thing the page says for the Steam app.
+        let bridge = ["app_bridge.jinja", "app_store.jinja"]
+            .map(|name| std::fs::read_to_string(root.join("templates").join(name)).unwrap())
+            .join("\n");
         let ids: Vec<&str> = bridge
             .split("ftl_get_message(\"")
             .skip(1)
@@ -1314,7 +1317,7 @@ mod template_tests {
         };
 
         let off = render(false, json!(null));
-        assert!(!off.contains("/auth/steam/app"));
+        assert!(!off.contains(r#"href="/auth/steam/app"#));
         assert!(!off.contains("identity-login-notice"));
 
         let on = render(true, json!(null));
@@ -1326,7 +1329,7 @@ mod template_tests {
         let linking = render(true, json!("Steam"));
         assert!(linking.contains("identity-login-notice(provider=Steam)"));
         assert!(linking.contains(r#"action="/auth/cancel""#));
-        assert!(!linking.contains("/auth/steam/app"));
+        assert!(!linking.contains(r#"href="/auth/steam/app"#));
     }
 
     #[test]
@@ -1343,12 +1346,12 @@ mod template_tests {
                 })
                 .expect("login renders")
         };
-        assert!(!render(false, json!(null)).contains("/auth/apple"));
+        assert!(!render(false, json!(null)).contains(r#"href="/auth/apple"#));
         let on = render(true, json!(null));
         assert!(on.contains("auth-apple"));
         assert!(on.contains("/auth/apple?next="));
         assert!(on.contains("sign-in-with-apple"));
-        assert!(!render(true, json!("Apple")).contains("/auth/apple"));
+        assert!(!render(true, json!("Apple")).contains(r#"href="/auth/apple"#));
     }
 
     #[test]
@@ -1365,12 +1368,12 @@ mod template_tests {
                 })
                 .expect("login renders")
         };
-        assert!(!render(false, json!(null)).contains("/auth/google"));
+        assert!(!render(false, json!(null)).contains(r#"href="/auth/google"#));
         let on = render(true, json!(null));
         assert!(on.contains("auth-google"));
         assert!(on.contains("/auth/google?next="));
         assert!(on.contains("sign-in-with-google"));
-        assert!(!render(true, json!("Google")).contains("/auth/google"));
+        assert!(!render(true, json!("Google")).contains(r#"href="/auth/google"#));
     }
 
     /// Apple's answer, posted on from this site: every field it carried, as
@@ -1516,7 +1519,7 @@ mod template_tests {
         assert!(squashed
             .contains(r#"<span class="supporter-price" data-product="cafe.oeee.supporter.2026"></span>"#));
         assert!(squashed.contains(r#"<span class="supporter-price" data-product="481"></span>"#));
-        assert!(both.contains("window.oeeeApp.storePrices = "));
+        assert!(both.contains("(app.store = app.store || {}).prices = "));
 
         // Nothing for this year yet: the page says so instead.
         let nothing = render(
