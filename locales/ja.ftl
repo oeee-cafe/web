@@ -19,7 +19,7 @@ theme-system = システム
 keyboard-shortcuts = キーボードショートカット
 keyboard-shortcuts-show = キーボードショートカットを表示
 keyboard-shortcuts-then = の次に
-nav-recent = 新着
+nav-home = ホーム
 timeline = タイムライン
 timeline-my = 私のタイムライン
 timeline-empty = タイムラインが空です。 <a href="/communities">コミュニティ</a>で他の人と同盟を結びましょう！

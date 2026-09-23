@@ -64,7 +64,7 @@
        they take a second row of the bar, sharing its width. #}
     <div class="toolbar-links">
       <div class="toolbar-sections">
-        <a href="/">{{ ftl_get_message("nav-recent") }}</a>
+        <a href="/">{{ ftl_get_message("nav-home") }}</a>
         {% if current_user %}
           <a href="/home">{{ ftl_get_message("timeline") }}</a>
         {% endif %}
@@ -236,7 +236,7 @@
           <dt><kbd>N</kbd></dt><dd>{{ ftl_get_message("draw") }}</dd>
         {% endif %}
         <dt><kbd>/</kbd></dt><dd>{{ ftl_get_message("search") }}</dd>
-        <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>R</kbd></dt><dd>{{ ftl_get_message("nav-recent") }}</dd>
+        <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>R</kbd></dt><dd>{{ ftl_get_message("nav-home") }}</dd>
         {% if current_user %}
           <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>F</kbd></dt><dd>{{ ftl_get_message("timeline") }}</dd>
         {% endif %}
