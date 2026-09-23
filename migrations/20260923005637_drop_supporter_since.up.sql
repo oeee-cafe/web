@@ -1,0 +1,12 @@
+-- The second half of 20260922222603_add_supporter_purchases, a deploy later.
+--
+-- Standing moved to supporter_purchases, which holds a year and an account
+-- rather than an identity and a timestamp. This column was left behind on
+-- purpose: the release serving while that one booted still read it on every
+-- page it rendered, and both colours serve during a deploy. It has been
+-- stale ever since -- nothing has written it since that release went out --
+-- and nothing reads it now, so it goes.
+--
+-- supporter_checked_at stays. It is when Steam was last asked about that
+-- account, and the recheck still works through it (models::supporter).
+ALTER TABLE user_identities DROP COLUMN supporter_since;
