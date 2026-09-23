@@ -54,8 +54,7 @@ use crate::web::handlers::devices::{
     delete_device_handler, list_devices_handler, register_device_handler,
 };
 use crate::web::handlers::draw::{
-    banner_draw_finish, draw_finish, start_banner_draw, start_banner_draw_mobile, start_draw,
-    start_draw_get, start_draw_mobile,
+    banner_draw_finish, draw_finish, start_banner_draw, start_draw, start_draw_get,
 };
 use crate::web::handlers::tag::{
     tag_autocomplete, tag_cards, tag_discovery, tag_view, load_more_tag_posts,
@@ -312,7 +311,6 @@ impl App {
                 post(do_post_edit_community),
             )
             .route("/banners/draw", get(start_banner_draw))
-            .route("/banners/draw/mobile", get(start_banner_draw_mobile))
             .route("/banners/draw/finish", post(banner_draw_finish))
             .route("/posts/:id/publish", get(post_publish_form))
             .route("/@:login_name/follow", post(do_follow_profile))
@@ -415,7 +413,6 @@ impl App {
             // uploading it (/draw/finish) is still for someone signed in.
             .route("/draw", get(start_draw_get))
             .route("/draw", post(start_draw))
-            .route("/draw/mobile", post(start_draw_mobile))
             .route("/posts/drafts", get(draft_posts))
             .route("/health", get(health))
             .route("/robots.txt", get(robots_txt))

@@ -45,41 +45,6 @@ interface OeeePainterConfig {
   mode: PainterMode;
 }
 
-interface NativeMessage {
-  type: string;
-  [key: string]: unknown;
-}
-
-declare global {
-  interface Window {
-    webkit?: {
-      messageHandlers?: {
-        oeee?: { postMessage(message: NativeMessage): void };
-      };
-    };
-    OeeeCafe?: { postMessage(message: string): void };
-  }
-}
-
-// The hand-off to the native painter screens of the apps before they became
-// web views (oeee-cafe-apple before e1846e7, oeee-cafe-android before
-// 43ee094), which opened this page in a web view of their own and took over
-// once it was saved. Builds of those are still installed; nothing current
-// registers either name, so for everyone else this is a plain page load.
-function nativeAvailable(): boolean {
-  return Boolean(
-    window.webkit?.messageHandlers?.oeee || window.OeeeCafe?.postMessage,
-  );
-}
-
-function postNative(message: NativeMessage): void {
-  if (window.webkit?.messageHandlers?.oeee) {
-    window.webkit.messageHandlers.oeee.postMessage(message);
-  } else if (window.OeeeCafe?.postMessage) {
-    window.OeeeCafe.postMessage(JSON.stringify(message));
-  }
-}
-
 /** The page's words for what saving says, rendered by the server. */
 interface PainterWords {
   guestSaveConfirm: string;
@@ -120,20 +85,9 @@ async function submitBanner(
   form.append("paint_duration_ms", String(Date.now() - startedAt));
   form.append("security_count", String(snapshot.strokeCount));
 
-  const result = await postDrawing<{ banner_id: string; image_url: string }>(
-    "/banners/draw/finish",
-    form,
-  );
+  await postDrawing<{ banner_id: string }>("/banners/draw/finish", form);
   onSaved();
-  if (nativeAvailable()) {
-    postNative({
-      type: "banner_complete",
-      bannerId: result.banner_id,
-      imageUrl: result.image_url,
-    });
-  } else {
-    window.location.href = profileUrl;
-  }
+  window.location.href = profileUrl;
 }
 
 /**
@@ -184,16 +138,7 @@ async function submitPost(
   if (kept) await deleteLocalDraft(draft.id).catch(console.error);
 
   onPosted();
-  if (nativeAvailable()) {
-    postNative({
-      type: "drawing_complete",
-      postId: result.post_id,
-      communityId: result.community_id,
-      imageUrl: result.image_url,
-    });
-  } else {
-    window.location.href = `/posts/${result.post_id}/publish`;
-  }
+  window.location.href = `/posts/${result.post_id}/publish`;
   return { draft, kept, posted: true };
 }
 
