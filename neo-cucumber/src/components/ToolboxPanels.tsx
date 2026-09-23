@@ -2,6 +2,12 @@ import React, { useLayoutEffect, useState } from "react";
 import { ToolboxPanel, type ToolboxPanelProps } from "./ToolboxPanel";
 import { NeoLayersPanel } from "./NeoLayersPanel";
 import {
+  NeoPalettePresetsPanel,
+  PALETTE_PRESETS_WIDTH,
+} from "./NeoPalettePresetsPanel";
+import type { ResolvedPalettePreset } from "../hooks/usePalettePresets";
+import { windowBounds } from "../utils/windowDrag";
+import {
   anchorTo,
   minimumTop,
   PANEL_MARGIN,
@@ -15,7 +21,14 @@ import {
  * each is its own draggable window and clamps itself into the viewport.
  */
 export interface ToolboxPanelsProps
-  extends Omit<ToolboxPanelProps, "section" | "initialPosition" | "minimumY"> {
+  extends Omit<
+    ToolboxPanelProps,
+    | "section"
+    | "initialPosition"
+    | "minimumY"
+    | "palettePresetsOpen"
+    | "onTogglePalettePresets"
+  > {
   /** The painter's area: what the panels are kept inside. */
   anchorRef?: React.RefObject<HTMLElement | null>;
   /** The drawing itself, which is what they open beside. */
@@ -35,6 +48,41 @@ export interface ToolboxPanelsProps
   drawThumbnail?: (actorId: string, target: HTMLCanvasElement) => void;
   /** The drawing's shape, so the thumbnails share it. */
   canvasAspect?: number;
+  /** Whole palettes to offer; none leaves the button out. */
+  palettePresets?: readonly ResolvedPalettePreset[];
+  /** Replaces all fourteen swatches, as `Neo.setColors` does. */
+  onApplyPalette?: (colors: string[]) => void;
+}
+
+/**
+ * Where the palettes window opens: beside the two columns, on the side away
+ * from the drawing if there is room, since the point of opening it is to
+ * watch the swatches and the drawing change together.
+ *
+ * Measured against both columns rather than the extras one it is opened from,
+ * which would put it on top of NEO's swatches when the columns stand side by
+ * side -- the very swatches it recolours.
+ */
+function paletteWindowOrigin(): { x: number; y: number } {
+  const bounds = windowBounds();
+  const columns = [".toolbox-neo", ".toolbox-extras"]
+    .map((selector) => document.querySelector(selector)?.getBoundingClientRect())
+    .filter((rect): rect is DOMRect => rect !== undefined);
+  if (columns.length === 0) return { x: PANEL_MARGIN, y: PANEL_MARGIN };
+  const left = Math.min(...columns.map((rect) => rect.left));
+  const right = Math.max(...columns.map((rect) => rect.right));
+  const top = Math.min(...columns.map((rect) => rect.top));
+  const width = PALETTE_PRESETS_WIDTH + 8;
+  const onLeft = (left + right) / 2 < bounds.width / 2;
+  const outside = onLeft ? left - PANEL_MARGIN - width : right + PANEL_MARGIN;
+  const inside = onLeft ? right + PANEL_MARGIN : left - PANEL_MARGIN - width;
+  const fits = (x: number) => x >= 0 && x + width <= bounds.width;
+  const x = fits(outside)
+    ? outside
+    : fits(inside)
+      ? inside
+      : Math.max(0, bounds.width - width);
+  return { x, y: top };
 }
 
 export function ToolboxPanels({
@@ -44,8 +92,20 @@ export function ToolboxPanels({
   layersOrigin,
   drawThumbnail,
   canvasAspect,
+  palettePresets,
+  onApplyPalette,
   ...shared
 }: ToolboxPanelsProps) {
+  /** Where the palettes window is, when it is open. */
+  const [paletteOrigin, setPaletteOrigin] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const offerPresets =
+    palettePresets !== undefined && palettePresets.length > 0 && onApplyPalette !== undefined;
+  const togglePalettePresets = offerPresets
+    ? () => setPaletteOrigin((open) => (open ? null : paletteWindowOrigin()))
+    : undefined;
+
   const [positions, setPositions] = useState<PanelPositions | null>(
     origin
       ? {
@@ -136,7 +196,18 @@ export function ToolboxPanels({
         section="extras"
         initialPosition={positions.extras}
         minimumY={ceiling}
+        palettePresetsOpen={paletteOrigin !== null}
+        onTogglePalettePresets={togglePalettePresets}
       />
+      {offerPresets && paletteOrigin && (
+        <NeoPalettePresetsPanel
+          presets={palettePresets}
+          paletteColors={shared.paletteColors}
+          onApply={onApplyPalette}
+          initialPosition={paletteOrigin}
+          minimumY={ceiling}
+        />
+      )}
       {shared.participantLayers &&
         shared.participantLayers.length > 0 &&
         layersTop !== null &&

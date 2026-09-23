@@ -64,6 +64,10 @@ export interface ToolboxPanelProps {
   /** NEO's Right Click button: whether the next press is a right press. */
   virtualRight?: boolean;
   onToggleVirtualRight?: () => void;
+  /** Whether the palette presets window is open; see `NeoPalettePresetsPanel`. */
+  palettePresetsOpen?: boolean;
+  /** Absent when there are no presets to offer, which hides the button. */
+  onTogglePalettePresets?: () => void;
   /**
    * Everyone with a layer pair, top of the stack first. Absent outside a
    * collaborative session, where there is only ever one participant.
@@ -110,6 +114,8 @@ export const ToolboxPanel = ({
   onSaveCollaborativeDrawing,
   virtualRight,
   onToggleVirtualRight,
+  palettePresetsOpen = false,
+  onTogglePalettePresets,
   section = "all",
   initialPosition,
   minimumY = 0,
@@ -241,6 +247,24 @@ export const ToolboxPanel = ({
               aria-label={t`Pick a colour`}
               className={NEO_COLOR_INPUT}
             />
+
+            {/*
+              Preset palettes, which NEO leaves to the board around it --
+              POTI-board lists them beside the painter. They open in a window
+              of their own, since a list of names will not fit in 50px.
+            */}
+            {onTogglePalettePresets && (
+              <button
+                type="button"
+                onClick={onTogglePalettePresets}
+                aria-pressed={palettePresetsOpen}
+                title={t`Palettes`}
+                aria-label={t`Palettes`}
+                className={`${NEO_PANEL_BUTTON} ${palettePresetsOpen ? NEO_BUTTON_ON : ""}`}
+              >
+                <Icon icon="material-symbols:palette" width={14} height={14} />
+              </button>
+            )}
 
             {/* Undo and redo. NEO puts these in the bar above the canvas. */}
             <div className="grid grid-cols-2 gap-[2px]">

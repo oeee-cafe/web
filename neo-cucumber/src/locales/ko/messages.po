@@ -45,11 +45,26 @@ msgctxt "painter tool"
 msgid "Bezier"
 msgstr "베지어"
 
+#: src/constants/palettePresets.ts:91
+msgctxt "palette preset"
+msgid "blue"
+msgstr "파랑"
+
 #. NEO ぼかし
 #: src/neo/labels.ts:57
 msgctxt "painter tool"
 msgid "Blur"
 msgstr "흐리기"
+
+#: src/components/NeoPalettePresetsPanel.tsx:97
+msgctxt "palette effect"
+msgid "Bright"
+msgstr "밝게"
+
+#: src/constants/palettePresets.ts:103
+msgctxt "palette preset"
+msgid "character"
+msgstr "캐릭터"
 
 #. NEO 全消し, erase the layer
 #: src/neo/labels.ts:75
@@ -73,10 +88,20 @@ msgctxt "painter tool"
 msgid "Dark"
 msgstr "어둡게"
 
+#: src/components/NeoPalettePresetsPanel.tsx:98
+msgctxt "palette effect"
+msgid "Dark"
+msgstr "어둡게"
+
 #: src/components/SimplifiedToolbox.tsx:221
 #: src/components/ToolboxPanel.tsx:333
 #~ msgid "Dark"
 #~ msgstr "다크"
+
+#: src/constants/palettePresets.ts:71
+msgctxt "palette preset"
+msgid "Default"
+msgstr "기본"
 
 #. NEO 逆加算
 #: src/neo/labels.ts:93
@@ -99,8 +124,8 @@ msgctxt "painter tool"
 msgid "Fill"
 msgstr "채우기"
 
-#: src/components/ToolboxPanel.tsx:178
-#: src/components/ToolboxPanel.tsx:179
+#: src/components/ToolboxPanel.tsx:184
+#: src/components/ToolboxPanel.tsx:185
 msgid "Fit canvas"
 msgstr "캔버스 맞추기"
 
@@ -128,6 +153,36 @@ msgctxt "painter tool"
 msgid "Freehan"
 msgstr "자유선"
 
+#: src/components/NeoPalettePresetsPanel.tsx:203
+msgctxt "palette window"
+msgid "GRADATION"
+msgstr "그라데이션"
+
+#: src/components/NeoPalettePresetsPanel.tsx:211
+#: src/components/NeoPalettePresetsPanel.tsx:212
+msgid "Gradation end"
+msgstr "그라데이션 끝"
+
+#: src/components/NeoPalettePresetsPanel.tsx:207
+#: src/components/NeoPalettePresetsPanel.tsx:208
+msgid "Gradation start"
+msgstr "그라데이션 시작"
+
+#: src/constants/palettePresets.ts:111
+msgctxt "palette preset"
+msgid "grass"
+msgstr "풀밭"
+
+#: src/constants/palettePresets.ts:119
+msgctxt "palette preset"
+msgid "grayscale"
+msgstr "회색조"
+
+#: src/constants/palettePresets.ts:87
+msgctxt "palette preset"
+msgid "green"
+msgstr "초록"
+
 #. NEO トーン
 #: src/neo/labels.ts:56
 msgctxt "painter tool"
@@ -142,6 +197,11 @@ msgstr "{0}의 레이어 숨기기"
 #: src/components/neo/NeoParticipantLayers.tsx:127
 msgid "Hide these layers"
 msgstr "이 레이어 숨기기"
+
+#: src/components/NeoPalettePresetsPanel.tsx:99
+msgctxt "palette effect"
+msgid "Invert"
+msgstr "반전"
 
 #. NEO Layer0
 #: src/neo/labels.ts:105
@@ -206,11 +266,32 @@ msgstr "일반"
 msgid "Off"
 msgstr "끄기"
 
+#: src/components/NeoPalettePresetsPanel.tsx:222
+msgctxt "palette window"
+msgid "Ok"
+msgstr "확인"
+
+#: src/constants/palettePresets.ts:83
+msgctxt "palette preset"
+msgid "orange"
+msgstr "주황"
+
 #. NEO 楕円, the filled ellipse
 #: src/neo/labels.ts:63
 msgctxt "painter tool"
 msgid "Oval"
 msgstr "타원"
+
+#: src/components/NeoPalettePresetsPanel.tsx:160
+msgctxt "palette window"
+msgid "PALETTE"
+msgstr "팔레트"
+
+#: src/components/NeoPalettePresetsPanel.tsx:169
+#: src/components/ToolboxPanel.tsx:261
+#: src/components/ToolboxPanel.tsx:262
+msgid "Palettes"
+msgstr "팔레트"
 
 #: src/neo/labels.ts:84
 msgctxt "painter tool"
@@ -222,18 +303,28 @@ msgctxt "painter tool"
 msgid "Paste"
 msgstr "붙여넣기"
 
+#: src/constants/palettePresets.ts:107
+msgctxt "palette preset"
+msgid "pastel"
+msgstr "파스텔"
+
 #: src/components/SimplifiedToolbox.tsx:87
 msgid "Pen size"
 msgstr "펜 크기"
 
-#: src/components/ToolboxPanel.tsx:240
-#: src/components/ToolboxPanel.tsx:241
+#: src/components/ToolboxPanel.tsx:246
+#: src/components/ToolboxPanel.tsx:247
 msgid "Pick a colour"
 msgstr "색 선택"
 
-#: src/components/ToolboxPanel.tsx:306
+#: src/components/ToolboxPanel.tsx:330
 msgid "Pick a colour from the drawing with the next click"
 msgstr "다음 클릭으로 그림에서 색을 가져옵니다"
+
+#: src/constants/palettePresets.ts:95
+msgctxt "palette preset"
+msgid "purple"
+msgstr "보라"
 
 #. NEO 四角, the filled rectangle
 #: src/neo/labels.ts:61
@@ -241,9 +332,14 @@ msgctxt "painter tool"
 msgid "Rect"
 msgstr "사각"
 
+#: src/constants/palettePresets.ts:79
+msgctxt "palette preset"
+msgid "red"
+msgstr "빨강"
+
 #: src/components/SimplifiedToolbox.tsx:89
 #: src/components/SimplifiedToolbox.tsx:199
-#: src/components/ToolboxPanel.tsx:260
+#: src/components/ToolboxPanel.tsx:284
 msgid "Redo"
 msgstr "다시 실행"
 
@@ -257,11 +353,11 @@ msgctxt "painter mask mode"
 msgid "ReMask"
 msgstr "역마스크"
 
-#: src/components/ToolboxPanel.tsx:209
+#: src/components/ToolboxPanel.tsx:215
 msgid "Reset zoom"
 msgstr "확대 초기화"
 
-#: src/components/ToolboxPanel.tsx:307
+#: src/components/ToolboxPanel.tsx:331
 msgid "Right click"
 msgstr "오른쪽 클릭"
 
@@ -271,13 +367,23 @@ msgctxt "painter tool"
 msgid "rotate"
 msgstr "기울이기"
 
-#: src/components/ToolboxPanel.tsx:344
+#: src/constants/palettePresets.ts:115
+msgctxt "palette preset"
+msgid "sakura"
+msgstr "벚꽃"
+
+#: src/components/ToolboxPanel.tsx:368
 msgid "Save"
 msgstr "저장"
 
-#: src/components/ToolboxPanel.tsx:332
+#: src/components/ToolboxPanel.tsx:356
 msgid "Save drawing to gallery"
 msgstr "그림을 갤러리에 저장"
+
+#: src/constants/palettePresets.ts:99
+msgctxt "palette preset"
+msgid "sepia"
+msgstr "세피아"
 
 #: src/components/SimplifiedToolbox.tsx:206
 msgid "Shortcuts"
@@ -291,6 +397,11 @@ msgstr "{0}의 레이어 표시"
 #: src/components/neo/NeoParticipantLayers.tsx:127
 msgid "Show these layers"
 msgstr "이 레이어 표시"
+
+#: src/constants/palettePresets.ts:75
+msgctxt "palette preset"
+msgid "skin"
+msgstr "피부"
 
 #. NEO 鉛筆
 #: src/neo/labels.ts:52
@@ -318,7 +429,8 @@ msgctxt "painter tool"
 msgid "Text"
 msgstr "텍스트"
 
-#: src/Painter.tsx:999
+#: src/Painter.tsx:1035
+#: src/Painter.tsx:1036
 msgid "Time's up."
 msgstr "설정한 시간이 지났습니다."
 
@@ -330,13 +442,13 @@ msgstr "타이머"
 msgid "Timer off"
 msgstr "타이머 꺼짐"
 
-#: src/components/ToolboxPanel.tsx:222
+#: src/components/ToolboxPanel.tsx:228
 msgid "Toggle horizontal flip"
 msgstr "좌우 반전 전환"
 
 #: src/components/SimplifiedToolbox.tsx:88
 #: src/components/SimplifiedToolbox.tsx:191
-#: src/components/ToolboxPanel.tsx:251
+#: src/components/ToolboxPanel.tsx:275
 msgid "Undo"
 msgstr "실행 취소"
 
@@ -358,10 +470,10 @@ msgctxt "painter tool"
 msgid "WhiteRe"
 msgstr "사각지움"
 
-#: src/components/ToolboxPanel.tsx:201
+#: src/components/ToolboxPanel.tsx:207
 msgid "Zoom in"
 msgstr "확대"
 
-#: src/components/ToolboxPanel.tsx:193
+#: src/components/ToolboxPanel.tsx:199
 msgid "Zoom out"
 msgstr "축소"
