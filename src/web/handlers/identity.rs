@@ -472,6 +472,11 @@ pub async fn do_apple_purchase(
     let Some(user) = auth_session.user.as_ref() else {
         return Ok(StatusCode::UNAUTHORIZED.into_response());
     };
+    // Every post here is a request to Apple, against a rate limit the whole
+    // site shares (app_store::may_ask).
+    if !app_store::may_ask(user.id) {
+        return Ok(StatusCode::TOO_MANY_REQUESTS.into_response());
+    }
     let purchase = match app_store::look_up(config, &form.transaction_id).await {
         Ok(Some(purchase)) => purchase,
         // Not a transaction of ours, or not one Apple knows.

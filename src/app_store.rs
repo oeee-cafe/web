@@ -27,14 +27,17 @@
 //! does -- one configuration serves both, and a sandbox purchase grants
 //! standing on a test server without granting it on the real one.
 
-use std::sync::OnceLock;
-use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::Deserialize;
 use serde_json::json;
+
+use uuid::Uuid;
 
 use crate::config::AppStoreConfig;
 use crate::models::supporter::OwnedProduct;
@@ -204,6 +207,39 @@ pub async fn look_up(config: &AppStoreConfig, transaction_id: &str) -> Result<Op
         transaction: transaction.original_transaction_id,
         owned,
     }))
+}
+
+/// How many times a minute one account may send us to Apple.
+///
+/// A purchase is posted once and a restore once more, so a handful a minute
+/// is generous; past that it is a loop. Every one of them spends a request
+/// against the App Store Server API's rate limit, and that limit is the
+/// site's to lose rather than any one buyer's -- a signed-in account with a
+/// script could otherwise leave everybody else's purchase unanswerable.
+const ASKS_PER_MINUTE: usize = 6;
+
+/// Whether `user_id` may have another transaction looked up.
+///
+/// Per process, which means per colour: both serve for a moment during a
+/// deploy, and a limit that is twice as generous for that moment is still a
+/// limit. Nothing here is worth a round trip to Redis.
+pub fn may_ask(user_id: Uuid) -> bool {
+    static ASKED: OnceLock<Mutex<HashMap<Uuid, Vec<Instant>>>> = OnceLock::new();
+    let mut asked = ASKED.get_or_init(Default::default).lock().unwrap();
+    let now = Instant::now();
+    // What has fallen out of the window is forgotten, and an account whose
+    // asks all have is forgotten with it: this map would otherwise hold
+    // every account that ever bought anything for the life of the process.
+    asked.retain(|_, asks| {
+        asks.retain(|at| now.duration_since(*at) < Duration::from_secs(60));
+        !asks.is_empty()
+    });
+    let asks = asked.entry(user_id).or_default();
+    if asks.len() >= ASKS_PER_MINUTE {
+        return false;
+    }
+    asks.push(now);
+    true
 }
 
 /// A transaction id of the right shape that cannot be anybody's: Apple's
@@ -498,6 +534,18 @@ mod tests {
     /// The key, the key id and the issuer are all in the token, so a
     /// configuration Apple would turn away fails here rather than quietly
     /// answering no.
+    /// A loop is stopped before it reaches Apple; somebody else's loop is
+    /// not anyone's to answer for.
+    #[test]
+    fn an_account_may_only_ask_so_often() {
+        let account = Uuid::new_v4();
+        for ask in 0..ASKS_PER_MINUTE {
+            assert!(may_ask(account), "ask {ask} of {ASKS_PER_MINUTE}");
+        }
+        assert!(!may_ask(account), "the one past the limit");
+        assert!(may_ask(Uuid::new_v4()), "a different account is unaffected");
+    }
+
     /// What `cli check-app-store` does: the App Store saying it has never
     /// heard of a transaction is the key being accepted.
     #[tokio::test]
