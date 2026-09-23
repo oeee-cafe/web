@@ -15,12 +15,6 @@
   // flashes up and away.
   if (/OeeeCafeiOS/.test(navigator.userAgent)) {
     document.documentElement.setAttribute("data-app", "ios");
-    // An app that signs in with Apple itself stops the button's navigation
-    // (WebTab.swift); an older one would open Apple's page in Safari, away
-    // from this session, so the button shows only for one that says so.
-    if (/\bSignInWithApple\b/.test(navigator.userAgent)) {
-      document.documentElement.setAttribute("data-native-apple-sign-in", "");
-    }
     // Going back in the app is the web view's edge swipe, which already
     // moved the page; a cross-fade after it would move it twice. Listened
     // for here, in the head, so it is heard before the page first paints.
@@ -46,6 +40,16 @@
     // apps, its button shows only for a build that signs in some other way
     // and says so below (style.css).
     document.documentElement.setAttribute("data-mac-app", "");
+  }
+  // An app that can finish an Apple sign-in itself stops the button's
+  // navigation and says so: the iOS app with Apple's own sheet
+  // (AppleSignIn.swift), the Android app by sending it to a browser and
+  // taking the answer back through a handoff (SignInHandoff.kt). An app
+  // that says nothing would open Apple's page in a browser of its own,
+  // where the answer arrives without this session, so it is shown no
+  // button.
+  if (/\bSignInWithApple\b/.test(navigator.userAgent)) {
+    document.documentElement.setAttribute("data-native-apple-sign-in", "");
   }
   // Google refuses its own sign-in pages in an embedded web view, so the
   // button shows only for an app that signs in some other way and says so:
