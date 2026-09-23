@@ -998,6 +998,13 @@ async fn finish_google_sign_in(
 
 const HANDOFF_KEY: &str = "identity.handoff";
 
+/// A handoff's id, short enough to follow one through the log and hashed so
+/// the log never holds the id itself -- which is as good as the sign-in it
+/// is waiting for (`crate::handoff`).
+fn handoff_mark(id: &str) -> String {
+    sha256::digest(id).chars().take(8).collect()
+}
+
 /// Remembers, for the length of this browser's sign-in, which handoff it is
 /// being done on behalf of. Only an id that names a handoff still waiting is
 /// kept: a made-up one is ignored rather than carried to the provider and
@@ -1028,13 +1035,23 @@ async fn handed_off(
     identity: &VerifiedIdentity,
 ) -> Option<Response> {
     let id: String = session.remove(HANDOFF_KEY).await.ok().flatten()?;
+    let mark = handoff_mark(&id);
     match crate::handoff::verified(&state.redis_pool, &id, identity).await {
         // Claimed already, or waited too long: nothing is listening, so the
         // browser carries on as an ordinary sign-in.
-        Ok(false) => None,
-        Ok(true) => Some(Redirect::to("/auth/handoff/done").into_response()),
+        Ok(false) => {
+            tracing::info!("handoff {mark}: nothing waiting for it; signing in here instead");
+            None
+        }
+        Ok(true) => {
+            tracing::info!(
+                "handoff {mark}: {} said who this is; the app can take it",
+                identity.provider.as_str()
+            );
+            Some(Redirect::to("/auth/handoff/done").into_response())
+        }
         Err(error) => {
-            tracing::error!("A sign-in could not be handed to the app: {error:#}");
+            tracing::error!("handoff {mark}: could not be handed to the app: {error:#}");
             None
         }
     }
@@ -1119,10 +1136,14 @@ pub async fn handoff_claim(
     }
     let say = |status: &str| axum::Json(serde_json::json!({ "status": status })).into_response();
 
+    let mark = handoff_mark(&form.id);
     let looked = crate::handoff::peek(&state.redis_pool, &form.id, &form.secret).await?;
     let (identity, next) = match looked {
         crate::handoff::Claim::Waiting => return Ok(say("waiting")),
-        crate::handoff::Claim::Unknown => return Ok(say("unknown")),
+        crate::handoff::Claim::Unknown => {
+            tracing::info!("handoff {mark}: claimed, but there is no such handoff to give");
+            return Ok(say("unknown"));
+        }
         crate::handoff::Claim::Ready { identity, next } => (*identity, next),
     };
 
@@ -1155,14 +1176,19 @@ pub async fn handoff_claim(
         .into_response());
     }
 
-    // Spent before it is acted on: a handoff answers once, and two claims
-    // racing must not both sign in.
-    if !crate::handoff::spend(&state.redis_pool, &form.id, &form.secret).await? {
-        return Ok(say("unknown"));
-    }
-
+    // Acted on first, and spent only once it has taken.
+    //
+    // The other way round loses a sign-in outright: spending first meant
+    // that anything going wrong afterwards -- and `sign_in_with` can fail --
+    // left the handoff already gone, so every later ask got `unknown` and
+    // the person was left on the page they started from with nothing said.
+    // Acting twice, if two claims race, costs nothing: signing the same
+    // session in as the same account, or linking an identity already linked
+    // to it, both land where they already are.
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
-    let response = sign_in_with(
+    let provider = identity.provider;
+    let signed_in_before = auth_session.user.is_some();
+    let response = match sign_in_with(
         &mut auth_session,
         &session,
         &messages,
@@ -1171,7 +1197,23 @@ pub async fn handoff_claim(
         identity,
         next.clone(),
     )
-    .await?;
+    .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            // Left unspent on purpose: whatever went wrong, the sign-in
+            // waiting in it has not been used, and asking again may work.
+            tracing::error!("handoff {mark}: {} sign-in failed: {error:?}", provider.as_str());
+            return Ok(say("failed"));
+        }
+    };
+    let spent = crate::handoff::spend(&state.redis_pool, &form.id, &form.secret).await?;
+    tracing::info!(
+        "handoff {mark}: {} claimed; signed in here: {} -> {}; spent: {spent}",
+        provider.as_str(),
+        signed_in_before,
+        auth_session.user.is_some(),
+    );
     // `sign_in_with` answers with a redirect -- to `next`, to /account, or
     // to /auth/welcome when there is no account yet and one has to be named.
     // The page follows it itself, so it is told where rather than sent.
