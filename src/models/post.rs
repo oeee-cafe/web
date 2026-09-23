@@ -119,33 +119,6 @@ pub struct SerializableDraftPost {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Structured post detail response for JSON API
-#[derive(Serialize)]
-pub struct PostDetailForJson {
-    pub id: Uuid,
-    pub title: Option<String>,
-    pub content: Option<String>,
-    pub author_id: Uuid,
-    pub login_name: String,
-    pub display_name: String,
-    pub paint_duration: String,
-    pub viewer_count: i32,
-    pub image_filename: String,
-    pub image_width: i32,
-    pub image_height: i32,
-    pub image_tool: String,
-    pub is_sensitive: bool,
-    pub allow_relay: bool,
-    pub allow_replay: bool,
-    pub published_at_utc: Option<String>,
-    pub community_id: Option<Uuid>,
-    pub community_name: Option<String>,
-    pub community_slug: Option<String>,
-    pub community_background_color: Option<String>,
-    pub community_foreground_color: Option<String>,
-    pub parent_post_id: Option<Uuid>,
-}
-
 // Minimal structs for post thumbnails (grid/list views)
 #[derive(Serialize)]
 pub struct PostThumbnail {
@@ -589,12 +562,7 @@ pub struct CommunityRecentPost {
     pub image_width: i32,
     pub image_height: i32,
     pub author_login_name: String,
-    pub title: Option<String>,
-    pub paint_duration: Option<String>,
-    pub stroke_count: Option<i32>,
-    pub viewer_count: Option<i32>,
     pub published_at: Option<DateTime<Utc>>,
-    pub is_sensitive: bool,
 }
 
 /// Fetch recent posts (up to `limit` per community) for multiple communities
@@ -618,12 +586,7 @@ pub async fn find_recent_posts_by_communities(
             ranked.image_width,
             ranked.image_height,
             ranked.author_login_name,
-            ranked.title,
-            ranked.paint_duration,
-            ranked.stroke_count,
-            ranked.viewer_count,
-            ranked.published_at,
-            ranked.is_sensitive AS "is_sensitive!"
+            ranked.published_at
         FROM (
             SELECT
                 p.id,
@@ -633,12 +596,7 @@ pub async fn find_recent_posts_by_communities(
                 i.width as image_width,
                 i.height as image_height,
                 u.login_name as author_login_name,
-                p.title,
-                i.paint_duration,
-                i.stroke_count,
-                p.viewer_count,
                 p.published_at,
-                (p.is_sensitive OR p.is_explicit) AS is_sensitive,
                 ROW_NUMBER() OVER (PARTITION BY p.community_id ORDER BY p.published_at DESC) as rn
             FROM posts p
             INNER JOIN images i ON p.image_id = i.id
@@ -668,12 +626,7 @@ pub async fn find_recent_posts_by_communities(
             image_width: row.image_width,
             image_height: row.image_height,
             author_login_name: row.author_login_name,
-            title: row.title,
-            paint_duration: Some(row.paint_duration.microseconds.to_string()),
-            stroke_count: Some(row.stroke_count),
-            viewer_count: Some(row.viewer_count),
             published_at: row.published_at,
-            is_sensitive: row.is_sensitive,
         })
         .collect())
 }
@@ -893,81 +846,6 @@ pub async fn find_post_by_id(
             row.parent_post_id.map(|id| id.to_string()),
         );
         map
-    }))
-}
-
-/// Fetch post details with structured types for JSON API
-pub async fn find_post_detail_for_json(
-    tx: &mut Transaction<'_, Postgres>,
-    id: Uuid,
-) -> Result<Option<PostDetailForJson>> {
-    let q = query!(
-        "
-            SELECT
-                posts.id,
-                posts.title,
-                posts.content,
-                (posts.is_sensitive OR posts.is_explicit) AS \"is_sensitive!\",
-                posts.allow_relay,
-                posts.allow_replay,
-                posts.author_id,
-                posts.community_id,
-                posts.parent_post_id,
-                images.paint_duration,
-                images.width,
-                images.height,
-                images.image_filename,
-                images.tool::text AS image_tool,
-                posts.viewer_count,
-                posts.published_at,
-                users.display_name AS display_name,
-                users.login_name AS login_name,
-                communities.name AS \"community_name?\",
-                communities.slug AS \"community_slug?\",
-                communities.background_color AS \"community_background_color?\",
-                communities.foreground_color AS \"community_foreground_color?\"
-            FROM posts
-            LEFT JOIN images ON posts.image_id = images.id
-            LEFT JOIN users ON posts.author_id = users.id
-            LEFT JOIN communities ON posts.community_id = communities.id
-            WHERE posts.id = $1
-            AND posts.deleted_at IS NULL
-        ",
-        id
-    );
-    let result = q.fetch_optional(&mut **tx).await?;
-
-    Ok(result.map(|row| {
-        let paint_duration = Duration::try_seconds(row.paint_duration.microseconds / 1000000)
-            .expect("Duration should be valid")
-            .to_std()
-            .expect("Duration should be convertible to std::time::Duration");
-        let paint_duration_human_readable = format_duration(paint_duration);
-
-        PostDetailForJson {
-            id: row.id,
-            title: row.title,
-            content: row.content,
-            author_id: row.author_id,
-            login_name: row.login_name,
-            display_name: row.display_name,
-            paint_duration: paint_duration_human_readable.to_string(),
-            viewer_count: row.viewer_count,
-            image_filename: row.image_filename,
-            image_width: row.width,
-            image_height: row.height,
-            image_tool: row.image_tool.unwrap_or_else(|| "neo".to_string()),
-            is_sensitive: row.is_sensitive,
-            allow_relay: row.allow_relay,
-            allow_replay: row.allow_replay,
-            published_at_utc: row.published_at.map(|dt| dt.to_rfc3339()),
-            community_id: row.community_id,
-            community_name: row.community_name,
-            community_slug: row.community_slug,
-            community_background_color: row.community_background_color,
-            community_foreground_color: row.community_foreground_color,
-            parent_post_id: row.parent_post_id,
-        }
     }))
 }
 
@@ -1390,10 +1268,7 @@ pub struct PostableCommunity {
     pub slug: String,
     pub description: String,
     pub visibility: CommunityVisibility,
-    pub background_color: Option<String>,
-    pub foreground_color: Option<String>,
     pub owner_login_name: String,
-    pub owner_display_name: String,
     pub has_participated: bool,
     pub is_member: bool,
 }
@@ -1416,10 +1291,7 @@ pub async fn get_movable_communities(
             c.slug,
             c.description,
             c.visibility as "visibility: CommunityVisibility",
-            c.background_color,
-            c.foreground_color,
             u.login_name as "owner_login_name!",
-            u.display_name as "owner_display_name!",
             EXISTS(
                 SELECT 1 FROM posts p
                 WHERE p.community_id = c.id AND p.author_id = $1
@@ -1465,10 +1337,7 @@ pub async fn get_movable_communities(
         slug: row.slug,
         description: row.description,
         visibility: row.visibility,
-        background_color: row.background_color,
-        foreground_color: row.foreground_color,
         owner_login_name: row.owner_login_name,
-        owner_display_name: row.owner_display_name,
         has_participated: row.has_participated,
         is_member: row.is_member,
     })
@@ -1477,7 +1346,7 @@ pub async fn get_movable_communities(
     Ok(communities)
 }
 
-/// The public feed behind `/`, `/api/home/posts` and `/api/v1/posts/public`.
+/// The public feed behind `/` and `/api/home/posts`.
 ///
 /// Drawings saved out of a collaborative session are left out: they have their
 /// own lobby (see `find_collaborative_posts`), and a session that ends with

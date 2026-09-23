@@ -349,7 +349,7 @@ pub async fn draw_finish(
     // This drawing has been here before; answer with what it made then.
     if let Some(draft_id) = client_draft_id {
         if let Some(post_id) = find_post_id_by_client_draft_id(&mut tx, current_user.id, draft_id).await? {
-            return existing_post_response(&mut tx, &state, post_id).await;
+            return existing_post_response(&mut tx, post_id).await;
         }
     }
 
@@ -432,7 +432,7 @@ pub async fn draw_finish(
             let post_id = find_post_id_by_client_draft_id(&mut tx, current_user.id, draft_id)
                 .await?
                 .ok_or_else(|| AppError::Anyhow(error))?;
-            return existing_post_response(&mut tx, &state, post_id).await;
+            return existing_post_response(&mut tx, post_id).await;
         }
         Err(error) => return Err(error.into()),
     };
@@ -448,22 +448,13 @@ pub async fn draw_finish(
 /// already made, in the same shape as a new one.
 async fn existing_post_response(
     tx: &mut Transaction<'_, Postgres>,
-    state: &AppState,
     post_id: Uuid,
 ) -> Result<Response, AppError> {
-    let post = find_post_by_id(tx, post_id)
+    find_post_by_id(tx, post_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Post".to_string()))?;
-    let field = |name: &str| post.get(name).cloned().flatten();
-    let image_filename = field("image_filename").unwrap_or_default();
-    let image_prefix = image_filename.get(..2).unwrap_or_default();
     Ok(Json(DrawFinishResponse {
-        community_id: field("community_id"),
         post_id: post_id.to_string(),
-        image_url: format!(
-            "{}/image/{}/{}",
-            state.config.r2_public_endpoint_url, image_prefix, image_filename
-        ),
     })
     .into_response())
 }

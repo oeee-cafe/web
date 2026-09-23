@@ -106,26 +106,6 @@ pub async fn delete_invalid_device(
     Ok(result.rows_affected() > 0)
 }
 
-/// Delete a device by device token only (for unauthenticated deletion)
-/// Device tokens are cryptographically unguessable, so possession of the token
-/// is sufficient authentication
-pub async fn delete_device_by_token(
-    tx: &mut Transaction<'_, Postgres>,
-    device_token: String,
-) -> Result<bool> {
-    let result = sqlx::query!(
-        r#"
-        DELETE FROM devices
-        WHERE device_token = $1
-        "#,
-        device_token,
-    )
-    .execute(&mut **tx)
-    .await?;
-
-    Ok(result.rows_affected() > 0)
-}
-
 /// Delete one of a user's devices, and only theirs: the token comes from a
 /// cookie, which is no proof that the device was ever registered to them.
 pub async fn delete_user_device_by_token(

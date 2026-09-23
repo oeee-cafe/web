@@ -228,24 +228,6 @@ pub async fn get_public_communities_paginated(
     Ok(q.fetch_all(&mut **tx).await?)
 }
 
-pub async fn count_public_communities(tx: &mut Transaction<'_, Postgres>) -> Result<i64> {
-    // Count public communities with at least one post
-    let result = query!(
-        r#"
-            SELECT COUNT(DISTINCT communities.id) AS "count!"
-            FROM communities
-            LEFT JOIN posts ON communities.id = posts.community_id AND posts.published_at IS NOT NULL AND posts.deleted_at IS NULL
-            WHERE communities.visibility = 'public' AND communities.deleted_at IS NULL
-            GROUP BY communities.id
-            HAVING MAX(posts.published_at) IS NOT NULL
-        "#
-    )
-    .fetch_all(&mut **tx)
-    .await?;
-
-    Ok(result.len() as i64)
-}
-
 pub async fn search_public_communities(
     tx: &mut Transaction<'_, Postgres>,
     query: &str,
@@ -292,29 +274,6 @@ pub async fn search_public_communities(
     );
 
     Ok(q.fetch_all(&mut **tx).await?)
-}
-
-pub async fn count_search_public_communities(
-    tx: &mut Transaction<'_, Postgres>,
-    query: &str,
-) -> Result<i64> {
-    let pattern = format!("%{}%", query);
-
-    let result = query!(
-        r#"
-            SELECT COUNT(*) AS "count!"
-            FROM communities
-            WHERE communities.visibility = 'public' AND communities.deleted_at IS NULL
-              AND (communities.name ILIKE $1
-                   OR communities.slug ILIKE $1
-                   OR communities.description ILIKE $1)
-        "#,
-        pattern
-    )
-    .fetch_one(&mut **tx)
-    .await?;
-
-    Ok(result.count)
 }
 
 pub async fn get_active_public_communities_excluding_owner(
@@ -1084,10 +1043,8 @@ pub async fn get_pending_invitations_for_user(
 #[derive(Debug)]
 pub struct InvitationWithDetails {
     pub id: Uuid,
-    pub community_id: Uuid,
     pub community_name: String,
     pub community_slug: String,
-    pub inviter_id: Uuid,
     pub inviter_login_name: String,
     pub inviter_display_name: String,
     pub created_at: DateTime<Utc>,
@@ -1102,10 +1059,8 @@ pub async fn get_pending_invitations_with_details_for_user(
         r#"
         SELECT
             ci.id,
-            ci.community_id,
             c.name as community_name,
             c.slug as community_slug,
-            ci.inviter_id,
             u.login_name as inviter_login_name,
             u.display_name as inviter_display_name,
             ci.created_at
@@ -1124,10 +1079,8 @@ pub async fn get_pending_invitations_with_details_for_user(
         .into_iter()
         .map(|row| InvitationWithDetails {
             id: row.id,
-            community_id: row.community_id,
             community_name: row.community_name,
             community_slug: row.community_slug,
-            inviter_id: row.inviter_id,
             inviter_login_name: row.inviter_login_name,
             inviter_display_name: row.inviter_display_name,
             created_at: row.created_at,
@@ -1160,7 +1113,6 @@ pub async fn get_pending_invitations_for_community(
 #[derive(Debug)]
 pub struct CommunityInvitationWithInviteeDetails {
     pub id: Uuid,
-    pub invitee_id: Uuid,
     pub invitee_login_name: String,
     pub invitee_display_name: String,
     pub created_at: DateTime<Utc>,
@@ -1175,7 +1127,6 @@ pub async fn get_pending_invitations_with_invitee_details_for_community(
         r#"
         SELECT
             ci.id,
-            ci.invitee_id,
             u.login_name as invitee_login_name,
             u.display_name as invitee_display_name,
             ci.created_at
@@ -1193,7 +1144,6 @@ pub async fn get_pending_invitations_with_invitee_details_for_community(
         .into_iter()
         .map(|row| CommunityInvitationWithInviteeDetails {
             id: row.id,
-            invitee_id: row.invitee_id,
             invitee_login_name: row.invitee_login_name,
             invitee_display_name: row.invitee_display_name,
             created_at: row.created_at,

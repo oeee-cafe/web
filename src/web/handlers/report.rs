@@ -6,13 +6,11 @@ use crate::web::state::AppState;
 use axum::extract::{Path, State};
 use axum::response::Html;
 use axum::Form;
-use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use lettre::{Message, SmtpTransport, Transport};
 use minijinja::context;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -20,19 +18,14 @@ pub struct ReportPostRequest {
     pub description: String,
 }
 
-#[derive(Serialize)]
-pub struct ReportPostResponse {
-    pub message: String,
-}
-
-/// API endpoint: POST /api/v1/posts/:post_id/report
-pub async fn report_post_api(
+/// Mails abuse@ about a post, from the reporter's account.
+async fn send_post_report(
     auth_session: AuthSession,
-    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
-    State(state): State<AppState>,
-    Path(post_id): Path<Uuid>,
-    Json(request): Json<ReportPostRequest>,
-) -> Result<impl IntoResponse, AppError> {
+    accept_language: &axum::http::HeaderValue,
+    state: &AppState,
+    post_id: Uuid,
+    request: ReportPostRequest,
+) -> Result<(), AppError> {
     // Ensure user is authenticated
     let user = auth_session
         .user
@@ -142,7 +135,7 @@ This is an automated report notification from oeee.cafe",
     );
 
     // Get bundle for localized from address
-    let bundle = get_bundle(&accept_language, None);
+    let bundle = get_bundle(accept_language, None);
     let from_address = safe_get_message(&bundle, "email-from-address");
 
     // Send email to abuse@oeee.cafe
@@ -178,22 +171,17 @@ This is an automated report notification from oeee.cafe",
         .send(&email_message)
         .map_err(|e| AppError::DatabaseError(format!("Failed to send email: {}", e)))?;
 
-    Ok((
-        StatusCode::CREATED,
-        Json(ReportPostResponse {
-            message: "Post reported successfully".to_string(),
-        }),
-    ))
+    Ok(())
 }
 
-/// API endpoint: POST /api/v1/profiles/:login_name/report
-pub async fn report_profile_api(
+/// Mails abuse@ about a profile, from the reporter's account.
+async fn send_profile_report(
     auth_session: AuthSession,
-    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
-    State(state): State<AppState>,
-    Path(login_name): Path<String>,
-    Json(request): Json<ReportPostRequest>,
-) -> Result<impl IntoResponse, AppError> {
+    accept_language: &axum::http::HeaderValue,
+    state: &AppState,
+    login_name: String,
+    request: ReportPostRequest,
+) -> Result<(), AppError> {
     // Ensure user is authenticated
     let user = auth_session
         .user
@@ -263,7 +251,7 @@ This is an automated report notification from oeee.cafe",
     );
 
     // Get bundle for localized from address
-    let bundle = get_bundle(&accept_language, None);
+    let bundle = get_bundle(accept_language, None);
     let from_address = safe_get_message(&bundle, "email-from-address");
 
     // Send email to abuse@oeee.cafe
@@ -299,21 +287,11 @@ This is an automated report notification from oeee.cafe",
         .send(&email_message)
         .map_err(|e| AppError::DatabaseError(format!("Failed to send email: {}", e)))?;
 
-    Ok((
-        StatusCode::CREATED,
-        Json(ReportPostResponse {
-            message: "Profile reported successfully".to_string(),
-        }),
-    ))
+    Ok(())
 }
 
-/// The same two reports, submitted from the site instead of from the phone.
-///
-/// Both delegate to the API handlers above rather than restating any of it, so
-/// the mail that reaches abuse@ is identical whichever client sent it. What
-/// differs is the reply: the browser gets a rendered sentence to swap into the
-/// modal it was submitted from, where the JSON body and its status would be
-/// useless.
+/// The answer to either report form: a rendered sentence to swap into the
+/// modal it was submitted from.
 ///
 /// Failures come back as 200 with the message inside, deliberately. These
 /// forms sit in a modal over a dimmed page, and `web::htmx::error_banner`
@@ -332,20 +310,13 @@ async fn render_report_result(
 /// POST /posts/:post_id/report
 pub async fn hx_report_post(
     auth_session: AuthSession,
-    accept_language: ExtractAcceptLanguage,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(post_id): Path<Uuid>,
     Form(form): Form<ReportPostRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let outcome = report_post_api(
-        auth_session,
-        accept_language,
-        State(state.clone()),
-        Path(post_id),
-        Json(form),
-    )
-    .await;
+    let outcome = send_post_report(auth_session, &accept_language, &state, post_id, form).await;
 
     let key = match outcome {
         Ok(_) => "post-report-success",
@@ -360,20 +331,14 @@ pub async fn hx_report_post(
 /// POST /@:login_name/report
 pub async fn hx_report_profile(
     auth_session: AuthSession,
-    accept_language: ExtractAcceptLanguage,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(login_name): Path<String>,
     Form(form): Form<ReportPostRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let outcome = report_profile_api(
-        auth_session,
-        accept_language,
-        State(state.clone()),
-        Path(login_name),
-        Json(form),
-    )
-    .await;
+    let outcome =
+        send_profile_report(auth_session, &accept_language, &state, login_name, form).await;
 
     let key = match outcome {
         Ok(_) => "profile-report-success",

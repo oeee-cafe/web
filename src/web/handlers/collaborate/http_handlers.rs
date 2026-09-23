@@ -470,22 +470,6 @@ pub async fn collaborate_lobby(
     Ok(Html(rendered).into_response())
 }
 
-/// POST /api/v1/collaborate/sessions: a session, from the apps' JSON.
-pub async fn create_collaborative_session(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Json(request): Json<CreateSessionRequest>,
-) -> Result<Json<CreateSessionResponse>, AppError> {
-    let user = auth_session
-        .user
-        .ok_or_else(|| anyhow::anyhow!("Authentication required"))?;
-    let session_id = insert_session(&state, user.id, request).await?;
-    Ok(Json(CreateSessionResponse {
-        session_id: session_id.to_string(),
-        url: format!("/collaborate/{}", session_id),
-    }))
-}
-
 /// The lobby's new-session form, as the browser sends it: the canvas as one
 /// "WxH" choice, the checkbox present or absent.
 #[derive(serde::Deserialize)]
@@ -729,27 +713,6 @@ fn with_site_chrome(html: &str, head: &str, toolbar: &str) -> String {
     }
     out
 }
-
-pub async fn get_active_sessions_json(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-) -> Result<Json<Vec<SessionWithCounts>>, AppError> {
-    let user = match auth_session.user {
-        Some(user) => user,
-        None => return Err(anyhow::anyhow!("Authentication required").into()),
-    };
-
-    let mut tx = state.db_pool.begin().await?;
-    // Same list the lobby renders, so the two cannot disagree about which
-    // sessions exist. Full ones are included and flagged rather than dropped.
-    let mut active_sessions = find_public_sessions(&mut tx, Some(user.id)).await?;
-    tx.commit().await?;
-    let mut all: Vec<&mut SessionWithCounts> = active_sessions.iter_mut().collect();
-    attach_preview_versions(&state, &mut all).await;
-
-    Ok(Json(active_sessions))
-}
-
 
 #[cfg(test)]
 mod tests {

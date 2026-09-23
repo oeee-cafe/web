@@ -1,7 +1,7 @@
-use crate::app_error::{error_codes, AppError};
-use crate::web::responses::ErrorResponse;
+use crate::app_error::AppError;
 use crate::models::email_verification_challenge::{
     create_email_verification_challenge, find_email_verification_challenge_by_id,
+    EmailVerificationChallenge,
 };
 use crate::models::user::{
     delete_user_with_activity, find_user_by_id, update_password, update_user_email_verified_at,
@@ -20,7 +20,7 @@ use axum::{
     extract::{Query, State},
     http::StatusCode,
     response::Html,
-    Form, Json,
+    Form,
 };
 use axum_messages::Messages;
 use chrono::{TimeDelta, Utc};
@@ -450,73 +450,6 @@ pub async fn edit_account(
 }
 
 #[derive(Deserialize)]
-pub struct DeleteAccountRequest {
-    /// For an account with a password.
-    password: Option<String>,
-    /// For one without: the account's own handle, typed out.
-    login_name: Option<String>,
-}
-
-pub async fn delete_account(
-    mut auth_session: AuthSession,
-    State(state): State<AppState>,
-    Json(payload): Json<DeleteAccountRequest>,
-) -> Result<impl IntoResponse, AppError> {
-    let user = match auth_session.user.as_ref() {
-        Some(user) => user.clone(),
-        None => {
-            return Ok((
-                StatusCode::UNAUTHORIZED,
-                Json(ErrorResponse::new(
-                    error_codes::UNAUTHORIZED,
-                    "Not authenticated",
-                )),
-            )
-                .into_response())
-        }
-    };
-
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    // Attempt to delete the user
-    match delete_user_with_activity(
-        &mut tx,
-        user.id,
-        DeleteConfirmation::for_user(
-            &user,
-            payload.password.as_deref(),
-            payload.login_name.as_deref(),
-        ),
-        &state.config,
-        Some(&state),
-    )
-    .await
-    {
-        Ok(_) => {
-            tx.commit().await?;
-
-            // Log the user out
-            auth_session.logout().await?;
-
-            Ok(StatusCode::NO_CONTENT.into_response())
-        }
-        Err(e) => {
-            tx.rollback().await?;
-
-            Ok((
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse::new(
-                    error_codes::VALIDATION_ERROR,
-                    e.to_string(),
-                )),
-            )
-                .into_response())
-        }
-    }
-}
-
-#[derive(Deserialize)]
 pub struct DeleteAccountForm {
     password: Option<String>,
     login_name: Option<String>,
@@ -574,10 +507,6 @@ pub async fn delete_account_htmx(
     }
 }
 
-// JSON API endpoints for mobile apps
-
-use crate::models::email_verification_challenge::EmailVerificationChallenge;
-
 // Helper function to create verification challenge and send email
 async fn create_and_send_verification_email(
     state: &AppState,
@@ -631,170 +560,4 @@ async fn create_and_send_verification_email(
     mailer.send(&email_message).map_err(|e| e.to_string())?;
 
     Ok(email_verification_challenge)
-}
-
-#[derive(serde::Deserialize)]
-pub struct RequestEmailVerificationJson {
-    email: String,
-}
-
-#[derive(serde::Serialize)]
-pub struct RequestEmailVerificationResponseJson {
-    challenge_id: Uuid,
-    email: String,
-    expires_in_seconds: i64,
-}
-
-pub async fn request_email_verification_json(
-    auth_session: AuthSession,
-    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
-    State(state): State<AppState>,
-    Json(payload): Json<RequestEmailVerificationJson>,
-) -> Result<impl IntoResponse, AppError> {
-    let user = match auth_session.user.as_ref() {
-        Some(user) => user.clone(),
-        None => {
-            return Ok((
-                StatusCode::UNAUTHORIZED,
-                Json(ErrorResponse::new(
-                    error_codes::UNAUTHORIZED,
-                    "Not authenticated",
-                )),
-            )
-                .into_response())
-        }
-    };
-
-    // Check if email is already verified
-    if user.email.as_ref() == Some(&payload.email) && user.email_verified_at.is_some() {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse::new(
-                error_codes::EMAIL_ALREADY_VERIFIED,
-                "Email is already verified",
-            )),
-        )
-            .into_response());
-    }
-
-    // Validate email format - basic check for @ symbol and parseable email
-    if !payload.email.contains('@') || payload.email.parse::<lettre::Address>().is_err() {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse::new(
-                error_codes::VALIDATION_ERROR,
-                "Invalid email format",
-            )),
-        )
-            .into_response());
-    }
-
-    let user_preferred_language = user.preferred_language;
-    let bundle = get_bundle(&accept_language, user_preferred_language);
-
-    // Create challenge and send email using shared helper
-    match create_and_send_verification_email(&state, user.id, &payload.email, &bundle).await {
-        Ok(email_verification_challenge) => Ok((
-            StatusCode::OK,
-            Json(RequestEmailVerificationResponseJson {
-                challenge_id: email_verification_challenge.id,
-                email: payload.email,
-                expires_in_seconds: 300,
-            }),
-        )
-            .into_response()),
-        Err(e) => Ok((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse::new(
-                error_codes::INTERNAL_ERROR,
-                format!("Failed to send email: {}", e),
-            )),
-        )
-            .into_response()),
-    }
-}
-
-#[derive(serde::Deserialize)]
-pub struct VerifyEmailCodeJson {
-    challenge_id: Uuid,
-    token: String,
-}
-
-pub async fn verify_email_code_json(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Json(payload): Json<VerifyEmailCodeJson>,
-) -> Result<impl IntoResponse, AppError> {
-    let user = match auth_session.user.as_ref() {
-        Some(user) => user.clone(),
-        None => {
-            return Ok((
-                StatusCode::UNAUTHORIZED,
-                Json(ErrorResponse::new(
-                    error_codes::UNAUTHORIZED,
-                    "Not authenticated",
-                )),
-            )
-                .into_response())
-        }
-    };
-
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let challenge = find_email_verification_challenge_by_id(&mut tx, payload.challenge_id).await?;
-
-    if challenge.is_none() {
-        return Ok((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse::new(
-                error_codes::NOT_FOUND,
-                "Verification challenge not found",
-            )),
-        )
-            .into_response());
-    }
-
-    let challenge =
-        challenge.ok_or_else(|| AppError::NotFound("Email verification challenge".to_string()))?;
-    let now = Utc::now();
-
-    // Check if token matches
-    if challenge.token != payload.token {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse::new(
-                error_codes::INVALID_VERIFICATION_CODE,
-                "Invalid verification code",
-            )),
-        )
-            .into_response());
-    }
-
-    // Check if token is expired
-    if challenge.expires_at < now {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse::new(
-                error_codes::VALIDATION_ERROR,
-                "Verification code has expired",
-            )),
-        )
-            .into_response());
-    }
-
-    // Update user email and verification timestamp
-    update_user_email_verified_at(&mut tx, user.id, challenge.email, now).await?;
-    tx.commit().await?;
-
-    Ok(StatusCode::NO_CONTENT.into_response())
-}
-
-pub async fn get_account_json(auth_session: AuthSession) -> Result<impl IntoResponse, AppError> {
-    let user = match auth_session.user.as_ref() {
-        Some(user) => user.clone(),
-        None => return Ok((StatusCode::UNAUTHORIZED).into_response()),
-    };
-
-    Ok((StatusCode::OK, Json(user)).into_response())
 }

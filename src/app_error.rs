@@ -12,13 +12,8 @@ pub mod error_codes {
     pub const UNAUTHORIZED: &str = "UNAUTHORIZED";
     pub const NOT_FOUND: &str = "NOT_FOUND";
     pub const VALIDATION_ERROR: &str = "VALIDATION_ERROR";
-    pub const INVALID_CREDENTIALS: &str = "INVALID_CREDENTIALS";
     pub const EMAIL_ALREADY_EXISTS: &str = "EMAIL_ALREADY_EXISTS";
-    pub const USERNAME_ALREADY_EXISTS: &str = "USERNAME_ALREADY_EXISTS";
-    pub const EMAIL_ALREADY_VERIFIED: &str = "EMAIL_ALREADY_VERIFIED";
-    pub const INVALID_VERIFICATION_CODE: &str = "INVALID_VERIFICATION_CODE";
     pub const FORBIDDEN: &str = "FORBIDDEN";
-    pub const CONFLICT: &str = "CONFLICT";
     /// A drawing sent for a community this account may not post in. The
     /// painter's drafts page reads it to offer posting it without one.
     pub const COMMUNITY_NOT_ALLOWED: &str = "COMMUNITY_NOT_ALLOWED";
