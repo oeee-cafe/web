@@ -561,3 +561,7 @@ app-saved-image = 已保存到图片
 app-saved-file = 已保存到下载
 app-save-failed = 无法保存
 app-steam-sign-in-failed = 无法通过 Steam 登录。请确认 Steam 正在运行，然后重试。
+window-minimize = 最小化
+window-maximize = 最大化
+window-restore = 向下还原
+window-close = 关闭

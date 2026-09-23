@@ -1,0 +1,106 @@
+{# The window's own controls in the Windows app -- minimise, maximise or
+   restore, close -- at the right end of the toolbar, where a title bar
+   would have put them above it. The window has no title bar there: the
+   toolbar is one, and the room for these at its end is kept by ds.css.
+
+   Drawn to Windows 11's measure (ds.css, "The Windows app's caption"), in
+   the glyphs the system draws its own with (Segoe Fluent Icons; Segoe MDL2
+   Assets on Windows 10, at the same code points), and shown in the Windows
+   app only (data-app="windows", theme_head.jinja). Each asks the app on the
+   bridge (a `window` message, app_bridge.jinja), which alone can move a
+   window; close goes the way the system's button went, so a page holding
+   a drawing is still asked before it is left (close_guard.rs in
+   oeee-cafe-desktop).
+
+   What the app knows and the page does not, it says: whether the window is
+   maximised, and whether the pointer is on the maximise button or pressing
+   it -- Windows offers its Snap Layouts only over what it knows for a
+   maximise button, so the app keeps a stand-in of its own over this one,
+   which the pointer reaches instead (snap.rs), and the page says where the
+   button is for it (a `caption` message). Both come as
+   oeeeApp.caption({maximized, pointer}). #}
+<div class="oeee-caption" data-tauri-drag-region="false"
+     data-maximize-label="{{ ftl_get_message("window-maximize") }}"
+     data-restore-label="{{ ftl_get_message("window-restore") }}">
+  <button type="button" class="is-minimize" data-caption="minimize"
+          title="{{ ftl_get_message("window-minimize") }}" aria-label="{{ ftl_get_message("window-minimize") }}"><span aria-hidden="true">&#xE921;</span></button>
+  <button type="button" class="is-maximize" data-caption="maximize"
+          title="{{ ftl_get_message("window-maximize") }}" aria-label="{{ ftl_get_message("window-maximize") }}"><span aria-hidden="true">&#xE922;</span></button>
+  <button type="button" class="is-close" data-caption="close"
+          title="{{ ftl_get_message("window-close") }}" aria-label="{{ ftl_get_message("window-close") }}"><span aria-hidden="true">&#xE8BB;</span></button>
+</div>
+<script>
+  (function () {
+    var root = document.documentElement;
+    if (root.getAttribute("data-app") !== "windows" || !window.oeeeApp) return;
+    var app = window.oeeeApp;
+    // What the app last said, kept across a boosted swap, which draws the
+    // toolbar and these anew.
+    var state = window.oeeeCaption || (window.oeeeCaption = { maximized: false, pointer: "" });
+    var box = document.querySelector(".nav-bar .oeee-caption");
+    if (!box) return;
+
+    // A press here is the button's, not the start of a drag of the window,
+    // which the toolbar around it is (data-window-drag).
+    box.addEventListener("mousedown", function (event) { event.stopPropagation(); });
+    box.addEventListener("click", function (event) {
+      var button = event.target.closest && event.target.closest("[data-caption]");
+      if (!button) return;
+      var action = button.classList.contains("is-close") ? "close"
+        : button.classList.contains("is-maximize") ? "maximize" : "minimize";
+      app.post("window", { action: action }, true);
+    });
+
+    function show() {
+      var current = document.querySelector(".nav-bar .oeee-caption");
+      if (!current) return;
+      var maximize = current.querySelector(".is-maximize");
+      var name = state.maximized ? "restore" : "maximize";
+      var label = current.getAttribute("data-" + name + "-label");
+      maximize.setAttribute("data-caption", name);
+      maximize.title = label;
+      maximize.setAttribute("aria-label", label);
+      maximize.firstChild.textContent = state.maximized ? "\uE923" : "\uE922";
+      maximize.classList.toggle("is-hot", state.pointer === "hot");
+      maximize.classList.toggle("is-pressed", state.pointer === "pressed");
+    }
+
+    // Where the maximise button is, in the window's pixels, for the app's
+    // stand-in -- said when it may have moved, and only when it has.
+    var reporting = false;
+    function report() {
+      if (reporting) return;
+      reporting = true;
+      requestAnimationFrame(function () {
+        reporting = false;
+        var button = document.querySelector(".nav-bar .oeee-caption .is-maximize");
+        var r = button && button.getBoundingClientRect();
+        var scale = window.devicePixelRatio || 1;
+        var place = r && r.width > 0 && r.height > 0 ? {
+          x: Math.round(r.left * scale),
+          y: Math.round(r.top * scale),
+          width: Math.round(r.right * scale) - Math.round(r.left * scale),
+          height: Math.round(r.bottom * scale) - Math.round(r.top * scale)
+        } : null;
+        app.post("caption", { place: place });
+      });
+    }
+
+    show();
+    report();
+    if (window.oeeeCaptionListening) return;
+    window.oeeeCaptionListening = true;
+    app.caption = function (told) {
+      if (!told) return;
+      if ("maximized" in told) state.maximized = !!told.maximized;
+      if ("pointer" in told) state.pointer = told.pointer || "";
+      show();
+    };
+    window.addEventListener("resize", report);
+    // A window in the background greys its controls.
+    function focused() { root.toggleAttribute("data-window-inactive", !document.hasFocus()); }
+    window.addEventListener("focus", focused);
+    window.addEventListener("blur", focused);
+    focused();
+  })();
+</script>

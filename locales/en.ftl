@@ -563,3 +563,7 @@ app-saved-image = Saved to Pictures
 app-saved-file = Saved to Downloads
 app-save-failed = Couldn't save
 app-steam-sign-in-failed = Steam could not sign you in. Make sure Steam is running and try again.
+window-minimize = Minimize
+window-maximize = Maximize
+window-restore = Restore
+window-close = Close

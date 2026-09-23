@@ -33,7 +33,8 @@ function template(name: string): string {
     .replace(/\{%\s*include\s+"([^"]+)"\s*%\}/g, (_, included: string) => template(included))
     .replace(/\{\{\s*ftl_get_message\("([^"]+)"\)\|tojson\s*\}\}/g, (_, id: string) =>
       JSON.stringify(id),
-    );
+    )
+    .replace(/\{\{\s*ftl_get_message\("([^"]+)"\)\s*\}\}/g, (_, id: string) => id);
 }
 
 const HEAD = template("theme_head.jinja");
@@ -82,6 +83,8 @@ interface Options {
   unread?: number;
   /** What each path the page fetches answers with, as JSON; absent is a 404. */
   answers?: Record<string, unknown>;
+  /** The toolbar carries the Windows app's caption (app_caption.jinja), as the site's does. */
+  caption?: boolean;
 }
 
 const frames: HTMLIFrameElement[] = [];
@@ -130,6 +133,7 @@ async function open(options: Options = {}): Promise<Page> {
     <nav class="nav-bar" data-window-drag${options.signedIn ? " data-signed-in" : ""}
          style="background-color: rgb(250, 250, 252)">
       <a id="nav-notifications" data-unread="${options.unread ?? 0}"></a>
+      ${options.caption ? template("app_caption.jinja") : ""}
     </nav>
     <a href="/@artist/9c881320"><img data-oeee-drawing width="300" height="200"
        src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></a>
@@ -164,6 +168,44 @@ function keys(message: Message): string[] {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("what the site tells the apps", () => {
+  it("asks the Windows app to minimise, maximise and close, and shows what it says back", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", caption: true });
+    const doc = page.window.document;
+    const button = (name: string) => doc.querySelector<HTMLButtonElement>(`.oeee-caption .is-${name}`)!;
+    button("minimize").click();
+    button("maximize").click();
+    button("close").click();
+    const window = page.sent.filter((message) => message.type === "window");
+    expect(window.map((message) => message.action)).toEqual(["minimize", "maximize", "close"]);
+
+    // Where its maximise button is, for the app's Snap Layouts stand-in.
+    await new Promise((resolve) => page.window.requestAnimationFrame(resolve));
+    const caption = last(page, "caption");
+    expect(keys(caption)).toEqual(["place", "type", "v"]);
+    const place = caption.place as Record<string, number>;
+    expect(place.width).toBeGreaterThan(0);
+
+    const told = (page.window.oeeeApp as unknown as { caption(told: unknown): void }).caption;
+    told({ maximized: true, pointer: "hot" });
+    expect(button("maximize").getAttribute("aria-label")).toBe("window-restore");
+    expect(button("maximize").classList.contains("is-hot")).toBe(true);
+    told({ maximized: false, pointer: "" });
+    expect(button("maximize").getAttribute("aria-label")).toBe("window-maximize");
+    expect(button("maximize").classList.contains("is-hot")).toBe(false);
+
+    // A press on them is theirs, not a drag of the window.
+    const press = new page.window.MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 });
+    let reached = false;
+    doc.addEventListener("mousedown", () => (reached = true));
+    button("close").dispatchEvent(press);
+    expect(reached).toBe(false);
+
+    // Hidden and silent everywhere else.
+    const mac = await open({ userAgent: "Mozilla/5.0 OeeeCafe/macos store/apple", caption: true });
+    mac.window.document.querySelector<HTMLButtonElement>(".oeee-caption .is-close")!.click();
+    expect(mac.sent.some((message) => message.type === "window" || message.type === "caption")).toBe(false);
+  });
+
   it("moves and zooms the Mac window from the toolbar, and keeps the browser's menu quiet", async () => {
     const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/macos store/apple" });
     const bar = page.window.document.querySelector(".nav-bar")!;

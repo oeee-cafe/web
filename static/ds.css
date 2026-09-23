@@ -1576,6 +1576,81 @@ html[data-app="macos"] .nav-bar.is-stacked .toolbar-links {
   margin-left: -80px;
 }
 
+/* The Windows app's caption: minimise, maximise or restore, and close, at
+   the toolbar's right end in the room kept for them just below
+   (app_caption.jinja). Windows 11's own measure -- 46px wide, the height of
+   the toolbar's first row -- in the system's glyphs and fills, in the
+   toolbar's ink whichever the theme: a faint wash under the pointer,
+   fainter pressed with the glyph dimmed, and close's red. Maximise is under
+   the app's Snap Layouts stand-in, so the pointer never reaches it; it is
+   shown hot and pressed when the app says (is-hot, is-pressed). A window in
+   the background greys them until one is pointed at. Nowhere but that app:
+   the markup is on every page, and hidden. */
+.oeee-caption {
+  display: none;
+}
+
+html[data-app="windows"] .oeee-caption {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  height: 52px;
+}
+
+html[data-app="windows"] .oeee-caption button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ds-ink);
+  box-shadow: none;
+  cursor: default;
+  font: 400 10px/1 "Segoe Fluent Icons", "Segoe MDL2 Assets";
+  -webkit-font-smoothing: auto;
+}
+
+html[data-app="windows"] .oeee-caption span {
+  display: block;
+  pointer-events: none;
+}
+
+html[data-app="windows"] .oeee-caption button:hover,
+html[data-app="windows"] .oeee-caption button.is-hot {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+html[data-app="windows"] .oeee-caption button:active,
+html[data-app="windows"] .oeee-caption button.is-pressed {
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+html[data-app="windows"] .oeee-caption button:active span,
+html[data-app="windows"] .oeee-caption button.is-pressed span {
+  opacity: 0.7;
+}
+
+html[data-app="windows"] .oeee-caption button.is-close:hover {
+  background: #c42b1c;
+  color: #ffffff;
+}
+
+html[data-app="windows"] .oeee-caption button.is-close:active {
+  background: rgba(196, 43, 28, 0.9);
+  color: #ffffff;
+}
+
+html[data-app="windows"][data-window-inactive] .oeee-caption button:not(:hover):not(.is-hot) span {
+  opacity: 0.4;
+}
+
 html[data-app="windows"] .nav-bar #menubar {
   padding-right: 150px;
 }

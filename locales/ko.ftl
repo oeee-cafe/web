@@ -561,3 +561,7 @@ app-saved-image = 사진에 저장했습니다
 app-saved-file = 다운로드에 저장했습니다
 app-save-failed = 저장하지 못했습니다
 app-steam-sign-in-failed = Steam으로 로그인하지 못했습니다. Steam이 실행 중인지 확인하고 다시 시도해 주세요.
+window-minimize = 최소화
+window-maximize = 최대화
+window-restore = 이전 크기로
+window-close = 닫기
