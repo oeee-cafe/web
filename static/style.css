@@ -2411,11 +2411,7 @@ html[data-app="android"][data-push]::view-transition-new(root) {
 }
 
 /* The tag directory borrows the community directory's bar and cards; only
-   its title and the tag's glyph on an empty cover are its own. */
-.hashtag-directory-title {
-  margin-bottom: var(--ds-space-4);
-}
-
+   the tag's glyph on an empty cover is its own. */
 .hashtag-card .community-card-empty {
   color: var(--ds-faint);
   font-size: var(--ds-text-2xl);
