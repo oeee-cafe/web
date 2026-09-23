@@ -6,9 +6,9 @@
 {% block content %}
   {# Drafts as a queue of work: the same grid as every other page of
      drawings, and on each drawing what is left to do with it -- publish it,
-     or throw it away -- rather than a card that only led somewhere. A new
-     drawing is the other thing this page is for, so it is the header's
-     button. #}
+     or throw it away -- rather than a card that only led somewhere. Starting
+     a new drawing is the header bar's button, on this page as on every
+     other, so the page does not repeat it. #}
   {% include "post_feed_head.jinja" %}
   <div class="profile drafts-page">
     <section class="profile-section" aria-labelledby="drafts-heading">
@@ -19,7 +19,6 @@
         </div>
         <div class="drafts-tools">
           {% if posts %}{{ per_row() }}{% endif %}
-          <button type="button" class="ds-button ds-button-primary" onclick="window.oeeeCommand && window.oeeeCommand('new-drawing')">{{ ftl_get_message("draw") }}</button>
         </div>
       </div>
       {% if posts %}
@@ -63,7 +62,6 @@
       {% endif %}
       <div class="ds-card drafts-empty" data-drafts-empty {% if posts %}hidden{% endif %}>
         <p class="profile-empty">{{ ftl_get_message("draft-empty") }}</p>
-        <button type="button" class="ds-button ds-button-primary" onclick="window.oeeeCommand && window.oeeeCommand('new-drawing')">{{ ftl_get_message("draw") }}</button>
       </div>
     </section>
   </div>

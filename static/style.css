@@ -1605,15 +1605,15 @@ html[data-app="android"][data-push]::view-transition-new(root) {
   }
 }
 
-/* Nothing drafted: what to do about it, in the card the rest of the site
-   uses for a thing on its own. */
+/* Nothing drafted, said in the card the rest of the site uses for a thing
+   on its own. */
 .drafts-empty {
   padding: var(--ds-space-6) var(--ds-space-5);
   text-align: center;
 }
 
 .drafts-empty .profile-empty {
-  margin: 0 0 var(--ds-space-4);
+  margin: 0;
 }
 
 /* Form layout -- fieldsets, fields, checkboxes, actions -- is the design
