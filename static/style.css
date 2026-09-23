@@ -3709,21 +3709,16 @@ html[data-steam-app] .auth-steam {
   background-color: #e5e5e5;
 }
 
-/* An app is shown a provider's button only once it has said it can finish
-   that sign-in itself -- natively, or out to a browser and back through a
-   handoff -- because a web view that simply follows the link either loses
-   the session the answer has to come back to, or is refused outright. The
-   app says so in its user agent and the site marks the root element
-   (theme_head.jinja).
-
-   Keyed on that mark rather than on which app it is: every app used to be
-   listed here, so a platform that gained the ability kept its button hidden
-   until somebody remembered this file. The Mac app learning Google is how
-   that was found. A browser marks none of these and is shown everything. */
-html[data-app]:not([data-native-apple-sign-in]) .auth-apple,
-html[data-mac-app]:not([data-native-apple-sign-in]) .auth-apple,
-html[data-desktop]:not([data-native-apple-sign-in]) .auth-apple,
-html[data-steam-app]:not([data-native-apple-sign-in]) .auth-apple {
+/* Everywhere but the Windows app, which cannot finish either of these.
+   The phone apps and the Mac app sign in with Apple and with Google
+   themselves -- natively, or out to a browser and back through a handoff --
+   and a browser needs no help at all. The Windows app (on Steam and in the
+   Microsoft Store) opens these pages in a browser of its own, where the
+   answer arrives without the session it belongs to, so it is offered
+   neither; it is the one that marks `data-desktop` without `data-mac-app`,
+   since the Mac app marks both (theme_head.jinja). */
+html[data-desktop]:not([data-mac-app]) .auth-apple,
+html[data-desktop]:not([data-mac-app]) .auth-google {
   display: none;
 }
 
@@ -3769,12 +3764,7 @@ html[data-steam-app]:not([data-native-apple-sign-in]) .auth-apple {
   background-color: #1e1f20;
 }
 
-html[data-app]:not([data-native-google-sign-in]) .auth-google,
-html[data-mac-app]:not([data-native-google-sign-in]) .auth-google,
-html[data-desktop]:not([data-native-google-sign-in]) .auth-google,
-html[data-steam-app]:not([data-native-google-sign-in]) .auth-google {
-  display: none;
-}
+
 
 /* The agreement: a box to tick, and the two pages it agrees to. */
 .auth-agree {
