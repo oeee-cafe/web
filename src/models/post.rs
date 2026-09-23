@@ -210,6 +210,28 @@ pub struct PostDraft {
     pub replay_filename: Option<String>,
     pub tool: Tool,
     pub parent_post_id: Option<Uuid>,
+    /// The id the browser gave the drawing when it kept it on the device;
+    /// see `find_post_id_by_client_draft_id`.
+    pub client_draft_id: Option<Uuid>,
+}
+
+/// The post an earlier upload of the same locally saved drawing made, if one
+/// did. A drawing is kept on the device before it is sent, so it can arrive
+/// twice -- from two tabs, or after a tab closed between the upload landing and
+/// its local copy being forgotten.
+pub async fn find_post_id_by_client_draft_id(
+    tx: &mut Transaction<'_, Postgres>,
+    author_id: Uuid,
+    client_draft_id: Uuid,
+) -> Result<Option<Uuid>> {
+    let row = query!(
+        "SELECT id FROM posts WHERE author_id = $1 AND client_draft_id = $2 AND deleted_at IS NULL",
+        author_id,
+        client_draft_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(row.map(|row| row.id))
 }
 
 pub async fn find_posts_by_community_id(
@@ -691,16 +713,18 @@ pub async fn create_post(
                 image_id,
                 community_id,
                 is_sensitive,
-                parent_post_id
+                parent_post_id,
+                client_draft_id
             )
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id, created_at, updated_at
         ",
         post_draft.author_id,
         image.id,
         post_draft.community_id,
         false,
-        post_draft.parent_post_id
+        post_draft.parent_post_id,
+        post_draft.client_draft_id
     )
     .fetch_one(&mut **tx)
     .await?;

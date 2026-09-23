@@ -297,14 +297,10 @@ impl App {
             .route("/invitations/:id/accept", post(do_accept_invitation))
             .route("/invitations/:id/reject", post(do_reject_invitation))
             .route("/logout", post(do_logout))
-            .route("/draw", get(start_draw_get))
-            .route("/draw", post(start_draw))
-            .route("/draw/mobile", post(start_draw_mobile))
             .route(
                 "/draw/finish",
                 post(draw_finish).layer(DefaultBodyLimit::max(10 * 1024 * 1024)),
             )
-            .route("/posts/drafts", get(draft_posts))
             .route("/posts/publish", post(post_publish))
             .route("/posts/:id/edit", get(hx_edit_post))
             .route("/posts/:id/relay", get(post_relay_view))
@@ -414,6 +410,13 @@ impl App {
 
         let app = Router::new()
             .route("/", get(home))
+            // Open to guests. A guest's drawing is kept on the device, and the
+            // drafts page is where it waits for them to have an account;
+            // uploading it (/draw/finish) is still for someone signed in.
+            .route("/draw", get(start_draw_get))
+            .route("/draw", post(start_draw))
+            .route("/draw/mobile", post(start_draw_mobile))
+            .route("/posts/drafts", get(draft_posts))
             .route("/health", get(health))
             .route("/robots.txt", get(robots_txt))
             .route("/sitemap.xml", get(sitemap_xml))

@@ -1741,12 +1741,17 @@ mod template_tests {
             "signed out, About is its own button at the bar's end: a mark, with its words for its label"
         );
         assert!(
-            out.contains(r#"<a class="toolbar-square toolbar-draw toolbar-sign-in" href="/login" aria-label="sign-in" title="sign-in"><svg"#),
-            "and signing in is the filled button, a mark with its words for its label"
+            out.contains(r#"<a class="toolbar-square toolbar-button toolbar-sign-in" href="/login" aria-label="sign-in" title="sign-in"><svg"#),
+            "and signing in is a mark with its words for its label"
         );
-        // The theme square opens onto the three-way switch and nothing
-        // else: one link to `/about` in the whole bar, and it is not that
-        // menu's. (The desktop app's Help menu also reaches it, by script.)
+        assert!(
+            out.contains(r#"id="nav-draw-button" class="toolbar-square toolbar-draw""#),
+            "Draw is the filled button signed out too: a guest can draw"
+        );
+        // The theme square opens onto the three-way switch, and this
+        // browser's drafts when it has some: one link to `/about` in the
+        // whole bar, and it is not that menu's. (The desktop app's Help menu
+        // also reaches it, by script.)
         assert_eq!(out.matches(r#"href="/about""#).count(), 1);
         assert!(!out.contains("toolbar-menu-about"));
 
@@ -3026,5 +3031,98 @@ mod template_tests {
         assert!(found.contains(r#"href="/@someone/00000000-0000-0000-0000-000000000000""#));
         assert!(found.contains("/image/ab/abcdef0123.png"));
         assert!(!found.contains("search-no-results"));
+    }
+
+    /// Guests draw now, and keep what they drew in the browser. The pages that
+    /// serve them render with no one signed in, and the words the painter's
+    /// dialogs use arrive as JSON inside the page, which has to stay JSON once
+    /// every message in it has been escaped for HTML.
+    fn guest_chrome() -> minijinja::Value {
+        context! {
+            current_user => json!(null),
+            messages => Vec::<serde_json::Value>::new(),
+            draft_post_count => 0,
+            unread_notification_count => 0,
+            ftl_lang => "en",
+        }
+    }
+
+    fn json_script(rendered: &str, id: &str) -> serde_json::Value {
+        let open = format!(r#"<script id="{id}" type="application/json">"#);
+        let start = rendered.find(&open).expect("page has the script") + open.len();
+        let end = start + rendered[start..].find("</script>").expect("script is closed");
+        serde_json::from_str(&rendered[start..end]).expect("the script holds JSON")
+    }
+
+    #[test]
+    fn a_guest_painter_says_where_the_drawing_is_kept() {
+        let env = test_support::env();
+        for name in ["draw_post_cucumber.jinja", "draw_post_cucumber_mobile.jinja"] {
+            let rendered = env
+                .get_template(name)
+                .expect("painter template loads")
+                .render(context! {
+                    width => 300,
+                    height => 300,
+                    tool => "neo",
+                    painter_config => "{}",
+                    ..guest_chrome()
+                })
+                .expect("painter renders for a guest");
+            assert!(rendered.contains("draw-guest-notice"), "{name} does not warn a guest");
+            let words = json_script(&rendered, "oeee-painter-words");
+            assert_eq!(words["guestSaved"], "draw-guest-saved", "{name}");
+            assert_eq!(words["downloadPng"], "draw-download-png", "{name}");
+        }
+    }
+
+    #[test]
+    fn a_signed_in_painter_has_no_guest_notice() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("draw_post_cucumber.jinja")
+            .expect("painter template loads")
+            .render(context! {
+                width => 300,
+                height => 300,
+                tool => "neo",
+                painter_config => "{}",
+                current_user => json!({
+                    "id": "00000000-0000-0000-0000-000000000001",
+                    "login_name": "someone",
+                    "display_name": "Someone",
+                    "email_verified_at": "2026-01-01T00:00:00Z",
+                }),
+                messages => Vec::<serde_json::Value>::new(),
+                draft_post_count => 0,
+                unread_notification_count => 0,
+                ftl_lang => "en",
+            })
+            .expect("painter renders");
+        assert!(!rendered.contains("draw-guest-notice"));
+        assert!(rendered.contains(r#"data-user-id="00000000-0000-0000-0000-000000000001""#));
+    }
+
+    #[test]
+    fn a_guest_can_start_a_drawing_and_find_its_drafts() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("draft_posts.jinja")
+            .expect("drafts template loads")
+            .render(context! { posts => Vec::<serde_json::Value>::new(), ..guest_chrome() })
+            .expect("drafts render for a guest");
+        // The toolbar's draw button, signed out as well as in.
+        assert!(rendered.contains(r#"id="nav-draw-button""#));
+        // This browser's drafts, listed by the page's script, and the link to
+        // them in the guest's menu that the toolbar's script reveals.
+        assert!(rendered.contains(r#"id="local-drafts""#));
+        assert!(rendered.contains(r#"data-user-id="""#));
+        assert!(rendered.contains(r#"id="local-drafts-empty""#));
+        assert!(rendered.contains("/static/neo-cucumber/drafts.js"));
+        assert!(rendered.contains(r#"class="toolbar-menu-drafts""#));
+        // No server drafts to arrange for someone with none.
+        assert!(!rendered.contains(r#"id="post-feed-grid""#));
+        let words = json_script(&rendered, "local-drafts-words");
+        assert_eq!(words["communityDenied"], "drafts-local-community-denied");
     }
 }

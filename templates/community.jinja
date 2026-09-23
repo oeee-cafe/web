@@ -71,8 +71,14 @@
           {% endif %}
         </div>
         <div class="profile-actions">
-          {% if current_user %}
+          {# A guest can draw for a public community too, keeping the
+             drawing in the browser until they have an account; drawing
+             together, and anything unlisted or private, is for someone
+             signed in (draw.rs, may_draw_in). #}
+          {% if current_user or community.visibility == "public" %}
             <button type="button" class="ds-button ds-button-primary" onclick="showCommunityDrawModal()">{{ ftl_get_message("community-drawing-new") }}</button>
+          {% endif %}
+          {% if current_user %}
             {# Opens the lobby with this community preselected, so the
                session's saved drawing lands here. Goes through the lobby
                rather than creating a session outright so the canvas size,
@@ -118,7 +124,7 @@
     </section>
   </div>
 
-  {% if current_user %}
+  {% if current_user or community.visibility == "public" %}
     {# New drawing: the painter's choices, asked for when they are needed. #}
     <div id="community-draw-modal" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="community-draw-title">
       <div class="ds-modal-panel">

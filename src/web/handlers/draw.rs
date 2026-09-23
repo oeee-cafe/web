@@ -1,9 +1,12 @@
-use crate::app_error::AppError;
+use crate::app_error::{error_codes, AppError};
 use crate::models::banner::{create_banner, BannerDraft};
-use crate::models::community::find_community_by_id;
-use crate::models::post::{create_post, find_post_by_id, PostDraft, Tool};
-use crate::models::user::{update_user_preferred_language, AuthSession};
+use crate::models::community::{find_community_by_id, is_user_member, Community, CommunityVisibility};
+use crate::models::post::{
+    create_post, find_post_by_id, find_post_id_by_client_draft_id, PostDraft, Tool,
+};
+use crate::models::user::{update_user_preferred_language, AuthSession, User};
 use crate::web::context::CommonContext;
+use crate::web::responses::ErrorResponse;
 use crate::web::handlers::{
     detect_preferred_language, safe_decode_hash, safe_parse_uuid, ExtractAcceptLanguage,
     ExtractFtlLang,
@@ -14,7 +17,7 @@ use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client;
-use axum::response::{IntoResponse, Redirect};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
 use axum::{
     extract::{Multipart, State},
@@ -31,7 +34,7 @@ use serde_json::json;
 use sha256::digest;
 use crate::web::presence::{Activity, Presence};
 use sqlx::postgres::types::PgInterval;
-use std::time::{SystemTime, UNIX_EPOCH};
+use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 #[derive(Deserialize, Debug)]
@@ -54,6 +57,36 @@ pub struct InputMobile {
     parent_post_id: Option<String>,
 }
 
+/// Whether `user` may draw for `community`, and so post what they drew there.
+///
+/// Signed in, it is what publishing already asks: a private community is for
+/// its members, and anything else is open. A guest's drawing is kept on the
+/// device until they have an account, and a guest can be a member of nothing,
+/// so a guest may draw only for a public community -- an unlisted one is
+/// reached by a link its members pass around, and a private one's name and
+/// colours are not for a stranger's painter page.
+async fn may_draw_in(
+    tx: &mut Transaction<'_, Postgres>,
+    user: Option<&User>,
+    community: &Community,
+) -> Result<bool, AppError> {
+    Ok(match (user, community.visibility) {
+        (None, CommunityVisibility::Public) => true,
+        (None, _) => false,
+        (Some(user), CommunityVisibility::Private) => {
+            is_user_member(tx, user.id, community.id).await?
+        }
+        (Some(_), _) => true,
+    })
+}
+
+/// Where a guest is sent from a painter they may not open. Plain /login, with
+/// no way back: the form that asked for the painter was a POST, which a
+/// redirect cannot repeat.
+fn sign_in_instead() -> Response {
+    Redirect::to("/login").into_response()
+}
+
 pub async fn start_draw_get() -> Redirect {
     Redirect::to("/")
 }
@@ -63,7 +96,7 @@ pub async fn start_draw(
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Form(input): Form<Input>,
-) -> Result<Html<String>, AppError> {
+) -> Result<Response, AppError> {
     let template_filename = "draw_post_cucumber.jinja";
 
     let db = &state.db_pool;
@@ -94,6 +127,21 @@ pub async fn start_draw(
         None
     };
 
+    // A guest draws on a plain canvas or for a public community, and relays
+    // nothing: see `may_draw_in`.
+    let user = auth_session.user.as_ref();
+    if user.is_none() && input.parent_post_id.as_deref().is_some_and(|id| !id.is_empty()) {
+        return Ok(sign_in_instead());
+    }
+    if let Some(ref community) = community {
+        if !may_draw_in(&mut tx, user, community).await? {
+            return Ok(match user {
+                None => sign_in_instead(),
+                Some(_) => AppError::Forbidden.into_response(),
+            });
+        }
+    }
+
     let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
     let painter_mode = match community.as_ref().and_then(|community| {
         Some((
@@ -111,10 +159,12 @@ pub async fn start_draw(
     let painter_config = serde_json::to_string(&json!({
         "width": input.width.parse::<u32>()?,
         "height": input.height.parse::<u32>()?,
-        "communityId": input.community_id.clone(),
+        "communityId": community.as_ref().map(|c| c.id.to_string()),
+        "communityName": community.as_ref().map(|c| c.name.clone()),
         "parentPostId": input.parent_post_id.clone(),
         "locale": ftl_lang.clone(),
         "mode": painter_mode,
+        "userId": user.map(|u| u.id.to_string()),
     }))?;
     let presence = Presence::new(if parent_post.is_some() {
         Activity::Relaying
@@ -141,7 +191,7 @@ pub async fn start_draw(
         painter_config
     })?;
 
-    Ok(Html(rendered))
+    Ok(Html(rendered).into_response())
 }
 
 pub async fn start_draw_mobile(
@@ -190,6 +240,21 @@ pub async fn start_draw_mobile(
         None
     };
 
+    // A guest draws on a plain canvas or for a public community, and relays
+    // nothing: see `may_draw_in`.
+    let user = auth_session.user.as_ref();
+    if user.is_none() && input.parent_post_id.as_deref().is_some_and(|id| !id.is_empty()) {
+        return Ok(sign_in_instead());
+    }
+    if let Some(ref community) = community {
+        if !may_draw_in(&mut tx, user, community).await? {
+            return Ok(match user {
+                None => sign_in_instead(),
+                Some(_) => AppError::Forbidden.into_response(),
+            });
+        }
+    }
+
     let template_filename = "draw_post_cucumber_mobile.jinja";
 
     let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
@@ -209,10 +274,12 @@ pub async fn start_draw_mobile(
     let painter_config = serde_json::to_string(&json!({
         "width": input.width.parse::<u32>()?,
         "height": input.height.parse::<u32>()?,
-        "communityId": community_id.map(|id| id.to_string()),
+        "communityId": community.as_ref().map(|c| c.id.to_string()),
+        "communityName": community.as_ref().map(|c| c.name.clone()),
         "parentPostId": input.parent_post_id.clone(),
         "locale": ftl_lang.clone(),
         "mode": painter_mode,
+        "userId": user.map(|u| u.id.to_string()),
     }))?;
     let rendered = template.render(context! {
         current_user => auth_session.user,
@@ -286,10 +353,11 @@ pub async fn draw_finish(
     let mut replay_sha256 = String::new();
     let mut replay_data = Vec::new();
     let mut community_id = None;
-    let mut security_timer = 0;
+    let mut paint_duration_ms = None;
     let mut security_count = 0;
     let mut tool = String::new();
     let mut parent_post_id = None;
+    let mut client_draft_id = None;
 
     while let Some(field) = multipart.next_field().await? {
         let name = field
@@ -341,13 +409,15 @@ pub async fn draw_finish(
             if !id_str.is_empty() {
                 community_id = Uuid::parse_str(id_str).ok();
             }
-        } else if name == "security_timer" {
-            let timer_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in security_timer: {}", e))
+        } else if name == "paint_duration_ms" {
+            // Measured by the painter when it saved, not from when the page
+            // opened: a drawing kept on the device can be sent days later.
+            let duration_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
+                AppError::InvalidFormData(format!("Invalid UTF-8 in paint_duration_ms: {}", e))
             })?;
-            security_timer = timer_str
-                .parse::<u128>()
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid security_timer: {}", e)))?;
+            paint_duration_ms = Some(duration_str.parse::<u32>().map_err(|e| {
+                AppError::InvalidFormData(format!("Invalid paint_duration_ms: {}", e))
+            })?);
         } else if name == "security_count" {
             let count_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
                 AppError::InvalidFormData(format!("Invalid UTF-8 in security_count: {}", e))
@@ -377,18 +447,31 @@ pub async fn draw_finish(
                 AppError::InvalidFormData(format!("Invalid UTF-8 in parent_post_id: {}", e))
             })?;
             parent_post_id = Some(safe_parse_uuid(parent_id_str)?);
+        } else if name == "client_draft_id" && !data.is_empty() {
+            let draft_id_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
+                AppError::InvalidFormData(format!("Invalid UTF-8 in client_draft_id: {}", e))
+            })?;
+            client_draft_id = Some(safe_parse_uuid(draft_id_str)?);
         }
     }
-    let start = SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    let duration_ms = since_the_epoch.as_millis() - security_timer;
+    let paint_duration_ms = paint_duration_ms
+        .ok_or_else(|| AppError::InvalidFormData("paint_duration_ms is required".to_string()))?;
 
     // Every painter left records a NEO replay. Tegaki's .tgkr is still
     // played for the posts that have one, but nothing can make a new one.
     if !(tool == "neo" || tool == "cucumber" || tool == "neo-cucumber-offline") {
         return Ok(StatusCode::BAD_REQUEST.into_response());
+    }
+
+    let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
+    let db = &state.db_pool;
+    let mut tx = db.begin().await?;
+
+    // This drawing has been here before; answer with what it made then.
+    if let Some(draft_id) = client_draft_id {
+        if let Some(post_id) = find_post_id_by_client_draft_id(&mut tx, current_user.id, draft_id).await? {
+            return existing_post_response(&mut tx, &state, post_id).await;
+        }
     }
 
     // Get first 2 characters for directory prefix
@@ -407,11 +490,7 @@ pub async fn draw_finish(
 
     let replay_filename = format!("{}.pch", replay_sha256);
 
-    let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
-
     // If creating a reply but community_id is not provided, inherit from parent post
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
 
     if community_id.is_none() {
         if let Some(parent_id) = parent_post_id {
@@ -429,11 +508,28 @@ pub async fn draw_finish(
         "neo-cucumber-offline" => Tool::NeoCucumber,
         _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
+    if let Some(cid) = community_id {
+        let allowed = match find_community_by_id(&mut tx, cid).await? {
+            Some(community) => may_draw_in(&mut tx, Some(current_user), &community).await?,
+            None => false,
+        };
+        if !allowed {
+            return Ok((
+                StatusCode::FORBIDDEN,
+                Json(ErrorResponse::new(
+                    error_codes::COMMUNITY_NOT_ALLOWED,
+                    "This account cannot post in that community",
+                )),
+            )
+                .into_response());
+        }
+    }
+
     let post_draft = PostDraft {
         author_id: current_user.id,
         community_id,
         paint_duration: PgInterval::try_from(
-            Duration::try_milliseconds(duration_ms as i64).unwrap_or_default(),
+            Duration::try_milliseconds(i64::from(paint_duration_ms)).unwrap_or_default(),
         )
         .unwrap_or_default(),
         stroke_count: security_count,
@@ -443,9 +539,24 @@ pub async fn draw_finish(
         replay_filename: Some(replay_filename),
         tool: tool_enum,
         parent_post_id,
+        client_draft_id,
     };
 
-    let post = create_post(&mut tx, post_draft).await?;
+    let post = match create_post(&mut tx, post_draft).await {
+        Ok(post) => post,
+        // Another tab sent the same drawing between the lookup above and
+        // this insert, and won; its post is the answer to this one too.
+        Err(error) if client_draft_id.is_some() && is_unique_violation(&error) => {
+            drop(tx);
+            let mut tx = db.begin().await?;
+            let draft_id = client_draft_id.expect("checked above");
+            let post_id = find_post_id_by_client_draft_id(&mut tx, current_user.id, draft_id)
+                .await?
+                .ok_or_else(|| AppError::Anyhow(error))?;
+            return existing_post_response(&mut tx, &state, post_id).await;
+        }
+        Err(error) => return Err(error.into()),
+    };
     let _ = tx.commit().await;
 
     // Construct image URL
@@ -461,6 +572,37 @@ pub async fn draw_finish(
         image_url,
     })
     .into_response())
+}
+
+/// What `draw_finish` says about a post an earlier upload of the same drawing
+/// already made, in the same shape as a new one.
+async fn existing_post_response(
+    tx: &mut Transaction<'_, Postgres>,
+    state: &AppState,
+    post_id: Uuid,
+) -> Result<Response, AppError> {
+    let post = find_post_by_id(tx, post_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post".to_string()))?;
+    let field = |name: &str| post.get(name).cloned().flatten();
+    let image_filename = field("image_filename").unwrap_or_default();
+    let image_prefix = image_filename.get(..2).unwrap_or_default();
+    Ok(Json(DrawFinishResponse {
+        community_id: field("community_id"),
+        post_id: post_id.to_string(),
+        image_url: format!(
+            "{}/image/{}/{}",
+            state.config.r2_public_endpoint_url, image_prefix, image_filename
+        ),
+    })
+    .into_response())
+}
+
+fn is_unique_violation(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<sqlx::Error>()
+        .and_then(|error| error.as_database_error())
+        .is_some_and(|error| error.is_unique_violation())
 }
 
 pub async fn banner_draw_finish(
@@ -488,7 +630,7 @@ pub async fn banner_draw_finish(
     let mut height = 0;
     let mut image_sha256 = String::new();
     let mut replay_sha256 = String::new();
-    let mut security_timer = 0;
+    let mut paint_duration_ms = None;
     let mut security_count = 0;
 
     while let Some(field) = multipart.next_field().await? {
@@ -547,13 +689,13 @@ pub async fn banner_draw_finish(
                 &BASE64.encode(&safe_decode_hash(&replay_sha256)?),
             )
             .await?;
-        } else if name == "security_timer" {
+        } else if name == "paint_duration_ms" {
             let data_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in security_timer: {}", e))
+                AppError::InvalidFormData(format!("Invalid UTF-8 in paint_duration_ms: {}", e))
             })?;
-            security_timer = data_str
-                .parse::<u128>()
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid security_timer: {}", e)))?;
+            paint_duration_ms = Some(data_str.parse::<u32>().map_err(|e| {
+                AppError::InvalidFormData(format!("Invalid paint_duration_ms: {}", e))
+            })?);
         } else if name == "security_count" {
             let data_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
                 AppError::InvalidFormData(format!("Invalid UTF-8 in security_count: {}", e))
@@ -577,17 +719,13 @@ pub async fn banner_draw_finish(
         }
     }
     let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
-
-    let start = SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    let duration_ms = since_the_epoch.as_millis() - security_timer;
+    let paint_duration_ms = paint_duration_ms
+        .ok_or_else(|| AppError::InvalidFormData("paint_duration_ms is required".to_string()))?;
 
     let banner_draft = BannerDraft {
         author_id: current_user.id,
         paint_duration: PgInterval::try_from(
-            Duration::try_milliseconds(duration_ms as i64).unwrap_or_default(),
+            Duration::try_milliseconds(i64::from(paint_duration_ms)).unwrap_or_default(),
         )
         .unwrap_or_default(),
         stroke_count: security_count,

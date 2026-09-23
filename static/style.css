@@ -1598,6 +1598,21 @@ nav a:visited,
   margin: 0;
 }
 
+.drafts-empty .profile-empty + .profile-empty {
+  margin-top: var(--ds-space-3);
+}
+
+/* Drawings kept in this browser (draft_posts.jinja): above the account's
+   own, and hidden -- against the section's and the card's own display --
+   until the page's script has found some. */
+.drafts-page [hidden] {
+  display: none;
+}
+
+.local-drafts {
+  margin-bottom: var(--ds-space-6);
+}
+
 /* Form layout -- fieldsets, fields, checkboxes, actions -- is the design
    system's; see "Forms" in ds.css. */
 

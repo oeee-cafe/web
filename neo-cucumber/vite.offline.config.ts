@@ -38,9 +38,14 @@ export default defineConfig({
     outDir: "dist-offline",
     emptyOutDir: true,
     lib: {
-      entry: resolve(import.meta.dirname, "../frontend/painter/entry.ts"),
+      // The painter, and the drafts page's list of the drawings it kept in
+      // the browser (frontend/shared/localDrafts.ts), which the two share.
+      entry: {
+        offline: resolve(import.meta.dirname, "../frontend/painter/entry.ts"),
+        drafts: resolve(import.meta.dirname, "../frontend/drafts/entry.ts"),
+      },
       formats: ["es"],
-      fileName: () => "offline.js",
+      fileName: (_format, name) => `${name}.js`,
     },
     cssCodeSplit: false,
     rollupOptions: {
