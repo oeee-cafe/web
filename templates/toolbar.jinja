@@ -103,7 +103,14 @@
          form with a single field submits on Enter by itself. Hidden in the
          phone apps, whose own search tabs are the native field
          (theme_head.jinja marks the root). #}
-      <form class="toolbar-search" method="get" action="/search" role="search">
+      {# Unboosted, like the two forms below and for a plainer reason than
+         theirs: htmx 4 takes a boosted form's submit, sends the request --
+         GET /search?q=… , 200, the right page -- and swaps nothing in. The
+         bar stays where it was and the search appears to do nothing. So
+         this goes the way a form went before htmx existed, which is also
+         the way it goes with no script at all; the skeleton is laid by
+         hand below, where a boosted link would have had one for free. #}
+      <form class="toolbar-search" method="get" action="/search" role="search" hx-boost="false">
         <label class="toolbar-search-glass" for="toolbar-search-field" title="{{ ftl_get_message("search") }} (/)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
         </label>
@@ -747,9 +754,8 @@
       });
       // A search is a trip to /search, and the bar's links to it lay a
       // skeleton down while they go; submitting the field is the same trip
-      // and gets the same one. It is the nav's, so it is boosted, and a
-      // boosted request's swap takes the skeleton away exactly as a
-      // boosted link's does.
+      // and gets the same one. The form is unboosted, so this is a page
+      // load, and the page that arrives replaces the skeleton with itself.
       document.addEventListener("submit", function (event) {
         var form = event.target;
         if (!form || !form.classList || !form.classList.contains("toolbar-search")) return;

@@ -1604,6 +1604,10 @@ mod template_tests {
             .expect("toolbar renders");
 
         assert!(bar.contains(r#"class="toolbar-search" method="get" action="/search""#));
+        // htmx 4 answers a boosted form's submit by fetching the page and
+        // swapping nothing in, so this one is not boosted -- the bar would
+        // sit there looking as though the search had not been pressed.
+        assert!(bar.contains(r#"role="search" hx-boost="false""#));
         assert!(bar.contains(r#"for="toolbar-search-field""#), "the glass labels it");
         assert!(bar.contains(r#"id="toolbar-search-field""#));
         assert!(bar.contains(r#"type="search""#) && bar.contains(r#"name="q""#));
