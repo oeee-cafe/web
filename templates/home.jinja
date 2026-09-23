@@ -18,7 +18,11 @@
        (handlers/home.rs, Feed). #}
     <section role="region" aria-label="{{ ftl_get_message("feed-" ~ feed_switch) }}">
       <div class="feed-header">
-        {% include "feed_switch.jinja" %}
+        {% if current_user %}
+          {% include "feed_switch.jinja" %}
+        {% else %}
+          <h2 class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
+        {% endif %}
         {# Only with drawings to arrange: an empty feed has no columns to set. #}
         {% if feed.posts and feed.posts|length > 0 %}
           {% include "post_feed_controls.jinja" %}

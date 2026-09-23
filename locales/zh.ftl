@@ -22,11 +22,9 @@ keyboard-shortcuts-then = 然后
 nav-home = 首页
 feed-switch = 动态
 feed-recent = 最新
-feed-popular = 热门
 feed-following = 关注
 feed-communities = 社区
 feed-recent-empty = 还没有作品。
-feed-popular-empty = 还没有作品。
 feed-following-empty = 时间线是空的。在<a href="/communities">社区</a>中与其他用户建立联系吧！
 feed-communities-empty = 你加入的社区还没有新作品。去<a href="/communities">社区</a>找一个加入吧！
 

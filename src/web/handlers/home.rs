@@ -15,7 +15,7 @@ use crate::models::notification::{
 };
 use crate::models::post::{
     build_thread_tree, delete_post_with_activity, edit_post, find_following_posts_by_user_id,
-    find_member_community_posts, find_popular_posts, find_post_by_id, find_post_detail_for_json,
+    find_member_community_posts, find_post_by_id, find_post_detail_for_json,
     find_public_posts,
     find_recent_posts_by_communities, SerializableThreadedPost,
 };
@@ -80,8 +80,6 @@ pub(crate) fn feed_context(
 pub(crate) enum Feed {
     /// `/`: every public drawing, newest first.
     Recent,
-    /// `/popular`: Reddit's "hot", liked and recent together.
-    Popular,
     /// `/following`: the people the reader follows.
     Following,
     /// `/joined`: the communities the reader is a member of.
@@ -93,7 +91,6 @@ impl Feed {
     fn name(self) -> &'static str {
         match self {
             Feed::Recent => "recent",
-            Feed::Popular => "popular",
             Feed::Following => "following",
             Feed::Communities => "communities",
         }
@@ -103,7 +100,6 @@ impl Feed {
     fn batch_path(self) -> &'static str {
         match self {
             Feed::Recent => "/api/home/posts",
-            Feed::Popular => "/api/popular/posts",
             Feed::Following => "/api/following/posts",
             Feed::Communities => "/api/joined/posts",
         }
@@ -122,7 +118,6 @@ impl Feed {
         let show_sensitive = viewer.map_or(false, |user| user.show_sensitive_content);
         Ok(match self {
             Feed::Recent => find_public_posts(tx, limit, offset, viewer_id, show_sensitive).await?,
-            Feed::Popular => find_popular_posts(tx, limit, offset, viewer_id, show_sensitive).await?,
             Feed::Following => {
                 let user = viewer.ok_or(AppError::Unauthorized)?;
                 find_following_posts_by_user_id(tx, user.id, show_sensitive, limit, offset).await?
@@ -195,15 +190,6 @@ pub async fn home(
     feed_page(Feed::Recent, auth_session, state, ftl_lang, messages).await
 }
 
-pub async fn popular(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    messages: Messages,
-) -> Result<impl IntoResponse, AppError> {
-    feed_page(Feed::Popular, auth_session, state, ftl_lang, messages).await
-}
-
 pub async fn my_timeline(
     auth_session: AuthSession,
     State(state): State<AppState>,
@@ -252,15 +238,6 @@ pub async fn load_more_public_posts(
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     feed_batch(Feed::Recent, auth_session, state, query).await
-}
-
-/// GET /api/popular/posts
-pub async fn load_more_popular_posts(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Query(query): Query<LoadMoreQuery>,
-) -> Result<impl IntoResponse, AppError> {
-    feed_batch(Feed::Popular, auth_session, state, query).await
 }
 
 /// GET /api/following/posts
@@ -1447,8 +1424,8 @@ mod tests {
     }
 
     /// Home's feeds are orders of one feed, so they are a switch where its
-    /// heading was rather than tabs in the toolbar: Recent and Popular for
-    /// anyone, Following and Communities too for someone signed in.
+    /// heading was rather than tabs in the toolbar -- for someone signed in.
+    /// Signed out there is only Recent, which keeps its heading.
     #[test]
     fn home_switches_between_its_feeds_in_place_of_a_heading() {
         let env = test_support::env();
@@ -1457,11 +1434,8 @@ mod tests {
         let signed_out = home
             .render(home_context(vec![sample_post()], false))
             .expect("home.jinja renders");
-        assert!(signed_out.contains(r#"<a href="/" aria-current="page">feed-recent</a>"#));
-        assert!(signed_out.contains(r#"<a href="/popular">feed-popular</a>"#));
-        assert!(!signed_out.contains(r#"href="/following""#), "nobody's own feeds signed out");
-        assert!(!signed_out.contains(r#"href="/joined""#));
-        assert!(!signed_out.contains("home-section-title"), "the switch is the heading");
+        assert!(!signed_out.contains("feed-switch"), "one feed signed out, no switch");
+        assert!(signed_out.contains(r#"<h2 class="home-section-title">recent-drawings</h2>"#));
 
         let signed_in = |feed_switch: &str| {
             home.render(context! {
@@ -1475,7 +1449,6 @@ mod tests {
         assert!(recent.contains(r#"<a href="/following">feed-following</a>"#));
         assert!(recent.contains(r#"<a href="/joined">feed-communities</a>"#));
         for (feed, path) in [
-            ("popular", "/popular"),
             ("following", "/following"),
             ("communities", "/joined"),
         ] {

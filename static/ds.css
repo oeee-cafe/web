@@ -514,6 +514,42 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   outline: none;
 }
 
+/* A page's pill switching it in place (pill_macro.jinja): while a page
+   that was not fetched ahead is on its way, the content under the pill
+   dims -- after a moment, so one that arrives at once never flickers --
+   and the pill, above the veil, stays as bright as it is. */
+.ds-content.htmx-request {
+  position: relative;
+}
+
+.ds-content.htmx-request::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  background-color: var(--ds-ground);
+  pointer-events: none;
+  -webkit-animation: ds-veil 0.2s 0.12s both;
+  animation: ds-veil 0.2s 0.12s both;
+}
+
+.ds-content.htmx-request .ds-segmented {
+  z-index: 2;
+}
+
+@-webkit-keyframes ds-veil {
+  from { opacity: 0; }
+  to { opacity: 0.55; }
+}
+
+@keyframes ds-veil {
+  from { opacity: 0; }
+  to { opacity: 0.55; }
+}
+
 /* The macOS app: the toolbar is a window's toolbar there, and like Finder's
    or Safari's it is frosted glass the content scrolls under, rather than a
    strip the content stops at. So the header floats over the content area,

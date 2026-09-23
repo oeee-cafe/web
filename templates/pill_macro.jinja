@@ -1,0 +1,18 @@
+{# The attributes that make a page's pill of links -- Home's feeds, the
+   hashtag orders, the documents -- switch the page in place: the links
+   are boosted, and what comes back is morphed into the content area
+   (main.ds-content) rather than swapped for the whole body, so the
+   toolbar is untouched and the content keeps what it can. The pill
+   itself is skipped by the morph (hx-morph-skip): it is already showing
+   the new choice, its thumb sliding to it (segmented.jinja), and the
+   response's copy of it would stop the slide where it stands. Fetched
+   ahead on hover or touch (hx-preload); the content area dims while a
+   fetch that was not ahead is on its way (hx-indicator, ds.css). The
+   address is pushed as for any boosted link, and going back is htmx's,
+   from its history cache where it has the page.
+
+   htmx 4 is too new for the oldest browsers the site serves (Firefox 56),
+   and there these are ordinary links. #}
+{% macro in_place() -%}
+hx-boost:inherited="true" hx-target:inherited="main.ds-content" hx-select:inherited="main.ds-content" hx-swap:inherited="outerMorph" hx-indicator:inherited="main.ds-content" hx-preload:inherited="mouseover, touchstart" hx-morph-skip
+{%- endmacro %}
