@@ -20,10 +20,37 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+LOCK_DIR=.deploy.lock
+
+# One deploy at a time: two would fight over the build database's port and over
+# which colour is live.
+#
+# Taken before the pull, because the pull is itself a change to the machine: a
+# deploy refused after pulling leaves the checkout on a commit that the deploy
+# already building has never seen, and the release that came out of it was
+# built from one tree while the checkout claimed another. Taken before the trap
+# is installed, so failing to take it cannot clean up after the deploy that
+# holds it.
+if [[ -z ${DEPLOY_LOCK_HELD:-} ]] && ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    echo "ERROR: another deploy is in progress (remove $LOCK_DIR if it is not)"
+    exit 1
+fi
+
+cleanup() {
+    echo "==> Cleaning up build database..."
+    docker rm -fv oeee-cafe-build-db 2>/dev/null || true
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 # `git pull` can rewrite this file underneath the shell that is reading it, and
 # zsh reads a script incrementally rather than all at once. Pull before doing
 # anything else, and start over from the new version if it changed, so the rest
 # of the deploy runs from one consistent script.
+#
+# zsh does not run an EXIT trap on exec, so the lock survives that restart;
+# DEPLOY_LOCK_HELD is how the new process knows it already holds it rather than
+# refusing its own deploy.
 SCRIPT_BEFORE_PULL="$(shasum "$0")"
 echo "==> Pulling latest code from git..."
 if ! git pull; then
@@ -32,6 +59,7 @@ if ! git pull; then
 fi
 if [[ "$SCRIPT_BEFORE_PULL" != "$(shasum "$0")" ]]; then
     echo "==> deploy.sh changed in that pull; restarting it..."
+    export DEPLOY_LOCK_HELD=1
     exec "$0" "$@"
 fi
 
@@ -47,22 +75,6 @@ DRAIN_SECONDS=${DRAIN_SECONDS:-10}
 HEALTH_TIMEOUT_SECONDS=${HEALTH_TIMEOUT_SECONDS:-180}
 
 UPSTREAM_FILE=proxy/upstream.caddy
-LOCK_DIR=.deploy.lock
-
-# One deploy at a time: two would fight over the build database's port and over
-# which colour is live. Taken before the trap is installed, so failing to take
-# it cannot clean up after the deploy that holds it.
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    echo "ERROR: another deploy is in progress (remove $LOCK_DIR if it is not)"
-    exit 1
-fi
-
-cleanup() {
-    echo "==> Cleaning up build database..."
-    docker rm -fv oeee-cafe-build-db 2>/dev/null || true
-    rmdir "$LOCK_DIR" 2>/dev/null || true
-}
-trap cleanup EXIT
 
 echo "==> Ensuring build network exists..."
 docker network create oeee-cafe-network 2>/dev/null || true
