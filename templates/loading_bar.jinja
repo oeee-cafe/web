@@ -115,6 +115,14 @@
     }
     window.oeeeLoadingBar = { start: start, done: done, leave: leave };
 
+    // Whether htmx will take this trip for itself. The toolbar is boosted
+    // wherever it is, but the painter pages it sits above (the collaborative
+    // one, served as a built file) do not load htmx, and there a boosted link
+    // is an ordinary page load -- one the page may ask about first.
+    function isBoosted(element) {
+      return !!window.htmx && !!element.closest('[hx-boost\\:inherited="true"]') &&
+        !element.closest('[hx-boost="false"]');
+    }
     // On the window, so it is heard after every listener on the document:
     // those that do something with a link the page is leaving by (a
     // segmented control's thumb sliding to it, segmented.jinja) see a click
@@ -126,7 +134,7 @@
       if (!link || link.target || link.hasAttribute("download")) return;
       // htmx cancels the click on a boosted link and fetches the page
       // itself; any other cancelled click is a script keeping the page.
-      var boosted = link.closest('[hx-boost\\:inherited="true"]') && !link.closest('[hx-boost="false"]');
+      var boosted = isBoosted(link);
       if (event.defaultPrevented && !boosted) return;
       if (link.origin !== location.origin) return;
       if (link.pathname === location.pathname && link.search === location.search) return;
@@ -146,7 +154,7 @@
       if ((form.getAttribute("method") || "").toLowerCase() === "dialog") return;
       if (form.hasAttribute("hx-post") || form.hasAttribute("hx-get") ||
           form.hasAttribute("hx-put") || form.hasAttribute("hx-delete")) return;
-      var boosted = form.closest('[hx-boost\\:inherited="true"]') && !form.closest('[hx-boost="false"]');
+      var boosted = isBoosted(form);
       if (event.defaultPrevented && !boosted) return;
       if (boosted) return start(form);
       if (wouldAsk()) return;
