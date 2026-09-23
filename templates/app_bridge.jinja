@@ -35,9 +35,10 @@
             The number on the bell (nav_notifications.jinja): unread
             notifications and invitations waiting, together. Sent whenever it
             changes, which is when a request swaps the bell.
-   theme    {choice, dark, top, bottom, ground, grid}
-            `choice` is "light", "dark" or "system"; `dark` what that comes
-            to now. `top` and `bottom` are the colours at the page's two
+   theme    {choice, top, bottom, ground, grid}
+            `choice` is "light", "dark" or "system", as the reader picked it
+            in the toolbar; what "system" comes to is the app's to know.
+            `top` and `bottom` are the colours at the page's two
             edges, as CSS colours, for the bars an app draws against them --
             or null where nothing there has a colour, the app's own then.
             `ground` and `grid` are the design system's --ds-ground and
@@ -219,11 +220,8 @@
       return null;
     }
     function themeState() {
-      var choice = root.getAttribute("data-theme") || "system";
-      var system = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
       return {
-        choice: choice,
-        dark: choice === "dark" || (choice === "system" && !!system),
+        choice: root.getAttribute("data-theme") || "system",
         top: document.body ? colourAt(document.querySelector(".nav-bar") || document.body) : null,
         bottom: document.body ? colourAt(document.body) : null,
         ground: token("--ds-ground"),
