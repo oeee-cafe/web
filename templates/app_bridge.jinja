@@ -87,8 +87,8 @@
    download {name, mime, data}
             What Android's web view cannot do itself (app_polyfills.jinja).
 
-   Each app ends its web view's user agent with  OeeeCafe/<app>, and a build
-   that sells with  store/<store>  after it. theme_head.jinja reads that in
+   Each app ends its web view's user agent with  OeeeCafe platform/<app>,
+   and a build that sells with  store/<store>  straight after it. theme_head.jinja reads that in
    one place and marks the root before the page paints: `data-app` (which
    app: "ios", "android", "macos", "windows"), `data-form` (the kind of
    device: "handheld" or "desktop") and `data-store` (where it sells). The
@@ -101,6 +101,12 @@
    browser asks them, which neither WKWebView nor a window being closed
    asks by itself. The painter answers only for a drawing with something in
    it, and not while it is being saved -- which `painting` above cannot say.
+   When the app has asked the reader itself -- after wouldLoseWork(), or
+   from its web view's own `beforeunload` dialog -- and the answer was
+   Leave, it calls window.oeeeApp.leaving() and begins the load once the
+   promise settles; the page shows it is on its way, as it does for every
+   load it sees coming. Every app asks both the same way, in the words
+   appContract.json gives them.
 
    A build that sells says which store it sells through in its user agent
    -- store/apple (the App Store), store/microsoft (the Microsoft Store) or
@@ -120,10 +126,11 @@
    find as `window.oeeeApp && oeeeApp.command && oeeeApp.command(name)`:
 
      wouldLoseWork()         here; see below
+     leaving()               here; see below
      pushToken(token)        here: the app's push token, from APNs or FCM,
                              which the app hands over whenever a page says
                              someone is signed in. The page registers it for
-                             them (POST /api/v1/devices, from its own session,
+                             them (POST /devices, from its own session,
                              with the platform its user agent names), once a
                              document; the answer sets the oeee_device cookie
                              the site's sign-out reads (devices.rs, auth.rs).
@@ -164,7 +171,15 @@
 
    There is no other channel. The web-view apps were never released before
    this contract; the builds people have from before it are the native
-   apps, which never load these pages. #}
+   apps, which never load these pages.
+
+   The apps test against frontend/shared/appContract.json: the user agents
+   and the marks each makes, an example of every message above as the page
+   sends it, every member of oeeeApp, the names command() takes, and the
+   two calls around leaving, word for word. appContract.browser.test.ts
+   captures the page again and fails when the file no longer says what it
+   does, so a change here that an app has to follow shows up as a change to
+   that file, which each app fetches with its scripts/sync-app-contract.sh. #}
 <script>
   (function () {
     var root = document.documentElement;
@@ -307,7 +322,7 @@
       var platform = PLATFORMS[root.getAttribute("data-app")];
       if (!platform) return;
       registered = token;
-      fetch("/api/v1/devices", {
+      fetch("/devices", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -343,6 +358,13 @@
         window.dispatchEvent(event);
         return event.defaultPrevented ||
           (typeof event.returnValue === "string" && event.returnValue !== "");
+      },
+      // The reader said Leave in the app's own dialog, and the app is about
+      // to load the next page: the loading bar goes up (loading_bar.jinja),
+      // and the promise settles when the load may begin.
+      leaving: function () {
+        var bar = window.oeeeLoadingBar;
+        return bar ? bar.leaving() : Promise.resolve();
       }
     };
   })();

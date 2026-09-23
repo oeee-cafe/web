@@ -1267,7 +1267,7 @@ mod template_tests {
         // pasted between quotes.
         assert!(head.contains(r#"leaveTitle: "app-leave-title","#), "{head}");
         assert!(head.contains("window.oeeeApp.signIn = {"));
-        assert!(head.contains(r#"OeeeCafe\/(ios|android|macos|windows)"#));
+        assert!(head.contains(r#"OeeeCafe platform\/(ios|android|macos|windows)"#));
     }
 
     /// What app_bridge.jinja tells the apps is read from marks the templates
