@@ -7,14 +7,21 @@
    by dimming the content. In an app there is no chrome, and a link inside a
    page keeps that page up, unchanged, until the next has come.
 
-   The bar is added to <html> rather than to the header, because a boosted
-   swap replaces everything in <body> and would take a bar that is still
-   going with it. It is fixed, laid at the header's bottom edge when it
-   starts, since the header's height is whatever the toolbar and its notices
-   make it. It creeps towards the end and never reaches it on its own
+   The bar hangs from the header's bottom edge, inside it, so it goes
+   wherever the header goes -- pinned, pulled down with a refresh, scrolled
+   under the status bar. Fixed to the screen instead, it parted from the
+   header as soon as either moved: iOS insets the page under the status bar,
+   and a sticky header and a fixed bar do not agree on where the top is. A
+   boosted swap puts a new header up mid-trip, and the bar is carried over
+   into it where it had got to. It creeps towards the end and never reaches it on its own
    (ds.css, "The loading bar"); what finishes it is the page arriving --
    htmx's swap, or for a page load, the new document -- or, for a trip that
    never lands (a download, a cancelled load), a timeout.
+
+   Clicks and submits start it at the press. Any page load that is neither
+   -- a script's, or back to a page not kept -- is caught as the page is
+   about to be left (beforeunload, below). htmx's own trips are only ever
+   the first kind.
 
    Included by toolbar.jinja, so the painter pages have it as well. A
    boosted swap runs this again; the document listeners are added once. #}
@@ -37,16 +44,25 @@
       request = null;
       if (bar) bar.className = "ds-loading-bar";
     }
+    function loadingNow() {
+      return !!bar && bar.className.indexOf("is-loading") >= 0;
+    }
+    // Under the whole header, the notices included; the painter pages have
+    // the toolbar alone.
+    function hang() {
+      var header = document.querySelector(".ds-page > header") || document.querySelector(".nav-bar");
+      if (!header) return false;
+      if (bar.parentNode !== header) header.appendChild(bar);
+      return true;
+    }
     function start(from) {
       if (navigator.onLine === false) return;
       if (!bar) {
         bar = document.createElement("div");
         bar.setAttribute("aria-hidden", "true");
-        document.documentElement.appendChild(bar);
       }
       reset();
-      var header = document.querySelector(".ds-page > header") || document.querySelector(".nav-bar");
-      bar.style.top = (header ? Math.max(0, header.getBoundingClientRect().bottom) : 0) + "px";
+      if (!hang()) return;
       // Read back once, so the step to .is-loading is a transition from
       // nothing rather than from wherever the last trip left it.
       void bar.offsetWidth;
@@ -56,7 +72,7 @@
       timeout = setTimeout(done, 20000);
     }
     function done() {
-      if (!bar || bar.className.indexOf("is-loading") < 0) return;
+      if (!loadingNow()) return;
       clearTimeout(timeout);
       source = null;
       request = null;
@@ -112,6 +128,39 @@
       var ctx = event.detail && event.detail.ctx;
       if (!ctx || !(source || request)) return;
       if (ctx === request || ctx.sourceElement === source) done();
+    });
+    // A boosted swap replaces the header, and the bar with it. It is hung
+    // under the new one where it had got to, and goes on from there.
+    var reached = null;
+    document.addEventListener("htmx:before:swap", function () {
+      reached = loadingNow() && bar.parentNode ? getComputedStyle(bar).transform : null;
+    });
+    document.addEventListener("htmx:after:swap", function () {
+      if (!reached || !loadingNow() || document.documentElement.contains(bar)) return;
+      if (!hang()) return;
+      bar.style.transition = "none";
+      bar.style.transform = reached;
+      bar.style.opacity = "1";
+      void bar.offsetWidth;
+      bar.style.transition = "";
+      bar.style.transform = "";
+      bar.style.opacity = "";
+      reached = null;
+    });
+    // Every other page load: a script's (the apps' menus and shortcuts,
+    // Draw's form.submit(), htmx following an HX-Redirect, a retry after a
+    // gateway error), back or forward to a page that was not kept, the app
+    // loading an address itself. The page stays up, and running, until the
+    // next one commits. Looked at once every listener has had its say: a
+    // page that asks whether to leave (a drawing not yet saved) may be
+    // stayed on, and the bar would hang there, so it is left without.
+    window.addEventListener("beforeunload", function (event) {
+      setTimeout(function () {
+        if (event.defaultPrevented) return;
+        if (typeof event.returnValue === "string" && event.returnValue !== "") return;
+        if (loadingNow()) return;
+        start(null);
+      }, 0);
     });
     // Back to a page kept in memory, left with the bar still going.
     window.addEventListener("pageshow", function (event) {
