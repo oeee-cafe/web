@@ -551,11 +551,12 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    the way across and slows as it goes, never arriving by itself; the page
    arriving runs it to the end and lets it fade. It shows only after a
    moment, so a page fetched ahead, which arrives at once, never flashes it.
-   Fixed, with `top` set by the script, because it lives on <html>, out of
-   reach of a swap of the body. */
+   It hangs from the header's bottom edge, inside the header, so it moves
+   when the header does; the header is sticky (or, in the Mac app,
+   absolute), so the bar has a box to hang from. */
 .ds-loading-bar {
-  position: fixed;
-  top: 0;
+  position: absolute;
+  top: 100%;
   right: 0;
   left: 0;
   z-index: 51;
