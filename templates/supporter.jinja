@@ -96,9 +96,10 @@
 
   <script>
     // Buying happens in the app: the page asks, the app sells, and the app
-    // hands what it got back to the site (/auth/apple/purchase,
-    // /auth/steam/refresh) before reloading this page. Nothing here records
-    // anything -- a page cannot be trusted about a purchase, and is not.
+    // hands what the store gave it back to the page, which tells the site
+    // (app_store.jinja) and reloads. Nothing here records anything -- a page
+    // cannot be trusted about a purchase, and is not; the site asks the
+    // store itself.
     //
     // The price is the store's to say, in the reader's own currency and
     // formatted its way, so the button leaves room for it and the app fills
@@ -115,7 +116,8 @@
       // Defined before the asking, so an app that answers at once is heard.
       // Called again whenever the app knows better -- a currency that
       // arrived late, a price that changed while the page was open.
-      if (window.oeeeApp) window.oeeeApp.storePrices = function (prices) {
+      var app = window.oeeeApp;
+      if (app) (app.store = app.store || {}).prices = function (prices) {
         if (!prices) return;
         var spans = document.querySelectorAll(".supporter-price");
         for (var i = 0; i < spans.length; i++) {

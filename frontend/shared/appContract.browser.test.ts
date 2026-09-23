@@ -48,6 +48,8 @@ type PageWindow = Window &
       feel(name: string): void;
       wouldLoseWork(): boolean;
       pushToken(token: string): void;
+      store: { purchased(ids: unknown): Promise<string[]> };
+      steam?: { ticket(hex: string | null): void; dlcInstalled(): void };
       signIn: {
         answer(told: Record<string, unknown>): void;
         resume(): void;
@@ -71,6 +73,8 @@ interface Page {
 
 interface Options {
   userAgent?: string;
+  /** Marked as the Steam build marks it, before the page's scripts run. */
+  steamApp?: boolean;
   signedIn?: boolean;
   presence?: string;
   unread?: number;
@@ -113,6 +117,7 @@ async function open(options: Options = {}): Promise<Page> {
     Object.defineProperty(navigator, "userAgent", { get: function () { return ${JSON.stringify(
       options.userAgent ?? "Mozilla/5.0 OeeeCafeAndroid",
     )}; } });
+    ${options.steamApp ? 'document.documentElement.setAttribute("data-steam-app", "");' : ""}
     // Desktop Chromium has Web Share, which Android's web view does not.
     delete Navigator.prototype.share;
     delete Navigator.prototype.canShare;
@@ -128,7 +133,8 @@ async function open(options: Options = {}): Promise<Page> {
     <a href="/@artist/9c881320"><img data-oeee-drawing width="300" height="200"
        src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></a>
     <a class="auth-apple" href="/auth/apple?next=%2Fafter">Apple</a>
-    <a class="auth-google" href="/auth/google?next=%2Fafter">Google</a>`;
+    <a class="auth-google" href="/auth/google?next=%2Fafter">Google</a>
+    <a class="auth-steam" href="/auth/steam/app?next=%2Fafter">Steam</a>`;
   const html = `<!doctype html><html><head>${before}
     <style>:root { --ds-ground: #ccccff; --ds-grid: #bbbbff; } body { background: rgb(255, 255, 255); }</style>
     ${presence}${HEAD}</head><body>${body}</body></html>`;
@@ -204,7 +210,7 @@ describe("what the site tells the apps", () => {
     expect(keys(message)).toEqual(
       [
         "cancel", "copyImage", "copyLink", "leave", "leaveBody", "leaveTitle", "ok", "saveFailed",
-        "saveImage", "savedFile", "savedImage", "share", "stay", "steamSignInFailed", "type", "v",
+        "saveImage", "savedFile", "savedImage", "share", "stay", "type", "v",
       ],
     );
     for (const [key, value] of Object.entries(message)) {
@@ -287,6 +293,76 @@ describe("push notifications for an app", () => {
     failing.window.oeeeApp.pushToken("T");
     await settle();
     expect(failing.asked).toHaveLength(2);
+  });
+});
+
+describe("what a store gives an app", () => {
+  it("tells the site each StoreKit transaction, and answers with the ones it took", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeiOS" });
+    // The test's site takes "A" (204) and turns "B" away (a 404 here, as
+    // anything but a plain yes is).
+    (window as unknown as { __appContract: { fetch: (url: string, init?: RequestInit) => Promise<Response> } })
+      .__appContract.fetch = (url: string, init?: RequestInit) => {
+        page.asked.push({ url, body: String(init?.body ?? "") });
+        const id = new URLSearchParams(String(init?.body)).get("transaction_id");
+        return Promise.resolve(new Response(null, { status: id === "A" ? 204 : 404 }));
+      };
+    const taken = await page.window.oeeeApp.store.purchased(["A", "B", 3, ""]);
+    expect(taken).toEqual(["A"]);
+    expect(page.asked.map((request) => [request.url, request.body])).toEqual([
+      ["/auth/apple/purchase", "transaction_id=A"],
+      ["/auth/apple/purchase", "transaction_id=B"],
+    ]);
+  });
+
+  it("finishes nothing the site did not take", async () => {
+    const page = await open();
+    expect(await page.window.oeeeApp.store.purchased(["A"])).toEqual([]);
+    expect(await page.window.oeeeApp.store.purchased(null)).toEqual([]);
+  });
+
+  it("is Steam's only in the Steam build", async () => {
+    expect((await open()).window.oeeeApp.steam).toBeUndefined();
+    expect((await open({ steamApp: true })).window.oeeeApp.steam).toBeDefined();
+  });
+
+  it("asks the Steam app for a ticket once, however many are waiting, and posts it for what it owns", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeWindows", steamApp: true, answers: { "/auth/steam/refresh": {} } });
+    const steam = page.window.oeeeApp.steam!;
+    steam.dlcInstalled();
+    steam.dlcInstalled();
+    expect(page.sent.filter((message) => message.type === "steamTicket")).toEqual([{ v: 1, type: "steamTicket" }]);
+    steam.ticket("ab12");
+    await settle();
+    const refreshes = page.asked.filter((request) => request.url === "/auth/steam/refresh");
+    expect(refreshes.map((request) => request.body)).toEqual(["ticket=ab12", "ticket=ab12"]);
+  });
+
+  it("signs in with Steam from the page's own button", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeWindows", steamApp: true });
+    const link = page.window.document.querySelector(".auth-steam")!;
+    const pressed = new page.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    link.dispatchEvent(pressed);
+    expect(pressed.defaultPrevented).toBe(true);
+    expect(last(page, "steamTicket")).toEqual({ v: 1, type: "steamTicket" });
+
+    // The form is posted, not fetched: the site answers with a page.
+    const posted: HTMLFormElement[] = [];
+    page.window.HTMLFormElement.prototype.submit = function (this: HTMLFormElement) {
+      posted.push(this);
+    };
+    page.window.oeeeApp.steam!.ticket("ab12");
+    expect(posted.map((form) => form.getAttribute("action"))).toEqual(["/auth/steam"]);
+    expect(Object.fromEntries(new page.window.FormData(posted[0]))).toEqual({ ticket: "ab12", next: "/after" });
+  });
+
+  it("says so when Steam gives no ticket", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafeWindows", steamApp: true });
+    const said: string[] = [];
+    page.window.alert = (message?: string) => { said.push(String(message)); };
+    page.window.document.querySelector<HTMLElement>(".auth-steam")!.click();
+    page.window.oeeeApp.steam!.ticket(null);
+    expect(said).toEqual(["app-steam-sign-in-failed"]);
   });
 });
 
