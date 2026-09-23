@@ -235,6 +235,10 @@ export default function App() {
    * object, which remounts the painter, which activates again.
    */
   const joinedRef = useRef(false);
+  /** Whether this visit has sent the room a stroke; see the `beforeunload` below. */
+  const hasDrawnRef = useRef(false);
+  /** Set by the page's own ways out, which are not accidents to ask about. */
+  const leavingRef = useRef(false);
   const userLoginNameRef = useRef("");
   const localUserJoinTimeRef = useRef(0);
   const localIdRef = useRef<number | null>(null);
@@ -329,6 +333,7 @@ export default function App() {
     const ws = wsRef.current;
     const localId = localIdRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN || localId === null || isCatchingUpRef.current) return;
+    hasDrawnRef.current = true;
     const encoded = encodePainterOperation(localId, entry.operation);
     const wireId = bytesId(new Uint8Array(encoded));
     const queue = pendingIdsRef.current.get(wireId) ?? [];
@@ -730,6 +735,7 @@ export default function App() {
 
   const handleSessionEnded = useCallback((postUrl: string) => {
     setSessionEnding(true);
+    leavingRef.current = true;
     window.location.assign(postUrl);
   }, []);
 
@@ -967,7 +973,10 @@ export default function App() {
       socket.send(encodeEndSession(userIdRef.current, result.post_url));
       // The post above is already committed, so a confirmation that never
       // comes back must not strand the owner on a session that is over.
-      window.setTimeout(() => window.location.assign(result.post_url), SAVE_CONFIRMATION_TIMEOUT_MS);
+      window.setTimeout(() => {
+        leavingRef.current = true;
+        window.location.assign(result.post_url);
+      }, SAVE_CONFIRMATION_TIMEOUT_MS);
     } catch (error) {
       say(error instanceof Error ? error.message : String(error));
       setIsSaving(false);
@@ -976,6 +985,43 @@ export default function App() {
   }, [drainCanonical, isSaving, wsRef]);
 
   const isOwner = canvasMeta?.ownerId === userIdRef.current;
+
+  /**
+   * Leaving the room by accident.
+   *
+   * The site's toolbar sits above the canvas, so a stray tap on it leaves the
+   * session the way it would leave /draw, and /draw asks first. What is drawn
+   * here is already the room's, so what leaving costs is different: a
+   * participant drops out of a drawing they were part of, and the owner walks
+   * away from one only they can save, which the room loses when it expires.
+   * So it asks once this visit has drawn something, or of the owner of a room
+   * with anything in it -- and never on the page's own way out: the save that
+   * ends the session, a reload offered after an error, the lobby from a
+   * session that is already over.
+   */
+  const sessionOverRef = useRef(false);
+  sessionOverRef.current = sessionEnding || sessionExpired;
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (leavingRef.current || sessionOverRef.current) return;
+      const roomHasDrawing = appliedSequenceRef.current > 0;
+      if (!hasDrawnRef.current && !(isOwner && roomHasDrawing)) return;
+      event.preventDefault();
+      // Chrome shows its own wording, but only when returnValue is set.
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isOwner]);
+
+  const reload = useCallback(() => {
+    leavingRef.current = true;
+    location.reload();
+  }, []);
+  const goToLobby = useCallback(() => {
+    leavingRef.current = true;
+    location.href = "/collaborate";
+  }, []);
 
   useEffect(() => {
     const painter = painterRef.current;
@@ -1043,10 +1089,10 @@ export default function App() {
 
   return <>
     <div className="w-full app-container flex flex-col">
-      <InitializationErrorModal isOpen={!!initializationError} errorMessage={initializationError ?? ""} onRetry={() => location.reload()} />
+      <InitializationErrorModal isOpen={!!initializationError} errorMessage={initializationError ?? ""} onRetry={reload} />
       <LoadingModal isOpen={!canvasMeta && !initializationError} />
-      <AuthErrorModal isOpen={authError} onGoToLobby={() => { location.href = "/collaborate"; }} />
-      <RoomFullModal isOpen={!!roomFullError} currentUserCount={roomFullError?.currentUserCount ?? 0} maxUsers={roomFullError?.maxUsers ?? 0} onGoToLobby={() => { location.href = "/collaborate"; }} onRetry={() => location.reload()} />
+      <AuthErrorModal isOpen={authError} onGoToLobby={goToLobby} />
+      <RoomFullModal isOpen={!!roomFullError} currentUserCount={roomFullError?.currentUserCount ?? 0} maxUsers={roomFullError?.maxUsers ?? 0} onGoToLobby={goToLobby} onRetry={reload} />
       <div className="relative flex-1 overflow-hidden">
         {/*
           The chat is the toolbox's neighbour, so it is one of the painter's
@@ -1086,7 +1132,7 @@ export default function App() {
           </div>
         </div>
         <div ref={painterElementRef} className="h-full w-full" />
-        <ConnectionStatusModal isCatchingUp={isCatchingUp} connectionState={connectionState} syncProgress={syncProgress} synchronizationError={synchronizationError} onReconnect={() => location.reload()} onDownloadPNG={downloadPng} />
+        <ConnectionStatusModal isCatchingUp={isCatchingUp} connectionState={connectionState} syncProgress={syncProgress} synchronizationError={synchronizationError} onReconnect={reload} onDownloadPNG={downloadPng} />
         {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => setSaveConfirmation(true)} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : <Trans>Save to Gallery</Trans>}</button>}
         <SaveConfirmationModal
           isOpen={saveConfirmation}
@@ -1096,6 +1142,6 @@ export default function App() {
         <SessionEndingModal isOpen={sessionEnding} />
       </div>
     </div>
-    <SessionExpiredModal isOpen={sessionExpired} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} onClose={() => {}} onSaveToGallery={saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={() => { location.href = "/collaborate"; }} />
+    <SessionExpiredModal isOpen={sessionExpired} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} onClose={() => {}} onSaveToGallery={saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
   </>;
 }
