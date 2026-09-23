@@ -1418,6 +1418,20 @@ html[data-desktop="windows"] ::-webkit-scrollbar-track {
   padding-left: 8px;
 }
 
+/* The signed-out "what is this?" at its shortest, a step before the name
+   would have to go (fitToolbar, toolbar.jinja). */
+.toolbar-about-mark {
+  display: none;
+}
+
+.nav-bar.is-brief .toolbar-about-words {
+  display: none;
+}
+
+.nav-bar.is-brief .toolbar-about-mark {
+  display: inline;
+}
+
 .nav-bar.is-bare .toolbar-name-text {
   display: none;
 }

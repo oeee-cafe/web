@@ -1640,9 +1640,12 @@ mod template_tests {
 
         let out = render(json!(null));
         assert!(
-            out.contains(r#"<a class="toolbar-about" href="/about">"#),
+            out.contains(r#"<a class="toolbar-about" href="/about" aria-label="nav-about-menu""#),
             "signed out, About is its own button at the bar's end"
         );
+        // On a phone it may say only "?" (ds.css, is-brief), so its words
+        // are its label as well as its text.
+        assert!(out.contains(r#"<span class="toolbar-about-mark" aria-hidden="true">?</span>"#));
         // The theme square opens onto the three-way switch and nothing
         // else: one link to `/about` in the whole bar, and it is not that
         // menu's. (The desktop app's Help menu also reaches it, by script.)
