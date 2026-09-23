@@ -692,10 +692,11 @@
         window.oeeeMarkCurrent(path || location.pathname);
         var content = document.querySelector("main.ds-content");
         if (!content || content.querySelector(".ds-skeleton")) return;
-        // Pushed (below), the skeleton is laid over the page where the reader
-        // is, and the page is hidden rather than taken out, so nothing is
-        // scrolled: coming back finds the page where it was left, which is
-        // also where the web view remembers it.
+        // Over the page (the handheld apps, the click handler below), the
+        // skeleton is laid where the reader is, and the page is hidden
+        // rather than taken out, so nothing is scrolled: coming back finds
+        // the page where it was left, which is also where the web view
+        // remembers it.
         var property = over ? "visibility" : "display";
         var kept = [];
         for (var c = 0; c < content.children.length; c++) {
@@ -772,11 +773,14 @@
         // and the content dimmed rather than skeletoned while it comes
         // (pill_macro.jinja).
         if (link.closest("main .ds-segmented")) return;
-        // The toolbar's sections are the app's tabs, and a page's own
-        // variations -- a filter, a sort, the next page -- are the same
-        // screen; anything else is a new screen.
-        if (!link.closest(".nav-bar") && link.pathname !== location.pathname) push(link.pathname);
-        else loading(link.pathname);
+        // In the handheld apps the page itself scrolls, and a skeleton in
+        // its place would take its height away and the reader's place with
+        // it: coming back from the back-forward cache would find the page at
+        // its top. So a page opened from inside another is laid over it
+        // instead, the page kept where it is under it. The toolbar's
+        // sections, the app's tabs, start their pages at the top anyway.
+        var handheld = document.documentElement.getAttribute("data-form") === "handheld";
+        loading(link.pathname, handheld && !link.closest(".nav-bar") && link.pathname !== location.pathname);
       });
       // A search is a trip to /search, and the bar's links to it lay a
       // skeleton down while they go; submitting the field is the same trip
@@ -787,45 +791,6 @@
         if (!form || !form.classList || !form.classList.contains("toolbar-search")) return;
         loading("/search");
       });
-      // In the handheld apps a page opened from the one showing is pushed, as a
-      // screen is onto a navigation stack: its skeleton comes in over the
-      // page it came from (style.css -- sliding from the right edge on iOS,
-      // along the shared axis on Android), at the tap, while the page itself
-      // loads. Going back is the web view's own edge swipe on iOS.
-      function push(path) {
-        if (navigator.onLine === false) return;
-        var root = document.documentElement;
-        var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (root.getAttribute("data-form") !== "handheld" || !document.startViewTransition || reduced) {
-          loading(path);
-          return;
-        }
-        // The toolbar is held still across the push only when it is there to
-        // hold: it is sticky (ds.css), so on a page that scrolls it always
-        // is, but the painter gives its own copy `position: relative`, and a
-        // push from further down that page would hold a bar that is on
-        // neither screen. Measured rather than assumed, for that reason.
-        var bar = document.querySelector(".nav-bar");
-        var shown = bar && bar.getBoundingClientRect().bottom > 0;
-        root.setAttribute("data-push", shown ? "" : "whole");
-        // The skeleton is laid in the transition's own time, which can come
-        // after the page has already been left for the next: then it is not
-        // laid at all, or it would be over the page when the reader comes back.
-        var left = false;
-        var transition = document.startViewTransition(function () {
-          if (!left) loading(path, true);
-        });
-        function leave() {
-          left = true;
-          transition.skipTransition();
-        }
-        window.addEventListener("pagehide", leave);
-        transition.finished.then(done, done);
-        function done() {
-          root.removeAttribute("data-push");
-          window.removeEventListener("pagehide", leave);
-        }
-      }
       document.addEventListener("submit", function (event) {
         var form = event.target;
         if (event.defaultPrevented || !form || !form.getAttribute) return;
