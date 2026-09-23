@@ -28,7 +28,7 @@
             {% set title = post.title or ftl_get_message("post-untitled") %}
             <div class="posts-grid-item draft-item" data-post-id="{{ post.id }}">
               <a href="/posts/{{ post.id }}/publish" aria-label="{{ ftl_get_message('post-publish') }}: {{ title }}">
-                <img draggable="false"
+                <img
                      width="{{ post.image_width }}"
                      height="{{ post.image_height }}"
                      alt="{{ title }}"

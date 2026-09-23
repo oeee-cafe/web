@@ -6,7 +6,7 @@
    elsewhere itself). #}
 {% macro user_pill(href, banner_filename, banner_width, banner_height, display_name, handle, r2_public_endpoint_url, size="") %}
   {% if href %}<a class="user-pill {{ size }}" href="{{ href }}">{% else %}<span class="user-pill {{ size }}">{% endif %}
-    <img draggable="false"
+    <img
          class="user-pill-banner banner"
          width="{{ banner_width }}"
          height="{{ banner_height }}"

@@ -9,7 +9,7 @@
         {% for post in posts %}
           <div class="posts-grid-item">
             <a href="/@{{ post.user_login_name }}/{{ post.id }}" target="_blank">
-              <img draggable="false" alt="{{ post.title }}"
+              <img alt="{{ post.title }}"
                    class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
                    width="{{ post.image_width }}"
                    height="{{ post.image_height }}"

@@ -10,7 +10,6 @@
       <span class="post-thread-thumb">
         <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
              alt=""
-             draggable="false"
              loading="lazy"
              decoding="async" />
       </span>
@@ -101,7 +100,7 @@
                data-poster="{{ image_url }}"
                data-lang="{{ ftl_lang }}"
              {% endif %}>
-          <img draggable="false" class="post-stage-image" data-oeee-drawing
+          <img class="post-stage-image" data-oeee-drawing
                width="{{ post.image_width }}"
                height="{{ post.image_height }}"
                alt="{{ post.title }}"
