@@ -106,33 +106,36 @@ impl Store {
     ///
     /// The same rule as theme_head.jinja's, which marks the root
     /// `data-store` for the page's scripts: an app ends its user agent with
-    /// `OeeeCafe/<app> [store/<store>]`, and a store counts only where one
-    /// of the four apps is named too. Both read the words whole, as a
-    /// regular expression's `\b` does -- `OeeeCafe/iosx` names no app. It
-    /// decides which buttons /supporter draws and nothing else: nothing is
-    /// trusted for being named here, and a purchase is checked with the
-    /// store.
+    /// `OeeeCafe platform/<app> [store/<store>]`, the store straight after
+    /// the platform. Both read the words whole, as a regular expression's
+    /// `\b` does -- `platform/iosx` names no app. It decides which buttons
+    /// /supporter draws and nothing else: nothing is trusted for being named
+    /// here, and a purchase is checked with the store.
     pub fn from_user_agent(user_agent: &str) -> Option<Self> {
-        word_after(user_agent, "OeeeCafe/", &["ios", "android", "macos", "windows"])?;
-        let store = word_after(user_agent, "store/", &["apple", "microsoft", "steam"])?;
+        const MARK: &str = "OeeeCafe platform/";
+        let rest = user_agent.match_indices(MARK).find_map(|(at, _)| {
+            if user_agent[..at].chars().next_back().is_some_and(is_word) {
+                return None;
+            }
+            word_at(&user_agent[at + MARK.len()..], &["ios", "android", "macos", "windows"])
+                .map(|(_, rest)| rest)
+        })?;
+        let (store, _) = word_at(rest.strip_prefix(" store/")?, &["apple", "microsoft", "steam"])?;
         Store::parse(store)
     }
 }
 
-/// The first of `names` that follows `prefix` in `text` as a word of its
-/// own, where `prefix` starts a word: `\bprefix(names)\b`, with a word
-/// what JavaScript's `\w` is.
-fn word_after<'a>(text: &str, prefix: &str, names: &[&'a str]) -> Option<&'a str> {
-    let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
-    text.match_indices(prefix).find_map(|(at, _)| {
-        if text[..at].chars().next_back().is_some_and(word) {
-            return None;
-        }
-        let rest = &text[at + prefix.len()..];
-        names.iter().copied().find(|name| {
-            rest.strip_prefix(name)
-                .is_some_and(|after| !after.chars().next().is_some_and(word))
-        })
+/// A character of a word, as JavaScript's `\w` has it.
+fn is_word(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_'
+}
+
+/// The first of `names` that `text` starts with as a word of its own, and
+/// what follows it: `^(names)\b`.
+fn word_at<'a, 't>(text: &'t str, names: &[&'a str]) -> Option<(&'a str, &'t str)> {
+    names.iter().copied().find_map(|name| {
+        let after = text.strip_prefix(name)?;
+        (!after.chars().next().is_some_and(is_word)).then_some((name, after))
     })
 }
 
@@ -1135,37 +1138,33 @@ mod tests {
     /// purchases too.
     const SELLING: [Store; 3] = Store::ALL;
 
-    /// The same cases as appContract.browser.test.ts gives theme_head.jinja,
-    /// which reads the same user agents for `data-store`.
+    /// The user agents the apps are tested against (appContract.json, which
+    /// appContract.browser.test.ts gives theme_head.jinja): the server reads
+    /// the store from each as the page does.
     #[test]
     fn the_store_is_read_from_the_user_agent_as_the_page_reads_it() {
-        let cases = [
-            ("Mozilla/5.0 OeeeCafe/ios store/apple", Some(Store::Apple)),
-            ("Mozilla/5.0 OeeeCafe/android", None),
-            ("Mozilla/5.0 OeeeCafe/macos store/apple", Some(Store::Apple)),
-            (
-                "Mozilla/5.0 Edg/120 OeeeCafe/windows store/steam",
-                Some(Store::Steam),
-            ),
-            (
-                "Mozilla/5.0 Edg/120 OeeeCafe/windows store/microsoft",
-                Some(Store::Microsoft),
-            ),
-            ("Mozilla/5.0 Edg/120 OeeeCafe/windows", None),
-            // A browser, and a store named with no app to be in.
-            ("Mozilla/5.0 Firefox/56.0", None),
-            ("Mozilla/5.0 store/apple", None),
-            // Only the names these are, and only as words of their own.
-            ("Mozilla/5.0 OeeeCafe/tv store/nowhere", None),
-            ("Mozilla/5.0 OeeeCafe/iosx store/apple", None),
-            ("Mozilla/5.0 OeeeCafe/ios store/applesauce", None),
-            ("Mozilla/5.0 OeeeCafe/ios mystore/apple", None),
-            ("Mozilla/5.0 XOeeeCafe/ios store/apple", None),
-            ("", None),
-        ];
-        for (user_agent, expected) in cases {
-            assert_eq!(Store::from_user_agent(user_agent), expected, "{user_agent}");
+        #[derive(Deserialize)]
+        struct Contract {
+            #[serde(rename = "userAgents")]
+            user_agents: Vec<Case>,
         }
+        #[derive(Deserialize)]
+        struct Case {
+            agent: String,
+            store: Option<String>,
+        }
+        let contract: Contract =
+            serde_json::from_str(include_str!("../../frontend/shared/appContract.json")).unwrap();
+        assert!(contract.user_agents.len() > 10);
+        for case in contract.user_agents {
+            assert_eq!(
+                Store::from_user_agent(&case.agent),
+                case.store.as_deref().and_then(Store::parse),
+                "{}",
+                case.agent
+            );
+        }
+        assert_eq!(Store::from_user_agent(""), None);
     }
 
     #[test]

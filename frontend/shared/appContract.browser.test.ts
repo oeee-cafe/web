@@ -6,8 +6,10 @@
  * drop one they cannot read without a word, so a field renamed or retyped
  * here would break them with nothing failing on this side. They each used to
  * keep a copy of captured messages to test against, copied by hand and never
- * recaptured; this is where that check lives now, against the templates as
- * they are.
+ * recaptured. So the copy they test against now is appContract.json, and the
+ * last part of this file captures the page again and fails when that file no
+ * longer says what the page does: a change the apps must follow is a change
+ * to that file, and each app fetches it with a script of its own.
  *
  * The head is rendered the way the server renders it, near enough: the
  * templates' own includes are followed, comments are dropped, and a message
@@ -18,6 +20,8 @@
  * records what it is told.
  */
 import { afterEach, describe, expect, it } from "vitest";
+import { offerPainterToApp } from "./appBridge";
+import contract from "./appContract.json";
 
 const sources = import.meta.glob("../../templates/*.jinja", {
   query: "?raw",
@@ -85,6 +89,18 @@ interface Options {
   answers?: Record<string, unknown>;
   /** The toolbar carries the Windows app's caption (app_caption.jinja), as the site's does. */
   caption?: boolean;
+  /** The page is /supporter, with a button for each of these products (supporter.jinja). */
+  supporter?: string[];
+  /** The page has the loading bar, as every page with the toolbar has (loading_bar.jinja). */
+  loadingBar?: boolean;
+}
+
+/** /supporter's own script, which is all of it that talks to an app. */
+function supporterScript(): string {
+  const scripts = template("supporter.jinja").match(/<script>[\s\S]*?<\/script>/g) ?? [];
+  const script = scripts.pop();
+  if (!script || /\{[{%]/.test(script)) throw new Error("supporter.jinja's script is not plain");
+  return script;
 }
 
 const frames: HTMLIFrameElement[] = [];
@@ -120,7 +136,7 @@ async function open(options: Options = {}): Promise<Page> {
       return /^(blob|data):/.test(String(url)) ? ownFetch(url, init) : parent.__appContract.fetch(String(url), init);
     };
     Object.defineProperty(navigator, "userAgent", { get: function () { return ${JSON.stringify(
-      (options.userAgent ?? "Mozilla/5.0 OeeeCafe/android") + (options.store ? ` store/${options.store}` : ""),
+      (options.userAgent ?? "Mozilla/5.0 OeeeCafe platform/android") + (options.store ? ` store/${options.store}` : ""),
     )}; } });
     // Desktop Chromium has Web Share, which Android's web view does not.
     delete Navigator.prototype.share;
@@ -139,7 +155,12 @@ async function open(options: Options = {}): Promise<Page> {
        src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></a>
     <a class="auth-apple" href="/auth/apple?next=%2Fafter">Apple</a>
     <a class="auth-google" href="/auth/google?next=%2Fafter">Google</a>
-    <a class="auth-steam" href="/auth/steam/app?next=%2Fafter">Steam</a>`;
+    <a class="auth-steam" href="/auth/steam/app?next=%2Fafter">Steam</a>
+    ${(options.supporter ?? [])
+      .map((product) => `<button class="supporter-buy" data-product="${product}"></button>`)
+      .join("")}
+    ${options.supporter ? `<button class="supporter-restore"></button>${supporterScript()}` : ""}
+    ${options.loadingBar ? template("loading_bar.jinja") : ""}`;
   const html = `<!doctype html><html><head>${before}
     <style>:root { --ds-ground: #ccccff; --ds-grid: #bbbbff; } body { background: rgb(255, 255, 255); }</style>
     ${presence}${HEAD}</head><body>${body}</body></html>`;
@@ -169,7 +190,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("what the site tells the apps", () => {
   it("asks the Windows app to minimise, maximise and close, and shows what it says back", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", caption: true });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", caption: true });
     const doc = page.window.document;
     const button = (name: string) => doc.querySelector<HTMLButtonElement>(`.oeee-caption .is-${name}`)!;
     button("minimize").click();
@@ -201,13 +222,13 @@ describe("what the site tells the apps", () => {
     expect(reached).toBe(false);
 
     // Hidden and silent everywhere else.
-    const mac = await open({ userAgent: "Mozilla/5.0 OeeeCafe/macos store/apple", caption: true });
+    const mac = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/macos store/apple", caption: true });
     mac.window.document.querySelector<HTMLButtonElement>(".oeee-caption .is-close")!.click();
     expect(mac.sent.some((message) => message.type === "window" || message.type === "caption")).toBe(false);
   });
 
   it("moves and zooms the Mac window from the toolbar, and keeps the browser's menu quiet", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/macos store/apple" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/macos store/apple" });
     const bar = page.window.document.querySelector(".nav-bar")!;
     const press = (detail: number) => {
       const event = new page.window.MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, detail });
@@ -322,34 +343,19 @@ describe("what the site tells the apps", () => {
   });
 
   it("marks the root with which app, what kind of device, and where it sells, from the user agent", async () => {
+    // The cases the apps build their user agents against, and the server
+    // reads its store from (Store::from_user_agent): only these names, only
+    // as words of their own, and the store straight after the platform.
     const marks = (root: HTMLElement) =>
       ["data-app", "data-form", "data-store"].map((name) => root.getAttribute(name));
-    const cases: [string, (string | null)[]][] = [
-      ["Mozilla/5.0 OeeeCafe/ios store/apple", ["ios", "handheld", "apple"]],
-      ["Mozilla/5.0 OeeeCafe/android", ["android", "handheld", null]],
-      ["Mozilla/5.0 OeeeCafe/macos store/apple", ["macos", "desktop", "apple"]],
-      ["Mozilla/5.0 Edg/120 OeeeCafe/windows store/steam", ["windows", "desktop", "steam"]],
-      ["Mozilla/5.0 Edg/120 OeeeCafe/windows store/microsoft", ["windows", "desktop", "microsoft"]],
-      ["Mozilla/5.0 Edg/120 OeeeCafe/windows", ["windows", "desktop", null]],
-      // A browser, and a store named with no app to be in.
-      ["Mozilla/5.0 Firefox/56.0", [null, null, null]],
-      ["Mozilla/5.0 store/apple", [null, null, null]],
-      // Only the names these are, and only as words of their own. The
-      // server reads the same cases the same way (Store::from_user_agent).
-      ["Mozilla/5.0 OeeeCafe/tv store/nowhere", [null, null, null]],
-      ["Mozilla/5.0 OeeeCafe/iosx store/apple", [null, null, null]],
-      ["Mozilla/5.0 OeeeCafe/ios store/applesauce", ["ios", "handheld", null]],
-      ["Mozilla/5.0 OeeeCafe/ios mystore/apple", ["ios", "handheld", null]],
-      ["Mozilla/5.0 XOeeeCafe/ios store/apple", [null, null, null]],
-    ];
-    for (const [userAgent, expected] of cases) {
-      const page = await open({ userAgent });
-      expect(marks(page.window.document.documentElement), userAgent).toEqual(expected);
+    for (const { agent, app, form, store } of contract.userAgents) {
+      const page = await open({ userAgent: agent });
+      expect(marks(page.window.document.documentElement), agent).toEqual([app, form, store]);
     }
   });
 
   it("sends haptics to any app listening, whatever it is on", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/macos" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/macos" });
     const button = page.window.document.createElement("button");
     button.setAttribute("data-haptic", "light");
     page.window.document.body.appendChild(button);
@@ -360,25 +366,25 @@ describe("what the site tells the apps", () => {
 
 describe("push notifications for an app", () => {
   it("registers the app's token for whoever is signed in, once, with the platform its user agent names", async () => {
-    const page = await open({ signedIn: true, answers: { "/api/v1/devices": { id: "D" } } });
+    const page = await open({ signedIn: true, answers: { "/devices": { id: "D" } } });
     page.window.oeeeApp.pushToken("T1");
     page.window.oeeeApp.pushToken("T1");
     await settle();
-    const posted = page.asked.filter((request) => request.url === "/api/v1/devices");
+    const posted = page.asked.filter((request) => request.url === "/devices");
     expect(posted.map((request) => JSON.parse(request.body))).toEqual([{ device_token: "T1", platform: "android" }]);
 
     // A token the app was given since is registered too.
     page.window.oeeeApp.pushToken("T2");
     await settle();
-    expect(page.asked.filter((request) => request.url === "/api/v1/devices")).toHaveLength(2);
+    expect(page.asked.filter((request) => request.url === "/devices")).toHaveLength(2);
   });
 
   it("names each app's platform as the site's devices do", async () => {
     for (const [userAgent, platform] of [
-      ["Mozilla/5.0 OeeeCafe/ios", "ios"],
-      ["Mozilla/5.0 OeeeCafe/macos", "macos"],
+      ["Mozilla/5.0 OeeeCafe platform/ios", "ios"],
+      ["Mozilla/5.0 OeeeCafe platform/macos", "macos"],
     ]) {
-      const page = await open({ userAgent, signedIn: true, answers: { "/api/v1/devices": {} } });
+      const page = await open({ userAgent, signedIn: true, answers: { "/devices": {} } });
       page.window.oeeeApp.pushToken("T");
       expect(JSON.parse(page.asked[0].body).platform, userAgent).toBe(platform);
     }
@@ -409,7 +415,7 @@ describe("what a store gives an app", () => {
   }
 
   it("tells the site each proof, at the build's own store, and answers with the ones it took", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/ios", store: "apple" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/ios", store: "apple" });
     takingOnly(page, "A");
     expect(await page.window.oeeeApp.store.purchased(["A", "B", 3, ""])).toEqual(["A"]);
     expect(page.asked.map((request) => [request.url, request.body])).toEqual([
@@ -419,7 +425,7 @@ describe("what a store gives an app", () => {
   });
 
   it("goes the same way for every store", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "steam" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
     takingOnly(page, "ab12");
     expect(await page.window.oeeeApp.store.purchased(["ab12"])).toEqual(["ab12"]);
     expect(page.asked.map((request) => request.url)).toEqual(["/store/steam/purchases"]);
@@ -436,7 +442,7 @@ describe("what a store gives an app", () => {
   it("gets the Microsoft Store build a ticket and a user for its Store ID key", async () => {
     const told = { ticket: "eyJ0eXAi.eyJhdWQi.c2ln", user: "5f0b6a2e-1d3c-4b7a-9e8f-0a1b2c3d4e5f" };
     const page = await open({
-      userAgent: "Mozilla/5.0 Edg/120 OeeeCafe/windows",
+      userAgent: "Mozilla/5.0 Edg/120 OeeeCafe platform/windows",
       store: "microsoft",
       answers: { "/store/microsoft/tickets": { ...told, extra: "dropped" } },
     });
@@ -446,13 +452,13 @@ describe("what a store gives an app", () => {
 
   it("gives no ticket where there is none to give", async () => {
     // Signed out, unconfigured or unreachable: the site says anything but 200.
-    const refused = await open({ userAgent: "Mozilla/5.0 Edg/120 OeeeCafe/windows", store: "microsoft" });
+    const refused = await open({ userAgent: "Mozilla/5.0 Edg/120 OeeeCafe platform/windows", store: "microsoft" });
     expect(await refused.window.oeeeApp.store.ticket()).toBeNull();
 
     // An answer missing either string is no answer.
     for (const answer of [{ ticket: "t" }, { ticket: "", user: "u" }, { ticket: 1, user: "u" }, null]) {
       const page = await open({
-        userAgent: "Mozilla/5.0 Edg/120 OeeeCafe/windows",
+        userAgent: "Mozilla/5.0 Edg/120 OeeeCafe platform/windows",
         store: "microsoft",
         answers: { "/store/microsoft/tickets": answer },
       });
@@ -462,7 +468,7 @@ describe("what a store gives an app", () => {
     // Every other build, and a browser, never asks.
     for (const store of ["apple", "steam", undefined] as const) {
       const page = await open({
-        userAgent: "Mozilla/5.0 OeeeCafe/windows",
+        userAgent: "Mozilla/5.0 OeeeCafe platform/windows",
         store,
         answers: { "/store/microsoft/tickets": { ticket: "t", user: "u" } },
       });
@@ -472,7 +478,7 @@ describe("what a store gives an app", () => {
   });
 
   it("signs in with Steam from the page's own button, in the Steam build only", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "steam" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
     const link = page.window.document.querySelector(".auth-steam")!;
     const pressed = new page.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
     link.dispatchEvent(pressed);
@@ -488,7 +494,7 @@ describe("what a store gives an app", () => {
     expect(posted.map((form) => form.getAttribute("action"))).toEqual(["/auth/steam"]);
     expect(Object.fromEntries(new page.window.FormData(posted[0]))).toEqual({ ticket: "ab12", next: "/after" });
 
-    const elsewhere = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "microsoft" });
+    const elsewhere = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "microsoft" });
     const there = new elsewhere.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
     elsewhere.window.addEventListener("click", (event: Event) => event.preventDefault());
     elsewhere.window.document.querySelector(".auth-steam")!.dispatchEvent(there);
@@ -496,7 +502,7 @@ describe("what a store gives an app", () => {
   });
 
   it("says so when Steam gives no ticket", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "steam" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
     const said: string[] = [];
     page.window.alert = (message?: string) => {
       said.push(String(message));
@@ -507,7 +513,7 @@ describe("what a store gives an app", () => {
   });
 
   it("says it in the site's own alert where the page has one", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/windows", store: "steam" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
     const said: string[] = [];
     const site = page.window as unknown as { dsAlert: (message: string) => void };
     site.dsAlert = (message: string) => said.push(message);
@@ -620,11 +626,11 @@ describe("signing in for an app", () => {
 
   it("goes the way each app signs in with each provider", async () => {
     const ways: [string, "apple" | "google", string][] = [
-      ["Mozilla/5.0 OeeeCafe/ios", "apple", "/auth/apple/start"],
-      ["Mozilla/5.0 OeeeCafe/ios", "google", "/auth/google/start"],
-      ["Mozilla/5.0 OeeeCafe/macos", "apple", "/auth/apple/start"],
-      ["Mozilla/5.0 OeeeCafe/windows", "google", "/auth/handoff/start"],
-      ["Mozilla/5.0 OeeeCafe/windows", "apple", "/auth/handoff/start"],
+      ["Mozilla/5.0 OeeeCafe platform/ios", "apple", "/auth/apple/start"],
+      ["Mozilla/5.0 OeeeCafe platform/ios", "google", "/auth/google/start"],
+      ["Mozilla/5.0 OeeeCafe platform/macos", "apple", "/auth/apple/start"],
+      ["Mozilla/5.0 OeeeCafe platform/windows", "google", "/auth/handoff/start"],
+      ["Mozilla/5.0 OeeeCafe platform/windows", "apple", "/auth/handoff/start"],
     ];
     for (const [userAgent, provider, asked] of ways) {
       const page = await open({ userAgent });
@@ -665,7 +671,7 @@ describe("what Android's web view cannot do", () => {
   });
 
   it("leaves the other apps' web views to do both themselves", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe/ios" });
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/ios" });
     const link = page.window.document.createElement("a");
     link.download = "drawing.png";
     link.href = "data:image/png;base64,iVBORw0KGgo=";
@@ -674,5 +680,189 @@ describe("what Android's web view cannot do", () => {
     link.click();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(page.sent.some((message) => message.type === "download")).toBe(false);
+  });
+});
+
+
+describe("what the apps test against (appContract.json)", () => {
+  /** Where the test's own pages are, which the site's would be at. */
+  const site = (value: unknown) =>
+    JSON.parse(JSON.stringify(value).split(location.origin).join("https://oeee.cafe"));
+
+  /** Every message the page sends, from the pages that send each. */
+  async function captured(): Promise<Record<string, Message[]>> {
+    const sent: Message[] = [];
+    const keep = (page: Page) => page.sent;
+
+    const signedIn = await open({ signedIn: true, presence: "collaborating", unread: 12 });
+    sent.push(...keep(signedIn));
+    const bare = await open();
+    bare.window.document.querySelector(".nav-bar")!.remove();
+    bare.window.oeeeApp.report();
+    sent.push(last(bare, "page"));
+
+    bare.window.oeeeApp.feel("success");
+    bare.window.document.querySelector("img")!.dispatchEvent(new bare.window.Event("touchstart", { bubbles: true }));
+    bare.window.document.body.dispatchEvent(new bare.window.Event("touchstart", { bubbles: true }));
+    sent.push(...bare.sent.filter((message) => message.type === "haptic" || message.type === "pressed"));
+
+    // The painter, offered from the drawing page's own module.
+    const drawing = await open();
+    const host = window as unknown as { oeeeApp?: unknown };
+    host.oeeeApp = drawing.window.oeeeApp;
+    try {
+      offerPainterToApp({ command() {}, preferPen() {} } as unknown as Parameters<typeof offerPainterToApp>[0]);
+    } finally {
+      delete host.oeeeApp;
+    }
+    sent.push(last(drawing, "painter"));
+
+    const supporter = await open({
+      userAgent: "Mozilla/5.0 OeeeCafe platform/ios",
+      store: "apple",
+      supporter: ["cafe.oeee.supporter.2026"],
+    });
+    supporter.window.document.querySelector<HTMLElement>(".supporter-buy")!.click();
+    supporter.window.document.querySelector<HTMLElement>(".supporter-restore")!.click();
+    sent.push(...supporter.sent.filter((message) => /^(prices|purchase|restore)$/.test(message.type)));
+
+    const google = await open({ answers: { "/auth/google/start": { state: "S", nonce: "N" } } });
+    google.window.document.querySelector<HTMLElement>(".auth-google")!.dispatchEvent(
+      new google.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }),
+    );
+    await settle();
+    await settle();
+    sent.push(last(google, "signIn"));
+
+    const steam = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
+    steam.window.document.querySelector(".auth-steam")!.dispatchEvent(
+      new steam.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }),
+    );
+    sent.push(last(steam, "signIn"));
+
+    const handoff = await open({
+      answers: { "/auth/handoff/start": { id: "I", secret: "X", url: "/auth/apple?handoff=I" } },
+    });
+    handoff.window.addEventListener("click", (event: Event) => event.preventDefault());
+    handoff.window.document.querySelector(".auth-apple")!.dispatchEvent(
+      new handoff.window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }),
+    );
+    await settle();
+    await settle();
+    sent.push(last(handoff, "browse"));
+    handoff.window.oeeeApp.signIn.unopened();
+
+    const android = await open();
+    await android.window.navigator.share({ title: "A drawing", url: "https://oeee.cafe/@a/1" });
+    const file = android.window.document.createElement("a");
+    file.download = "drawing.png";
+    file.href = "data:image/png;base64,iVBORw0KGgo=";
+    file.click();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    sent.push(last(android, "share"), last(android, "download"));
+
+    const mac = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/macos store/apple" });
+    mac.window.document.querySelector(".nav-bar")!.dispatchEvent(
+      new mac.window.MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, detail: 1 }),
+    );
+    sent.push(last(mac, "window"));
+
+    const windows = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", caption: true });
+    windows.window.document.querySelector<HTMLElement>(".oeee-caption .is-maximize")!.click();
+    await new Promise((resolve) => windows.window.requestAnimationFrame(resolve));
+    sent.push(last(windows, "window"), last(windows, "caption"));
+
+    // One example of each distinct message, in the order first sent.
+    const byType: Record<string, Message[]> = {};
+    for (const message of site(sent) as Message[]) {
+      const same = (byType[message.type] ??= []);
+      if (!same.some((kept) => JSON.stringify(kept) === JSON.stringify(message))) same.push(message);
+    }
+    return byType;
+  }
+
+  /** What a message is made of, which is what the caption's pixels are held to. */
+  function shape(value: unknown): unknown {
+    if (value === null) return null;
+    if (Array.isArray(value)) return value.map(shape);
+    if (typeof value === "object") {
+      return Object.fromEntries(Object.entries(value as object).map(([key, inner]) => [key, shape(inner)]));
+    }
+    return typeof value;
+  }
+
+  it("is an example of every message the page sends, as it sends it", async () => {
+    const examples = contract.messages as Record<string, Message[]>;
+    const sent = await captured();
+    expect(Object.keys(sent).sort()).toEqual(Object.keys(examples).sort());
+    for (const [type, messages] of Object.entries(sent)) {
+      // Where the Windows caption's button is depends on how this browser
+      // lays it out; what the app reads from it does not.
+      if (type === "caption") expect(messages.map(shape), type).toEqual(examples[type].map(shape));
+      else expect(messages, type).toEqual(examples[type]);
+    }
+    // Every example says it is this contract's.
+    for (const messages of Object.values(examples)) {
+      for (const message of messages) expect(message.v).toBe(contract.v);
+    }
+  });
+
+  it("names every member an app may call, and each is there", async () => {
+    const page = await open({
+      userAgent: "Mozilla/5.0 OeeeCafe platform/windows",
+      store: "microsoft",
+      caption: true,
+      supporter: ["cafe.oeee.supporter.2026"],
+    });
+    const host = window as unknown as { oeeeApp?: unknown };
+    host.oeeeApp = page.window.oeeeApp;
+    try {
+      offerPainterToApp({ command() {}, preferPen() {} } as unknown as Parameters<typeof offerPainterToApp>[0]);
+    } finally {
+      delete host.oeeeApp;
+    }
+    // The toolbar's commands need the server to render it; the Rust tests
+    // hold it to adding `command` (the_apps_are_told_the_unread_count_and_who_is_signed_in),
+    // and its table is read here for the names it takes.
+    const toolbar = template("toolbar.jinja");
+    expect(toolbar).toContain("window.oeeeApp.command = command;");
+    const table = /var commands = \{([\s\S]*?)\n\s*\};/.exec(toolbar)![1];
+    const named = [...table.matchAll(/^\s*"([a-z-]+)": function/gm)].map((match) => match[1]);
+    expect(named.sort()).toEqual([...contract.commands].sort());
+    const found = (path: string) =>
+      path.split(".").reduce<unknown>((at, name) => (at as Record<string, unknown> | undefined)?.[name], page.window.oeeeApp);
+    for (const member of contract.members) {
+      if (member === "command") continue;
+      expect(typeof found(member), member).toBe("function");
+    }
+  });
+
+  it("asks whether leaving would lose work, and shows the page is being left, in the words every app uses", async () => {
+    const page = await open();
+    const run = (script: string) => page.window.eval(script) as unknown;
+    expect(run(contract.scripts.wouldLoseWork)).toBe(false);
+    page.window.addEventListener("beforeunload", (event: Event) => event.preventDefault());
+    expect(run(contract.scripts.wouldLoseWork)).toBe(true);
+    await expect(run(contract.scripts.leaving)).resolves.toBeUndefined();
+
+    // With the loading bar, as every page with the toolbar has it: up as the
+    // app is told it may go, on WebKit a frame before (loading_bar.jinja).
+    for (const app of ["ios", "android"]) {
+      const barred = await open({ userAgent: `Mozilla/5.0 OeeeCafe platform/${app}`, loadingBar: true });
+      const left = barred.window.eval(contract.scripts.leaving) as Promise<void>;
+      const bar = barred.window.document.querySelector(".ds-loading-bar");
+      expect(bar?.className, app).toContain("is-loading");
+      expect(bar?.className.includes("is-now"), app).toBe(app === "ios");
+      await expect(left, app).resolves.toBeUndefined();
+    }
+
+    // A page that is not the site's -- the desktop app's loader, a page
+    // outside -- answers without throwing.
+    const outside = document.createElement("iframe");
+    frames.push(outside);
+    document.body.appendChild(outside);
+    const plain = outside.contentWindow as Window & typeof globalThis;
+    expect(plain.eval(contract.scripts.wouldLoseWork)).toBe(false);
+    expect(plain.eval(contract.scripts.leaving)).toBeNull();
   });
 });

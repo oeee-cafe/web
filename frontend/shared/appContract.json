@@ -1,0 +1,313 @@
+{
+  "about": "What the site and the apps say to each other (app_bridge.jinja), as examples the apps test against: the user agents and the marks each makes, one or more of every message the page sends, every member of window.oeeeApp an app may call, the names oeeeApp.command takes, and the two calls every app makes around leaving a page, word for word. appContract.browser.test.ts fails when the page stops matching this file, and the server's test reads the user agents from it too; each app keeps a copy, and a script of its own that fetches it again.",
+  "v": 1,
+  "userAgents": [
+    {
+      "agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 OeeeCafe platform/ios store/apple",
+      "app": "ios",
+      "form": "handheld",
+      "store": "apple"
+    },
+    {
+      "agent": "Mozilla/5.0 (Linux; Android 16; Pixel 9 Build/BP2A.250605.031; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.7339.51 Mobile Safari/537.36 OeeeCafe platform/android",
+      "app": "android",
+      "form": "handheld",
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) OeeeCafe platform/macos store/apple",
+      "app": "macos",
+      "form": "desktop",
+      "store": "apple"
+    },
+    {
+      "agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0 OeeeCafe platform/windows store/steam",
+      "app": "windows",
+      "form": "desktop",
+      "store": "steam"
+    },
+    {
+      "agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0 OeeeCafe platform/windows store/microsoft",
+      "app": "windows",
+      "form": "desktop",
+      "store": "microsoft"
+    },
+    {
+      "agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0 OeeeCafe platform/windows",
+      "app": "windows",
+      "form": "desktop",
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 (Windows NT 10.0; rv:56.0) Gecko/20100101 Firefox/56.0",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 store/apple",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 platform/ios store/apple",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe/ios store/apple",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe platform/tv store/nowhere",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe platform/iosx store/apple",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 XOeeeCafe platform/ios store/apple",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe platform/ios store/applesauce",
+      "app": "ios",
+      "form": "handheld",
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe platform/ios mystore/apple",
+      "app": "ios",
+      "form": "handheld",
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe platform/android Chrome/140 store/apple",
+      "app": "android",
+      "form": "handheld",
+      "store": null
+    }
+  ],
+  "messages": {
+    "page": [
+      {
+        "path": "srcdoc",
+        "signedIn": true,
+        "presence": "collaborating",
+        "community": "오이카페 \"모에화\"",
+        "group": "0123456789abcdef",
+        "painting": true,
+        "refreshable": false,
+        "v": 1,
+        "type": "page"
+      },
+      {
+        "path": "srcdoc",
+        "signedIn": null,
+        "presence": null,
+        "community": null,
+        "group": null,
+        "painting": false,
+        "refreshable": true,
+        "v": 1,
+        "type": "page"
+      }
+    ],
+    "unread": [
+      {
+        "count": 12,
+        "v": 1,
+        "type": "unread"
+      }
+    ],
+    "theme": [
+      {
+        "choice": "system",
+        "ground": "#ccccff",
+        "grid": "#bbbbff",
+        "v": 1,
+        "type": "theme"
+      }
+    ],
+    "words": [
+      {
+        "leaveTitle": "app-leave-title",
+        "leaveBody": "app-leave-body",
+        "leave": "app-leave",
+        "stay": "app-stay",
+        "saveImage": "app-save-image",
+        "copyImage": "app-copy-image",
+        "share": "app-share",
+        "copyLink": "app-copy-link",
+        "savedImage": "app-saved-image",
+        "savedFile": "app-saved-file",
+        "saveFailed": "app-save-failed",
+        "v": 1,
+        "type": "words"
+      }
+    ],
+    "haptic": [
+      {
+        "name": "success",
+        "v": 1,
+        "type": "haptic"
+      }
+    ],
+    "pressed": [
+      {
+        "drawing": {
+          "src": "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+          "link": "https://oeee.cafe/@artist/9c881320",
+          "width": 300,
+          "height": 200
+        },
+        "v": 1,
+        "type": "pressed"
+      },
+      {
+        "drawing": null,
+        "v": 1,
+        "type": "pressed"
+      }
+    ],
+    "painter": [
+      {
+        "state": "ready",
+        "v": 1,
+        "type": "painter"
+      }
+    ],
+    "prices": [
+      {
+        "products": [
+          "cafe.oeee.supporter.2026"
+        ],
+        "v": 1,
+        "type": "prices"
+      }
+    ],
+    "purchase": [
+      {
+        "product": "cafe.oeee.supporter.2026",
+        "v": 1,
+        "type": "purchase"
+      }
+    ],
+    "restore": [
+      {
+        "v": 1,
+        "type": "restore"
+      }
+    ],
+    "signIn": [
+      {
+        "provider": "google",
+        "nonce": "N",
+        "v": 1,
+        "type": "signIn"
+      },
+      {
+        "provider": "steam",
+        "v": 1,
+        "type": "signIn"
+      }
+    ],
+    "browse": [
+      {
+        "url": "https://oeee.cafe/auth/apple?handoff=I",
+        "v": 1,
+        "type": "browse"
+      }
+    ],
+    "share": [
+      {
+        "title": "A drawing",
+        "text": "https://oeee.cafe/@a/1",
+        "v": 1,
+        "type": "share"
+      }
+    ],
+    "download": [
+      {
+        "name": "drawing.png",
+        "mime": "image/png",
+        "data": "data:image/png;base64,iVBORw0KGgo=",
+        "v": 1,
+        "type": "download"
+      }
+    ],
+    "window": [
+      {
+        "action": "drag",
+        "v": 1,
+        "type": "window"
+      },
+      {
+        "action": "maximize",
+        "v": 1,
+        "type": "window"
+      }
+    ],
+    "caption": [
+      {
+        "place": {
+          "x": 38,
+          "y": 8,
+          "width": 26,
+          "height": 21
+        },
+        "v": 1,
+        "type": "caption"
+      }
+    ]
+  },
+  "members": [
+    "wouldLoseWork",
+    "leaving",
+    "pushToken",
+    "command",
+    "signIn.answer",
+    "signIn.resume",
+    "signIn.unopened",
+    "store.prices",
+    "store.purchased",
+    "store.ended",
+    "store.ticket",
+    "painter.command",
+    "painter.preferPen",
+    "caption"
+  ],
+  "commands": [
+    "recent",
+    "following",
+    "communities",
+    "together",
+    "hashtags",
+    "search",
+    "notifications",
+    "drafts",
+    "profile",
+    "account",
+    "about",
+    "new-drawing",
+    "theme-light",
+    "theme-dark",
+    "theme-system",
+    "shortcuts"
+  ],
+  "scripts": {
+    "wouldLoseWork": "window.oeeeApp && window.oeeeApp.wouldLoseWork ? window.oeeeApp.wouldLoseWork() : false",
+    "leaving": "window.oeeeApp && window.oeeeApp.leaving ? window.oeeeApp.leaving() : null"
+  }
+}

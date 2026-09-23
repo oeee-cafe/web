@@ -113,7 +113,25 @@
       start(null, true);
       requestAnimationFrame(function () { go(); });
     }
-    window.oeeeLoadingBar = { start: start, done: done, leave: leave };
+    // A page load the reader has just agreed to in an app's own dialog
+    // (oeeeApp.leaving, app_bridge.jinja): the one load leave() cannot see
+    // coming, since only the app hears the answer to the question it asked.
+    // Up at once, and on WebKit a frame let pass before the promise settles,
+    // for the app to begin the load after -- though never longer than a
+    // moment, since a web view that is off the screen has no frames to wait
+    // for.
+    function leaving() {
+      if (!holds || !window.requestAnimationFrame) {
+        start(null);
+        return Promise.resolve();
+      }
+      start(null, true);
+      return new Promise(function (resolve) {
+        requestAnimationFrame(function () { resolve(); });
+        setTimeout(resolve, 100);
+      });
+    }
+    window.oeeeLoadingBar = { start: start, done: done, leave: leave, leaving: leaving };
 
     // Whether htmx will take this trip for itself. The toolbar is boosted
     // wherever it is, but the painter pages it sits above (the collaborative
