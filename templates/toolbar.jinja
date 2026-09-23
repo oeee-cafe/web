@@ -671,7 +671,7 @@
         // stays where it is and nothing should slide in over it. A browser
         // really does leave for the provider, and is given the skeleton.
         var root = document.documentElement;
-        var signsInItself = root.hasAttribute("data-app") || root.hasAttribute("data-mac-app");
+        var signsInItself = root.hasAttribute("data-app") || root.hasAttribute("data-desktop");
         if (signsInItself &&
             (link.classList.contains("auth-apple") || link.classList.contains("auth-google"))) return;
         var thumb = link.querySelector("img[width][height]");
