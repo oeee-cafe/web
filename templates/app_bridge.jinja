@@ -134,6 +134,14 @@
    find as `window.oeeeApp && oeeeApp.command && oeeeApp.command(name)`:
 
      wouldLoseWork()         here; see below
+     pushToken(token)        here: the app's push token, from APNs or FCM,
+                             which the app hands over whenever a page says
+                             someone is signed in. The page registers it for
+                             them (POST /api/v1/devices, from its own session,
+                             with the platform its user agent names), once a
+                             document; the answer sets the oeee_device cookie
+                             the site's sign-out reads (devices.rs, auth.rs).
+                             The app makes no request to the site itself.
      signIn.answer(told), signIn.resume(), signIn.unopened()
                              app_sign_in.jinja
      command(name)           toolbar.jinja: the site's menu commands and keys,
@@ -285,6 +293,30 @@
       }, true);
     }, { capture: true, passive: true });
 
+    // The push token the app handed over, registered for whoever the page is
+    // signed in as. Once a document: signing in or out loads a new one, and
+    // the account signed in then takes the token over.
+    var registered = null;
+    var PLATFORMS = { ios: "ios", android: "android", macos: "macos" };
+    function pushToken(token) {
+      if (typeof token !== "string" || !token || registered === token) return;
+      var bar = document.querySelector(".nav-bar");
+      if (!bar || !bar.hasAttribute("data-signed-in")) return;
+      var platform = PLATFORMS[root.getAttribute("data-app") || root.getAttribute("data-desktop")];
+      if (!platform) return;
+      registered = token;
+      fetch("/api/v1/devices", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_token: token, platform: platform })
+      }).then(function (response) {
+        if (!response.ok) registered = null;
+      }, function () {
+        registered = null;
+      });
+    }
+
     window.oeeeApp = {
       // Whether an app is listening at all.
       connected: function () { return !!channel(); },
@@ -295,6 +327,7 @@
       },
       // Said again after something the page changed by itself.
       report: report,
+      pushToken: pushToken,
       // Whether the page would stop a browser from leaving it. Its value is
       // the answer, so an app evaluates the call and reads it.
       wouldLoseWork: function () {

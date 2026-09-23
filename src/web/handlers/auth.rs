@@ -224,11 +224,11 @@ pub enum LoginError {
     PasswordNotMatch,
 }
 
-/// The cookie the apps set to the push token they registered (POST
-/// /api/v1/devices), so that signing out on the site's own page also stops
-/// that device's notifications. Before it, each app caught the page's logout
-/// form on its way out and deleted the device itself first.
-const DEVICE_COOKIE: &str = "oeee_device";
+/// The cookie naming the push token registered from this web view (POST
+/// /api/v1/devices sets it, devices.rs), so that signing out on the site's own
+/// page also stops that device's notifications. Before it, each app caught the
+/// page's logout form on its way out and deleted the device itself first.
+pub(crate) const DEVICE_COOKIE: &str = "oeee_device";
 
 fn device_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
     headers
