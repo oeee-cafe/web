@@ -98,6 +98,7 @@ message-incorrect-credentials = 用户名或密码错误。
 login-name-conflict-error = 此用户名已被社区使用。请选择其他用户名。
 
 forgot-password = 忘记密码？
+find-password = 找回密码
 
 password-reset-title = 重置密码
 password-reset-description = 输入您的邮箱地址，我们将发送密码重置链接。
@@ -462,6 +463,7 @@ nav-about = 关于
 nav-about-menu = 黄瓜咖啡馆？
 post-move-to = 移动到{ $communityName }
 post-move-choose = 请选择移动到哪里
+sign-in-other-ways = 使用其他方式登录
 sign-in-no-account = 还没有账号？
 signup-agree = 我同意社区准则和隐私政策。
 signup-agree-required = 注册前请同意社区准则和隐私政策。

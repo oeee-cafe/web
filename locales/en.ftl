@@ -96,6 +96,7 @@ message-incorrect-credentials = Incorrect credentials.
 login-name-conflict-error = This username is already taken by a community. Please choose a different username.
 
 forgot-password = Forgot password?
+find-password = Reset password
 
 password-reset-title = Reset Password
 password-reset-description = Enter your email address and we'll send you a link to reset your password.
@@ -464,6 +465,7 @@ nav-about = About
 nav-about-menu = Oeee Cafe?
 post-move-to = Move to { $communityName }
 post-move-choose = Choose where it goes
+sign-in-other-ways = Or sign in with
 sign-in-no-account = No account yet?
 signup-agree = I agree to the Community Guidelines and the Privacy Policy.
 signup-agree-required = Please agree to the Community Guidelines and the Privacy Policy to sign up.

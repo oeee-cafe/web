@@ -98,6 +98,7 @@ message-incorrect-credentials = 아이디 또는 비밀번호가 틀렸습니다
 login-name-conflict-error = 이미 커뮤니티가 사용 중인 아이디입니다. 다른 아이디를 선택해 주세요.
 
 forgot-password = 비밀번호를 잊으셨나요?
+find-password = 비밀번호 찾기
 
 password-reset-title = 비밀번호 재설정
 password-reset-description = 이메일 주소를 입력하시면 비밀번호 재설정을 위한 링크를 보내드립니다.
@@ -462,6 +463,7 @@ nav-about = 소개
 nav-about-menu = 오이카페?
 post-move-to = { $communityName }(으)로 이동
 post-move-choose = 옮길 곳을 고르세요
+sign-in-other-ways = 다른 방법으로 로그인
 sign-in-no-account = 아직 계정이 없나요?
 signup-agree = 커뮤니티 가이드라인과 개인정보 처리방침에 동의합니다.
 signup-agree-required = 가입하려면 커뮤니티 가이드라인과 개인정보 처리방침에 동의해 주세요.
