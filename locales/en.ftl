@@ -17,7 +17,7 @@ theme-system = System
 keyboard-shortcuts = Keyboard shortcuts
 keyboard-shortcuts-show = Show keyboard shortcuts
 keyboard-shortcuts-then = then
-nav-recent = Recent
+nav-home = Home
 timeline = Timeline
 timeline-my = My timeline
 timeline-empty = Your timeline is empty. Discover and follow other people from <a href="/communities">communities</a>!

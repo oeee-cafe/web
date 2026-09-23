@@ -19,7 +19,7 @@ theme-system = 시스템
 keyboard-shortcuts = 키보드 단축키
 keyboard-shortcuts-show = 키보드 단축키 보기
 keyboard-shortcuts-then = 다음에
-nav-recent = 최신
+nav-home = 홈
 timeline = 동맹
 timeline-my = 내 동맹
 timeline-empty = 동맹이 비어 있습니다. <a href="/communities">커뮤니티</a>에서 다른 사람과 동맹을 맺어 보세요!
