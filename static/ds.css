@@ -2298,6 +2298,70 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   font-weight: 600;
 }
 
+/* The raised choice slides from one to the next rather than jumping: it is
+   one thumb behind them all, drawn by the group and moved by
+   segmented.jinja, which sets where it is (--thumb-x, -y, -w, -h) and marks
+   the group has-thumb once it has. The choice itself then draws nothing of
+   its own, and anything the script has not reached -- a group still hidden,
+   an engine with no custom properties -- keeps the raised choice above.
+   thumb-moves is on only for a change the reader made, so a page arriving,
+   a window resizing or a font loading puts it in place without a slide.
+   The toolbar's sections are the same control and move the same way. */
+.ds-segmented,
+.toolbar-sections {
+  position: relative;
+}
+
+.ds-segmented.has-thumb::before,
+.toolbar-sections.has-thumb::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--thumb-w);
+  height: var(--thumb-h);
+  -webkit-transform: translate(var(--thumb-x), var(--thumb-y));
+  transform: translate(var(--thumb-x), var(--thumb-y));
+  border-radius: 5px;
+  background-color: var(--ds-surface);
+  box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
+  pointer-events: none;
+}
+
+.toolbar-sections.has-thumb::before {
+  border-radius: 6px;
+}
+
+.ds-segmented.thumb-moves::before,
+.toolbar-sections.thumb-moves::before {
+  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.25, 1),
+    width 0.28s cubic-bezier(0.2, 0.9, 0.25, 1),
+    height 0.28s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-segmented.thumb-moves::before,
+  .toolbar-sections.thumb-moves::before {
+    transition: none;
+  }
+}
+
+.ds-segmented.has-thumb > *,
+.toolbar-sections.has-thumb > * {
+  position: relative;
+}
+
+.ds-segmented.has-thumb > [aria-pressed="true"],
+.ds-segmented.has-thumb > [aria-current="page"],
+.ds-segmented.has-thumb > .is-selected,
+.ds-page .ds-segmented.has-thumb > button[aria-pressed="true"],
+.ds-page .ds-segmented.has-thumb > button[aria-pressed="true"]:hover,
+.nav-bar .toolbar-sections.has-thumb a[aria-current="page"],
+.nav-bar .toolbar-sections.has-thumb a[aria-current="page"]:hover {
+  background-color: transparent;
+  box-shadow: none;
+}
+
 .ds-badge {
   display: inline-block;
   min-width: 16px;

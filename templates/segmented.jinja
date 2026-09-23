@@ -1,0 +1,124 @@
+{# The raised choice in a segmented control -- every .ds-segmented, and the
+   toolbar's sections, which are one -- slides to the next rather than
+   jumping. It is a thumb the group draws behind its items (ds.css), put
+   under whichever item is chosen: aria-current="page" for a group of
+   links, aria-pressed="true" for a group of buttons, or .is-selected.
+
+   It moves when the choice does, whoever changes it: a page's own script
+   pressing a tab, the toolbar marking the section being gone to
+   (oeeeMarkCurrent), or a press here on a link to another page, which is
+   marked chosen at once so the thumb is on its way while the page is --
+   the toolbar keeps the pill on screen over the page's skeleton for it
+   (loading, toolbar.jinja). Anything else that moves the items -- a page
+   arriving, a font loading, the window resizing, a menu opening on a group
+   that was hidden -- puts it in place without sliding.
+
+   The boost swaps the body and runs this again, which places the new
+   page's groups; the document's listeners are added once. #}
+<script>
+  (function () {
+    var GROUPS = ".ds-segmented, .toolbar-sections";
+
+    function isGroup(node) {
+      return !!node && node.nodeType === 1 && node.matches && node.matches(GROUPS);
+    }
+
+    function chosen(group) {
+      for (var i = 0; i < group.children.length; i++) {
+        var item = group.children[i];
+        if (item.getAttribute("aria-current") === "page" ||
+            item.getAttribute("aria-pressed") === "true" ||
+            item.classList.contains("is-selected")) return item;
+      }
+      return null;
+    }
+
+    function place(group, moving) {
+      var item = chosen(group);
+      // Nothing chosen, or not laid out (a closed menu): the item's own
+      // raised look stands in until it can be measured.
+      if (!item || !item.offsetWidth) {
+        group.classList.remove("has-thumb", "thumb-moves");
+        return;
+      }
+      if (moving && group.classList.contains("has-thumb")) {
+        // Where the thumb is now, settled before it is told where to go,
+        // or a group just moved in the document would have no start.
+        void group.offsetWidth;
+        group.classList.add("thumb-moves");
+      } else {
+        group.classList.remove("thumb-moves");
+      }
+      group.style.setProperty("--thumb-x", item.offsetLeft + "px");
+      group.style.setProperty("--thumb-y", item.offsetTop + "px");
+      group.style.setProperty("--thumb-w", item.offsetWidth + "px");
+      group.style.setProperty("--thumb-h", item.offsetHeight + "px");
+      group.classList.add("has-thumb");
+    }
+
+    function settle() {
+      var groups = document.querySelectorAll(GROUPS);
+      for (var i = 0; i < groups.length; i++) place(groups[i], false);
+    }
+    window.oeeeSettleThumbs = settle;
+    settle();
+
+    if (window.oeeeThumbsListening) return;
+    window.oeeeThumbsListening = true;
+
+    if (window.MutationObserver) {
+      new MutationObserver(function (records) {
+        var moved = [];
+        for (var i = 0; i < records.length; i++) {
+          var group = records[i].target.parentNode;
+          if (isGroup(group) && moved.indexOf(group) < 0) moved.push(group);
+        }
+        for (var j = 0; j < moved.length; j++) place(moved[j], true);
+      }).observe(document.documentElement, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["aria-current", "aria-pressed"]
+      });
+    }
+
+    // A link in a pill that goes to another page: chosen now, so the thumb
+    // slides while that page loads. After the toolbar's own click handler,
+    // which is the one that lays the skeleton and moves the pill into it.
+    document.addEventListener("click", function (event) {
+      if (event.button !== 0 || event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+      if (!link || link.target || link.origin !== location.origin) return;
+      var group = link.parentNode;
+      // The toolbar's sections are marked by the toolbar (oeeeMarkCurrent).
+      if (!isGroup(group) || link.closest("#menubar")) return;
+      if (link.getAttribute("aria-current") === "page") return;
+      var was = chosen(group);
+      group.oeeeWas = was;
+      if (was) was.removeAttribute("aria-current");
+      link.setAttribute("aria-current", "page");
+    });
+
+    // Back to a page kept in memory: the choice is the one it was left with.
+    window.addEventListener("pageshow", function (event) {
+      if (!event.persisted) return;
+      var groups = document.querySelectorAll(GROUPS);
+      for (var i = 0; i < groups.length; i++) {
+        var group = groups[i];
+        if (!("oeeeWas" in group)) continue;
+        var now = chosen(group);
+        if (now && now !== group.oeeeWas) now.removeAttribute("aria-current");
+        if (group.oeeeWas) group.oeeeWas.setAttribute("aria-current", "page");
+        delete group.oeeeWas;
+      }
+      settle();
+    });
+
+    window.addEventListener("resize", settle);
+    window.addEventListener("load", settle);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
+    // A group inside a menu is measured when the menu opens.
+    document.addEventListener("toggle", settle, true);
+    document.addEventListener("htmx:after:settle", settle);
+  })();
+</script>
