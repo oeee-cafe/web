@@ -2831,13 +2831,14 @@ html[data-app="android"][data-push]::view-transition-new(root) {
   background-color: var(--ds-ground);
 }
 
-/* The Supporter Pack's own page and the heart that leads to it. Only an app
-   can take the money -- StoreKit in the iOS app, Steam's overlay in the
-   Steam build -- so both are hidden until an app that can sell marks the
-   root `data-store`, before anything is drawn, as the Steam app marks
-   `data-steam-app` above. Each button appears only in front of its own
-   store; a browser gets the page and the line saying where it is sold. */
-html:not([data-store]) .toolbar-supporter,
+/* The Supporter Pack's own page and the heart that leads to it.
+   The heart is always there -- it leads to a page, not to a payment, and
+   somebody reading in a browser is how they find out the pack exists at
+   all. What is gated is the paying: only an app can take the money, and
+   only for its own store, so a buy button waits until an app that can sell
+   marks the root `data-store` before anything is drawn, as the Steam app
+   marks `data-steam-app` above. A browser gets the page, the years already
+   bought, and the line saying where the pack is sold. */
 html:not([data-store="apple"]) .supporter-buy[data-store="apple"],
 html:not([data-store="steam"]) .supporter-buy[data-store="steam"],
 html:not([data-store="apple"]) .supporter-restore {
