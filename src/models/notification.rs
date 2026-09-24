@@ -570,10 +570,7 @@ pub async fn send_push_for_notification(
         .flatten(),
         _ => None,
     };
-    data.insert(
-        "url".to_string(),
-        serde_json::json!(push_url(notification, recipient_login_name.as_deref())),
-    );
+    let url = push_url(notification, recipient_login_name.as_deref());
 
     if let Some(post_id) = notification.post_id {
         data.insert(
@@ -601,7 +598,8 @@ pub async fn send_push_for_notification(
             &title,
             &body,
             badge,
-            Some(serde_json::Value::Object(data)),
+            &url,
+            data,
         )
         .await
     {
