@@ -1412,7 +1412,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   border-top: 1px solid var(--ds-line);
 }
 
-.toolbar-menu-items .toolbar-theme:first-child {
+/* Signed out, the drafts link comes first and is hidden until there are
+   drafts, so the switch is first in all but the markup. */
+.toolbar-menu-items .toolbar-theme:first-child,
+.toolbar-menu-items .toolbar-menu-drafts[hidden] + .toolbar-theme {
   margin-top: 0;
   border-top: 0;
 }
