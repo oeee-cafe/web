@@ -7,6 +7,8 @@ export interface CollaborationMeta {
   ownerLoginName: string;
   maxUsers: number;
   currentUserCount: number;
+  /** Over, saved or not: no socket to open, only the session-over dialog. */
+  ended: boolean;
 }
 
 export interface Participant {

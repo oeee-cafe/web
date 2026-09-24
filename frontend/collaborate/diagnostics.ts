@@ -44,6 +44,8 @@ export type DiagnosticContext = {
  * nobody anything.
  */
 const MAX_TRACE_EVENTS = 512;
+/** Half the browser's in-flight keepalive budget; see `reportDiagnostics`. */
+const MAX_REPORT_BYTES = 30 * 1024;
 
 /**
  * Sends one report. Never throws and never waits on the result: this runs on
@@ -63,13 +65,23 @@ export function reportDiagnostics(
     // worth having -- it carries the positions.
   }
 
-  const body = JSON.stringify({
+  // A keepalive request may carry 64 KiB in flight per page, all of them
+  // together, and one over the budget is refused by the browser before it is
+  // sent -- silently, and the fuller the trace the likelier. Two reports go
+  // out back to back when a checkpoint fails and the socket then closes on
+  // the gap, so each is held to half of that, oldest events first to go.
+  const encode = () => JSON.stringify({
     format: "oeee-collab-diagnostic",
     version: 1,
     at: new Date().toISOString(),
     ...context,
     trace,
   });
+  let body = encode();
+  while (body.length > MAX_REPORT_BYTES && trace.length > 0) {
+    trace = trace.slice(Math.max(1, Math.ceil(trace.length / 4)));
+    body = encode();
+  }
 
   void fetch(`/collaborate/${sessionId}/diagnostics`, {
     method: "POST",

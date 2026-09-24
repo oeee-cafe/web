@@ -658,6 +658,13 @@ pub async fn upload_session_preview(
 /// the archive cannot: a stream can be recorded perfectly and still be applied
 /// wrongly, which is what happened to session c9b8321d. Filed by the client on
 /// trouble, so a healthy session posts nothing.
+/// The shortest gap between two reports from one participant of one session.
+const DIAGNOSTIC_INTERVAL_SECS: u64 = 30;
+/// The most reports kept for one session. A report is filed when a canvas
+/// goes wrong, and a session that goes wrong this often has said everything
+/// it can.
+const MAX_DIAGNOSTICS_PER_SESSION: i64 = 50;
+
 pub async fn report_session_diagnostics(
     Path(room_uuid): Path<Uuid>,
     auth_session: AuthSession,
@@ -671,6 +678,32 @@ pub async fn report_session_diagnostics(
     }
     if body.len() > super::archive::MAX_DIAGNOSTIC_BYTES {
         return Ok(StatusCode::PAYLOAD_TOO_LARGE.into_response());
+    }
+    // A participant may file a report whenever their canvas goes wrong, for
+    // as long as the session row exists, and each one is an object of up to
+    // half a megabyte in the private bucket. Bounded per person and per
+    // session, so a loop cannot fill the bucket or bury the genuine reports
+    // under junk with the same prefix.
+    let mut redis = state.redis_pool.get().await?;
+    let admitted: Option<String> = redis::cmd("SET")
+        .arg(format!("oeee:diagnostic_rate:{room_uuid}:{}", user.id))
+        .arg("1")
+        .arg("NX")
+        .arg("EX")
+        .arg(DIAGNOSTIC_INTERVAL_SECS)
+        .query_async(&mut *redis)
+        .await?;
+    if admitted.is_none() {
+        return Ok(StatusCode::TOO_MANY_REQUESTS.into_response());
+    }
+    if crate::models::collaborative_recording::report_count(&state.db_pool, room_uuid).await?
+        >= MAX_DIAGNOSTICS_PER_SESSION
+    {
+        warn!(
+            "Dropping a report from {} for room {}: already holds {}",
+            user.login_name, room_uuid, MAX_DIAGNOSTICS_PER_SESSION
+        );
+        return Ok(StatusCode::NO_CONTENT.into_response());
     }
     // Stored as sent, but only once it is known to be the shape it claims:
     // this is written to object storage under an admin-readable prefix, and

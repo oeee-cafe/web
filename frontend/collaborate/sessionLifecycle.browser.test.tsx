@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
 import { decodeMessage, unwrapReplayBatch, unwrapSequenced } from "./binaryProtocol";
 import {
-  FakeServer, type FakeSocket, inkAt, installRoom, mountSession,
+  FakeServer, type FakeSocket, inkAt, installRoom, mountPage, mountSession,
   pointer, pressUndo, settle, settleUntil, sockets, uninstallRoom,
 } from "./test/fakeRoom";
 import { HISTORY_ID, stroke } from "./test/frames";
@@ -146,6 +146,17 @@ describe("a join into a room with history", () => {
     await pointer().drag(MARK.afterReconnect, { x: MARK.afterReconnect.x + 12, y: MARK.afterReconnect.y });
     await settleUntil(() => deliveredSequences(socket).length > 0);
     expect(deliveredSequences(socket)[0]).toBe(3);
+  });
+});
+
+describe("a session that is already over", () => {
+  it("opens no socket and shows the session-over dialog instead", async () => {
+    uninstallRoom();
+    installRoom({ ended: true });
+    await mountPage();
+    await settle(6);
+    expect(sockets, "nothing to connect to").toHaveLength(0);
+    expect(document.body.textContent, "the dialog names what happened").toMatch(/session|expired|ended/i);
   });
 });
 

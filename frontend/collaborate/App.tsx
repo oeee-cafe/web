@@ -34,7 +34,6 @@ import { SaveConfirmationModal } from "./components/modals/SaveConfirmationModal
 import { SessionEndingModal } from "./components/modals/SessionEndingModal";
 import {
   decodePainterOperation,
-  encodeEndSession,
   encodeMovePointer,
   encodePainterOperation,
   encodePointerUp,
@@ -52,7 +51,6 @@ import type { CollaborationMeta, Participant } from "./types";
 
 /** How long the owner waits for the server to confirm the end of the session
  * before going to the saved post anyway. */
-const SAVE_CONFIRMATION_TIMEOUT_MS = 5000;
 
 /**
  * How often this client offers to refresh the lobby's picture of this canvas.
@@ -747,10 +745,14 @@ export default function App() {
   });
 
   useEffect(() => {
+    // Not before the painter is ready: its handle throws until then, and a
+    // session found to be over as the page opens changes this before the
+    // canvases are up.
+    if (!painterReady) return;
     painterRef.current?.setInteractionEnabled(
       view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired,
     );
-  }, [view.connection, view.catchingUp, sessionEnding, sessionExpired]);
+  }, [painterReady, view.connection, view.catchingUp, sessionEnding, sessionExpired]);
 
   const initializeApp = useCallback(async () => {
     try {
@@ -778,6 +780,9 @@ export default function App() {
       }
       document.title = `Oeee Cafe - ${meta.title?.trim() || t`No Title`}`;
       setCanvasMeta(meta);
+      // Over without a post: the dialog, not a socket the server would
+      // refuse. The owner can still save it from there.
+      if (meta.ended) setSessionExpired(true);
     } catch (error) {
       setInitializationError(error instanceof Error ? error.message : String(error));
       setAuthError(true);
@@ -799,7 +804,7 @@ export default function App() {
   // connection -- a dropped socket, a redeploy -- comes back through the
   // hook's own backoff.
   useEffect(() => {
-    if (canvasMeta && painterRef.current) connect();
+    if (canvasMeta && !canvasMeta.ended && painterRef.current) connect();
   }, [canvasMeta, connect]);
   useEffect(() => () => disconnect(), [disconnect]);
 
@@ -814,51 +819,48 @@ export default function App() {
     setSessionEnding(true);
     painterRef.current.setInteractionEnabled(false);
     try {
-      const socket = wsRef.current;
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        throw new Error("Reconnect before saving the collaborative session");
-      }
-      for (let attempt = 0; attempt < 40; attempt++) {
-        await drainCanonical();
+      // Settled first: a canvas still holding an optimistic fork, or behind
+      // the canonical position, is not what the room agreed on. Only while
+      // there is a room to be behind -- an expired session has no stream.
+      if (!sessionExpired) {
+        for (let attempt = 0; attempt < 40; attempt++) {
+          await drainCanonical();
+          if (
+            painterRef.current.isSynchronizationSettled() &&
+            feed.applied >= link.lastSeq
+          ) break;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
         if (
-          painterRef.current.isSynchronizationSettled() &&
-          feed.applied >= link.lastSeq
-        ) break;
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-      if (
-        !painterRef.current.isSynchronizationSettled() ||
-        feed.applied < link.lastSeq
-      ) {
-        throw new Error("The shared drawing is still synchronizing; please try again");
+          !painterRef.current.isSynchronizationSettled() ||
+          feed.applied < link.lastSeq
+        ) {
+          throw new Error("The shared drawing is still synchronizing; please try again");
+        }
       }
       const png = await painterRef.current.exportPng();
       const response = await fetch(`/collaborate/${getSessionId()}`, {
         method: "POST", body: png, headers: { "Content-Type": "image/png" }, credentials: "include",
       });
-      if (!response.ok) throw new Error(`Failed to save drawing: ${response.status}`);
-      const result = await response.json();
-      // Committed: what follows only ends the session around it.
-      feelInApp("success");
-      if (socket.readyState !== WebSocket.OPEN) {
-        throw new Error("The session was saved, but the connection closed before finalization; reload to continue");
+      // 409 is "already a post", with the post: a retry after a lost
+      // response lands where the first save did.
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`Failed to save drawing: ${response.status}`);
       }
-      // The server echoes END_SESSION only after accepting the authoritative
-      // lifecycle transition. Navigation happens in handleSessionEnded.
-      socket.send(encodeEndSession(userIdRef.current, result.post_url));
-      // The post above is already committed, so a confirmation that never
-      // comes back must not strand the owner on a session that is over.
-      window.setTimeout(() => {
-        leavingRef.current = true;
-        window.location.assign(result.post_url);
-      }, SAVE_CONFIRMATION_TIMEOUT_MS);
+      const result = await response.json();
+      // Committed, and the server has ended the session for everybody else.
+      // The socket is not needed for any of it: a save from a tab whose
+      // connection is gone still lands.
+      feelInApp("success");
+      leavingRef.current = true;
+      window.location.assign(result.post_url);
     } catch (error) {
       feelInApp("error");
       say(error instanceof Error ? error.message : String(error));
       setIsSaving(false);
       setSessionEnding(false);
     }
-  }, [drainCanonical, feed, isSaving, link, wsRef]);
+  }, [drainCanonical, feed, isSaving, link, sessionExpired]);
 
   const isOwner = canvasMeta?.ownerId === userIdRef.current;
 

@@ -74,18 +74,21 @@ pub async fn get_collaboration_meta(
     auth_session: AuthSession,
     State(state): State<AppState>,
 ) -> Result<Json<CollaborationMeta>, AppError> {
-    let _user = auth_session
-        .user
-        .ok_or_else(|| anyhow::anyhow!("Authentication required"))?;
+    let _user = auth_session.user.ok_or(AppError::Unauthorized)?;
 
     let db = &state.db_pool;
 
+    // Ended sessions answer too. The page opens on this, and for a session
+    // that is over it has to learn where the post is, or that there is none,
+    // rather than fail to load: a link shared earlier, a lobby card clicked
+    // in the moment before it went, the owner reloading after a save.
     let session = sqlx::query!(
         r#"
-        SELECT cs.title, cs.width, cs.height, cs.owner_id, cs.saved_post_id, cs.max_participants, u.login_name as owner_login_name
+        SELECT cs.title, cs.width, cs.height, cs.owner_id, cs.saved_post_id, cs.max_participants,
+               cs.ended_at, u.login_name as owner_login_name
         FROM collaborative_sessions cs
         JOIN users u ON cs.owner_id = u.id
-        WHERE cs.id = $1 AND cs.ended_at IS NULL
+        WHERE cs.id = $1
         "#,
         session_uuid
     )
@@ -115,6 +118,7 @@ pub async fn get_collaboration_meta(
         owner_login_name: session.owner_login_name,
         max_users: session.max_participants,
         current_user_count: user_count,
+        ended: session.ended_at.is_some(),
     }))
 }
 
@@ -347,7 +351,7 @@ pub async fn load_more_collaborative_posts(
     let mut tx = state.db_pool.begin().await?;
     let posts = crate::models::post::find_collaborative_posts(
         &mut tx,
-        query.limit,
+        query.batch_limit(),
         query.offset,
         viewer_user_id,
         viewer_show_sensitive,
@@ -592,21 +596,25 @@ async fn insert_session(
     Ok(session_id)
 }
 
+/// The largest PNG a save accepts. Sized like `/draw/finish`: the largest
+/// canvas is a few megabytes raw, and a busy drawing does not always compress
+/// below the framework's two-megabyte default, which answered such a save
+/// with a 413 the owner could do nothing about.
+pub const MAX_SAVE_BYTES: usize = 10 * 1024 * 1024;
+
 pub async fn save_collaborative_session(
     Path(session_uuid): Path<Uuid>,
     auth_session: AuthSession,
     State(state): State<AppState>,
     body: Bytes,
-) -> Result<Json<SaveSessionResponse>, AppError> {
-    let user = auth_session
-        .user
-        .ok_or_else(|| anyhow::anyhow!("Authentication required"))?;
+) -> Result<Response, AppError> {
+    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
 
     let db = &state.db_pool;
 
     let session = sqlx::query!(
         r#"
-        SELECT owner_id, saved_post_id, u.login_name as owner_login_name 
+        SELECT owner_id, saved_post_id, width, height, u.login_name as owner_login_name
         FROM collaborative_sessions cs
         JOIN users u ON cs.owner_id = u.id
         WHERE cs.id = $1
@@ -615,33 +623,65 @@ pub async fn save_collaborative_session(
     )
     .fetch_optional(db)
     .await?
-    .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
+    .ok_or_else(|| AppError::NotFound("Session".to_string()))?;
 
     if session.owner_id != user.id {
-        return Err(anyhow::anyhow!("Only session owner can save").into());
+        return Err(AppError::Forbidden);
     }
 
-    if session.saved_post_id.is_some() {
-        return Err(anyhow::anyhow!("Session has already been saved").into());
+    // Already a post: not an error, and the answer is where it is. A save
+    // retried after a lost response used to come back as a failure, with the
+    // owner left to reload.
+    if let Some(post_id) = session.saved_post_id {
+        return Ok((
+            StatusCode::CONFLICT,
+            Json(SaveSessionResponse {
+                post_id: post_id.to_string(),
+                post_url: format!("/@{}/{}", session.owner_login_name, post_id),
+                owner_login_name: session.owner_login_name,
+            }),
+        )
+            .into_response());
     }
 
-    let png_data = body.to_vec();
+    // The bytes become a public image and an `images` row of the session's
+    // size, so they have to be a PNG of that size before anything is written.
+    match super::preview::inspect_image(&body) {
+        Some((super::preview::ImageKind::Png, width, height))
+            if (width, height) == (session.width as u32, session.height as u32) => {}
+        Some((_, width, height)) => {
+            return Err(AppError::InvalidFormData(format!(
+                "expected a {}x{} PNG, got {}x{}",
+                session.width, session.height, width, height
+            )));
+        }
+        None => {
+            return Err(AppError::InvalidFormData("the body is not a PNG".to_string()));
+        }
+    }
 
-    let (post_id, owner_login_name) =
-        db::save_session_to_post(db.clone(), session_uuid, user.id, png_data, state.clone())
-            .await
-            .map_err(|e| anyhow::anyhow!("Save failed: {}", e))?;
+    let (post_id, owner_login_name) = db::save_session_to_post(
+        db.clone(),
+        session_uuid,
+        user.id,
+        body.to_vec(),
+        state.clone(),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Save failed: {}", e))?;
 
     let post_url = format!("/@{}/{}", owner_login_name, post_id);
 
-    // Note: Session ending and participant notification will be handled by the WebSocket END_SESSION message
-    // that the client sends after receiving this HTTP response. This prevents double-broadcasting.
+    // The session is over the moment the post exists, whether or not the
+    // owner's socket is still there to say so.
+    super::messages::finish_session(&state, session_uuid, user.id, &post_url, "system").await;
 
     Ok(Json(SaveSessionResponse {
         post_id: post_id.to_string(),
         owner_login_name,
         post_url,
-    }))
+    })
+    .into_response())
 }
 
 /// The collaborative drawing app: a page built by Vite and served as a file,
