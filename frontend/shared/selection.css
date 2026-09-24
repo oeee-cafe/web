@@ -3,8 +3,12 @@
  * session's -- and imported by each page's own stylesheet rather than by the
  * package, because what a page lets you select is a claim about the page: the
  * package cannot know whether it has been mounted somewhere with text on it.
- * The collaborative page adds its one exception, the chat transcript, in its
- * own file.
+ *
+ * That includes the chat transcript. It used to be the collaborative page's
+ * one exception, so messages could be copied out, and on iOS that meant a
+ * long press anywhere in the chat window raised the loupe and a selection
+ * over the log -- the same mode as below, in the window people keep open
+ * while they draw.
  */
 
 /*

@@ -222,7 +222,7 @@ export const Chat = ({
                 </div>
               ))}
           </div>
-          <div ref={messagesRef} onScroll={handleMessagesScroll} className={`${NEO_WELL} chat-transcript relative min-h-0 flex-1 overflow-y-auto p-[3px] text-[11px] leading-[15px]`}>
+          <div ref={messagesRef} onScroll={handleMessagesScroll} className={`${NEO_WELL} relative min-h-0 flex-1 overflow-y-auto p-[3px] text-[11px] leading-[15px]`}>
             <div>
               {messages.map((msg) => (
                 <div
