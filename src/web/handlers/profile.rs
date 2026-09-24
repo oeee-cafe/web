@@ -1,5 +1,6 @@
 use crate::app_error::AppError;
 use crate::models::achievement::list_achievements;
+use crate::models::comment::find_public_comments_by_user;
 use crate::models::supporter::standings;
 use crate::models::actor::Actor;
 use crate::models::banner::{activate_banner, delete_banner, find_banner_by_id, list_user_banners};
@@ -216,6 +217,7 @@ pub async fn profile(
     }
 
     let followings = find_followings_by_user_id(&mut tx, user.id, 9999, 0, false).await?;
+    let comments = find_public_comments_by_user(&mut tx, user.id, 100).await?;
 
     let banner = match user.banner_id {
         Some(banner_id) => Some(find_banner_by_id(&mut tx, banner_id).await?),
@@ -244,6 +246,7 @@ pub async fn profile(
         banner,
         is_following => is_current_user_following,
         followings,
+        comments,
         achievements,
         supporter_standings,
         user => Some(user),
@@ -297,6 +300,7 @@ pub async fn profile_or_community(
         }
 
         let followings = find_followings_by_user_id(&mut tx, user.id, 9999, 0, false).await?;
+        let comments = find_public_comments_by_user(&mut tx, user.id, 100).await?;
 
         let banner = match user.banner_id {
             Some(banner_id) => Some(find_banner_by_id(&mut tx, banner_id).await?),
@@ -325,6 +329,7 @@ pub async fn profile_or_community(
             banner,
             is_following => is_current_user_following,
             followings,
+            comments,
             achievements,
             supporter_standings,
             user => Some(user),

@@ -580,6 +580,7 @@ profile-tabs-label = 絵
 profile-tab-public = 公開
 profile-tab-private = 非公開
 profile-tab-drawings = 絵
+profile-tab-comments = コメント
 profile-more = その他
 profile-private-community-posts-note = プライベートコミュニティで描いた絵は公開プロフィールに表示されません。
 profile-member-since = { $year }年{ $month }月から参加

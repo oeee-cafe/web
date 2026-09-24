@@ -2,6 +2,7 @@
 {% from "achievement_icon_macro.jinja" import achievement_icon %}
 {% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
 {% from "per_row_macro.jinja" import per_row %}
+{% import "comment_card_macro.jinja" as comment_card_macro %}
 {% block title %}
   {{ super() }} | {{ user.display_name }} (@{{ user.login_name }})
 {% endblock title %}
@@ -134,16 +135,20 @@
 
     <section class="profile-section">
       {# One switch, one grid. Everyone sees their drawings and, when there
-         are any, who they follow; on their own profile the drawings are
-         split in two -- what everyone sees, and what only they do. With
-         nothing to switch between, the one grid is simply named. #}
-      {% set tab_count = 1 + (1 if is_owner else 0) + (1 if followings else 0) %}
+         are any, what they have said and who they follow; on their own
+         profile the drawings are split in two -- what everyone sees, and
+         what only they do. With nothing to switch between, the one grid is
+         simply named. #}
+      {% set tab_count = 1 + (1 if is_owner else 0) + (1 if comments else 0) + (1 if followings else 0) %}
       <div class="grid-header">
         {% if tab_count > 1 %}
           <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-tabs-label') }}">
             <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-tab-public" if is_owner else "profile-tab-drawings") }}<span class="profile-tab-count">{{ public_community_posts|length }}</span></button>
             {% if is_owner %}
               <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-tab-private") }}<span class="profile-tab-count">{{ private_community_posts|length }}</span></button>
+            {% endif %}
+            {% if comments %}
+              <button type="button" aria-pressed="false" data-profile-tab="comments">{{ ftl_get_message("profile-tab-comments") }}<span class="profile-tab-count">{{ comments|length }}</span></button>
             {% endif %}
             {% if followings %}
               <button type="button" aria-pressed="false" data-profile-tab="following">{{ ftl_get_message("profile-following") }}<span class="profile-tab-count">{{ followings|length }}</span></button>
@@ -195,6 +200,18 @@
           {% endif %}
         </div>
       {% endif %}
+      {% if comments %}
+        {# What they have said, as a community's recent comments are laid
+           out: the drawing, what was said, and the row the way to it. Only
+           on drawings this profile would show anyone. #}
+        <div data-profile-panel="comments" hidden>
+          <div class="comment-list">
+            {% for comment in comments %}
+              {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
       {% if followings %}
         {# Everyone they follow as the same shape: their banner framed in
            hard pixels, or where they have none, a frame of the same size
@@ -241,7 +258,7 @@
                   panels[k].hidden = panels[k].getAttribute("data-profile-panel") !== chosen;
                 }
                 // How many a row is a question about drawings only.
-                if (perRow) perRow.hidden = chosen === "following";
+                if (perRow) perRow.hidden = chosen === "following" || chosen === "comments";
               });
             }
           })();

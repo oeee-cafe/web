@@ -582,6 +582,7 @@ profile-tabs-label = Drawings
 profile-tab-public = Public
 profile-tab-private = Private
 profile-tab-drawings = Drawings
+profile-tab-comments = Comments
 profile-more = More
 profile-private-community-posts-note = Drawings from private communities are not shown on your public profile.
 profile-member-since = Member since { $month ->

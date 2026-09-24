@@ -2249,6 +2249,66 @@ mod template_tests {
         assert!(at("data-profile-panel=\"public\"") < at("data-profile-panel=\"following\""));
     }
 
+    /// What they have said gets its own tab, a row per comment leading to
+    /// the drawing it is on; someone who has said nothing gets no tab.
+    #[test]
+    fn the_profile_lists_what_its_owner_has_said() {
+        let env = test_support::env();
+        let render = |comments: serde_json::Value| {
+            env.get_template("profile.jinja")
+                .expect("profile loads")
+                .render(context! {
+                    user => json!({
+                        "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
+                        "login_name": "oeee",
+                        "display_name": "오이",
+                        "created_at": "2024-03-05T12:00:00Z",
+                    }),
+                    banner => json!(null),
+                    links => Vec::<serde_json::Value>::new(),
+                    followings => Vec::<serde_json::Value>::new(),
+                    achievements => Vec::<serde_json::Value>::new(),
+                    comments,
+                    public_community_posts => Vec::<serde_json::Value>::new(),
+                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    domain => "oeee.cafe",
+                    is_following => false,
+                    ..chrome()
+                })
+                .expect("profile renders")
+        };
+        // As `NotificationComment` serialises.
+        let with = render(json!([{
+            "id": "0c8f0000-0000-0000-0000-000000000001",
+            "post_id": "0c8f0000-0000-0000-0000-000000000002",
+            "actor_id": "0c8f0000-0000-0000-0000-000000000003",
+            "content": "멋져요",
+            "content_html": null,
+            "iri": null,
+            "actor_name": "오이",
+            "actor_handle": "@oeee@oeee.cafe",
+            "actor_url": "https://oeee.cafe/@oeee",
+            "actor_login_name": "oeee",
+            "is_local": true,
+            "updated_at": "2026-09-22T00:00:00Z",
+            "created_at": "2026-09-22T00:00:00Z",
+            "post_title": "고양이",
+            "post_author_login_name": "cat",
+            "post_image_filename": "abcdef.png",
+            "post_image_width": 300,
+            "post_image_height": 300,
+        }]));
+        assert!(with.contains(r#"data-profile-tab="comments""#));
+        assert!(with.contains(r#"data-profile-panel="comments""#));
+        assert!(with.contains(r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002""#));
+        assert!(with.contains("멋져요"));
+        assert!(with.contains("고양이"));
+
+        let without = render(json!([]));
+        assert!(!without.contains("data-profile-tab=\"comments\""));
+        assert!(!without.contains("data-profile-panel=\"comments\""));
+    }
+
     /// Under the handle, the month they joined -- in Seoul, so an account
     /// made on the evening of 29 February UTC joined in March. The locale is
     /// handed numbers, not a formatted date, and the `<time>` carries the

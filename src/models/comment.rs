@@ -418,6 +418,61 @@ pub async fn find_latest_comments_in_community(
     Ok(comments)
 }
 
+/// What a user has said, newest first, for their profile. Only on drawings a
+/// profile would show anyone: published, not deleted, and outside any
+/// community that is not public -- a comment in a private or unlisted
+/// community is not the profile's to repeat.
+pub async fn find_public_comments_by_user(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    limit: i64,
+) -> Result<Vec<NotificationComment>> {
+    let comments = sqlx::query_as!(
+        NotificationComment,
+        r#"
+        SELECT
+            comments.id,
+            comments.post_id,
+            comments.actor_id,
+            comments.updated_at,
+            comments.created_at,
+            comments.content,
+            comments.content_html,
+            comments.iri,
+            actors.name AS actor_name,
+            actors.handle AS actor_handle,
+            actors.url AS actor_url,
+            comment_authors.login_name AS "actor_login_name?",
+            true AS "is_local!",
+            posts.title AS post_title,
+            post_authors.login_name AS post_author_login_name,
+            images.image_filename AS "post_image_filename?",
+            images.width AS "post_image_width?",
+            images.height AS "post_image_height?"
+        FROM comments
+        JOIN actors ON comments.actor_id = actors.id
+        JOIN users AS comment_authors ON actors.user_id = comment_authors.id
+        JOIN posts ON comments.post_id = posts.id
+        JOIN users AS post_authors ON posts.author_id = post_authors.id
+        LEFT JOIN communities ON posts.community_id = communities.id
+        LEFT JOIN images ON posts.image_id = images.id
+        WHERE comment_authors.id = $1
+        AND posts.published_at IS NOT NULL
+        AND posts.deleted_at IS NULL
+        AND comments.deleted_at IS NULL
+        AND (posts.community_id IS NULL OR communities.visibility = 'public')
+        ORDER BY comments.created_at DESC
+        LIMIT $2
+        "#,
+        user_id,
+        limit
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(comments)
+}
+
 pub async fn create_comment(
     tx: &mut Transaction<'_, Postgres>,
     draft: CommentDraft,

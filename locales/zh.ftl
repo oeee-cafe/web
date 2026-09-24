@@ -580,6 +580,7 @@ profile-tabs-label = 作品
 profile-tab-public = 公开
 profile-tab-private = 私密
 profile-tab-drawings = 作品
+profile-tab-comments = 评论
 profile-more = 更多
 profile-private-community-posts-note = 私密社区的作品不会显示在你的公开个人资料中。
 profile-member-since = { $year }年{ $month }月加入
