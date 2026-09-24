@@ -12,13 +12,13 @@
 {% for post in feed.posts %}
   {% set heading = feed.headings[loop.index0] if feed.headings else none %}
   {% if heading %}
-    <h3 class="feed-period">
+    <h3 class="feed-period"><span class="feed-period-label">
       {%- if heading.year -%}
         {{ ftl_format_pattern("feed-period-month-year", {"month": heading.month, "year": heading.year}) }}
       {%- else -%}
         {{ ftl_format_pattern("feed-period-month", {"month": heading.month}) }}
       {%- endif -%}
-    </h3>
+    </span></h3>
   {% endif %}
   {{ card.post_card(post, r2_public_endpoint_url, false) }}
 {% endfor %}

@@ -499,8 +499,15 @@ nav a:visited,
 
 /* The month, over the first drawing of each
    (post_feed_fragment.jinja, feed_period.rs): an item of the grid that
-   takes its whole row, with a rule running out to the edge. It sits
-   nearer the row it heads than the row before it. */
+   takes its whole row. It sits nearer the row it heads than the row
+   before it.
+
+   The month is a label on its own surface, framed as the pills and
+   badges are, with a rule from it to the edge. A bare 1px rule was the
+   same mark as the ground's grid, a line of nearly the same colour --
+   in light, #a3a3e0 across #bbbbff -- and off the grid's 14px, so it read
+   as a grid line drawn in the wrong place, where it could be seen at all.
+   Starting from a solid label, the rule is plainly something else. */
 .posts-grid .feed-period {
   grid-column: 1 / -1;
   display: flex;
@@ -516,12 +523,20 @@ nav a:visited,
   margin-top: 0;
 }
 
+.feed-period-label {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--ds-frame);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+}
+
 .posts-grid .feed-period::after {
   content: "";
   flex: 1 1 auto;
   height: 1px;
   margin-left: var(--ds-space-3);
-  background-color: var(--ds-line);
+  background-color: var(--ds-frame);
 }
 
 .banner-controls {
