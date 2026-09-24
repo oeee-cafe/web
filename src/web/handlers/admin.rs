@@ -629,6 +629,20 @@ pub async fn download_collaborative_archive(
         .map_err(|e| anyhow::anyhow!("Failed to build the archive response: {}", e))?)
 }
 
+/// Refuses, by name, to answer from a deployment that records nothing.
+///
+/// Without this a list of what was kept comes back empty, which reads as
+/// "nobody said anything" or "nobody filed a report" when the truth is that
+/// there was never anywhere to keep either.
+fn require_recording(state: &AppState) -> Result<(), AppError> {
+    match crate::web::handlers::collaborate::archive::bucket(&state.config) {
+        Some(_) => Ok(()),
+        None => Err(AppError::NotFound(
+            "Collaborative sessions are not recorded on this deployment: archive_s3_bucket is not configured".to_string(),
+        )),
+    }
+}
+
 /// GET /admin/collaborative-sessions/:uuid/diagnostics — what each client
 /// believed about its own position, for the moments one of them said
 /// something was wrong.
@@ -640,6 +654,7 @@ pub async fn download_collaborative_diagnostics(
     Path(room_uuid): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Response, AppError> {
+    require_recording(&state)?;
     let reports =
         crate::web::handlers::collaborate::archive::download_diagnostics(&state, room_uuid)
             .await
@@ -685,6 +700,11 @@ pub async fn collaborative_session_chat(
     Path(room_uuid): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Response, AppError> {
+    require_recording(&state)?;
+    // A session that is still going, or never drew five hundred marks, has
+    // its conversation only in Redis until something flushes it -- the same
+    // reason the archive download flushes first.
+    crate::web::handlers::collaborate::archive::flush_room(&state, room_uuid).await;
     let lines = crate::web::handlers::collaborate::archive::read_chat(&state, room_uuid)
         .await
         .map_err(|e| {
