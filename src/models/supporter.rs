@@ -27,12 +27,12 @@
 //! Standing is whatever the platform said last. Steam is asked when someone
 //! signs in or the app hands over a ticket, and once a day besides for every
 //! Steam account the site knows (`steam::recheck_supporters`); the App Store
-//! is asked when the app hands over a transaction (`app_store::look_up`) and
-//! once a day for every purchase it has told us about
-//! (`app_store::recheck_supporters`), and Google Play the same way for every
-//! purchase token it has been handed (`google_play::recheck_supporters`).
-//! Either way a purchase or a refund shows within a day whether or not
-//! anyone signs in.
+//! is asked when the app hands over a transaction (`app_store::look_up`),
+//! and tells the site itself when one is refunded, with the notifications
+//! it could not deliver swept up hourly (`app_store::sweep_notifications`);
+//! Google Play is asked once a day about every purchase token it has been
+//! handed (`google_play::recheck_supporters`). Either way a purchase or a
+//! refund shows within a day whether or not anyone signs in.
 //!
 //! **A store is not a sign-in.** Where a pack was bought is a [`Store`],
 //! never an identity [`Provider`], even where the two share a name: a
@@ -378,9 +378,9 @@ pub struct DuePurchase {
 }
 
 /// Purchases in `store` it has not been asked about for a day, longest ago
-/// first. For the stores that answer about one purchase at a time, the App
-/// Store and Google Play; Steam is asked by account
-/// ([`steam_accounts_due_for_check`]).
+/// first: Google Play's daily recheck. Steam is asked by account
+/// ([`steam_accounts_due_for_check`]), and the App Store tells the site of
+/// a refund itself.
 pub async fn purchases_due_for_check(
     tx: &mut Transaction<'_, Postgres>,
     store: Store,
