@@ -254,17 +254,19 @@
           </div>
         </details>
       {% else %}
-        {# Where your initial would be, the theme in use, opening onto the
-           three-way switch and the language and nothing else: what the
-           site is and this browser's drafts have their own buttons in the
-           bar above, since a theme square is not where anyone would look
-           for either. #}
-        <details class="toolbar-menu toolbar-theme-menu">
+        {# Where your initial would be, a gear, opening onto the theme and
+           the language and nothing else: what the site is and this
+           browser's drafts have their own buttons in the bar above, since
+           a settings square is not where anyone would look for either. It
+           used to show the theme in use, which described half of what it
+           opened onto once the language joined it.
+
+           material-symbols:settings-outline (Apache 2.0;
+           THIRD-PARTY-NOTICES.md), outlined like the squares beside it. #}
+        <details class="toolbar-menu">
           <summary aria-label="{{ ftl_get_message("theme-and-language") }}" title="{{ ftl_get_message("theme-and-language") }}">
             <span class="toolbar-square toolbar-avatar toolbar-avatar-guest" aria-hidden="true">
-              <svg class="toolbar-theme-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>
-              <svg class="toolbar-theme-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></svg>
-              <svg class="toolbar-theme-system" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="m9.25 22l-.4-3.2q-.325-.125-.612-.3t-.563-.375L4.7 19.375l-2.75-4.75l2.575-1.95Q4.5 12.5 4.5 12.338v-.675q0-.163.025-.338L1.95 9.375l2.75-4.75l2.975 1.25q.275-.2.575-.375t.6-.3l.4-3.2h5.5l.4 3.2q.325.125.613.3t.562.375l2.975-1.25l2.75 4.75l-2.575 1.95q.025.175.025.338v.674q0 .163-.05.338l2.575 1.95l-2.75 4.75l-2.95-1.25q-.275.2-.575.375t-.6.3l-.4 3.2zM11 20h1.975l.35-2.65q.775-.2 1.438-.587t1.212-.938l2.475 1.025l.975-1.7l-2.15-1.625q.125-.35.175-.737T17.5 12t-.05-.787t-.175-.738l2.15-1.625l-.975-1.7l-2.475 1.05q-.55-.575-1.212-.962t-1.438-.588L13 4h-1.975l-.35 2.65q-.775.2-1.437.588t-1.213.937L5.55 7.15l-.975 1.7l2.15 1.6q-.125.375-.175.75t-.05.8q0 .4.05.775t.175.75l-2.15 1.625l.975 1.7l2.475-1.05q.55.575 1.213.963t1.437.587zm1.05-4.5q1.45 0 2.475-1.025T15.55 12t-1.025-2.475T12.05 8.5q-1.475 0-2.488 1.025T8.55 12t1.013 2.475T12.05 15.5M12 12"/></svg>
             </span>
           </summary>
           <div class="toolbar-menu-items">

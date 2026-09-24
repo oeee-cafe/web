@@ -1464,8 +1464,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   justify-content: center;
 }
 
-/* The language, under the theme and inside the same rules. */
-.toolbar-language {
+/* The language, under the theme and inside the same rules. Spelled with
+   the menu's class so it outranks `.toolbar-menu-items form`, which would
+   otherwise take its margin away and sit its label on the switch. */
+.toolbar-menu-items .toolbar-language {
   margin-top: 10px;
 }
 
@@ -1476,17 +1478,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 
 .toolbar-language .ds-button {
   margin-top: 6px;
-}
-
-/* The theme menu's square shows the theme in use. */
-.nav-bar .toolbar-theme-menu svg {
-  display: none;
-}
-
-:root[data-theme="light"] .nav-bar .toolbar-theme-menu .toolbar-theme-light,
-:root[data-theme="dark"] .nav-bar .toolbar-theme-menu .toolbar-theme-dark,
-:root:not([data-theme]) .nav-bar .toolbar-theme-menu .toolbar-theme-system {
-  display: block;
 }
 
 /* The switch, then a rule, then what the site is. */
