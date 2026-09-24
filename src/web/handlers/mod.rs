@@ -3026,6 +3026,47 @@ mod template_tests {
     }
 
     #[test]
+    fn reactions_offer_any_emoji_and_quote_the_ones_they_show() {
+        // The handler swaps this in with only these keys. A remote server can
+        // react with any text at all, so the emoji goes into hx-vals as JSON.
+        let env = test_support::env();
+        let template = env
+            .get_template("post_reactions.jinja")
+            .unwrap_or_else(|e| panic!("post_reactions.jinja loads: {e:#}"));
+        let reaction_counts = vec![
+            context! { emoji => "👏", count => 2, reacted_by_user => true },
+            context! { emoji => "a\"}'b", count => 1, reacted_by_user => false },
+        ];
+        let signed_in = template
+            .render(context! {
+                current_user => context! { id => "u" },
+                reaction_counts => reaction_counts.clone(),
+                post_id => "p",
+                login_name => "someone",
+                ftl_lang => "en",
+            })
+            .expect("reactions render signed in");
+        assert!(
+            signed_in.contains("reaction-custom-form"),
+            "signed in, any emoji can be added"
+        );
+        assert!(
+            signed_in.contains(r#"hx-vals='{"emoji": "a\"}\u0027b"}'"#),
+            "a quote in an emoji must not close hx-vals or its attribute"
+        );
+
+        let signed_out = template
+            .render(context! {
+                reaction_counts => reaction_counts,
+                post_id => "p",
+                login_name => "someone",
+                ftl_lang => "en",
+            })
+            .expect("reactions render signed out");
+        assert!(!signed_out.contains("reaction-custom-form"));
+    }
+
+    #[test]
     fn the_notification_chrome_renders_standalone() {
         // Both are swapped in by handlers as well as included by the page, so
         // they have to stand up with only the keys those handlers pass.

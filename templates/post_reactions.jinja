@@ -32,7 +32,7 @@
     {% if current_user %}
       <button class="reaction-button {% if reaction.reacted_by_user %}reacted{% endif %}" data-haptic="light"
               hx-post="{% if reaction.reacted_by_user %}/posts/{{ post_id }}/reactions/remove{% else %}/posts/{{ post_id }}/reactions/add{% endif %}"
-              hx-vals='{"emoji": "{{ reaction.emoji }}"}'
+              hx-vals='{"emoji": {{ reaction.emoji|tojson }}}'
               hx-target="#post-reactions-{{ post_id }}"
               hx-swap="outerHTML"
               title="{% if reaction.reacted_by_user %}Remove your {{ reaction.emoji }}{% else %}React with {{ reaction.emoji }}{% endif %}"
@@ -43,4 +43,25 @@
       <span class="reaction-button-readonly" title="Sign in to react">{{ reaction.emoji }} {{ reaction.count }}</span>
     {% endif %}
   {% endfor %}
+  {% if current_user %}
+    {# Any other emoji, typed or picked from the system's emoji keyboard.
+       `pattern` is compiled with the `v` flag, which is what makes
+       \p{RGI_Emoji} (one emoji, sequences included) mean anything; a browser
+       too old for it ignores the pattern and the server refuses the rest. #}
+    <details class="reaction-custom">
+      <summary class="reaction-button" title="{{ ftl_get_message('post-reaction-custom') }}"
+               aria-label="{{ ftl_get_message('post-reaction-custom') }}">+</summary>
+      <form class="reaction-custom-form"
+            hx-post="/posts/{{ post_id }}/reactions/add"
+            hx-target="#post-reactions-{{ post_id }}"
+            hx-swap="outerHTML"
+            hx-disabled-elt="find button">
+        <input class="reaction-custom-input" type="text" name="emoji" required
+               autocomplete="off" maxlength="32" pattern="\p{RGI_Emoji}"
+               placeholder="😀" aria-label="{{ ftl_get_message('post-reaction-custom') }}"
+               title="{{ ftl_get_message('post-reaction-custom-hint') }}">
+        <button class="reaction-button" type="submit">{{ ftl_get_message("post-reaction-custom-submit") }}</button>
+      </form>
+    </details>
+  {% endif %}
 </div>
