@@ -189,11 +189,12 @@ pub struct GoogleConfig {
     /// That client's secret. Only ever sent to Google's token endpoint, to
     /// trade a code for an ID token.
     pub client_secret: String,
-    /// The client ids of the apps that sign in with Google themselves and
-    /// post the ID token, whose tokens name the app's own client id as
-    /// audience rather than the web one. The iOS app's iOS OAuth client
-    /// belongs here; the Android app's does not, since Credential Manager is
-    /// given `client_id` above as its server client id.
+    /// The client ids of any app that signs in with Google itself and posts
+    /// the ID token under its own client id as audience rather than the web
+    /// one. None does now: the Android app's Credential Manager is given
+    /// `client_id` above as its server client id, and the other apps sign in
+    /// in a browser (src/google.rs), so the iOS OAuth client that used to be
+    /// listed here is no longer needed.
     #[serde(default)]
     pub app_ids: Vec<String>,
     /// Where Google publishes the keys it signs ID tokens with. Only a test

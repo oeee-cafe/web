@@ -9,10 +9,12 @@
 
      So the one thing left is to put the app back in front, which it cannot
      do for itself from here -- a tab the browser opened is not one a script
-     may close. `oeee-cafe://handoff/done` is what does it: the apps claim
-     that and nothing else of the scheme, and being opened is all it is for
-     (AndroidManifest.xml in oeee-cafe/android). It carries nothing; the app
-     is already holding the secret that claims the sign-in.
+     may close. `oeee-cafe://handoff/done` is what does it: being opened is
+     all the apps use the scheme for, and they load nothing from it
+     (AndroidManifest.xml in oeee-cafe-android, handoff.rs in
+     oeee-cafe-desktop, the callback scheme of ASWebAuthenticationSession in
+     oeee-cafe-apple). It carries nothing; the app is already holding the
+     secret that claims the sign-in.
 
      The link is here to be pressed as well as followed by itself. A browser
      may refuse to leave for another application without somebody asking it
