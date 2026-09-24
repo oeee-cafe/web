@@ -57,7 +57,7 @@ export const ConnectionStatusModal = ({
   }
 
   return (
-    <div className={`${PANEL} min-w-[280px] touch-auto select-auto`}>
+    <div className={`${PANEL} min-w-[280px] touch-auto`}>
       <div className={TITLE}>
         {connectionState === "connecting"
           ? <Trans>Connecting...</Trans>

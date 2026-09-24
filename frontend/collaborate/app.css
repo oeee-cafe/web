@@ -16,24 +16,6 @@
 @source ".";
 
 /*
- * Except what people said to each other.
- *
- * A message is the one thing on a drawing page that is there to be read, and
- * copying one out is worth the hazard the rest of the page is spared: this is
- * a transcript, not chrome. It is the transcript alone, though -- the buttons
- * around it stay unselectable, so a drag that misses the log cannot arm a
- * selection next to Send -- and the callout comes back with it, because on
- * iOS the long press is how you copy at all.
- *
- * The rows inside inherit this; none of them say otherwise.
- */
-.chat-transcript {
-  user-select: text;
-  -webkit-user-select: text;
-  -webkit-touch-callout: default;
-}
-
-/*
  * Room above the app for the site's toolbar.
  *
  * The server puts the toolbar at the top of this page and sets
