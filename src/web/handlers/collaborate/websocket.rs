@@ -105,6 +105,8 @@ struct PendingReset {
     base_seq: u64,
     remaining: u16,
     payloads: Vec<Vec<u8>>,
+    /// What `payloads` weighs, against `MAX_CHECKPOINT_BYTES`.
+    bytes: usize,
     /// False when this connection was not the one asked for the checkpoint.
     /// The snapshots are still counted off the wire -- see `parse_reset_begin`
     /// -- and then dropped.
@@ -160,14 +162,19 @@ pub async fn handle_socket(
     .await
     {
         Ok(owner_info) => owner_info,
-        Err(_) => {
-            // The join was refused (session over, full, or out of session user
-            // ids). Say so with a policy close rather than just dropping the
-            // socket, so the client knows not to keep retrying.
+        Err(failure) => {
+            // Say why with a close frame rather than just dropping the socket.
+            // The code is what the client reads: a policy close means the
+            // session is over, full or out of ids, and no retry will change
+            // that; anything else it comes back from on its own backoff.
+            let (code, reason) = match failure {
+                JoinFailure::Refused => (close_code::POLICY, "cannot join session"),
+                JoinFailure::Unavailable => (close_code::AGAIN, "session unavailable"),
+            };
             let _ = sender
                 .send(Message::Close(Some(CloseFrame {
-                    code: close_code::POLICY,
-                    reason: "cannot join session".into(),
+                    code,
+                    reason: reason.into(),
                 })))
                 .await;
             return;
@@ -321,10 +328,21 @@ pub async fn handle_socket(
 
     // Send history to new connection, remembering the highest sequence number
     // it contained so the live stream can skip messages history already covered
-    let (history_identity, max_history_seq) =
-        send_history_to_new_connection(
-            &state, room_uuid, &mut sender, &connection_id, resume_position,
-        ).await;
+    let (history_identity, max_history_seq) = match send_history_to_new_connection(
+        &state, room_uuid, &mut sender, &connection_id, resume_position,
+    )
+    .await
+    {
+        Some(position) => position,
+        None => {
+            // Nothing was replayed and nothing said the replay was over, so
+            // the client would sit in catch-up for good: it has no timer,
+            // because only CAUGHT_UP can tell an empty history from a slow
+            // one. Send it away to come back on its own backoff instead.
+            send_goodbye(&close_tx, close_code::AGAIN, "history unavailable");
+            (Uuid::nil(), 0)
+        }
+    };
     send_recent_chat_to_new_connection(&state, room_uuid, &mut sender, &connection_id).await;
 
     info!(
@@ -512,6 +530,15 @@ fn now_secs() -> u64 {
         .as_secs()
 }
 
+/// Why a join did not go through, told apart by whether coming back could
+/// help.
+enum JoinFailure {
+    /// The session is over, full, or out of session user ids.
+    Refused,
+    /// Postgres or Redis did not answer; the same join may work in a moment.
+    Unavailable,
+}
+
 async fn setup_connection(
     db: &sqlx::Pool<sqlx::Postgres>,
     room_uuid: Uuid,
@@ -519,16 +546,16 @@ async fn setup_connection(
     user_login_name: &str,
     connection_id: &str,
     state: &AppState,
-) -> Result<(bool, u8, super::redis_state::ConnectionInfo), ()> {
+) -> Result<(bool, u8, super::redis_state::ConnectionInfo), JoinFailure> {
     let session_info = match db::get_session_info(db, room_uuid).await {
         Ok(Some(info)) => info,
         Ok(None) => {
             error!("Session {} not found", room_uuid);
-            return Err(());
+            return Err(JoinFailure::Refused);
         }
         Err(e) => {
             error!("Failed to get session info: {}", e);
-            return Err(());
+            return Err(JoinFailure::Unavailable);
         }
     };
 
@@ -544,7 +571,7 @@ async fn setup_connection(
         Ok(success) => success,
         Err(e) => {
             error!("Failed to track participant: {}", e);
-            false
+            return Err(JoinFailure::Unavailable);
         }
     };
 
@@ -553,7 +580,7 @@ async fn setup_connection(
             "User {} rejected from session {} (capacity check failed)",
             user_login_name, room_uuid
         );
-        return Err(());
+        return Err(JoinFailure::Refused);
     }
 
     db::update_session_activity(state, room_uuid).await;
@@ -563,26 +590,69 @@ async fn setup_connection(
         setup_connection_atomically(state, room_uuid, user_id, connection_id, user_login_name)
             .await;
 
-    let session_user_id = match state.redis_state.assign_user_id(room_uuid, user_id).await {
-        Ok(Some(id)) => id,
+    let assigned = state.redis_state.assign_user_id(room_uuid, user_id).await;
+    let failure = match assigned {
+        Ok(Some(id)) => {
+            return Ok((session_info.owner_id == user_id, id, connection_info));
+        }
         Ok(None) => {
             error!(
                 "No session user id available for user {} in room {}",
                 user_login_name, room_uuid
             );
-            return Err(());
+            JoinFailure::Refused
         }
         Err(e) => {
             error!("Failed to assign session user id: {}", e);
-            return Err(());
+            JoinFailure::Unavailable
         }
     };
 
-    Ok((
-        session_info.owner_id == user_id,
-        session_user_id,
-        connection_info,
-    ))
+    // The seat above was taken before the id could be. Give it back, or the
+    // row stays active until the session ends and counts a person who never
+    // got in against the room's capacity -- the registry entry would lapse on
+    // its own after a missed heartbeat, the Postgres row never.
+    if let Err(e) = state.redis_state.unregister_connection(connection_id).await {
+        error!(
+            "Failed to unregister connection {} after a refused join: {}",
+            connection_id, e
+        );
+    }
+    if !user_has_other_connection(state, room_uuid, user_id, connection_id).await {
+        if let Err(e) = db::mark_participant_inactive(db, room_uuid, user_id).await {
+            error!(
+                "Failed to release the seat of user {} in room {}: {}",
+                user_login_name, room_uuid, e
+            );
+        }
+    }
+    Err(failure)
+}
+
+/// Whether this user is in the room through some other socket -- another tab,
+/// or a reconnect that overlapped this one.
+async fn user_has_other_connection(
+    state: &AppState,
+    room_uuid: Uuid,
+    user_id: Uuid,
+    connection_id: &str,
+) -> bool {
+    let room_connections = state
+        .redis_state
+        .get_room_connections(room_uuid)
+        .await
+        .unwrap_or_default();
+    for conn_id in &room_connections {
+        if conn_id == connection_id {
+            continue;
+        }
+        if let Ok(Some(conn_info)) = state.redis_state.get_connection_info(conn_id).await {
+            if conn_info.user_id == user_id {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 async fn setup_connection_atomically(
@@ -792,15 +862,17 @@ mod forwarding_tests {
     }
 }
 
-// Returns the highest sequence number contained in the replayed history,
-// or 0 if the history is empty or could not be retrieved.
+// Returns the history's identity and the highest sequence number the replay
+// reached (0 for an empty history), or None when the history could not be
+// read at all -- in which case the client was told nothing and must not be
+// left waiting.
 async fn send_history_to_new_connection(
     state: &AppState,
     room_uuid: Uuid,
     sender: &mut SplitSink<WebSocket, Message>,
     connection_id: &str,
     resume_position: Option<(Uuid, u64)>,
-) -> (Uuid, u64) {
+) -> Option<(Uuid, u64)> {
     let redis_store = redis_messages::RedisMessageStore::new(state.redis_pool.clone());
 
     let mut max_seq = 0;
@@ -830,7 +902,7 @@ async fn send_history_to_new_connection(
             replay_start.extend_from_slice(&current_max_seq.to_le_bytes());
             if sender.send(Message::Binary(replay_start.into())).await.is_err() {
                 warn!("Failed to send replay boundary to {}", connection_id);
-                return (history_id, after_seq);
+                return Some((history_id, after_seq));
             }
             for (seq, stored_msg) in history.iter() {
                 if *seq <= after_seq {
@@ -857,7 +929,7 @@ async fn send_history_to_new_connection(
             }
             if sender.flush().await.is_err() {
                 warn!("Failed to flush replayed history to {}", connection_id);
-                return (history_id, max_seq);
+                return Some((history_id, max_seq));
             }
             debug!(
                 "Sent {} stored messages from Redis to new connection {} (max seq {})",
@@ -872,16 +944,16 @@ async fn send_history_to_new_connection(
             if sender.send(Message::Binary(caught_up.into())).await.is_err() {
                 warn!("Failed to send caught-up marker to {}", connection_id);
             }
-            return (history_id, max_seq);
+            Some((history_id, max_seq))
         }
         Err(e) => {
             error!(
                 "Failed to retrieve message history from Redis for connection {}: {}",
                 connection_id, e
             );
+            None
         }
     }
-    (Uuid::nil(), max_seq)
 }
 
 async fn handle_incoming_messages(
@@ -973,7 +1045,22 @@ async fn handle_incoming_messages(
             if let Some(reset) = pending_reset.as_mut() {
                 if data.first() == Some(&(messages::MessageType::Snapshot as u8)) {
                     if reset.accepted {
-                        reset.payloads.push(data.to_vec());
+                        reset.bytes += data.len();
+                        if reset.bytes as u64 > redis_messages::MAX_CHECKPOINT_BYTES {
+                            // Heavier than any checkpoint a room this size can
+                            // make. The rest of the upload is still counted off
+                            // the wire, as an unselected uploader's is, and the
+                            // room is freed to ask somebody else.
+                            warn!(
+                                "Discarding a checkpoint over {} bytes from connection {} in room {}",
+                                redis_messages::MAX_CHECKPOINT_BYTES, ctx.connection_id, ctx.room_uuid
+                            );
+                            reset.accepted = false;
+                            reset.payloads = Vec::new();
+                            let _ = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await;
+                        } else {
+                            reset.payloads.push(data.to_vec());
+                        }
                     }
                     reset.remaining -= 1;
                     if reset.remaining == 0 {
@@ -993,7 +1080,7 @@ async fn handle_incoming_messages(
             // Validation above guarantees a type byte.
             let msg_type = data[0];
             if msg_type < 0x10 {
-                msg = match process_server_message(msg_type, data, &msg, &ctx).await {
+                msg = match process_server_message(msg_type, data, &ctx).await {
                     Some(processed_msg) => processed_msg,
                     None => continue,
                 };
@@ -1168,6 +1255,7 @@ async fn parse_reset_begin(data: &[u8], ctx: &SessionContext<'_>) -> Option<Pend
         base_seq,
         remaining: count,
         payloads: Vec::with_capacity(if accepted { count as usize } else { 0 }),
+        bytes: 0,
         accepted,
     })
 }
@@ -1363,16 +1451,16 @@ async fn handle_reset_offer(ctx: &SessionContext<'_>) {
 async fn process_server_message(
     msg_type: u8,
     data: &[u8],
-    msg: &Message,
     ctx: &SessionContext<'_>,
 ) -> Option<Message> {
     match msg_type {
         0x01 => {
-            // For JOIN messages with Redis Pub/Sub architecture:
-            // 1. Process the join (sends JOIN_RESPONSE via Redis to all participants)
-            // 2. Return the original message to be broadcast (but not stored - JOIN messages are ephemeral)
-            // 3. Current participants are communicated via JOIN_RESPONSE, not history replay
-
+            // The frame the room hears is the one the handler builds, carrying
+            // the login name this connection authenticated with. The client's
+            // own 25 bytes are the bare join -- uuid and timestamp, no name --
+            // and every client's decoder refuses a JOIN shorter than 27, so
+            // re-broadcasting those meant nobody was ever told who joined.
+            // JOIN is ephemeral: broadcast, never stored.
             messages::handle_join_message(
                 data,
                 ctx.user_id,
@@ -1381,10 +1469,7 @@ async fn process_server_message(
                 ctx.db,
                 ctx.state,
             )
-            .await;
-
-            // Return the JOIN message to be stored and broadcast via Redis
-            Some(msg.clone())
+            .await
         }
         0x02 => {
             // A snapshot is a layer of a checkpoint, and a checkpoint arrives
@@ -1415,7 +1500,6 @@ async fn process_server_message(
                     is_owner: ctx.is_owner,
                     db: ctx.db,
                     state: ctx.state,
-                    msg,
                     connection_id: ctx.connection_id,
                 },
             )
@@ -1480,20 +1564,8 @@ async fn cleanup_connection(
         .get_room_connections(room_uuid)
         .await
         .unwrap_or_default();
-    let user_has_other_connections = {
-        let mut has_other = false;
-        for conn_id in &room_connections {
-            if conn_id != connection_id {
-                if let Ok(Some(conn_info)) = state.redis_state.get_connection_info(conn_id).await {
-                    if conn_info.user_id == user_id {
-                        has_other = true;
-                        break;
-                    }
-                }
-            }
-        }
-        has_other
-    };
+    let user_has_other_connections =
+        user_has_other_connection(state, room_uuid, user_id, connection_id).await;
 
     // Leaving is something a user does, not a tab. With another connection
     // still open they are still here: the LEAVE carries only their user id,

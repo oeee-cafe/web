@@ -246,6 +246,31 @@ pub async fn get_active_participants(
         .collect())
 }
 
+/// Where the session's saved post lives, once it has one: the path the
+/// owner's client is sent to after saving, built here from the same two
+/// columns rather than taken from the client.
+pub async fn saved_post_path(
+    db: &Pool<Postgres>,
+    room_uuid: Uuid,
+) -> Result<Option<String>, sqlx::Error> {
+    let row = sqlx::query!(
+        r#"
+        SELECT cs.saved_post_id, u.login_name
+        FROM collaborative_sessions cs
+        JOIN users u ON cs.owner_id = u.id
+        WHERE cs.id = $1
+        "#,
+        room_uuid
+    )
+    .fetch_optional(db)
+    .await?;
+
+    Ok(row.and_then(|row| {
+        row.saved_post_id
+            .map(|post_id| format!("/@{}/{}", row.login_name, post_id))
+    }))
+}
+
 pub async fn end_session(db: &Pool<Postgres>, room_uuid: Uuid) -> Result<(), sqlx::Error> {
     sqlx::query!(
         "UPDATE collaborative_sessions SET ended_at = NOW() WHERE id = $1",

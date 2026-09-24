@@ -529,20 +529,18 @@ return 0
         // already owns someone else's strokes — and their undo. It shares the
         // history's TTL, and `RedisMessageStore::cleanup_room` deletes both
         // together once the session is really over.
-        let patterns = [
-            format!("{}{}:*", ROOM_PREFIX, room_uuid),
+        //
+        // Named outright rather than found with KEYS: that is a scan of the
+        // whole keyspace, on Redis's one thread, in a Redis shared with other
+        // apps on the host -- and it ran three times per room, from every
+        // last leave and from every pass of the ended-session sweep. The only
+        // key ever written under the room prefix is its connection set.
+        let keys = [
+            format!("{}{}:connections", ROOM_PREFIX, room_uuid),
             format!("{}{}", ACTIVITY_PREFIX, room_uuid),
             format!("{}{}", RESET_PENDING_PREFIX, room_uuid),
         ];
-
-        let mut total_deleted = 0;
-        for pattern in &patterns {
-            let keys = conn.keys::<_, Vec<String>>(pattern).await?;
-            if !keys.is_empty() {
-                let deleted: usize = conn.del(&keys).await?;
-                total_deleted += deleted;
-            }
-        }
+        let total_deleted: usize = conn.del(&keys).await?;
 
         info!(
             "Cleaned up {} Redis keys for room {}",
