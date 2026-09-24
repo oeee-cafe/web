@@ -788,24 +788,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   align-items: center;
 }
 
-/* The sections read as one control at rest, not only under the pointer: a
-   segmented group, the current one raised out of it. */
-.toolbar-sections {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  padding: 2px;
-  border: 1px solid var(--ds-line);
-  border-radius: 7px;
-  background-color: var(--ds-track);
-}
-
-.toolbar-sections > * + * {
-  margin-left: 2px;
-}
-
-/* A segment's padding and corner, as every segmented control's
-   (.ds-segmented), rather than the toolbar's other links'. */
+/* The sections are a segmented control (.ds-segmented), which draws their
+   track, thumb and spacing. `.toolbar-links a` outranks its segments,
+   though, so a segment's padding and corner are said again here rather
+   than the toolbar's other links'. */
 .nav-bar .toolbar-sections a {
   padding: var(--ds-segment-padding);
   border-radius: var(--ds-radius-s);
@@ -978,8 +964,9 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-color: var(--ds-hover);
 }
 
-/* The sections only: 넷캔 stays as it is on its own pages. */
-.nav-bar .toolbar-sections a[aria-current="page"],
+/* The chosen section keeps its raise under the pointer, which
+   `.toolbar-links a:hover` would otherwise take (.ds-segmented draws it at
+   rest). The sections only: 넷캔 stays as it is on its own pages. */
 .nav-bar .toolbar-sections a[aria-current="page"]:hover {
   background-color: var(--ds-thumb);
   box-shadow: inset 0 0 0 1px var(--ds-line-strong);
@@ -2795,14 +2782,12 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
    an engine with no custom properties -- keeps the raised choice above.
    thumb-moves is on only for a change the reader made, so a page arriving,
    a window resizing or a font loading puts it in place without a slide.
-   The toolbar's sections are the same control and move the same way. */
-.ds-segmented,
-.toolbar-sections {
+   The toolbar's sections are one of them. */
+.ds-segmented {
   position: relative;
 }
 
-.ds-segmented.has-thumb::before,
-.toolbar-sections.has-thumb::before {
+.ds-segmented.has-thumb::before {
   content: "";
   position: absolute;
   top: 0;
@@ -2817,22 +2802,19 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   pointer-events: none;
 }
 
-.ds-segmented.thumb-moves::before,
-.toolbar-sections.thumb-moves::before {
+.ds-segmented.thumb-moves::before {
   transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.25, 1),
     width 0.28s cubic-bezier(0.2, 0.9, 0.25, 1),
     height 0.28s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ds-segmented.thumb-moves::before,
-  .toolbar-sections.thumb-moves::before {
+  .ds-segmented.thumb-moves::before {
     transition: none;
   }
 }
 
-.ds-segmented.has-thumb > *,
-.toolbar-sections.has-thumb > * {
+.ds-segmented.has-thumb > * {
   position: relative;
 }
 
@@ -2844,7 +2826,6 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-segmented.has-thumb > .is-selected,
 .ds-page .ds-segmented.has-thumb > button[aria-pressed="true"],
 .ds-page .ds-segmented.has-thumb > button[aria-pressed="true"]:hover,
-.nav-bar .toolbar-sections.has-thumb a[aria-current="page"],
 .nav-bar .toolbar-sections.has-thumb a[aria-current="page"]:hover {
   background-color: transparent;
   box-shadow: none;

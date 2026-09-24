@@ -1,5 +1,5 @@
-{# The raised choice in a segmented control -- every .ds-segmented, and the
-   toolbar's sections, which are one -- slides to the next rather than
+{# The raised choice in a segmented control -- every .ds-segmented, the
+   toolbar's sections among them -- slides to the next rather than
    jumping. It is a thumb the group draws behind its items (ds.css), put
    under whichever item is chosen: aria-current="page" for a group of
    links, aria-pressed="true" for a group of buttons, or .is-selected.
@@ -16,7 +16,7 @@
    page's groups; the document's listeners are added once. #}
 <script>
   (function () {
-    var GROUPS = ".ds-segmented, .toolbar-sections";
+    var GROUPS = ".ds-segmented";
 
     function isGroup(node) {
       return !!node && node.nodeType === 1 && node.matches && node.matches(GROUPS);
