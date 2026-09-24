@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { CANVAS_Z_INDEX } from "neo-cucumber";
+import type { SessionLink } from "./useWebSocket";
 
 const CURSOR_IDLE_MS = 1500;
 const CURSOR_FADE_MS = 300;
@@ -47,7 +48,8 @@ interface RemoteCursor {
  */
 export const useRemoteCursors = (
   painterRootRef: React.RefObject<HTMLDivElement | null>,
-  localSessionIdRef: React.RefObject<number | null>,
+  /** Whose cursor is not drawn: the local id, once the server assigns it. */
+  link: Pick<SessionLink, "localId">,
 ) => {
   const cursorsRef = useRef(new Map<string, RemoteCursor>());
   const frameRef = useRef<number | null>(null);
@@ -122,7 +124,7 @@ export const useRemoteCursors = (
   const createOrUpdateCursor = useCallback((
     userId: string, x: number, y: number, username: string,
   ) => {
-    if (userId === String(localSessionIdRef.current)) return;
+    if (userId === String(link.localId)) return;
 
     let cursor = cursorsRef.current.get(userId);
     if (!cursor) {
@@ -165,7 +167,7 @@ export const useRemoteCursors = (
       cursor.element.style.opacity = "1";
     }
     scheduleFlush();
-  }, [container, localSessionIdRef, scheduleFlush, startSweep]);
+  }, [container, link, scheduleFlush, startSweep]);
 
   const clearCursors = useCallback(() => {
     for (const cursor of cursorsRef.current.values()) cursor.element.remove();
