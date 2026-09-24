@@ -32,6 +32,8 @@ const HEIGHT = 48;
 function twoClients() {
   const relayed: string[] = [];
   const sentOperations: PainterOperation[] = [];
+  /** Pointer positions the painters reported for the room's cursors. */
+  const pointerReports: ({ x: number; y: number } | null)[] = [];
   let sequence = 0;
   const clients = new Map<string, ReturnType<typeof mount>>();
 
@@ -76,6 +78,7 @@ function twoClients() {
         synchronization: {
           actorId: id,
           onOperation: (entry) => pending.push(relay(id, entry)),
+          onPointerMove: (at) => pointerReports.push(at),
         },
       });
     });
@@ -119,6 +122,7 @@ function twoClients() {
     undosSent,
     relayed,
     sentOperations,
+    pointerReports,
     /** Sends an operation the way a painter's own would go. */
     send: (from: string, operation: LocalPainterOperation["operation"]) =>
       relay(from, { id: `${from}:sent:${sequence + 1}`, actorId: from, operation }),
@@ -451,6 +455,39 @@ describe("two clients and the wire between them", () => {
     // the band below. See participantZIndex.
     expect(inkedAt(bob.element, 9000)).toBeGreaterThan(0);
     expect(inkedAt(bob.element, 8990)).toBe(0);
+  });
+
+  it("keeps reporting the pointer while a shape is dragged out", async () => {
+    // A freehand stroke carries its own points, so the pointer is not also
+    // reported during one. A rectangle, line or bezier being dragged sends
+    // nothing until it is released, and silencing the pointer for those too
+    // left this user's cursor standing at the press point on every other
+    // screen for the whole drag.
+    const room = twoClients();
+    const bob = await room.join("2");
+    const pointer = pointerOn(bob.element).dispatch;
+    const reported = () => room.pointerReports.filter((at) => at !== null).length;
+
+    // Freehand: the stroke speaks for the pen.
+    await pointer("pointerdown", 8, 8);
+    await pointer("pointermove", 14, 8);
+    await pointer("pointermove", 20, 8);
+    expect(reported()).toBe(0);
+    await pointer("pointerup", 20, 8);
+    await room.rest(60);
+
+    // A rectangle: nothing else says where the pen is.
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "r", bubbles: true, cancelable: true,
+      }));
+    });
+    const before = reported();
+    await pointer("pointerdown", 8, 24);
+    await pointer("pointermove", 14, 30);
+    await pointer("pointermove", 20, 36);
+    expect(reported()).toBeGreaterThan(before);
+    await pointer("pointerup", 20, 36);
   });
 
   it("ignores Ctrl+Z while the host has drawing disabled", async () => {

@@ -22,6 +22,7 @@ use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use super::redis_state::RoomBroadcast;
+use axum::body::Bytes;
 
 /// How far behind a connection may fall before it is told to reconnect.
 ///
@@ -43,7 +44,7 @@ struct RoomEntry {
     /// room. The forwarding task and every listener remember the generation
     /// they belong to, so neither can tear down a successor by mistake.
     generation: u64,
-    sender: broadcast::Sender<Arc<RoomBroadcast>>,
+    sender: broadcast::Sender<Arc<Delivery>>,
     /// Connections currently holding a listener. The entry goes when it hits
     /// zero; a room with nobody in it has nothing to deliver.
     listeners: usize,
@@ -60,9 +61,41 @@ pub struct RoomFanout {
     next_generation: Arc<AtomicU64>,
 }
 
+/// A broadcast as every listener in the room receives it.
+///
+/// The SEQUENCED frame a sequenced message is sent as is the same bytes for
+/// everyone in the room, so it is built here, once, rather than by each
+/// connection's task as it forwarded the message -- eight copies of a
+/// checkpoint-sized PUT_IMAGE for an eight-seat room.
+#[derive(Debug)]
+pub struct Delivery {
+    pub broadcast: RoomBroadcast,
+    /// The frame to send, for a message that is part of canonical history.
+    pub sequenced: Option<Bytes>,
+}
+
+impl Delivery {
+    pub fn new(broadcast: RoomBroadcast) -> Self {
+        let sequenced = broadcast
+            .history_id
+            .zip(broadcast.seq)
+            .map(|(history_id, seq)| {
+                Bytes::from(super::websocket::wrap_sequenced(
+                    history_id,
+                    seq,
+                    &broadcast.payload,
+                ))
+            });
+        Self {
+            broadcast,
+            sequenced,
+        }
+    }
+}
+
 /// One connection's view of a room's stream.
 pub struct RoomListener {
-    pub receiver: broadcast::Receiver<Arc<RoomBroadcast>>,
+    pub receiver: broadcast::Receiver<Arc<Delivery>>,
     subscription: Subscription,
 }
 
@@ -149,7 +182,7 @@ impl RoomFanout {
                     // The error is that nobody is listening, which is the
                     // normal state between the last leave and the abort below.
                     Some(broadcast) => {
-                        let _ = publisher.send(Arc::new(broadcast));
+                        let _ = publisher.send(Arc::new(Delivery::new(broadcast)));
                     }
                     None => error!(
                         "Dropping unrecognised Redis broadcast ({} bytes)",

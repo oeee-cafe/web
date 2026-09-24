@@ -1343,10 +1343,10 @@ async fn one_room_subscription_feeds_every_connection_in_it() {
             .await
             .expect("a broadcast arrives")
             .expect("the stream is live");
-        assert_eq!(received.payload, sent.payload);
-        assert_eq!(received.seq, sent.seq);
-        assert_eq!(received.history_id, sent.history_id);
-        assert_eq!(received.from_connection, sent.from_connection);
+        assert_eq!(received.broadcast.payload, sent.payload);
+        assert_eq!(received.broadcast.seq, sent.seq);
+        assert_eq!(received.broadcast.history_id, sent.history_id);
+        assert_eq!(received.broadcast.from_connection, sent.from_connection);
     }
 
     // Decoded once for the whole room: both listeners hold the same value.
@@ -1457,7 +1457,7 @@ async fn a_lost_room_subscription_closes_its_listeners_and_the_next_join_starts_
         .await
         .expect("the new subscription delivers")
         .expect("the stream is live");
-    assert_eq!(received.payload, sent.payload);
+    assert_eq!(received.broadcast.payload, sent.payload);
 
     fanout.release(fresh.subscription()).await;
     assert_eq!(fanout.subscribed_rooms().await, 0);
