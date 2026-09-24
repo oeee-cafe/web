@@ -1,13 +1,16 @@
 {% extends "admin/base.jinja" %}
+{% set admin_section = "banners" %}
 {% block admin_content %}
-  <h2>Banners</h2>
-  <p class="muted">
-    Flagging a banner as explicit withholds it from the public /about page.
-    The author is not told, and cannot clear the flag themselves.
-  </p>
+  <div class="admin-head">
+    <h1 class="admin-title">Banners</h1>
+    <p class="ds-help">
+      Flagging a banner as explicit withholds it from the public /about page.
+      The author is not told, and cannot clear the flag themselves.
+    </p>
+  </div>
 
-  <form class="admin-filters" method="get" action="/admin/banners">
-    <label>
+  <form class="ds-card admin-filters" method="get" action="/admin/banners">
+    <label class="admin-check">
       <input type="checkbox"
              name="explicit"
              {% if only_explicit %}checked{% endif %} />
@@ -19,10 +22,10 @@
   {% if banners %}
     {# The grid is the htmx swap target: the sentinel replaces itself with the
        next batch, which ends with a fresh sentinel. #}
-    <div class="admin-grid">
+    <div class="admin-grid admin-banners">
       {% include "admin/banners_fragment.jinja" %}
     </div>
   {% else %}
-    <p>No banners{% if only_explicit %} have been flagged{% endif %}.</p>
+    <p class="ds-card admin-empty">No banners{% if only_explicit %} have been flagged{% endif %}.</p>
   {% endif %}
 {% endblock admin_content %}

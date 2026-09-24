@@ -1,63 +1,68 @@
 {% extends "admin/base.jinja" %}
+{% set admin_section = "users" %}
 {% macro sort_link(key, label) %}
   <a href="?sort={{ key }}" {% if sort == key %}class="admin-sort-active"{% endif %}>
     {{ label }}{% if sort == key %} ▾{% endif %}
   </a>
 {% endmacro %}
 {% block admin_content %}
-  <h2>Users</h2>
-  <p class="muted">
-    "Last active" is the most recent post, comment or guestbook entry the
-    account produced. Passive browsing is not tracked.
-  </p>
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>{{ sort_link("name", "Login name") }}</th>
-        <th>Display name</th>
-        <th>Role</th>
-        <th>Posts</th>
-        <th>{{ sort_link("active", "Last active") }}</th>
-        <th>{{ sort_link("created", "Joined") }}</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for user in users %}
+  <div class="admin-head">
+    <h1 class="admin-title">Users</h1>
+    <p class="ds-help">
+      "Last active" is the most recent post, comment or guestbook entry the
+      account produced. Passive browsing is not tracked.
+    </p>
+  </div>
+  <div class="admin-table-scroll">
+    <table>
+      <thead>
         <tr>
-          <td>@{{ user.login_name }}</td>
-          <td>{{ user.display_name }}</td>
-          <td>
-            {% if user.role != "user" %}<strong>{{ user.role }}</strong>{% else %}{{ user.role }}{% endif %}
-          </td>
-          <td>{{ user.post_count }}</td>
-          <td>
-            {% if user.last_active_at %}
-              {{ user.last_active_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-            {% else %}
-              <span class="muted">never</span>
-            {% endif %}
-          </td>
-          <td>{{ user.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
-          <td>
-            {% if user.deleted_at %}
-              <span class="admin-tag deleted">deleted</span>
-            {% else %}
-              active
-            {% endif %}
-          </td>
-          <td>
-            <a href="/admin/users/{{ user.login_name }}/posts">posts →</a>
-          </td>
+          <th>{{ sort_link("name", "Login name") }}</th>
+          <th>Display name</th>
+          <th>Role</th>
+          <th>Posts</th>
+          <th>{{ sort_link("active", "Last active") }}</th>
+          <th>{{ sort_link("created", "Joined") }}</th>
+          <th>Status</th>
+          <th></th>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for user in users %}
+          <tr>
+            <td>@{{ user.login_name }}</td>
+            <td>{{ user.display_name }}</td>
+            <td>
+              {% if user.role != "user" %}<strong>{{ user.role }}</strong>{% else %}{{ user.role }}{% endif %}
+            </td>
+            <td>{{ user.post_count }}</td>
+            <td>
+              {% if user.last_active_at %}
+                {{ user.last_active_at|datetimeformat(format="short", tz="Asia/Seoul") }}
+              {% else %}
+                <span class="muted">never</span>
+              {% endif %}
+            </td>
+            <td>{{ user.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
+            <td>
+              {% if user.deleted_at %}
+                <span class="admin-tag deleted">deleted</span>
+              {% else %}
+                active
+              {% endif %}
+            </td>
+            <td>
+              <a href="/admin/users/{{ user.login_name }}/posts">posts →</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
   <div class="admin-pager">
-    {% if page > 1 %}<a href="?sort={{ sort }}&page={{ page - 1 }}">← Previous</a>{% endif %}
-    <span>Page {{ page }}</span>
-    {% if has_next %}<a href="?sort={{ sort }}&page={{ page + 1 }}">Next →</a>{% endif %}
+    {% if page > 1 %}<a class="ds-button ds-button-small" href="?sort={{ sort }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+    <span class="muted">Page {{ page }}</span>
+    {% if has_next %}<a class="ds-button ds-button-small" href="?sort={{ sort }}&page={{ page + 1 }}">Next →</a>{% endif %}
   </div>
 {% endblock admin_content %}

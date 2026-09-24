@@ -1,128 +1,133 @@
 {% extends "admin/base.jinja" %}
+{% set admin_section = "sessions" %}
 {% macro sort_link(key, label) %}
   <a href="?status={{ status }}&sort={{ key }}" {% if sort == key %}class="admin-sort-active"{% endif %}>
     {{ label }}{% if sort == key %} ▾{% endif %}
   </a>
 {% endmacro %}
-{% macro status_link(key, label) %}
-  <a href="?sort={{ sort }}&status={{ key }}" {% if status == key %}class="admin-sort-active"{% endif %}>{{ label }}</a>
-{% endmacro %}
+{% macro status_link(key, label) -%}
+  <a href="?sort={{ sort }}&status={{ key }}"{% if status == key %} aria-current="page"{% endif %}>{{ label }}</a>
+{%- endmacro %}
 {% block admin_content %}
-  <h2>Collaborative sessions</h2>
-  <p class="muted">
-    Includes link-only sessions and sessions destined for private communities —
-    neither appears in the lobby for anyone but their own participants. The
-    preview is uploaded by a participant's browser, so a live room shows one
-    within a minute of the first stroke; an ended room has none, because its
-    canvas is a post by then.
-  </p>
-  <p class="admin-filters">
-    {{ status_link("all", "All") }}
-    {{ status_link("live", "Live") }}
-    {{ status_link("ended", "Ended") }}
-  </p>
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>Canvas</th>
-        <th>{{ sort_link("name", "Title") }}</th>
-        <th>Owner</th>
-        <th>Size</th>
-        <th>Seats</th>
-        <th>Visibility</th>
-        <th>Community</th>
-        <th>{{ sort_link("active", "Last active") }}</th>
-        <th>{{ sort_link("created", "Created") }}</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for session in sessions %}
+  <div class="admin-head">
+    <h1 class="admin-title">Collaborative sessions</h1>
+    <p class="ds-help">
+      Includes link-only sessions and sessions destined for private communities —
+      neither appears in the lobby for anyone but their own participants. The
+      preview is uploaded by a participant's browser, so a live room shows one
+      within a minute of the first stroke; an ended room has none, because its
+      canvas is a post by then.
+    </p>
+  </div>
+  <nav class="ds-segmented admin-status" aria-label="Status">
+    {{- status_link("all", "All") -}}
+    {{- status_link("live", "Live") -}}
+    {{- status_link("ended", "Ended") -}}
+  </nav>
+  <div class="admin-table-scroll">
+    <table>
+      <thead>
         <tr>
-          <td>
-            {% if session.preview_version %}
-              <img class="admin-session-preview"
-                   src="/collaborate/{{ session.id }}/preview?v={{ session.preview_version }}"
-                   width="{{ session.width }}"
-                   height="{{ session.height }}"
-                   loading="lazy"
-                   decoding="async"
-                   alt="Current canvas of this session">
-            {% else %}
-              <span class="muted">—</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if session.title %}
-              {{ session.title }}
-            {% else %}
-              <span class="muted">untitled</span>
-            {% endif %}
-          </td>
-          <td>@{{ session.owner_login_name }}</td>
-          <td>{{ session.width }}×{{ session.height }}</td>
-          {# Seats held out of seats offered, then everyone who has ever been
-             in the room — which is what says whether a quiet session was quiet
-             all along or emptied out. #}
-          <td>
-            {{ session.active_participant_count }} / {{ session.max_participants }}
-            {% if session.total_participant_count > session.active_participant_count %}
-              <span class="muted">({{ session.total_participant_count }} ever)</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if session.is_public %}
-              public
-            {% else %}
-              <span class="admin-tag private">link only</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if session.community_slug %}
-              <a href="/admin/communities/{{ session.community_slug }}/posts">{{ session.community_name }}</a>
-              {% if session.community_visibility != "public" %}
-                <span class="admin-tag {{ session.community_visibility }}">{{ session.community_visibility }}</span>
-              {% endif %}
-            {% else %}
-              <span class="muted">personal</span>
-            {% endif %}
-          </td>
-          <td>{{ session.last_activity|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
-          <td>{{ session.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
-          <td>
-            {% if session.saved_post_id %}
-              <a href="/@{{ session.owner_login_name }}/{{ session.saved_post_id }}">saved</a>
-            {% elif session.ended_at %}
-              <span class="admin-tag deleted">ended</span>
-            {% else %}
-              live
-            {% endif %}
-          </td>
-          <td>
-            {# Joining takes a seat and puts a layer in the drawing, so this is
-               deliberately the ordinary session link and nothing more
-               convenient: opening a room is a visible act, not a look. #}
-            {% if not session.ended_at %}
-              <a href="/collaborate/{{ session.id }}">open →</a>
-            {% endif %}
-            {# The recording of this session's canonical stream, for replaying
-               it back through the client when a canvas came out wrong. Offered
-               for every row: an ended session is exactly the one worth
-               examining, and the archive outlives the room. #}
-            <a href="/admin/collaborative-sessions/{{ session.id }}/replay">replay</a>
-            <a href="/admin/collaborative-sessions/{{ session.id }}/archive">log</a>
-            <a href="/admin/collaborative-sessions/{{ session.id }}/chat">chat</a>
-            <a href="/admin/collaborative-sessions/{{ session.id }}/diagnostics">reports</a>
-          </td>
+          <th>Canvas</th>
+          <th>{{ sort_link("name", "Title") }}</th>
+          <th>Owner</th>
+          <th>Size</th>
+          <th>Seats</th>
+          <th>Visibility</th>
+          <th>Community</th>
+          <th>{{ sort_link("active", "Last active") }}</th>
+          <th>{{ sort_link("created", "Created") }}</th>
+          <th>Status</th>
+          <th></th>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for session in sessions %}
+          <tr>
+            <td>
+              {% if session.preview_version %}
+                <img class="admin-session-preview"
+                     src="/collaborate/{{ session.id }}/preview?v={{ session.preview_version }}"
+                     width="{{ session.width }}"
+                     height="{{ session.height }}"
+                     loading="lazy"
+                     decoding="async"
+                     alt="Current canvas of this session">
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if session.title %}
+                {{ session.title }}
+              {% else %}
+                <span class="muted">untitled</span>
+              {% endif %}
+            </td>
+            <td>@{{ session.owner_login_name }}</td>
+            <td>{{ session.width }}×{{ session.height }}</td>
+            {# Seats held out of seats offered, then everyone who has ever been
+               in the room — which is what says whether a quiet session was quiet
+               all along or emptied out. #}
+            <td>
+              {{ session.active_participant_count }} / {{ session.max_participants }}
+              {% if session.total_participant_count > session.active_participant_count %}
+                <span class="muted">({{ session.total_participant_count }} ever)</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if session.is_public %}
+                public
+              {% else %}
+                <span class="admin-tag private">link only</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if session.community_slug %}
+                <a href="/admin/communities/{{ session.community_slug }}/posts">{{ session.community_name }}</a>
+                {% if session.community_visibility != "public" %}
+                  <span class="admin-tag {{ session.community_visibility }}">{{ session.community_visibility }}</span>
+                {% endif %}
+              {% else %}
+                <span class="muted">personal</span>
+              {% endif %}
+            </td>
+            <td>{{ session.last_activity|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
+            <td>{{ session.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
+            <td>
+              {% if session.saved_post_id %}
+                <a href="/@{{ session.owner_login_name }}/{{ session.saved_post_id }}">saved</a>
+              {% elif session.ended_at %}
+                <span class="admin-tag deleted">ended</span>
+              {% else %}
+                live
+              {% endif %}
+            </td>
+            <td class="admin-row-actions">
+              {# Joining takes a seat and puts a layer in the drawing, so this is
+                 deliberately the ordinary session link and nothing more
+                 convenient: opening a room is a visible act, not a look. #}
+              {% if not session.ended_at %}
+                <a href="/collaborate/{{ session.id }}">open →</a>
+              {% endif %}
+              {# The recording of this session's canonical stream, for replaying
+                 it back through the client when a canvas came out wrong. Offered
+                 for every row: an ended session is exactly the one worth
+                 examining, and the archive outlives the room. #}
+              <a href="/admin/collaborative-sessions/{{ session.id }}/replay">replay</a>
+              <a href="/admin/collaborative-sessions/{{ session.id }}/archive">log</a>
+              <a href="/admin/collaborative-sessions/{{ session.id }}/chat">chat</a>
+              <a href="/admin/collaborative-sessions/{{ session.id }}/diagnostics">reports</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
   <div class="admin-pager">
-    {% if page > 1 %}<a href="?sort={{ sort }}&status={{ status }}&page={{ page - 1 }}">← Previous</a>{% endif %}
-    <span>Page {{ page }}</span>
-    {% if has_next %}<a href="?sort={{ sort }}&status={{ status }}&page={{ page + 1 }}">Next →</a>{% endif %}
+    {% if page > 1 %}<a class="ds-button ds-button-small" href="?sort={{ sort }}&status={{ status }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+    <span class="muted">Page {{ page }}</span>
+    {% if has_next %}<a class="ds-button ds-button-small" href="?sort={{ sort }}&status={{ status }}&page={{ page + 1 }}">Next →</a>{% endif %}
   </div>
 {% endblock admin_content %}

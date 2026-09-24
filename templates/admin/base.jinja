@@ -1,35 +1,39 @@
 {% extends "base.jinja" %}
 {# Staff-only chrome. The banner is deliberately loud: these pages show private
    communities, unpublished drafts and removed posts, so it should never be
-   ambiguous which context you are looking at. #}
+   ambiguous which context you are looking at.
+
+   Each page names its section with `{% set admin_section = "..." %}` above
+   its blocks, which marks that section in the pill. #}
 {% block title %}Admin · {{ ftl_get_message("brand") }}{% endblock title %}
 {% block head %}
-  {# Admin content is not wrapped in .center, so it already spans the window.
-     This used to widen --page-width to 100% so the nav matched, but that also
-     moved the site header — the same bug the public pages had. The nav keeps
-     its normal width now; the admin grid being wider than it is the same
-     arrangement the feed pages use. #}
   <link rel="stylesheet"
         href="{{ '/static/admin.css' | cachebuster | safe }}"
         type="text/css" />
 {% endblock head %}
 {% block content %}
-  <div class="admin-banner">
-    ADMIN — showing content that bypasses normal visibility rules
-  </div>
-  <nav class="admin-nav">
-    <a href="/admin/posts">All posts</a>
-    <a href="/admin/users">Users</a>
-    <a href="/admin/communities">Communities</a>
-    <a href="/admin/collaborative-sessions">Collaborations</a>
-    <a href="/admin/banners">Banners</a>
-    <a href="/admin/store">Store</a>
-    <a href="/">← Back to site</a>
-  </nav>
-  {# Staff copy ids, handles and reasons out of these pages, so their
-     content stays selectable where the rest of the site's chrome is not. #}
-  <div class="ds-selectable">
-    {% block admin_content %}
-    {% endblock admin_content %}
+  {# The tables and the grid want more room than the text column; the
+     toolbar above does not move for it, as on the feed pages. #}
+  <div class="center-wide admin-page">
+    <div class="admin-banner" role="note">
+      Admin — showing content that bypasses normal visibility rules
+    </div>
+    <div class="admin-bar">
+      <nav class="ds-segmented admin-nav" aria-label="Admin">
+        <a href="/admin/posts"{% if admin_section == "posts" %} aria-current="page"{% endif %}>All posts</a>
+        <a href="/admin/users"{% if admin_section == "users" %} aria-current="page"{% endif %}>Users</a>
+        <a href="/admin/communities"{% if admin_section == "communities" %} aria-current="page"{% endif %}>Communities</a>
+        <a href="/admin/collaborative-sessions"{% if admin_section == "sessions" %} aria-current="page"{% endif %}>Collaborations</a>
+        <a href="/admin/banners"{% if admin_section == "banners" %} aria-current="page"{% endif %}>Banners</a>
+        <a href="/admin/store"{% if admin_section == "store" %} aria-current="page"{% endif %}>Store</a>
+      </nav>
+      <a class="ds-button ds-button-quiet ds-button-small" href="/">← Back to site</a>
+    </div>
+    {# Staff copy ids, handles and reasons out of these pages, so their
+       content stays selectable where the rest of the site's chrome is not. #}
+    <div class="ds-selectable">
+      {% block admin_content %}
+      {% endblock admin_content %}
+    </div>
   </div>
 {% endblock content %}

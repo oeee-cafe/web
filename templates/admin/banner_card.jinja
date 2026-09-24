@@ -1,32 +1,35 @@
 {# One banner card. Rendered inside the queue and returned standalone by the
    flag endpoint, which swaps it in place via hx-swap="outerHTML". #}
-<div class="admin-card banner-card {% if banner.is_explicit %}flagged{% endif %}"
+<div class="ds-card admin-banner-card {% if banner.is_explicit %}flagged{% endif %}"
      id="banner-{{ banner.id }}">
-  <img width="{{ banner.image_width }}"
+  <img class="admin-drawing"
+       width="{{ banner.image_width }}"
        height="{{ banner.image_height }}"
        alt="Banner by {{ banner.author_login_name }}"
        loading="lazy"
        decoding="async"
        src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
-  <div>
-    {% if banner.is_explicit %}
-      <span class="admin-tag deleted">explicit — hidden from /about</span>
-    {% elif banner.is_active %}
-      <span class="admin-tag">shown on /about</span>
-    {% else %}
-      <span class="muted">not the author's active banner</span>
+  <div class="admin-banner-card-text">
+    <div>
+      {% if banner.is_explicit %}
+        <span class="admin-tag deleted">explicit — hidden from /about</span>
+      {% elif banner.is_active %}
+        <span class="admin-tag">shown on /about</span>
+      {% else %}
+        <span class="muted">not the author's active banner</span>
+      {% endif %}
+    </div>
+    <div>
+      <a href="/admin/users/{{ banner.author_login_name }}/posts">@{{ banner.author_login_name }}</a>
+      <span class="muted">· {{ banner.created_at|dateformat(format="short", tz="Asia/Seoul") }}</span>
+    </div>
+    {% if banner.is_explicit and banner.flagged_at %}
+      <div class="muted">
+        flagged {{ banner.flagged_at|datetimeformat(format="short", tz="Asia/Seoul") }}
+        {% if banner.flagged_by_login_name %}by @{{ banner.flagged_by_login_name }}{% endif %}
+      </div>
     {% endif %}
   </div>
-  <div>
-    <a href="/admin/users/{{ banner.author_login_name }}/posts">@{{ banner.author_login_name }}</a>
-  </div>
-  <div class="muted">{{ banner.created_at|dateformat(format="short", tz="Asia/Seoul") }}</div>
-  {% if banner.is_explicit and banner.flagged_at %}
-    <div class="muted">
-      flagged {{ banner.flagged_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-      {% if banner.flagged_by_login_name %}by @{{ banner.flagged_by_login_name }}{% endif %}
-    </div>
-  {% endif %}
   <form hx-post="/admin/banners/{{ banner.id }}/explicit"
         hx-target="#banner-{{ banner.id }}"
         hx-swap="outerHTML"
@@ -34,7 +37,7 @@
     <input type="hidden"
            name="is_explicit"
            value="{% if banner.is_explicit %}false{% else %}true{% endif %}" />
-    <button type="submit">
+    <button type="submit" class="ds-button ds-button-small">
       {% if banner.is_explicit %}Unflag{% else %}Flag as explicit{% endif %}
     </button>
   </form>

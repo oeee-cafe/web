@@ -1,6 +1,6 @@
 {# Explicit-flag control. Rendered inside post_detail.jinja and returned
    standalone by the flag endpoint, which swaps it via hx-swap="outerHTML". #}
-<div id="post-flag-panel" class="admin-flag-panel">
+<section id="post-flag-panel" class="ds-card ds-stack admin-flag-panel">
   {% if post.is_explicit %}
     <p>
       <span class="admin-tag deleted">flagged explicit by staff</span>
@@ -13,7 +13,7 @@
         </span>
       {% endif %}
     </p>
-    <p class="muted">
+    <p class="ds-help">
       Withheld from public listings and blurred, exactly as if the author had
       marked it sensitive. The author cannot clear this by editing the post.
     </p>
@@ -33,8 +33,8 @@
     <input type="hidden"
            name="is_explicit"
            value="{% if post.is_explicit %}false{% else %}true{% endif %}" />
-    <button type="submit">
+    <button type="submit" class="ds-button">
       {% if post.is_explicit %}Remove explicit flag{% else %}Flag as explicit{% endif %}
     </button>
   </form>
-</div>
+</section>

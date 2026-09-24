@@ -1143,6 +1143,10 @@ mod tests {
         // the boost attribute, and this assertion is about its layout.
         assert!(rendered.contains("<nav class=\"nav-bar\""));
         assert!(rendered.contains("<div id=\"menubar\">"));
+        // The page's `set admin_section` reaches the layout, which marks
+        // its section in the pill and no other.
+        assert!(rendered.contains("href=\"/admin/posts\" aria-current=\"page\""));
+        assert!(!rendered.contains("href=\"/admin/users\" aria-current"));
     }
 
     #[test]
@@ -1637,7 +1641,7 @@ mod tests {
         assert!(rendered.contains(r#"href="/admin/store""#), "in the nav");
         assert!(rendered.contains("[microsoft_store]"), "says the store cannot be asked");
         assert!(rendered.contains(r#"name="year" value="2026""#), "this year by default");
-        assert!(!rendered.contains("not added"));
+        assert!(!rendered.contains("Not added"));
     }
 
     #[test]
@@ -1646,7 +1650,7 @@ mod tests {
             json!("A product id is one word, with no spaces."),
             json!({"store": "steam", "product": "4 81", "year": "2027", "label": "Hi"}),
         );
-        assert!(rendered.contains("not added"));
+        assert!(rendered.contains("Not added"));
         assert!(rendered.contains("A product id is one word, with no spaces."));
         assert!(rendered.contains(r#"<option value="steam" selected>"#));
         assert!(rendered.contains(r#"name="product" value="4 81""#));
