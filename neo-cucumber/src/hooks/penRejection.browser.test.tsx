@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { act, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { useOfflineDrawing } from "./useOfflineDrawing";
+import { usePainterDrawing } from "./usePainterDrawing";
 import { preferPen, resetPenPreference } from "../utils/penPreference";
 import type { DrawingState } from "../types/drawing";
 
@@ -10,7 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const W = 80;
 const H = 60;
 
-type OfflineApi = ReturnType<typeof useOfflineDrawing>;
+type OfflineApi = ReturnType<typeof usePainterDrawing>;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -39,7 +39,11 @@ async function mountPainter() {
   function Harness() {
     const appRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const api = useOfflineDrawing(canvasRef, appRef, state, undefined, 100, W, H);
+    const api = usePainterDrawing({
+      canvasRef, appRef, drawingState: state,
+      zoomLevel: 100, canvasWidth: W, canvasHeight: H,
+      mode: { kind: "offline" },
+    });
     useEffect(() => {
       captured.api = api;
     });

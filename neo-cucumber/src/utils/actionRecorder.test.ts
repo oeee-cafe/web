@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { decompressFromUint8Array } from "lz-string";
 import { ActionRecorder } from "./ActionRecorder";
-import { lineTypeForBrush } from "../hooks/useOfflineDrawing";
+import { lineTypeForBrush } from "../hooks/drawingModes/ReplayRecorder";
 
 // Decode a replay blob the way Neo.decodePCH does (neo/src/actions.js)
 const decodeReplay = async (blob: Blob) => {

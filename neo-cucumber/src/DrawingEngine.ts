@@ -1173,7 +1173,7 @@ export class DrawingEngine {
           // `rect` is where the copy lands -- the source moved by however far
           // it was dragged, at the size it was copied -- so the offset NEO
           // takes separately is already folded in. The recorded `.pch` frame
-          // keeps NEO's own form, source and offset; see useOfflineDrawing.
+          // keeps NEO's own form, source and offset; see hooks/drawingModes/ReplayRecorder.
           this.neo.paste(index, x, y, width, height, 0, 0);
           break;
       }

@@ -1,6 +1,6 @@
 import { act, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { useOfflineDrawing } from "../hooks/useOfflineDrawing";
+import { usePainterDrawing } from "../hooks/usePainterDrawing";
 import type { PasteDisplay } from "../neo/regionPreview";
 import type { DrawingState } from "../types/drawing";
 import type { ToolId } from "../neo/tools";
@@ -28,7 +28,7 @@ export async function mountPainter(initialTool: ToolId) {
   const regionPreviews: (RegionRect | null)[] = [];
   type Layer = DrawingState["layerType"];
   const handle: {
-    api: ReturnType<typeof useOfflineDrawing> | null;
+    api: ReturnType<typeof usePainterDrawing> | null;
     setTool: (tool: ToolId) => void;
     setLayer: (layer: Layer) => void;
     tool: ToolId;
@@ -60,14 +60,13 @@ export async function mountPainter(initialTool: ToolId) {
       }),
       []
     );
-    const api = useOfflineDrawing(
-      canvasRef, appRef, state, undefined, 100, W, H,
-      undefined, undefined,
-      (rect: RegionRect | null) => regionPreviews.push(rect),
-      undefined, undefined, undefined,
-      undefined, false, undefined, undefined, undefined, undefined,
-      undefined, true, placement
-    );
+    const api = usePainterDrawing({
+      canvasRef, appRef, drawingState: state,
+      zoomLevel: 100, canvasWidth: W, canvasHeight: H,
+      previews: { onRegionPreview: (rect: RegionRect | null) => regionPreviews.push(rect) },
+      placement,
+      mode: { kind: "offline" },
+    });
     useEffect(() => {
       handle.api = api;
       handle.setTool = setBrushType;
@@ -118,7 +117,7 @@ export async function mountPainter(initialTool: ToolId) {
   const layer = () => handle.api!.drawingEngine!.layers.background;
   const alphaAt = (x: number, y: number) => layer()[(y * W + x) * 4 + 3];
   const frames = async () =>
-    (await decodePCH(handle.api!.getReplayBlob())).items;
+    (await decodePCH(handle.api!.replay!.getReplayBlob())).items;
 
   return {
     handle, tools, previews, regionPreviews, send, drag,

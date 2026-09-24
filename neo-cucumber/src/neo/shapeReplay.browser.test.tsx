@@ -32,7 +32,7 @@ describe("shapes drawn with a drag, replayed by NEO", () => {
       // ["fill", layer, 9 drawing-state slots, x, y, w, h, type]
       expect(items.at(-1)).toHaveLength(16);
 
-      const neo = await neoRendering(p.handle.api!.getReplayBlob());
+      const neo = await neoRendering(p.handle.api!.replay!.getReplayBlob());
       expect(
         firstPixelDifference(ours, neo),
         describeDifference(ours, neo, W)
