@@ -777,7 +777,7 @@ mod community_page_tests {
             .render(base())
             .expect("community renders");
         let on_drawings = pill(&drawings);
-        assert!(on_drawings.contains(r#"<a href="/communities/@open" aria-current="page">feed-view-drawings</a>"#));
+        assert!(on_drawings.contains(r#"<a href="/@open" aria-current="page">feed-view-drawings</a>"#));
         assert!(on_drawings.contains(r#"<a href="/communities/@open/comments">feed-view-comments</a>"#));
         assert!(on_drawings.contains("hx-boost:inherited"), "switched in place");
 
@@ -809,7 +809,7 @@ mod community_page_tests {
             })
             .expect("comments render");
         let on_comments = pill(&comments);
-        assert!(on_comments.contains(r#"<a href="/communities/@open">feed-view-drawings</a>"#));
+        assert!(on_comments.contains(r#"<a href="/@open">feed-view-drawings</a>"#));
         assert!(on_comments.contains(r#"<a href="/communities/@open/comments" aria-current="page">feed-view-comments</a>"#));
         assert!(comments.contains("Draw with us"), "under the same card");
         assert!(comments.contains(r#"<div class="comment-grid">"#));

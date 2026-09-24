@@ -177,7 +177,7 @@
             <dt>{{ ftl_get_message("community") }}</dt>
             <dd>
               {% if post.community_slug %}
-                <a href="/communities/@{{ post.community_slug }}">{{ post.community_name }}</a>
+                <a href="/@{{ post.community_slug }}">{{ post.community_name }}</a>
                 {% if current_user.id == post.author_id and (not post_community or post_community.visibility != "private") and not post.parent_post_id and not two_tone %}
                   <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit") }}</a>
                 {% endif %}

@@ -695,7 +695,7 @@ mod tests {
         let rendered = template
             .render(home_context(vec![sample_post()], false))
             .expect("renders");
-        assert!(rendered.contains("/communities/@open"));
+        assert!(rendered.contains(r#"href="/@open""#));
         assert!(rendered.contains("Open Studio"));
         // Title, author handle and timestamp are credited too, not just the
         // community — the point is that attribution is visible, not implied.

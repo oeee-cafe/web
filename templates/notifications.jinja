@@ -28,7 +28,7 @@
                 {{ ftl_get_message("invitation-from") }}
                 <a href="/@{{ invitation.inviter_login_name }}" class="notification-actor">@{{ invitation.inviter_login_name }}</a>
                 {{ ftl_get_message("invitation-to-community") }}
-                <a href="/communities/@{{ invitation.community_slug }}">{{ invitation.community_name }}</a>
+                <a href="/@{{ invitation.community_slug }}">{{ invitation.community_name }}</a>
               </p>
             </div>
             <div class="notification-meta">

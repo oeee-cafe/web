@@ -1063,7 +1063,7 @@ mod tests {
             ))
             .expect("renders");
         assert!(rendered.contains("2 / 4"));
-        assert!(rendered.contains("/communities/@open"));
+        assert!(rendered.contains(r#"href="/@open""#));
         assert!(rendered.contains("Open Studio"));
     }
 

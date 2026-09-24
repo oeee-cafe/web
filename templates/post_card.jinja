@@ -53,7 +53,7 @@
          when they were drawn. #}
       <div class="post-card-byline">
         <a class="post-card-who" href="{% if admin %}/admin/users/{{ handle }}/posts{% else %}/@{{ handle }}{% endif %}">@{{ handle }}</a>
-        {%- if post.community_slug %}<span class="post-card-where"><a href="{% if admin %}/admin/communities/{{ post.community_slug }}/posts{% else %}/communities/@{{ post.community_slug }}{% endif %}"
+        {%- if post.community_slug %}<span class="post-card-where"><a href="{% if admin %}/admin/communities/{{ post.community_slug }}/posts{% else %}/@{{ post.community_slug }}{% endif %}"
              title="{{ post.community_name }}">{{ post.community_name }}</a></span>
         {%- elif admin %}<span class="post-card-where muted">no community</span>{% endif %}
         {%- if post.published_at and not admin %}<span class="post-card-when" title="{{ post.published_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ post.published_at|ago }}</span>{% endif %}

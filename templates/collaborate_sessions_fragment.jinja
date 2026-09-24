@@ -61,7 +61,7 @@
            joining, and it is the same choice the create form makes. #}
         {% if session.community_slug %}
           <p class="session-community">
-            <a class="profile-chip" href="/communities/@{{ session.community_slug }}">{{ session.community_name }}</a>
+            <a class="profile-chip" href="/@{{ session.community_slug }}">{{ session.community_name }}</a>
           </p>
         {% endif %}
         {% if session.is_full or (show_visibility and not session.is_public) %}
