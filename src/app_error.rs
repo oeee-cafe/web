@@ -36,7 +36,7 @@ fn should_filter_from_sentry(err: &anyhow::Error) -> bool {
             cause.downcast_ref::<FederationError>(),
             Some(
                 FederationError::ParseFetchedObject(..)
-                    | FederationError::ParseReceivedActivity(..)
+                    | FederationError::ParseReceivedActivity { .. }
                     | FederationError::ObjectDeleted(..)
                     | FederationError::FetchInvalidContentType(..)
                     | FederationError::FetchWrongId(..)

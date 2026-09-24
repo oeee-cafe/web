@@ -5,6 +5,7 @@ use axum::extract::{
     ws::close_code, ws::CloseFrame, ws::Message, ws::WebSocket, Path, Query, State,
     WebSocketUpgrade,
 };
+use axum::body::Bytes;
 use axum::response::Response;
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
@@ -166,7 +167,7 @@ pub async fn handle_socket(
             let _ = sender
                 .send(Message::Close(Some(CloseFrame {
                     code: close_code::POLICY,
-                    reason: Cow::from("cannot join session"),
+                    reason: "cannot join session".into(),
                 })))
                 .await;
             return;
@@ -175,10 +176,10 @@ pub async fn handle_socket(
 
     // Tell the client its 1-byte session user id before any history arrives;
     // all its drawing messages will carry this id instead of a UUID
-    let welcome = Message::Binary(vec![
+    let welcome = Message::Binary(Bytes::from(vec![
         messages::MessageType::Welcome as u8,
         session_user_id,
-    ]);
+    ]));
     if sender.send(welcome).await.is_err() {
         error!(
             "Failed to send welcome to connection {} in room {}",
@@ -195,7 +196,7 @@ pub async fn handle_socket(
     // this socket and has begun replay. Without this a joiner spends the whole
     // of its catch-up watching marks made by session ids it has no names for.
     if let Some(layers) = messages::current_layers_message(room_uuid, &state).await {
-        if sender.send(Message::Binary(layers)).await.is_err() {
+        if sender.send(Message::Binary(layers.into())).await.is_err() {
             error!(
                 "Failed to send the participant list to connection {} in room {}",
                 connection_id, room_uuid
@@ -323,7 +324,7 @@ pub async fn handle_socket(
                         let _ = sender
                             .send(Message::Close(Some(CloseFrame {
                                 code: goodbye.code,
-                                reason: goodbye.reason,
+                                reason: goodbye.reason.as_ref().into(),
                             })))
                             .await;
                     }
@@ -336,7 +337,7 @@ pub async fn handle_socket(
                     let _ = sender
                         .send(Message::Close(Some(CloseFrame {
                             code: close_code::AWAY,
-                            reason: Cow::from("server restarting"),
+                            reason: "server restarting".into(),
                         })))
                         .await;
                     break;
@@ -351,8 +352,8 @@ pub async fn handle_socket(
                         // `wrap_sequenced` builds its own buffer, so the shared
                         // payload is only read here; the clone below is the
                         // ephemeral path, which is a pointer position at most.
-                        Some((history_id, s)) => Message::Binary(wrap_sequenced(history_id, s, &room_msg.payload)),
-                        None => Message::Binary(room_msg.payload.clone()),
+                        Some((history_id, s)) => Message::Binary(wrap_sequenced(history_id, s, &room_msg.payload).into()),
+                        None => Message::Binary(room_msg.payload.clone().into()),
                     };
                     if sender.send(msg).await.is_err() {
                         debug!("WebSocket send failed");
@@ -360,7 +361,7 @@ pub async fn handle_socket(
                     }
                 }
                 _ = keepalive.tick() => {
-                    if sender.send(Message::Ping(Vec::new())).await.is_err() {
+                    if sender.send(Message::Ping(Bytes::new())).await.is_err() {
                         debug!("WebSocket keepalive failed");
                         break;
                     }
@@ -807,7 +808,7 @@ async fn send_history_to_new_connection(
             replay_start.extend_from_slice(history_id.as_bytes());
             replay_start.extend_from_slice(&after_seq.to_le_bytes());
             replay_start.extend_from_slice(&current_max_seq.to_le_bytes());
-            if sender.send(Message::Binary(replay_start)).await.is_err() {
+            if sender.send(Message::Binary(replay_start.into())).await.is_err() {
                 warn!("Failed to send replay boundary to {}", connection_id);
                 return (history_id, after_seq);
             }
@@ -817,10 +818,10 @@ async fn send_history_to_new_connection(
                     continue;
                 }
                 let payload = match stored_msg {
-                    Message::Binary(data) => data.as_slice(),
+                    Message::Binary(data) => &data[..],
                     _ => continue,
                 };
-                let wrapped = Message::Binary(wrap_sequenced(history_id, *seq, payload));
+                let wrapped = Message::Binary(wrap_sequenced(history_id, *seq, payload).into());
                 // `feed` rather than `send`: a replay is up to the whole
                 // auto-reset threshold of messages, and `send` flushes each one
                 // on its own. The flush below covers all of them, so a join
@@ -848,7 +849,7 @@ async fn send_history_to_new_connection(
             caught_up.push(messages::MessageType::CaughtUp as u8);
             caught_up.extend_from_slice(history_id.as_bytes());
             caught_up.extend_from_slice(&max_seq.to_le_bytes());
-            if sender.send(Message::Binary(caught_up)).await.is_err() {
+            if sender.send(Message::Binary(caught_up.into())).await.is_err() {
                 warn!("Failed to send caught-up marker to {}", connection_id);
             }
             return (history_id, max_seq);
@@ -900,9 +901,10 @@ async fn handle_incoming_messages(
             }
         };
 
-        let Message::Binary(mut data) = msg else {
+        let Message::Binary(data) = msg else {
             continue;
         };
+        let mut data = Vec::from(data);
 
         // Nothing the server cannot lay out gets past here. History is
         // replayed to everyone who joins later, so a frame accepted once is
@@ -941,7 +943,7 @@ async fn handle_incoming_messages(
             );
         }
 
-        let mut msg = Message::Binary(data);
+        let mut msg = Message::Binary(data.into());
 
         if let Message::Binary(data) = &msg {
             // Session reset upload: RESET_BEGIN announces the snapshots, then
@@ -951,7 +953,7 @@ async fn handle_incoming_messages(
             if let Some(reset) = pending_reset.as_mut() {
                 if data.first() == Some(&(messages::MessageType::Snapshot as u8)) {
                     if reset.accepted {
-                        reset.payloads.push(data.clone());
+                        reset.payloads.push(data.to_vec());
                     }
                     reset.remaining -= 1;
                     if reset.remaining == 0 {
@@ -1063,7 +1065,7 @@ async fn send_recent_chat_to_new_connection(
     match store.get_recent_chat(room_uuid).await {
         Ok(messages) => {
             for payload in &messages {
-                if sender.send(Message::Binary(payload.clone())).await.is_err() {
+                if sender.send(Message::Binary(payload.clone().into())).await.is_err() {
                     warn!("Failed to replay recent chat to {}", connection_id);
                     break;
                 }
@@ -1184,7 +1186,7 @@ async fn finish_reset(ctx: &SessionContext<'_>, reset: PendingReset) {
             reset_point.extend_from_slice(&reset.base_seq.to_le_bytes());
             reset_point.extend_from_slice(&(reset.payloads.len() as u16).to_le_bytes());
             if let Err(e) = messages::sequence_and_broadcast(
-                &Message::Binary(reset_point),
+                &Message::Binary(reset_point.into()),
                 ctx.room_uuid,
                 "system",
                 ctx.state,

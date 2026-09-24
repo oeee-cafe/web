@@ -733,15 +733,15 @@ pub async fn post_view(
 
     if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
         let rendered = template
-            .eval_to_state(context! {
+            .render_captured_to(context! {
                 current_user => auth_session.user,
                 post => Some(&post),
                 post_id => id,
                 tags,
                 post_community,
                 ftl_lang
-            })?
-            .render_block("post_edit_block")
+            }, std::io::sink())?
+            .with_state_mut(|state| state.render_block("post_edit_block"))
             .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
         Ok(Html(rendered).into_response())
     } else {
@@ -2153,14 +2153,14 @@ pub async fn hx_do_edit_post(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("post_view.jinja")?;
     let rendered = template
-        .eval_to_state(context! {
+        .render_captured_to(context! {
             current_user => auth_session.user,
                 post,
             post_id => id,
             tags,
             ftl_lang
-        })?
-        .render_block("post_edit_block")?;
+        }, std::io::sink())?
+        .with_state_mut(|state| state.render_block("post_edit_block"))?;
 
     Ok(Html(rendered).into_response())
 }
@@ -2562,15 +2562,15 @@ pub async fn post_view_by_login_name(
 
     if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
         let rendered = template
-            .eval_to_state(context! {
+            .render_captured_to(context! {
                 current_user => auth_session.user,
                 post => Some(&post),
                 post_id => post_id,
                 tags,
                 post_community,
                 ftl_lang
-            })?
-            .render_block("post_edit_block")
+            }, std::io::sink())?
+            .with_state_mut(|state| state.render_block("post_edit_block"))
             .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
         Ok(Html(rendered).into_response())
     } else {
@@ -3105,7 +3105,7 @@ pub async fn add_reaction(
                     content: form.emoji.clone(),
                     r#type: "EmojiReact".to_string(),
                     id: reaction.iri.parse()?,
-                    to: vec![post_author_actor.iri.clone()],
+                    to: vec![post_author_actor.iri.to_string()],
                     cc: vec![],
                     signature: None,
                 };
@@ -3246,7 +3246,7 @@ pub async fn remove_reaction(
                         content: form.emoji.clone(),
                         r#type: "EmojiReact".to_string(),
                         id: reaction.iri.parse()?,
-                        to: vec![post_author_actor.iri.clone()],
+                        to: vec![post_author_actor.iri.to_string()],
                         cc: vec![],
                         signature: None,
                     };

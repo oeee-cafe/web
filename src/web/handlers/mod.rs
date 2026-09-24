@@ -8,7 +8,6 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
 use axum::{
-    async_trait,
     extract::FromRequestParts,
     http::{
         header::{HeaderValue, ACCEPT_LANGUAGE},
@@ -148,7 +147,6 @@ pub fn detect_preferred_language(accept_language: &HeaderValue) -> Option<Langua
 
 pub struct ExtractAcceptLanguage(HeaderValue);
 
-#[async_trait]
 impl<S> FromRequestParts<S> for ExtractAcceptLanguage
 where
     S: Send + Sync,
@@ -167,7 +165,6 @@ where
 /// Extractor that provides the computed locale string for templates
 pub struct ExtractFtlLang(pub String);
 
-#[async_trait]
 impl<S> FromRequestParts<S> for ExtractFtlLang
 where
     S: Send + Sync,
@@ -217,7 +214,6 @@ where
 /// queries in `models::admin` are unreachable without it.
 pub struct AdminUser(pub User);
 
-#[async_trait]
 impl<S> FromRequestParts<S> for AdminUser
 where
     S: Send + Sync,
@@ -716,7 +712,7 @@ mod community_page_tests {
         let rendered = env
             .get_template("community.jinja")
             .expect("community template loads")
-            .eval_to_state(context! {
+            .render_captured_to(context! {
                 current_user => json!(null),
                 community => json!({
                     "id": "00000000-0000-0000-0000-000000000001",
@@ -729,9 +725,9 @@ mod community_page_tests {
                 community_id => "00000000-0000-0000-0000-000000000001",
                 domain => "oeee.test",
                 ftl_lang => "en",
-            })
+            }, std::io::sink())
             .expect("template evaluates")
-            .render_block("community_edit_block")
+            .with_state_mut(|state| state.render_block("community_edit_block"))
             .expect("the header block renders on its own");
 
         assert!(rendered.contains("Open Studio"));
