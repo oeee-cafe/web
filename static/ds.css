@@ -824,7 +824,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 
 /* Drawing together, live: a button of its own beside the sections, with a
    light the cucumber's green, the site's mark -- a lime disc in a dark
-   rim -- pulsing. Its green border is its only edge: the raise shadow the
+   rim. Its green border is its only edge: the raise shadow the
    bar's other buttons carry drew a second, darker line under it, in a
    colour that was not the border's. It is the sections' 32px tall -- 5px
    of padding, 20px of line and its 1px border, as the section group's 1px
@@ -851,19 +851,18 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
 }
 
-/* A 10px box that the light and its ring both fill, rather than a dot
-   with a ring worked out around it: the rim sits inside the face, so the
-   painter pages' border-box reset has nothing to shrink, and a ring that
-   is inset: 0 of the same box as the dot has no offsets to drift by -- a
-   ring placed with its own top, left and size drifted off the dot in iOS
-   Safari.
+/* A 10px box the light fills, rather than a dot with its rim worked out
+   around it: the rim sits inside the face, so the painter pages' border-box
+   reset has nothing to shrink.
 
-   It pulses on every page for as long as the page is open, so it moves
-   only what the compositor can move by itself, opacity and transform. Its
-   ring was a spreading box-shadow once, which WebKit cannot animate off
-   the main thread: the page was restyled and repainted sixty times a
-   second, for about a tenth of a core in the web content process, and as
-   much again in the GPU and app processes, on a page otherwise at rest. */
+   It holds still. It pulsed once, with a ring spreading from it, on every
+   page for as long as the page was open, and no way of animating it was
+   cheap everywhere: a spreading box-shadow restyled and repainted the page
+   sixty times a second in WebKit, and even an opacity and transform pulse,
+   which a browser's compositor runs by itself, redrew the whole page every
+   frame in the Android app, whose web view draws into the app's own window
+   -- most of a core on a Galaxy Tab at 90Hz, and none with the light
+   still. */
 .toolbar-live-dot {
   position: relative;
   display: inline-block;
@@ -871,13 +870,9 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   height: 10px;
   margin-right: 7px;
   flex: none;
-  -webkit-animation: toolbar-live-pulse 1.2s ease-out infinite;
-  animation: toolbar-live-pulse 1.2s ease-out infinite;
 }
 
-/* The ring that spreads from it and fades, under the light: painted
-   first, as the shadow was. */
-.toolbar-live-dot::before,
+/* The light: the site's mark, a lime disc in a dark rim. */
 .toolbar-live-dot::after {
   content: "";
   position: absolute;
@@ -886,48 +881,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   bottom: 0;
   left: 0;
   border-radius: 50%;
-}
-
-.toolbar-live-dot::before {
-  background-color: #7abe28;
-  opacity: 0;
-  -webkit-animation: toolbar-live-ring 1.2s ease-out infinite;
-  animation: toolbar-live-ring 1.2s ease-out infinite;
-}
-
-/* The light: the site's mark, a lime disc in a dark rim. */
-.toolbar-live-dot::after {
   border: 2px solid #3c6712;
   background-color: var(--ds-accent);
-}
-
-@-webkit-keyframes toolbar-live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-
-@keyframes toolbar-live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-
-/* Out to 7px past the dot's edge: 24px across, from 10. */
-@-webkit-keyframes toolbar-live-ring {
-  0% { opacity: 0.7; -webkit-transform: scale(1); transform: scale(1); }
-  100% { opacity: 0; -webkit-transform: scale(2.4); transform: scale(2.4); }
-}
-
-@keyframes toolbar-live-ring {
-  0% { opacity: 0.7; transform: scale(1); }
-  100% { opacity: 0; transform: scale(2.4); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toolbar-live-dot,
-  .toolbar-live-dot::before {
-    -webkit-animation: none;
-    animation: none;
-  }
 }
 
 .toolbar-end {
@@ -935,7 +890,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 }
 
 /* Drafts, shown only while there are some, signed in or out: the square
-   is tinted and edged as 넷캔 is, and 넷캔's own light pulses on its top
+   is tinted and edged as 넷캔 is, and 넷캔's own light sits on its top
    right corner -- centred on it, as the unverified-email dot is on the
    initial. */
 .nav-bar .toolbar-end .toolbar-drafts,
