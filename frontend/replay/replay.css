@@ -514,3 +514,50 @@ button.inspect-log-current:hover {
   margin-right: 1px;
   background-color: var(--ds-line-strong);
 }
+
+/* The replay check: below the controls, and its own painter off the page. */
+.inspect-check {
+  margin-top: var(--ds-space-3);
+}
+
+.inspect-check-says {
+  margin: 0;
+}
+
+.inspect-check-says.ds-notice {
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-s);
+}
+
+.inspect-check-stage {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  pointer-events: none;
+}
+
+.inspect-check-details {
+  margin-top: var(--ds-space-2);
+  font-size: var(--ds-text-s);
+}
+
+.inspect-check-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-2);
+}
+
+.inspect-check-figure {
+  margin: 0;
+}
+
+/* Hard pixels: the difference is often one pixel wide, and smoothing it
+   away would hide exactly what is being shown. */
+.inspect-check-figure canvas {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--ds-frame);
+  background-color: var(--ds-field);
+  image-rendering: pixelated;
+}

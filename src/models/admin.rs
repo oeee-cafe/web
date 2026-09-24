@@ -380,6 +380,9 @@ pub enum AdminSessionStatus {
     All,
     Live,
     Ended,
+    /// Needs a look: a client filed a report, or the replay came out
+    /// different from what was saved.
+    Flagged,
 }
 
 impl AdminSessionStatus {
@@ -388,6 +391,7 @@ impl AdminSessionStatus {
             AdminSessionStatus::All => "all",
             AdminSessionStatus::Live => "live",
             AdminSessionStatus::Ended => "ended",
+            AdminSessionStatus::Flagged => "flagged",
         }
     }
 }
@@ -424,6 +428,26 @@ pub struct AdminCollaborativeSession {
     /// previews do not live in this table. See
     /// `web::handlers::collaborate::preview`.
     pub preview_version: Option<u64>,
+    /// What is known of its recording, or None when nothing has been noted --
+    /// nothing recorded, or recorded before recordings were noted and never
+    /// opened in the inspector since.
+    pub recording: Option<AdminSessionRecording>,
+}
+
+/// A row of `collaborative_session_recordings`, as the list shows it.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdminSessionRecording {
+    pub first_seq: Option<i64>,
+    pub last_seq: Option<i64>,
+    pub messages: i64,
+    pub sealed: bool,
+    pub chat_lines: i32,
+    pub reports: i32,
+    pub check_outcome: Option<String>,
+    pub check_differing_pixels: Option<i64>,
+    pub check_total_pixels: Option<i64>,
+    pub check_note: Option<String>,
+    pub checked_at: Option<DateTime<Utc>>,
 }
 
 /// Every session, in any state, with no visibility rule applied.
@@ -483,16 +507,30 @@ async fn find_collaborative_sessions(
             cs.ended_at,
             cs.saved_post_id,
             COUNT(csp.user_id) FILTER (WHERE csp.is_active) AS "active_participant_count!",
-            COUNT(csp.user_id) AS "total_participant_count!"
+            COUNT(csp.user_id) AS "total_participant_count!",
+            r.session_id AS "recorded?",
+            r.first_seq AS "first_seq?",
+            r.last_seq AS "last_seq?",
+            r.messages AS "messages?",
+            r.sealed AS "sealed?",
+            r.chat_lines AS "chat_lines?",
+            r.reports AS "reports?",
+            r.check_outcome AS "check_outcome?",
+            r.check_differing_pixels AS "check_differing_pixels?",
+            r.check_total_pixels AS "check_total_pixels?",
+            r.check_note AS "check_note?",
+            r.checked_at AS "checked_at?"
         FROM collaborative_sessions cs
         JOIN users u ON cs.owner_id = u.id
         LEFT JOIN communities c ON cs.community_id = c.id
         LEFT JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
+        LEFT JOIN collaborative_session_recordings r ON r.session_id = cs.id
         WHERE ($1 = 'all'
            OR ($1 = 'live' AND cs.ended_at IS NULL)
-           OR ($1 = 'ended' AND cs.ended_at IS NOT NULL))
+           OR ($1 = 'ended' AND cs.ended_at IS NOT NULL)
+           OR ($1 = 'flagged' AND (r.reports > 0 OR r.check_outcome = 'differs')))
           AND ($5::uuid IS NULL OR cs.id = $5)
-        GROUP BY cs.id, u.login_name, c.slug, c.name, c.visibility
+        GROUP BY cs.id, u.login_name, c.slug, c.name, c.visibility, r.session_id
         ORDER BY
             CASE WHEN $2 = 'created' THEN cs.created_at END DESC,
             CASE WHEN $2 = 'name' THEN cs.title END ASC NULLS LAST,
@@ -528,6 +566,19 @@ async fn find_collaborative_sessions(
             ended_at: row.ended_at,
             saved_post_id: row.saved_post_id,
             preview_version: None,
+            recording: row.recorded.map(|_| AdminSessionRecording {
+                first_seq: row.first_seq,
+                last_seq: row.last_seq,
+                messages: row.messages.unwrap_or(0),
+                sealed: row.sealed.unwrap_or(false),
+                chat_lines: row.chat_lines.unwrap_or(0),
+                reports: row.reports.unwrap_or(0),
+                check_outcome: row.check_outcome,
+                check_differing_pixels: row.check_differing_pixels,
+                check_total_pixels: row.check_total_pixels,
+                check_note: row.check_note,
+                checked_at: row.checked_at,
+            }),
         })
         .collect())
 }

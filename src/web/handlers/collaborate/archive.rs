@@ -616,7 +616,20 @@ pub async fn flush_room(state: &AppState, room_uuid: Uuid) -> usize {
 
     let written = write_chunks(state, room_uuid, &buffer).await;
     let chatted = match write_chat(state, room_uuid).await {
-        Ok(lines) => lines,
+        Ok(lines) => {
+            if lines > 0 {
+                if let Err(e) = crate::models::collaborative_recording::note_chat_lines(
+                    &state.db_pool,
+                    room_uuid,
+                    lines,
+                )
+                .await
+                {
+                    warn!("Failed to note the transcript length for room {}: {}", room_uuid, e);
+                }
+            }
+            lines
+        }
         Err(e) => {
             warn!(
                 "Failed to store the transcript for room {}: {}",
@@ -959,6 +972,20 @@ async fn write_manifest(
         .body(ByteStream::from(serde_json::to_vec(&manifest)?))
         .send()
         .await?;
+    // And where the admin list can read it without fetching this. After the
+    // manifest, so the list never claims a span the manifest does not.
+    if let Err(e) = crate::models::collaborative_recording::note_span(
+        &state.db_pool,
+        room_uuid,
+        manifest.recording.first_seq,
+        manifest.recording.last_seq,
+        manifest.recording.messages,
+        sealed,
+    )
+    .await
+    {
+        warn!("Failed to note the recording span for room {}: {}", room_uuid, e);
+    }
     Ok(())
 }
 

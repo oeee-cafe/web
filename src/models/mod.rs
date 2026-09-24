@@ -3,6 +3,7 @@ pub mod actor;
 pub mod admin;
 pub mod banner;
 pub mod comment;
+pub mod collaborative_recording;
 pub mod community;
 pub mod device;
 pub mod email_verification_challenge;
