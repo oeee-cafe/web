@@ -1,6 +1,8 @@
 use crate::app_error::AppError;
 use crate::models::achievement::list_achievements;
-use crate::models::comment::find_public_comments_by_user;
+use crate::models::comment::{
+    count_public_comments_by_user, find_public_comments_by_user, NotificationComment,
+};
 use crate::models::supporter::standings;
 use crate::models::actor::Actor;
 use crate::models::banner::{activate_banner, delete_banner, find_banner_by_id, list_user_banners};
@@ -28,7 +30,7 @@ use anyhow::Error;
 use aws_sdk_s3::config::{Credentials as AwsCredentials, Region, SharedCredentialsProvider};
 use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::http::{uri::Uri, HeaderMap};
 use axum::response::IntoResponse;
 use axum::{extract::State, http::StatusCode, response::Html, Form};
@@ -217,7 +219,9 @@ pub async fn profile(
     }
 
     let followings = find_followings_by_user_id(&mut tx, user.id, 9999, 0, false).await?;
-    let comments = find_public_comments_by_user(&mut tx, user.id, 100).await?;
+    let comment_count = count_public_comments_by_user(&mut tx, user.id).await?;
+    let (comments, comments_next_url) =
+        comments_batch(&mut tx, &user.login_name, user.id, None).await?;
 
     let banner = match user.banner_id {
         Some(banner_id) => Some(find_banner_by_id(&mut tx, banner_id).await?),
@@ -247,6 +251,8 @@ pub async fn profile(
         is_following => is_current_user_following,
         followings,
         comments,
+        comment_count,
+        comments_next_url,
         achievements,
         supporter_standings,
         user => Some(user),
@@ -259,6 +265,62 @@ pub async fn profile(
     })?;
 
     Ok(Html(rendered).into_response())
+}
+
+/// How many of a profile's comments one scroll brings in.
+const COMMENTS_PER_BATCH: i64 = 20;
+
+/// One batch of a profile's comments, and where the next one is, if there is
+/// one. One row more than a batch is asked for, so the last batch knows it is
+/// the last rather than leaving a sentinel that fetches nothing.
+async fn comments_batch(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    login_name: &str,
+    user_id: Uuid,
+    after: Option<Uuid>,
+) -> Result<(Vec<NotificationComment>, Option<String>), AppError> {
+    let mut comments =
+        find_public_comments_by_user(tx, user_id, after, COMMENTS_PER_BATCH + 1).await?;
+    let has_more = comments.len() as i64 > COMMENTS_PER_BATCH;
+    comments.truncate(COMMENTS_PER_BATCH as usize);
+    let next_url = match comments.last() {
+        Some(last) if has_more => Some(format!("/@{login_name}/comments?after={}", last.id)),
+        _ => None,
+    };
+    Ok((comments, next_url))
+}
+
+#[derive(Deserialize)]
+pub struct ProfileCommentsQuery {
+    after: Option<Uuid>,
+}
+
+/// GET /@{login_name}/comments -- the next batch of a profile's comments and
+/// the sentinel after it, for the Comments tab's infinite scroll.
+pub async fn profile_comments_fragment(
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+    Query(query): Query<ProfileCommentsQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let user = find_user_by_login_name(&mut tx, &login_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+    let (comments, comments_next_url) =
+        comments_batch(&mut tx, &user.login_name, user.id, query.after).await?;
+    tx.commit().await?;
+
+    let rendered = state
+        .env
+        .get_template("profile_comments_fragment.jinja")?
+        .render(context! {
+            comments,
+            comments_next_url,
+            ftl_lang,
+        })?;
+
+    Ok(Html(rendered))
 }
 
 pub async fn profile_or_community(
@@ -300,7 +362,9 @@ pub async fn profile_or_community(
         }
 
         let followings = find_followings_by_user_id(&mut tx, user.id, 9999, 0, false).await?;
-        let comments = find_public_comments_by_user(&mut tx, user.id, 100).await?;
+        let comment_count = count_public_comments_by_user(&mut tx, user.id).await?;
+        let (comments, comments_next_url) =
+            comments_batch(&mut tx, &user.login_name, user.id, None).await?;
 
         let banner = match user.banner_id {
             Some(banner_id) => Some(find_banner_by_id(&mut tx, banner_id).await?),
@@ -330,6 +394,8 @@ pub async fn profile_or_community(
             is_following => is_current_user_following,
             followings,
             comments,
+            comment_count,
+            comments_next_url,
             achievements,
             supporter_standings,
             user => Some(user),

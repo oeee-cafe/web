@@ -422,9 +422,14 @@ pub async fn find_latest_comments_in_community(
 /// profile would show anyone: published, not deleted, and outside any
 /// community that is not public -- a comment in a private or unlisted
 /// community is not the profile's to repeat.
+///
+/// `after` is the last comment of the previous batch. Paging by it rather
+/// than by offset keeps a batch from repeating a row when they say something
+/// new while someone is scrolling.
 pub async fn find_public_comments_by_user(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
+    after: Option<Uuid>,
     limit: i64,
 ) -> Result<Vec<NotificationComment>> {
     let comments = sqlx::query_as!(
@@ -461,16 +466,48 @@ pub async fn find_public_comments_by_user(
         AND posts.deleted_at IS NULL
         AND comments.deleted_at IS NULL
         AND (posts.community_id IS NULL OR communities.visibility = 'public')
-        ORDER BY comments.created_at DESC
-        LIMIT $2
+        AND (
+            $2::uuid IS NULL
+            OR (comments.created_at, comments.id)
+                < (SELECT created_at, id FROM comments WHERE id = $2)
+        )
+        ORDER BY comments.created_at DESC, comments.id DESC
+        LIMIT $3
         "#,
         user_id,
+        after,
         limit
     )
     .fetch_all(&mut **tx)
     .await?;
 
     Ok(comments)
+}
+
+/// How many comments `find_public_comments_by_user` would page through.
+pub async fn count_public_comments_by_user(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+) -> Result<i64> {
+    let count = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) AS "count!"
+        FROM comments
+        JOIN actors ON comments.actor_id = actors.id
+        JOIN posts ON comments.post_id = posts.id
+        LEFT JOIN communities ON posts.community_id = communities.id
+        WHERE actors.user_id = $1
+        AND posts.published_at IS NOT NULL
+        AND posts.deleted_at IS NULL
+        AND comments.deleted_at IS NULL
+        AND (posts.community_id IS NULL OR communities.visibility = 'public')
+        "#,
+        user_id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok(count)
 }
 
 pub async fn create_comment(
