@@ -47,6 +47,19 @@ const KO = {
   },
 };
 
+// The category tabs are emoji too, and at the grid's size and colour they
+// read as more emoji to pick. Set them apart the way Discord does: a strip of
+// their own, small and grey until current or pointed at. The picker's shadow
+// root is open and its README documents styling it this way; the site's
+// tokens inherit into it, so the strip follows the theme switch.
+const NAV_STYLE = `
+  .nav, .indicator-wrapper { background: var(--ds-ground); }
+  .nav { padding: 2px 4px 0; }
+  .nav-emoji { filter: grayscale(1); opacity: 0.55; transition: filter 0.15s, opacity 0.15s; }
+  .nav-button:hover .nav-emoji,
+  .nav-button[aria-selected="true"] .nav-emoji { filter: none; opacity: 1; }
+`;
+
 let loading = null;
 
 function load() {
@@ -115,6 +128,11 @@ async function mount(details) {
     submit(form);
   });
   slot.appendChild(picker);
+  if (picker.shadowRoot) {
+    const style = document.createElement("style");
+    style.textContent = NAV_STYLE;
+    picker.shadowRoot.appendChild(style);
+  }
   // The typed form is only for when there is no picker. Its pattern is for a
   // person's typing; the picker can send a variation selector the server
   // accepts and the pattern would not.

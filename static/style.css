@@ -1419,6 +1419,7 @@ nav a:visited,
   --button-active-background: var(--ds-press);
   --button-hover-background: var(--ds-hover);
   --category-font-color: var(--ds-muted);
+  --category-emoji-size: 1rem;
   --indicator-color: var(--ds-accent);
   --input-border-color: var(--ds-line-strong);
   --input-font-color: var(--ds-ink);
