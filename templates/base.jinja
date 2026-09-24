@@ -29,7 +29,11 @@
     <script type="module" src="{{ '/static/reaction_picker.js' | cachebuster | safe }}"></script>
     {% block viewport %}
       <meta name="viewport"
-            content="width=device-width,initial-scale=1.0,minimum-scale=1.0,viewport-fit=cover" />
+            content="width=device-width,initial-scale=1.0,minimum-scale=1.0,shrink-to-fit=no,viewport-fit=cover" />
+      {# shrink-to-fit=no is what makes Safari on an iPad mini honour
+         device-width: browsing as a desktop, it otherwise lays the page out
+         at least 980px wide and shrinks it to fit, and the whole site looks
+         zoomed out. Every other browser ignores it. #}
       {# The phone and tablet apps do not pinch to zoom, as an app's own
          screens do not; a browser still does. data-form is marked by
          theme_head.jinja, which has already run. Written before the first
@@ -38,7 +42,7 @@
         if (document.documentElement.getAttribute("data-form") === "handheld") {
           document.querySelector('meta[name="viewport"]').setAttribute(
             "content",
-            "width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"
+            "width=device-width,initial-scale=1.0,minimum-scale=1.0,shrink-to-fit=no,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"
           );
         }
       </script>
