@@ -386,35 +386,23 @@ async fn render_relay_page(
         .and_then(|v| v.as_ref())
         .ok_or_else(|| AppError::InvalidFormData("Missing image_filename".to_string()))?;
 
-    let painter_mode = match community.as_ref().and_then(|community| {
-        Some((
-            community.background_color.as_ref()?,
-            community.foreground_color.as_ref()?,
-        ))
-    }) {
-        Some((background, foreground)) => json!({
-            "kind": "two-tone",
-            "backgroundColor": background,
-            "foregroundColor": foreground,
-        }),
-        None => json!({ "kind": "standard" }),
-    };
-    let painter_config = serde_json::to_string(&json!({
-        "width": width,
-        "height": height,
-        "communityId": community.as_ref().map(|community| community.id.to_string()),
-        "parentPostId": post_id.to_string(),
-        "initialImageUrl": format!(
-            "{}/image/{}/{}?relay={}",
-            state.config.r2_public_endpoint_url,
-            &image_filename[..2],
-            image_filename,
-            post_id,
-        ),
-        "locale": ftl_lang.clone(),
-        "submission": { "kind": "post" },
-        "mode": painter_mode,
-    }))?;
+    let mut painter_config = crate::web::handlers::draw::post_painter_config(
+        width,
+        height,
+        community.as_ref(),
+        Some(&post_id.to_string()),
+        &ftl_lang,
+        current_user.as_ref(),
+    );
+    painter_config["initialImageUrl"] = json!(format!(
+        "{}/image/{}/{}?relay={}",
+        state.config.r2_public_endpoint_url,
+        &image_filename[..2],
+        image_filename,
+        post_id,
+    ));
+    painter_config["submission"] = json!({ "kind": "post" });
+    let painter_config = serde_json::to_string(&painter_config)?;
 
     let rendered = template
         .render(context! {

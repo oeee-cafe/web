@@ -75,6 +75,47 @@ fn sign_in_instead() -> Response {
     Redirect::to("/login").into_response()
 }
 
+/// What the post painter (`frontend/painter/entry.ts`) is told about the
+/// drawing it opens, for `/draw` and for the relay page alike.
+///
+/// `userId` is what decides whether Save uploads: without it the painter
+/// treats its reader as a guest and keeps the drawing on the device only. The
+/// relay page once built this by hand and left it out, so a signed-in relay
+/// was saved as a guest's drawing and never posted. One builder is what keeps
+/// the two pages from telling the painter different things.
+pub(crate) fn post_painter_config(
+    width: u32,
+    height: u32,
+    community: Option<&Community>,
+    parent_post_id: Option<&str>,
+    locale: &str,
+    user: Option<&User>,
+) -> serde_json::Value {
+    let mode = match community.and_then(|community| {
+        Some((
+            community.background_color.as_ref()?,
+            community.foreground_color.as_ref()?,
+        ))
+    }) {
+        Some((background_color, foreground_color)) => json!({
+            "kind": "two-tone",
+            "backgroundColor": background_color,
+            "foregroundColor": foreground_color,
+        }),
+        None => json!({ "kind": "standard" }),
+    };
+    json!({
+        "width": width,
+        "height": height,
+        "communityId": community.map(|c| c.id.to_string()),
+        "communityName": community.map(|c| c.name.clone()),
+        "parentPostId": parent_post_id,
+        "locale": locale,
+        "mode": mode,
+        "userId": user.map(|u| u.id.to_string()),
+    })
+}
+
 pub async fn start_draw_get() -> Redirect {
     Redirect::to("/")
 }
@@ -131,29 +172,14 @@ pub async fn start_draw(
     }
 
     let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
-    let painter_mode = match community.as_ref().and_then(|community| {
-        Some((
-            community.background_color.as_ref()?,
-            community.foreground_color.as_ref()?,
-        ))
-    }) {
-        Some((background_color, foreground_color)) => json!({
-            "kind": "two-tone",
-            "backgroundColor": background_color,
-            "foregroundColor": foreground_color,
-        }),
-        None => json!({ "kind": "standard" }),
-    };
-    let painter_config = serde_json::to_string(&json!({
-        "width": input.width.parse::<u32>()?,
-        "height": input.height.parse::<u32>()?,
-        "communityId": community.as_ref().map(|c| c.id.to_string()),
-        "communityName": community.as_ref().map(|c| c.name.clone()),
-        "parentPostId": input.parent_post_id.clone(),
-        "locale": ftl_lang.clone(),
-        "mode": painter_mode,
-        "userId": user.map(|u| u.id.to_string()),
-    }))?;
+    let painter_config = serde_json::to_string(&post_painter_config(
+        input.width.parse::<u32>()?,
+        input.height.parse::<u32>()?,
+        community.as_ref(),
+        input.parent_post_id.as_deref(),
+        &ftl_lang,
+        user,
+    ))?;
     let presence = Presence::new(if parent_post.is_some() {
         Activity::Relaying
     } else {
@@ -647,4 +673,71 @@ pub async fn start_banner_draw(
     })?;
 
     Ok(Html(rendered))
+}
+
+#[cfg(test)]
+mod painter_config_tests {
+    use super::post_painter_config;
+    use crate::models::community::{Community, CommunityVisibility};
+    use crate::models::user::{User, UserRole};
+    use uuid::Uuid;
+
+    fn user() -> User {
+        User {
+            id: Uuid::new_v4(),
+            login_name: "relayer".to_string(),
+            password_hash: None,
+            display_name: "Relayer".to_string(),
+            email: None,
+            email_verified_at: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            banner_id: None,
+            preferred_language: None,
+            deleted_at: None,
+            show_sensitive_content: false,
+            role: UserRole::User,
+        }
+    }
+
+    fn community() -> Community {
+        Community {
+            id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            name: "Two Tone".to_string(),
+            slug: "two-tone".to_string(),
+            description: String::new(),
+            visibility: CommunityVisibility::Public,
+            updated_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            background_color: Some("#ffffff".to_string()),
+            foreground_color: Some("#000000".to_string()),
+        }
+    }
+
+    /// A signed-in reply, relayed or drawn fresh, has to reach the painter
+    /// with its account, or Save keeps it on the device as a guest's drawing
+    /// and never uploads it.
+    #[test]
+    fn a_signed_in_reply_is_uploaded_not_kept_as_a_guests() {
+        let user = user();
+        let community = community();
+        let parent = Uuid::new_v4().to_string();
+        let config =
+            post_painter_config(640, 480, Some(&community), Some(&parent), "ko", Some(&user));
+
+        assert_eq!(config["userId"], user.id.to_string());
+        assert_eq!(config["parentPostId"], parent);
+        assert_eq!(config["communityId"], community.id.to_string());
+        assert_eq!(config["communityName"], "Two Tone");
+        assert_eq!(config["mode"]["kind"], "two-tone");
+    }
+
+    #[test]
+    fn a_guest_is_told_to_the_painter_as_no_one() {
+        let config = post_painter_config(640, 480, None, None, "en", None);
+        assert!(config["userId"].is_null());
+        assert!(config["communityName"].is_null());
+        assert_eq!(config["mode"]["kind"], "standard");
+    }
 }
