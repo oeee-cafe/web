@@ -408,15 +408,32 @@
 }
 
 /* ---------------------------------------------------------------------------
-   The store: a sale window's two fields and its button on one line, and
-   adding a product as a fieldset card whose fields share a grid.
+   The store: a sale window's two fields and its button on one line, a
+   product's year and button the same way, and adding a product as a
+   fieldset card whose fields share a grid.
    --------------------------------------------------------------------------- */
-.admin-sale-window {
+.admin-sale-window,
+.admin-product-details {
   white-space: nowrap;
 }
 
-.admin-sale-window > * + * {
+.admin-sale-window > * + *,
+.admin-product-details > * + * {
   margin-left: var(--ds-space-1);
+}
+
+.admin-product-year {
+  width: 5.5em;
+}
+
+/* This year's products stand out, as the year printed in bold used to. */
+.admin-product-this-year {
+  font-weight: 700;
+}
+
+.admin-product-purchases {
+  margin: var(--ds-space-1) 0 0;
+  white-space: normal;
 }
 
 .admin-add-product {
