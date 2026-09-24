@@ -52,7 +52,8 @@ use crate::web::handlers::draw::{
     banner_draw_finish, draw_finish, start_banner_draw, start_draw, start_draw_get,
 };
 use crate::web::handlers::tag::{
-    tag_autocomplete, tag_cards, tag_discovery, tag_view, load_more_tag_posts,
+    load_more_tag_comments, load_more_tag_posts, tag_autocomplete, tag_cards, tag_comments,
+    tag_discovery, tag_view,
 };
 use crate::web::handlers::home::{
     do_delete_comment, following_comments_page, home, joined_comments_page,
@@ -470,6 +471,8 @@ impl App {
             .route("/tags", get(tag_discovery))
             .route("/tags/{tag_name}", get(tag_view))
             .route("/tags/{tag_name}/posts", get(load_more_tag_posts))
+            .route("/tags/{tag_name}/comments", get(tag_comments))
+            .route("/api/tags/{tag_name}/comments", get(load_more_tag_comments))
             .route("/api/tags/autocomplete", get(tag_autocomplete))
             .route("/api/tags/cards", get(tag_cards))
             .route("/@{slug}", get(profile_or_community))

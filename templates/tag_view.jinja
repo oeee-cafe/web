@@ -1,4 +1,6 @@
 {% extends "base.jinja" %}
+{% import "pill_macro.jinja" as pill %}
+{% from "comments_aside_macro.jinja" import comments_aside %}
 {% block title %}
   {{ super() }} | #{{ tag.display_name }}
 {% endblock title %}
@@ -24,6 +26,18 @@
   {% endif %}
   <meta name="twitter:site" content="@oeee_cafe" />
 {% endblock social_meta %}
+{# What of the tag is showing under its card -- its drawings, or what has
+   been said on them -- as a pill of links, each its own address
+   (/tags/name and /tags/name/comments), switched in place, as a
+   community's are. tag_comments.jinja is this page with the other one
+   chosen. #}
+{% macro tag_views(chosen) %}
+  {% set here = "/tags/" ~ tag.name|urlencode %}
+  <nav class="ds-segmented" aria-label="#{{ tag.display_name }}" {{ pill.in_place() }}>
+    <a href="{{ here }}"{% if chosen == "drawings" %} aria-current="page"{% endif %}>{{ ftl_get_message("recent-drawings") }}</a>
+    <a href="{{ here }}/comments"{% if chosen == "comments" %} aria-current="page"{% endif %}>{{ ftl_get_message("recent-comments") }}</a>
+  </nav>
+{% endmacro %}
 {% block content %}
   {# In the body, not the head: a boosted visit keeps nothing of the head but
      the title, so from there it stopped applying the reader's count a row. #}
@@ -44,14 +58,20 @@
       </div>
     </section>
 
+    {% block tag_body %}
     {# The shared feed: same cards, same sensitive blur, same column control
-       and same infinite scroll as / and a community page. #}
-    <section class="profile-section" role="region" aria-labelledby="post-feed-heading">
-      {% if feed.posts %}
-        <div class="grid-header">
-          <div id="post-feed-heading" class="profile-section-label">{{ ftl_get_message("recent-drawings") }}</div>
+       and same infinite scroll as / and a community page, and the same
+       comments beside it (comments_aside_macro.jinja). #}
+    {% set aside_comments = comments if comments is defined else {} %}
+    <section class="profile-section feed-layout{% if aside_comments.rows %} has-comments{% endif %}" role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
+      <div class="grid-header">
+        {{ tag_views("drawings") }}
+        {% if feed.posts %}
           {% include "post_feed_controls.jinja" %}
-        </div>
+        {% endif %}
+      </div>
+      {{ comments_aside(aside_comments, "/tags/" ~ tag.name|urlencode ~ "/comments") }}
+      {% if feed.posts %}
         <div class="posts-grid" id="post-feed-grid">
           {% include "post_feed_fragment.jinja" %}
         </div>
@@ -59,5 +79,6 @@
         <p class="profile-empty">{{ ftl_get_message("tag-no-posts") }}</p>
       {% endif %}
     </section>
+    {% endblock tag_body %}
   </div>
 {% endblock content %}
