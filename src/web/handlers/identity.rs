@@ -811,10 +811,9 @@ pub async fn google_start(
         started_at: Utc::now(),
         handoff: None,
     };
-    // Which OAuth client each app signs in against is the app's own: Android is
-    // built with the site's, iOS with one of its own (GoogleSignIn.kt,
-    // GoogleSignIn.swift), and the site takes the tokens of both
-    // (`[google].client_id` and `app_ids`).
+    // Android's Credential Manager is given the site's own OAuth client
+    // (GoogleSignIn.kt), so its token names `[google].client_id` as audience,
+    // the only one the site takes.
     let answer = serde_json::json!({ "state": request.state, "nonce": request.nonce });
     session
         .insert(GOOGLE_REQUEST_KEY, request)
