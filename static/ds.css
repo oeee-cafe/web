@@ -2891,6 +2891,45 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   box-shadow: var(--ds-shadow-raise);
 }
 
+/* The card's padding is the whole of its edge. A paragraph's own margins
+   are the browser's, 1em apiece, and `.ds-help` sets only the top one, so a
+   card that opened or closed on one had a lopsided inside -- tighter above
+   than below by whatever the text size made an em.
+   Only the elements that bring the browser's margins are trimmed: a row
+   written with a margin of its own -- a negative one that takes back what
+   its wrapped items carry below them, say -- keeps it. */
+.ds-card > p:first-child,
+.ds-card > h2:first-child,
+.ds-card > h3:first-child,
+.ds-card > ul:first-child,
+.ds-card > ol:first-child {
+  margin-top: 0;
+}
+
+.ds-card > p:last-child,
+.ds-card > h2:last-child,
+.ds-card > h3:last-child,
+.ds-card > ul:last-child,
+.ds-card > ol:last-child {
+  margin-bottom: 0;
+}
+
+/* Things one under another, one gap between each: the children's own
+   margins are dropped and the gap is the stack's to say. Paragraphs, a row
+   of buttons, a status line -- whatever they are and whatever margins they
+   were written with, they come out evenly spaced. Declared after `.ds-help`
+   and `.ds-label` so that, at the same specificity, the stack wins. A
+   hidden child between two others takes no room, so they are still one gap
+   apart; one hidden at the very top would leave a gap above the next. */
+.ds-stack > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.ds-stack > * + * {
+  margin-top: var(--ds-space-3);
+}
+
 /* ---------------------------------------------------------------------------
    Notices
 

@@ -1,0 +1,31 @@
+{# The apps, as each store's official badge: Apple's from its marketing
+   Toolbox and Google's from Google Play's badge page, both served by the
+   store itself and in the reader's language, and neither redrawn -- both
+   stores ask that their badge be used as they make it. /about lists them
+   under what the site is, and /supporter under the line saying the pack is
+   sold in the apps. Neither shows them inside an app (style.css hides
+   `.about-stores` under `data-app`): whoever is reading there already has
+   one, and an Apple app pointing at Google Play is the steering App Review
+   reads for.
+
+   `lang` is `ftl_lang`; a macro that is imported does not see the page's
+   context, so it is handed over. A language either store has no badge in
+   gets the English one. #}
+{% macro app_stores(lang) -%}
+  {%- set apple = {"ko": "ko-kr", "ja": "ja-jp", "zh": "zh-cn"}[lang] or "en-us" -%}
+  {%- set google = {"ko": "ko", "ja": "ja", "zh": "zh-cn"}[lang] or "en" -%}
+  <div class="about-stores" role="group" aria-label="{{ ftl_get_message("about-apps") }}">
+    <a class="about-store" href="https://apps.apple.com/us/app/oeee-cafe/id6754636117" target="_blank" rel="noopener">
+      <img class="about-store-badge about-store-badge-apple"
+           src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/{{ apple }}"
+           alt="{{ ftl_get_message("app-store-badge") }}"
+           referrerpolicy="no-referrer" />
+    </a>
+    <a class="about-store" href="https://play.google.com/store/apps/details?id=cafe.oeee" target="_blank" rel="noopener">
+      <img class="about-store-badge about-store-badge-google"
+           src="https://play.google.com/intl/en_us/badges/static/images/badges/{{ google }}_badge_web_generic.png"
+           alt="{{ ftl_get_message("google-play-badge") }}"
+           referrerpolicy="no-referrer" />
+    </a>
+  </div>
+{%- endmacro %}
