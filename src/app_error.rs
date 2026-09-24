@@ -20,23 +20,34 @@ pub mod error_codes {
 }
 
 /// Check if an error should be filtered from Sentry reporting.
-/// These are expected federation errors that shouldn't be treated as application errors.
-fn should_filter_from_sentry(message: &str) -> bool {
-    // Filter out ActivityPub federation errors that are expected
-    let federation_error_patterns = [
-        // Remote actors that return 404 or invalid JSON
-        ("Failed to parse object", "data did not match any variant of untagged enum ActorObject"),
-        // Remote objects that have been deleted/tombstoned
-        ("Fetched remote object", "which was deleted"),
-    ];
+///
+/// Federation errors caused by what another server sent — a login page where
+/// an actor should be, a tombstone, a bad signature — are not bugs here and
+/// arrive at whatever rate the fediverse sends them. Matching on the variant
+/// rather than the message matters: each new way a remote can answer with
+/// HTML words the serde error differently, and one such wording was 13k
+/// events a month (OEEE-CAFE-4B).
+fn should_filter_from_sentry(err: &anyhow::Error) -> bool {
+    use activitypub_federation::error::Error as FederationError;
 
-    for (pattern1, pattern2) in federation_error_patterns.iter() {
-        if message.contains(pattern1) && message.contains(pattern2) {
-            return true;
-        }
-    }
-
-    false
+    err.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<FederationError>(),
+            Some(
+                FederationError::ParseFetchedObject(..)
+                    | FederationError::ParseReceivedActivity(..)
+                    | FederationError::ObjectDeleted(..)
+                    | FederationError::FetchInvalidContentType(..)
+                    | FederationError::FetchWrongId(..)
+                    | FederationError::UrlVerificationError(..)
+                    | FederationError::ActivitySignatureInvalid
+                    | FederationError::ActivityBodyDigestInvalid
+                    | FederationError::WebfingerResolveFailed(..)
+                    | FederationError::RequestLimit
+                    | FederationError::ResponseBodyLimit
+            )
+        )
+    })
 }
 
 // Application-specific errors with better context
@@ -64,10 +75,8 @@ impl IntoResponse for AppError {
         let (status, code, message, should_capture) = match &self {
             AppError::Anyhow(err) => {
                 let message = format!("Something went wrong: {}", err);
-                let should_capture = !should_filter_from_sentry(&message);
-
                 // Capture anyhow errors with full backtrace to Sentry
-                if should_capture {
+                if !should_filter_from_sentry(err) {
                     sentry::integrations::anyhow::capture_anyhow(err);
                 }
 
@@ -183,5 +192,31 @@ where
 {
     fn from(err: E) -> Self {
         AppError::Anyhow(err.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use activitypub_federation::error::Error as FederationError;
+
+    #[test]
+    fn a_remote_answering_with_html_is_not_reported() {
+        let body = r#"<html><body>You are being <a href="https://social.cleverlibre.org/about">redirected</a>.</body></html>"#;
+        let parse = serde_json::from_str::<serde_json::Value>(body).unwrap_err();
+        let url = "https://social.cleverlibre.org/".parse().unwrap();
+        let AppError::Anyhow(err) =
+            AppError::from(FederationError::ParseFetchedObject(parse, url, body.to_string()))
+        else {
+            unreachable!()
+        };
+        assert!(should_filter_from_sentry(&err));
+        assert!(should_filter_from_sentry(&err.context("while fetching an actor")));
+    }
+
+    #[test]
+    fn our_own_failures_are_still_reported() {
+        assert!(!should_filter_from_sentry(&anyhow::anyhow!("Failed to parse object")));
+        assert!(!should_filter_from_sentry(&FederationError::Other("x".into()).into()));
     }
 }
