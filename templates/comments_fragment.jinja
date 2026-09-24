@@ -1,9 +1,11 @@
 {# One batch of comments plus the sentinel that pulls the next, as
    post_feed_fragment.jinja is for drawings. `comments` is built by
    comments_context() in handlers/home.rs: `rows`, and `next_url` while a
-   full batch says there may be more. Rendered inline for the first batch
+   full batch says there may be more. A profile's (handlers/profile.rs)
+   also says `by_drawing`: every row there is by the same person, so each
+   is headed by the drawing it is on instead (comment_card_macro.jinja). Rendered inline for the first batch
    -- beside a feed (comments_aside_macro.jinja), on a feed's comments page
-   (home_comments.jinja), on a community's (community_comments.jinja) --
+   (home_comments.jinja), a community's, a tag's, a profile's tab --
    and standalone by the load-more handlers for the rest, so it must not
    depend on anything those handlers do not pass.
 
@@ -12,7 +14,7 @@
    IntersectionObserver, which counts the list's own clipping. #}
 {% import "comment_card_macro.jinja" as comment_card_macro %}
 {% for comment in comments.rows %}
-  {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
+  {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message, by_drawing=comments.by_drawing) }}
 {% endfor %}
 {% if comments.next_url %}
   <div class="infinite-scroll-sentinel"

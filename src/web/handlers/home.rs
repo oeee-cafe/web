@@ -274,6 +274,7 @@ async fn feed_comments_batch(
     feed: Feed,
     auth_session: AuthSession,
     state: AppState,
+    ftl_lang: String,
     query: CommentsQuery,
 ) -> Result<axum::response::Response, AppError> {
     let scope = feed.comment_scope(auth_session.user.as_ref())?;
@@ -284,6 +285,7 @@ async fn feed_comments_batch(
     let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
         comments => comments_context(comments, feed.comments_batch_path()),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+        ftl_lang,
     })?;
     Ok(Html(rendered).into_response())
 }
@@ -322,27 +324,30 @@ pub async fn joined_comments_page(
 pub async fn load_more_recent_comments(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Query(query): Query<CommentsQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    feed_comments_batch(Feed::Recent, auth_session, state, query).await
+    feed_comments_batch(Feed::Recent, auth_session, state, ftl_lang, query).await
 }
 
 /// GET /api/following/comments
 pub async fn load_more_following_comments(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Query(query): Query<CommentsQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    feed_comments_batch(Feed::Following, auth_session, state, query).await
+    feed_comments_batch(Feed::Following, auth_session, state, ftl_lang, query).await
 }
 
 /// GET /api/joined/comments
 pub async fn load_more_joined_comments(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Query(query): Query<CommentsQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    feed_comments_batch(Feed::Communities, auth_session, state, query).await
+    feed_comments_batch(Feed::Communities, auth_session, state, ftl_lang, query).await
 }
 
 /// A feed's next batch of cards, and the sentinel for the one after.
@@ -350,6 +355,7 @@ async fn feed_batch(
     feed: Feed,
     auth_session: AuthSession,
     state: AppState,
+    ftl_lang: String,
     query: LoadMoreQuery,
 ) -> Result<axum::response::Response, AppError> {
     let mut tx = state.db_pool.begin().await?;
@@ -363,6 +369,7 @@ async fn feed_batch(
     let rendered = template.render(context! {
         feed => feed_context(posts, feed.batch_path(), query.offset, query.period.as_deref()),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+        ftl_lang,
     })?;
     Ok(Html(rendered).into_response())
 }
@@ -405,27 +412,30 @@ pub struct LoadMoreQuery {
 pub async fn load_more_public_posts(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    feed_batch(Feed::Recent, auth_session, state, query).await
+    feed_batch(Feed::Recent, auth_session, state, ftl_lang, query).await
 }
 
 /// GET /api/following/posts
 pub async fn load_more_timeline_posts(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    feed_batch(Feed::Following, auth_session, state, query).await
+    feed_batch(Feed::Following, auth_session, state, ftl_lang, query).await
 }
 
 /// GET /api/joined/posts
 pub async fn load_more_community_feed_posts(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    feed_batch(Feed::Communities, auth_session, state, query).await
+    feed_batch(Feed::Communities, auth_session, state, ftl_lang, query).await
 }
 
 pub async fn do_delete_comment(

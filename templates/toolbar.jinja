@@ -632,8 +632,11 @@
         if (!(cols >= 1 && cols <= 12)) cols = 6;
         return window.innerWidth <= 600 ? 3 : cols;
       }
-      function postGrid(rows) {
-        var html = '<div class="posts-grid">';
+      // `month` for a feed that heads its drawings by month
+      // (post_feed_fragment.jinja): the label over the first row.
+      function postGrid(rows, month) {
+        var html = '<div class="posts-grid">' + (month ?
+          '<div class="feed-period"><span class="feed-period-label">' + bar("32px", 15) + "</span></div>" : "");
         for (var i = 0, n = perRow() * (rows || 3); i < n; i++) {
           html += '<div class="posts-grid-item"><div class="ds-skeleton-square"></div>' +
             '<div class="post-card-meta">' + bar("70%", 13) + bar("45%", 11, "ds-skeleton-gap") + "</div></div>";
@@ -649,29 +652,77 @@
         return '<div class="grid-header">' + bar(label, 16) +
           (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>";
       }
-      function identityCard(chips) {
-        var html = '<section class="profile-card ds-card"><div class="profile-identity">' +
-          bar("220px", 26) + bar("160px", 13, "ds-skeleton-gap") +
-          (chips ? '<div class="ds-skeleton-row">' + bar("72px", 24, "ds-skeleton-chip") + bar("96px", 24, "ds-skeleton-chip") + "</div>" : bar("60%", 13, "ds-skeleton-gap-l")) +
-          '</div><div class="profile-actions">' + bar("96px", 30, "ds-skeleton-button") + bar("80px", 30, "ds-skeleton-button") + "</div></section>";
-        return html;
+      // The card over a person's, a community's or a tag's page: a name
+      // and a handle, then for a person a row of chips, for a community a
+      // line of description and its owner and counts as chips, and for a
+      // tag its count alone and one button.
+      function identityCard(kind) {
+        var community = kind === "community", tag = kind === "tag";
+        var chip = community ? 30 : 24;
+        return '<section class="profile-card ds-card"><div class="profile-identity">' +
+          bar("220px", 26) + bar("160px", community ? 16 : 13, "ds-skeleton-gap") +
+          (community ? bar("60%", 18, "ds-skeleton-gap-l") : "") +
+          (tag ? "" : '<div class="ds-skeleton-row">' + bar("72px", chip, "ds-skeleton-chip") + bar("96px", chip, "ds-skeleton-chip") + "</div>") +
+          '</div><div class="profile-actions">' + bar("96px", 30, "ds-skeleton-button") +
+          (tag ? "" : bar("80px", 30, "ds-skeleton-button")) + "</div></section>";
       }
+      // The pieces every page of drawings and comments is made of, in the
+      // layouts those pages share: Home's feeds, a community, a tag. The
+      // header of each -- its pill, and on a page of drawings the Per row
+      // control after it -- then either the drawings with the comments
+      // beside them (comments_aside_macro.jinja, `.feed-layout`), or the
+      // comments alone as cards (comments_fragment.jinja).
+      // Home's pills sit in `.feed-choices` (feed_choices.jinja), which
+      // spaces them, and stand as tall as they are; a community's and a
+      // tag's are one pill in a `.grid-header`.
+      function pillHeader(kind, pill, perRowControl) {
+        var pills = kind === "feed-header" ? '<div class="feed-choices">' + bar(pill, 32) + "</div>" : bar(pill, 22);
+        return '<div class="' + kind + '">' + pills +
+          (perRowControl && window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>";
+      }
+      function drawingsBesideComments(section, header) {
+        var comments = '<aside class="feed-comments">' + bar("90px", 16, "feed-comments-title") +
+          '<div class="feed-comments-panel"><div class="feed-comments-list">';
+        for (var i = 0; i < 6; i++) comments += commentRow();
+        return '<section class="' + section + ' feed-layout has-comments">' + header + comments +
+          "</div></div></aside>" + postGrid(3, true) + "</section>";
+      }
+      function commentCards(section, header) {
+        var html = '<section class="' + section + '">' + header + '<div class="comment-grid">';
+        for (var i = 0; i < 8; i++) html += commentRow();
+        return html + "</div></section>";
+      }
+      // Home's own: the feed switch and the drawings | comments pill.
+      function home(inner) {
+        return '<div class="center-wide">' + inner + "</div>";
+      }
+      // A person's, a community's or a tag's: its card over the rest.
+      function underCard(kind, inner) {
+        return '<div class="profile">' + identityCard(kind) + inner + "</div>";
+      }
+      // Pages a link from inside another page lays a skeleton down for,
+      // as well as the toolbar's (the click handler below). Each is one
+      // pill's half of a page reached from cards and bylines across the
+      // site, which lands a long way from where the reader was.
+      var FROM_ANYWHERE = /^\/(((following|joined)\/)?comments|communities\/@[^/]+(\/comments)?|tags\/[^/]+(\/comments)?)$/;
       var SHAPES = [
-        // Home's feeds: the switch, Per row, the comments beside the grid
-        // (comments_aside_macro.jinja), the grid.
         [/^\/(following|joined)?$/, function () {
-          var comments = '<aside class="feed-comments">' + bar("90px", 16, "feed-comments-title") +
-            '<div class="feed-comments-panel"><div class="feed-comments-list">';
-          for (var i = 0; i < 6; i++) comments += commentRow();
-          return '<div class="center-wide"><section class="feed-layout has-comments"><div class="feed-header">' + bar("180px", 22) +
-            (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + comments + "</div></div></aside>" + postGrid() + "</section></div>";
+          return home(drawingsBesideComments("", pillHeader("feed-header", "260px", true)));
         }],
-        // A Home feed's comments: the two pills, then the cards.
         [/^\/((following|joined)\/)?comments$/, function () {
-          var html = '<div class="center-wide"><section class="feed-layout"><div class="feed-header">' + bar("260px", 22) +
-            '</div><div class="comment-grid">';
-          for (var i = 0; i < 8; i++) html += commentRow();
-          return html + "</div></section></div>";
+          return home(commentCards("feed-layout", pillHeader("feed-header", "260px", false)));
+        }],
+        [/^\/communities\/@[^/]+$/, function () {
+          return underCard("community", drawingsBesideComments("profile-section", pillHeader("grid-header", "130px", true)));
+        }],
+        [/^\/communities\/@[^/]+\/comments$/, function () {
+          return underCard("community", commentCards("profile-section", pillHeader("grid-header", "130px", false)));
+        }],
+        [/^\/tags\/[^/]+$/, function () {
+          return underCard("tag", drawingsBesideComments("profile-section", pillHeader("grid-header", "130px", true)));
+        }],
+        [/^\/tags\/[^/]+\/comments$/, function () {
+          return underCard("tag", commentCards("profile-section", pillHeader("grid-header", "130px", false)));
         }],
         // The tag directory, whose cards are the community directory's.
         [/^\/tags$/, function () {
@@ -706,7 +757,7 @@
         }],
         // A person, drafts: the identity card, then the grid.
         [/^\/@[^/]+$/, function () {
-          return '<div class="profile">' + identityCard(true) + '<section class="profile-section">' + gridHeader("160px") + postGrid(2) + "</section></div>";
+          return underCard("person", '<section class="profile-section">' + gridHeader("160px") + postGrid(2, true) + "</section>");
         }],
         [/^\/posts\/drafts$/, function () {
           return '<div class="profile"><section class="profile-section"><div class="grid-header"><div>' + bar("120px", 26) + bar("80px", 13, "ds-skeleton-gap") +
@@ -811,7 +862,10 @@
         // one has come, so nothing about where the reader was is disturbed
         // for coming back to it. The page's own pills switch it in place
         // (pill_macro.jinja).
-        if (!link.closest(".nav-bar")) return;
+        // Except the pages in FROM_ANYWHERE, a long way from wherever they
+        // are linked; but not from a pill, which switches its own page in
+        // place.
+        if (!link.closest(".nav-bar") && !(FROM_ANYWHERE.test(link.pathname) && !link.closest(".ds-segmented"))) return;
         loading(link.pathname);
       });
       // A search is a trip to /search, and the bar's links to it lay a

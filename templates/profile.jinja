@@ -180,9 +180,9 @@
         {% if tab_count > 1 %}
           <div class="profile-tabs-bar">
             <nav class="ds-segmented profile-tabs" aria-label="{{ ftl_get_message('profile-tabs-label') }}">
-              <a href="/@{{ user.login_name }}" data-profile-tab="public"{% if tab == "public" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-public" if is_owner else "profile-tab-drawings") }}<span class="profile-tab-count">{{ public_community_posts|length }}</span></a>
+              <a href="/@{{ user.login_name }}" data-profile-tab="public"{% if tab == "public" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-public" if is_owner else "profile-tab-drawings") }}<span class="profile-tab-count">{{ public_count }}</span></a>
               {% if is_owner %}
-                <a href="/@{{ user.login_name }}/private" data-profile-tab="private"{% if tab == "private" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-private") }}<span class="profile-tab-count">{{ private_community_posts|length }}</span></a>
+                <a href="/@{{ user.login_name }}/private" data-profile-tab="private"{% if tab == "private" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-private") }}<span class="profile-tab-count">{{ private_count }}</span></a>
               {% endif %}
               {% if comment_count %}
                 <a href="/@{{ user.login_name }}/comments" data-profile-tab="comments"{% if tab == "comments" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-comments") }}<span class="profile-tab-count">{{ comment_count }}</span></a>
@@ -197,42 +197,27 @@
         {% else %}
           <div class="profile-section-label">{{ ftl_get_message("profile-tab-drawings") }}</div>
         {% endif %}
-        {% if public_community_posts or is_owner %}<div data-profile-per-row{% if tab == "comments" %} hidden{% endif %}>{{ per_row() }}</div>{% endif %}
+        {% if public_count or is_owner %}<div data-profile-per-row{% if tab == "comments" %} hidden{% endif %}>{{ per_row() }}</div>{% endif %}
       </div>
-      <div data-profile-panel="public"{% if tab != "public" %} hidden{% endif %}>
-        {% if public_community_posts %}
+      {# Their drawings in the feeds' own grid and cards: the same
+         sensitive blur, captions and Per row, headed by month, and loading
+         on as it is scrolled -- a tab's sentinel sits harmlessly in its
+         panel while the panel is hidden, as the comments' does. The cards
+         leave out whose drawing each is: every one here is theirs. #}
+      <div class="profile-drawings" data-profile-panel="public"{% if tab != "public" %} hidden{% endif %}>
+        {% if public_feed.posts %}
           <div class="posts-grid">
-            {% for post in public_community_posts %}
-              <div class="posts-grid-item">
-                <a href="/@{{ user.login_name }}/{{ post.id }}">
-                  <img class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
-                       width="{{ post.image_width }}"
-                       height="{{ post.image_height }}"
-                       alt="{{ post.title }}"
-                       src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-                </a>
-              </div>
-            {% endfor %}
+            {% with feed = public_feed %}{% include "post_feed_fragment.jinja" %}{% endwith %}
           </div>
         {% else %}
           <p class="profile-empty">{{ ftl_get_message("profile-public-community-posts-nil") }}</p>
         {% endif %}
       </div>
       {% if is_owner %}
-        <div data-profile-panel="private"{% if tab != "private" %} hidden{% endif %}>
-          {% if private_community_posts %}
+        <div class="profile-drawings" data-profile-panel="private"{% if tab != "private" %} hidden{% endif %}>
+          {% if private_feed.posts %}
             <div class="posts-grid">
-              {% for post in private_community_posts %}
-                <div class="posts-grid-item">
-                  <a href="/@{{ user.login_name }}/{{ post.id }}">
-                    <img class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
-                         width="{{ post.image_width }}"
-                         height="{{ post.image_height }}"
-                         alt="{{ post.title }}"
-                         src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-                  </a>
-                </div>
-              {% endfor %}
+              {% with feed = private_feed %}{% include "post_feed_fragment.jinja" %}{% endwith %}
             </div>
           {% else %}
             <p class="profile-empty">{{ ftl_get_message("profile-private-community-posts-nil") }}</p>
@@ -249,7 +234,7 @@
            it with an IntersectionObserver and nothing hidden intersects. #}
         <div data-profile-panel="comments"{% if tab != "comments" %} hidden{% endif %}>
           <div class="comment-grid">
-            {% include "profile_comments_fragment.jinja" %}
+            {% include "comments_fragment.jinja" %}
           </div>
         </div>
       {% endif %}

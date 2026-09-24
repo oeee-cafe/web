@@ -81,7 +81,8 @@ use crate::web::handlers::privacy::privacy;
 use crate::web::handlers::profile::{
     banner_management, do_activate_banner, do_add_link, do_delete_banner, do_delete_guestbook_entry,
     do_delete_link, do_follow_profile, do_move_link_down, do_move_link_up, do_reply_guestbook_entry,
-    do_unfollow_profile, do_write_guestbook_entry, guestbook, profile_banners_iframe,
+    do_unfollow_profile, do_write_guestbook_entry, guestbook, load_more_profile_posts,
+    load_more_profile_private_posts, profile_banners_iframe,
     profile_comments, profile_iframe, profile_or_community, profile_private, profile_settings,
 };
 use crate::web::handlers::report::{hx_report_post, hx_report_profile};
@@ -445,6 +446,14 @@ impl App {
             .route(
                 "/api/communities/@{slug}/comments",
                 get(load_more_community_comments),
+            )
+            .route(
+                "/api/profiles/@{login_name}/posts",
+                get(load_more_profile_posts),
+            )
+            .route(
+                "/api/profiles/@{login_name}/private/posts",
+                get(load_more_profile_private_posts),
             )
             .route("/api/collaborate/posts", get(load_more_collaborative_posts))
             .route("/api/communities/cards", get(communities_fragment))
