@@ -162,11 +162,22 @@ impl App {
             .map_err(|e| anyhow::anyhow!("Failed to set schema name: {}", e))?;
         session_store.migrate().await?;
 
-        let deletion_task = tokio::task::spawn(
-            session_store
-                .clone()
-                .continuously_delete_expired(tokio::time::Duration::from_secs(60)),
-        );
+        // Not `continuously_delete_expired`: that returns on the first error,
+        // so one pool timeout ended the sweep for the life of the process and
+        // left the error waiting to panic the server on its way out at the
+        // next deploy (OEEE-CAFE-7K). A missed sweep is caught by the next.
+        let deletion_task = tokio::task::spawn({
+            let session_store = session_store.clone();
+            async move {
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+                loop {
+                    interval.tick().await;
+                    if let Err(e) = session_store.delete_expired().await {
+                        tracing::warn!("Failed to delete expired sessions: {}", e);
+                    }
+                }
+            }
+        });
 
         let cleanup_task = tokio::task::spawn(cleanup_collaborative_sessions(self.state.clone()));
 
@@ -577,7 +588,7 @@ impl App {
         // cancellation here is the expected outcome rather than a failure —
         // treating it as one turned every SIGTERM into a panic on the way out.
         match deletion_task.await {
-            Ok(result) => result?,
+            Ok(()) => {}
             Err(e) if e.is_cancelled() => {}
             Err(e) => return Err(e.into()),
         }
