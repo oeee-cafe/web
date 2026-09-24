@@ -458,17 +458,12 @@ export const useWebSocket = ({
           if (resumeSequence === null) lastSeqRef.current = 0;
           historyIdRef.current = sequenced.historyId;
         }
-        // Only while the progress readout is on screen. Publishing it for
-        // every live message re-renders the whole session view once per
-        // remote pointer move, for a number nobody is looking at.
-        if (isCatchingUpRef.current) {
-          setSyncProgress({
-            phase: "receiving",
-            receivedSequence: sequenced.seq,
-            appliedSequence: lastSeqRef.current,
-            targetSequence: replayTargetRef.current,
-          });
-        }
+        // No progress publish here. Every frame goes straight from this point
+        // into the queue below and is applied before the next one is read, so
+        // a "received" position was never visibly ahead of the applied one --
+        // and publishing it per frame re-rendered the whole session view once
+        // per replayed message, which is what the throttle in
+        // `processMessageQueue` exists to prevent.
         if (historyIdRef.current === null) {
           historyIdRef.current = sequenced.historyId;
         } else if (historyIdRef.current !== sequenced.historyId) {

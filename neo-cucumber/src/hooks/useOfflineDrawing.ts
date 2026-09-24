@@ -496,7 +496,8 @@ export const useOfflineDrawing = (
         layer: "foreground" | "background",
         source: RegionRect,
         dx: number,
-        dy: number
+        dy: number,
+        mask: Mask
       ) => {
         const shape = frameShapeFor("paste");
         if (!shape) return;
@@ -514,7 +515,7 @@ export const useOfflineDrawing = (
           color,
           drawingState.brushSize,
           [dx, dy],
-          strokeMaskRef.current
+          mask
         );
         emitOperation({
           kind: "region",
@@ -528,7 +529,7 @@ export const useOfflineDrawing = (
           },
           color,
           brushSize: drawingState.brushSize,
-          mask: strokeMaskRef.current,
+          mask,
         });
       },
       [drawingState.color, drawingState.opacity, drawingState.brushSize, emitOperation]
@@ -545,7 +546,8 @@ export const useOfflineDrawing = (
         brushSize: number,
         brushType: BrushType,
         color: { r: number; g: number; b: number; a: number },
-        layer: "foreground" | "background"
+        layer: "foreground" | "background",
+        mask: Mask
       ) => {
         actionRecorderRef.current.pushBezier(
           layer === "foreground" ? 1 : 0,
@@ -553,13 +555,13 @@ export const useOfflineDrawing = (
           points,
           color,
           brushSize,
-          strokeMaskRef.current
+          mask
         );
         emitOperation({
           kind: "bezier", layer, brushSize,
           brush: brushType as PainterBrush, color,
           points: points as [number, number, number, number, number, number, number, number],
-          mask: strokeMaskRef.current,
+          mask,
         });
       },
       [emitOperation]
@@ -572,7 +574,8 @@ export const useOfflineDrawing = (
         brushSize: number,
         brushType: BrushType,
         color: { r: number; g: number; b: number; a: number },
-        layer: "foreground" | "background"
+        layer: "foreground" | "background",
+        mask: Mask
       ) => {
         actionRecorderRef.current.pushLine(
           layer === "foreground" ? 1 : 0,
@@ -581,12 +584,12 @@ export const useOfflineDrawing = (
           to,
           color,
           brushSize,
-          strokeMaskRef.current
+          mask
         );
         emitOperation({
           kind: "line", layer, brushSize,
           brush: brushType as PainterBrush, color, from, to,
-          mask: strokeMaskRef.current,
+          mask,
         });
       },
       [emitOperation]
@@ -613,7 +616,8 @@ export const useOfflineDrawing = (
         layer: "foreground" | "background",
         rect: RegionRect,
         color: { r: number; g: number; b: number; a: number },
-        brushSize: number
+        brushSize: number,
+        mask: Mask
       ) => {
         const shape = frameShapeFor(tool);
         if (!shape) return;
@@ -632,11 +636,11 @@ export const useOfflineDrawing = (
           // in NEO and in our own viewer alike -- while the canvas it was
           // recorded on showed it.
           fillType !== null ? [fillType] : [],
-          strokeMaskRef.current
+          mask
         );
         emitOperation({
           kind: "region", layer, tool, rect, color, brushSize,
-          mask: strokeMaskRef.current,
+          mask,
         });
       },
       [emitOperation]

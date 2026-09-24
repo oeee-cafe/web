@@ -294,13 +294,19 @@ function readInt16LE(buffer: Uint8Array, offset: number): number {
 
 /**
  * Read little-endian uint32 from buffer
+ *
+ * `>>> 0` at the end, because `|` works on signed 32-bit integers: a top byte
+ * of 0x80 or more came back negative, and every 64-bit value built on top of
+ * it -- the millisecond timestamps on JOIN, LEAVE, CHAT and the participant
+ * list -- read 2^32 ms (49.7 days) early for half of every 49.7-day cycle.
  */
 function readUint32LE(buffer: Uint8Array, offset: number): number {
   return (
-    buffer[offset] |
-    (buffer[offset + 1] << 8) |
-    (buffer[offset + 2] << 16) |
-    (buffer[offset + 3] << 24)
+    (buffer[offset] |
+      (buffer[offset + 1] << 8) |
+      (buffer[offset + 2] << 16) |
+      (buffer[offset + 3] << 24)) >>>
+    0
   );
 }
 
