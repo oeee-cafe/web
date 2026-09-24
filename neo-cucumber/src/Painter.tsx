@@ -462,10 +462,6 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
   // Create a ref to hold the DOM canvas update function
   const domCanvasUpdateRef = useRef<() => void>(() => {});
 
-  // Callback to trigger canvas update when local drawing changes
-  const handleLocalDrawingChange = useCallback(() => {
-    domCanvasUpdateRef.current();
-  }, []);
 
   // A finished copy switches the painter to paste and a paste switches it
   // back, NEO's CopyTool/PasteTool hand-off; the preview shows the copy while
@@ -498,7 +494,12 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     drawingState.zoomLevel,
     canvasWidth,
     canvasHeight,
-    handleLocalDrawingChange,
+    // Nothing to do per segment. Every kernel the engine runs queues a repaint
+    // of the rectangle it wrote, uploaded once a frame; this used to re-upload
+    // every participant's two layers whole, synchronously, for every segment
+    // of the local stroke -- which made a stroke cost more with each person in
+    // the room, and on a large canvas was most of the frame.
+    undefined,
     tempCanvasContainerRef,
     handleRegionPreview,
     handleLinePreview,
