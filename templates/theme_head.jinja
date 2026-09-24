@@ -80,6 +80,24 @@
       }
     });
   }
+  if (document.documentElement.getAttribute("data-form") === "desktop") {
+    // Nor do the Mac and Windows apps pinch to zoom -- the phone and tablet
+    // apps are held by their viewport (base.jinja), which neither of these
+    // web views reads. A trackpad pinch reaches the page as a ctrl-wheel in
+    // WebView2 and as gesture events in WebKit, and a touch screen's is a
+    // touch gesture; the page declining each is what keeps the view still.
+    // The painter's own pinch (useZoomControls.ts) is a listener on its
+    // stage, which hears the ctrl-wheel before it gets here.
+    document.documentElement.style.touchAction = "pan-x pan-y";
+    window.addEventListener("wheel", function (event) {
+      if (event.ctrlKey) event.preventDefault();
+    }, { passive: false });
+    ["gesturestart", "gesturechange", "gestureend"].forEach(function (name) {
+      window.addEventListener(name, function (event) {
+        event.preventDefault();
+      });
+    });
+  }
   if (document.documentElement.getAttribute("data-app") === "macos") {
     // The Mac app's window has no title bar of its own: the toolbar is it.
     // A press on the toolbar's empty space (data-window-drag, toolbar.jinja)
