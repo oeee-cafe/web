@@ -341,7 +341,7 @@ function askInPainter(
 async function confirmSave(): Promise<boolean> {
   const guest = !config.userId && config.submission?.kind !== "banner";
   const question = guest
-    ? words.guestSaveConfirm || "Save this drawing in this browser?"
+    ? words.guestSaveConfirm || "Save this drawing on this device?"
     : pageSaveButton.dataset.confirm || "Save this drawing?";
   const answer = await askInPainter(saveLabel, question, [
     { key: "cancel", label: pageSaveButton.dataset.cancel || "Cancel" },
@@ -358,7 +358,7 @@ async function confirmSave(): Promise<boolean> {
 async function afterGuestSave(draft: LocalDraft, kept: boolean): Promise<void> {
   const png = new Blob([draft.png], { type: "image/png" });
   if (!kept) {
-    const answer = await askInPainter(saveLabel, words.localSaveFailed || "This browser can't keep drawings.", [
+    const answer = await askInPainter(saveLabel, words.localSaveFailed || "Drawings can't be kept on this device right now.", [
       { key: "keep-drawing", label: words.keepDrawing || "Keep drawing" },
       { key: "download", label: words.downloadPng || "Download PNG" },
     ]);
@@ -370,7 +370,7 @@ async function afterGuestSave(draft: LocalDraft, kept: boolean): Promise<void> {
   for (;;) {
     const answer = await askInPainter(
       words.guestSavedTitle || saveLabel,
-      words.guestSaved || "This drawing is only in this browser.",
+      words.guestSaved || "This drawing is only on this device.",
       [
         { key: "download", label: words.downloadPng || "Download PNG" },
         { key: "ok", label: words.ok || "OK" },
@@ -418,7 +418,7 @@ saveButton.addEventListener("click", () => {
       } else if (kept) {
         // Signed in, but the upload failed: it waits in the drafts page.
         markKept();
-        say(words.uploadFailedKept || "Couldn't post this drawing. It's kept in your drafts in this browser.");
+        say(words.uploadFailedKept || "Couldn't post this drawing. It's kept in your drafts on this device.");
       } else {
         say(words.uploadFailedLost || "Failed to save drawing. Please try again.");
       }

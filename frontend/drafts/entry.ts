@@ -156,7 +156,7 @@ function card(draft: LocalDraft): HTMLElement {
   downloadButton.addEventListener("click", () => downloadPng(png, draft.savedAt));
   const deleteButton = button(words.delete || "Delete");
   deleteButton.addEventListener("click", () => {
-    void ask(words.deleteConfirm || "Delete this drawing from this browser?", words.delete).then(
+    void ask(words.deleteConfirm || "Delete this drawing from this device?", words.delete).then(
       async (confirmed) => {
         if (!confirmed) return;
         await deleteLocalDraft(draft.id);
