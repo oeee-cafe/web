@@ -4,14 +4,18 @@
    offers it. A product is never removed, only taken off sale -- whoever
    bought it keeps it, and a refund of it still has to be heard -- and its
    year never changes, since that is what its purchases were credited
-   with. So each row has a toggle and nothing else. #}
+   with. So each row has a toggle, and when it is sold: a window the
+   toggle narrows rather than replaces, in Seoul time, either end left
+   empty for open. #}
 {% block admin_content %}
   <h2>Store</h2>
   <p class="muted">
     The Supporter Packs each store sells. /supporter offers a store's
     products on sale for {{ this_year }} to the app that sells through it.
     Off sale only stops that: a product off sale still counts for everyone
-    who bought it, and its refunds are still heard.
+    who bought it, and its refunds are still heard. A sale window narrows
+    it further -- a product on sale is offered only between its start and
+    its end, in Seoul time, and an empty end is open.
   </p>
 
   {% if error %}
@@ -38,6 +42,7 @@
             <th>Added</th>
             <th>On sale</th>
             <th></th>
+            <th>Sold (Seoul time)</th>
           </tr>
         </thead>
         <tbody>
@@ -52,7 +57,13 @@
               </td>
               <td>{{ product.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
               <td>
-                {% if product.on_sale %}on sale{% else %}<span class="admin-tag deleted">off sale</span>{% endif %}
+                {% if product.selling_now %}
+                  selling now
+                {% elif product.on_sale %}
+                  <span class="admin-tag deleted">outside its window</span>
+                {% else %}
+                  <span class="admin-tag deleted">off sale</span>
+                {% endif %}
               </td>
               <td>
                 <form method="post"
@@ -63,6 +74,21 @@
                   <button type="submit">
                     {% if product.on_sale %}Take off sale{% else %}Put on sale{% endif %}
                   </button>
+                </form>
+              </td>
+              <td>
+                <form method="post"
+                      action="/admin/store/{{ product.store|urlencode }}/{{ product.product|urlencode }}/sale-window">
+                  <input type="datetime-local"
+                         name="sale_starts_at"
+                         value="{{ product.sale_starts_local }}"
+                         aria-label="Starts" />
+                  –
+                  <input type="datetime-local"
+                         name="sale_ends_at"
+                         value="{{ product.sale_ends_local }}"
+                         aria-label="Ends" />
+                  <button type="submit">Save</button>
                 </form>
               </td>
             </tr>
@@ -98,6 +124,14 @@
     <label>
       Button label (optional)
       <input type="text" name="label" value="{{ form.label }}" maxlength="100" />
+    </label>
+    <label>
+      Sold from (optional, Seoul time)
+      <input type="datetime-local" name="sale_starts_at" value="{{ form.sale_starts_at }}" />
+    </label>
+    <label>
+      Sold until (optional)
+      <input type="datetime-local" name="sale_ends_at" value="{{ form.sale_ends_at }}" />
     </label>
     <button type="submit">Add</button>
   </form>

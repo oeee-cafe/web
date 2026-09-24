@@ -17,7 +17,8 @@ use crate::web::handlers::activitypub::{
 use crate::web::handlers::admin::{
     admin_banners, admin_banners_fragment, admin_collaborative_sessions, admin_communities,
     admin_community_posts, admin_flag_banner, admin_flag_post, admin_post_detail, admin_posts,
-    admin_add_store_product, admin_posts_fragment, admin_set_store_product_on_sale, admin_store,
+    admin_add_store_product, admin_posts_fragment, admin_set_store_product_on_sale,
+    admin_set_store_product_sale_window, admin_store,
     admin_user_posts, admin_users, collaborative_archive_manifest, collaborative_session_chat,
     download_collaborative_archive, download_collaborative_diagnostics,
     replay_collaborative_session,
@@ -354,6 +355,10 @@ impl App {
             .route(
                 "/admin/store/:store/:product/on-sale",
                 post(admin_set_store_product_on_sale),
+            )
+            .route(
+                "/admin/store/:store/:product/sale-window",
+                post(admin_set_store_product_sale_window),
             )
             .route_layer(login_required!(Backend, login_url = "/login"));
 

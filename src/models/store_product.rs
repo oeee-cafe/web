@@ -12,16 +12,23 @@
 //! So there is no delete. Taking a product off sale is `on_sale = false`,
 //! which only stops /supporter offering it; every check still knows it.
 //!
+//! **When it is sold is a window, and the window only narrows `on_sale`.**
+//! `sale_starts_at` and `sale_ends_at` are when /supporter starts and stops
+//! offering it; either may be open. A product is offered while it is on sale
+//! *and* inside its window, so taking it off sale still stops it at once,
+//! and a purchase made outside the window counts all the same. Every query
+//! below that asks what is offered spells the window out the same way.
+//!
 //! **A product's year does not change.** It is what a purchase is credited
 //! with, and changing it would quietly move every purchase already made
 //! from one year to another. A different year is a different product.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::RwLock;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use sqlx::{query, query_as, query_scalar, Postgres, Transaction};
+use sqlx::{query, query_as, Postgres, Transaction};
 
 use super::supporter::{OwnedProduct, Store};
 use crate::config::AppConfig;
@@ -42,6 +49,13 @@ pub struct StoreProduct {
     /// Whether /supporter offers it. A product off sale still counts for
     /// whoever bought it.
     pub on_sale: bool,
+    /// When /supporter starts offering it; open when there is none.
+    pub sale_starts_at: Option<DateTime<Utc>>,
+    /// When /supporter stops offering it; open when there is none.
+    pub sale_ends_at: Option<DateTime<Utc>>,
+    /// On sale and inside its window by the database's clock: whether
+    /// /supporter offers it now.
+    pub selling_now: bool,
     pub created_at: DateTime<Utc>,
 }
 
@@ -51,7 +65,11 @@ pub async fn list_all(tx: &mut Transaction<'_, Postgres>) -> Result<Vec<StorePro
     let products = query_as!(
         StoreProduct,
         r#"
-        SELECT store, product, year, label, on_sale, created_at
+        SELECT store, product, year, label, on_sale, sale_starts_at, sale_ends_at,
+               (on_sale
+                AND (sale_starts_at IS NULL OR sale_starts_at <= now())
+                AND (sale_ends_at IS NULL OR now() < sale_ends_at)) AS "selling_now!",
+               created_at
         FROM store_products
         ORDER BY store, year DESC, created_at, product
         "#,
@@ -61,8 +79,8 @@ pub async fn list_all(tx: &mut Transaction<'_, Postgres>) -> Result<Vec<StorePro
     Ok(products)
 }
 
-/// What /supporter offers in `store` for `year`: the products on sale, in
-/// the order they were added.
+/// What /supporter offers in `store` for `year`: the products on sale and
+/// inside their windows, in the order they were added.
 pub async fn list_on_sale(
     tx: &mut Transaction<'_, Postgres>,
     store: Store,
@@ -71,9 +89,15 @@ pub async fn list_on_sale(
     let products = query_as!(
         StoreProduct,
         r#"
-        SELECT store, product, year, label, on_sale, created_at
+        SELECT store, product, year, label, on_sale, sale_starts_at, sale_ends_at,
+               (on_sale
+                AND (sale_starts_at IS NULL OR sale_starts_at <= now())
+                AND (sale_ends_at IS NULL OR now() < sale_ends_at)) AS "selling_now!",
+               created_at
         FROM store_products
         WHERE store = $1 AND year = $2 AND on_sale
+          AND (sale_starts_at IS NULL OR sale_starts_at <= now())
+          AND (sale_ends_at IS NULL OR now() < sale_ends_at)
         ORDER BY created_at, product
         "#,
         store.as_str(),
@@ -119,7 +143,11 @@ pub async fn find(
     let found = query_as!(
         StoreProduct,
         r#"
-        SELECT store, product, year, label, on_sale, created_at
+        SELECT store, product, year, label, on_sale, sale_starts_at, sale_ends_at,
+               (on_sale
+                AND (sale_starts_at IS NULL OR sale_starts_at <= now())
+                AND (sale_ends_at IS NULL OR now() < sale_ends_at)) AS "selling_now!",
+               created_at
         FROM store_products
         WHERE store = $1 AND product = $2
         "#,
@@ -171,6 +199,32 @@ pub async fn set_on_sale(
         store.as_str(),
         product,
         on_sale,
+    )
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    Ok(changed == 1)
+}
+
+/// Sets when a product is sold, `None` leaving that end open. `false` when
+/// there is no such product. The caller has checked that a start comes
+/// before an end; the table checks it again.
+pub async fn set_sale_window(
+    tx: &mut Transaction<'_, Postgres>,
+    store: Store,
+    product: &str,
+    starts_at: Option<DateTime<Utc>>,
+    ends_at: Option<DateTime<Utc>>,
+) -> Result<bool> {
+    let changed = query!(
+        r#"
+        UPDATE store_products SET sale_starts_at = $3, sale_ends_at = $4
+        WHERE store = $1 AND product = $2
+        "#,
+        store.as_str(),
+        product,
+        starts_at,
+        ends_at,
     )
     .execute(&mut **tx)
     .await?
@@ -231,27 +285,58 @@ pub async fn import_configured(db: &sqlx::PgPool, config: &AppConfig) -> Result<
     Ok(added)
 }
 
-static ANY_ON_SALE: AtomicBool = AtomicBool::new(false);
-
-/// Whether any store has anything on sale: what decides if the toolbar has
-/// a heart in it at all. Kept in memory, because the toolbar is on every
-/// page and the answer changes only when the catalogue does.
-pub fn any_on_sale() -> bool {
-    ANY_ON_SALE.load(Ordering::Relaxed)
+/// A product on sale, as the window it is sold in. What [`any_on_sale`]
+/// looks at: the flag alone would go stale the moment a window opened or
+/// closed, which happens with nobody at /admin/store to refresh it.
+#[derive(Clone, Copy, Debug)]
+struct SaleWindow {
+    starts_at: Option<DateTime<Utc>>,
+    ends_at: Option<DateTime<Utc>>,
 }
 
-/// Reads [`any_on_sale`] again from the table: on boot, and after every
-/// change at /admin/store.
+impl SaleWindow {
+    fn contains(&self, now: DateTime<Utc>) -> bool {
+        self.starts_at.is_none_or(|starts| starts <= now)
+            && self.ends_at.is_none_or(|ends| now < ends)
+    }
+}
+
+static ON_SALE: RwLock<Vec<SaleWindow>> = RwLock::new(Vec::new());
+
+/// Whether any store has anything on sale right now: what decides if the
+/// toolbar has a heart in it at all. Kept in memory, because the toolbar is
+/// on every page and the catalogue changes only at /admin/store -- the
+/// windows are kept rather than the answer, so the answer follows the clock.
+pub fn any_on_sale() -> bool {
+    let now = Utc::now();
+    ON_SALE
+        .read()
+        .map(|windows| windows.iter().any(|window| window.contains(now)))
+        .unwrap_or(false)
+}
+
+/// Reads the windows [`any_on_sale`] looks at again from the table: on boot,
+/// and after every change at /admin/store. Returns whether anything is on
+/// sale now.
 ///
 /// Per process, so per colour. Only one serves at a time, and the one that
 /// starts next reads it on boot.
 pub async fn refresh_any_on_sale(db: &sqlx::PgPool) -> Result<bool> {
-    let any =
-        query_scalar!(r#"SELECT EXISTS (SELECT 1 FROM store_products WHERE on_sale) AS "any!""#)
-            .fetch_one(db)
-            .await?;
-    ANY_ON_SALE.store(any, Ordering::Relaxed);
-    Ok(any)
+    let windows: Vec<SaleWindow> = query!(
+        "SELECT sale_starts_at, sale_ends_at FROM store_products WHERE on_sale"
+    )
+    .fetch_all(db)
+    .await?
+    .into_iter()
+    .map(|row| SaleWindow {
+        starts_at: row.sale_starts_at,
+        ends_at: row.sale_ends_at,
+    })
+    .collect();
+    if let Ok(mut on_sale) = ON_SALE.write() {
+        *on_sale = windows;
+    }
+    Ok(any_on_sale())
 }
 
 /// Against the database `DATABASE_URL` names, inside a transaction that is
@@ -324,6 +409,74 @@ mod tests {
                 .unwrap()
         );
         tx.rollback().await.unwrap();
+    }
+
+    /// Outside its window a product on sale is not offered, and says so;
+    /// taking the window away offers it again. Its purchases count
+    /// throughout.
+    #[tokio::test]
+    async fn a_product_is_offered_only_inside_its_window() {
+        let Some(mut tx) = tx().await else { return };
+        let offered = |products: Vec<StoreProduct>| {
+            products
+                .into_iter()
+                .any(|product| product.product == "9TESTWINDOW1")
+        };
+        assert!(add(&mut tx, Store::Microsoft, "9TESTWINDOW1", 2026, None)
+            .await
+            .unwrap());
+        let hour = chrono::Duration::hours(1);
+        let now = Utc::now();
+        for (starts, ends, inside) in [
+            (Some(now + hour), None, false),
+            (None, Some(now - hour), false),
+            (Some(now - hour), Some(now + hour), true),
+            (None, None, true),
+        ] {
+            assert!(
+                set_sale_window(&mut tx, Store::Microsoft, "9TESTWINDOW1", starts, ends)
+                    .await
+                    .unwrap()
+            );
+            assert_eq!(
+                offered(list_on_sale(&mut tx, Store::Microsoft, 2026).await.unwrap()),
+                inside,
+                "{starts:?}..{ends:?}"
+            );
+            let found = find(&mut tx, Store::Microsoft, "9TESTWINDOW1")
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(found.selling_now, inside);
+            assert!(packs(&mut tx, Store::Microsoft)
+                .await
+                .unwrap()
+                .iter()
+                .any(|pack| pack.product == "9TESTWINDOW1"));
+        }
+        // The table refuses a window that ends before it starts.
+        assert!(set_sale_window(
+            &mut tx,
+            Store::Microsoft,
+            "9TESTWINDOW1",
+            Some(now + hour),
+            Some(now)
+        )
+        .await
+        .is_err());
+        tx.rollback().await.unwrap();
+    }
+
+    #[test]
+    fn a_window_is_open_at_either_end_it_leaves_out() {
+        let now = Utc::now();
+        let hour = chrono::Duration::hours(1);
+        let window = |starts_at, ends_at| SaleWindow { starts_at, ends_at };
+        assert!(window(None, None).contains(now));
+        assert!(window(Some(now), None).contains(now), "a start is inclusive");
+        assert!(!window(None, Some(now)).contains(now), "an end is not");
+        assert!(!window(Some(now + hour), None).contains(now));
+        assert!(window(Some(now - hour), Some(now + hour)).contains(now));
     }
 
     /// Adding a product that is already there changes nothing: its year is
