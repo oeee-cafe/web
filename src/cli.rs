@@ -1,3 +1,8 @@
+//! `oeee-cafe cli ...`: admin and ops commands, run inside a serving
+//! container by ./cli.sh. A subcommand of the server rather than a binary of
+//! its own, because a second binary links nearly all of the same code again
+//! and was 200MB of every release image.
+
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use oeee_cafe::{
@@ -17,7 +22,7 @@ use tracing::Level;
 use uuid::Uuid;
 
 #[derive(Parser)]
-#[command(version, about, long_about = None)]
+#[command(name = "oeee-cafe cli", version, about, long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
     #[arg(short, long)]
@@ -71,18 +76,22 @@ impl From<RoleArg> for UserRole {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Initialize rustls crypto provider
-    let _ = rustls::crypto::ring::default_provider().install_default();
+/// `args` are the ones after `cli`.
+pub fn main(args: impl IntoIterator<Item = String>) -> Result<()> {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run(args))
+}
 
+async fn run(args: impl IntoIterator<Item = String>) -> Result<()> {
     // Initialize tracing/logging
     let subscriber = tracing_subscriber::fmt()
         .with_max_level(Level::WARN)
         .finish();
     let _ = tracing::subscriber::set_global_default(subscriber);
 
-    let cli = Cli::parse();
+    let cli = Cli::parse_from(std::iter::once("oeee-cafe cli".to_string()).chain(args));
 
     let config_path = cli
         .config

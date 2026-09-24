@@ -25,15 +25,23 @@ ENV SCCACHE_DIR=/sccache
 ENV SCCACHE_CACHE_SIZE="10G"
 ENV DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5433/oeee_cafe
 
-# `cargo build --release` already builds both bin targets. /app/target is a
-# cache mount, so anything needed later must be copied out inside this RUN.
+# /app/target is a cache mount, so anything needed later must be copied out
+# inside this RUN.
+#
+# The release profile builds full debug info, and it is split off here: the
+# image gets the binary without it, and deploy.sh takes oeee-cafe.debug from
+# the debug-files stage below and uploads it to Sentry, which puts file, line
+# and inlined frames back into its stack traces by the GNU build id the two
+# share. The symbol table stays in, so a backtrace in `docker logs` still
+# names its functions.
 RUN --mount=type=cache,target=/sccache \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     cargo build --release && \
     sccache --show-stats && \
     cp /app/target/release/oeee-cafe /app/oeee-cafe && \
-    cp /app/target/release/cli /app/cli
+    objcopy --only-keep-debug --compress-debug-sections=zlib /app/oeee-cafe /app/oeee-cafe.debug && \
+    objcopy --strip-debug /app/oeee-cafe
 
 # Build neo-cucumber
 FROM node:24-slim AS node-builder-neo-cucumber
@@ -46,7 +54,12 @@ RUN corepack use pnpm@latest-10
 RUN pnpm install --frozen-lockfile
 RUN pnpm run build
 
-# Build runtime image
+# `docker build --target debug-files --output type=local,dest=DIR` writes
+# oeee-cafe.debug to DIR for uploading, from the same cached build as the image.
+FROM scratch AS debug-files
+COPY --from=rust-builder /app/oeee-cafe.debug /
+
+# Build runtime image. The last stage, so it is what a plain `docker build` makes.
 FROM ubuntu:25.10
 WORKDIR /app
 # curl is what the compose healthcheck shells out to.
@@ -55,11 +68,10 @@ COPY tegaki/ ./tegaki/
 COPY locales/ ./locales/
 COPY static/ ./static/
 COPY templates/ ./templates/
-COPY --from=rust-builder /app/oeee-cafe ./
-# Admin/ops commands. ./cli.sh finds whichever blue/green colour is serving and
-# runs this inside it, e.g.
+# Admin/ops commands are `./oeee-cafe cli ...`. ./cli.sh finds whichever
+# blue/green colour is serving and runs them inside it, e.g.
 #   ./cli.sh set-role <login_name> admin
-COPY --from=rust-builder /app/cli ./
+COPY --from=rust-builder /app/oeee-cafe ./
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist/ ./neo-cucumber/dist/
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-viewer/ ./neo-cucumber/dist-viewer/
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-offline/ ./neo-cucumber/dist-offline/

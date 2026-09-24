@@ -7,15 +7,12 @@ publish = false
 # missing, cargo would quietly build without it and new migrations would stop
 # being embedded again. This turns that into a build failure.
 build = "build.rs"
-default-run = "oeee-cafe"
-
-[[bin]]
-name = "cli"
 
 [profile.release]
-# File and line numbers in panics and backtraces, without the full DWARF
-# that made each binary 500-700MB and every image 1.4GB.
-debug = "line-tables-only"
+# Full debug info, which the Dockerfile splits off the binary before it goes
+# into the image and deploy.sh uploads to Sentry. Left in, it made the binary
+# 700MB and every image 1.4GB.
+debug = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

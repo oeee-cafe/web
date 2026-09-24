@@ -39,6 +39,12 @@ the image over ssh (host alias `oeee-cafe-deploy` in `~/.ssh/config`), and
 runs `deploy-server.sh <commit>` there. Nothing compiles on the server, and
 its compose file has no `build:` on purpose.
 
+The image's binary carries no debug info: the Dockerfile splits it off and
+`deploy.sh` uploads it to Sentry (`sentry-cli` must be logged in), which is
+where file and line come back. The admin CLI is a subcommand of the one
+binary, `./oeee-cafe cli ...`, reached through `./cli.sh`, not a second
+binary — that one cost 200MB of every image.
+
 The switch is blue/green: `oeee-cafe-blue` and `oeee-cafe-green` take turns,
 and the `proxy` container (Caddy) owns the published port so it is never
 rebound. Which colour is live is written in `proxy/upstream.caddy` — that file

@@ -16,13 +16,26 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing_subscriber::EnvFilter;
 
+mod cli;
+
 fn main() {
     // Initialize rustls crypto provider for push notifications
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     let args: Vec<String> = args().collect();
+    if args.get(1).map(String::as_str) == Some("cli") {
+        if let Err(e) = cli::main(args.into_iter().skip(2)) {
+            eprintln!("error: {:#}", e);
+            exit(1);
+        }
+        return;
+    }
     if args.len() < 2 {
-        println!("usage: {} CFG", args.first().unwrap_or(&"oeee".to_string()));
+        println!(
+            "usage: {} CFG\n       {} cli --help",
+            args.first().map(String::as_str).unwrap_or("oeee-cafe"),
+            args.first().map(String::as_str).unwrap_or("oeee-cafe")
+        );
         exit(1);
     }
 

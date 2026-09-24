@@ -20,6 +20,14 @@
 #       HostName <the server's address>
 #
 # Docker here has to be running. OrbStack is started if it is not.
+#
+# The image's binary has no debug info; it is uploaded to Sentry instead, so
+# sentry-cli has to be logged in (`sentry-cli login`). The organization and
+# project are named here rather than left to ~/.sentryclirc's defaults, which
+# belong to whichever project that machine set up last. Without the upload, a
+# release goes out whose stack traces in Sentry have no file or line, so the
+# deploy stops rather than find that out from the first error. SENTRY_UPLOAD=skip
+# deploys anyway.
 
 set -euo pipefail
 
@@ -32,6 +40,8 @@ REMOTE_DIR=${REMOTE_DIR:-'~/Git/oeee-cafe'}
 # pushed. This one is cleaned to exactly the commit being deployed.
 BUILD_DIR=${DEPLOY_BUILD_DIR:-$HOME/.cache/oeee-cafe-deploy}
 LOCK_DIR=$BUILD_DIR.lock
+export SENTRY_ORG=${SENTRY_ORG:-limeburst}
+export SENTRY_PROJECT=${SENTRY_PROJECT:-oeee-cafe}
 
 REPO_URL="$(git -C "$(dirname "$0")" remote get-url origin)"
 
@@ -58,6 +68,14 @@ if ! docker info >/dev/null 2>&1; then
         echo "ERROR: Docker is not running on this machine"
         exit 1
     fi
+fi
+
+# Checked before the build rather than after it, which is when it would fail.
+if [[ ${SENTRY_UPLOAD:-} != skip ]] && ! sentry-cli info >/dev/null 2>&1; then
+    echo "ERROR: sentry-cli cannot reach $SENTRY_ORG/$SENTRY_PROJECT: run"
+    echo "       \`sentry-cli login\`, or deploy without debug info in Sentry"
+    echo "       with SENTRY_UPLOAD=skip"
+    exit 1
 fi
 
 echo "==> Fetching origin/main..."
@@ -88,54 +106,71 @@ remote() {
 if remote "docker image inspect $IMAGE" >/dev/null 2>&1; then
     echo "==> The server already has $IMAGE"
 else
-    if docker image inspect "$IMAGE" >/dev/null 2>&1; then
-        echo "==> $IMAGE is already built"
+    # Built even when $IMAGE is already here from a deploy that failed later
+    # on: the debug info exists only in the build cache, and a build that finds
+    # everything cached takes seconds.
+    #
+    # sqlx checks every query against a real schema at compile time, and
+    # the Dockerfile's DATABASE_URL points at this, on the host.
+    echo "==> Starting temporary PostgreSQL container for build..."
+    docker rm -fv oeee-cafe-build-db >/dev/null 2>&1 || true
+    docker run -d --quiet \
+        --name oeee-cafe-build-db \
+        -p 5433:5432 \
+        -e POSTGRES_PASSWORD=postgres \
+        -e POSTGRES_DB=oeee_cafe \
+        postgres:18 >/dev/null
+
+    echo "==> Waiting for PostgreSQL to be ready..."
+    for i in {1..30}; do
+        if docker exec oeee-cafe-build-db pg_isready -U postgres >/dev/null 2>&1; then
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "ERROR: PostgreSQL did not become ready in time"
+            exit 1
+        fi
+        sleep 1
+    done
+
+    echo "==> Running migrations..."
+    MIGRATION_ATTEMPTS=0
+    until DATABASE_URL=postgresql://postgres:postgres@localhost:5433/oeee_cafe \
+        sqlx migrate run --source "$BUILD_DIR/migrations"; do
+        MIGRATION_ATTEMPTS=$((MIGRATION_ATTEMPTS + 1))
+        if [ $MIGRATION_ATTEMPTS -ge 5 ]; then
+            echo "ERROR: migrations failed after $MIGRATION_ATTEMPTS attempts"
+            exit 1
+        fi
+        echo "Migration attempt $MIGRATION_ATTEMPTS failed, retrying in 2 seconds..."
+        sleep 2
+    done
+
+    echo "==> Building $IMAGE..."
+    # GIT_COMMIT versions the static asset URLs the server hands out, so
+    # each deploy invalidates browser and CDN caches exactly once.
+    DOCKER_BUILDKIT=1 docker build \
+        --platform linux/arm64 \
+        --build-arg GIT_COMMIT="$COMMIT" \
+        --tag "$IMAGE" \
+        "$BUILD_DIR"
+    DEBUG_DIR="$BUILD_DIR.debug"
+    rm -rf "$DEBUG_DIR"
+    DOCKER_BUILDKIT=1 docker build --quiet \
+        --platform linux/arm64 \
+        --target debug-files \
+        --output "type=local,dest=$DEBUG_DIR" \
+        "$BUILD_DIR"
+    docker rm -fv oeee-cafe-build-db >/dev/null 2>&1 || true
+
+    # Before the image goes anywhere, so the first error the new release
+    # reports is already symbolicated. Matched to the binary by build id, so
+    # an upload of a file Sentry already has is a no-op.
+    if [[ ${SENTRY_UPLOAD:-} == skip ]]; then
+        echo "==> Not uploading debug info to Sentry (SENTRY_UPLOAD=skip)"
     else
-        # sqlx checks every query against a real schema at compile time, and
-        # the Dockerfile's DATABASE_URL points at this, on the host.
-        echo "==> Starting temporary PostgreSQL container for build..."
-        docker rm -fv oeee-cafe-build-db >/dev/null 2>&1 || true
-        docker run -d --quiet \
-            --name oeee-cafe-build-db \
-            -p 5433:5432 \
-            -e POSTGRES_PASSWORD=postgres \
-            -e POSTGRES_DB=oeee_cafe \
-            postgres:18 >/dev/null
-
-        echo "==> Waiting for PostgreSQL to be ready..."
-        for i in {1..30}; do
-            if docker exec oeee-cafe-build-db pg_isready -U postgres >/dev/null 2>&1; then
-                break
-            fi
-            if [ $i -eq 30 ]; then
-                echo "ERROR: PostgreSQL did not become ready in time"
-                exit 1
-            fi
-            sleep 1
-        done
-
-        echo "==> Running migrations..."
-        MIGRATION_ATTEMPTS=0
-        until DATABASE_URL=postgresql://postgres:postgres@localhost:5433/oeee_cafe \
-            sqlx migrate run --source "$BUILD_DIR/migrations"; do
-            MIGRATION_ATTEMPTS=$((MIGRATION_ATTEMPTS + 1))
-            if [ $MIGRATION_ATTEMPTS -ge 5 ]; then
-                echo "ERROR: migrations failed after $MIGRATION_ATTEMPTS attempts"
-                exit 1
-            fi
-            echo "Migration attempt $MIGRATION_ATTEMPTS failed, retrying in 2 seconds..."
-            sleep 2
-        done
-
-        echo "==> Building $IMAGE..."
-        # GIT_COMMIT versions the static asset URLs the server hands out, so
-        # each deploy invalidates browser and CDN caches exactly once.
-        DOCKER_BUILDKIT=1 docker build \
-            --platform linux/arm64 \
-            --build-arg GIT_COMMIT="$COMMIT" \
-            --tag "$IMAGE" \
-            "$BUILD_DIR"
-        docker rm -fv oeee-cafe-build-db >/dev/null 2>&1 || true
+        echo "==> Uploading debug info to Sentry..."
+        sentry-cli debug-files upload --no-zips "$DEBUG_DIR"
     fi
 
     echo "==> Shipping $IMAGE to $DEPLOY_HOST..."
