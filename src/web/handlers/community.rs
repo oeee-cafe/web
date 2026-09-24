@@ -1,6 +1,6 @@
 use crate::app_error::AppError;
 use crate::models::actor::create_actor_for_community;
-use crate::models::comment::find_latest_comments_in_community;
+use crate::models::comment::{find_recent_comments, CommentScope};
 use crate::models::community::{
     accept_invitation, add_community_member, create_community, create_invitation, find_community_by_id,
     find_community_by_slug, get_communities_members_count, get_community_members_with_details,
@@ -15,7 +15,9 @@ use crate::models::community::{
 use crate::models::notification::{format_community_invitation_message, get_user_language_preference};
 use crate::models::post::{find_published_posts_by_community_id, find_recent_posts_by_communities};
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession};
-use crate::web::handlers::home::{feed_context, LoadMoreQuery, HOME_POSTS_PER_BATCH};
+use crate::web::handlers::home::{
+    feed_context, LoadMoreQuery, HOME_POSTS_PER_BATCH, SIDEBAR_COMMENTS,
+};
 use crate::web::handlers::{parse_id_with_legacy_support, ParsedId};
 use crate::web::handlers::render_403;
 use crate::web::state::AppState;
@@ -197,6 +199,14 @@ pub(crate) async fn render_community_page(
         viewer_show_sensitive,
     )
     .await?;
+    let comments = find_recent_comments(
+        tx,
+        CommentScope::Community(community_uuid),
+        viewer_user_id,
+        viewer_show_sensitive,
+        SIDEBAR_COMMENTS,
+    )
+    .await?;
     let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
     let rendered = template.render(context! {
@@ -206,7 +216,8 @@ pub(crate) async fn render_community_page(
         community_id => community_uuid.to_string(),
         domain => state.config.domain.clone(),
         unread_notification_count => common_ctx.unread_notification_count,
-        feed => feed_context(posts, &community_posts_path(&community.slug), 0),
+        feed => feed_context(posts, &community_posts_path(&community.slug), 0, None),
+        comments,
         draft_post_count => common_ctx.draft_post_count,
         ftl_lang,
     })?;
@@ -263,7 +274,12 @@ pub async fn load_more_community_posts(
     let template: minijinja::Template<'_, '_> =
         state.env.get_template("post_feed_fragment.jinja")?;
     let rendered = template.render(context! {
-        feed => feed_context(posts, &community_posts_path(&community.slug), query.offset),
+        feed => feed_context(
+            posts,
+            &community_posts_path(&community.slug),
+            query.offset,
+            query.period.as_deref(),
+        ),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
     })?;
 
@@ -1147,8 +1163,15 @@ pub async fn community_comments(
         }
     }
 
-    // Get more comments for the dedicated comments page (100 instead of 5)
-    let comments = find_latest_comments_in_community(&mut tx, community_uuid, 100).await?;
+    // The whole of what the drawings page's list is the start of.
+    let comments = find_recent_comments(
+        &mut tx,
+        CommentScope::Community(community_uuid),
+        auth_session.user.as_ref().map(|u| u.id),
+        auth_session.user.as_ref().map_or(false, |u| u.show_sensitive_content),
+        100,
+    )
+    .await?;
     let header = community_header_context(&mut tx, &community).await?;
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;

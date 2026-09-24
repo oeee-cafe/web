@@ -124,7 +124,7 @@ pub async fn tag_view(
         current_user => auth_session.user,
         tag => tag,
         post_count,
-        feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), 0),
+        feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), 0, None),
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang
@@ -137,6 +137,8 @@ pub async fn tag_view(
 pub struct LoadMoreQuery {
     offset: i64,
     limit: i64,
+    /// The stretch of time the previous batch ended in (home::feed_context).
+    period: Option<String>,
 }
 
 /// GET /tags/:tag_name/posts — the next batch of cards for the tag
@@ -170,7 +172,12 @@ pub async fn load_more_tag_posts(
         .env
         .get_template("post_feed_fragment.jinja")?
         .render(context! {
-            feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), query.offset),
+            feed => feed_context(
+                posts,
+                &format!("{}/posts", tag_url(&name)),
+                query.offset,
+                query.period.as_deref(),
+            ),
             r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
         })?;
 

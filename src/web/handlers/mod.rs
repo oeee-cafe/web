@@ -1066,18 +1066,37 @@ mod community_page_tests {
                 }),
                 community_id => "00000000-0000-0000-0000-000000000001",
                 domain => "oeee.test",
-                feed => feed_context(posts, "/api/communities/@open/posts", 0),
+                feed => feed_context(posts, "/api/communities/@open/posts", 0, None),
+                comments => vec![json!({
+                    "post_id": "00000000-0000-0000-0000-000000000001",
+                    "post_author_login_name": "artist",
+                    "post_title": "Drawing 0",
+                    "actor_name": "Commenter",
+                    "actor_handle": "@commenter@oeee.test",
+                    "content": "Lovely colours",
+                    "created_at": "2026-01-02T03:04:05Z",
+                })],
                 ftl_lang => "en",
             })
             .expect("community renders");
 
+        // What is said on its drawings goes beside them, and goes on to the
+        // community's own page of comments.
+        assert!(rendered.contains(r#"<aside class="feed-comments" aria-labelledby"#));
+        assert!(rendered.contains(
+            r#"<a class="feed-comments-all" href="&#x2f;communities&#x2f;@open&#x2f;comments">"#
+        ));
+
         // Minijinja escapes the slashes and the ampersand in an attribute; the
         // browser reads them back as the URL, so assert against that.
+        // Every drawing is this month's, so the next batch is told the grid
+        // is still in it, and does not head its first drawing again.
+        let month = crate::feed_period::period(chrono::Utc::now(), chrono::Utc::now()).key;
         let links_in = rendered.replace("&#x2f;", "/").replace("&amp;", "&");
         assert!(
             links_in.contains(&format!(
-                r#"hx-get="/api/communities/@open/posts?offset={}&limit={}""#,
-                HOME_POSTS_PER_BATCH, HOME_POSTS_PER_BATCH
+                r#"hx-get="/api/communities/@open/posts?offset={}&limit={}&period={}""#,
+                HOME_POSTS_PER_BATCH, HOME_POSTS_PER_BATCH, month
             )),
             "the sentinel should ask this community for the next batch"
         );

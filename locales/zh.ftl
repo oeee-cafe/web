@@ -29,6 +29,9 @@ feed-communities = 社区
 feed-recent-empty = 还没有作品。
 feed-following-empty = 时间线是空的。在<a href="/communities">社区</a>中与其他用户建立联系吧！
 feed-communities-empty = 你加入的社区还没有新作品。去<a href="/communities">社区</a>找一个加入吧！
+feed-period-month = { $month }月
+feed-period-month-year = { $year }年{ $month }月
+recent-comments-all = 查看全部评论
 
 draw = 画画！
 collaborate = 协作画画

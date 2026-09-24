@@ -1,5 +1,6 @@
 {% extends "base.jinja" %}
 {% import "pill_macro.jinja" as pill %}
+{% from "comments_aside_macro.jinja" import comments_aside %}
 {% block title %}
   {{ super() }} | {{ community.name }}
 {% endblock title %}
@@ -117,7 +118,8 @@
        the header block above: saving or cancelling the edit form renders
        that block alone, and minijinja still walks the rest to reach it. #}
     {% set feed_posts = feed.posts if feed is defined else [] %}
-    <section class="profile-section" role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
+    {% set aside_comments = comments if comments is defined else [] %}
+    <section class="profile-section feed-layout{% if aside_comments %} has-comments{% endif %}" role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
       <div class="grid-header">
         {{ community_views("drawings") }}
         {# Only with posts to arrange: an empty feed has no columns to set. #}
@@ -125,6 +127,7 @@
           {% include "post_feed_controls.jinja" %}
         {% endif %}
       </div>
+      {{ comments_aside(aside_comments, "/communities/@" ~ community.slug ~ "/comments") }}
       {% if feed_posts %}
         <div class="posts-grid" id="post-feed-grid">
           {% include "post_feed_fragment.jinja" %}

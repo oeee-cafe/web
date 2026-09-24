@@ -368,11 +368,45 @@ pub async fn find_comments_to_posts_by_author(
     Ok(comments)
 }
 
-pub async fn find_latest_comments_in_community(
+/// Whose comments a list of the latest ones is drawn from.
+#[derive(Clone, Copy, Debug)]
+pub enum CommentScope {
+    /// Everything said on public drawings: Home's Recent.
+    Public,
+    /// What the people this user follows have said, on public drawings:
+    /// Home's Following.
+    FollowedBy(Uuid),
+    /// Everything said in the communities this user is a member of,
+    /// whatever their visibility: Home's Communities.
+    MemberOf(Uuid),
+    /// Everything said in one community. Whoever asks has already been let
+    /// into it.
+    Community(Uuid),
+}
+
+/// The latest comments in `scope`, newest first, for the lists beside a
+/// feed and a community's comments page. A comment appears only where the
+/// drawing it is on would: published, not deleted, and sensitive only for
+/// a viewer who shows sensitive drawings or drew it -- the thumbnail is
+/// the drawing, so a list that ignored this would show what the grid
+/// beside it blurs or hides. An artist answering on their own drawing is
+/// left out; what the list is for is what others said.
+pub async fn find_recent_comments(
     tx: &mut Transaction<'_, Postgres>,
-    community_id: Uuid,
+    scope: CommentScope,
+    viewer_user_id: Option<Uuid>,
+    viewer_show_sensitive: bool,
     limit: i64,
 ) -> Result<Vec<NotificationComment>> {
+    let (community_id, member_id, follower_id) = match scope {
+        CommentScope::Public => (None, None, None),
+        CommentScope::FollowedBy(user_id) => (None, None, Some(user_id)),
+        CommentScope::MemberOf(user_id) => (None, Some(user_id), None),
+        CommentScope::Community(community_id) => (Some(community_id), None, None),
+    };
+    // Public and Following are the public feeds' drawings; the other two
+    // are a member's or already checked.
+    let public_only = community_id.is_none() && member_id.is_none();
     let comments = sqlx::query_as!(
         NotificationComment,
         r#"
@@ -389,27 +423,46 @@ pub async fn find_latest_comments_in_community(
             actors.handle AS actor_handle,
             actors.url AS actor_url,
             comment_authors.login_name AS "actor_login_name?",
-            CASE WHEN comment_authors.id IS NOT NULL THEN true ELSE false END AS "is_local!",
+            (comment_authors.id IS NOT NULL) AS "is_local!",
             posts.title AS post_title,
             post_authors.login_name AS post_author_login_name,
-            images.image_filename AS post_image_filename,
-            images.width AS post_image_width,
-            images.height AS post_image_height
+            images.image_filename AS "post_image_filename?",
+            images.width AS "post_image_width?",
+            images.height AS "post_image_height?"
         FROM comments
-        LEFT JOIN actors ON comments.actor_id = actors.id
+        JOIN actors ON comments.actor_id = actors.id
         LEFT JOIN users AS comment_authors ON actors.user_id = comment_authors.id
-        LEFT JOIN posts ON comments.post_id = posts.id
-        LEFT JOIN users AS post_authors ON posts.author_id = post_authors.id
+        JOIN posts ON comments.post_id = posts.id
+        JOIN users AS post_authors ON posts.author_id = post_authors.id
+        LEFT JOIN communities ON posts.community_id = communities.id
         LEFT JOIN images ON posts.image_id = images.id
-        WHERE posts.community_id = $1
-        AND posts.published_at IS NOT NULL
-        AND (actors.user_id IS NULL OR actors.user_id != posts.author_id)
+        WHERE posts.published_at IS NOT NULL
         AND posts.deleted_at IS NULL
         AND comments.deleted_at IS NULL
-        ORDER BY comments.created_at DESC
-        LIMIT $2
+        AND (actors.user_id IS NULL OR actors.user_id != posts.author_id)
+        AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $1 OR posts.author_id = $2)
+        AND (NOT $3 OR posts.community_id IS NULL OR communities.visibility = 'public')
+        AND ($4::uuid IS NULL OR posts.community_id = $4)
+        AND ($5::uuid IS NULL OR EXISTS (
+            SELECT 1 FROM community_members
+            WHERE community_members.community_id = posts.community_id
+            AND community_members.user_id = $5
+        ))
+        AND ($6::uuid IS NULL OR EXISTS (
+            SELECT 1 FROM follows
+            JOIN actors AS followers ON follows.follower_actor_id = followers.id
+            WHERE follows.following_actor_id = comments.actor_id
+            AND followers.user_id = $6
+        ))
+        ORDER BY comments.created_at DESC, comments.id DESC
+        LIMIT $7
         "#,
+        viewer_show_sensitive,
+        viewer_user_id,
+        public_only,
         community_id,
+        member_id,
+        follower_id,
         limit
     )
     .fetch_all(&mut **tx)

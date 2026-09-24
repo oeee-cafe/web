@@ -497,6 +497,33 @@ nav a:visited,
   }
 }
 
+/* The month, over the first drawing of each
+   (post_feed_fragment.jinja, feed_period.rs): an item of the grid that
+   takes its whole row, with a rule running out to the edge. It sits
+   nearer the row it heads than the row before it. */
+.posts-grid .feed-period {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  margin: var(--ds-space-3) 0 -8px;
+  color: var(--ds-ink);
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+}
+
+.posts-grid .feed-period:first-child {
+  margin-top: 0;
+}
+
+.posts-grid .feed-period::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  margin-left: var(--ds-space-3);
+  background-color: var(--ds-line);
+}
+
 .banner-controls {
   display: flex;
   flex-direction: row;
@@ -4620,6 +4647,175 @@ html[data-app] .about-stores {
 @media (max-width: 400px) {
   .comment-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The comments beside a feed (comments_aside_macro.jinja)
+
+   Narrower than a laptop it is a row of the same cards a profile's
+   comments are, between the feed's header and its grid, swiped across so
+   the drawings are still the first thing a scroll reaches. From 1024px it
+   is a column beside the grid: `.feed-layout` puts the header over the
+   grid, and the comments beside both, where they hold still while the
+   grid scrolls and scroll on their own when there are more than the window
+   holds. The heading stays put above them. Grid areas are Firefox 52, so
+   the floor lays it out; a sticky grid item that does not stick in some
+   engine only scrolls away with the page.
+   --------------------------------------------------------------------------- */
+.feed-comments {
+  min-width: 0;
+  margin: var(--space-3) 0 var(--space-4);
+}
+
+.feed-comments-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--ds-space-2);
+}
+
+.feed-comments-title {
+  margin: 0 var(--ds-space-3) 0 0;
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+}
+
+.feed-comments-all,
+.feed-comments-all:visited {
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+  white-space: nowrap;
+}
+
+.feed-comments-all:hover {
+  color: var(--ds-ink);
+}
+
+.feed-comments-list {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  /* Room for the cards' frames and, on a desktop, the scrollbar. */
+  padding: 1px 1px 6px;
+}
+
+.feed-comments-list > .comment-row,
+.feed-comments-list > .comment-row + .comment-row {
+  flex: 0 0 280px;
+  max-width: 80vw;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+}
+
+.feed-comments-list > .comment-row + .comment-row {
+  margin-left: 8px;
+}
+
+.feed-comments-list > .comment-row:hover {
+  border-color: var(--ds-line-strong);
+  background-color: var(--ds-field);
+}
+
+/* Beside a feed a line holds the name and when, and the full handle
+   between them pushed when off the end. The name says who; when is what
+   the list is for. */
+.feed-comments .comment-row-handle {
+  display: none;
+}
+
+/* Two lines a card, so the row is level. The height is for the engines
+   with no line clamp. */
+.feed-comments-list .comment-row-content {
+  -webkit-line-clamp: 2;
+  max-height: 3em;
+}
+
+@media (min-width: 1024px) {
+  .feed-layout.has-comments {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "head side" "grid side";
+    grid-column-gap: var(--space-5);
+    column-gap: var(--space-5);
+    align-items: start;
+  }
+
+  /* The header's own top margin would drop the switch below the heading
+     beside it. */
+  .feed-layout.has-comments > :first-child {
+    grid-area: head;
+    margin-top: 0;
+  }
+
+  .feed-layout.has-comments > :last-child {
+    grid-area: grid;
+  }
+
+  /* It sticks at the top of the content area's padding, which is already
+     the page's distance from the toolbar -- in the macOS app too, where
+     that padding clears the floating toolbar -- so it neither drops below
+     the header beside it nor moves when the grid starts to scroll. */
+  .feed-layout.has-comments > .feed-comments {
+    grid-area: side;
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    max-height: calc(100vh - var(--ds-header-height, 53px) - var(--space-5) - var(--space-4));
+    margin: 0;
+  }
+
+  .feed-layout.has-comments .feed-comments-list {
+    -webkit-box-flex: 1;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-m);
+    background-color: var(--ds-surface);
+  }
+
+  .feed-layout.has-comments .feed-comments-list > .comment-row,
+  .feed-layout.has-comments .feed-comments-list > .comment-row + .comment-row {
+    flex: none;
+    max-width: none;
+    margin-left: 0;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+  }
+
+  .feed-layout.has-comments .feed-comments-list > .comment-row + .comment-row {
+    border-top: 1px solid var(--ds-line);
+  }
+
+  .feed-layout.has-comments .feed-comments-list > .comment-row:hover {
+    background-color: var(--ds-field);
+  }
+
+  .feed-layout.has-comments .feed-comments-list .comment-row-content {
+    -webkit-line-clamp: 3;
+    max-height: 4.5em;
+  }
+
+  /* In the handheld apps the page itself scrolls, under a sticky
+     toolbar, so the column stops below the toolbar rather than under it. */
+  html[data-form="handheld"] .feed-layout.has-comments > .feed-comments {
+    top: calc(var(--ds-header-height, 53px) + var(--space-4));
+    max-height: calc(100vh - var(--ds-header-height, 53px) - 2 * var(--space-4));
   }
 }
 
