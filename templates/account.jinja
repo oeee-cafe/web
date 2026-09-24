@@ -65,9 +65,13 @@
     <section class="settings-group">
       <div class="profile-section-label">{{ ftl_get_message("account-linked-accounts") }}</div>
       <div class="ds-card settings-card">
+        {# A Google account is told apart by its address, which is what
+           Google's own account chooser shows; a name is only a fallback.
+           Steam has no address, and Apple's is often a relay, so theirs
+           lead with the name they gave. #}
         {% for identity in identities %}
           <form method="post" action="/account/identities/{{ identity.provider }}/unlink" class="settings-row">
-            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% elif identity.provider == "apple" %}Apple{% elif identity.provider == "google" %}Google{% else %}{{ identity.provider }}{% endif %}{% if identity.display_hint %}: {{ identity.display_hint }}{% elif identity.email %}: {{ identity.email }}{% endif %}</span>
+            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% elif identity.provider == "apple" %}Apple{% elif identity.provider == "google" %}Google{% else %}{{ identity.provider }}{% endif %}{% if identity.provider == "google" and identity.email %}: {{ identity.email }}{% elif identity.display_hint %}: {{ identity.display_hint }}{% elif identity.email %}: {{ identity.email }}{% endif %}</span>
             <button type="submit" class="ds-button">{{ ftl_get_message("account-unlink") }}</button>
           </form>
         {% else %}

@@ -1864,6 +1864,14 @@ mod template_tests {
             json!([{"provider": "apple", "display_hint": null, "email": "x@privaterelay.appleid.com", "subject": "001234.abc"}]),
         );
         assert!(apple.contains("Apple: x@privaterelay.appleid.com"));
+
+        // Google leads with the address even when it gave a name too.
+        let google = render(
+            true,
+            json!([{"provider": "google", "display_hint": "오이", "email": "oeee@example.test", "subject": "1234"}]),
+        );
+        assert!(google.contains("Google: oeee@example.test"));
+        assert!(!google.contains("Google: 오이"));
         assert!(apple.contains(r#"action="/account/identities/apple/unlink""#));
     }
 
