@@ -69,13 +69,21 @@
   color: #1a1a2e;
 }
 
-/* The play button holds both of its labels, so it keeps one width; the one
-   not in use takes room across and none down. */
-.neo-cucumber-replay-label {
+/* Play, rewind and skip are icons; the play button holds Play and Pause and
+   shows the one it would do. */
+.neo-cucumber-replay-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.neo-cucumber-replay-pause-icon,
+.neo-cucumber-replay-button[data-playing] .neo-cucumber-replay-play-icon {
+  display: none;
+}
+.neo-cucumber-replay-button[data-playing] .neo-cucumber-replay-pause-icon {
   display: block;
 }
-.neo-cucumber-replay-label[aria-hidden="true"] {
-  height: 0;
-  overflow: hidden;
-  visibility: hidden;
+.neo-cucumber-replay-controls :disabled {
+  cursor: default;
+  opacity: 0.5;
 }

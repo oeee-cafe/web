@@ -57,9 +57,60 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+const icon = (name: string, path: string) =>
+  `<svg class="neo-cucumber-replay-icon neo-cucumber-replay-${name}-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${path}"/></svg>`;
+
+/**
+ * The controls as a page renders them before this script has arrived:
+ * everything disabled and nothing to read, because the words are in this
+ * script's catalog and not the server's. Rewind, Play and Skip to end are
+ * one pill, as a player's transport is, and the speeds another. The three
+ * are Material Symbols (skip-previous, play-arrow, pause, skip-next), inline
+ * as the site's toolbar draws them: the viewer has no React for
+ * ../components/Icon, and the page has to draw them before any script. So the
+ * row is one width in every language, and one height; the speeds say the same
+ * thing everywhere.
+ *
+ * templates/replay_controls.jinja is this, written out; embed.browser.test.ts
+ * holds the two to each other. The seek bar starts at its end, the drawing
+ * being finished, and is fine enough to let go of anywhere until the step
+ * count is known.
+ */
+export function controlsMarkup(): string {
+  const button = (control: string, icons: string) =>
+    `<button class="neo-cucumber-replay-button" type="button" data-replay-control="${control}" disabled>${icons}</button>`;
+  const speeds = SPEEDS.map(
+    (speed, index) =>
+      `<button class="neo-cucumber-replay-speed" type="button" aria-pressed="${index === DEFAULT_SPEED_INDEX}" disabled>${speed.label}</button>`
+  ).join("");
+  return (
+    '<div class="neo-cucumber-replay-controls">' +
+    '<input class="neo-cucumber-replay-seek" type="range" min="0" max="1000" value="1000" disabled>' +
+    '<div class="neo-cucumber-replay-buttons">' +
+    '<div class="neo-cucumber-replay-transport ds-segmented">' +
+    button("rewind", icon("rewind", "M5.5 18V6h2v12zm13 0l-9-6l9-6z")) +
+    button("play", icon("play", "M8 19V5l11 7z") + icon("pause", "M14 19V5h4v14zm-8 0V5h4v14z")) +
+    button("skip", icon("skip", "M16.5 18V6h2v12zm-11 0V6l9 6z")) +
+    "</div>" +
+    `<div class="neo-cucumber-replay-speeds ds-segmented">${speeds}</div>` +
+    "</div></div>"
+  );
+}
+
+function buildControls(): HTMLElement {
+  const holder = document.createElement("div");
+  holder.innerHTML = controlsMarkup();
+  return holder.firstChild as HTMLElement;
+}
+
 /**
  * Renders a replay viewer into `container`. Styling hangs off `neo-cucumber-replay-*`
  * class names so the host page keeps control of the look.
+ *
+ * A container that already holds the controls -- a page that rendered them
+ * with the drawing, so nothing moves when this arrives -- keeps them and its
+ * drawing, which becomes the poster; the controls are switched on and given
+ * their words. Otherwise both are made here.
  */
 export function mount(
   container: HTMLElement,
@@ -67,54 +118,49 @@ export function mount(
 ): MountedViewer {
   const labels = labelsFor(options.lang);
   container.classList.add("neo-cucumber-replay");
-  container.textContent = "";
+
+  const existing = container.querySelector<HTMLElement>(".neo-cucumber-replay-controls");
+  const rendered = existing !== null;
+  const controls = existing ?? buildControls();
+  if (!rendered) container.textContent = "";
 
   const status = el("p", "neo-cucumber-replay-status", labels.loading);
-  container.appendChild(status);
 
   const canvas = el("canvas", "neo-cucumber-replay-canvas");
   canvas.width = options.width ?? 300;
   canvas.height = options.height ?? 300;
 
-  const controls = el("div", "neo-cucumber-replay-controls");
-  const seek = el("input", "neo-cucumber-replay-seek") as HTMLInputElement;
-  seek.type = "range";
-  seek.min = "0";
-  seek.value = "0";
-  seek.setAttribute("aria-label", labels.seek);
+  const control = <T extends Element>(selector: string) => {
+    const found = controls.querySelector<T>(selector);
+    if (!found) throw new Error(`replay controls have no ${selector}`);
+    return found;
+  };
+  const seek = control<HTMLInputElement>(".neo-cucumber-replay-seek");
+  const playButton = control<HTMLButtonElement>('[data-replay-control="play"]');
+  const rewindButton = control<HTMLButtonElement>('[data-replay-control="rewind"]');
+  const skipButton = control<HTMLButtonElement>('[data-replay-control="skip"]');
+  const speedButtons = Array.from(
+    controls.querySelectorAll<HTMLButtonElement>(".neo-cucumber-replay-speed")
+  );
 
-  const buttons = el("div", "neo-cucumber-replay-buttons");
-  // Play and Pause are both in the button, the one not in use hidden but
-  // still taking room, so the button is as wide as the wider of them. With
-  // only the current one in it, every press moved the buttons after it --
-  // and on the post page, where the controls can set the stage's width,
-  // resized the drawing too.
-  const playButton = el("button", "neo-cucumber-replay-button");
-  playButton.type = "button";
-  const playLabel = el("span", "neo-cucumber-replay-label", labels.play);
-  const pauseLabel = el("span", "neo-cucumber-replay-label", labels.pause);
-  playButton.append(playLabel, pauseLabel);
+  const name = (node: Element, label: string) => {
+    node.setAttribute("aria-label", label);
+    node.setAttribute("title", label);
+  };
+  seek.setAttribute("aria-label", labels.seek);
+  name(rewindButton, labels.rewind);
+  name(skipButton, labels.skip);
+  // Play and Pause are two icons of one width in one button, so a press
+  // moves nothing after it.
   const showPlaying = (playing: boolean) => {
-    playLabel.setAttribute("aria-hidden", String(playing));
-    pauseLabel.setAttribute("aria-hidden", String(!playing));
+    if (playing) playButton.setAttribute("data-playing", "");
+    else playButton.removeAttribute("data-playing");
+    name(playButton, playing ? labels.pause : labels.play);
   };
   showPlaying(false);
-  const rewindButton = el("button", "neo-cucumber-replay-button", labels.rewind);
-  rewindButton.type = "button";
-  const skipButton = el("button", "neo-cucumber-replay-button", labels.skip);
-  skipButton.type = "button";
-
-  const speeds = el("div", "neo-cucumber-replay-speeds");
-  const speedButtons = SPEEDS.map((speed, index) => {
-    const button = el("button", "neo-cucumber-replay-speed", speed.label);
-    button.type = "button";
-    button.setAttribute("aria-pressed", String(index === DEFAULT_SPEED_INDEX));
-    speeds.appendChild(button);
-    return button;
-  });
-
-  buttons.append(playButton, rewindButton, skipButton, speeds);
-  controls.append(seek, buttons);
+  for (const node of [seek, playButton, rewindButton, skipButton, ...speedButtons]) {
+    node.disabled = false;
+  }
 
   let player: ReplayPlayer | null = null;
   let loading: Promise<ReplayPlayer | null> | null = null;
@@ -127,21 +173,26 @@ export function mount(
     showPlaying(state.playing);
   };
 
-  // With a poster, the drawing stands where the canvas will, the controls
-  // under it, and the seek bar at its end -- the drawing is finished.
+  // With a poster, the drawing stands where the canvas will and the controls
+  // are under it; the page's own drawing, when it rendered one.
   let poster: HTMLImageElement | null = null;
   if (options.poster) {
-    poster = el("img", "neo-cucumber-replay-poster");
-    poster.src = options.poster;
-    poster.alt = "";
-    poster.draggable = false;
-    poster.width = options.width ?? 300;
-    poster.height = options.height ?? 300;
-    // Fine enough to let go of anywhere, until the step count is known.
-    seek.max = "1000";
-    seek.value = "1000";
-    status.remove();
-    container.append(poster, controls);
+    poster = rendered ? container.querySelector("img") : null;
+    if (!poster) {
+      poster = el("img", "");
+      poster.src = options.poster;
+      poster.alt = "";
+      poster.draggable = false;
+      poster.width = options.width ?? 300;
+      poster.height = options.height ?? 300;
+      container.insertBefore(poster, rendered ? controls : null);
+    }
+    poster.classList.add("neo-cucumber-replay-poster");
+    if (!rendered) container.appendChild(controls);
+  } else {
+    // Loading at once: the words say so until the canvas is ready.
+    container.textContent = "";
+    container.appendChild(status);
   }
 
   const load = (): Promise<ReplayPlayer | null> => {

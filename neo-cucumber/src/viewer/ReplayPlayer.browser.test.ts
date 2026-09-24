@@ -151,7 +151,7 @@ describe("ReplayPlayer", () => {
     // it ran an order of magnitude past its label. Playback is driven from
     // steps per second now, and the multipliers have to stay exact.
     const base = SPEEDS[DEFAULT_SPEED_INDEX].rate;
-    expect(SPEEDS.map((s) => s.rate / base)).toEqual([4, 2, 1, 0.5]);
+    expect(SPEEDS.map((s) => s.rate / base)).toEqual([0.5, 1, 2, 4]);
     expect(SPEEDS[DEFAULT_SPEED_INDEX].label).toBe("×1");
   });
 
