@@ -610,6 +610,24 @@ pub fn compress(chunk: &[u8]) -> Result<Vec<u8>, std::io::Error> {
     encoder.finish()
 }
 
+/// `compress`, off the async runtime.
+///
+/// A chunk is a few hundred kilobytes and a whole session's download is
+/// megabytes; either way it is CPU work, and done on a worker thread it
+/// held that thread while every socket the thread was serving waited.
+pub async fn compress_off_thread(chunk: Vec<u8>) -> Result<Vec<u8>, std::io::Error> {
+    tokio::task::spawn_blocking(move || compress(&chunk))
+        .await
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+}
+
+/// `decompress`, off the async runtime, for the same reason.
+async fn decompress_off_thread(stored: Vec<u8>) -> Result<Vec<u8>, std::io::Error> {
+    tokio::task::spawn_blocking(move || decompress(&stored))
+        .await
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+}
+
 /// Restores one, or passes it through when it was stored before compression.
 ///
 /// Decompressed here rather than handed on compressed: what a reader gets is
@@ -745,7 +763,7 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
         let first_seq = entries[0].seq;
         let history_id = entries[0].history_id;
         let count = entries.len();
-        let body = match compress(&encode_chunk(history_id, &entries)) {
+        let body = match compress_off_thread(encode_chunk(history_id, &entries)).await {
             Ok(body) => body,
             Err(e) => {
                 error!("Failed to compress a chunk for room {}: {}", room_uuid, e);
@@ -1235,7 +1253,7 @@ pub async fn download_session(
         async move {
             let object = client.get_object().bucket(bucket).key(&key).send().await?;
             let bytes = object.body.collect().await?.into_bytes();
-            Ok(decompress(&bytes)?)
+            Ok(decompress_off_thread(bytes.to_vec()).await?)
         }
     })
     .await
@@ -1276,7 +1294,7 @@ pub async fn read_tail(
         async move {
             let object = client.get_object().bucket(bucket).key(&key).send().await?;
             let bytes = object.body.collect().await?.into_bytes();
-            Ok(decompress(&bytes)?)
+            Ok(decompress_off_thread(bytes.to_vec()).await?)
         }
     })
     .await?;
