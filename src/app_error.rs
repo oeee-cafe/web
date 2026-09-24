@@ -138,11 +138,13 @@ impl IntoResponse for AppError {
                 "Forbidden".to_string(),
                 true,
             ),
+            // A link to something deleted, or a crawler guessing URLs: the
+            // caller's business, and not worth a Sentry event apiece.
             AppError::NotFound(resource) => (
                 StatusCode::NOT_FOUND,
                 error_codes::NOT_FOUND,
                 format!("{} not found", resource),
-                true,
+                false,
             ),
             AppError::DatabaseError(msg) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -158,7 +160,6 @@ impl IntoResponse for AppError {
                 StatusCode::INTERNAL_SERVER_ERROR => sentry::Level::Error,
                 StatusCode::BAD_REQUEST => sentry::Level::Info,
                 StatusCode::UNAUTHORIZED => sentry::Level::Info,
-                StatusCode::NOT_FOUND => sentry::Level::Info,
                 _ => sentry::Level::Warning,
             };
             sentry::capture_message(&message, sentry_level);
