@@ -3,6 +3,7 @@ import { act, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { useOfflineDrawing } from "../hooks/useOfflineDrawing";
 import type { DrawingState } from "../types/drawing";
+import type { PainterOperation } from "../operations";
 import { drawRegionPreview } from "./regionPreview";
 import type { RegionRect } from "./regionDrag";
 
@@ -13,7 +14,11 @@ const H = 40;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Mounts the real offline stack with a region tool selected. */
-async function mountWithTool(tool: string, extra: Partial<DrawingState> = {}) {
+async function mountWithTool(
+  tool: string,
+  extra: Partial<DrawingState> = {},
+  onOperation?: (operation: PainterOperation) => void,
+) {
   const previews: (RegionRect | null)[] = [];
   const captured: { api: ReturnType<typeof useOfflineDrawing> | null } = { api: null };
 
@@ -29,7 +34,8 @@ async function mountWithTool(tool: string, extra: Partial<DrawingState> = {}) {
     const appRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const api = useOfflineDrawing(canvasRef, appRef, state, undefined, 100, W, H,
-      undefined, undefined, (r: RegionRect | null) => previews.push(r));
+      undefined, undefined, (r: RegionRect | null) => previews.push(r),
+      undefined, undefined, undefined, undefined, false, onOperation);
     useEffect(() => { captured.api = api; });
     return (
       <div id="app" ref={appRef}>
@@ -226,6 +232,26 @@ describe("eraseAll, which acts on the press itself", () => {
 });
 
 describe("the line draw type", () => {
+  it("records the mask the line was drawn through", async () => {
+    // The mask reached the recorder from the freehand press only; a line
+    // never told it, so one drawn with the mask on was recorded unmasked.
+    const { api, send } = await mountWithTool("solid", {
+      drawType: "line", maskType: 1, maskColor: "#ff0000",
+    });
+    await send("pointerdown", 8, 8);
+    await act(async () => { await sleep(20); });
+    await send("pointermove", 40, 30);
+    await send("pointerup", 40, 30);
+
+    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+    const { decodePCH } = await import("./NeoReplay");
+    const frame = decodePCH(bytes)!.items.at(-1)!;
+    expect(frame[0]).toBe("line");
+    // pushCurrent: [verb, layer, r, g, b, a, mask r, g, b, size, mask type]
+    expect(frame.slice(6, 9)).toEqual([255, 0, 0]);
+    expect(frame[10]).toBe(1);
+  });
+
   it("draws a straight line on release and records it", async () => {
     const { api, send, previews } = await mountWithTool("solid", { drawType: "line" });
     const layer = api.drawingEngine!.layers.background;
@@ -304,6 +330,40 @@ describe("the bezier draw type", () => {
     await send("pointerdown", ...c2);
     await send("pointerup", ...c2);           // second handle, commits
   }
+
+  it("records the mask the curve was drawn through", async () => {
+    const { api, send } = await mountWithTool("solid", {
+      drawType: "bezier", maskType: 2, maskColor: "#00ff00",
+    });
+    await buildCurve(send, [20, 8], [40, 8]);
+
+    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+    const { decodePCH } = await import("./NeoReplay");
+    const frame = decodePCH(bytes)!.items.at(-1)!;
+    expect(frame[0]).toBe("bezier");
+    expect(frame.slice(6, 9)).toEqual([0, 255, 0]);
+    expect(frame[10]).toBe(2);
+  });
+
+  it("lands in the pair the painter is aimed at", async () => {
+    // A session lets a participant draw into somebody else's layers. The
+    // curve was rasterised into our own pair while the operation sent for it
+    // named the target's, so the author alone saw it in the wrong place.
+    const { api, send } = await mountWithTool("solid", { drawType: "bezier" });
+    const engine = api.drawingEngine!;
+    engine.setDrawTarget("7");
+    await buildCurve(send, [20, 8], [40, 8]);
+
+    const theirs = engine.layersFor("7").background;
+    const ours = engine.layers.background;
+    const painted = (layer: Uint8ClampedArray) => {
+      let count = 0;
+      for (let i = 3; i < layer.length; i += 4) if (layer[i] > 0) count++;
+      return count;
+    };
+    expect(painted(theirs)).toBeGreaterThan(30);
+    expect(painted(ours)).toBe(0);
+  });
 
   it("commits only on the third release, and records NEO's frame", async () => {
     const { api, send } = await mountWithTool("solid", { drawType: "bezier" });
@@ -415,6 +475,27 @@ describe("copy and paste", () => {
 
   // The gesture -- copy handing over to paste, the drag, the frames NEO
   // reads -- is covered in copyPaste.browser.test.tsx.
+});
+
+describe("the fill tool, in a session", () => {
+  it("emits the fill in the turn it floods", async () => {
+    // The coverage used to be compressed through the browser's streams, so
+    // the operation reached the fork a few milliseconds after the pixels
+    // reached the canvas -- long enough for the next emission, or a
+    // checkpoint request, to get in ahead of it.
+    const emitted: PainterOperation["kind"][] = [];
+    const { canvas } = await mountWithTool("fill", {}, (operation) => {
+      emitted.push(operation.kind);
+    });
+    const box = canvas.getBoundingClientRect();
+    canvas.dispatchEvent(new PointerEvent("pointerdown", {
+      pointerId: 1, pointerType: "mouse", button: 0, buttons: 1,
+      clientX: box.left + 12, clientY: box.top + 12,
+      bubbles: true, cancelable: true,
+    }));
+    // Nothing awaited: the press is still on the stack.
+    expect(emitted).toContain("fill-region");
+  });
 });
 
 describe("the text tool", () => {

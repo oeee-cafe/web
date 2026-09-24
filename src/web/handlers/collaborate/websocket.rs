@@ -113,6 +113,26 @@ struct PendingReset {
     accepted: bool,
 }
 
+impl PendingReset {
+    /// Takes one snapshot off the wire. Returns true the moment the upload
+    /// has grown past what a checkpoint may weigh: from then on it is
+    /// counted off and dropped like an unselected uploader's, so one
+    /// connection cannot make the process hold 510 snapshots of 4 MiB.
+    fn take_snapshot(&mut self, data: &[u8]) -> bool {
+        if !self.accepted {
+            return false;
+        }
+        self.bytes += data.len();
+        if self.bytes as u64 > redis_messages::MAX_CHECKPOINT_BYTES {
+            self.accepted = false;
+            self.payloads = Vec::new();
+            return true;
+        }
+        self.payloads.push(data.to_vec());
+        false
+    }
+}
+
 pub async fn websocket_collaborate_handler(
     Path(room_uuid): Path<Uuid>,
     auth_session: AuthSession,
@@ -754,6 +774,54 @@ fn accepted_resume_sequence(
 }
 
 #[cfg(test)]
+mod reset_upload_tests {
+    use super::PendingReset;
+    use crate::web::handlers::collaborate::protocol::MAX_SNAPSHOT_BYTES;
+    use crate::web::handlers::collaborate::redis_messages::MAX_CHECKPOINT_BYTES;
+
+    fn upload(accepted: bool) -> PendingReset {
+        PendingReset { base_seq: 7, remaining: 510, payloads: Vec::new(), bytes: 0, accepted }
+    }
+
+    #[test]
+    fn keeps_a_checkpoint_of_the_largest_legal_size() {
+        let mut reset = upload(true);
+        let snapshot = vec![0u8; MAX_SNAPSHOT_BYTES];
+        let fits = (MAX_CHECKPOINT_BYTES as usize) / MAX_SNAPSHOT_BYTES;
+        for _ in 0..fits {
+            assert!(!reset.take_snapshot(&snapshot));
+        }
+        assert!(reset.accepted);
+        assert_eq!(reset.payloads.len(), fits);
+    }
+
+    #[test]
+    fn drops_the_upload_the_moment_it_outweighs_a_checkpoint() {
+        let mut reset = upload(true);
+        let snapshot = vec![0u8; MAX_SNAPSHOT_BYTES];
+        let fits = (MAX_CHECKPOINT_BYTES as usize) / MAX_SNAPSHOT_BYTES;
+        for _ in 0..fits {
+            reset.take_snapshot(&snapshot);
+        }
+        assert!(reset.take_snapshot(&[0u8; 1]));
+        assert!(!reset.accepted);
+        // Nothing is held for an upload that will not be applied, and the
+        // snapshots that follow are counted off without being kept.
+        assert!(reset.payloads.is_empty());
+        assert!(!reset.take_snapshot(&snapshot));
+        assert!(reset.payloads.is_empty());
+    }
+
+    #[test]
+    fn an_unselected_upload_is_never_kept() {
+        let mut reset = upload(false);
+        assert!(!reset.take_snapshot(&[0u8; 64]));
+        assert!(reset.payloads.is_empty());
+        assert_eq!(reset.bytes, 0);
+    }
+}
+
+#[cfg(test)]
 mod forwarding_tests {
     use super::{accepted_resume_sequence, should_forward_to_connection};
     use crate::web::handlers::collaborate::redis_state::RoomBroadcast;
@@ -1044,23 +1112,14 @@ async fn handle_incoming_messages(
             // state; only late joiners replay the reset)
             if let Some(reset) = pending_reset.as_mut() {
                 if data.first() == Some(&(messages::MessageType::Snapshot as u8)) {
-                    if reset.accepted {
-                        reset.bytes += data.len();
-                        if reset.bytes as u64 > redis_messages::MAX_CHECKPOINT_BYTES {
-                            // Heavier than any checkpoint a room this size can
-                            // make. The rest of the upload is still counted off
-                            // the wire, as an unselected uploader's is, and the
-                            // room is freed to ask somebody else.
-                            warn!(
-                                "Discarding a checkpoint over {} bytes from connection {} in room {}",
-                                redis_messages::MAX_CHECKPOINT_BYTES, ctx.connection_id, ctx.room_uuid
-                            );
-                            reset.accepted = false;
-                            reset.payloads = Vec::new();
-                            let _ = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await;
-                        } else {
-                            reset.payloads.push(data.to_vec());
-                        }
+                    if reset.take_snapshot(data) {
+                        // Heavier than any checkpoint a room this size can
+                        // make. The room is freed to ask somebody else.
+                        warn!(
+                            "Discarding a checkpoint over {} bytes from connection {} in room {}",
+                            redis_messages::MAX_CHECKPOINT_BYTES, ctx.connection_id, ctx.room_uuid
+                        );
+                        let _ = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await;
                     }
                     reset.remaining -= 1;
                     if reset.remaining == 0 {

@@ -103,6 +103,29 @@ describe("interactive previews against canonical NEO", () => {
     ]);
   });
 
+  it("composites every visible participant, latest joiner at the bottom", () => {
+    // What is on screen in a session is the whole stack. An outline computed
+    // against our own pair alone came out wrong wherever somebody above us
+    // had drawn.
+    const engine = new DrawingEngine(W, H);
+    engine.setLocalOwner("1");
+    engine.attachDOMCanvases(context().canvas, context().canvas, "1");
+    const theirs = context();
+    theirs.fillStyle = "black";
+    theirs.fillRect(0, 0, W, H);
+    engine.attachDOMCanvases(theirs.canvas, context().canvas, "2");
+
+    const both = previewBackdrop(engine, W, H, 1, true, true);
+    // Participant 2's pair first -- they joined later and sit underneath.
+    expect(both.layers).toHaveLength(4);
+    expect(both.layers[0][3]).toBe(255);
+    expect(both.layers[2][3]).toBe(0);
+
+    const hidden = previewBackdrop(engine, W, H, 1, true, true, new Set(["2"]));
+    expect(hidden.layers).toHaveLength(2);
+    expect(hidden.layers.every((layer) => layer[3] === 0)).toBe(true);
+  });
+
   it("draws the straight-line cursor exactly", () => {
     const from = { x: 3, y: 46 };
     const to = { x: 68, y: 4 };
