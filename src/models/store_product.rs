@@ -20,10 +20,14 @@
 //! and a purchase made outside the window counts all the same. Every query
 //! below that asks what is offered spells the window out the same way.
 //!
-//! **A product's year does not change.** It is what a purchase is credited
-//! with, and changing it would quietly move every purchase already made
-//! from one year to another. A different year is a different product.
+//! **A product's year is what its purchases count for.** It is set when the
+//! product is added and can be corrected at /admin/store, and a correction
+//! moves every purchase already made of it to the new year with it
+//! ([`set_details`]) -- a purchase is credited with the catalogue's year, and
+//! a purchase recorded again after a restore would take the new one anyway.
+//! The page says how many purchases a change will move before it is made.
 
+use std::collections::HashMap;
 use std::sync::RwLock;
 
 use anyhow::Result;
@@ -184,6 +188,65 @@ pub async fn add(
     .await?
     .rows_affected();
     Ok(added == 1)
+}
+
+/// Sets a product's year and its button's words, `None` for the usual
+/// words, and moves every purchase of it to that year. `None` when there is
+/// no such product; otherwise how many purchases were moved.
+pub async fn set_details(
+    tx: &mut Transaction<'_, Postgres>,
+    store: Store,
+    product: &str,
+    year: i32,
+    label: Option<&str>,
+) -> Result<Option<u64>> {
+    let changed = query!(
+        "UPDATE store_products SET year = $3, label = $4 WHERE store = $1 AND product = $2",
+        store.as_str(),
+        product,
+        year,
+        label,
+    )
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    if changed == 0 {
+        return Ok(None);
+    }
+    let moved = query!(
+        r#"
+        UPDATE supporter_purchases SET year = $3
+        WHERE store = $1 AND product = $2 AND year <> $3
+        "#,
+        store.as_str(),
+        product,
+        year,
+    )
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    Ok(Some(moved))
+}
+
+/// How many purchases each product has, refunded ones included, keyed by
+/// store and product: what a change of year would move. A product nobody
+/// has bought is not in it.
+pub async fn purchase_counts(
+    tx: &mut Transaction<'_, Postgres>,
+) -> Result<HashMap<(String, String), i64>> {
+    let rows = query!(
+        r#"
+        SELECT store, product, count(*) AS "count!"
+        FROM supporter_purchases
+        GROUP BY store, product
+        "#,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| ((row.store, row.product), row.count))
+        .collect())
 }
 
 /// Puts a product on sale or takes it off. `false` when there is no such
@@ -427,7 +490,8 @@ mod tests {
     }
 
     /// Adding a product that is already there changes nothing: its year is
-    /// what its purchases were credited with.
+    /// what its purchases were credited with, and correcting it is
+    /// [`set_details`]'s, which says what it moves.
     #[tokio::test]
     async fn a_product_is_added_once_and_keeps_its_year() {
         let Some(mut tx) = tx().await else { return };
@@ -452,6 +516,123 @@ mod tests {
         assert!(
             !found.on_sale,
             "still off sale: the import does not put it back"
+        );
+        tx.rollback().await.unwrap();
+    }
+
+    /// Correcting a year takes the product's purchases with it, and says how
+    /// many; the button's words are set or cleared with it. Another store's
+    /// product of the same id is not touched.
+    #[tokio::test]
+    async fn a_year_is_corrected_with_its_purchases() {
+        use crate::models::supporter::record_purchase;
+        let Some(mut tx) = tx().await else { return };
+        let product = "cafe.oeee.test.fix";
+        add(&mut tx, Store::Apple, product, 2026, None).await.unwrap();
+        add(&mut tx, Store::Google, product, 2026, None).await.unwrap();
+        let buyer = query!(
+            "INSERT INTO users (login_name, display_name, password_hash)
+             VALUES ('store_product_fix', 'store_product_fix', 'x') RETURNING id"
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+        .id;
+        let bought = OwnedProduct {
+            product: product.to_string(),
+            year: 2026,
+        };
+        for owner in ["t1", "t2"] {
+            record_purchase(&mut tx, buyer, Store::Apple, owner, &bought, true)
+                .await
+                .unwrap();
+        }
+        record_purchase(&mut tx, buyer, Store::Google, "g1", &bought, true)
+            .await
+            .unwrap();
+
+        let moved = set_details(&mut tx, Store::Apple, product, 2027, Some("Buy 2027"))
+            .await
+            .unwrap();
+        assert_eq!(moved, Some(2));
+        let found = find(&mut tx, Store::Apple, product).await.unwrap().unwrap();
+        assert_eq!((found.year, found.label.as_deref()), (2027, Some("Buy 2027")));
+        let years: Vec<(String, i32)> = query!(
+            "SELECT store, year FROM supporter_purchases WHERE product = $1 ORDER BY store, owner",
+            product
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| (row.store, row.year))
+        .collect();
+        assert_eq!(
+            years,
+            [
+                ("apple".to_string(), 2027),
+                ("apple".to_string(), 2027),
+                ("google".to_string(), 2026)
+            ]
+        );
+        let counts = purchase_counts(&mut tx).await.unwrap();
+        assert_eq!(counts.get(&("apple".to_string(), product.to_string())), Some(&2));
+
+        // There and back, beside another product already counting for that
+        // year: each product's purchases move with it and no further, so the
+        // round trip leaves everything as it was.
+        add(&mut tx, Store::Apple, "cafe.oeee.test.next", 2027, None)
+            .await
+            .unwrap();
+        let next = OwnedProduct {
+            product: "cafe.oeee.test.next".to_string(),
+            year: 2027,
+        };
+        record_purchase(&mut tx, buyer, Store::Apple, "t3", &next, true)
+            .await
+            .unwrap();
+        assert_eq!(
+            set_details(&mut tx, Store::Apple, product, 2026, Some("Buy 2027"))
+                .await
+                .unwrap(),
+            Some(2)
+        );
+        let by_product: Vec<(String, i32)> = query!(
+            "SELECT product, year FROM supporter_purchases
+             WHERE store = 'apple' AND user_id = $1 ORDER BY owner",
+            buyer
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| (row.product, row.year))
+        .collect();
+        assert_eq!(
+            by_product,
+            [
+                (product.to_string(), 2026),
+                (product.to_string(), 2026),
+                ("cafe.oeee.test.next".to_string(), 2027)
+            ]
+        );
+        set_details(&mut tx, Store::Apple, product, 2027, Some("Buy 2027"))
+            .await
+            .unwrap();
+
+        // Only the words: nothing moves, and they can be taken away again.
+        assert_eq!(
+            set_details(&mut tx, Store::Apple, product, 2027, None).await.unwrap(),
+            Some(0)
+        );
+        let found = find(&mut tx, Store::Apple, product).await.unwrap().unwrap();
+        assert_eq!(found.label, None);
+
+        assert_eq!(
+            set_details(&mut tx, Store::Apple, "cafe.oeee.no.such", 2027, None)
+                .await
+                .unwrap(),
+            None
         );
         tx.rollback().await.unwrap();
     }

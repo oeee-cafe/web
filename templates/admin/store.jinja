@@ -48,8 +48,7 @@
             <thead>
               <tr>
                 <th>Product</th>
-                <th>Year</th>
-                <th>Button</th>
+                <th>Year and button</th>
                 <th>Added</th>
                 <th>On sale</th>
                 <th></th>
@@ -61,10 +60,31 @@
                 <tr>
                   <td><code>{{ product.product }}</code></td>
                   <td>
-                    {% if product.year == this_year %}<strong>{{ product.year }}</strong>{% else %}{{ product.year }}{% endif %}
-                  </td>
-                  <td>
-                    {% if product.label %}{{ product.label }}{% else %}<span class="muted">the usual words</span>{% endif %}
+                    {# A year is what the product's purchases count for, so
+                       changing it moves them too; the count is said before
+                       the press rather than after. #}
+                    <form class="admin-product-details"
+                          method="post"
+                          action="/admin/store/{{ product.store|urlencode }}/{{ product.product|urlencode }}/details">
+                      <input type="number"
+                             name="year"
+                             value="{{ product.year }}"
+                             class="admin-product-year{% if product.year == this_year %} admin-product-this-year{% endif %}"
+                             aria-label="Year" />
+                      <input type="text"
+                             name="label"
+                             value="{{ product.label or '' }}"
+                             maxlength="100"
+                             placeholder="the usual words"
+                             aria-label="Button" />
+                      <button type="submit" class="ds-button ds-button-small">Save</button>
+                    </form>
+                    {% if product.purchases > 0 %}
+                      <p class="ds-help admin-product-purchases">
+                        {{ product.purchases }} {% if product.purchases == 1 %}purchase{% else %}purchases{% endif %}
+                        counted for {{ product.year }}; a new year moves {% if product.purchases == 1 %}it{% else %}them{% endif %} too.
+                      </p>
+                    {% endif %}
                   </td>
                   <td>{{ product.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
                   <td>
@@ -118,8 +138,8 @@
       <legend>Add a product</legend>
       <p class="ds-help">
         The store's own id: an App Store product id, a Google Play product id,
-        a Microsoft Store ID, or a Steam DLC's app id. Its year cannot be
-        changed after it is added.
+        a Microsoft Store ID, or a Steam DLC's app id. Its year and button can
+        be changed in the table after it is added; its id cannot.
       </p>
       <div class="admin-fields">
         <label>

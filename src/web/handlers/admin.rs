@@ -14,6 +14,7 @@ use crate::models::admin::{
 use crate::web::handlers::collaborate::preview::preview_versions;
 use crate::models::store_product::{
     self, add as add_store_product, find as find_store_product, list_all as list_store_products,
+    purchase_counts as store_purchase_counts, set_details as set_store_product_details,
     set_on_sale as set_store_product_on_sale, set_sale_window as set_store_product_sale_window,
     StoreProduct,
 };
@@ -923,6 +924,8 @@ struct StoreProductRow {
     product: StoreProduct,
     sale_starts_local: String,
     sale_ends_local: String,
+    /// How many purchases it has, which a change of year moves with it.
+    purchases: i64,
 }
 
 /// The time zone /admin/store is read and written in, as its dates are
@@ -1002,8 +1005,32 @@ fn sensible_years() -> std::ops::RangeInclusive<i32> {
     2020..=current_year() + 5
 }
 
-/// A product ready to add, or why not. Its year cannot be changed once it
-/// is in, so this is the one place it is looked at.
+/// A year a product may count for, or why not.
+fn validate_year(year: &str) -> Result<i32, String> {
+    year.trim()
+        .parse::<i32>()
+        .ok()
+        .filter(|year| sensible_years().contains(year))
+        .ok_or_else(|| {
+            let years = sensible_years();
+            format!(
+                "The year has to be between {} and {}.",
+                years.start(),
+                years.end()
+            )
+        })
+}
+
+/// A button's own words, `None` for the usual ones, or why not.
+fn validate_label(label: &str) -> Result<Option<String>, String> {
+    let label = label.trim();
+    if label.chars().count() > 100 {
+        return Err("A button label is a hundred characters at most.".to_string());
+    }
+    Ok((!label.is_empty()).then(|| label.to_string()))
+}
+
+/// A product ready to add, or why not.
 fn validate_store_product(
     form: &AddStoreProductForm,
     steam_app_id: Option<u32>,
@@ -1041,25 +1068,8 @@ fn validate_store_product(
             );
         }
     }
-    let year = form
-        .year
-        .trim()
-        .parse::<i32>()
-        .ok()
-        .filter(|year| sensible_years().contains(year))
-        .ok_or_else(|| {
-            let years = sensible_years();
-            format!(
-                "The year has to be between {} and {}.",
-                years.start(),
-                years.end()
-            )
-        })?;
-    let label = form.label.trim();
-    if label.chars().count() > 100 {
-        return Err("A button label is a hundred characters at most.".to_string());
-    }
-    let label = (!label.is_empty()).then(|| label.to_string());
+    let year = validate_year(&form.year)?;
+    let label = validate_label(&form.label)?;
     Ok((store, product.to_string(), year, label))
 }
 
@@ -1072,6 +1082,7 @@ async fn render_store_page(
 ) -> Result<String, AppError> {
     let mut tx = state.db_pool.begin().await?;
     let mut products = list_store_products(&mut tx).await?;
+    let counts = store_purchase_counts(&mut tx).await?;
     let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
     tx.commit().await?;
 
@@ -1088,6 +1099,10 @@ async fn render_store_page(
                     .map(|product| StoreProductRow {
                         sale_starts_local: to_local_input(product.sale_starts_at),
                         sale_ends_local: to_local_input(product.sale_ends_at),
+                        purchases: counts
+                            .get(&(product.store.clone(), product.product.clone()))
+                            .copied()
+                            .unwrap_or(0),
                         product,
                     })
                     .collect()
@@ -1163,7 +1178,7 @@ pub async fn admin_add_store_product(
     if !added {
         return refused(
             format!(
-                "{} already has {product}. A product keeps its year; to stop selling it, take it off sale.",
+                "{} already has {product}. Change its year or button in the table; to stop selling it, take it off sale.",
                 store.as_str()
             ),
             form,
@@ -1276,6 +1291,67 @@ pub async fn admin_set_store_product_sale_window(
         "changed when a product is sold"
     );
     store_product::refresh_any_on_sale(&state.db_pool).await?;
+    Ok(Redirect::to("/admin/store").into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StoreProductDetailsForm {
+    #[serde(default)]
+    pub year: String,
+    #[serde(default)]
+    pub label: String,
+}
+
+/// POST /admin/store/:store/:product/details -- corrects a product's year
+/// and its button's words. A new year moves every purchase of it with it
+/// (`store_product::set_details`); the table says how many before the
+/// button is pressed. Turned away, the page comes back with why.
+pub async fn admin_set_store_product_details(
+    admin: AdminUser,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path((store, product)): Path<(String, String)>,
+    headers: HeaderMap,
+    Form(form): Form<StoreProductDetailsForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let Some(store) = Store::parse(&store) else {
+        return Err(AppError::NotFound("Store".to_string()));
+    };
+    let valid = validate_year(&form.year)
+        .and_then(|year| validate_label(&form.label).map(|label| (year, label)));
+    let (year, label) = match valid {
+        Ok(valid) => valid,
+        Err(error) => {
+            let rendered = render_store_page(
+                &state,
+                &admin,
+                ftl_lang,
+                Some(format!("{product}: {error}")),
+                AddStoreProductForm::default(),
+            )
+            .await?;
+            return Ok((StatusCode::BAD_REQUEST, Html(rendered)).into_response());
+        }
+    };
+    let mut tx = state.db_pool.begin().await?;
+    let Some(moved) =
+        set_store_product_details(&mut tx, store, &product, year, label.as_deref()).await?
+    else {
+        return Err(AppError::NotFound("Product".to_string()));
+    };
+    tx.commit().await?;
+    tracing::info!(
+        admin = %admin.0.login_name,
+        store = store.as_str(),
+        product,
+        year,
+        ?label,
+        moved,
+        "changed a product's year or button"
+    );
     Ok(Redirect::to("/admin/store").into_response())
 }
 
@@ -1891,7 +1967,7 @@ mod tests {
                          "label": null, "on_sale": true, "selling_now": false,
                          "sale_starts_at": "2026-01-01T00:00:00Z", "sale_ends_at": null,
                          "sale_starts_local": "2026-01-01T09:00", "sale_ends_local": "",
-                         "created_at": "2026-01-01T00:00:00Z"},
+                         "purchases": 3, "created_at": "2026-01-01T00:00:00Z"},
                         {"store": "apple", "product": "cafe.oeee.supporter.2025", "year": 2025,
                          "label": "Last year's", "on_sale": false, "created_at": "2025-01-01T00:00:00Z"},
                     ]},
@@ -1933,6 +2009,15 @@ mod tests {
         assert!(rendered.contains(r#"href="/admin/store""#), "in the nav");
         assert!(rendered.contains("[microsoft_store]"), "says the store cannot be asked");
         assert!(rendered.contains("[google_play]"), "and this one");
+        // The year and the words, changed together, and what a new year moves.
+        assert!(rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/details""#));
+        assert!(rendered.contains("admin-product-this-year"), "this year stands out");
+        assert!(
+            rendered.contains(r#"value="Last year&#x27;s""#)
+                || rendered.contains(r#"value="Last year's""#),
+            "the words are there to change"
+        );
+        assert!(rendered.contains("3 purchases"), "says what a new year would move");
         assert!(rendered.contains(r#"name="year" value="2026""#), "this year by default");
         assert!(!rendered.contains("Not added"));
     }
