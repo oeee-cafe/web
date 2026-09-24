@@ -496,6 +496,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     emitOperation,
     isDrawingRef,
     setInteractionSuspended,
+    flushPendingStroke,
   } = useOfflineDrawing(
     tempLocalUserCanvasRef,
     appRef,
@@ -526,6 +527,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     placement,
   );
   previewEngineRef.current = drawingEngine ?? null;
+  const flushPendingStrokeRef = useRef(flushPendingStroke);
+  flushPendingStrokeRef.current = flushPendingStroke;
   strokeActiveRef.current = isDrawingRef;
 
   useEffect(() => {
@@ -535,13 +538,17 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     }
     const history = new CanvasHistory(drawingEngine, handleHistoryChange);
     history.setLocalUserId(localActorIdRef.current);
+    history.setLocalWork({
+      drawing: () => isDrawingRef.current,
+      flush: () => flushPendingStrokeRef.current(),
+    });
     synchronizationHistoryRef.current = history;
     return () => {
       if (synchronizationHistoryRef.current === history) {
         synchronizationHistoryRef.current = null;
       }
     };
-  }, [drawingEngine, synchronization, handleHistoryChange]);
+  }, [drawingEngine, synchronization, handleHistoryChange, isDrawingRef]);
 
   const readinessRef = useRef<{
     promise: Promise<void>;

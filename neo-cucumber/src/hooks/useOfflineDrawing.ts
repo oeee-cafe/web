@@ -817,6 +817,8 @@ export const useOfflineDrawing = (
   // Return enhanced interface with replay functionality
   return {
     ...baseDrawing,
+    /** Hands the stroke in progress over now rather than at the next chunk. */
+    flushPendingStroke: flushStrokeChunk,
     undo: wrappedUndo,
     redo: wrappedRedo,
     getReplayBlob: () =>
