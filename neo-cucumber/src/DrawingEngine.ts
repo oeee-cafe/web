@@ -1257,7 +1257,9 @@ export class DrawingEngine {
       DrawingEngine.lineTypeFor(brushType)
     );
     this.neo.prevLine = null;
-    if (!target) this.queueLayerRegionUpdate(layer);
+    // Whoever's buffer it was, as every other kernel here does: a bezier
+    // aimed at another participant's layers is on screen too.
+    this.queueUpdateIfLive(target ?? this.layers[layer]);
   }
 
   /**
