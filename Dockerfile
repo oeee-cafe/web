@@ -60,10 +60,19 @@ FROM scratch AS debug-files
 COPY --from=rust-builder /app/oeee-cafe.debug /
 
 # Build runtime image. The last stage, so it is what a plain `docker build` makes.
-FROM ubuntu:25.10
+#
+# A glibc at least as new as rust-builder's (bookworm, 2.36) is all the binary
+# asks of it. This was ubuntu:25.10 until it was noticed that an interim
+# release had gone out of support months before and was getting no security
+# updates; a Debian stable does not do that without a year's warning.
+FROM debian:trixie-slim
 WORKDIR /app
-# curl is what the compose healthcheck shells out to.
-RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
+# libssl3t64 is linked by the binary (see `ldd oeee-cafe`). It used to arrive
+# only as a dependency of curl, which is what the compose healthcheck shells
+# out to, so it is named here in its own right.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl libssl3t64 && \
+    rm -rf /var/lib/apt/lists/*
 COPY tegaki/ ./tegaki/
 COPY locales/ ./locales/
 COPY static/ ./static/
