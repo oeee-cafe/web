@@ -240,7 +240,7 @@ export class FakeServer {
  * Puts the page's surroundings in place: the sign-in, the session's
  * metadata, the room's URL, and a `WebSocket` that is one of ours.
  */
-export function installRoom(options: { ownerId?: string } = {}) {
+export function installRoom(options: { ownerId?: string; ended?: boolean } = {}) {
   sockets = [];
   RealWebSocket = globalThis.WebSocket;
   realFetch = globalThis.fetch;
@@ -259,6 +259,7 @@ export function installRoom(options: { ownerId?: string } = {}) {
           title: "", width: WIDTH, height: HEIGHT,
           ownerId: options.ownerId ?? "oeee-uuid", ownerLoginName: "oeee",
           savedPostId: null, maxUsers: 8, currentUserCount: 1,
+          ended: options.ended ?? false,
         }),
         { status: 200 },
       );
@@ -276,6 +277,22 @@ export function uninstallRoom() {
   host = null;
   globalThis.WebSocket = RealWebSocket;
   globalThis.fetch = realFetch;
+}
+
+/** Mounts the session view without waiting for a socket. */
+export async function mountPage(): Promise<void> {
+  setupI18n("en");
+  host = document.createElement("div");
+  document.body.appendChild(host);
+  await act(async () => {
+    root = createRoot(host!);
+    root.render(
+      <I18nProvider i18n={i18n} defaultComponent={DefaultI18n}>
+        <App />
+      </I18nProvider>,
+    );
+  });
+  await settle();
 }
 
 /** Mounts the session view and returns the socket it opened. */

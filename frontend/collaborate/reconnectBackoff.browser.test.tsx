@@ -70,6 +70,7 @@ const canvasMeta: CollaborationMeta = {
   ownerLoginName: "owner",
   maxUsers: 8,
   currentUserCount: 1,
+  ended: false,
 };
 
 /**

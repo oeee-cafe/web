@@ -525,7 +525,11 @@ impl App {
             .route("/collaborate/", get(serve_collaborative_app))
             .route(
                 "/collaborate/{uuid}",
-                get(serve_collaborative_app).post(save_collaborative_session),
+                get(serve_collaborative_app)
+                    .post(save_collaborative_session)
+                    .layer(DefaultBodyLimit::max(
+                        crate::web::handlers::collaborate::http_handlers::MAX_SAVE_BYTES,
+                    )),
             )
             .route("/collaborate/{uuid}/ws", get(websocket_collaborate_handler))
             // What the room's canvas looks like right now, rendered by a

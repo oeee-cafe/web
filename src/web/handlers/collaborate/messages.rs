@@ -590,8 +590,35 @@ pub async fn handle_end_session_message(data: &[u8], ctx: EndSessionContext<'_>)
         ctx.user_login_name, ctx.room_uuid, post_url
     );
 
+    finish_session(
+        ctx.state,
+        ctx.room_uuid,
+        ctx.user_id,
+        &post_url,
+        ctx.connection_id,
+    )
+    .await;
+}
+
+/// Ends a saved session for everybody: the end time, the sealed recording,
+/// the room's Redis state, the lobby preview, and the END_SESSION that sends
+/// every participant to the post.
+///
+/// Run by the save itself, not only on the owner's END_SESSION frame. Waiting
+/// for that frame left a room open whenever it was lost -- the owner's socket
+/// closed or reconnecting in the seconds after the save, the tab gone -- with
+/// the others drawing into a canvas that would never be saved, the lobby
+/// still listing it, and no way for the owner back in: a second save is
+/// refused and a reload sends them to the post.
+pub async fn finish_session(
+    state: &AppState,
+    room_uuid: Uuid,
+    owner_id: Uuid,
+    post_url: &str,
+    from_connection: &str,
+) {
     // Set collaborative_sessions.ended_at
-    if let Err(e) = db::end_session(ctx.db, ctx.room_uuid).await {
+    if let Err(e) = db::end_session(&state.db_pool, room_uuid).await {
         // END_SESSION is the client's acknowledgement. Do
         // not publish it unless the authoritative database
         // transition succeeded, or every participant would
@@ -603,57 +630,56 @@ pub async fn handle_end_session_message(data: &[u8], ctx: EndSessionContext<'_>)
     // Before the cleanup below: sealing reads the
     // participant map, and that map is one of the keys
     // that goes.
-    super::archive::seal_room(ctx.state, ctx.room_uuid, true).await;
+    super::archive::seal_room(state, room_uuid, true).await;
 
     // Clean up Redis message history when session is explicitly ended
-    let redis_store = redis_messages::RedisMessageStore::new(ctx.state.redis_pool.clone());
-    if let Err(e) = redis_store.cleanup_room(ctx.room_uuid).await {
+    let redis_store = redis_messages::RedisMessageStore::new(state.redis_pool.clone());
+    if let Err(e) = redis_store.cleanup_room(room_uuid).await {
         error!(
             "Failed to cleanup Redis for ended session {}: {}",
-            ctx.room_uuid, e
+            room_uuid, e
         );
     } else {
         info!(
             "Cleaned up Redis message history for ended session {}",
-            ctx.room_uuid
+            room_uuid
         );
     }
 
     // And the lobby preview, which is about a canvas that
     // is now a post.
-    let preview_store = super::preview::PreviewStore::new(ctx.state.redis_pool.clone());
-    if let Err(e) = preview_store.cleanup(ctx.room_uuid).await {
+    let preview_store = super::preview::PreviewStore::new(state.redis_pool.clone());
+    if let Err(e) = preview_store.cleanup(room_uuid).await {
         error!(
             "Failed to cleanup the preview for ended session {}: {}",
-            ctx.room_uuid, e
+            room_uuid, e
         );
     }
 
     // Broadcast END_SESSION to all participants in the room (including sender) via Redis pub/sub
     let room_message = super::redis_state::RoomBroadcast {
-        from_connection: ctx.connection_id.to_string(),
+        from_connection: from_connection.to_string(),
         target_connection: None,
         seq: None,
         history_id: None,
-        payload: end_session_frame(ctx.user_id, &post_url),
+        payload: end_session_frame(owner_id, post_url),
     };
 
-    match ctx
-        .state
+    match state
         .redis_state
-        .publish_message(ctx.room_uuid, &room_message)
+        .publish_message(room_uuid, &room_message)
         .await
     {
         Ok(subscriber_count) => {
             info!(
                 "Broadcasted END_SESSION to {} subscribers in room {}",
-                subscriber_count, ctx.room_uuid
+                subscriber_count, room_uuid
             );
         }
         Err(e) => {
             error!(
                 "Failed to publish END_SESSION message for room {}: {}",
-                ctx.room_uuid, e
+                room_uuid, e
             );
         }
     }

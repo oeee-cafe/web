@@ -74,4 +74,7 @@ pub struct CollaborationMeta {
     pub max_users: i32,
     #[serde(rename = "currentUserCount")]
     pub current_user_count: i64,
+    /// Over, saved or not. The page shows the session-over dialog rather
+    /// than opening a socket the server would refuse.
+    pub ended: bool,
 }

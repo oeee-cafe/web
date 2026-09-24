@@ -360,7 +360,12 @@ async fn feed_batch(
 ) -> Result<axum::response::Response, AppError> {
     let mut tx = state.db_pool.begin().await?;
     let posts = feed
-        .posts(&mut tx, auth_session.user.as_ref(), query.limit, query.offset)
+        .posts(
+            &mut tx,
+            auth_session.user.as_ref(),
+            query.batch_limit(),
+            query.offset,
+        )
         .await?;
     tx.commit().await?;
 
@@ -407,6 +412,15 @@ pub struct LoadMoreQuery {
     pub limit: i64,
     /// The month the previous batch ended in (feed_context).
     pub period: Option<String>,
+}
+
+impl LoadMoreQuery {
+    /// The batch size, held to what a page asks for. Taken as sent, a
+    /// `limit` of a million rendered every post through the card template
+    /// in one response, and a negative one was a database error.
+    pub fn batch_limit(&self) -> i64 {
+        self.limit.clamp(1, HOME_POSTS_PER_BATCH)
+    }
 }
 
 pub async fn load_more_public_posts(

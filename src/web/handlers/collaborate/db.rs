@@ -273,7 +273,7 @@ pub async fn saved_post_path(
 
 pub async fn end_session(db: &Pool<Postgres>, room_uuid: Uuid) -> Result<(), sqlx::Error> {
     sqlx::query!(
-        "UPDATE collaborative_sessions SET ended_at = NOW() WHERE id = $1",
+        "UPDATE collaborative_sessions SET ended_at = NOW() WHERE id = $1 AND ended_at IS NULL",
         room_uuid
     )
     .execute(db)
@@ -309,6 +309,38 @@ pub async fn save_session_to_post(
     png_data: Vec<u8>,
     state: AppState,
 ) -> Result<(Uuid, String), Box<dyn std::error::Error + Send + Sync>> {
+    // The image goes up before the row is locked. Its key is its own hash,
+    // so a put is idempotent and an upload nobody then references is at
+    // worst an unreferenced object -- where a put inside the transaction
+    // held the session row, and with it every join to the room, for the
+    // length of a network upload.
+    let image_sha256 = sha256::digest(&png_data);
+
+    let s3_client = super::archive::s3_client(&state.config);
+
+    // SHA256 is always 64 hex characters, but let's be safe about accessing them
+    let s3_key = if image_sha256.len() >= 2 {
+        format!(
+            "image/{}{}/{}.png",
+            &image_sha256[0..1],
+            &image_sha256[1..2],
+            image_sha256
+        )
+    } else {
+        // This should never happen with valid SHA256, but handle gracefully
+        return Err("Invalid SHA256 hash: too short".into());
+    };
+
+    s3_client
+        .put_object()
+        .bucket(&state.config.aws_s3_bucket)
+        .key(&s3_key)
+        .content_type(crate::image_store::PNG)
+        .checksum_sha256(data_encoding::BASE64.encode(&hex::decode(&image_sha256)?))
+        .body(aws_sdk_s3::primitives::ByteStream::from(png_data))
+        .send()
+        .await?;
+
     let mut tx = db.begin().await?;
 
     // Lock the session row and check if it's already saved atomically
@@ -347,33 +379,6 @@ pub async fn save_session_to_post(
     )
     .fetch_all(&mut *tx)
     .await?;
-
-    let image_sha256 = sha256::digest(&png_data);
-
-    let s3_client = super::archive::s3_client(&state.config);
-
-    // SHA256 is always 64 hex characters, but let's be safe about accessing them
-    let s3_key = if image_sha256.len() >= 2 {
-        format!(
-            "image/{}{}/{}.png",
-            &image_sha256[0..1],
-            &image_sha256[1..2],
-            image_sha256
-        )
-    } else {
-        // This should never happen with valid SHA256, but handle gracefully
-        return Err("Invalid SHA256 hash: too short".into());
-    };
-
-    s3_client
-        .put_object()
-        .bucket(&state.config.aws_s3_bucket)
-        .key(&s3_key)
-        .content_type(crate::image_store::PNG)
-        .checksum_sha256(data_encoding::BASE64.encode(&hex::decode(&image_sha256)?))
-        .body(aws_sdk_s3::primitives::ByteStream::from(png_data))
-        .send()
-        .await?;
 
     let participant_names: Vec<String> =
         participants.iter().map(|p| p.login_name.clone()).collect();

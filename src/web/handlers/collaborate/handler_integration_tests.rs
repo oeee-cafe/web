@@ -27,6 +27,7 @@ use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use uuid::Uuid;
 
+use super::messages;
 use super::protocol_integration_tests::{redis_pool, start_redis, RedisProcess};
 use super::redis_state::RedisStateManager;
 use super::room_fanout::RoomFanout;
@@ -40,6 +41,7 @@ const SNAPSHOT: u8 = 0x02;
 const RESET_OFFER: u8 = 0x04;
 const REPLAY_START: u8 = 0x05;
 const LAYERS: u8 = 0x06;
+const END_SESSION: u8 = 0x07;
 const LEAVE: u8 = 0x09;
 const SEQUENCED: u8 = 0x0a;
 const RESET_REQUEST: u8 = 0x0b;
@@ -59,6 +61,7 @@ struct Room {
     server: JoinHandle<()>,
     url: String,
     db: PgPool,
+    state: AppState,
     room: Uuid,
     users: Vec<Uuid>,
 }
@@ -219,7 +222,7 @@ async fn open_room(seats: i32) -> Option<Room> {
     };
     let app = Router::new()
         .route("/ws/{room}/{user}", get(upgrade))
-        .with_state(state);
+        .with_state(state.clone());
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("listener");
     let address = listener.local_addr().expect("address");
     let server = tokio::spawn(async move {
@@ -230,6 +233,7 @@ async fn open_room(seats: i32) -> Option<Room> {
         server,
         url: format!("ws://{address}"),
         db,
+        state,
         room,
         users,
     })
@@ -646,6 +650,52 @@ async fn a_checkpoint_from_somebody_not_asked_is_counted_off_the_wire_and_droppe
             (1, FILL),
             "the fill is the first thing in history"
         );
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// What a save does to the room, run the way the save runs it: without the
+/// owner's socket having to say anything.
+#[tokio::test]
+async fn finishing_a_session_sends_everyone_to_the_post_and_closes_the_room() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        opening(&mut alice).await;
+        let mut bob = room.connect(1, None).await;
+        opening(&mut bob).await;
+
+        messages::finish_session(
+            &room.state,
+            room.room,
+            room.users[0],
+            "/@owner/post",
+            "system",
+        )
+        .await;
+
+        for socket in [&mut alice, &mut bob] {
+            let frame = next_of_type(socket, END_SESSION).await;
+            let len = u16::from_le_bytes([frame[17], frame[18]]) as usize;
+            assert_eq!(&frame[19..19 + len], b"/@owner/post");
+        }
+        let ended: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar!(
+            "SELECT ended_at FROM collaborative_sessions WHERE id = $1",
+            room.room
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("session row");
+        assert!(ended.is_some(), "ended in the database");
+
+        // And the room is closed to the next person.
+        let mut late = room.connect(1, None).await;
+        let goodbye = next_close(&mut late).await.expect("a close, not a welcome");
+        assert_eq!(u16::from(goodbye.code), 1008);
     })
     .await;
     room.teardown().await;
