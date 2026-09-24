@@ -1759,12 +1759,16 @@ mod template_tests {
             out.contains(r#"id="nav-draw-button" class="toolbar-square toolbar-draw""#),
             "Draw is the filled button signed out too: a guest can draw"
         );
-        // The theme square opens onto the three-way switch, and this
-        // browser's drafts when it has some: one link to `/about` in the
-        // whole bar, and it is not that menu's. (The desktop app's Help menu
-        // also reaches it, by script.)
+        assert!(
+            out.contains(r#"<a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" aria-label="drafts" title="drafts"><svg"#),
+            "and this browser's drafts are a square of their own, there whether or not it holds any"
+        );
+        // The theme square opens onto the three-way switch and nothing
+        // else: one link to `/about` in the whole bar, and it is not that
+        // menu's. (The desktop app's Help menu also reaches it, by script.)
         assert_eq!(out.matches(r#"href="/about""#).count(), 1);
         assert!(!out.contains("toolbar-menu-about"));
+        assert!(!out.contains(r#"class="toolbar-menu-drafts""#));
 
         let signed_in = render(json!({"login_name": "oeee", "display_name": "오이"}));
         assert!(
@@ -1772,6 +1776,8 @@ mod template_tests {
             "signed in, About is the last item of the account menu"
         );
         assert_eq!(signed_in.matches(r#"href="/about""#).count(), 1);
+        // Drafts are in the account menu, so the bar has no square for them.
+        assert!(!signed_in.contains("toolbar-drafts\" href"));
     }
 
     /// Which platform's mark to wear is only a question for someone who
@@ -3153,13 +3159,13 @@ mod template_tests {
             .expect("drafts render for a guest");
         // The toolbar's draw button, signed out as well as in.
         assert!(rendered.contains(r#"id="nav-draw-button""#));
-        // This browser's drafts, listed by the page's script, and the link to
-        // them in the guest's menu that the toolbar's script reveals.
+        // This browser's drafts, listed by the page's script, and the
+        // guest's drafts square in the toolbar, which its script fills.
         assert!(rendered.contains(r#"id="local-drafts""#));
         assert!(rendered.contains(r#"data-user-id="""#));
         assert!(rendered.contains(r#"id="local-drafts-empty""#));
         assert!(rendered.contains("/static/neo-cucumber/drafts.js"));
-        assert!(rendered.contains(r#"class="toolbar-menu-drafts""#));
+        assert!(rendered.contains("toolbar-drafts\" href=\"/posts/drafts\""));
         // No server drafts to arrange for someone with none.
         assert!(!rendered.contains(r#"id="post-feed-grid""#));
         let words = json_script(&rendered, "local-drafts-words");
