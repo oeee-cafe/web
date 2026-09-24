@@ -36,7 +36,12 @@
      2. the page asks the site (POST /auth/handoff/claim) until the browser
         has finished, at which point the site signs *this* session in; the
         app calls window.oeeeApp.signIn.resume() when it is brought back to
-        the front, so the page asks at once.
+        the front, so the page asks at once. An app whose sheet closes by
+        itself (iOS and macOS) calls resume() when it returned by
+        oeee-cafe://handoff/done and unopened() when it was put away --
+        which the page answers by asking once more before letting the
+        handoff go, since the reader may have put it away just after
+        signing in.
 
    Steam, in the build that sells through Steam (data-store="steam"): the
    page sends  signIn {provider: "steam"}, with no nonce, and the app answers
@@ -182,6 +187,9 @@
     var inFlight = false;
     // Whether the reader is being asked something, which the asking waits on.
     var deciding = false;
+    // Whether the app has said the browser is gone (unopened), so the next
+    // answer that is not the sign-in is the last one asked for.
+    var closing = false;
 
     // How often to ask whether the browser has finished, and for how long.
     // The site forgets a handoff after fifteen minutes (src/handoff.rs), so
@@ -202,6 +210,7 @@
         asking = null;
       }
       pending = null;
+      closing = false;
     }
 
     function ask(confirmed) {
@@ -215,8 +224,11 @@
           // No answer decides nothing, and neither does "failed": the handoff
           // is still good, so keep asking rather than give up on a sign-in
           // that may well have taken.
-          if (!claimed || !pending) return;
-          if (claimed.status === "waiting" || claimed.status === "failed") return;
+          if (!pending) return;
+          if (!claimed || claimed.status === "waiting" || claimed.status === "failed") {
+            if (closing) stop();
+            return;
+          }
           if (claimed.status === "confirm") {
             // Linking the browser's account to the one signed in here. The
             // site words the question, in the reader's language, and asks it
@@ -244,8 +256,10 @@
           stop();
         })
         .catch(function () {
-          // A request that did not land says nothing either way; the next will.
+          // A request that did not land says nothing either way; the next will
+          // -- unless there is to be no next.
           inFlight = false;
+          if (closing && pending) stop();
         });
     }
 
@@ -309,9 +323,14 @@
       resume: function () {
         if (pending) ask(false);
       },
-      // The app went to open the browser and could not.
+      // The browser could not be opened, or was put away. Put away can be
+      // after the sign-in finished there and before the page asked, so the
+      // site is asked once more, and the handoff is let go only if that
+      // answer is not the sign-in -- an ask already under way is that one.
       unopened: function () {
-        if (pending) stop();
+        if (!pending) return;
+        closing = true;
+        if (!inFlight) ask(false);
       }
     };
   })();
