@@ -238,6 +238,55 @@ pub async fn forget(pool: &RedisPool, id: &str) -> Result<()> {
     Ok(())
 }
 
+const AT_PROVIDER_PREFIX: &str = "oeee:handoff-at-provider:";
+
+/// A sign-in the browser was sent straight to the provider for, rather than
+/// to `/auth/<provider>?handoff=<id>` first: which handoff it is for, and the
+/// nonce the provider's answer has to carry.
+///
+/// The iOS and macOS apps open the browser in `ASWebAuthenticationSession`,
+/// which first asks whether the app may "use" the first page's domain to sign
+/// in. Sent to this site first, that named oeee.cafe under a Sign in with
+/// Google button; sent to Google, it names Google. The cost is that the
+/// browser's session cookie cannot carry the handoff and the nonce to the
+/// callback, since the browser never visits this site before Google, so they
+/// are kept here under the OAuth `state` instead. The `state` is as good as
+/// the handoff's id -- it is in the URL the browser is given -- and gets the
+/// same treatment: random, never logged, used once, and gone when the
+/// handoff is.
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AtProvider {
+    pub id: String,
+    pub nonce: String,
+}
+
+fn at_provider_key(state: &str) -> String {
+    format!("{AT_PROVIDER_PREFIX}{state}")
+}
+
+/// Remembers that the provider's answer carrying `state` is for handoff `id`.
+pub async fn send_to_provider(pool: &RedisPool, state: &str, request: &AtProvider) -> Result<()> {
+    let mut conn = connect(pool).await?;
+    let _: () = conn
+        .set_ex(at_provider_key(state), serde_json::to_string(request)?, HANDOFF_FOR)
+        .await?;
+    Ok(())
+}
+
+/// What `state` was sent to the provider for, once: taken as it is read, so
+/// an answer replayed at the callback finds nothing.
+pub async fn back_from_provider(pool: &RedisPool, state: &str) -> Result<Option<AtProvider>> {
+    let mut conn = connect(pool).await?;
+    let key = at_provider_key(state);
+    let (stored, _): (Option<String>, i64) = redis::pipe()
+        .atomic()
+        .get(&key)
+        .del(&key)
+        .query_async(&mut *conn)
+        .await?;
+    Ok(stored.and_then(|s| serde_json::from_str(&s).ok()))
+}
+
 /// Against the Redis `REDIS_URL` names, under keys of their own. Skipped
 /// when there is no Redis to reach.
 #[cfg(test)]
@@ -429,5 +478,16 @@ mod tests {
         assert!(left <= 60, "{left} seconds left, expected at most 60");
         drop(conn);
         forget(&pool, &started.id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_state_sent_to_the_provider_answers_once() {
+        let Some(pool) = pool().await else { return };
+        let state = random_token();
+        let request = AtProvider { id: random_token(), nonce: random_token() };
+        send_to_provider(&pool, &state, &request).await.unwrap();
+        assert_eq!(back_from_provider(&pool, &state).await.unwrap(), Some(request));
+        assert_eq!(back_from_provider(&pool, &state).await.unwrap(), None);
+        assert_eq!(back_from_provider(&pool, &random_token()).await.unwrap(), None);
     }
 }

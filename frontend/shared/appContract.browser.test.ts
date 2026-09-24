@@ -660,6 +660,25 @@ describe("signing in for an app", () => {
     expect(finished.frame.contentWindow!.location.pathname).toBe("/after");
   }, 10000);
 
+  it("sends the Apple apps' browser straight to Google, and the others through the site", async () => {
+    const cases: [string, "apple" | "google", string | null][] = [
+      ["Mozilla/5.0 OeeeCafe platform/ios", "google", "provider"],
+      ["Mozilla/5.0 OeeeCafe platform/macos", "google", "provider"],
+      ["Mozilla/5.0 OeeeCafe platform/windows", "google", null],
+      ["Mozilla/5.0 OeeeCafe platform/windows", "apple", null],
+      ["Mozilla/5.0 OeeeCafe platform/android", "apple", null],
+    ];
+    for (const [userAgent, provider, at] of cases) {
+      const page = await open({ userAgent });
+      expect(press(page, provider), `${userAgent} ${provider}`).toBe(true);
+      await settle();
+      const started = page.asked.find((request) => request.url === "/auth/handoff/start");
+      const fields = new URLSearchParams(started?.body);
+      expect(fields.get("provider"), `${userAgent} ${provider}`).toBe(provider);
+      expect(fields.get("at"), `${userAgent} ${provider}`).toBe(at);
+    }
+  });
+
   it("goes the way each app signs in with each provider", async () => {
     const ways: [string, "apple" | "google", string][] = [
       ["Mozilla/5.0 OeeeCafe platform/ios", "apple", "/auth/apple/start"],
