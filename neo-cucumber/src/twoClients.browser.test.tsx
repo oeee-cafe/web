@@ -288,6 +288,47 @@ describe("two clients and the wire between them", () => {
     });
   });
 
+  it("answers one Ctrl+Z with one undo", async () => {
+    // Two listeners used to answer this key -- the shortcut table's and one
+    // the painter bound on its own -- and both read the same render's
+    // `canUndo`, so a single press sent the room two undo operations and
+    // took back two strokes.
+    const room = twoClients();
+    const bob = room.open("2");
+    await act(async () => {
+      await bob.painter.ready;
+    });
+    act(() => {
+      bob.painter.setLocalActorId("2");
+    });
+    await act(async () => {
+      await room.send("2", { kind: "undo-boundary" });
+      await room.send("2", {
+        kind: "stroke",
+        layer: "background",
+        targetActorId: "2",
+        brushSize: 2,
+        brush: "solid",
+        color: { r: 0, g: 0, b: 128, a: 255 },
+        points: [{ x: 8, y: 30 }, { x: 14, y: 30 }],
+        mask: { type: 0, r: 0, g: 0, b: 0 },
+      });
+      await room.settle();
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "z", ctrlKey: true, bubbles: true, cancelable: true,
+      }));
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      await room.settle();
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+
+    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
+  });
+
   it("agree after one of them undoes, which rebuilds the canvas", async () => {
     // Undo is the only thing that replays history, and replaying is where the
     // screen and the buffers come apart: the layers are rewritten for whoever

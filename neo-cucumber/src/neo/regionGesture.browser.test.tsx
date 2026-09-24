@@ -104,6 +104,28 @@ describe("dragging out a region tool", () => {
     expect(frame.slice(11, 15)).toEqual([6, 6, 15, 13]);
   });
 
+  it("records the mask the region was drawn through", async () => {
+    // The mask only ever reached the recorder from a freehand press. A region
+    // dragged out with the mask on and no freehand stroke before it -- or
+    // after a stroke made with the mask off -- was masked on this canvas and
+    // recorded as unmasked, so NEO and the room drew it over everything.
+    const { api, send } = await mountWithTool("rectFill", {
+      maskType: 1, maskColor: "#ff0000",
+    });
+    await send("pointerdown", 6, 6);
+    await act(async () => { await sleep(20); });
+    await send("pointermove", 20, 18);
+    await send("pointerup", 20, 18);
+
+    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+    const { decodePCH } = await import("./NeoReplay");
+    const frame = decodePCH(bytes)!.items.at(-1)!;
+    expect(frame[0]).toBe("fill");
+    // pushCurrent: [verb, layer, r, g, b, a, mask r, g, b, size, mask type]
+    expect(frame.slice(6, 9)).toEqual([255, 0, 0]);
+    expect(frame[10]).toBe(1);
+  });
+
   it("leaves the canvas alone when the drag is cancelled", async () => {
     const { api, previews, send, canvas } = await mountWithTool("rectFill");
     const layer = api.drawingEngine!.layers.background;

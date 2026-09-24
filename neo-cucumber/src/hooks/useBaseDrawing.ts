@@ -11,6 +11,7 @@ import {
   type ToolId,
 } from "../neo/tools";
 import { RegionDrag, type RegionRect } from "../neo/regionDrag";
+import { maskFrom, type Mask } from "../neo/mask";
 import { StrokeSmoother, strokeSmootherSizeFor } from "../neo/strokeSmoother";
 import type { BezierPreviewStyle, PasteDisplay } from "../neo/regionPreview";
 import { screenToArtwork } from "../neo/canvasTransform";
@@ -132,13 +133,21 @@ interface DrawingEventCallbacks {
   /** The rubber-band rectangle as it is dragged, or null when it ends. */
   onRegionPreview?: (rect: RegionRect | null) => void;
   /** A straight line was drawn from `from` to `to`. */
+  /**
+   * The mask on these is the one the shape was drawn through -- frozen with
+   * the rest of the settings at the press. The recorder used to take it from
+   * the last *freehand* press instead, which is the only path that told it
+   * about masks, so a rectangle dragged out after the mask was switched on
+   * was masked on this canvas and unmasked in the replay and the room.
+   */
   onLine?: (
     from: { x: number; y: number },
     to: { x: number; y: number },
     brushSize: number,
     brushType: BrushType,
     color: { r: number; g: number; b: number; a: number },
-    layer: "foreground" | "background"
+    layer: "foreground" | "background",
+    mask: Mask
   ) => void;
   /** Endpoints while a line is dragged out, or null when it ends. */
   onLinePreview?: (
@@ -152,7 +161,8 @@ interface DrawingEventCallbacks {
     brushSize: number,
     brushType: BrushType,
     color: { r: number; g: number; b: number; a: number },
-    layerType: "foreground" | "background"
+    layerType: "foreground" | "background",
+    mask: Mask
   ) => void;
   onBezierPreview?: (
     points: number[] | null,
@@ -185,7 +195,8 @@ interface DrawingEventCallbacks {
     layer: "foreground" | "background",
     source: RegionRect,
     dx: number,
-    dy: number
+    dy: number,
+    mask: Mask
   ) => void;
   /** A region tool was released over `rect`; record it. */
   onRegionCommit?: (
@@ -193,7 +204,8 @@ interface DrawingEventCallbacks {
     layer: "foreground" | "background",
     rect: RegionRect,
     color: { r: number; g: number; b: number; a: number },
-    brushSize: number
+    brushSize: number,
+    mask: Mask
   ) => void;
 }
 
@@ -456,6 +468,13 @@ export const useBaseDrawing = (
 
   useEffect(() => {
     isDrawingDisabledRef.current = isDrawingDisabled;
+    // A host disables drawing when its connection drops or a replay begins,
+    // and it can do so mid-stroke. The release that follows is ignored while
+    // disabled, so without this the gesture stayed open: the stroke's last
+    // chunk was never handed over, the painter reported itself unsettled
+    // until the next press, and the pointer's next plain movement over the
+    // canvas, once re-enabled, went on drawing with no button down.
+    if (isDrawingDisabled) abortGestureRef.current();
   }, [isDrawingDisabled]);
 
   useEffect(() => {
@@ -1006,11 +1025,16 @@ export const useBaseDrawing = (
           drawingEngineRef.current.drawBezier(
             params.layerType,
             points as [number, number, number, number, number, number, number, number],
-            params.brushSize, brush, color
+            params.brushSize, brush, color,
+            // The selected participant's pair, as the line tool below and
+            // the operation emitted for it already name.
+            drawingEngineRef.current.drawTarget[params.layerType]
           );
           saveToHistory();
         }
-        callbacks?.onBezier?.(points, params.brushSize, brush, color, params.layerType);
+        callbacks?.onBezier?.(
+          points, params.brushSize, brush, color, params.layerType, maskFrom(params)
+        );
         onDrawingChangeRef.current?.();
         cleanupPointerState(e.pointerId);
         return;
@@ -1042,7 +1066,9 @@ export const useBaseDrawing = (
             drawingEngineRef.current.setStrokeState(null);
             saveToHistory();
           }
-          callbacks?.onLine?.(from, to, params.brushSize, brush, color, params.layerType);
+          callbacks?.onLine?.(
+            from, to, params.brushSize, brush, color, params.layerType, maskFrom(params)
+          );
           onDrawingChangeRef.current?.();
         }
         cleanupPointerState(e.pointerId);
@@ -1080,7 +1106,7 @@ export const useBaseDrawing = (
             );
             saveToHistory();
           }
-          callbacks?.onPaste?.(layer, source, dx, dy);
+          callbacks?.onPaste?.(layer, source, dx, dy, maskFrom(params));
           onDrawingChangeRef.current?.();
           callbacks?.onToolChange?.("copy");
         }
@@ -1119,7 +1145,8 @@ export const useBaseDrawing = (
             params.layerType,
             rect,
             color,
-            params.brushSize
+            params.brushSize,
+            maskFrom(params)
           );
           onDrawingChangeRef.current?.();
 

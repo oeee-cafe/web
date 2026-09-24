@@ -56,6 +56,26 @@ describe("canonical history positions", () => {
     });
   });
 
+  it("reads a 64-bit position whose low word has its top bit set", () => {
+    // `|` builds a signed 32-bit integer, so a low word of 0x80000000 or more
+    // used to come back negative and the whole value 2^32 too small. Every
+    // millisecond timestamp on the wire looks like this for half of every
+    // 49.7-day cycle.
+    const wire = new Uint8Array(25);
+    wire[0] = MSG_TYPE.CAUGHT_UP;
+    wire.set(historyBytes, 1);
+    new DataView(wire.buffer).setBigUint64(17, 0x1_8000_0005n, true);
+    expect(decodeMessage(wire.buffer)).toMatchObject({ lastSeq: 0x1_8000_0005 });
+
+    const chat = new Uint8Array(29);
+    chat[0] = MSG_TYPE.CHAT;
+    new DataView(chat.buffer).setBigUint64(17, 1758789107717n, true);
+    expect(decodeMessage(chat.buffer)).toMatchObject({
+      type: "chat",
+      timestamp: 1758789107717,
+    });
+  });
+
   it("decodes the replay range before catch-up begins", () => {
     const wire = new Uint8Array(33);
     wire[0] = MSG_TYPE.REPLAY_START;

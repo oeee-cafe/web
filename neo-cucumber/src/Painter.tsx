@@ -627,7 +627,12 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
         drawingState.opacity / 255,
         value,
         size,
-        TEXT_FONT_FAMILY
+        TEXT_FONT_FAMILY,
+        // Into the pair the operation below names. Left to its default the
+        // engine wrote our own, while the emitted operation carried the
+        // selected participant's -- so the author saw the text in one place
+        // and everyone else in another, until a replay moved it.
+        drawingEngine.drawTarget[drawingState.layerType]
       );
       // NEO packs the colour with red in the low byte
       recordText(
@@ -1167,8 +1172,13 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     onAdjustPenSize: adjustPenSize,
   });
 
-  // Add keyboard shortcuts for undo/redo
+  // Undo/redo keys for two-tone mode, whose shortcut hook above binds only
+  // the pen keys. Standard mode gets them from the shortcut table below, and
+  // binding them here as well answered every Ctrl+Z twice: both listeners
+  // read the same render's `canUndo`, so one keypress undid two strokes --
+  // two `undo` operations sent to a session, two snapshots popped offline.
   useEffect(() => {
+    if (twoToneConfig === null) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey) {
         if (e.key === "z" && !e.shiftKey) {
@@ -1187,7 +1197,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo, historyState.canUndo, historyState.canRedo]);
+  }, [twoToneConfig, undo, redo, historyState.canUndo, historyState.canRedo]);
 
   return (
     <div className="w-full painter-root flex flex-col">
