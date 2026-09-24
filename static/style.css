@@ -318,17 +318,22 @@ nav a:visited,
 }
 
 /* A feed's own header row: what it is at the start, Per row at the end.
-   Firefox 56: no flex gap, so the label keeps its distance by margin. */
+   The distance between them is a gap, not a margin on the first, so a
+   first that has wrapped onto a row of its own reaches the row's end
+   (.feed-choices). Firefox 56 has no flex gap and keeps the margin. */
 .feed-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  column-gap: var(--ds-space-4);
   margin: var(--space-5) 0 var(--space-3) 0;
 }
 
-.feed-header > :first-child {
-  margin-right: var(--ds-space-4);
+@supports not (row-gap: 1px) {
+  .feed-header > :first-child {
+    margin-right: var(--ds-space-4);
+  }
 }
 
 .posts-grid {
@@ -4733,21 +4738,45 @@ html[data-app] .about-stores {
 }
 
 /* Home's header: which feed and which half of it, side by side, the
-   second under the first when a phone has no room for both. Firefox 56:
-   no flex gap, so the margin keeps them apart. */
+   second under the first when there is no room for both -- decided by
+   what the pills measure, not by a breakpoint, so a longer language wraps
+   sooner and a shorter one not at all.
+   The switch is only ever as wide as its pills on one row, which leaves
+   them nothing to grow into; once it overflows it is squeezed to the
+   header's width, they wrap, and each grows across its own row, its
+   choices sharing the extra. Stacked rows the same width read as meant,
+   where a short pill under a long one read as a line that broke. The
+   thumb follows, since segmented.jinja measures it again on resize.
+   Firefox 56: no flex gap, so the margin keeps them apart, and the first
+   of two stacked rows stops that margin short of the second's end. */
 .feed-choices {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   min-width: 0;
+  column-gap: var(--ds-space-3);
 }
 
 .feed-choices > * {
-  margin: 4px var(--ds-space-3) 4px 0;
+  -webkit-box-flex: 1;
+  flex-grow: 1;
+  margin: 4px 0;
 }
 
-.feed-choices > :last-child {
-  margin-right: 0;
+.feed-choices > * > * {
+  -webkit-box-flex: 1;
+  flex-grow: 1;
+  text-align: center;
+}
+
+@supports not (row-gap: 1px) {
+  .feed-choices > * {
+    margin-right: var(--ds-space-3);
+  }
+
+  .feed-choices > :last-child {
+    margin-right: 0;
+  }
 }
 
 @media (min-width: 1024px) {
