@@ -1768,7 +1768,7 @@ mod template_tests {
         // menu's. (The desktop app's Help menu also reaches it, by script.)
         assert_eq!(out.matches(r#"href="/about""#).count(), 1);
         assert!(!out.contains("toolbar-menu-about"));
-        assert!(!out.contains(r#"class="toolbar-menu-drafts""#));
+        assert!(!out.contains("toolbar-menu-drafts"));
 
         let signed_in = render(json!({"login_name": "oeee", "display_name": "오이"}));
         assert!(
@@ -1798,7 +1798,9 @@ mod template_tests {
             })
             .expect("toolbar renders");
         assert!(out.contains(r#"<a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="3" aria-label="drafts (3)" title="drafts (3)"><svg"#));
-        assert!(out.contains(r#"class="toolbar-menu-drafts""#));
+        // Drafts are the square's alone: no line in the account menu, and
+        // the initial does not pulse.
+        assert!(!out.contains("toolbar-menu-drafts"));
         assert!(!out.contains("toolbar-avatar-pulse"));
     }
 

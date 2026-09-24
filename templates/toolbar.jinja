@@ -216,8 +216,9 @@
       {% if current_user %}
         <details class="toolbar-menu">
           <summary aria-label="{{ current_user.display_name or current_user.login_name }}">
-            {# An unverified email puts a red dot on the initial. Drafts
-               left to finish have the square beside Draw. #}
+            {# An unverified email puts a red dot on the initial. Unread
+               notifications fill the bell, and drafts have the square
+               beside Draw, so the initial itself stays still. #}
             <span class="toolbar-square toolbar-avatar" aria-hidden="true">{{ (current_user.display_name or current_user.login_name or "?")[:1]|upper }}</span>
             {% if not current_user.email_verified_at %}<span class="toolbar-dot" title="{{ ftl_get_message('email-not-verified') }}"></span>{% endif %}
           </summary>
@@ -227,12 +228,6 @@
               <span>@{{ current_user.login_name }}</span>
             </div>
             <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>
-            {# Unboosted: the drafts page lists the drawings kept in this
-               browser with a module bundle, which a boosted visit would not
-               run a second time. The script below adds those to the count. #}
-            <a href="/posts/drafts" hx-boost="false" class="toolbar-menu-drafts" data-server-count="{{ draft_post_count }}">{{ ftl_get_message("drafts") }}
-              {%- if draft_post_count > 0 %} <span class="toolbar-badge">{{ draft_post_count }}</span>{% endif -%}
-            </a>
             <a href="/account">{{ ftl_get_message("account") }}
               {% if not current_user.email_verified_at %}
                 <span class="dangerous">({{ ftl_get_message("email-not-verified") }})</span>
@@ -831,7 +826,6 @@
     (function () {
       var square = document.querySelector(".nav-bar .toolbar-drafts");
       if (!square || !window.indexedDB) return;
-      var link = document.querySelector(".nav-bar .toolbar-menu-drafts");
       var nav = square.closest ? square.closest(".nav-bar") : null;
       var userId = (nav && nav.getAttribute("data-user-id")) || "";
       var opening;
@@ -861,16 +855,6 @@
         square.setAttribute("aria-label", label);
         square.setAttribute("title", label);
         square.hidden = false;
-        // The account menu's line, signed in: counted in its badge.
-        if (!link) return;
-        var badge = link.querySelector(".toolbar-badge");
-        if (!badge) {
-          badge = document.createElement("span");
-          badge.className = "toolbar-badge";
-          link.appendChild(document.createTextNode(" "));
-          link.appendChild(badge);
-        }
-        badge.textContent = String(total);
       }
     })();
   </script>
