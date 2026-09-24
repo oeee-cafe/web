@@ -1375,11 +1375,11 @@ nav a:visited,
   opacity: 0.75;
 }
 
-/* "+": any emoji beyond the defaults. Opening it lays the form out beside
-   the chip rather than pushing the row apart. */
+/* "+": any emoji beyond the defaults, from a picker that opens under the
+   chip (static/reaction_picker.js), or a typed one where there is none. */
 .reaction-custom {
-  display: inline-flex;
-  align-items: center;
+  position: relative;
+  display: inline-block;
 }
 
 .reaction-custom > summary {
@@ -1391,14 +1391,81 @@ nav a:visited,
   display: none;
 }
 
+.reaction-add svg {
+  display: inline-block;
+  vertical-align: -4px;
+}
+
 .reaction-custom[open] > summary {
-  background-color: var(--ds-ground);
+  background-color: var(--ds-hover);
+}
+
+.reaction-custom-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  padding: 8px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-menu);
+}
+
+.reaction-custom.has-picker .reaction-custom-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.reaction-custom.has-picker .reaction-custom-form {
+  display: none;
 }
 
 .reaction-custom-form {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  margin-left: 6px;
+  white-space: nowrap;
+}
+
+/* The picker's own palette follows the site's tokens, so it changes with the
+   site's theme switch and not only with the system's. */
+.reaction-picker emoji-picker {
+  --background: var(--ds-surface);
+  --border-color: transparent;
+  --border-size: 0;
+  --button-active-background: var(--ds-press);
+  --button-hover-background: var(--ds-hover);
+  --category-font-color: var(--ds-muted);
+  --indicator-color: var(--ds-accent);
+  --input-border-color: var(--ds-line-strong);
+  --input-font-color: var(--ds-ink);
+  --input-placeholder-color: var(--ds-faint);
+  --outline-color: var(--ds-focus);
+  --num-columns: 9;
+  height: 400px;
+  font-family: var(--ds-font);
+}
+
+@media (max-width: 480px) {
+  .reaction-custom-panel {
+    position: fixed;
+    top: auto;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    left: 16px !important;
+    justify-content: center;
+  }
+
+  .reaction-picker,
+  .reaction-picker emoji-picker {
+    width: 100%;
+  }
+
+  .reaction-picker emoji-picker {
+    --num-columns: 8;
+    height: 360px;
+  }
 }
 
 .reaction-custom-input {
@@ -1407,7 +1474,7 @@ nav a:visited,
   padding: 2px 8px;
   border: 1px solid var(--ds-line-strong);
   border-radius: 14px;
-  background-color: var(--ds-surface);
+  background-color: var(--ds-field);
   color: var(--ds-ink);
   font: inherit;
   font-size: var(--ds-text-m);

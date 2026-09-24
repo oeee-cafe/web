@@ -11,8 +11,14 @@ pub const AVAILABLE_EMOJIS: &[&str] = &["❤️", "🎉", "😂", "😲", "👏"
 /// The fully-qualified form of `input` if it is exactly one emoji, so that
 /// "❤" and "❤️" count as the same reaction. Anything else, including text
 /// that merely contains an emoji, is `None`.
+///
+/// A variation selector where Unicode has none is let through: the picker
+/// sends "👍️" for 👍, and so do some keyboards.
 pub fn normalize_emoji(input: &str) -> Option<&'static str> {
-    emojis::get(input.trim()).map(|emoji| emoji.as_str())
+    let input = input.trim();
+    emojis::get(input)
+        .or_else(|| emojis::get(&input.replace('\u{FE0F}', "")))
+        .map(|emoji| emoji.as_str())
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -297,6 +303,9 @@ mod tests {
         assert_eq!(normalize_emoji(" 👍🏽 "), Some("👍🏽"));
         assert_eq!(normalize_emoji("👩‍👩‍👧"), Some("👩‍👩‍👧"));
         assert_eq!(normalize_emoji("🇰🇷"), Some("🇰🇷"));
+        assert_eq!(normalize_emoji("👍\u{FE0F}"), Some("👍"));
+        assert_eq!(normalize_emoji("🏳\u{FE0F}\u{200D}🌈"), Some("🏳️‍🌈"));
+        assert_eq!(normalize_emoji("🏳\u{200D}🌈"), Some("🏳️‍🌈"));
     }
 
     #[test]

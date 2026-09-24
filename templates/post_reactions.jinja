@@ -44,24 +44,36 @@
     {% endif %}
   {% endfor %}
   {% if current_user %}
-    {# Any other emoji, typed or picked from the system's emoji keyboard.
-       `pattern` is compiled with the `v` flag, which is what makes
-       \p{RGI_Emoji} (one emoji, sequences included) mean anything; a browser
-       too old for it ignores the pattern and the server refuses the rest. #}
+    {# Any other emoji. /static/reaction_picker.js mounts a picker in the
+       panel the first time it opens and hides the form; the form is what a
+       browser without modules, or without the CDN, gets. Its `pattern` is
+       compiled with the `v` flag, which is what makes \p{RGI_Emoji} (one
+       emoji, sequences included) mean anything; a browser too old for it
+       ignores the pattern and the server refuses the rest. #}
     <details class="reaction-custom">
-      <summary class="reaction-button" title="{{ ftl_get_message('post-reaction-custom') }}"
-               aria-label="{{ ftl_get_message('post-reaction-custom') }}">+</summary>
-      <form class="reaction-custom-form"
-            hx-post="/posts/{{ post_id }}/reactions/add"
-            hx-target="#post-reactions-{{ post_id }}"
-            hx-swap="outerHTML"
-            hx-disabled-elt="find button">
-        <input class="reaction-custom-input" type="text" name="emoji" required
-               autocomplete="off" maxlength="32" pattern="\p{RGI_Emoji}"
-               placeholder="😀" aria-label="{{ ftl_get_message('post-reaction-custom') }}"
-               title="{{ ftl_get_message('post-reaction-custom-hint') }}">
-        <button class="reaction-button" type="submit">{{ ftl_get_message("post-reaction-custom-submit") }}</button>
-      </form>
+      <summary class="reaction-button reaction-add" title="{{ ftl_get_message('post-reaction-custom') }}"
+               aria-label="{{ ftl_get_message('post-reaction-custom') }}">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.5 11.5a8.5 8.5 0 1 1-7-8.4"/>
+          <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/>
+          <path d="M9 9.5h.01M15 9.5h.01" stroke-width="2.6"/>
+          <path d="M19 2v6M16 5h6"/>
+        </svg>
+      </summary>
+      <div class="reaction-custom-panel">
+        <div class="reaction-picker"></div>
+        <form class="reaction-custom-form"
+              hx-post="/posts/{{ post_id }}/reactions/add"
+              hx-target="#post-reactions-{{ post_id }}"
+              hx-swap="outerHTML">
+          <input class="reaction-custom-input" type="text" name="emoji" required
+                 autocomplete="off" maxlength="32" pattern="\p{RGI_Emoji}"
+                 placeholder="😀" aria-label="{{ ftl_get_message('post-reaction-custom') }}"
+                 title="{{ ftl_get_message('post-reaction-custom-hint') }}">
+          <button class="reaction-button" type="submit">{{ ftl_get_message("post-reaction-custom-submit") }}</button>
+        </form>
+      </div>
     </details>
   {% endif %}
 </div>
