@@ -476,6 +476,17 @@ nav a:visited,
   display: none;
 }
 
+/* On a profile every drawing is theirs, so the byline leaves out whose
+   (profile.jinja) and starts at where, or when, without a separator. */
+.profile-drawings .post-card-who {
+  display: none;
+}
+
+.profile-drawings .post-card-byline > :nth-child(2)::before {
+  content: none;
+  margin: 0;
+}
+
 /* A phone keeps three a row whatever was chosen on a wider screen -- eight
    squares across a phone are too small to see -- so the control has nothing
    to do there. Its gaps are closer, in step with its narrower columns. */
@@ -4593,6 +4604,28 @@ html[data-app] .about-stores {
 .comment-row-link:visited {
   color: var(--ds-ink);
   font-weight: 600;
+}
+
+/* One line: who said it, or on a profile the drawing's title, then the
+   meta, each cut off rather than wrapped, sharing what room there is by
+   their lengths -- a long title took a second line and pushed when off
+   the end. The link's overflow does not clip its stretch below: that is
+   placed against the row, not against the link. */
+.comment-row-head {
+  min-width: 0;
+}
+
+.comment-row-link {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.comment-row-head > .comment-row-meta {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* The whole row is the way to the drawing; links in what was said sit

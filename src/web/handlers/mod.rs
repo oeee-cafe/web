@@ -672,8 +672,10 @@ mod social_meta_tests {
             }),
             followings => Vec::<serde_json::Value>::new(),
             links => Vec::<serde_json::Value>::new(),
-            public_community_posts => Vec::<serde_json::Value>::new(),
-            private_community_posts => Vec::<serde_json::Value>::new(),
+            public_count => 0,
+            public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+            private_count => 0,
+            private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
             is_following => false,
             ..chrome()
         };
@@ -2325,8 +2327,10 @@ mod template_tests {
                         "banner_image_width": 200, "banner_image_height": 40,
                     }]),
                     achievements,
-                    public_community_posts => Vec::<serde_json::Value>::new(),
-                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    public_count => 0,
+                    public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                    private_count => 0,
+                    private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
                     domain => "oeee.cafe",
                     is_following => false,
                     ..chrome()
@@ -2353,6 +2357,73 @@ mod template_tests {
         assert!(at("profile-follows") < at("data-profile-panel=\"public\""));
     }
 
+    /// A profile's drawings are the feeds' grid and cards, rendered here from
+    /// what the handler hands them: a sensitive drawing blurred as it is
+    /// everywhere else (the bare grid this replaced showed it plainly),
+    /// headed by month, loading on from the profile's own endpoint, and
+    /// without whose drawing each is, since every one is theirs.
+    #[test]
+    fn a_profiles_drawings_are_the_shared_grid() {
+        use crate::models::post::SerializablePostForHome;
+        use crate::web::handlers::home::{feed_context, HOME_POSTS_PER_BATCH};
+
+        let now = chrono::Utc::now();
+        let posts = (0..HOME_POSTS_PER_BATCH as u128)
+            .map(|i| SerializablePostForHome {
+                id: uuid::Uuid::from_u128(i + 1),
+                title: Some(format!("Drawing {i}")),
+                author_id: uuid::Uuid::from_u128(999),
+                user_login_name: "oeee".to_string(),
+                paint_duration: "0".to_string(),
+                stroke_count: 1,
+                viewer_count: 0,
+                image_filename: "abcdef.png".to_string(),
+                image_width: 300,
+                image_height: 300,
+                replay_filename: None,
+                is_sensitive: i == 0,
+                community_slug: Some("open".to_string()),
+                community_name: Some("Open Studio".to_string()),
+                published_at: Some(now),
+                created_at: now,
+                updated_at: now,
+            })
+            .collect();
+        let empty = json!({"posts": [], "headings": [], "has_more": false, "next_url": ""});
+        let rendered = test_support::env()
+            .get_template("profile.jinja")
+            .expect("profile loads")
+            .render(context! {
+                user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
+                banner => json!(null),
+                links => Vec::<serde_json::Value>::new(),
+                followings => Vec::<serde_json::Value>::new(),
+                achievements => Vec::<serde_json::Value>::new(),
+                comments => json!({"rows": [], "next_url": null, "by_drawing": true}),
+                comment_count => 0,
+                public_count => 75,
+                public_feed => feed_context(posts, "/api/profiles/@oeee/posts", 0, None),
+                private_count => 0,
+                private_feed => empty,
+                domain => "oeee.cafe",
+                is_following => false,
+                ..chrome()
+            })
+            .expect("profile renders");
+
+        assert!(rendered.contains(r#"<div class="profile-drawings" data-profile-panel="public">"#));
+        assert!(rendered.contains("post-card-byline"), "the shared card");
+        assert!(rendered.contains(r#"class="sensitive""#), "blurred, as everywhere else");
+        // The heading element: the toolbar's skeleton script carries the
+        // class too.
+        assert_eq!(rendered.matches(r#"<h3 class="feed-period">"#).count(), 1, "headed by month");
+        let links_in = rendered.replace("&#x2f;", "/").replace("&amp;", "&");
+        assert!(links_in.contains(&format!(
+            r#"hx-get="/api/profiles/@oeee/posts?offset={0}&limit={0}&period="#,
+            HOME_POSTS_PER_BATCH
+        )));
+    }
+
     /// What they have said gets its own tab, counted in full, a row per
     /// comment leading to the drawing it is on, and a sentinel that scrolls
     /// in the next batch while there is one; someone who has said nothing
@@ -2360,7 +2431,8 @@ mod template_tests {
     #[test]
     fn the_profile_lists_what_its_owner_has_said() {
         let env = test_support::env();
-        let render = |comments: serde_json::Value, comment_count: i64, comments_next_url: Option<&str>| {
+        // As profile.rs's comments_batch hands them to comments_fragment.jinja.
+        let render = |rows: serde_json::Value, comment_count: i64, next_url: Option<&str>| {
             env.get_template("profile.jinja")
                 .expect("profile loads")
                 .render(context! {
@@ -2374,11 +2446,12 @@ mod template_tests {
                     links => Vec::<serde_json::Value>::new(),
                     followings => Vec::<serde_json::Value>::new(),
                     achievements => Vec::<serde_json::Value>::new(),
-                    comments,
+                    comments => json!({"rows": rows, "next_url": next_url, "by_drawing": true}),
                     comment_count,
-                    comments_next_url,
-                    public_community_posts => Vec::<serde_json::Value>::new(),
-                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    public_count => 0,
+                    public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                    private_count => 0,
+                    private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
                     domain => "oeee.cafe",
                     is_following => false,
                     ..chrome()
@@ -2426,11 +2499,10 @@ mod template_tests {
         // The scrolled batches come from the fragment alone, which has to
         // stand without the profile's context.
         let last_batch = env
-            .get_template("profile_comments_fragment.jinja")
+            .get_template("comments_fragment.jinja")
             .expect("fragment loads")
             .render(context! {
-                comments => json!([]),
-                comments_next_url => None::<String>,
+                comments => json!({"rows": [], "next_url": null, "by_drawing": true}),
                 ftl_lang => "en",
             })
             .expect("fragment renders");
@@ -2452,11 +2524,13 @@ mod template_tests {
                 links => Vec::<serde_json::Value>::new(),
                 followings => Vec::<serde_json::Value>::new(),
                 achievements => Vec::<serde_json::Value>::new(),
-                comments => json!([]),
+                comments => json!({"rows": [], "next_url": null, "by_drawing": true}),
                 comment_count => 3,
                 tab => "comments",
-                public_community_posts => json!([{"id": "p1", "title": "t", "image_filename": "abcdef.png", "image_width": 300, "image_height": 300}]),
-                private_community_posts => Vec::<serde_json::Value>::new(),
+                public_count => 1,
+                public_feed => json!({"posts": [{"id": "p1", "title": "t", "user_login_name": "oeee", "image_filename": "abcdef.png", "image_width": 300, "image_height": 300, "is_sensitive": false, "published_at": "2026-08-01T00:00:00Z"}], "headings": [], "has_more": false, "next_url": ""}),
+                private_count => 0,
+                private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
                 domain => "oeee.cafe",
                 is_following => false,
                 ..chrome()
@@ -2465,7 +2539,7 @@ mod template_tests {
             .replace("&#x2f;", "/");
         assert!(on_comments.contains(r#"<a href="/@oeee/comments" data-profile-tab="comments" aria-current="page">"#));
         assert!(on_comments.contains(r#"<div data-profile-panel="comments">"#));
-        assert!(on_comments.contains(r#"<div data-profile-panel="public" hidden>"#));
+        assert!(on_comments.contains(r#"<div class="profile-drawings" data-profile-panel="public" hidden>"#));
         assert!(on_comments.contains("<div data-profile-per-row hidden>"));
 
         let without = render(json!([]), 0, None);
@@ -2495,8 +2569,10 @@ mod template_tests {
                 links => Vec::<serde_json::Value>::new(),
                 followings => Vec::<serde_json::Value>::new(),
                 achievements => Vec::<serde_json::Value>::new(),
-                public_community_posts => Vec::<serde_json::Value>::new(),
-                private_community_posts => Vec::<serde_json::Value>::new(),
+                public_count => 0,
+                public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                private_count => 0,
+                private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
                 domain => "oeee.cafe",
                 is_following => false,
                 ..chrome()
@@ -2612,8 +2688,10 @@ mod template_tests {
                     followings => Vec::<serde_json::Value>::new(),
                     achievements => Vec::<serde_json::Value>::new(),
                     supporter_standings,
-                    public_community_posts => Vec::<serde_json::Value>::new(),
-                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    public_count => 0,
+                    public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                    private_count => 0,
+                    private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
                     domain => "oeee.cafe",
                     is_following => false,
                     ..chrome()
@@ -2707,8 +2785,10 @@ mod template_tests {
                     links => Vec::<serde_json::Value>::new(),
                     followings,
                     achievements => Vec::<serde_json::Value>::new(),
-                    public_community_posts => Vec::<serde_json::Value>::new(),
-                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    public_count => 0,
+                    public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                    private_count => 0,
+                    private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
                     domain => "oeee.cafe",
                     is_following => false,
                     ..chrome()
@@ -2754,8 +2834,10 @@ mod template_tests {
                     achievements => Vec::<serde_json::Value>::new(),
                     comment_count => 0,
                     tab,
-                    public_community_posts => Vec::<serde_json::Value>::new(),
-                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    public_count => 0,
+                    public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                    private_count => 0,
+                    private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
                     domain => "oeee.cafe",
                     is_following => false,
                     messages => Vec::<serde_json::Value>::new(),
@@ -2791,8 +2873,10 @@ mod template_tests {
                     links => Vec::<serde_json::Value>::new(),
                     followings => Vec::<serde_json::Value>::new(),
                     achievements => Vec::<serde_json::Value>::new(),
-                    public_community_posts => Vec::<serde_json::Value>::new(),
-                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    public_count => 0,
+                    public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                    private_count => 0,
+                    private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
                     domain => "oeee.cafe",
                     is_following => false,
                     r2_public_endpoint_url => "https://images.example",

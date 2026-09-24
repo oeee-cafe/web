@@ -198,6 +198,7 @@ pub async fn tag_comments(
 /// and the sentinel for the one after.
 pub async fn load_more_tag_comments(
     auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(requested): Path<String>,
     Query(query): Query<CommentsQuery>,
@@ -219,6 +220,7 @@ pub async fn load_more_tag_comments(
     let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
         comments => comments_context(comments, &tag_comments_path(&name)),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+        ftl_lang,
     })?;
     Ok(Html(rendered).into_response())
 }
@@ -235,6 +237,7 @@ pub struct LoadMoreQuery {
 /// page's infinite scroll. Same fragment every other feed loads.
 pub async fn load_more_tag_posts(
     auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(requested): Path<String>,
     Query(query): Query<LoadMoreQuery>,
@@ -269,6 +272,7 @@ pub async fn load_more_tag_posts(
                 query.period.as_deref(),
             ),
             r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+            ftl_lang,
         })?;
 
     Ok(Html(rendered).into_response())

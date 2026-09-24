@@ -19,9 +19,11 @@ use crate::models::notification::{
     CreateNotificationParams, NotificationType,
 };
 use crate::models::post::{
-    find_published_posts_by_author_id, find_published_public_posts_by_author_id,
+    count_profile_posts, find_profile_posts, find_published_public_posts_by_author_id,
+    ProfileDrawings,
 };
-use crate::models::community::{find_community_by_slug, CommunityVisibility};
+use crate::models::community::find_community_by_slug;
+use crate::web::handlers::home::{feed_context, LoadMoreQuery, HOME_POSTS_PER_BATCH};
 use crate::web::handlers::community::render_community_page;
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession, User};
 use crate::web::context::CommonContext;
@@ -185,23 +187,99 @@ pub async fn do_unfollow_profile(
 const COMMENTS_PER_BATCH: i64 = 20;
 
 /// One batch of a profile's comments, and where the next one is, if there is
-/// one. One row more than a batch is asked for, so the last batch knows it is
-/// the last rather than leaving a sentinel that fetches nothing.
+/// one, for comments_fragment.jinja -- the fragment every list of comments
+/// renders, here with each row headed by the drawing rather than by its
+/// owner's own name every time (`by_drawing`). One row more than a batch is
+/// asked for, so the last batch knows it is the last rather than leaving a
+/// sentinel that fetches nothing.
 async fn comments_batch(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     login_name: &str,
     user_id: Uuid,
     after: Option<Uuid>,
-) -> Result<(Vec<NotificationComment>, Option<String>), AppError> {
-    let mut comments =
+) -> Result<minijinja::Value, AppError> {
+    let mut rows: Vec<NotificationComment> =
         find_public_comments_by_user(tx, user_id, after, COMMENTS_PER_BATCH + 1).await?;
-    let has_more = comments.len() as i64 > COMMENTS_PER_BATCH;
-    comments.truncate(COMMENTS_PER_BATCH as usize);
-    let next_url = match comments.last() {
+    let has_more = rows.len() as i64 > COMMENTS_PER_BATCH;
+    rows.truncate(COMMENTS_PER_BATCH as usize);
+    let next_url = match rows.last() {
         Some(last) if has_more => Some(format!("/@{login_name}/comments?after={}", last.id)),
         _ => None,
     };
-    Ok((comments, next_url))
+    Ok(context! { rows, next_url, by_drawing => true })
+}
+
+/// Where a profile tab's grid loads its next batch from.
+fn profile_posts_path(login_name: &str, which: ProfileDrawings) -> String {
+    match which {
+        ProfileDrawings::Public => format!("/api/profiles/@{login_name}/posts"),
+        ProfileDrawings::Private => format!("/api/profiles/@{login_name}/private/posts"),
+    }
+}
+
+/// The next batch of a profile tab's drawings and the sentinel for the one
+/// after. The private tab is its owner's alone, here as on the page.
+async fn profile_posts_batch(
+    which: ProfileDrawings,
+    auth_session: AuthSession,
+    state: AppState,
+    ftl_lang: String,
+    login_name: String,
+    query: LoadMoreQuery,
+) -> Result<axum::response::Response, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let user = find_user_by_login_name(&mut tx, &login_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+    let viewer_id = auth_session.user.as_ref().map(|u| u.id);
+    if which == ProfileDrawings::Private && viewer_id != Some(user.id) {
+        return Err(AppError::Forbidden);
+    }
+    let posts = find_profile_posts(
+        &mut tx,
+        user.id,
+        which,
+        viewer_id,
+        auth_session.user.as_ref().map_or(false, |u| u.show_sensitive_content),
+        query.limit.clamp(1, HOME_POSTS_PER_BATCH),
+        query.offset.max(0),
+    )
+    .await?;
+    tx.commit().await?;
+
+    let rendered = state.env.get_template("post_feed_fragment.jinja")?.render(context! {
+        feed => feed_context(
+            posts,
+            &profile_posts_path(&user.login_name, which),
+            query.offset,
+            query.period.as_deref(),
+        ),
+        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+        ftl_lang,
+    })?;
+    Ok(Html(rendered).into_response())
+}
+
+/// GET /api/profiles/@{login_name}/posts
+pub async fn load_more_profile_posts(
+    auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+    Query(query): Query<LoadMoreQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    profile_posts_batch(ProfileDrawings::Public, auth_session, state, ftl_lang, login_name, query).await
+}
+
+/// GET /api/profiles/@{login_name}/private/posts
+pub async fn load_more_profile_private_posts(
+    auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+    Query(query): Query<LoadMoreQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    profile_posts_batch(ProfileDrawings::Private, auth_session, state, ftl_lang, login_name, query).await
 }
 
 /// Which of a profile's tabs an address asks for (profile.jinja).
@@ -244,21 +322,41 @@ async fn render_profile(
         return Ok(Redirect::to(&format!("/@{}", user.login_name)).into_response());
     }
 
-    let published_posts = find_published_posts_by_author_id(tx, user.id).await?;
-    let public_community_posts = published_posts
-        .iter()
-        .filter(|post| {
-            post.community_visibility == Some(CommunityVisibility::Public)
-                || post.community_visibility.is_none()
-        })
-        .collect::<Vec<_>>();
-    let private_community_posts = published_posts
-        .iter()
-        .filter(|post| {
-            post.community_visibility != Some(CommunityVisibility::Public)
-                && post.community_visibility.is_some()
-        })
-        .collect::<Vec<_>>();
+    // Their drawings in the feeds' own grid (post_feed_fragment.jinja): a
+    // batch a tab, each loading on from its own endpoint, headed by month,
+    // counted over the same filter. Only they see the private tab.
+    let viewer_id = auth_session.user.as_ref().map(|u| u.id);
+    let show_sensitive = auth_session.user.as_ref().map_or(false, |u| u.show_sensitive_content);
+    let public_count =
+        count_profile_posts(tx, user.id, ProfileDrawings::Public, viewer_id, show_sensitive).await?;
+    let public_posts = find_profile_posts(
+        tx,
+        user.id,
+        ProfileDrawings::Public,
+        viewer_id,
+        show_sensitive,
+        HOME_POSTS_PER_BATCH,
+        0,
+    )
+    .await?;
+    let (private_count, private_posts) = if is_owner {
+        let count =
+            count_profile_posts(tx, user.id, ProfileDrawings::Private, viewer_id, show_sensitive)
+                .await?;
+        let posts = find_profile_posts(
+            tx,
+            user.id,
+            ProfileDrawings::Private,
+            viewer_id,
+            show_sensitive,
+            HOME_POSTS_PER_BATCH,
+            0,
+        )
+        .await?;
+        (count, posts)
+    } else {
+        (0, Vec::new())
+    };
 
     let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
@@ -268,8 +366,7 @@ async fn render_profile(
     }
 
     let followings = find_followings_by_user_id(tx, user.id, 9999, 0, false).await?;
-    let (comments, comments_next_url) =
-        comments_batch(tx, &user.login_name, user.id, None).await?;
+    let comments = comments_batch(tx, &user.login_name, user.id, None).await?;
 
     let banner = match user.banner_id {
         Some(banner_id) => Some(find_banner_by_id(tx, banner_id).await?),
@@ -291,6 +388,19 @@ async fn render_profile(
         })
         .collect::<Vec<_>>();
 
+    let public_feed = feed_context(
+        public_posts,
+        &profile_posts_path(&user.login_name, ProfileDrawings::Public),
+        0,
+        None,
+    );
+    let private_feed = feed_context(
+        private_posts,
+        &profile_posts_path(&user.login_name, ProfileDrawings::Private),
+        0,
+        None,
+    );
+
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile.jinja")?;
     let rendered = template.render(context! {
         current_user => auth_session.user,
@@ -300,14 +410,15 @@ async fn render_profile(
         followings,
         comments,
         comment_count,
-        comments_next_url,
         tab => tab.name(),
         achievements,
         supporter_standings,
         user => Some(user),
         domain => state.config.domain.clone(),
-        public_community_posts,
-        private_community_posts,
+        public_count,
+        public_feed,
+        private_count,
+        private_feed,
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang,
@@ -348,16 +459,14 @@ pub async fn profile_comments(
         .await;
     };
 
-    let (comments, comments_next_url) =
-        comments_batch(&mut tx, &user.login_name, user.id, Some(after)).await?;
+    let comments = comments_batch(&mut tx, &user.login_name, user.id, Some(after)).await?;
     tx.commit().await?;
 
     let rendered = state
         .env
-        .get_template("profile_comments_fragment.jinja")?
+        .get_template("comments_fragment.jinja")?
         .render(context! {
             comments,
-            comments_next_url,
             ftl_lang,
         })?;
 

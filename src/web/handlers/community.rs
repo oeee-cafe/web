@@ -241,6 +241,7 @@ fn community_comments_path(slug: &str) -> String {
 /// visibility check, because the endpoint can be called on its own.
 pub async fn load_more_community_comments(
     auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(slug): Path<String>,
     Query(query): Query<CommentsQuery>,
@@ -267,6 +268,7 @@ pub async fn load_more_community_comments(
     let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
         comments => comments_context(comments, &community_comments_path(&community.slug)),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+        ftl_lang,
     })?;
     Ok(Html(rendered).into_response())
 }
@@ -277,6 +279,7 @@ pub async fn load_more_community_comments(
 /// endpoint can be called on its own.
 pub async fn load_more_community_posts(
     auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(slug): Path<String>,
     Query(query): Query<LoadMoreQuery>,
@@ -322,6 +325,7 @@ pub async fn load_more_community_posts(
             query.period.as_deref(),
         ),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+        ftl_lang,
     })?;
 
     Ok(Html(rendered).into_response())

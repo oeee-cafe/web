@@ -335,6 +335,7 @@ pub async fn collaborate_sessions_fragment(
 /// the sentinel that pulls the next. Same contract as Home's feeds.
 pub async fn load_more_collaborative_posts(
     auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Query(query): Query<crate::web::handlers::home::LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -363,6 +364,7 @@ pub async fn load_more_collaborative_posts(
             query.period.as_deref(),
         ),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+        ftl_lang,
     })?;
 
     Ok(Html(rendered).into_response())
