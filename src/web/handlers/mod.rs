@@ -1865,7 +1865,14 @@ mod template_tests {
         );
         assert!(apple.contains("Apple: x@privaterelay.appleid.com"));
 
-        // Google leads with the address even when it gave a name too.
+        // Apple and Google lead with the address even when they gave a name
+        // too.
+        let apple_named = render(
+            true,
+            json!([{"provider": "apple", "display_hint": "오이", "email": "x@privaterelay.appleid.com", "subject": "001234.abc"}]),
+        );
+        assert!(apple_named.contains("Apple: x@privaterelay.appleid.com"));
+        assert!(!apple_named.contains("Apple: 오이"));
         let google = render(
             true,
             json!([{"provider": "google", "display_hint": "오이", "email": "oeee@example.test", "subject": "1234"}]),
