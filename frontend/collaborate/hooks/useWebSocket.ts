@@ -5,6 +5,7 @@ import {
   encodeResetOffer,
   unwrapSequenced,
   type DecodedMessage,
+  isCanvasHistoryMessage,
 } from "../binaryProtocol";
 import { type CollaborationMeta } from "../types";
 import { acceptedResumeSequence } from "../synchronization";
@@ -98,6 +99,13 @@ interface WebSocketHookParams {
   canUploadCheckpoint: () => boolean;
   onReconnectCanvas: (reconnecting: boolean, resumeSequence: number | null) => Promise<void> | void;
   onCanvasMessage: (message: DecodedMessage, raw: Uint8Array, sequence?: number) => Promise<void>;
+  /**
+   * A sequenced frame this client cannot read: a message type or tool code
+   * newer than it is, or a frame truncated on its way into the history. It
+   * still holds its place in canonical order, and the position has to be able
+   * to step over it; see where it is called.
+   */
+  onUnreadableSequence: (sequence: number) => Promise<void>;
   onWelcome: (sessionId: number) => void;
   onResetPoint: (
     baseSequence: number,
@@ -105,6 +113,12 @@ interface WebSocketHookParams {
     snapshotCount: number,
   ) => Promise<void> | void;
   verifyCanonicalPosition: () => Promise<boolean>;
+  /**
+   * The last sequence actually on the canvas, which is what a reconnect
+   * resumes from. `lastSeqRef` is the last one received, and it runs ahead of
+   * this across any gap -- a gap being the very thing that closes the socket.
+   */
+  appliedCanonicalPosition: () => number;
   canResumeCanonicalPosition: () => boolean;
   onSessionEnded: (postUrl: string) => void;
   onSessionExpired: () => void;
@@ -134,9 +148,11 @@ export const useWebSocket = ({
   canUploadCheckpoint,
   onReconnectCanvas,
   onCanvasMessage,
+  onUnreadableSequence,
   onWelcome,
   onResetPoint,
   verifyCanonicalPosition,
+  appliedCanonicalPosition,
   canResumeCanonicalPosition,
   onSessionEnded,
   onSessionExpired,
@@ -228,8 +244,18 @@ export const useWebSocket = ({
         historyIdRef.current !== null &&
         canResumeCanonicalPosition()
       ) {
+        // Resume from what was applied, not from what was received. A socket
+        // closed over a sequence gap has received past the hole, and asking
+        // to continue after the last one received would have the server skip
+        // the missing operations for good -- then clear everything held
+        // beyond the hole, and call the canvas caught up. The painter's
+        // canonical history ends here too, which is what lets a settled fork
+        // carry on from it. Nothing has arrived on the new socket yet, so the
+        // received position starts over from the same place.
+        const applied = appliedCanonicalPosition();
+        lastSeqRef.current = applied;
         url.searchParams.set("history_id", historyIdRef.current);
-        url.searchParams.set("after_seq", String(lastSeqRef.current));
+        url.searchParams.set("after_seq", String(applied));
         resumeRequestedRef.current = true;
       }
       return url.toString();
@@ -241,7 +267,7 @@ export const useWebSocket = ({
     }
     const url = new URL(`wss://${window.location.host}/collaborate/${sessionId}/ws`);
     return appendResumePosition(url);
-  }, [canResumeCanonicalPosition, lastSeqRef]);
+  }, [appliedCanonicalPosition, canResumeCanonicalPosition, lastSeqRef]);
 
   // Set after connectWebSocket is defined; lets the close handler retry
   // without depending on the callback identity.
@@ -323,6 +349,11 @@ export const useWebSocket = ({
       isConnectingRef.current = false;
       return;
     }
+
+    // The old socket's messages may still be on their way onto the canvas.
+    // The resume position has to be taken after the last of them lands:
+    // taken before, the server would send them again on top of themselves.
+    await processingChainRef.current;
 
     try {
       const wsUrl = getWebSocketUrl();
@@ -449,8 +480,32 @@ export const useWebSocket = ({
         arrayBuffer = sequenced.payload;
       }
 
-      const message = decodeMessage(arrayBuffer);
+      const decoded = decodeMessage(arrayBuffer);
+      // Inside a sequenced envelope only two things belong: a canvas operation,
+      // and the reset point the server itself sequences. The server stores
+      // whatever type byte a client sends it, so a WELCOME or an END_SESSION
+      // can arrive here too -- and acted on, it would renumber or end the
+      // session for everybody who reads the history. Such a frame still holds
+      // its place, so it is stepped over exactly like one that will not decode.
+      const message =
+        decoded && sequenced &&
+        !isCanvasHistoryMessage(decoded) && decoded.type !== "resetPoint"
+          ? null
+          : decoded;
       if (!message) {
+        if (!sequenced) return;
+        // Every client of this build rejects the same frame the same way, and
+        // asking for it again would only bring it back: resuming from before
+        // it is a reconnect loop. So it is stepped over as an operation that
+        // does nothing, which is what the decoder's own policy already is --
+        // an operation applied wrongly is worse than one not applied at all.
+        console.warn(`Stepping over unreadable canonical message ${sequenced.seq}`);
+        await onUnreadableSequence(sequenced.seq);
+        lastSeqRef.current = Math.max(lastSeqRef.current, sequenced.seq);
+        if (!isCatchingUpRef.current && !(await verifyCanonicalPosition())) {
+          setIsCatchingUp(true);
+          ws.close(4000, "canonical sequence gap");
+        }
         return;
       }
       const raw = new Uint8Array(arrayBuffer);
@@ -896,6 +951,7 @@ export const useWebSocket = ({
     scheduleReconnect,
     onReconnectCanvas,
     onCanvasMessage,
+    onUnreadableSequence,
     onWelcome,
     onResetPoint,
     verifyCanonicalPosition,
