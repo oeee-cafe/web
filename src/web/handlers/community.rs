@@ -1458,7 +1458,7 @@ pub async fn do_accept_invitation(
 
     // Get community info for validation and push notification
     let community = find_community_by_id(&mut tx, invitation.community_id).await?;
-    let community = community.ok_or_else(|| anyhow::anyhow!("Community not found"))?;
+    let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
 
     // Store inviter_id before consuming invitation
     let inviter_id = invitation.inviter_id;
@@ -1583,7 +1583,7 @@ pub async fn do_reject_invitation(
 
     // Get community info for push notification
     let community = find_community_by_id(&mut tx, invitation.community_id).await?;
-    let community = community.ok_or_else(|| anyhow::anyhow!("Community not found"))?;
+    let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
 
     // Store inviter_id before consuming invitation
     let inviter_id = invitation.inviter_id;
