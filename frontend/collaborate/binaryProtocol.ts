@@ -89,9 +89,9 @@ export const MSG_TYPE = {
   WELCOME: 0x0e,
   // Declares the history identity and exact position reached by replay.
   CAUGHT_UP: 0x0f,
-  // Several sequenced history messages in one compressed frame, sent to a
-  // client whose URL asked for its replay that way. The server refuses the
-  // byte from a client, so one can only come from the server.
+  // Several sequenced history messages in one compressed frame: how a
+  // join's replay arrives. The server refuses the byte from a client, so one
+  // can only come from the server.
   REPLAY_BATCH: 0x10,
 
   // Client messages (> 0x10) - server just broadcasts

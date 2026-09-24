@@ -171,17 +171,10 @@ export class FakeServer {
   historyId: string;
   entries: { seq: number; payload: Uint8Array }[] = [];
   lastSeq = 0;
-  /**
-   * Whether a replay a client asks for in batches is sent that way. Off, this
-   * is a server from before batches, which sends a frame per message
-   * whatever the URL says.
-   */
-  batches: boolean;
   private readonly clients = new Map<FakeSocket, number>();
 
-  constructor(options: { historyId?: string; batches?: boolean } = {}) {
-    this.historyId = options.historyId ?? HISTORY_ID;
-    this.batches = options.batches ?? true;
+  constructor(historyId = HISTORY_ID) {
+    this.historyId = historyId;
   }
 
   /**
@@ -201,11 +194,7 @@ export class FakeServer {
       resumeHistory === this.historyId && resumeAfter <= this.lastSeq ? resumeAfter : 0;
     socket.deliver(replayStart(after, this.lastSeq, this.historyId));
     const replay = this.entries.filter((entry) => entry.seq > after);
-    if (this.batches && url.searchParams.get("replay") === "batch") {
-      if (replay.length > 0) socket.deliver(replayBatch(replay, this.historyId));
-    } else {
-      for (const entry of replay) socket.deliver(sequenced(entry.seq, entry.payload, this.historyId));
-    }
+    if (replay.length > 0) socket.deliver(replayBatch(replay, this.historyId));
     socket.deliver(caughtUp(this.lastSeq, this.historyId));
   }
 

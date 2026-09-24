@@ -131,11 +131,10 @@ describe("a session, joined and drawn in", () => {
 });
 
 describe("a join into a room with history", () => {
-  it("asks for the replay in batches and comes out at the room's canvas", async () => {
+  it("takes the replay as one batch and comes out at the room's canvas", async () => {
     server.sequence(stroke(1, MARK.theirs));
     server.sequence(stroke(2, MARK.mine));
     const socket = await mountSession();
-    expect(new URL(socket.url).searchParams.get("replay")).toBe("batch");
     await act(async () => server.admit(socket, 3));
     await settle(12);
 
@@ -147,17 +146,6 @@ describe("a join into a room with history", () => {
     await pointer().drag(MARK.afterReconnect, { x: MARK.afterReconnect.x + 12, y: MARK.afterReconnect.y });
     await settleUntil(() => deliveredSequences(socket).length > 0);
     expect(deliveredSequences(socket)[0]).toBe(3);
-  });
-
-  it("still joins a server that sends a frame per message, whatever it asked for", async () => {
-    server.batches = false;
-    server.sequence(stroke(1, MARK.theirs));
-    server.sequence(stroke(2, MARK.mine));
-    const socket = await mountSession();
-    await act(async () => server.admit(socket, 3));
-    await settle(12);
-    expect(deliveredSequences(socket)).toEqual([1, 2]);
-    await settleUntil(() => inkAt(MARK.theirs) && inkAt(MARK.mine));
   });
 });
 

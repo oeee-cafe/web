@@ -39,33 +39,20 @@ struct Goodbye {
     reason: Cow<'static, str>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub struct ResumeQuery {
     history_id: Option<Uuid>,
     after_seq: Option<u64>,
-    /// `batch` asks for the replay as REPLAY_BATCH frames. A client that does
-    /// not say so predates them and gets one SEQUENCED frame per message.
-    replay: Option<String>,
 }
 
 impl ResumeQuery {
-    fn position(&self) -> Option<(Uuid, u64)> {
+    fn position(self) -> Option<(Uuid, u64)> {
         self.history_id.zip(self.after_seq)
-    }
-
-    fn batched(&self) -> bool {
-        self.replay.as_deref() == Some("batch")
     }
 }
 
-/// How much history one REPLAY_BATCH holds before compression.
-///
-/// A replay is up to the auto-reset threshold of messages, every one of them
-/// a WebSocket frame with a 25-byte envelope and, on the client, a turn of
-/// the processing chain. Batched, a join is a few frames, and the stroke
-/// points inside them -- int16 pairs that repeat their high bytes -- deflate
-/// to a fraction of their size. The batch is bounded so the client can start
-/// applying before the whole history has arrived.
+/// How much history one REPLAY_BATCH holds before compression. Bounded so
+/// the client can start applying before the whole history has arrived.
 const REPLAY_BATCH_BYTES: usize = 256 * 1024;
 
 // How many messages a room may add on top of its last checkpoint before the
@@ -161,15 +148,7 @@ pub async fn websocket_collaborate_handler(
         .user
         .ok_or_else(|| anyhow::anyhow!("Authentication required"))?;
     Ok(ws.on_upgrade(move |socket| {
-        handle_socket(
-            socket,
-            room_uuid,
-            state,
-            user.id,
-            user.login_name,
-            resume.position(),
-            resume.batched(),
-        )
+        handle_socket(socket, room_uuid, state, user.id, user.login_name, resume.position())
     }))
 }
 
@@ -180,7 +159,6 @@ pub async fn handle_socket(
     user_id: Uuid,
     user_login_name: String,
     resume_position: Option<(Uuid, u64)>,
-    batched_replay: bool,
 ) {
     let (mut sender, mut receiver) = socket.split();
 
@@ -375,12 +353,7 @@ pub async fn handle_socket(
     // Send history to new connection, remembering the highest sequence number
     // it contained so the live stream can skip messages history already covered
     let (history_identity, max_history_seq) = match send_history_to_new_connection(
-        &state,
-        room_uuid,
-        &mut sender,
-        &connection_id,
-        resume_position,
-        batched_replay,
+        &state, room_uuid, &mut sender, &connection_id, resume_position,
     )
     .await
     {
@@ -1083,6 +1056,12 @@ mod forwarding_tests {
 /// One REPLAY_BATCH frame: the history id, how many messages, then the
 /// messages as `[seq:8][len:4][bytes]` runs under zlib.
 ///
+/// Every join and every resume is replayed this way. A replay is up to the
+/// auto-reset threshold of messages, and framed one by one each cost a
+/// 25-byte envelope and a turn of the client's processing chain; the stroke
+/// points inside them are int16 pairs that repeat their high bytes, and
+/// deflate to less than half.
+///
 /// `[0x10][history_id:16][count:4][zlib(entries)]`, all little-endian. Each
 /// entry is what the same message's SEQUENCED frame would carry after its
 /// envelope, so a client applies one exactly as it applies the other.
@@ -1146,7 +1125,6 @@ async fn send_history_to_new_connection(
     sender: &mut SplitSink<WebSocket, Message>,
     connection_id: &str,
     resume_position: Option<(Uuid, u64)>,
-    batched: bool,
 ) -> Option<(Uuid, u64)> {
     let redis_store = redis_messages::RedisMessageStore::new(state.redis_pool.clone());
 
@@ -1191,36 +1169,20 @@ async fn send_history_to_new_connection(
                 };
                 to_send.push((*seq, payload));
             }
-            // `feed` rather than `send`: a replay is up to the whole
-            // auto-reset threshold of messages, and `send` flushes each one
-            // on its own. The flush below covers all of them, so a join
-            // costs a few writes instead of one per stored operation.
+            // `feed` rather than `send`: `send` flushes each frame on its
+            // own, and the flush below covers all of them.
             let mut fed = true;
-            if batched {
-                let last = to_send.last().map(|(seq, _)| *seq);
-                for batch in replay_batches(history_id, to_send.iter().copied(), REPLAY_BATCH_BYTES)
-                {
-                    if sender.feed(Message::Binary(batch.into())).await.is_err() {
-                        fed = false;
-                        break;
-                    }
-                }
-                if fed {
-                    max_seq = max_seq.max(last.unwrap_or(0));
-                }
-            } else {
-                for (seq, payload) in &to_send {
-                    let wrapped = Message::Binary(wrap_sequenced(history_id, *seq, payload).into());
-                    if sender.feed(wrapped).await.is_err() {
-                        fed = false;
-                        break;
-                    }
-                    max_seq = max_seq.max(*seq);
+            for batch in replay_batches(history_id, to_send.iter().copied(), REPLAY_BATCH_BYTES) {
+                if sender.feed(Message::Binary(batch.into())).await.is_err() {
+                    fed = false;
+                    break;
                 }
             }
-            if !fed {
+            if fed {
+                max_seq = max_seq.max(to_send.last().map(|(seq, _)| *seq).unwrap_or(0));
+            } else {
                 warn!(
-                    "Failed to send stored message to new connection {}",
+                    "Failed to send stored history to new connection {}",
                     connection_id
                 );
             }

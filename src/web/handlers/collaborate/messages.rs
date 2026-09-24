@@ -109,10 +109,9 @@ pub enum MessageType {
     Welcome = 0x0E,
     // Declares the exact canonical position reached by initial replay.
     CaughtUp = 0x0F,
-    // Several sequenced history messages in one compressed frame, for a
-    // client that asked for its replay that way (server -> client only; the
-    // server range below 0x10 is full, and `protocol::validate` refuses this
-    // byte from a client).
+    // Several sequenced history messages in one compressed frame: how a
+    // join's replay is sent (server -> client only; the server range below
+    // 0x10 is full, and `protocol::validate` refuses this byte from a client).
     ReplayBatch = 0x10,
 }
 
