@@ -126,7 +126,7 @@ pub async fn find_followings_by_user_id(
     .fetch_all(&mut **tx)
     .await?;
 
-    let following_infos: Vec<FollowingInfo> = rows
+    let mut following_infos: Vec<FollowingInfo> = rows
         .into_iter()
         .filter_map(|row| {
             row.user_id.map(|user_id| FollowingInfo {
@@ -147,6 +147,10 @@ pub async fn find_followings_by_user_id(
             }
         })
         .collect();
+
+    // Those with a banner first; the sort is stable, so each group keeps
+    // the display-name order the query gave it.
+    following_infos.sort_by_key(|f| f.banner_image_filename.is_none());
 
     Ok(following_infos)
 }
