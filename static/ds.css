@@ -1473,6 +1473,20 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   justify-content: center;
 }
 
+/* The language, under the theme and inside the same rules. */
+.toolbar-language {
+  margin-top: 10px;
+}
+
+.toolbar-language .ds-select {
+  display: block;
+  width: 100%;
+}
+
+.toolbar-language .ds-button {
+  margin-top: 6px;
+}
+
 /* The theme menu's square shows the theme in use. */
 .nav-bar .toolbar-theme-menu svg {
   display: none;
