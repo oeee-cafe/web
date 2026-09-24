@@ -14,7 +14,8 @@ use crate::models::admin::{
 use crate::web::handlers::collaborate::preview::preview_versions;
 use crate::models::store_product::{
     self, add as add_store_product, find as find_store_product, list_all as list_store_products,
-    set_on_sale as set_store_product_on_sale, StoreProduct,
+    set_on_sale as set_store_product_on_sale, set_sale_window as set_store_product_sale_window,
+    StoreProduct,
 };
 use crate::models::supporter::{current_year, Store};
 use crate::models::user::find_user_by_login_name;
@@ -694,7 +695,69 @@ pub async fn replay_collaborative_session(
 #[derive(serde::Serialize)]
 struct StoreGroup {
     store: Store,
-    products: Vec<StoreProduct>,
+    products: Vec<StoreProductRow>,
+}
+
+/// A product as its row shows it: the window again as the `datetime-local`
+/// inputs that change it want it, in the page's own time zone.
+#[derive(serde::Serialize)]
+struct StoreProductRow {
+    #[serde(flatten)]
+    product: StoreProduct,
+    sale_starts_local: String,
+    sale_ends_local: String,
+}
+
+/// The time zone /admin/store is read and written in, as its dates are
+/// printed elsewhere on the admin pages.
+const STORE_TZ: chrono_tz::Tz = chrono_tz::Asia::Seoul;
+
+/// How a `datetime-local` input writes a moment, and so how one is read back.
+const LOCAL_INPUT: &str = "%Y-%m-%dT%H:%M";
+
+fn to_local_input(at: Option<chrono::DateTime<chrono::Utc>>) -> String {
+    at.map(|at| at.with_timezone(&STORE_TZ).format(LOCAL_INPUT).to_string())
+        .unwrap_or_default()
+}
+
+/// A sale window as two `datetime-local` values in Seoul time, either empty
+/// for an end left open. A browser that was given a step adds seconds, so
+/// those are read too.
+fn parse_sale_window(
+    starts: &str,
+    ends: &str,
+) -> Result<
+    (
+        Option<chrono::DateTime<chrono::Utc>>,
+        Option<chrono::DateTime<chrono::Utc>>,
+    ),
+    String,
+> {
+    use chrono::{NaiveDateTime, TimeZone};
+    let parse = |value: &str, which: &str| -> Result<Option<chrono::DateTime<chrono::Utc>>, String> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Ok(None);
+        }
+        let naive = NaiveDateTime::parse_from_str(value, LOCAL_INPUT)
+            .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S"))
+            .map_err(|_| format!("The {which} is not a date and time."))?;
+        // Seoul has no daylight saving, so every local time is exactly one
+        // moment; `single` is only there to say so.
+        STORE_TZ
+            .from_local_datetime(&naive)
+            .single()
+            .map(|at| Some(at.with_timezone(&chrono::Utc)))
+            .ok_or_else(|| format!("The {which} is not a time Seoul has."))
+    };
+    let starts = parse(starts, "start")?;
+    let ends = parse(ends, "end")?;
+    if let (Some(starts), Some(ends)) = (starts, ends) {
+        if ends <= starts {
+            return Err("A sale has to end after it starts.".to_string());
+        }
+    }
+    Ok((starts, ends))
 }
 
 /// What the add form was sent, echoed back when it is turned away so
@@ -709,6 +772,10 @@ pub struct AddStoreProductForm {
     year: String,
     #[serde(default)]
     label: String,
+    #[serde(default)]
+    sale_starts_at: String,
+    #[serde(default)]
+    sale_ends_at: String,
 }
 
 /// The years a pack may be for: from the first one sold to a few ahead,
@@ -783,11 +850,17 @@ async fn render_store_page(
         .map(|store| StoreGroup {
             store,
             products: {
-                let (mine, rest) = products
+                let (mine, rest): (Vec<_>, Vec<_>) = products
                     .drain(..)
                     .partition(|product| product.store == store.as_str());
                 products = rest;
-                mine
+                mine.into_iter()
+                    .map(|product| StoreProductRow {
+                        sale_starts_local: to_local_input(product.sale_starts_at),
+                        sale_ends_local: to_local_input(product.sale_ends_at),
+                        product,
+                    })
+                    .collect()
             },
         })
         .collect();
@@ -845,9 +918,16 @@ pub async fn admin_add_store_product(
         Ok(valid) => valid,
         Err(error) => return refused(error, form).await,
     };
+    let (starts_at, ends_at) = match parse_sale_window(&form.sale_starts_at, &form.sale_ends_at) {
+        Ok(window) => window,
+        Err(error) => return refused(error, form).await,
+    };
 
     let mut tx = state.db_pool.begin().await?;
     let added = add_store_product(&mut tx, store, &product, year, label.as_deref()).await?;
+    if added && (starts_at.is_some() || ends_at.is_some()) {
+        set_store_product_sale_window(&mut tx, store, &product, starts_at, ends_at).await?;
+    }
     tx.commit().await?;
     if !added {
         return refused(
@@ -864,6 +944,8 @@ pub async fn admin_add_store_product(
         store = store.as_str(),
         product,
         year,
+        ?starts_at,
+        ?ends_at,
         "added a product to the store catalogue"
     );
     store_product::refresh_any_on_sale(&state.db_pool).await?;
@@ -904,6 +986,63 @@ pub async fn admin_set_store_product_on_sale(
         product,
         on_sale = form.on_sale,
         "changed whether a product is on sale"
+    );
+    store_product::refresh_any_on_sale(&state.db_pool).await?;
+    Ok(Redirect::to("/admin/store").into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StoreProductSaleWindowForm {
+    #[serde(default)]
+    pub sale_starts_at: String,
+    #[serde(default)]
+    pub sale_ends_at: String,
+}
+
+/// POST /admin/store/:store/:product/sale-window -- sets when a product is
+/// sold, in Seoul time, either end left empty for open. It narrows being on
+/// sale and nothing more: /supporter offers the product inside the window
+/// while it is on sale, and its purchases count whenever they were made.
+pub async fn admin_set_store_product_sale_window(
+    admin: AdminUser,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path((store, product)): Path<(String, String)>,
+    headers: HeaderMap,
+    Form(form): Form<StoreProductSaleWindowForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Ok(StatusCode::FORBIDDEN.into_response());
+    }
+    let Some(store) = Store::parse(&store) else {
+        return Err(AppError::NotFound("Store".to_string()));
+    };
+    let (starts_at, ends_at) = match parse_sale_window(&form.sale_starts_at, &form.sale_ends_at) {
+        Ok(window) => window,
+        Err(error) => {
+            let rendered = render_store_page(
+                &state,
+                &admin,
+                ftl_lang,
+                Some(format!("{product}: {error}")),
+                AddStoreProductForm::default(),
+            )
+            .await?;
+            return Ok((StatusCode::BAD_REQUEST, Html(rendered)).into_response());
+        }
+    };
+    let mut tx = state.db_pool.begin().await?;
+    if !set_store_product_sale_window(&mut tx, store, &product, starts_at, ends_at).await? {
+        return Err(AppError::NotFound("Product".to_string()));
+    }
+    tx.commit().await?;
+    tracing::info!(
+        admin = %admin.0.login_name,
+        store = store.as_str(),
+        product,
+        ?starts_at,
+        ?ends_at,
+        "changed when a product is sold"
     );
     store_product::refresh_any_on_sale(&state.db_pool).await?;
     Ok(Redirect::to("/admin/store").into_response())
@@ -1455,7 +1594,10 @@ mod tests {
                 groups => json!([
                     {"store": "apple", "products": [
                         {"store": "apple", "product": "cafe.oeee.supporter.2026", "year": 2026,
-                         "label": null, "on_sale": true, "created_at": "2026-01-01T00:00:00Z"},
+                         "label": null, "on_sale": true, "selling_now": false,
+                         "sale_starts_at": "2026-01-01T00:00:00Z", "sale_ends_at": null,
+                         "sale_starts_local": "2026-01-01T09:00", "sale_ends_local": "",
+                         "created_at": "2026-01-01T00:00:00Z"},
                         {"store": "apple", "product": "cafe.oeee.supporter.2025", "year": 2025,
                          "label": "Last year's", "on_sale": false, "created_at": "2025-01-01T00:00:00Z"},
                     ]},
@@ -1487,6 +1629,10 @@ mod tests {
         assert!(rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/on-sale""#));
         assert!(rendered.contains("Take off sale"));
         assert!(rendered.contains("Put on sale"));
+        // Its window, as the inputs that change it want it.
+        assert!(rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/sale-window""#));
+        assert!(rendered.contains(r#"value="2026-01-01T09:00""#));
+        assert!(rendered.contains("outside its window"));
         assert!(rendered.contains("Last year&#x27;s") || rendered.contains("Last year's"));
         assert!(rendered.contains(r#"href="/admin/store""#), "in the nav");
         assert!(rendered.contains("[microsoft_store]"), "says the store cannot be asked");
@@ -1508,6 +1654,24 @@ mod tests {
     }
 
     #[test]
+    fn a_sale_window_is_read_in_seoul_time() {
+        use super::{parse_sale_window, to_local_input};
+        let (starts, ends) = parse_sale_window("2026-12-01T09:00", " ").unwrap();
+        assert_eq!(starts.unwrap().to_rfc3339(), "2026-12-01T00:00:00+00:00");
+        assert_eq!(ends, None);
+        assert_eq!(to_local_input(starts), "2026-12-01T09:00", "and written back the same");
+        assert_eq!(parse_sale_window("", "").unwrap(), (None, None));
+        assert!(parse_sale_window("2026-12-01T09:00:30", "").is_ok(), "seconds");
+        for (starts, ends, why) in [
+            ("2026-12-02T00:00", "2026-12-01T00:00", "ends before it starts"),
+            ("2026-12-01T00:00", "2026-12-01T00:00", "ends as it starts"),
+            ("tomorrow", "", "not a date"),
+        ] {
+            assert!(parse_sale_window(starts, ends).is_err(), "{why}");
+        }
+    }
+
+    #[test]
     fn a_store_product_is_checked_before_it_is_added() {
         use super::{validate_store_product, AddStoreProductForm};
         use crate::models::supporter::{current_year, Store};
@@ -1516,6 +1680,7 @@ mod tests {
             product: product.to_string(),
             year: year.to_string(),
             label: label.to_string(),
+            ..Default::default()
         };
         let year = current_year().to_string();
         assert_eq!(
