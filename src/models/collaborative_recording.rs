@@ -26,7 +26,9 @@ pub async fn note_span(
             first_seq = EXCLUDED.first_seq,
             last_seq = EXCLUDED.last_seq,
             messages = EXCLUDED.messages,
-            sealed = EXCLUDED.sealed,
+            -- Sealed is final: a flush that lands after the seal must not
+            -- reopen the recording.
+            sealed = collaborative_session_recordings.sealed OR EXCLUDED.sealed,
             updated_at = now()
         "#,
         session_id,
@@ -38,6 +40,17 @@ pub async fn note_span(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+/// Whether anything of this session has been recorded, and if so whether the
+/// recording is sealed. None when nothing has been written for it yet.
+pub async fn sealed_state(pool: &PgPool, session_id: Uuid) -> Result<Option<bool>> {
+    Ok(sqlx::query_scalar!(
+        "SELECT sealed FROM collaborative_session_recordings WHERE session_id = $1",
+        session_id,
+    )
+    .fetch_optional(pool)
+    .await?)
 }
 
 /// How long the stored transcript is. The transcript is stored whole each
@@ -57,6 +70,17 @@ pub async fn note_chat_lines(pool: &PgPool, session_id: Uuid, lines: usize) -> R
     .execute(pool)
     .await?;
     Ok(())
+}
+
+/// How many synchronisation reports have been filed for this session.
+pub async fn report_count(pool: &PgPool, session_id: Uuid) -> Result<i64> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT COALESCE(reports, 0)::bigint as "reports!" FROM collaborative_session_recordings WHERE session_id = $1"#,
+        session_id,
+    )
+    .fetch_optional(pool)
+    .await?
+    .unwrap_or(0))
 }
 
 /// One more synchronisation report filed.

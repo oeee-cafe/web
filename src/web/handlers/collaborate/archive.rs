@@ -68,6 +68,17 @@ const FLUSH_BATCH: isize = 2048;
 pub const FLUSH_EVERY: u64 = 512;
 
 const FLUSH_CLAIM_TTL: u64 = 120;
+/// How long a seal waits for a flush already under way to finish, in
+/// attempts of a quarter second. A flush is a few object writes; one that
+/// takes longer than this is stuck, and the sweep will seal on its next pass.
+const SEAL_CLAIM_ATTEMPTS: u32 = 40;
+/// The most transcript lines kept for one session. The transcript is stored
+/// whole on every flush, so an unbounded one would be re-uploaded in full
+/// each time; a session's chat is far below this.
+const MAX_CHAT_LINES: isize = 5000;
+/// The most reports read back for one session. Keys sort by the moment
+/// filed, so these are the newest.
+const MAX_DIAGNOSTICS_READ: usize = 100;
 
 /// How many of a session's chunks are fetched at once.
 ///
@@ -345,6 +356,25 @@ impl ArchiveBuffer {
         Ok(raw.iter().filter_map(|entry| decode_buffered(entry)).collect())
     }
 
+    /// `peek`, and also how many raw entries were read: the count to trim
+    /// once the chunk is stored. An entry that does not decode is still one
+    /// entry in the list, and trimming by the decoded count instead left it
+    /// there, put the next chunk's first message twice in storage, and a run
+    /// of them stopped the flusher for good with the buffer still growing.
+    pub async fn peek_batch(
+        &self,
+        room_uuid: Uuid,
+        limit: isize,
+    ) -> BufferResult<(Vec<ArchivedMessage>, usize)> {
+        let mut conn = self.pool.get().await?;
+        let raw: Vec<Vec<u8>> = conn.lrange(buffer_key(room_uuid), 0, limit - 1).await?;
+        let entries = raw
+            .iter()
+            .filter_map(|entry| decode_buffered(entry))
+            .collect();
+        Ok((entries, raw.len()))
+    }
+
     pub async fn drop_front(&self, room_uuid: Uuid, count: usize) -> BufferResult<()> {
         let mut conn = self.pool.get().await?;
         conn.ltrim::<_, ()>(buffer_key(room_uuid), count as isize, -1)
@@ -365,6 +395,15 @@ impl ArchiveBuffer {
             .query_async::<Option<String>>(&mut *conn)
             .await?
             .is_some())
+    }
+
+    /// Keeps the claim while a long flush runs, so it cannot lapse between
+    /// two chunks and let a second flusher trim what this one is writing.
+    pub async fn extend_claim(&self, room_uuid: Uuid) -> BufferResult<()> {
+        let mut conn = self.pool.get().await?;
+        conn.expire::<_, ()>(archive_claim_key(room_uuid), FLUSH_CLAIM_TTL as i64)
+            .await?;
+        Ok(())
     }
 
     pub async fn release(&self, room_uuid: Uuid) -> BufferResult<()> {
@@ -421,6 +460,7 @@ pub async fn record_chat(state: &AppState, room_uuid: Uuid, frame: &[u8]) {
         let mut conn = state.redis_pool.get().await?;
         let key = chat_buffer_key(room_uuid);
         conn.rpush::<_, _, ()>(&key, encoded).await?;
+        conn.ltrim::<_, ()>(&key, -MAX_CHAT_LINES, -1).await?;
         conn.expire::<_, ()>(&key, ARCHIVE_BUFFER_TTL as i64).await?;
         Ok(())
     }
@@ -614,7 +654,30 @@ pub async fn flush_room(state: &AppState, room_uuid: Uuid) -> usize {
         }
     }
 
-    let written = write_chunks(state, room_uuid, &buffer).await;
+    let (written, chatted) = flush_claimed(state, room_uuid, &buffer).await;
+    if written > 0 || chatted > 0 {
+        if let Err(e) = write_manifest(state, room_uuid, false).await {
+            warn!(
+                "Failed to write the archive manifest for room {}: {}",
+                room_uuid,
+                describe(&*e)
+            );
+        }
+    }
+    if let Err(e) = buffer.release(room_uuid).await {
+        warn!("Failed to release the archive claim for room {}: {}", room_uuid, e);
+    }
+    written
+}
+
+/// The flush itself, for a caller holding the claim: the chunks, then the
+/// transcript. Returns how many messages and how many lines were written.
+async fn flush_claimed(
+    state: &AppState,
+    room_uuid: Uuid,
+    buffer: &ArchiveBuffer,
+) -> (usize, usize) {
+    let written = write_chunks(state, room_uuid, buffer).await;
     let chatted = match write_chat(state, room_uuid).await {
         Ok(lines) => {
             if lines > 0 {
@@ -639,19 +702,7 @@ pub async fn flush_room(state: &AppState, room_uuid: Uuid) -> usize {
             0
         }
     };
-    if written > 0 || chatted > 0 {
-        if let Err(e) = write_manifest(state, room_uuid, false).await {
-            warn!(
-                "Failed to write the archive manifest for room {}: {}",
-                room_uuid,
-                describe(&*e)
-            );
-        }
-    }
-    if let Err(e) = buffer.release(room_uuid).await {
-        warn!("Failed to release the archive claim for room {}: {}", room_uuid, e);
-    }
-    written
+    (written, chatted)
 }
 
 async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer) -> usize {
@@ -661,15 +712,33 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
     let client = s3_client(&state.config);
     let mut written = 0usize;
     loop {
-        let entries = match buffer.peek(room_uuid, FLUSH_BATCH).await {
-            Ok(entries) => entries,
+        let (entries, raw) = match buffer.peek_batch(room_uuid, FLUSH_BATCH).await {
+            Ok(batch) => batch,
             Err(e) => {
                 warn!("Failed to read the archive buffer for room {}: {}", room_uuid, e);
                 return written;
             }
         };
         if entries.is_empty() {
+            if raw > 0 {
+                // A run of entries nothing can read. Left there they would
+                // stop every flush at this point for the rest of the session.
+                warn!(
+                    "Dropping {} unreadable archive entries for room {}",
+                    raw, room_uuid
+                );
+                if buffer.drop_front(room_uuid, raw).await.is_err() {
+                    return written;
+                }
+                continue;
+            }
             return written;
+        }
+        if let Err(e) = buffer.extend_claim(room_uuid).await {
+            warn!(
+                "Failed to keep the archive claim for room {}: {}",
+                room_uuid, e
+            );
         }
         // Ephemeral messages never reach the sequencer, so every entry here
         // has a position; the first one names the object.
@@ -703,7 +772,7 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
             return written;
         }
 
-        if let Err(e) = buffer.drop_front(room_uuid, count).await {
+        if let Err(e) = buffer.drop_front(room_uuid, raw).await {
             // The chunk is stored; failing to trim means it is written again
             // next time, over the same bytes.
             warn!("Failed to trim the archive buffer for room {}: {}", room_uuid, e);
@@ -717,7 +786,7 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
             "Archived {} messages for room {} from sequence {}",
             count, room_uuid, first_seq
         );
-        if (count as isize) < FLUSH_BATCH {
+        if (raw as isize) < FLUSH_BATCH {
             return written;
         }
     }
@@ -726,19 +795,42 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
 /// Everything the room has, and the note that says nothing more is coming.
 ///
 /// Called where a session ends, before the room's Redis state is cleaned up --
-/// the participant map the manifest needs is one of the keys that goes.
+/// the participant map the manifest needs is one of the keys that goes. A
+/// recording already sealed is left exactly as it is: its manifest is final,
+/// and the map it was written from is gone.
 ///
 /// `force` is for the one place that knows a session has just ended, which is
 /// worth a manifest even if the last flush already emptied the buffer. The
 /// sweeper does not know that: it re-examines every ended session on every
 /// pass, so sealing unconditionally there wrote a manifest per session per
 /// five minutes -- thousands of objects an hour, for sessions that had nothing
-/// recorded at all. A room with nothing buffered has nothing left to seal.
+/// recorded at all. A room with nothing recorded and nothing buffered has
+/// nothing to seal; one with a recording that is not yet sealed -- a seal
+/// that failed on an earlier pass -- is sealed now.
+///
+/// Holds the flush claim itself across the flush and the manifest. Taken as
+/// two steps, a flush already under way made `flush_room` return at once,
+/// the manifest said sealed with messages still buffered, and the other
+/// flusher then rewrote it unsealed from a participant map that the cleanup
+/// had meanwhile deleted.
 pub async fn seal_room(state: &AppState, room_uuid: Uuid, force: bool) {
     if bucket(&state.config).is_none() {
         return;
     }
-    if !force {
+    let recorded =
+        match crate::models::collaborative_recording::sealed_state(&state.db_pool, room_uuid).await
+        {
+            Ok(Some(true)) => return,
+            Ok(state) => state.is_some(),
+            Err(e) => {
+                warn!(
+                    "Failed to read the recording state for room {}: {}",
+                    room_uuid, e
+                );
+                false
+            }
+        };
+    if !force && !recorded {
         let drawing = ArchiveBuffer::new(state.redis_pool.clone())
             .pending(room_uuid)
             .await;
@@ -753,8 +845,38 @@ pub async fn seal_room(state: &AppState, room_uuid: Uuid, force: bool) {
             }
         }
     }
-    let flushed = flush_room(state, room_uuid).await;
-    if let Err(e) = write_manifest(state, room_uuid, true).await {
+
+    let buffer = ArchiveBuffer::new(state.redis_pool.clone());
+    let mut claimed = false;
+    for _ in 0..SEAL_CLAIM_ATTEMPTS {
+        match buffer.claim(room_uuid).await {
+            Ok(true) => {
+                claimed = true;
+                break;
+            }
+            Ok(false) => tokio::time::sleep(std::time::Duration::from_millis(250)).await,
+            Err(e) => {
+                warn!(
+                    "Failed to claim the archive of room {} to seal it: {}",
+                    room_uuid, e
+                );
+                return;
+            }
+        }
+    }
+    if !claimed {
+        warn!(
+            "Room {} is still being flushed; leaving it for the sweep to seal",
+            room_uuid
+        );
+        return;
+    }
+    let (flushed, _) = flush_claimed(state, room_uuid, &buffer).await;
+    let sealed = write_manifest(state, room_uuid, true).await;
+    if let Err(e) = buffer.release(room_uuid).await {
+        warn!("Failed to release the archive claim for room {}: {}", room_uuid, e);
+    }
+    if let Err(e) = sealed {
         warn!(
             "Failed to seal the archive for room {}: {}",
             room_uuid,
@@ -762,10 +884,25 @@ pub async fn seal_room(state: &AppState, room_uuid: Uuid, force: bool) {
         );
         return;
     }
+    // The transcript is in storage whole. Held here it only made the sweep
+    // find something buffered and seal this room again on every pass for a
+    // day.
+    if let Err(e) = clear_chat_buffer(state, room_uuid).await {
+        warn!(
+            "Failed to clear the transcript buffer for room {}: {}",
+            room_uuid, e
+        );
+    }
     info!(
         "Sealed the archive for room {} ({} messages in this pass)",
         room_uuid, flushed
     );
+}
+
+async fn clear_chat_buffer(state: &AppState, room_uuid: Uuid) -> BufferResult<()> {
+    let mut conn = state.redis_pool.get().await?;
+    conn.del::<_, ()>(chat_buffer_key(room_uuid)).await?;
+    Ok(())
 }
 
 /// What a room has actually had written out.
@@ -901,6 +1038,15 @@ async fn write_manifest(
     room_uuid: Uuid,
     sealed: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // A sealed manifest is final. The participant map it was written from
+    // goes with the room's Redis state, so a rewrite -- an admin download
+    // flushing a stray line, a flush that raced the seal -- would replace
+    // it with one that names nobody and says the recording is open.
+    if crate::models::collaborative_recording::sealed_state(&state.db_pool, room_uuid).await?
+        == Some(true)
+    {
+        return Ok(());
+    }
     let session = sqlx::query!(
         "SELECT width, height, created_at, ended_at FROM collaborative_sessions WHERE id = $1",
         room_uuid
@@ -1007,10 +1153,14 @@ pub async fn store_diagnostic(
     let Some(bucket) = bucket(&state.config) else {
         return Ok(None);
     };
+    // A few random characters after the moment, so two reports filed in the
+    // same millisecond -- a client files two back to back when a checkpoint
+    // fails and the socket then closes on the gap -- do not overwrite.
     let key = format!(
-        "{ARCHIVE_R2_PREFIX}/{room_uuid}/diagnostics/{}-{}.json",
+        "{ARCHIVE_R2_PREFIX}/{room_uuid}/diagnostics/{}-{}-{}.json",
         chrono::Utc::now().format("%Y%m%dT%H%M%S%.3fZ"),
         user_login_name,
+        &Uuid::new_v4().simple().to_string()[..6],
     );
     s3_client(&state.config)
         .put_object()
@@ -1021,6 +1171,35 @@ pub async fn store_diagnostic(
         .send()
         .await?;
     Ok(Some(key))
+}
+
+/// Every key under a prefix, across every page the bucket answers with.
+///
+/// One page is a thousand keys, in name order: taken alone, a session with
+/// more chunks than that came back without its newest ones, and read as
+/// complete.
+async fn list_keys(
+    client: &aws_sdk_s3::Client,
+    bucket: &str,
+    prefix: String,
+) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+    let mut pages = client
+        .list_objects_v2()
+        .bucket(bucket)
+        .prefix(prefix)
+        .into_paginator()
+        .send();
+    let mut keys = Vec::new();
+    while let Some(page) = pages.next().await {
+        let page = page?;
+        keys.extend(
+            page.contents()
+                .iter()
+                .filter_map(|object| object.key())
+                .map(str::to_string),
+        );
+    }
+    Ok(keys)
 }
 
 /// Everything stored for a session, its objects end to end, and the manifest
@@ -1041,20 +1220,12 @@ pub async fn download_session(
     flush_room(state, room_uuid).await;
 
     let client = s3_client(&state.config);
-    let listed = client
-        .list_objects_v2()
-        .bucket(bucket)
-        .prefix(format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/"))
-        .send()
-        .await?;
-
-    let mut keys: Vec<String> = listed
-        .contents()
-        .iter()
-        .filter_map(|object| object.key())
-        .filter(|key| key.ends_with(CHUNK_SUFFIX) || key.ends_with(CHUNK_SUFFIX_PLAIN))
-        .map(|key| key.to_string())
-        .collect();
+    let mut keys: Vec<String> =
+        list_keys(&client, bucket, format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/"))
+            .await?
+            .into_iter()
+            .filter(|key| key.ends_with(CHUNK_SUFFIX) || key.ends_with(CHUNK_SUFFIX_PLAIN))
+            .collect();
     // Names are the zero-padded first sequence, so this is sequence order.
     keys.sort();
 
@@ -1090,18 +1261,12 @@ pub async fn read_tail(
         return Ok(Vec::new());
     };
     let client = s3_client(&state.config);
-    let listed = client
-        .list_objects_v2()
-        .bucket(bucket)
-        .prefix(format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/"))
-        .send()
-        .await?;
-    let mut chunks: Vec<(u64, String)> = listed
-        .contents()
-        .iter()
-        .filter_map(|object| object.key())
-        .filter_map(|key| chunk_first_seq(key).map(|first| (first, key.to_string())))
-        .collect();
+    let mut chunks: Vec<(u64, String)> =
+        list_keys(&client, bucket, format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/"))
+            .await?
+            .into_iter()
+            .filter_map(|key| chunk_first_seq(&key).map(|first| (first, key)))
+            .collect();
     chunks.sort();
     let keys = chunks_after(&chunks, after);
 
@@ -1232,21 +1397,18 @@ pub async fn download_diagnostics(
         return Ok(Vec::new());
     };
     let client = s3_client(&state.config);
-    let listed = client
-        .list_objects_v2()
-        .bucket(bucket)
-        .prefix(format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/diagnostics/"))
-        .send()
-        .await?;
-
     // The key begins with the moment it was filed, so this is chronological.
-    let mut keys: Vec<String> = listed
-        .contents()
-        .iter()
-        .filter_map(|object| object.key())
-        .map(|key| key.to_string())
-        .collect();
+    let mut keys = list_keys(
+        &client,
+        bucket,
+        format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/diagnostics/"),
+    )
+    .await?;
     keys.sort();
+    // The newest, bounded: each is a fetch and up to half a megabyte held.
+    if keys.len() > MAX_DIAGNOSTICS_READ {
+        keys.drain(..keys.len() - MAX_DIAGNOSTICS_READ);
+    }
 
     let mut reports = Vec::new();
     for key in keys {
@@ -1297,6 +1459,12 @@ fn filed_as(key: &str) -> (Option<String>, Option<String>) {
         .and_then(|name| name.strip_suffix(".json"))
     else {
         return (None, None);
+    };
+    // Less the random tail `store_diagnostic` adds; a name from before it
+    // had none.
+    let name = match name.rsplit_once('-') {
+        Some((rest, tail)) if tail.len() == 6 && tail.bytes().all(|b| b.is_ascii_hexdigit()) => rest,
+        _ => name,
     };
     match name.split_once('-') {
         Some((at, by)) => {
