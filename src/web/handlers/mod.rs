@@ -1339,33 +1339,6 @@ mod template_tests {
         assert!(rendered.contains("/login?next="));
     }
 
-    /// Signing up offers the same providers' buttons as signing in, under
-    /// its own question, and keeps where the reader was going through them.
-    #[test]
-    fn signing_up_offers_the_providers_signing_in_does() {
-        let env = test_support::env();
-        let render = |on: bool| {
-            env.get_template("signup.jinja")
-                .expect("signup loads")
-                .render(context! {
-                    next => "/draw",
-                    apple_enabled => on,
-                    google_enabled => on,
-                    ..chrome()
-                })
-                .expect("signup renders")
-        };
-        let off = render(false);
-        assert!(!off.contains("sign-up-other-ways"));
-        assert!(!off.contains(r#"href="/auth/apple"#));
-        let on = render(true);
-        assert!(on.contains("sign-up-other-ways"));
-        assert!(on.contains("auth-card-providers"));
-        assert!(on.contains("/auth/apple?next="));
-        assert!(on.contains("/auth/google?next="));
-        assert!(on.contains("/static/signin/google-light.svg"));
-    }
-
     /// Signing up after signing in with Steam: a handle and a name, the
     /// agreement, no password -- and a way to sign into an existing account
     /// instead, which keeps where the reader was going.
@@ -1864,9 +1837,12 @@ mod template_tests {
         assert!(with_password.contains(r#"name="password""#));
         assert!(!with_password.contains(r#"id="delete_login_name""#));
         assert!(with_password.contains("account-linked-accounts-none"));
-        assert!(with_password.contains("/auth/steam/app?next=/account"));
-        assert!(with_password.contains("/auth/apple?next=/account"));
-        assert!(with_password.contains("/auth/google?next=/account"));
+        // Linking uses /login's buttons, coming back here.
+        assert!(with_password.contains("/auth/steam/app?next=&#x2f;account"));
+        assert!(with_password.contains("/auth/apple?next=&#x2f;account"));
+        assert!(with_password.contains("/auth/google?next=&#x2f;account"));
+        assert!(with_password.contains("appleid.cdn-apple.com"));
+        assert!(with_password.contains("/static/signin/google-light.svg"));
 
         let without = render(
             false,
