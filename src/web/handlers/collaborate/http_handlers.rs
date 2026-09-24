@@ -74,9 +74,13 @@ pub async fn get_collaboration_meta(
     auth_session: AuthSession,
     State(state): State<AppState>,
 ) -> Result<Json<CollaborationMeta>, AppError> {
-    let _user = auth_session.user.ok_or(AppError::Unauthorized)?;
+    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
 
     let db = &state.db_pool;
+
+    if !db::viewer_may_enter(db, session_uuid, user.id).await? {
+        return Err(AppError::Forbidden);
+    }
 
     // Ended sessions answer too. The page opens on this, and for a session
     // that is over it has to learn where the post is, or that there is none,

@@ -584,6 +584,23 @@ async fn setup_connection(
         }
     };
 
+    // Before a seat is taken: a session in a private community is for its
+    // members, and a refused join must leave nothing behind.
+    match db::viewer_may_enter(db, room_uuid, user_id).await {
+        Ok(true) => {}
+        Ok(false) => {
+            info!(
+                "User {} refused from session {}: not a member of its community",
+                user_login_name, room_uuid
+            );
+            return Err(JoinFailure::Refused);
+        }
+        Err(e) => {
+            error!("Failed to check who may enter session {}: {}", room_uuid, e);
+            return Err(JoinFailure::Unavailable);
+        }
+    }
+
     // Use atomic capacity check and participant tracking to prevent race conditions
     let join_success = match db::track_participant_with_capacity_check(
         db,
