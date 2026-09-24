@@ -25,14 +25,16 @@
         (src/apple.rs, src/google.rs, identity.rs) and says where to go.
 
    The system's browser, where there is no sheet: Apple on Android, Google
-   on iOS and macOS (in ASWebAuthenticationSession, which Google allows),
-   both on Windows. Google on iOS and macOS once had a sheet of the app's
+   on iOS and macOS (in ASWebAuthenticationSession, which Google allows,
+   sent straight to Google's page so the sheet names Google), both on
+   Windows. Google on iOS and macOS once had a sheet of the app's
    own, with an OAuth client and a token exchange of its own to keep; this
    is the site's own sign-in, in the same system sheet.
      1. the page starts a handoff (POST /auth/handoff/start, src/handoff.rs)
         and sends the app  browse {url}  on the bridge; the app checks the
-        URL is this site's and opens it in the browser, or calls
-        window.oeeeApp.signIn.unopened();
+        URL is this site's -- or, in the Apple apps, Google's sign-in page,
+        where they are sent straight to -- and opens it in the browser, or
+        calls window.oeeeApp.signIn.unopened();
      2. the page asks the site (POST /auth/handoff/claim) until the browser
         has finished, at which point the site signs *this* session in; the
         app calls window.oeeeApp.signIn.resume() when it is brought back to
@@ -263,9 +265,9 @@
         });
     }
 
-    function browser(provider, next) {
+    function browser(provider, next, at) {
       if (pending) return;
-      post("/auth/handoff/start", { provider: provider, next: next })
+      post("/auth/handoff/start", { provider: provider, next: next, at: at })
         .then(function (started) {
           if (!started || !started.id || !started.secret || !started.url) return;
           pending = started;
@@ -286,9 +288,17 @@
     // How each app signs in with each provider: a sheet of its own where the
     // platform has one, the system's browser where it does not. The app is
     // the one the root is marked for (theme_head.jinja).
+    // The browser the Apple apps open (ASWebAuthenticationSession) first asks
+    // whether the app may use the first page's domain to sign in, so it is
+    // sent straight to Google's page, which is what the reader pressed for,
+    // rather than through this site's (handoff_start, `at`).
+    function atGoogle(provider, next) {
+      browser(provider, next, "provider");
+    }
+
     var WAYS = {
-      ios: { apple: native, google: browser },
-      macos: { apple: native, google: browser },
+      ios: { apple: native, google: atGoogle },
+      macos: { apple: native, google: atGoogle },
       android: { apple: browser, google: native },
       windows: { apple: browser, google: browser }
     };

@@ -694,8 +694,17 @@ pub async fn google_callback(
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
     let back = back_for(&auth_session);
 
-    // Each sign-in's state and nonce answer once.
-    let request = take_google_request(&session).await;
+    // Each sign-in's state and nonce answer once: from this browser's session,
+    // or -- for a browser an app sent straight to Google -- from the handoff
+    // it was sent for.
+    let mut request = take_google_request(&session)
+        .await
+        .filter(|request| answer.state.as_deref() == Some(request.state.as_str()));
+    if request.is_none() {
+        if let Some(oauth_state) = answer.state.as_deref() {
+            request = sent_to_google(&session, &state, oauth_state).await;
+        }
+    }
     let Some(config) = state.config.google.as_ref() else {
         messages
             .clone()
@@ -892,6 +901,31 @@ async fn google_sign_in_going(
     .await
 }
 
+/// The state and nonce of a sign-in an app sent the browser straight to Google
+/// for (`handoff::AtProvider`), with its handoff remembered in this browser's
+/// session as `/auth/google?handoff=` would have -- so everything after is
+/// the same as for a browser that came through this site first.
+async fn sent_to_google(
+    session: &Session,
+    state: &AppState,
+    oauth_state: &str,
+) -> Option<GoogleRequest> {
+    let request = match crate::handoff::back_from_provider(&state.redis_pool, oauth_state).await {
+        Ok(request) => request?,
+        Err(error) => {
+            tracing::warn!("A handoff sent to Google could not be looked up: {error:#}");
+            return None;
+        }
+    };
+    remember_handoff(session, state, Some(&request.id)).await;
+    Some(GoogleRequest {
+        state: oauth_state.to_string(),
+        nonce: request.nonce,
+        next: None,
+        started_at: Utc::now(),
+    })
+}
+
 /// The sign-in's state and nonce, taken from the session so they answer once,
 /// and only while the sign-in is still recent.
 async fn take_google_request(session: &Session) -> Option<GoogleRequest> {
@@ -1031,6 +1065,12 @@ fn asked_where(format: Option<&str>) -> bool {
 pub struct HandoffStartForm {
     provider: String,
     next: Option<String>,
+    /// "provider" sends the browser straight to the provider's own page
+    /// rather than through this site's first (`handoff::AtProvider`). Only
+    /// Google, and only asked for by the apps that open the browser in a
+    /// sheet that names the first page's domain: the others check that the
+    /// URL they open is this site's.
+    at: Option<String>,
 }
 
 /// Starts a handoff for the page in an app's web view: see `crate::handoff`.
@@ -1059,12 +1099,28 @@ pub async fn handoff_start(
 
     let next = local_next(form.next.as_deref());
     let started = crate::handoff::start(&state.redis_pool, next.clone()).await?;
-    let url = format!(
-        "{}/auth/{}?handoff={}",
-        state.config.base_url.trim_end_matches('/'),
-        form.provider,
-        started.id
-    );
+    let url = match (form.at.as_deref(), state.config.google.as_ref()) {
+        (Some("provider"), Some(config)) if form.provider == "google" => {
+            let request = crate::handoff::AtProvider {
+                id: started.id.clone(),
+                nonce: random_token(),
+            };
+            let oauth_state = random_token();
+            crate::handoff::send_to_provider(&state.redis_pool, &oauth_state, &request).await?;
+            google::authorize_url(
+                config,
+                &google_redirect_uri(&state.config.base_url),
+                &oauth_state,
+                &request.nonce,
+            )
+        }
+        _ => format!(
+            "{}/auth/{}?handoff={}",
+            state.config.base_url.trim_end_matches('/'),
+            form.provider,
+            started.id
+        ),
+    };
     Ok(axum::Json(serde_json::json!({
         "id": started.id,
         "secret": started.secret,
