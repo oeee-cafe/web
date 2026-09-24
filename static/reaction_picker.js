@@ -132,6 +132,13 @@ async function mount(details) {
     const style = document.createElement("style");
     style.textContent = NAV_STYLE;
     picker.shadowRoot.appendChild(style);
+    // The category tabs tick as a segmented control's do (theme_head.jinja).
+    // That listener sees only the picker itself, from outside its shadow.
+    picker.shadowRoot.addEventListener("click", (event) => {
+      const tab = event.target.closest && event.target.closest(".nav-button");
+      if (!tab || tab.getAttribute("aria-selected") === "true") return;
+      if (window.oeeeApp && window.oeeeApp.connected()) window.oeeeApp.feel("selection");
+    });
   }
   // The typed form is only for when there is no picker. Its pattern is for a
   // person's typing; the picker can send a variation selector the server

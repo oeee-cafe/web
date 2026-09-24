@@ -50,6 +50,7 @@
         tags.push(item.dataset.tag);
         input.value = tags.join(', ') + ', ';
         close();
+        if (window.oeeeApp && window.oeeeApp.connected()) window.oeeeApp.feel('selection');
         input.focus();
       }
 

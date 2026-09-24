@@ -339,6 +339,9 @@
 
         function choose(index) {
           if (index < 0 || index >= shown.length) return;
+          if (select.value !== shown[index].value && window.oeeeApp && window.oeeeApp.connected()) {
+            window.oeeeApp.feel("selection");
+          }
           select.value = shown[index].value;
           input.value = shown[index].label;
           closeList();

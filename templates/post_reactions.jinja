@@ -63,7 +63,7 @@
       </summary>
       <div class="reaction-custom-panel">
         <div class="reaction-picker"></div>
-        <form class="reaction-custom-form"
+        <form class="reaction-custom-form" data-haptic-done="light"
               hx-post="/posts/{{ post_id }}/reactions/add"
               hx-target="#post-reactions-{{ post_id }}"
               hx-swap="outerHTML">

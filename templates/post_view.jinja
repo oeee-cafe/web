@@ -437,6 +437,7 @@
         navigator.share({ title: button.getAttribute("data-share-title"), url: url }).catch(function () {});
       } else if (navigator.clipboard) {
         navigator.clipboard.writeText(url).then(function () {
+          if (window.oeeeApp && window.oeeeApp.connected()) window.oeeeApp.feel("success");
           dsAlert(button.getAttribute("data-share-copied"));
         });
       }
