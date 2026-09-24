@@ -329,6 +329,66 @@ describe("two clients and the wire between them", () => {
     expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
   });
 
+  it("ignores Ctrl+Z while the pen is down, as NEO does", async () => {
+    // An undo sent mid-stroke was sequenced ahead of the stroke's own tail,
+    // which then went out after it with no boundary of its own, while the
+    // pointer kept drawing onto a canvas the replay had just rolled back.
+    const room = twoClients();
+    const bob = room.open("2");
+    await act(async () => {
+      await bob.painter.ready;
+    });
+    act(() => {
+      bob.painter.setLocalActorId("2");
+    });
+    const canvas = bob.element.querySelector("#canvas") as HTMLCanvasElement;
+    const box = canvas.getBoundingClientRect();
+    const pointer = async (type: string, x: number, y: number) => {
+      await act(async () => {
+        canvas.dispatchEvent(new PointerEvent(type, {
+          pointerId: 1, pointerType: "mouse", button: 0,
+          buttons: type === "pointerup" ? 0 : 1,
+          clientX: box.left + x, clientY: box.top + y,
+          bubbles: true, cancelable: true,
+        }));
+      });
+    };
+    const undoKey = async () => {
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "z", ctrlKey: true, bubbles: true, cancelable: true,
+        }));
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        await room.settle();
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      });
+    };
+
+    // One stroke on the record, so there is something to undo.
+    await pointer("pointerdown", 8, 8);
+    await pointer("pointermove", 20, 8);
+    await pointer("pointerup", 20, 8);
+    await act(async () => {
+      await room.settle();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    expect(room.relayed).toContain("stroke");
+
+    // A second one, with the key pressed while it is still being drawn.
+    await pointer("pointerdown", 8, 24);
+    await pointer("pointermove", 20, 24);
+    await undoKey();
+    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(0);
+
+    await pointer("pointerup", 20, 24);
+    await act(async () => {
+      await room.settle();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    await undoKey();
+    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
+  });
+
   it("agree after one of them undoes, which rebuilds the canvas", async () => {
     // Undo is the only thing that replays history, and replaying is where the
     // screen and the buffers come apart: the layers are rewritten for whoever

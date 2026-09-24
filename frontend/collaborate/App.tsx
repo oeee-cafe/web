@@ -133,11 +133,11 @@ const HEX_OCTETS = Array.from({ length: 256 }, (_, value) =>
 /**
  * The bytes of a message, as the string used to recognise its echo.
  *
- * Runs on every operation this client sends and every canvas message it
- * receives. Built through `Array.from(...).join("")` it allocated an array and
- * two short-lived strings per byte -- some hundreds of allocations for one
- * stroke chunk, at the rate a busy room produces them. The output is the same
- * hex string; only the garbage is gone.
+ * Runs on every operation this client sends and on every one of its own that
+ * comes back. Built through `Array.from(...).join("")` it allocated an array
+ * and two short-lived strings per byte -- some hundreds of allocations for
+ * one stroke chunk, at the rate a busy room produces them. The output is the
+ * same hex string; only the garbage is gone.
  */
 const bytesId = (bytes: Uint8Array): string => {
   let id = "";
@@ -590,11 +590,16 @@ export default function App() {
     if (!operation || !("userId" in message) || typeof message.userId !== "number") return;
     // Only our own echoes can be in the fork. The bytes carry the sender's
     // session id, so nobody else's could match; there is no point searching
-    // the queue for them.
-    const wireId = bytesId(raw);
+    // the queue for them -- or naming them by their bytes. Everybody else's
+    // operation used to be given the hex of its whole payload as its id, a
+    // string twice the message's size that the painter's canonical log then
+    // held until the next checkpoint: for a room near the auto-reset
+    // threshold, several megabytes of names nothing ever looked up. The
+    // sequence is unique within a history, and a history is all a log spans.
+    // The `#` keeps it apart from the painter's own `actor:counter` names.
     const id = message.userId === localIdRef.current
-      ? pendingEchoesRef.current.claim(wireId)
-      : wireId;
+      ? pendingEchoesRef.current.claim(bytesId(raw))
+      : `#${sequence}`;
     const canonical: CanonicalPainterOperation = {
       id,
       actorId: String(message.userId),
