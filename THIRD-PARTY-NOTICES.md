@@ -41,6 +41,21 @@ it. The toolbar in `templates/toolbar.jinja` uses `brush` (its Draw button),
 `info-outline` (what the site is) and `login` (signing in) the same way.
 They are unmodified.
 
+## Sign in with Google
+
+<https://developers.google.com/identity/branding-guidelines> — Google's
+brand assets, used under its sign-in branding guidelines; not covered by
+this repository's licence.
+
+`static/signin/google-light.svg` and `google-dark.svg` are the kit's
+square "Sign in with Google" buttons for Android and web, and
+`google-mark.svg` is its square G-only button cropped to the G, without the
+button behind it. Each has one addition: flat wedges in the gradient's own
+colours under the G, which the gradient covers wherever it draws, for
+Firefox 56 -- the kit paints the G with a `conic-gradient` inside a
+`foreignObject`, and without one the G is nearly empty. The Apple button on
+`/login` is not copied here; it is Apple's, requested from Apple.
+
 ## PaintBBS NEO
 
 <https://github.com/yangnaru/neo> — included as the git submodule `neo`.

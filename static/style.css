@@ -3819,6 +3819,134 @@ html[data-store="steam"] .auth-steam {
   display: block;
 }
 
+/* The providers' own sign-in buttons on /login (login.jinja): Apple's
+   from its button service and Google's from its branding kit, one picture
+   for light and one for dark. Both are drawn at 180x40; here they are
+   198x44, the same shape a tenth larger, which is Apple's 44pt touch
+   height and the narrowest column the Japanese questions between them
+   fit in on one line. The theme rules below show one of the pair. */
+.auth-provider {
+  display: block;
+  width: 198px;
+  margin: var(--ds-space-2) auto 0;
+  text-decoration: none;
+}
+
+.auth-provider img {
+  display: block;
+  width: 198px;
+  height: 44px;
+}
+
+.auth-provider:hover {
+  opacity: 0.9;
+}
+
+.auth-provider .auth-provider-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .auth-provider .auth-provider-light {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]) .auth-provider .auth-provider-dark {
+    display: block;
+  }
+}
+
+:root[data-theme="dark"] .auth-provider .auth-provider-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .auth-provider .auth-provider-dark {
+  display: block;
+}
+
+/* On /login the site's own buttons and fields take the providers' size,
+   and the card narrows to them: one 198px column of 44px fields and 198x44
+   buttons, inside the card's 24px padding and its 1px edge. The longest
+   question between them ("パスワードをお忘れですか？", 146px) leaves each
+   rule 14px. `display` is left to the rules above, which is what keeps
+   Steam's hidden outside its app. */
+.auth-page-login {
+  max-width: 248px;
+}
+
+.auth-card-login .ds-input {
+  height: 44px;
+}
+
+.auth-card-login .auth-divider span {
+  white-space: nowrap;
+}
+
+.auth-card-login .auth-submit,
+.auth-card-login .auth-secondary {
+  width: 198px;
+  height: 44px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 12px;
+  line-height: 42px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Google draws its button in English only, so in the other languages it
+   is drawn here to Google's measurements, a tenth larger like the kit's
+   picture beside it: 44px tall (40) with a 4.4px corner (4), the kit's
+   22px G (20) 13px from the edge (12) and 11px from the words (10), in
+   Roboto Medium 15.4px (14), and the kit's own colours for each theme. Spaced with a
+   margin rather than `gap`, which Firefox 56 does not have for flexbox and
+   which this file, never seeing the legacy build pass, cannot fall back
+   from. */
+.auth-google-drawn {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  justify-content: center;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  height: 44px;
+  padding: 0 13px;
+  border: 1px solid #747775;
+  border-radius: 4.4px;
+  background-color: #fff;
+  color: #1f1f1f;
+  font-family: Roboto, var(--ds-font);
+  font-size: 15.4px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: 0.275px;
+  white-space: nowrap;
+}
+
+.auth-provider .auth-google-drawn img {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-right: 11px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .auth-google-drawn {
+    border-color: #8e918f;
+    background-color: #131314;
+    color: #e3e3e3;
+  }
+}
+
+:root[data-theme="dark"] .auth-google-drawn {
+  border-color: #8e918f;
+  background-color: #131314;
+  color: #e3e3e3;
+}
+
 /* Signing in with Apple, offered everywhere: a browser goes to Apple's page
    and back, and in the apps the page takes the press itself
    (app_sign_in.jinja). Black on light and white on dark, as Apple asks of

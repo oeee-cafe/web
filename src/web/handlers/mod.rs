@@ -1448,6 +1448,16 @@ mod template_tests {
         assert!(on.contains("/auth/google?next="));
         assert!(on.contains("sign-in-with-google"));
         assert!(!render(true, json!("Google")).contains(r#"href="/auth/google"#));
+        // Google's kit has its button in English only; elsewhere the words
+        // are the site's own, beside the kit's G.
+        assert!(on.contains("/static/signin/google-light.svg"));
+        let ko = env
+            .get_template("login.jinja")
+            .expect("login loads")
+            .render(context! { google_enabled => true, ftl_lang => "ko", ..chrome() })
+            .expect("login renders");
+        assert!(ko.contains("/static/signin/google-mark.svg"));
+        assert!(!ko.contains("google-light.svg"));
     }
 
     /// Apple's answer, posted on from this site: every field it carried, as
