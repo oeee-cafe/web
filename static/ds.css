@@ -222,6 +222,36 @@ html[data-app] {
   --ds-text-2xl: calc(26px * var(--ds-text-scale, 1));
 }
 
+/* A narrow screen reads a size larger, the way Hacker News's does: one
+   breakpoint, by width alone, under which the type grows. 750px takes in
+   every phone upright and an iPad mini upright (744px), whose pixel is a
+   fifth smaller than the larger iPads' and on which the wide layout's 13px
+   read as a page zoomed out. Width alone, because asking what points at
+   the screen -- `pointer: coarse` -- took in a phone on its side as well,
+   and the text grew when it was turned.
+
+   The Mac and Windows apps are left out: a window made narrow is still on
+   a desk, and its first row is set against the window's own controls. In
+   the phone and tablet apps the factor rides on the reader's own text
+   size. What is sized by the scale grows with it -- the type, its line
+   heights, the toolbar's squares. */
+@media (max-width: 750px) {
+  :root:not([data-form="desktop"]) {
+    --ds-text-scale: 1.15;
+    --ds-text-xs: calc(11px * var(--ds-text-scale, 1));
+    --ds-text-s: calc(12px * var(--ds-text-scale, 1));
+    --ds-text-m: calc(13px * var(--ds-text-scale, 1));
+    --ds-text-base: calc(14px * var(--ds-text-scale, 1));
+    --ds-text-l: calc(16px * var(--ds-text-scale, 1));
+    --ds-text-xl: calc(20px * var(--ds-text-scale, 1));
+    --ds-text-2xl: calc(26px * var(--ds-text-scale, 1));
+  }
+
+  :root[data-form="handheld"] {
+    --ds-text-scale: clamp(0.8, calc(var(--oeee-text-scale, 1) * 1.15), 2);
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Behaving like an application
 
@@ -756,7 +786,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   display: flex;
   flex: none;
   align-items: center;
-  height: 30px;
+  height: calc(30px * var(--ds-text-scale, 1));
   margin-right: var(--ds-space-4);
   color: var(--ds-ink);
   text-decoration: none;
@@ -979,7 +1009,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    and the account's initial or the theme's mark in the menu square.
 
    Each is 30px on a side -- 16px of mark, 6px of padding and a 1px
-   border -- and is a box around a block, with no line of text in it
+   border -- times the type scale (--ds-text-scale), so the squares grow
+   with the sections and the name beside them. The border stays 1px, which
+   is why the padding is 7px of scale less 1px: at any scale that leaves
+   the mark exactly 16px of it, centred. Each is a box around a block, with no line of text in it
    anywhere. A square that sat on a line box was placed by that line's
    baseline and strut, which differ with where it is: the brush in its
    form came out a quarter pixel above the squares beside it, the bell in
@@ -1006,9 +1039,9 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   display: block;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
-  width: 30px;
-  height: 30px;
-  padding: 6px;
+  width: calc(30px * var(--ds-text-scale, 1));
+  height: calc(30px * var(--ds-text-scale, 1));
+  padding: calc(7px * var(--ds-text-scale, 1) - 1px);
   border-radius: 6px;
   text-decoration: none;
 }
@@ -1022,6 +1055,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .nav-bar .toolbar-square svg,
 .nav-bar .toolbar-search-glass svg {
   display: block;
+  width: calc(16px * var(--ds-text-scale, 1));
+  height: calc(16px * var(--ds-text-scale, 1));
 }
 
 .toolbar-end .toolbar-button {
@@ -1065,8 +1100,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .toolbar-end .toolbar-search {
   position: relative;
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: calc(30px * var(--ds-text-scale, 1));
+  height: calc(30px * var(--ds-text-scale, 1));
 }
 
 .toolbar-end .toolbar-search-pill {
@@ -1079,7 +1114,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
-  height: 30px;
+  height: calc(30px * var(--ds-text-scale, 1));
   border: 1px solid var(--ds-line-strong);
   border-radius: 6px;
   background-color: var(--ds-surface);
@@ -1113,7 +1148,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .toolbar-end .toolbar-search-glass {
   display: block;
   flex: none;
-  padding: 6px;
+  padding: calc(7px * var(--ds-text-scale, 1) - 1px);
   color: var(--ds-ink);
 }
 
@@ -1125,7 +1160,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   -moz-box-sizing: border-box;
   box-sizing: border-box;
   width: 0;
-  height: 28px;
+  height: calc(28px * var(--ds-text-scale, 1));
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -1251,9 +1286,9 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-color: var(--ds-surface);
   box-shadow: var(--ds-shadow-raise);
   color: var(--ds-ink);
-  font-size: 13px;
+  font-size: var(--ds-text-m);
   font-weight: 700;
-  line-height: 16px;
+  line-height: calc(16px * var(--ds-text-scale, 1));
   text-align: center;
 }
 
