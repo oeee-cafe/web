@@ -32,11 +32,10 @@
         href="https://{{ domain }}/ap/users/{{ user.id }}" />
 {% endblock head %}
 {% block content %}
-  {# A profile in two parts. First one card: their banner at twice its size,
-     their name, their links, what they have earned, and what you can do
-     about them. Then one switch and the one grid it chooses -- their
-     drawings, or the people they follow -- so the drawings come straight
-     after the card rather than under every other list the page has. #}
+  {# A profile in three parts. First one card: their banner at twice its
+     size, their name, their links, what they have earned, and what you can
+     do about them. Then the people they follow. Then one switch and what it
+     chooses -- their drawings, or what they have said. #}
   {% include "post_feed_head.jinja" %}
   {% set is_owner = current_user and user.id == current_user.id %}
   <div class="profile">
@@ -132,13 +131,45 @@
       {% endif %}
     </section>
 
+    {% if followings %}
+      {# Everyone they follow, under the card and over the drawings, all
+         the same shape: their banner framed in hard pixels, or where they
+         have none, a frame of the same size with their name in it -- one
+         list, not banners and then chips. #}
+      <section class="profile-section">
+        <div class="profile-section-label">{{ ftl_get_message("profile-following") }}<span class="profile-tab-count">{{ followings|length }}</span></div>
+      <ul class="profile-follows">
+        {% for following in followings %}
+          <li>
+            <a class="profile-follow" href="/@{{ following.login_name }}">
+              {% if following.banner_image_filename %}
+                <img class="profile-follow-banner"
+                     width="200"
+                     height="40"
+                     alt=""
+                     loading="lazy"
+                     decoding="async"
+                     src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
+              {% else %}
+                <span class="profile-follow-banner profile-follow-blank" aria-hidden="true">{{ following.display_name }}</span>
+              {% endif %}
+              <span class="profile-follow-text">
+                <span class="profile-follow-name">{{ following.display_name }}</span>
+                <span class="profile-follow-handle">@{{ following.login_name }}</span>
+              </span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+      </section>
+    {% endif %}
+
     <section class="profile-section">
       {# One switch, one grid. Everyone sees their drawings and, when there
-         are any, what they have said and who they follow; on their own
-         profile the drawings are split in two -- what everyone sees, and
-         what only they do. With nothing to switch between, the one grid is
-         simply named. #}
-      {% set tab_count = 1 + (1 if is_owner else 0) + (1 if comment_count else 0) + (1 if followings else 0) %}
+         are any, what they have said; on their own profile the drawings are
+         split in two -- what everyone sees, and what only they do. With
+         nothing to switch between, the one grid is simply named. #}
+      {% set tab_count = 1 + (1 if is_owner else 0) + (1 if comment_count else 0) %}
       <div class="grid-header">
         {% if tab_count > 1 %}
           <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-tabs-label') }}">
@@ -148,9 +179,6 @@
             {% endif %}
             {% if comment_count %}
               <button type="button" aria-pressed="false" data-profile-tab="comments">{{ ftl_get_message("profile-tab-comments") }}<span class="profile-tab-count">{{ comment_count }}</span></button>
-            {% endif %}
-            {% if followings %}
-              <button type="button" aria-pressed="false" data-profile-tab="following">{{ ftl_get_message("profile-following") }}<span class="profile-tab-count">{{ followings|length }}</span></button>
             {% endif %}
           </div>
         {% else %}
@@ -212,36 +240,6 @@
           </div>
         </div>
       {% endif %}
-      {% if followings %}
-        {# Everyone they follow as the same shape: their banner framed in
-           hard pixels, or where they have none, a frame of the same size
-           with their name in it -- one list, not banners and then chips. #}
-        <div data-profile-panel="following" hidden>
-          <ul class="profile-follows">
-            {% for following in followings %}
-              <li>
-                <a class="profile-follow" href="/@{{ following.login_name }}">
-                  {% if following.banner_image_filename %}
-                    <img class="profile-follow-banner"
-                         width="200"
-                         height="40"
-                         alt=""
-                         loading="lazy"
-                         decoding="async"
-                         src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
-                  {% else %}
-                    <span class="profile-follow-banner profile-follow-blank" aria-hidden="true">{{ following.display_name }}</span>
-                  {% endif %}
-                  <span class="profile-follow-text">
-                    <span class="profile-follow-name">{{ following.display_name }}</span>
-                    <span class="profile-follow-handle">@{{ following.login_name }}</span>
-                  </span>
-                </a>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      {% endif %}
       {% if tab_count > 1 %}
         <script>
           (function () {
@@ -258,7 +256,7 @@
                   panels[k].hidden = panels[k].getAttribute("data-profile-panel") !== chosen;
                 }
                 // How many a row is a question about drawings only.
-                if (perRow) perRow.hidden = chosen === "following" || chosen === "comments";
+                if (perRow) perRow.hidden = chosen === "comments";
               });
             }
           })();

@@ -4,7 +4,7 @@
    /@{login_name}/comments for every scrolled batch, so it must not depend
    on anything that handler does not pass. #}
 {% for comment in comments %}
-  {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
+  {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message, by_drawing=true) }}
 {% endfor %}
 {% if comments_next_url %}
   <div class="infinite-scroll-sentinel"

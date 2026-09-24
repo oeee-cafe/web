@@ -2242,11 +2242,11 @@ mod template_tests {
         assert!(with.contains(r#"d="M6 21q-1.125 0-2.225-.55T2 19"#));
         assert!(with.contains(r#"d="M4.55 19q-1.275 0-1.975-.888"#));
         assert!(!render(json!([])).contains("profile-achievements"));
-        // In the card, over the switch; those they follow are behind it,
-        // after their drawings, not stacked above them.
+        // In the card; those they follow come after it, and the drawings
+        // after them.
         let at = |needle: &str| with.find(needle).unwrap_or_else(|| panic!("no {needle}"));
-        assert!(at("profile-achievements") < at("data-profile-tab=\"public\""));
-        assert!(at("data-profile-panel=\"public\"") < at("data-profile-panel=\"following\""));
+        assert!(at("profile-achievements") < at("profile-follows"));
+        assert!(at("profile-follows") < at("data-profile-panel=\"public\""));
     }
 
     /// What they have said gets its own tab, counted in full, a row per
@@ -2306,7 +2306,12 @@ mod template_tests {
         assert!(with.contains(r#"data-profile-panel="comments""#));
         assert!(with.contains(r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002""#));
         assert!(with.contains("멋져요"));
-        assert!(with.contains("고양이"));
+        // Headed by the drawing, not by its owner's own name on every row.
+        assert!(with.contains(
+            r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002">고양이</a>"#
+        ));
+        assert!(with.contains("@cat · "));
+        assert!(!with.contains("comment-row-post"));
         assert!(with.contains(r#"<span class="profile-tab-count">45</span>"#));
         // Minijinja escapes the slashes in an attribute; the browser reads
         // them back as the URL.
@@ -2549,11 +2554,11 @@ mod template_tests {
         assert!(!render(None).contains("about-version"));
     }
 
-    /// Following, behind its own tab with its count: everyone the same
-    /// shape, a banner where they have drawn one and a frame of the same
-    /// size holding their name where they have not. No tab at all for
-    /// someone who follows nobody, and with nothing to switch between, no
-    /// switch.
+    /// Following, in its own section under the card with its count:
+    /// everyone the same shape, a banner where they have drawn one and a
+    /// frame of the same size holding their name where they have not. No
+    /// section for someone who follows nobody, and following is never a
+    /// tab, so with only drawings there is no switch.
     #[test]
     fn the_profile_shows_everyone_followed_the_same_way() {
         let env = test_support::env();
@@ -2581,8 +2586,8 @@ mod template_tests {
         let plain = json!({"login_name": "b", "display_name": "비", "banner_image_filename": null});
 
         let both = render(json!([banner, plain]));
-        assert!(both.contains(r#"data-profile-tab="following">profile-following<span class="profile-tab-count">2</span>"#));
-        assert!(both.contains(r#"data-profile-panel="following" hidden"#));
+        assert!(both.contains(r#"<div class="profile-section-label">profile-following<span class="profile-tab-count">2</span></div>"#));
+        assert!(!both.contains("data-profile-tab"), "following is not a tab");
         assert_eq!(both.matches(r#"class="profile-follow""#).count(), 2);
         assert!(both.contains(r#"<a class="profile-follow" href="/@a""#));
         assert!(both.contains("/image/ab/abcdef.png"));
