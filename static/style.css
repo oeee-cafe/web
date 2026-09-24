@@ -2953,10 +2953,6 @@ html[data-store] .supporter-elsewhere {
   line-height: 1.5;
 }
 
-.supporter-pack-card > p {
-  max-width: 60ch;
-}
-
 .supporter-pack-card .ds-help {
   font-size: inherit;
 }
