@@ -16,7 +16,7 @@ import { NARROW_WORKSPACE, TOOLBOX_LANE } from "./components/toolboxAnchor";
 import { NEO_BUTTON } from "./components/neo/neoClasses";
 import { ALL_TOOLS } from "./constants/drawing";
 import { SimplifiedToolbox } from "./components/SimplifiedToolbox";
-import { useOfflineDrawing } from "./hooks/useOfflineDrawing";
+import { usePainterDrawing, type DrawingMode } from "./hooks/usePainterDrawing";
 import { useDrawingState } from "./hooks/useDrawingState";
 import { usePalettePresets } from "./hooks/usePalettePresets";
 import { useDrawingTimer } from "./hooks/useDrawingTimer";
@@ -515,56 +515,66 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     [updateBrushType, handlePastePreview]
   );
 
-  // Use the offline drawing hook
+  /**
+   * The gestures, and where their marks go. A session sends them to the
+   * room; a drawing of its own records a replay and keeps a snapshot stack.
+   * Chosen once, here, and nothing below asks again.
+   */
+  const drawingMode = useMemo<DrawingMode>(
+    () =>
+      synchronization
+        ? {
+            kind: "session",
+            onOperation: emitLocalOperation!,
+            onPointerRelease: synchronization.onPointerUp,
+          }
+        : { kind: "offline", recordReplay: config.recordReplay ?? true },
+    [synchronization, emitLocalOperation, config.recordReplay],
+  );
   const {
     undo,
     redo,
     drawingEngine,
-    getReplayBlob,
-    getActionCount,
-    getInitializationActionCount,
-    addRestoreAction,
+    replay,
+    session,
     initializeFromImage,
     initializeTwoToneCanvas,
-    recordText,
-    emitOperation,
     isDrawingRef,
     freehandRef,
     setInteractionSuspended,
-    flushPendingStroke,
-  } = useOfflineDrawing(
-    tempLocalUserCanvasRef,
+  } = usePainterDrawing({
+    canvasRef: tempLocalUserCanvasRef,
     appRef,
     drawingState,
-    handleOfflineHistoryChange,
-    drawingState.zoomLevel,
+    mode: drawingMode,
+    onHistoryChange: handleOfflineHistoryChange,
+    zoomLevel: drawingState.zoomLevel,
     canvasWidth,
     canvasHeight,
-    // Nothing to do per segment. Every kernel the engine runs queues a repaint
-    // of the rectangle it wrote, uploaded once a frame; this used to re-upload
-    // every participant's two layers whole, synchronously, for every segment
-    // of the local stroke -- which made a stroke cost more with each person in
-    // the room, and on a large canvas was most of the frame.
-    undefined,
-    tempCanvasContainerRef,
-    handleRegionPreview,
-    handleLinePreview,
-    handleTextPlace,
-    handleBezierPreview,
-    handleSynchronizedHover,
-    !interactionEnabled,
-    emitLocalOperation,
-    synchronization?.onPointerUp,
-    adoptPickedColor,
-    isVirtualRight,
-    releaseVirtualRight,
-    config.recordReplay ?? true,
+    // No onDrawingChange: nothing to do per segment. Every kernel the engine
+    // runs queues a repaint of the rectangle it wrote, uploaded once a frame;
+    // this used to re-upload every participant's two layers whole,
+    // synchronously, for every segment of the local stroke -- which made a
+    // stroke cost more with each person in the room, and on a large canvas
+    // was most of the frame.
+    containerRef: tempCanvasContainerRef,
+    isDrawingDisabled: !interactionEnabled,
+    previews: {
+      onRegionPreview: handleRegionPreview,
+      onLinePreview: handleLinePreview,
+      onTextPlace: handleTextPlace,
+      onBezierPreview: handleBezierPreview,
+      onHoverMove: handleSynchronizedHover,
+    },
+    picking: {
+      onPickColor: adoptPickedColor,
+      isVirtualRight,
+      onVirtualRightUsed: releaseVirtualRight,
+    },
     placement,
-  );
+  });
 
   previewEngineRef.current = drawingEngine ?? null;
-  const flushPendingStrokeRef = useRef(flushPendingStroke);
-  flushPendingStrokeRef.current = flushPendingStroke;
   strokeActiveRef.current = freehandRef;
 
   useEffect(() => {
@@ -576,7 +586,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     history.setLocalUserId(localActorIdRef.current);
     history.setLocalWork({
       drawing: () => isDrawingRef.current,
-      flush: () => flushPendingStrokeRef.current(),
+      // Hands the stroke in progress over now rather than at the next chunk.
+      flush: () => session?.flush(),
     });
     synchronizationHistoryRef.current = history;
     return () => {
@@ -587,7 +598,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
         synchronizationHistoryRef.current = null;
       }
     };
-  }, [drawingEngine, synchronization, handleHistoryChange, isDrawingRef]);
+  }, [drawingEngine, synchronization, handleHistoryChange, isDrawingRef, session]);
 
   const readinessRef = useRef<{
     promise: Promise<void>;
@@ -614,7 +625,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     if (drawingEngine && controlsReady) readinessRef.current?.resolve();
   }, [drawingEngine, controlsReady]);
 
-  const actionCount = getActionCount();
+  const actionCount = replay?.actionCount() ?? 0;
   const onChange = config?.onChange;
   useEffect(() => {
     onChange?.({
@@ -670,7 +681,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
         TEXT_FONT_FAMILY
       );
       // NEO packs the colour with red in the low byte
-      recordText(
+      replay?.recordText(
         drawingState.layerType,
         textAt.x,
         textAt.y,
@@ -680,7 +691,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
         size,
         TEXT_FONT_FAMILY
       );
-      emitOperation({
+      session?.emit({
         kind: "text",
         layer: drawingState.layerType,
         at: textAt,
@@ -697,7 +708,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       domCanvasUpdateRef.current();
       setTextAt(null);
     },
-    [textAt, drawingEngine, drawingState, recordText, emitOperation, interactionEnabled]
+    [textAt, drawingEngine, drawingState, replay, session, interactionEnabled]
   );
 
   // Zoom controls
@@ -764,16 +775,16 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
 
   const exportReplay = useCallback(async (): Promise<Blob> => {
     if (!drawingEngine) throw new Error("Painter is not ready");
-    if (config.recordReplay === false) {
+    if (!replay || config.recordReplay === false) {
       const error = new Error(
         "This painter was mounted without replay recording",
       ) as PainterError;
       error.code = "export-failed";
       throw error;
     }
-    addRestoreAction();
-    return getReplayBlob();
-  }, [drawingEngine, addRestoreAction, getReplayBlob, config.recordReplay]);
+    replay.addRestoreAction(drawingEngine);
+    return replay.getReplayBlob();
+  }, [drawingEngine, replay, config.recordReplay]);
 
   const save = useCallback(async (): Promise<PainterExport> => {
     // Start both captures in the same JavaScript turn. exportPng snapshots the
@@ -781,23 +792,16 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     // either promise yields back to pointer input.
     const pngPromise = exportPng();
     const replayPromise = exportReplay();
-    const [png, replay] = await Promise.all([pngPromise, replayPromise]);
-    const nonStrokeActions = 1 + getInitializationActionCount();
+    const [png, replayBlob] = await Promise.all([pngPromise, replayPromise]);
+    const nonStrokeActions = 1 + (replay?.initializationActionCount() ?? 0);
     return {
       png,
-      replay,
+      replay: replayBlob,
       width: canvasWidth,
       height: canvasHeight,
-      strokeCount: Math.max(0, getActionCount() - nonStrokeActions),
+      strokeCount: Math.max(0, (replay?.actionCount() ?? 0) - nonStrokeActions),
     };
-  }, [
-    exportPng,
-    exportReplay,
-    canvasWidth,
-    canvasHeight,
-    getActionCount,
-    getInitializationActionCount,
-  ]);
+  }, [exportPng, exportReplay, canvasWidth, canvasHeight, replay]);
 
   const loadImage = useCallback(
     async (source: ImageSource): Promise<void> => {

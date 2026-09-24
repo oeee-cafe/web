@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { act, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { useOfflineDrawing } from "../hooks/useOfflineDrawing";
+import { usePainterDrawing } from "../hooks/usePainterDrawing";
 import type { DrawingState } from "../types/drawing";
 import type { PainterOperation } from "../operations";
 import { drawRegionPreview } from "./regionPreview";
@@ -14,8 +14,8 @@ const H = 40;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The last frame of the recording, as NEO would read it. */
-async function lastFrame(api: { getReplayBlob: () => Blob }) {
-  const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+async function lastFrame(api: { replay: { getReplayBlob: () => Blob } | null }) {
+  const bytes = new Uint8Array(await api.replay!.getReplayBlob().arrayBuffer());
   const { decodePCH } = await import("./NeoReplay");
   return decodePCH(bytes)!.items.at(-1)!;
 }
@@ -27,7 +27,7 @@ async function mountWithTool(
   onOperation?: (operation: PainterOperation) => void,
 ) {
   const previews: (RegionRect | null)[] = [];
-  const captured: { api: ReturnType<typeof useOfflineDrawing> | null } = { api: null };
+  const captured: { api: ReturnType<typeof usePainterDrawing> | null } = { api: null };
 
   const state: DrawingState = {
     brushSize: 4, opacity: 255, color: "#1e2864",
@@ -40,9 +40,12 @@ async function mountWithTool(
   function Harness() {
     const appRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const api = useOfflineDrawing(canvasRef, appRef, state, undefined, 100, W, H,
-      undefined, undefined, (r: RegionRect | null) => previews.push(r),
-      undefined, undefined, undefined, undefined, false, onOperation);
+    const api = usePainterDrawing({
+      canvasRef, appRef, drawingState: state,
+      zoomLevel: 100, canvasWidth: W, canvasHeight: H,
+      previews: { onRegionPreview: (r: RegionRect | null) => previews.push(r) },
+      mode: onOperation ? { kind: "session", onOperation } : { kind: "offline" },
+    });
     useEffect(() => { captured.api = api; });
     return (
       <div id="app" ref={appRef}>
@@ -108,7 +111,7 @@ describe("dragging out a region tool", () => {
     await send("pointermove", 20, 18);
     await send("pointerup", 20, 18);
 
-    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+    const bytes = new Uint8Array(await api.replay!.getReplayBlob().arrayBuffer());
     const { decodePCH } = await import("./NeoReplay");
     const decoded = decodePCH(bytes)!;
     const frame = decoded.items.at(-1)!;
@@ -246,7 +249,7 @@ describe("eraseAll, which acts on the press itself", () => {
     // No rubber band: it is not a region tool
     expect(previews).toEqual([]);
 
-    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+    const bytes = new Uint8Array(await api.replay!.getReplayBlob().arrayBuffer());
     const { decodePCH } = await import("./NeoReplay");
     const frame = decodePCH(bytes)!.items.at(-1)!;
     expect(frame).toEqual(["eraseAll", 0]);
@@ -291,7 +294,7 @@ describe("the line draw type", () => {
     // A straight line is not a region drag, so no rubber band
     expect(previews).toEqual([]);
 
-    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+    const bytes = new Uint8Array(await api.replay!.getReplayBlob().arrayBuffer());
     const { decodePCH } = await import("./NeoReplay");
     const frame = decodePCH(bytes)!.items.at(-1)!;
     expect(frame[0]).toBe("line");
@@ -309,7 +312,7 @@ describe("the line draw type", () => {
 
     const { decodePCH, NeoReplay } = await import("./NeoReplay");
     const decoded = decodePCH(
-      new Uint8Array(await api.getReplayBlob().arrayBuffer())
+      new Uint8Array(await api.replay!.getReplayBlob().arrayBuffer())
     )!;
     const replay = new NeoReplay(W, H);
     const buffers = [new Uint8ClampedArray(W * H * 4), new Uint8ClampedArray(W * H * 4)];
@@ -404,7 +407,7 @@ describe("the bezier draw type", () => {
     // Third release commits
     expect(at(29, 12)).toBeGreaterThan(0);
 
-    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+    const bytes = new Uint8Array(await api.replay!.getReplayBlob().arrayBuffer());
     const { decodePCH } = await import("./NeoReplay");
     const frame = decodePCH(bytes)!.items.at(-1)!;
     expect(frame[0]).toBe("bezier");
@@ -438,7 +441,7 @@ describe("the bezier draw type", () => {
     const { decodePCH, NeoReplay } = await import("./NeoReplay");
     const { BufferSurface } = await import("./PixelSurface");
     const decoded = decodePCH(
-      new Uint8Array(await api.getReplayBlob().arrayBuffer())
+      new Uint8Array(await api.replay!.getReplayBlob().arrayBuffer())
     )!;
     const replay = new NeoReplay(W, H);
     const buffers = [new Uint8ClampedArray(W * H * 4), new Uint8ClampedArray(W * H * 4)];
@@ -629,10 +632,10 @@ describe("the text tool", () => {
     );
     expect(layer.some((v) => v !== 0)).toBe(true);
 
-    api.recordText("background", 4, 20, 0x000000, 1, "Hi", "20px", "Arial");
+    api.replay!.recordText("background", 4, 20, 0x000000, 1, "Hi", "20px", "Arial");
     const { decodePCH } = await import("./NeoReplay");
     const frame = decodePCH(
-      new Uint8Array(await api.getReplayBlob().arrayBuffer())
+      new Uint8Array(await api.replay!.getReplayBlob().arrayBuffer())
     )!.items.at(-1)!;
     expect(frame).toEqual(["text", 0, 4, 20, 0, 1, "Hi", "20px", "Arial"]);
   });

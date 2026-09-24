@@ -93,7 +93,7 @@ describe("copy and paste, NEO's way", () => {
     expect(items.at(-1)).toEqual(["paste", 0, 4, 4, 13, 13, 20, 6]);
 
     const ours = new Uint8ClampedArray(p.layer());
-    const neo = await neoRendering(p.handle.api!.getReplayBlob());
+    const neo = await neoRendering(p.handle.api!.replay!.getReplayBlob());
     expect(firstPixelDifference(ours, neo), describeDifference(ours, neo, W)).toBe(-1);
   });
 
@@ -113,7 +113,7 @@ describe("copy and paste, NEO's way", () => {
     await p.drag(2, 2, 32, 12); // drop it onto the filled square
 
     expect(p.alphaAt(36, 16)).toBe(0);
-    const neo = await neoRendering(p.handle.api!.getReplayBlob());
+    const neo = await neoRendering(p.handle.api!.replay!.getReplayBlob());
     const ours = new Uint8ClampedArray(p.layer());
     expect(firstPixelDifference(ours, neo), describeDifference(ours, neo, W)).toBe(-1);
   });

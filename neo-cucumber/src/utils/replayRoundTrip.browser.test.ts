@@ -25,7 +25,7 @@ interface Stroke {
 /**
  * Drives a drawing exactly as the offline app does -- the same engine calls
  * from useBaseDrawing.performDrawing and the same recorder frames from
- * useOfflineDrawing -- so the replay under test is the one users would upload.
+ * usePainterDrawing -- so the replay under test is the one users would upload.
  */
 class OfflineSession {
   readonly engine = new DrawingEngine(W, H);

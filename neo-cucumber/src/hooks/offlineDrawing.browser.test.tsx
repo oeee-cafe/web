@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { act, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { useOfflineDrawing } from "./useOfflineDrawing";
+import { usePainterDrawing } from "./usePainterDrawing";
 import type { DrawingState } from "../types/drawing";
 import {
   LAYER,
@@ -23,7 +23,7 @@ const H = 60;
 // to yield far enough for React to flush between them.
 const MOVE_INTERVAL_MS = 0;
 
-type OfflineApi = ReturnType<typeof useOfflineDrawing>;
+type OfflineApi = ReturnType<typeof usePainterDrawing>;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -54,15 +54,11 @@ async function mountOfflineDrawing(state: DrawingState) {
   function Harness() {
     const appRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const api = useOfflineDrawing(
-      canvasRef,
-      appRef,
-      current,
-      undefined,
-      100,
-      W,
-      H
-    );
+    const api = usePainterDrawing({
+      canvasRef, appRef, drawingState: current,
+      zoomLevel: 100, canvasWidth: W, canvasHeight: H,
+      mode: { kind: "offline" },
+    });
     useEffect(() => {
       captured.api = api;
     });
@@ -158,7 +154,7 @@ async function mountOfflineDrawing(state: DrawingState) {
 }
 
 async function replayThroughNeo(api: OfflineApi) {
-  const decoded = await decodePCH(api.getReplayBlob());
+  const decoded = await decodePCH(api.replay!.getReplayBlob());
   const cp = createCanonicalPainter(W, H);
   replayWithNeo(cp, decoded.items);
   return {
@@ -273,7 +269,7 @@ describe("offline drawing end to end", () => {
       [70, 44],
     ]);
     await act(async () => {
-      api.addRestoreAction();
+      api.replay!.addRestoreAction(api.drawingEngine!);
     });
 
     const replayed = await replayThroughNeo(api);
@@ -298,7 +294,7 @@ describe("offline drawing end to end", () => {
       [60, 40],
     ]);
 
-    const decoded = await decodePCH(api.getReplayBlob());
+    const decoded = await decodePCH(api.replay!.getReplayBlob());
     const replay = new NeoReplay(W, H);
     await replay.playAll(decoded.items);
     const replayed = {
