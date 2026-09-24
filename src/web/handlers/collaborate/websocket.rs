@@ -605,64 +605,75 @@ async fn setup_connection(
 
     db::update_session_activity(state, room_uuid).await;
 
-    // Atomically handle all connection management
-    let connection_info =
-        setup_connection_atomically(state, room_uuid, user_id, connection_id, user_login_name)
-            .await;
-
-    let assigned = state.redis_state.assign_user_id(room_uuid, user_id).await;
-    let failure = match assigned {
-        Ok(Some(id)) => {
-            return Ok((session_info.owner_id == user_id, id, connection_info));
-        }
+    // The id before the registry entry, so that a join failing here has
+    // nothing in Redis to undo. After the capacity check, not before it: a
+    // refused joiner would otherwise burn one of the room's 255 ids.
+    let session_user_id = match state.redis_state.assign_user_id(room_uuid, user_id).await {
+        Ok(Some(id)) => id,
         Ok(None) => {
             error!(
                 "No session user id available for user {} in room {}",
                 user_login_name, room_uuid
             );
-            JoinFailure::Refused
+            release_seat(db, state, room_uuid, user_id, connection_id).await;
+            return Err(JoinFailure::Refused);
         }
         Err(e) => {
             error!("Failed to assign session user id: {}", e);
-            JoinFailure::Unavailable
+            release_seat(db, state, room_uuid, user_id, connection_id).await;
+            return Err(JoinFailure::Unavailable);
         }
     };
 
-    // The seat above was taken before the id could be. Give it back, or the
-    // row stays active until the session ends and counts a person who never
-    // got in against the room's capacity -- the registry entry would lapse on
-    // its own after a missed heartbeat, the Postgres row never.
-    if let Err(e) = state.redis_state.unregister_connection(connection_id).await {
-        error!(
-            "Failed to unregister connection {} after a refused join: {}",
-            connection_id, e
-        );
-    }
-    if !user_has_other_connection(state, room_uuid, user_id, connection_id).await {
-        if let Err(e) = db::mark_participant_inactive(db, room_uuid, user_id).await {
-            error!(
-                "Failed to release the seat of user {} in room {}: {}",
-                user_login_name, room_uuid, e
-            );
-        }
-    }
-    Err(failure)
+    // Atomically handle all connection management
+    let connection_info =
+        setup_connection_atomically(state, room_uuid, user_id, connection_id, user_login_name)
+            .await;
+
+    Ok((
+        session_info.owner_id == user_id,
+        session_user_id,
+        connection_info,
+    ))
 }
 
-/// Whether this user is in the room through some other socket -- another tab,
-/// or a reconnect that overlapped this one.
-async fn user_has_other_connection(
+/// Gives back the Postgres seat a join took before it could finish. Left
+/// alone, the row stays active until the session ends and counts a person who
+/// never got in against the room's capacity. Not if they are in the room
+/// through another socket, whose seat this is too.
+async fn release_seat(
+    db: &sqlx::Pool<sqlx::Postgres>,
     state: &AppState,
     room_uuid: Uuid,
     user_id: Uuid,
     connection_id: &str,
-) -> bool {
+) {
     let room_connections = state
         .redis_state
         .get_room_connections(room_uuid)
         .await
         .unwrap_or_default();
-    for conn_id in &room_connections {
+    if user_has_other_connection(state, &room_connections, user_id, connection_id).await {
+        return;
+    }
+    if let Err(e) = db::mark_participant_inactive(db, room_uuid, user_id).await {
+        error!(
+            "Failed to release the seat of user {} in room {}: {}",
+            user_id, room_uuid, e
+        );
+    }
+}
+
+/// Whether this user is in the room through some other socket -- another tab,
+/// or a reconnect that overlapped this one -- given the room's registry as
+/// the caller already fetched it.
+async fn user_has_other_connection(
+    state: &AppState,
+    room_connections: &[String],
+    user_id: Uuid,
+    connection_id: &str,
+) -> bool {
+    for conn_id in room_connections {
         if conn_id == connection_id {
             continue;
         }
@@ -783,26 +794,28 @@ mod reset_upload_tests {
         PendingReset { base_seq: 7, remaining: 510, payloads: Vec::new(), bytes: 0, accepted }
     }
 
-    #[test]
-    fn keeps_a_checkpoint_of_the_largest_legal_size() {
+    /// An accepted upload holding the largest checkpoint there can be, every
+    /// snapshot of which was taken without complaint.
+    fn filled() -> PendingReset {
         let mut reset = upload(true);
         let snapshot = vec![0u8; MAX_SNAPSHOT_BYTES];
         let fits = (MAX_CHECKPOINT_BYTES as usize) / MAX_SNAPSHOT_BYTES;
         for _ in 0..fits {
             assert!(!reset.take_snapshot(&snapshot));
         }
-        assert!(reset.accepted);
         assert_eq!(reset.payloads.len(), fits);
+        reset
+    }
+
+    #[test]
+    fn keeps_a_checkpoint_of_the_largest_legal_size() {
+        assert!(filled().accepted);
     }
 
     #[test]
     fn drops_the_upload_the_moment_it_outweighs_a_checkpoint() {
-        let mut reset = upload(true);
+        let mut reset = filled();
         let snapshot = vec![0u8; MAX_SNAPSHOT_BYTES];
-        let fits = (MAX_CHECKPOINT_BYTES as usize) / MAX_SNAPSHOT_BYTES;
-        for _ in 0..fits {
-            reset.take_snapshot(&snapshot);
-        }
         assert!(reset.take_snapshot(&[0u8; 1]));
         assert!(!reset.accepted);
         // Nothing is held for an upload that will not be applied, and the
@@ -1624,7 +1637,7 @@ async fn cleanup_connection(
         .await
         .unwrap_or_default();
     let user_has_other_connections =
-        user_has_other_connection(state, room_uuid, user_id, connection_id).await;
+        user_has_other_connection(state, &room_connections, user_id, connection_id).await;
 
     // Leaving is something a user does, not a tab. With another connection
     // still open they are still here: the LEAVE carries only their user id,

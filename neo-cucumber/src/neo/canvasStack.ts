@@ -49,6 +49,15 @@ export function participantZIndex(
 }
 
 /**
+ * Participants as their pairs stack on screen, bottom first: the latest
+ * joiner, whose pair everybody else's covers. For compositing, where the
+ * order of drawing is the order of the stack.
+ */
+export function bottomFirst(owners: string[]): string[] {
+  return inJoinOrder(owners).reverse();
+}
+
+/**
  * Participants in join order, earliest first.
  *
  * For a collaborative session that is ascending session id: the ids are handed

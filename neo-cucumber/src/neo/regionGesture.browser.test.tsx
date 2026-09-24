@@ -13,6 +13,13 @@ const W = 60;
 const H = 40;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** The last frame of the recording, as NEO would read it. */
+async function lastFrame(api: { getReplayBlob: () => Blob }) {
+  const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
+  const { decodePCH } = await import("./NeoReplay");
+  return decodePCH(bytes)!.items.at(-1)!;
+}
+
 /** Mounts the real offline stack with a region tool selected. */
 async function mountWithTool(
   tool: string,
@@ -123,9 +130,7 @@ describe("dragging out a region tool", () => {
     await send("pointermove", 20, 18);
     await send("pointerup", 20, 18);
 
-    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
-    const { decodePCH } = await import("./NeoReplay");
-    const frame = decodePCH(bytes)!.items.at(-1)!;
+    const frame = await lastFrame(api);
     expect(frame[0]).toBe("fill");
     // pushCurrent: [verb, layer, r, g, b, a, mask r, g, b, size, mask type]
     expect(frame.slice(6, 9)).toEqual([255, 0, 0]);
@@ -202,6 +207,23 @@ describe("the preview overlay", () => {
 });
 
 describe("eraseAll, which acts on the press itself", () => {
+  it("clears the pair the painter is aimed at", async () => {
+    // The engine's interactive draws default to the draw target now, so a
+    // participant clearing somebody else's layer clears it on their own
+    // screen too -- not their own layer, while the room cleared the other.
+    const { api, send } = await mountWithTool("eraseAll");
+    const engine = api.drawingEngine!;
+    engine.setDrawTarget("7");
+    engine.layersFor("7").background.fill(200);
+    engine.layers.background.fill(200);
+
+    await send("pointerdown", 12, 12);
+    await send("pointerup", 12, 12);
+
+    expect(engine.layersFor("7").background.every((v) => v === 0)).toBe(true);
+    expect(engine.layers.background.every((v) => v === 200)).toBe(true);
+  });
+
   it("clears the layer and records it", async () => {
     // Draw something first, so there is anything to clear
     const drawing = await mountWithTool("rectFill");
@@ -243,9 +265,7 @@ describe("the line draw type", () => {
     await send("pointermove", 40, 30);
     await send("pointerup", 40, 30);
 
-    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
-    const { decodePCH } = await import("./NeoReplay");
-    const frame = decodePCH(bytes)!.items.at(-1)!;
+    const frame = await lastFrame(api);
     expect(frame[0]).toBe("line");
     // pushCurrent: [verb, layer, r, g, b, a, mask r, g, b, size, mask type]
     expect(frame.slice(6, 9)).toEqual([255, 0, 0]);
@@ -337,9 +357,7 @@ describe("the bezier draw type", () => {
     });
     await buildCurve(send, [20, 8], [40, 8]);
 
-    const bytes = new Uint8Array(await api.getReplayBlob().arrayBuffer());
-    const { decodePCH } = await import("./NeoReplay");
-    const frame = decodePCH(bytes)!.items.at(-1)!;
+    const frame = await lastFrame(api);
     expect(frame[0]).toBe("bezier");
     expect(frame.slice(6, 9)).toEqual([0, 255, 0]);
     expect(frame[10]).toBe(2);
@@ -475,6 +493,37 @@ describe("copy and paste", () => {
 
   // The gesture -- copy handing over to paste, the drag, the frames NEO
   // reads -- is covered in copyPaste.browser.test.tsx.
+});
+
+describe("undo while the pen is down", () => {
+  it("does nothing until the stroke is over", async () => {
+    // Offline, the snapshot popped was the one taken before the *previous*
+    // stroke, so the mark before this one vanished from under the pen while
+    // this one went on. NEO answers the key mid-stroke; this painter does
+    // not, by choice.
+    const { api, send } = await mountWithTool("solid");
+    const layer = api.drawingEngine!.layers.background;
+    const at = (x: number, y: number) => layer[(y * W + x) * 4 + 3];
+
+    await send("pointerdown", 8, 8);
+    await act(async () => { await sleep(20); });
+    await send("pointermove", 20, 8);
+    await send("pointerup", 20, 8);
+    expect(at(14, 8)).toBeGreaterThan(0);
+
+    await send("pointerdown", 8, 24);
+    await act(async () => { await sleep(20); });
+    await send("pointermove", 20, 24);
+    await act(async () => { api.undo(); });
+    await send("pointerup", 20, 24);
+
+    expect(at(14, 8)).toBeGreaterThan(0);
+    expect(at(14, 24)).toBeGreaterThan(0);
+    // And once the pen is up, undo takes the stroke that was just finished.
+    await act(async () => { api.undo(); });
+    expect(at(14, 24)).toBe(0);
+    expect(at(14, 8)).toBeGreaterThan(0);
+  });
 });
 
 describe("the fill tool, in a session", () => {

@@ -548,113 +548,110 @@ fn end_session_frame(owner: Uuid, post_url: &str) -> Vec<u8> {
 }
 
 pub async fn handle_end_session_message(data: &[u8], ctx: EndSessionContext<'_>) {
-    if ctx.is_owner && data.len() >= 19 {
-        if let Ok(sender_uuid) = bytes_to_uuid(&data[1..17]) {
-            if sender_uuid == ctx.user_id {
-                // The client's frame carries a URL too, and it is not read:
-                // every participant navigates to whatever this broadcast
-                // says, so the destination is looked up from the post the
-                // save actually made rather than taken from the one client
-                // allowed to send this. A session that has not been saved
-                // has nowhere to send anybody, and is not ended.
-                let post_url = match db::saved_post_path(ctx.db, ctx.room_uuid).await {
-                    Ok(Some(url)) => url,
-                    Ok(None) => {
-                        warn!(
-                            "END_SESSION from owner {} in session {} before it was saved; ignored",
-                            ctx.user_login_name, ctx.room_uuid
-                        );
-                        return;
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to look up the saved post for session {}: {}",
-                            ctx.room_uuid, e
-                        );
-                        return;
-                    }
-                };
-                info!(
-                    "END_SESSION from owner {} in session {}, redirecting to: {}",
-                    ctx.user_login_name, ctx.room_uuid, post_url
-                );
-
-                // Set collaborative_sessions.ended_at
-                if let Err(e) = db::end_session(ctx.db, ctx.room_uuid).await {
-                    // END_SESSION is the client's acknowledgement. Do
-                    // not publish it unless the authoritative database
-                    // transition succeeded, or every participant would
-                    // leave a session that is still open server-side.
-                    error!("Failed to update session ended_at: {}", e);
-                    return;
-                }
-
-                // Before the cleanup below: sealing reads the
-                // participant map, and that map is one of the keys
-                // that goes.
-                super::archive::seal_room(ctx.state, ctx.room_uuid, true).await;
-
-                // Clean up Redis message history when session is explicitly ended
-                let redis_store =
-                    redis_messages::RedisMessageStore::new(ctx.state.redis_pool.clone());
-                if let Err(e) = redis_store.cleanup_room(ctx.room_uuid).await {
-                    error!(
-                        "Failed to cleanup Redis for ended session {}: {}",
-                        ctx.room_uuid, e
-                    );
-                } else {
-                    info!(
-                        "Cleaned up Redis message history for ended session {}",
-                        ctx.room_uuid
-                    );
-                }
-
-                // And the lobby preview, which is about a canvas that
-                // is now a post.
-                let preview_store =
-                    super::preview::PreviewStore::new(ctx.state.redis_pool.clone());
-                if let Err(e) = preview_store.cleanup(ctx.room_uuid).await {
-                    error!(
-                        "Failed to cleanup the preview for ended session {}: {}",
-                        ctx.room_uuid, e
-                    );
-                }
-
-                // Broadcast END_SESSION to all participants in the room (including sender) via Redis pub/sub
-                let room_message = super::redis_state::RoomBroadcast {
-                    from_connection: ctx.connection_id.to_string(),
-                    target_connection: None,
-                    seq: None,
-                    history_id: None,
-                    payload: end_session_frame(ctx.user_id, &post_url),
-                };
-
-                match ctx
-                    .state
-                    .redis_state
-                    .publish_message(ctx.room_uuid, &room_message)
-                    .await
-                {
-                    Ok(subscriber_count) => {
-                        info!(
-                            "Broadcasted END_SESSION to {} subscribers in room {}",
-                            subscriber_count, ctx.room_uuid
-                        );
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to publish END_SESSION message for room {}: {}",
-                            ctx.room_uuid, e
-                        );
-                    }
-                }
-            }
-        }
-    } else if !ctx.is_owner {
+    if !ctx.is_owner {
         warn!(
             "Non-owner {} attempted to end session {}",
             ctx.user_login_name, ctx.room_uuid
         );
+        return;
+    }
+    // Only the sender's uuid is read off the frame, to check it is their own.
+    // The URL it also carries is not: every participant navigates to whatever
+    // this broadcast says, so the destination is looked up from the post the
+    // save actually made rather than taken from the one client allowed to
+    // send this. A session that has not been saved has nowhere to send
+    // anybody, and is not ended.
+    if data.len() < 19 || bytes_to_uuid(&data[1..17]) != Ok(ctx.user_id) {
+        return;
+    }
+    let post_url = match db::saved_post_path(ctx.db, ctx.room_uuid).await {
+        Ok(Some(url)) => url,
+        Ok(None) => {
+            warn!(
+                "END_SESSION from owner {} in session {} before it was saved; ignored",
+                ctx.user_login_name, ctx.room_uuid
+            );
+            return;
+        }
+        Err(e) => {
+            error!(
+                "Failed to look up the saved post for session {}: {}",
+                ctx.room_uuid, e
+            );
+            return;
+        }
+    };
+    info!(
+        "END_SESSION from owner {} in session {}, redirecting to: {}",
+        ctx.user_login_name, ctx.room_uuid, post_url
+    );
+
+    // Set collaborative_sessions.ended_at
+    if let Err(e) = db::end_session(ctx.db, ctx.room_uuid).await {
+        // END_SESSION is the client's acknowledgement. Do
+        // not publish it unless the authoritative database
+        // transition succeeded, or every participant would
+        // leave a session that is still open server-side.
+        error!("Failed to update session ended_at: {}", e);
+        return;
+    }
+
+    // Before the cleanup below: sealing reads the
+    // participant map, and that map is one of the keys
+    // that goes.
+    super::archive::seal_room(ctx.state, ctx.room_uuid, true).await;
+
+    // Clean up Redis message history when session is explicitly ended
+    let redis_store = redis_messages::RedisMessageStore::new(ctx.state.redis_pool.clone());
+    if let Err(e) = redis_store.cleanup_room(ctx.room_uuid).await {
+        error!(
+            "Failed to cleanup Redis for ended session {}: {}",
+            ctx.room_uuid, e
+        );
+    } else {
+        info!(
+            "Cleaned up Redis message history for ended session {}",
+            ctx.room_uuid
+        );
+    }
+
+    // And the lobby preview, which is about a canvas that
+    // is now a post.
+    let preview_store = super::preview::PreviewStore::new(ctx.state.redis_pool.clone());
+    if let Err(e) = preview_store.cleanup(ctx.room_uuid).await {
+        error!(
+            "Failed to cleanup the preview for ended session {}: {}",
+            ctx.room_uuid, e
+        );
+    }
+
+    // Broadcast END_SESSION to all participants in the room (including sender) via Redis pub/sub
+    let room_message = super::redis_state::RoomBroadcast {
+        from_connection: ctx.connection_id.to_string(),
+        target_connection: None,
+        seq: None,
+        history_id: None,
+        payload: end_session_frame(ctx.user_id, &post_url),
+    };
+
+    match ctx
+        .state
+        .redis_state
+        .publish_message(ctx.room_uuid, &room_message)
+        .await
+    {
+        Ok(subscriber_count) => {
+            info!(
+                "Broadcasted END_SESSION to {} subscribers in room {}",
+                subscriber_count, ctx.room_uuid
+            );
+        }
+        Err(e) => {
+            error!(
+                "Failed to publish END_SESSION message for room {}: {}",
+                ctx.room_uuid, e
+            );
+        }
     }
 }
 
@@ -957,7 +954,12 @@ mod history_admission_tests {
         use uuid::Uuid;
         let owner = Uuid::new_v4();
 
-        let join = JoinMessage { user_id: owner, timestamp: 5, username: "ada".into() }.serialize();
+        let join = JoinMessage {
+            user_id: owner,
+            timestamp: 5,
+            username: "ada".into(),
+        }
+        .serialize();
         assert_eq!(join[0], MessageType::Join as u8);
         assert_eq!(join.len(), 27 + 3);
         assert_eq!(u16::from_le_bytes([join[25], join[26]]), 3);
@@ -966,7 +968,10 @@ mod history_admission_tests {
         let end = end_session_frame(owner, "/@ada/post");
         assert_eq!(end[0], MessageType::EndSession as u8);
         assert_eq!(&end[1..17], owner.as_bytes());
-        assert_eq!(u16::from_le_bytes([end[17], end[18]]) as usize, "/@ada/post".len());
+        assert_eq!(
+            u16::from_le_bytes([end[17], end[18]]) as usize,
+            "/@ada/post".len()
+        );
         assert_eq!(&end[19..], b"/@ada/post");
     }
 }

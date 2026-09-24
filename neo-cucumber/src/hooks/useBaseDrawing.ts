@@ -1025,10 +1025,7 @@ export const useBaseDrawing = (
           drawingEngineRef.current.drawBezier(
             params.layerType,
             points as [number, number, number, number, number, number, number, number],
-            params.brushSize, brush, color,
-            // The selected participant's pair, as the line tool below and
-            // the operation emitted for it already name.
-            drawingEngineRef.current.drawTarget[params.layerType]
+            params.brushSize, brush, color
           );
           saveToHistory();
         }

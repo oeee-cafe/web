@@ -42,8 +42,11 @@ import {
 import type { DrawingEngine } from "./DrawingEngine";
 import type { RegionRect } from "./neo/regionDrag";
 import { TEXT_FONT_FAMILY, fontSizeForBrush, type ToolId } from "./neo/tools";
-import { previewBackdrop as backdropFromCanvasStack } from "./neo/previewBackdrop";
-import { inJoinOrder } from "./neo/canvasStack";
+import {
+  previewBackdrop as backdropFromCanvasStack,
+  releaseBackdrop,
+} from "./neo/previewBackdrop";
+import { bottomFirst, inJoinOrder } from "./neo/canvasStack";
 import { PainterWorkspace } from "./components/PainterWorkspace";
 import type {
   CanonicalPainterOperation,
@@ -72,6 +75,9 @@ function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
     }, "image/png");
   });
 }
+
+/** What the undo controls show while the host has drawing disabled. */
+const NO_HISTORY = { canUndo: false, canRedo: false };
 
 const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
   { config },
@@ -141,6 +147,13 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     canRedo: false,
   });
   const [interactionEnabled, setInteractionEnabled] = useState(true);
+  /**
+   * The undo state every control reads. While the host has drawing disabled
+   * -- a replay in progress, a canvas being exported to save -- the buttons
+   * and shortcuts show nothing to undo, which is also what the drawing hook
+   * answers if they are pressed anyway.
+   */
+  const shownHistory = interactionEnabled ? historyState : NO_HISTORY;
   /**
    * Which participants this viewer has hidden, and whose layers new marks go
    * into. Both are this screen's business: hiding is a way of looking at the
@@ -354,14 +367,21 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       hiddenOwners
     );
   }, [canvasWidth, canvasHeight, drawingState.zoomLevel, drawingState.bgVisible, drawingState.fgVisible, hiddenOwners]);
+  /** The drag is over; whatever was read off the canvases for it can go. */
+  const previewEnded = useCallback(() => {
+    const engine = previewEngineRef.current;
+    if (engine) releaseBackdrop(engine);
+  }, []);
   const handleRegionPreview = useCallback((rect: RegionRect | null) => {
     const ctx = previewCanvasRef.current?.getContext("2d");
     if (ctx) drawRegionPreview(ctx, rect, previewBackdrop(), drawingState.brushType);
-  }, [previewBackdrop, drawingState.brushType]);
+    if (rect === null) previewEnded();
+  }, [previewBackdrop, previewEnded, drawingState.brushType]);
   const handlePastePreview = useCallback((display: PasteDisplay | null) => {
     const ctx = previewCanvasRef.current?.getContext("2d");
     if (ctx) drawPastePreview(ctx, display, previewBackdrop());
-  }, [previewBackdrop]);
+    if (display === null) previewEnded();
+  }, [previewBackdrop, previewEnded]);
   /**
    * Where the text tool was clicked, if an editor is open there. NEO puts an
    * editable box straight on the canvas rather than in a dialog: you type in
@@ -381,15 +401,17 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     ) => {
       const ctx = previewCanvasRef.current?.getContext("2d");
       if (ctx) drawLinePreview(ctx, from, to, previewBackdrop());
+      if (from === null) previewEnded();
     },
-    [previewBackdrop]
+    [previewBackdrop, previewEnded]
   );
   const handleBezierPreview = useCallback(
     (points: number[] | null, step: number, style: BezierPreviewStyle) => {
       const ctx = previewCanvasRef.current?.getContext("2d");
       if (ctx) drawBezierPreview(ctx, points, previewBackdrop(), step, style);
+      if (points === null) previewEnded();
     },
-    [previewBackdrop]
+    [previewBackdrop, previewEnded]
   );
 
   /*
@@ -487,8 +509,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
 
   // Use the offline drawing hook
   const {
-    undo: undoWhenEnabled,
-    redo: redoWhenEnabled,
+    undo,
+    redo,
     drawingEngine,
     getReplayBlob,
     getActionCount,
@@ -531,20 +553,6 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     placement,
   );
 
-  /**
-   * Undo and redo, only while the painter takes input at all.
-   *
-   * The pointer was already refused while a host has drawing disabled -- a
-   * replay in progress, a canvas being exported to save -- but the toolbox
-   * buttons and the shortcut were not, so an undo clicked then went out to
-   * the room behind the very export it changed the answer to.
-   */
-  const undo = useCallback(() => {
-    if (interactionEnabled) undoWhenEnabled();
-  }, [interactionEnabled, undoWhenEnabled]);
-  const redo = useCallback(() => {
-    if (interactionEnabled) redoWhenEnabled();
-  }, [interactionEnabled, redoWhenEnabled]);
   previewEngineRef.current = drawingEngine ?? null;
   const flushPendingStrokeRef = useRef(flushPendingStroke);
   flushPendingStrokeRef.current = flushPendingStroke;
@@ -647,12 +655,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
         drawingState.opacity / 255,
         value,
         size,
-        TEXT_FONT_FAMILY,
-        // Into the pair the operation below names. Left to its default the
-        // engine wrote our own, while the emitted operation carried the
-        // selected participant's -- so the author saw the text in one place
-        // and everyone else in another, until a replay moved it.
-        drawingEngine.drawTarget[drawingState.layerType]
+        TEXT_FONT_FAMILY
       );
       // NEO packs the colour with red in the low byte
       recordText(
@@ -736,7 +739,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     // Every participant's pair, bottom of the stack first, and everyone is in
     // it: hiding somebody is a way of looking at the drawing, not an edit.
     const layers: HTMLCanvasElement[] = [];
-    for (const owner of inJoinOrder(drawingEngine.ownerIds()).reverse()) {
+    for (const owner of bottomFirst(drawingEngine.ownerIds())) {
       for (const layer of ["background", "foreground"] as const) {
         const canvas = drawingEngine.getLayerCanvas(layer, owner);
         if (canvas) layers.push(canvas);
@@ -1162,10 +1165,10 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
           }));
           break;
         case "undo":
-          if (historyState.canUndo) undo();
+          if (shownHistory.canUndo) undo();
           break;
         case "redo":
-          if (historyState.canRedo) redo();
+          if (shownHistory.canRedo) redo();
           break;
         case "help":
           setShowShortcuts((open) => !open);
@@ -1174,7 +1177,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     },
     [
       updateBrushType, setDrawingState, handleZoomIn, handleZoomOut,
-      historyState.canUndo, historyState.canRedo, undo, redo,
+      shownHistory.canUndo, shownHistory.canRedo, undo, redo,
     ]
   );
 
@@ -1203,12 +1206,12 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       if ((e.ctrlKey || e.metaKey) && !e.altKey) {
         if (e.key === "z" && !e.shiftKey) {
           e.preventDefault();
-          if (historyState.canUndo) {
+          if (shownHistory.canUndo) {
             undo();
           }
         } else if (e.key === "y" || (e.key === "z" && e.shiftKey)) {
           e.preventDefault();
-          if (historyState.canRedo) {
+          if (shownHistory.canRedo) {
             redo();
           }
         }
@@ -1217,7 +1220,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [twoToneConfig, undo, redo, historyState.canUndo, historyState.canRedo]);
+  }, [twoToneConfig, undo, redo, shownHistory.canUndo, shownHistory.canRedo]);
 
   return (
     <div className="w-full painter-root flex flex-col">
@@ -1268,8 +1271,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
                 brushSize={drawingState.brushSize}
                 paletteColors={paletteColors}
                 selectedPaletteIndex={selectedPaletteIndex}
-                canUndo={historyState.canUndo}
-                canRedo={historyState.canRedo}
+                canUndo={shownHistory.canUndo}
+                canRedo={shownHistory.canRedo}
                 timerMinutes={timerMinutes}
                 timerRemainingSeconds={timerRemainingSeconds}
                 onBrushSizeChange={setPenSize}
@@ -1289,11 +1292,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
                 // which already has codes for every one of these.
                 tools={ALL_TOOLS}
                 drawingState={drawingState}
-                historyState={
-                  interactionEnabled
-                    ? historyState
-                    : { canUndo: false, canRedo: false }
-                }
+                historyState={shownHistory}
                 paletteColors={paletteColors}
                 selectedPaletteIndex={selectedPaletteIndex}
                 currentZoom={currentZoom}

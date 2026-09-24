@@ -62,6 +62,7 @@ function twoClients() {
   };
 
   const pending: Promise<unknown>[] = [];
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const open = (id: string, controls: "none" | "toolbox" = "none") => {
     const element = document.createElement("div");
     document.body.appendChild(element);
@@ -82,8 +83,40 @@ function twoClients() {
     return { painter, element };
   };
 
+  /** Opens a painter, waits for it, and names it on the stream. */
+  const join = async (id: string, controls: "none" | "toolbox" = "none") => {
+    const client = open(id, controls);
+    await act(async () => {
+      await client.painter.ready;
+    });
+    act(() => {
+      client.painter.setLocalActorId(id);
+    });
+    return client;
+  };
+  /** Lets every relayed operation land, and the painters draw it. */
+  const rest = (ms = 200) =>
+    act(async () => {
+      await Promise.all(pending);
+      await sleep(ms);
+    });
+  /** Ctrl+Z on the window, and time for the room to answer it. */
+  const pressUndo = async () => {
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "z", ctrlKey: true, bubbles: true, cancelable: true,
+      }));
+    });
+    await rest(180);
+  };
+  const undosSent = () => relayed.filter((kind) => kind === "undo").length;
+
   return {
     open,
+    join,
+    rest,
+    pressUndo,
+    undosSent,
     relayed,
     sentOperations,
     /** Sends an operation the way a painter's own would go. */
@@ -120,6 +153,45 @@ function onScreen(element: HTMLElement) {
   for (const layer of layers) context.drawImage(layer, 0, 0);
 
   return Array.from(context.getImageData(0, 0, WIDTH, HEIGHT).data);
+}
+
+/** A pointer on a painter's canvas, placed in the canvas's own screen box. */
+function pointerOn(element: HTMLElement) {
+  const canvas = element.querySelector("#canvas") as HTMLCanvasElement;
+  const box = canvas.getBoundingClientRect();
+  const dispatch = (type: string, x: number, y: number, buttons?: number) =>
+    act(async () => {
+      canvas.dispatchEvent(new PointerEvent(type, {
+        pointerId: 1, pointerType: "mouse", button: 0,
+        buttons: buttons ?? (type === "pointerup" ? 0 : 1),
+        clientX: box.left + x, clientY: box.top + y,
+        bubbles: true, cancelable: true,
+      }));
+    });
+  return { box, dispatch };
+}
+
+/** A short horizontal mark in one participant's background. */
+const stroke = (target: string, x: number, y: number, blue: number) => ({
+  kind: "stroke" as const,
+  layer: "background" as const,
+  targetActorId: target,
+  brushSize: 2,
+  brush: "solid" as const,
+  color: { r: 0, g: 0, b: blue, a: 255 },
+  points: [{ x, y }, { x: x + 6, y }],
+  mask: { type: 0, r: 0, g: 0, b: 0 },
+});
+
+/** Pixels with any ink on the canvas the stack shows at this z-index. */
+function inkedAt(element: HTMLElement, zIndex: number): number {
+  const layer = Array.from(element.querySelectorAll("canvas"))
+    .find((c) => Number(c.style.zIndex) === zIndex);
+  if (!layer) throw new Error(`no canvas at z ${zIndex}`);
+  const data = layer.getContext("2d")!.getImageData(0, 0, WIDTH, HEIGHT).data;
+  let count = 0;
+  for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count++;
+  return count;
 }
 
 describe("two clients and the wire between them", () => {
@@ -297,39 +369,15 @@ describe("two clients and the wire between them", () => {
     // `canUndo`, so a single press sent the room two undo operations and
     // took back two strokes.
     const room = twoClients();
-    const bob = room.open("2");
-    await act(async () => {
-      await bob.painter.ready;
-    });
-    act(() => {
-      bob.painter.setLocalActorId("2");
-    });
+    await room.join("2");
     await act(async () => {
       await room.send("2", { kind: "undo-boundary" });
-      await room.send("2", {
-        kind: "stroke",
-        layer: "background",
-        targetActorId: "2",
-        brushSize: 2,
-        brush: "solid",
-        color: { r: 0, g: 0, b: 128, a: 255 },
-        points: [{ x: 8, y: 30 }, { x: 14, y: 30 }],
-        mask: { type: 0, r: 0, g: 0, b: 0 },
-      });
-      await room.settle();
-      await new Promise((resolve) => setTimeout(resolve, 120));
+      await room.send("2", stroke("2", 8, 30, 128));
     });
+    await room.rest(120);
 
-    await act(async () => {
-      window.dispatchEvent(new KeyboardEvent("keydown", {
-        key: "z", ctrlKey: true, bubbles: true, cancelable: true,
-      }));
-      await new Promise((resolve) => setTimeout(resolve, 60));
-      await room.settle();
-      await new Promise((resolve) => setTimeout(resolve, 120));
-    });
-
-    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
+    await room.pressUndo();
+    expect(room.undosSent()).toBe(1);
   });
 
   it("finishes the stroke under the pen when the host disables drawing", async () => {
@@ -339,42 +387,20 @@ describe("two clients and the wire between them", () => {
     // reported itself unsettled, and once re-enabled a plain hover kept
     // drawing with no button down.
     const room = twoClients();
-    const bob = room.open("2");
-    await act(async () => {
-      await bob.painter.ready;
-    });
-    act(() => {
-      bob.painter.setLocalActorId("2");
-    });
-    const canvas = bob.element.querySelector("#canvas") as HTMLCanvasElement;
-    const box = canvas.getBoundingClientRect();
-    const pointer = async (type: string, x: number, y: number, buttons = 1) => {
-      await act(async () => {
-        canvas.dispatchEvent(new PointerEvent(type, {
-          pointerId: 1, pointerType: "mouse", button: 0, buttons,
-          clientX: box.left + x, clientY: box.top + y,
-          bubbles: true, cancelable: true,
-        }));
-      });
-    };
-    const settle = async () => {
-      await act(async () => {
-        await room.settle();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      });
-    };
+    const bob = await room.join("2");
+    const pointer = pointerOn(bob.element).dispatch;
 
     await pointer("pointerdown", 8, 8);
     await pointer("pointermove", 20, 8);
     act(() => { bob.painter.setInteractionEnabled(false); });
-    await settle();
+    await room.rest();
     expect(room.relayed).toContain("stroke");
     expect(bob.painter.isSynchronizationSettled()).toBe(true);
 
     const sent = room.relayed.length;
     act(() => { bob.painter.setInteractionEnabled(true); });
     await pointer("pointermove", 30, 8, 0);
-    await settle();
+    await room.rest();
     expect(room.relayed.length).toBe(sent);
   });
 
@@ -383,27 +409,20 @@ describe("two clients and the wire between them", () => {
     // pair; the text itself was rasterised into our own. Everyone else saw
     // it in one place and the author in another.
     const room = twoClients();
-    const bob = room.open("2", "toolbox");
-    await act(async () => {
-      await bob.painter.ready;
-    });
+    const bob = await room.join("2", "toolbox");
     act(() => {
-      bob.painter.setLocalActorId("2");
       bob.painter.setParticipants([
         { actorId: "1", name: "Alice" },
         { actorId: "2", name: "Bob" },
       ]);
     });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
+    await room.rest(50);
 
-    const button = (selector: string) => {
-      const found = bob.element.querySelector<HTMLButtonElement>(selector);
-      if (!found) throw new Error(`no ${selector}`);
-      return found;
-    };
-    await act(async () => { button('button[aria-label="Draw on Alice\'s layers"]').click(); });
+    const row = bob.element.querySelector<HTMLButtonElement>(
+      'button[aria-label="Draw on Alice\'s layers"]',
+    );
+    if (!row) throw new Error("no layers row for Alice");
+    await act(async () => { row.click(); });
     // The shortcut table's T, rather than a tip in the toolbox: the pen tip
     // cycles through its tools on each press, and its title is a phrase.
     await act(async () => {
@@ -414,18 +433,9 @@ describe("two clients and the wire between them", () => {
 
     // A toolbox mount opens at a fitted zoom, so the press is placed by the
     // canvas's on-screen size rather than in artwork pixels.
-    const canvas = bob.element.querySelector("#canvas") as HTMLCanvasElement;
-    const box = canvas.getBoundingClientRect();
-    for (const type of ["pointerdown", "pointerup"]) {
-      await act(async () => {
-        canvas.dispatchEvent(new PointerEvent(type, {
-          pointerId: 1, pointerType: "mouse", button: 0,
-          buttons: type === "pointerup" ? 0 : 1,
-          clientX: box.left + box.width * 0.1, clientY: box.top + box.height * 0.5,
-          bubbles: true, cancelable: true,
-        }));
-      });
-    }
+    const { box, dispatch: pointer } = pointerOn(bob.element);
+    await pointer("pointerdown", box.width * 0.1, box.height * 0.5);
+    await pointer("pointerup", box.width * 0.1, box.height * 0.5);
     const editor = bob.element.querySelector<HTMLDivElement>("[contenteditable]");
     if (!editor) throw new Error("no text editor opened");
     await act(async () => {
@@ -433,24 +443,14 @@ describe("two clients and the wire between them", () => {
       editor.dispatchEvent(new KeyboardEvent("keydown", {
         key: "Enter", bubbles: true, cancelable: true,
       }));
-      await room.settle();
-      await new Promise((resolve) => setTimeout(resolve, 200));
     });
+    await room.rest();
     expect(room.relayed).toContain("text");
 
     // Alice joined first, so her pair sits on top: z 9000 and 9001. Bob's is
     // the band below. See participantZIndex.
-    const inked = (zIndex: number) => {
-      const layer = Array.from(bob.element.querySelectorAll("canvas"))
-        .find((c) => Number(c.style.zIndex) === zIndex);
-      if (!layer) throw new Error(`no canvas at z ${zIndex}`);
-      const data = layer.getContext("2d")!.getImageData(0, 0, WIDTH, HEIGHT).data;
-      let count = 0;
-      for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count++;
-      return count;
-    };
-    expect(inked(9000)).toBeGreaterThan(0);
-    expect(inked(8990)).toBe(0);
+    expect(inkedAt(bob.element, 9000)).toBeGreaterThan(0);
+    expect(inkedAt(bob.element, 8990)).toBe(0);
   });
 
   it("ignores Ctrl+Z while the host has drawing disabled", async () => {
@@ -458,102 +458,47 @@ describe("two clients and the wire between them", () => {
     // buttons were not, so an undo clicked during a replay or a save went
     // out to the room behind the export it changed.
     const room = twoClients();
-    const bob = room.open("2");
-    await act(async () => {
-      await bob.painter.ready;
-    });
-    act(() => {
-      bob.painter.setLocalActorId("2");
-    });
+    const bob = await room.join("2");
     await act(async () => {
       await room.send("2", { kind: "undo-boundary" });
-      await room.send("2", {
-        kind: "stroke", layer: "background", targetActorId: "2",
-        brushSize: 2, brush: "solid", color: { r: 0, g: 0, b: 128, a: 255 },
-        points: [{ x: 8, y: 30 }, { x: 14, y: 30 }],
-        mask: { type: 0, r: 0, g: 0, b: 0 },
-      });
-      await room.settle();
-      await new Promise((resolve) => setTimeout(resolve, 120));
+      await room.send("2", stroke("2", 8, 30, 128));
     });
-    const undoKey = async () => {
-      await act(async () => {
-        window.dispatchEvent(new KeyboardEvent("keydown", {
-          key: "z", ctrlKey: true, bubbles: true, cancelable: true,
-        }));
-        await new Promise((resolve) => setTimeout(resolve, 60));
-        await room.settle();
-        await new Promise((resolve) => setTimeout(resolve, 120));
-      });
-    };
+    await room.rest(120);
 
     act(() => { bob.painter.setInteractionEnabled(false); });
-    await undoKey();
-    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(0);
+    await room.pressUndo();
+    expect(room.undosSent()).toBe(0);
 
     act(() => { bob.painter.setInteractionEnabled(true); });
-    await undoKey();
-    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
+    await room.pressUndo();
+    expect(room.undosSent()).toBe(1);
   });
 
-  it("ignores Ctrl+Z while the pen is down, as NEO does", async () => {
+  it("ignores Ctrl+Z while the pen is down", async () => {
     // An undo sent mid-stroke was sequenced ahead of the stroke's own tail,
     // which then went out after it with no boundary of its own, while the
     // pointer kept drawing onto a canvas the replay had just rolled back.
     const room = twoClients();
-    const bob = room.open("2");
-    await act(async () => {
-      await bob.painter.ready;
-    });
-    act(() => {
-      bob.painter.setLocalActorId("2");
-    });
-    const canvas = bob.element.querySelector("#canvas") as HTMLCanvasElement;
-    const box = canvas.getBoundingClientRect();
-    const pointer = async (type: string, x: number, y: number) => {
-      await act(async () => {
-        canvas.dispatchEvent(new PointerEvent(type, {
-          pointerId: 1, pointerType: "mouse", button: 0,
-          buttons: type === "pointerup" ? 0 : 1,
-          clientX: box.left + x, clientY: box.top + y,
-          bubbles: true, cancelable: true,
-        }));
-      });
-    };
-    const undoKey = async () => {
-      await act(async () => {
-        window.dispatchEvent(new KeyboardEvent("keydown", {
-          key: "z", ctrlKey: true, bubbles: true, cancelable: true,
-        }));
-        await new Promise((resolve) => setTimeout(resolve, 60));
-        await room.settle();
-        await new Promise((resolve) => setTimeout(resolve, 120));
-      });
-    };
+    const bob = await room.join("2");
+    const pointer = pointerOn(bob.element).dispatch;
 
     // One stroke on the record, so there is something to undo.
     await pointer("pointerdown", 8, 8);
     await pointer("pointermove", 20, 8);
     await pointer("pointerup", 20, 8);
-    await act(async () => {
-      await room.settle();
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    await room.rest();
     expect(room.relayed).toContain("stroke");
 
     // A second one, with the key pressed while it is still being drawn.
     await pointer("pointerdown", 8, 24);
     await pointer("pointermove", 20, 24);
-    await undoKey();
-    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(0);
+    await room.pressUndo();
+    expect(room.undosSent()).toBe(0);
 
     await pointer("pointerup", 20, 24);
-    await act(async () => {
-      await room.settle();
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
-    await undoKey();
-    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
+    await room.rest();
+    await room.pressUndo();
+    expect(room.undosSent()).toBe(1);
   });
 
   it("agree after one of them undoes, which rebuilds the canvas", async () => {
@@ -572,17 +517,6 @@ describe("two clients and the wire between them", () => {
     act(() => {
       alice.painter.setLocalActorId("1");
       bob.painter.setLocalActorId("2");
-    });
-
-    const stroke = (target: string, x: number, y: number, blue: number) => ({
-      kind: "stroke" as const,
-      layer: "background" as const,
-      targetActorId: target,
-      brushSize: 2,
-      brush: "solid" as const,
-      color: { r: 0, g: 0, b: blue, a: 255 },
-      points: [{ x, y }, { x: x + 6, y }],
-      mask: { type: 0, r: 0, g: 0, b: 0 },
     });
 
     await act(async () => {

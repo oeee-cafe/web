@@ -690,33 +690,46 @@ export const useOfflineDrawing = (
    * because it was never an operation. That is what made an undo here jump
    * the drawing back further than it went for anybody watching.
    */
+  /**
+   * Whether an undo or redo may happen right now. Every way of asking for
+   * one -- the shortcut, the toolbox buttons, the handle -- comes through
+   * here, so this is the one place that says no.
+   *
+   * Not while the host has drawing disabled: the pointer was already refused
+   * then, but an undo that was not went out to the room behind the very
+   * export it changed the answer to. And not while the pen is down. In a
+   * session an undo sent mid-stroke was sequenced ahead of the stroke's own
+   * tail, and the pointer kept drawing onto a canvas the replay had just
+   * rolled back; offline it popped the stroke *before* the one in progress
+   * out from under the pen. NEO answers the key mid-stroke (its
+   * _keyDownHandler has no guard, and the stroke's undo step is pushed on the
+   * press), which is a deliberate departure.
+   */
+  const mayUndo = useCallback(
+    () => !isDrawingDisabled && !baseDrawing.isDrawingRef.current,
+    [isDrawingDisabled, baseDrawing],
+  );
+
   const wrappedUndo = useCallback(() => {
+    if (!mayUndo()) return;
     if (onOperation) {
-      // Not while the pen is down. An undo sent mid-stroke was sequenced
-      // ahead of the stroke's own tail: the chunk still under the pointer
-      // went out after it, with no boundary of its own, and the pointer kept
-      // drawing onto a canvas the replay had just rolled back. Sessions only:
-      // NEO itself answers the key mid-stroke (its _keyDownHandler has no
-      // guard, and the stroke's undo step is pushed on the press), and the
-      // offline painter keeps whatever it did before.
-      if (baseDrawing.isDrawingRef.current) return;
       onOperation({ kind: "undo", redo: false });
       return;
     }
     baseDrawing.undo();
     actionRecorderRef.current.back();
-  }, [baseDrawing, onOperation]);
+  }, [baseDrawing, mayUndo, onOperation]);
 
   // Redo, for the same reason and by the same rule.
   const wrappedRedo = useCallback(() => {
+    if (!mayUndo()) return;
     if (onOperation) {
-      if (baseDrawing.isDrawingRef.current) return;
       onOperation({ kind: "undo", redo: true });
       return;
     }
     baseDrawing.redo();
     actionRecorderRef.current.forward();
-  }, [baseDrawing, onOperation]);
+  }, [baseDrawing, mayUndo, onOperation]);
 
   // Add restore action with final layer states
   const addRestoreAction = useCallback(() => {
