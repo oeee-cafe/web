@@ -2372,6 +2372,11 @@ nav a:visited,
   width: 560px;
 }
 
+/* Focused only so the dialog has somewhere to start that is not a field. */
+#create-session-title:focus {
+  outline: none;
+}
+
 .session-form-actions {
   display: flex;
   justify-content: flex-end;
