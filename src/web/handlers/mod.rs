@@ -1604,8 +1604,8 @@ mod template_tests {
         );
         let squashed = apple.split_whitespace().collect::<Vec<_>>().join(" ");
         assert_eq!(apple.matches(r#"class="ds-button ds-button-primary supporter-buy""#).count(), 2);
-        assert!(squashed.contains(r#"data-product="cafe.oeee.supporter.2026" data-haptic="medium">supporter-pack-buy(year=2026)<span"#));
-        assert!(squashed.contains(r#"data-haptic="medium">Support twice as much<span"#));
+        assert!(squashed.contains(r#"data-product="cafe.oeee.supporter.2026">supporter-pack-buy(year=2026)<span"#));
+        assert!(squashed.contains(r#"data-product="cafe.oeee.supporter.2026.more">Support twice as much<span"#));
         assert!(apple.contains(r#"class="ds-button supporter-restore""#));
         // Room for the price the app will fill in, keyed by the product it
         // belongs to, and empty until then.

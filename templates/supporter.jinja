@@ -55,8 +55,7 @@
               {% for offer in offers %}
                 <button type="button"
                         class="ds-button ds-button-primary supporter-buy"
-                        data-product="{{ offer.product }}"
-                        data-haptic="medium">{{ offer.label or ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ offer.product }}"></span></button>
+                        data-product="{{ offer.product }}">{{ offer.label or ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ offer.product }}"></span></button>
               {% endfor %}
               {# Restoring is the App Store's word for it: the same purchase
                  handed over again, which gives a pack back to whoever is
