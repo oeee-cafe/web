@@ -1,4 +1,5 @@
 {% extends "base.jinja" %}
+{% import "pill_macro.jinja" as pill %}
 {% block title %}
   {{ super() }} | {{ community.name }}
 {% endblock title %}
@@ -24,6 +25,16 @@
         type="application/activity+json"
         href="https://{{ domain }}/ap/communities/{{ community.id }}" />
 {% endblock head %}
+{# What of the community is showing under its card -- its drawings, or
+   what has been said on them -- as a pill of links, each its own address
+   (/communities/@slug and /communities/@slug/comments), switched in place.
+   community_comments.jinja is this page with the other one chosen. #}
+{% macro community_views(chosen) %}
+  <nav class="ds-segmented" aria-label="{{ community.name }}" {{ pill.in_place() }}>
+    <a href="/communities/@{{ community.slug }}"{% if chosen == "drawings" %} aria-current="page"{% endif %}>{{ ftl_get_message("recent-drawings") }}</a>
+    <a href="/communities/@{{ community.slug }}/comments"{% if chosen == "comments" %} aria-current="page"{% endif %}>{{ ftl_get_message("recent-comments") }}</a>
+  </nav>
+{% endmacro %}
 {% block content %}
   {% include "post_feed_head.jinja" %}
   {# A community, laid out the way the profile lays out a person: one card
@@ -91,7 +102,6 @@
               <a href="/collaborate?community={{ community.slug }}" class="ds-button">{{ ftl_get_message("community-draw-together") }}</a>
             {% endif %}
           {% endif %}
-          <a href="/communities/@{{ community.slug }}/comments" class="ds-button">{{ ftl_get_message("recent-comments") }}</a>
           {% if current_user and community.visibility == "private" %}
             <a href="/communities/@{{ community.slug }}/members" class="ds-button">{{ ftl_get_message("community-members") }}</a>
           {% endif %}
@@ -101,14 +111,15 @@
         </div>
       </section>
     {% endblock community_edit_block %}
+    {% block community_body %}
     {# The drawings, with the same chrome as /: shared head, column control,
        grid and card fragment. `feed` is missing when a handler only wants
        the header block above: saving or cancelling the edit form renders
        that block alone, and minijinja still walks the rest to reach it. #}
     {% set feed_posts = feed.posts if feed is defined else [] %}
-    <section class="profile-section" role="region" aria-labelledby="post-feed-heading">
+    <section class="profile-section" role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
       <div class="grid-header">
-        <div id="post-feed-heading" class="profile-section-label">{{ ftl_get_message("recent-drawings") }}</div>
+        {{ community_views("drawings") }}
         {# Only with posts to arrange: an empty feed has no columns to set. #}
         {% if feed_posts %}
           {% include "post_feed_controls.jinja" %}
@@ -122,6 +133,7 @@
         <p class="profile-empty">{{ ftl_get_message("community-no-posts") }}</p>
       {% endif %}
     </section>
+    {% endblock community_body %}
   </div>
 
   {% if current_user or community.visibility == "public" %}

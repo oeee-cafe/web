@@ -1,27 +1,25 @@
-{% extends "base.jinja" %}
+{% extends "community.jinja" %}
 {% import "comment_card_macro.jinja" as comment_card_macro %}
 {% block title %}
-  {{ super() }} | {{ community.name }} | {{ ftl_get_message("recent-comments") }}
+  {{ super() }} | {{ ftl_get_message("recent-comments") }}
 {% endblock title %}
-{% block content %}
-  {# A community's recent comments as an inbox is laid out: one grouped list,
-     each row the drawing it is on, who said what, and the whole row the way
-     to the drawing. #}
-  <div class="notifications-page">
-    <div class="members-header">
-      <div>
-        <a class="profile-chip" href="/communities/@{{ community.slug }}">← {{ community.name }}</a>
-        <h1 class="settings-title">{{ ftl_get_message("recent-comments") }}</h1>
-      </div>
+{# The community page with the pill on its comments: the same card, then
+   what has been said on its drawings as the profile shows a person's --
+   a card each, as many across as the width holds, each the way to the
+   drawing it is on. #}
+{% block community_body %}
+  <section class="profile-section" role="region" aria-label="{{ ftl_get_message("recent-comments") }}">
+    <div class="grid-header">
+      {{ community_views("comments") }}
     </div>
     {% if comments %}
-      <div class="comment-list">
+      <div class="comment-grid">
         {% for comment in comments %}
           {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
         {% endfor %}
       </div>
     {% else %}
-      <div class="ds-card notifications-empty"><p>{{ ftl_get_message("no-comments-yet") }}</p></div>
+      <p class="profile-empty">{{ ftl_get_message("no-comments-yet") }}</p>
     {% endif %}
-  </div>
-{% endblock content %}
+  </section>
+{% endblock community_body %}

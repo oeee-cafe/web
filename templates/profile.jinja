@@ -168,25 +168,38 @@
       {# One switch, one grid. Everyone sees their drawings and, when there
          are any, what they have said; on their own profile the drawings are
          split in two -- what everyone sees, and what only they do. With
-         nothing to switch between, the one grid is simply named. #}
+         nothing to switch between, the one grid is simply named.
+
+         Each tab is a link to its own address -- /@name, /@name/comments,
+         /@name/private -- and `tab` is the one the address asked for, so a
+         tab can be shared, reloaded and gone back to. A plain click is
+         taken here and switches in place, pushing the address as it goes. #}
+      {% set tab = tab or "public" %}
       {% set tab_count = 1 + (1 if is_owner else 0) + (1 if comment_count else 0) %}
       <div class="grid-header">
         {% if tab_count > 1 %}
-          <div class="ds-segmented profile-tabs" role="group" aria-label="{{ ftl_get_message('profile-tabs-label') }}">
-            <button type="button" aria-pressed="true" data-profile-tab="public">{{ ftl_get_message("profile-tab-public" if is_owner else "profile-tab-drawings") }}<span class="profile-tab-count">{{ public_community_posts|length }}</span></button>
+          <div class="profile-tabs-bar">
+            <nav class="ds-segmented profile-tabs" aria-label="{{ ftl_get_message('profile-tabs-label') }}">
+              <a href="/@{{ user.login_name }}" data-profile-tab="public"{% if tab == "public" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-public" if is_owner else "profile-tab-drawings") }}<span class="profile-tab-count">{{ public_community_posts|length }}</span></a>
+              {% if is_owner %}
+                <a href="/@{{ user.login_name }}/private" data-profile-tab="private"{% if tab == "private" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-private") }}<span class="profile-tab-count">{{ private_community_posts|length }}</span></a>
+              {% endif %}
+              {% if comment_count %}
+                <a href="/@{{ user.login_name }}/comments" data-profile-tab="comments"{% if tab == "comments" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-comments") }}<span class="profile-tab-count">{{ comment_count }}</span></a>
+              {% endif %}
+            </nav>
             {% if is_owner %}
-              <button type="button" aria-pressed="false" data-profile-tab="private">{{ ftl_get_message("profile-tab-private") }}<span class="profile-tab-count">{{ private_community_posts|length }}</span></button>
-            {% endif %}
-            {% if comment_count %}
-              <button type="button" aria-pressed="false" data-profile-tab="comments">{{ ftl_get_message("profile-tab-comments") }}<span class="profile-tab-count">{{ comment_count }}</span></button>
+              {# Beside the switch, and only while it is on the private
+                 drawings: what that tab means, where it is chosen. #}
+              <p class="profile-panel-note" data-profile-note="private"{% if tab != "private" %} hidden{% endif %}>{{ ftl_get_message("profile-private-community-posts-note") }}</p>
             {% endif %}
           </div>
         {% else %}
           <div class="profile-section-label">{{ ftl_get_message("profile-tab-drawings") }}</div>
         {% endif %}
-        {% if public_community_posts or is_owner %}<div data-profile-per-row>{{ per_row() }}</div>{% endif %}
+        {% if public_community_posts or is_owner %}<div data-profile-per-row{% if tab == "comments" %} hidden{% endif %}>{{ per_row() }}</div>{% endif %}
       </div>
-      <div data-profile-panel="public">
+      <div data-profile-panel="public"{% if tab != "public" %} hidden{% endif %}>
         {% if public_community_posts %}
           <div class="posts-grid">
             {% for post in public_community_posts %}
@@ -206,8 +219,7 @@
         {% endif %}
       </div>
       {% if is_owner %}
-        <div data-profile-panel="private" hidden>
-          <p class="profile-panel-note">{{ ftl_get_message("profile-private-community-posts-note") }}</p>
+        <div data-profile-panel="private"{% if tab != "private" %} hidden{% endif %}>
           {% if private_community_posts %}
             <div class="posts-grid">
               {% for post in private_community_posts %}
@@ -235,7 +247,7 @@
            show anyone. The rest arrive as the grid is scrolled; the
            sentinel sits in the hidden panel harmlessly, since htmx watches
            it with an IntersectionObserver and nothing hidden intersects. #}
-        <div data-profile-panel="comments" hidden>
+        <div data-profile-panel="comments"{% if tab != "comments" %} hidden{% endif %}>
           <div class="comment-grid">
             {% include "profile_comments_fragment.jinja" %}
           </div>
@@ -244,20 +256,56 @@
       {% if tab_count > 1 %}
         <script>
           (function () {
+            // Found at the time rather than kept: a boosted visit to
+            // another profile swaps the body, and the listeners below
+            // outlive it.
+            function select(chosen) {
+              var tabs = document.querySelectorAll("[data-profile-tab]");
+              for (var j = 0; j < tabs.length; j++) {
+                if (tabs[j].getAttribute("data-profile-tab") === chosen) {
+                  tabs[j].setAttribute("aria-current", "page");
+                } else {
+                  tabs[j].removeAttribute("aria-current");
+                }
+              }
+              var panels = document.querySelectorAll("[data-profile-panel]");
+              for (var k = 0; k < panels.length; k++) {
+                panels[k].hidden = panels[k].getAttribute("data-profile-panel") !== chosen;
+              }
+              var notes = document.querySelectorAll("[data-profile-note]");
+              for (var n = 0; n < notes.length; n++) {
+                notes[n].hidden = notes[n].getAttribute("data-profile-note") !== chosen;
+              }
+              // How many a row is a question about drawings only.
+              var perRow = document.querySelector("[data-profile-per-row]");
+              if (perRow) perRow.hidden = chosen === "comments";
+            }
+
             var tabs = document.querySelectorAll("[data-profile-tab]");
-            var perRow = document.querySelector("[data-profile-per-row]");
             for (var i = 0; i < tabs.length; i++) {
-              tabs[i].addEventListener("click", function () {
-                var chosen = this.getAttribute("data-profile-tab");
-                for (var j = 0; j < tabs.length; j++) {
-                  tabs[j].setAttribute("aria-pressed", String(tabs[j] === this));
+              tabs[i].addEventListener("click", function (event) {
+                // A new tab or window, or a copied link, is the link's.
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                if (this.getAttribute("aria-current") === "page") return;
+                select(this.getAttribute("data-profile-tab"));
+                history.pushState({ profileTab: true }, "", this.href);
+              });
+            }
+
+            // Back and forward between tabs. htmx restores only the entries
+            // it pushed, so these are left to here; the one the page was
+            // loaded at is htmx's, and it fetches that address afresh.
+            if (!window.oeeeProfileTabsPopstate) {
+              window.oeeeProfileTabsPopstate = true;
+              window.addEventListener("popstate", function () {
+                var tabs = document.querySelectorAll("[data-profile-tab]");
+                for (var i = 0; i < tabs.length; i++) {
+                  if (tabs[i].pathname === location.pathname) {
+                    select(tabs[i].getAttribute("data-profile-tab"));
+                    return;
+                  }
                 }
-                var panels = document.querySelectorAll("[data-profile-panel]");
-                for (var k = 0; k < panels.length; k++) {
-                  panels[k].hidden = panels[k].getAttribute("data-profile-panel") !== chosen;
-                }
-                // How many a row is a question about drawings only.
-                if (perRow) perRow.hidden = chosen === "comments";
               });
             }
           })();
