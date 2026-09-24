@@ -484,6 +484,7 @@ sign-in-other-ways = 다른 방법으로 로그인
 sign-in-no-account = 아직 계정이 없나요?
 signup-agree = 커뮤니티 가이드라인과 개인정보 처리방침에 동의합니다.
 signup-agree-required = 가입하려면 커뮤니티 가이드라인과 개인정보 처리방침에 동의해 주세요.
+sign-up-other-ways = 다른 방법으로 가입
 sign-up-have-account = 이미 계정이 있나요?
 about-apps = 앱
 app-store-badge = App Store에서 다운로드하기

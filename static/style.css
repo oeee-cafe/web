@@ -3863,21 +3863,21 @@ html[data-store="steam"] .auth-steam {
   display: block;
 }
 
-/* On /login the site's own buttons and fields take the providers' 40px
-   height. `display` is left to the rules above, which is what keeps
+/* On /login and /signup the site's own buttons and fields take the
+   providers' 40px height. `display` is left to the rules above, which is what keeps
    Steam's hidden outside its app. The questions between them stay on one
    line: the longest ("パスワードをお忘れですか？") is 146px of a 330px
    column. */
-.auth-card-login .ds-input {
+.auth-card-providers .ds-input {
   height: 40px;
 }
 
-.auth-card-login .auth-divider span {
+.auth-card-providers .auth-divider span {
   white-space: nowrap;
 }
 
-.auth-card-login .auth-submit,
-.auth-card-login .auth-secondary {
+.auth-card-providers .auth-submit,
+.auth-card-providers .auth-secondary {
   height: 40px;
   padding: 0 12px;
   line-height: 38px;

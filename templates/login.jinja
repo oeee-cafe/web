@@ -1,4 +1,5 @@
 {% extends "base.jinja" %}
+{% from "sign_in_providers_macro.jinja" import sign_in_providers %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("sign-in") }}
 {% endblock title %}
@@ -9,7 +10,7 @@
      or an account they do not have yet -- each a section of its own under a
      question, rather than a line of small print under the form. #}
   <div class="auth-page">
-    <form method="post" class="ds-card auth-card auth-card-login">
+    <form method="post" class="ds-card auth-card auth-card-providers">
       <h1 class="auth-title">{{ ftl_get_message("sign-in") }}</h1>
       {% if linking_provider %}
         {# Arrived from signing in with Steam, say, to an account that is
@@ -33,61 +34,7 @@
       {% endif %}
 
       {% if not linking_provider and (steam_enabled or apple_enabled or google_enabled) %}
-        {# A section of its own, like signing up. Steam alone shows only in
-           the Steam app, so a section holding nothing else hides with it. #}
-        <div class="auth-social{% if steam_enabled and not apple_enabled and not google_enabled %} auth-steam{% endif %}">
-          <div class="auth-divider"><span>{{ ftl_get_message("sign-in-other-ways") }}</span></div>
-          {% if steam_enabled %}
-            {# Only the Oeee Cafe app on Steam can follow this: it stops the
-               navigation, asks Steam for a ticket and posts it to /auth/steam.
-               Hidden everywhere else, where following it would only say so. #}
-            <a class="ds-button auth-secondary auth-steam" href="/auth/steam/app{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-steam") }}</a>
-          {% endif %}
-          {% if apple_enabled %}
-            {# Apple's sign-in page, and back, in a browser. In every app the
-               page takes the press itself (app_sign_in.jinja): a sheet of the
-               platform's own on iOS and macOS, and elsewhere the browser, with
-               the answer handed back to this session.
-
-               The button is Apple's own, drawn by Apple in the reader's
-               language at the card's 330x40, black on light and white on dark
-               as it asks; the theme's picture shows and the other hides
-               (style.css). Its `border_radius` counts the picture's own
-               pixels, which at `scale=2` are half a CSS pixel: 8 is the 4px
-               corner of Google's button beside it. #}
-            {%- set apple_locale = {"ko": "ko_KR", "ja": "ja_JP", "zh": "zh_CN"}[ftl_lang] or "en_US" -%}
-            {%- set apple_button = "https://appleid.cdn-apple.com/appleid/button?height=40&width=330&type=sign-in&border=false&border_radius=8&scale=2&locale=" ~ apple_locale ~ "&color=" %}
-            <a class="auth-provider auth-apple" href="/auth/apple{% if next %}?next={{ next|urlencode }}{% endif %}">
-              <img class="auth-provider-light" src="{{ apple_button }}black" width="330" height="40"
-                   alt="{{ ftl_get_message("sign-in-with-apple") }}" referrerpolicy="no-referrer" />
-              <img class="auth-provider-dark" src="{{ apple_button }}white" width="330" height="40"
-                   alt="{{ ftl_get_message("sign-in-with-apple") }}" referrerpolicy="no-referrer" />
-            </a>
-          {% endif %}
-          {% if google_enabled %}
-            {# Google's sign-in page, and back, in a browser. Google refuses
-               its own pages in an embedded web view, so in every app the page
-               takes the press itself (app_sign_in.jinja): Credential Manager
-               on Android, and elsewhere this same page in a browser of the
-               system's -- a sheet on iOS and macOS, the browser on Windows --
-               with the answer handed back.
-
-               Google's branding kit (static/signin/) draws its button in
-               English only. In English the button is Google's own; in the
-               other languages it is the kit's G beside the words, laid out to
-               Google's measurements (style.css). #}
-            <a class="auth-provider auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}">
-              {%- if ftl_lang == "en" %}
-                <img class="auth-provider-light" src="{{ '/static/signin/google-light.svg' | cachebuster | safe }}" width="330" height="40"
-                     alt="{{ ftl_get_message("sign-in-with-google") }}" />
-                <img class="auth-provider-dark" src="{{ '/static/signin/google-dark.svg' | cachebuster | safe }}" width="330" height="40"
-                     alt="{{ ftl_get_message("sign-in-with-google") }}" />
-              {%- else %}
-                <span class="auth-google-drawn"><img src="{{ '/static/signin/google-mark.svg' | cachebuster | safe }}" width="20" height="20" alt="" /><span>{{ ftl_get_message("sign-in-with-google") }}</span></span>
-              {%- endif %}
-            </a>
-          {% endif %}
-        </div>
+        {{ sign_in_providers("sign-in-other-ways", ftl_lang, next, steam_enabled, apple_enabled, google_enabled) }}
       {% endif %}
 
       <div class="auth-divider"><span>{{ ftl_get_message("forgot-password") }}</span></div>

@@ -486,6 +486,7 @@ sign-in-other-ways = Or sign in with
 sign-in-no-account = No account yet?
 signup-agree = I agree to the Community Guidelines and the Privacy Policy.
 signup-agree-required = Please agree to the Community Guidelines and the Privacy Policy to sign up.
+sign-up-other-ways = Or sign up with
 sign-up-have-account = Already have an account?
 about-apps = Apps
 app-store-badge = Download on the App Store
