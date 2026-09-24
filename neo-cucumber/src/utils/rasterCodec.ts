@@ -12,16 +12,22 @@
  * fits in two kilobytes.
  */
 
-async function through(bytes: Uint8Array, stream: TransformStream): Promise<Uint8Array> {
-  const piped = new Blob([bytes.slice().buffer as ArrayBuffer])
-    .stream()
-    .pipeThrough(stream);
-  return new Uint8Array(await new Response(piped).arrayBuffer());
-}
+import { unzlibSync, zlibSync } from "fflate";
+
+/*
+ * Synchronous, through fflate, rather than the browser's `CompressionStream`.
+ * The streams are asynchronous, and a fill's operation could only go out once
+ * they had finished: for those few milliseconds the fill was on the canvas
+ * and in no fork, so anything emitted meanwhile -- the next stroke's
+ * boundary, an undo -- was sequenced ahead of it, and a checkpoint asked for
+ * in that window was exported settled with the fill's pixels already in it.
+ * The bytes are the same zlib-wrapped DEFLATE the streams produced, so
+ * history written either way reads either way.
+ */
 
 /** Compresses a coverage mask for transport. */
-export function deflateCoverage(coverage: Uint8Array): Promise<Uint8Array> {
-  return through(coverage, new CompressionStream("deflate"));
+export function deflateCoverage(coverage: Uint8Array): Uint8Array {
+  return zlibSync(coverage);
 }
 
 /**
@@ -29,12 +35,12 @@ export function deflateCoverage(coverage: Uint8Array): Promise<Uint8Array> {
  * short buffer would otherwise be blitted as a band of transparent pixels
  * across somebody's drawing.
  */
-export async function inflateCoverage(
+export function inflateCoverage(
   compressed: Uint8Array,
   width: number,
   height: number,
-): Promise<Uint8Array> {
-  const bytes = await through(compressed, new DecompressionStream("deflate"));
+): Uint8Array {
+  const bytes = unzlibSync(compressed);
   const expected = Math.ceil((width * height) / 8);
   if (bytes.length !== expected) {
     throw new Error(

@@ -329,6 +329,49 @@ describe("two clients and the wire between them", () => {
     expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
   });
 
+  it("ignores Ctrl+Z while the host has drawing disabled", async () => {
+    // The pointer was already refused then; the shortcut and the toolbox
+    // buttons were not, so an undo clicked during a replay or a save went
+    // out to the room behind the export it changed.
+    const room = twoClients();
+    const bob = room.open("2");
+    await act(async () => {
+      await bob.painter.ready;
+    });
+    act(() => {
+      bob.painter.setLocalActorId("2");
+    });
+    await act(async () => {
+      await room.send("2", { kind: "undo-boundary" });
+      await room.send("2", {
+        kind: "stroke", layer: "background", targetActorId: "2",
+        brushSize: 2, brush: "solid", color: { r: 0, g: 0, b: 128, a: 255 },
+        points: [{ x: 8, y: 30 }, { x: 14, y: 30 }],
+        mask: { type: 0, r: 0, g: 0, b: 0 },
+      });
+      await room.settle();
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+    const undoKey = async () => {
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "z", ctrlKey: true, bubbles: true, cancelable: true,
+        }));
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        await room.settle();
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      });
+    };
+
+    act(() => { bob.painter.setInteractionEnabled(false); });
+    await undoKey();
+    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(0);
+
+    act(() => { bob.painter.setInteractionEnabled(true); });
+    await undoKey();
+    expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
+  });
+
   it("ignores Ctrl+Z while the pen is down, as NEO does", async () => {
     // An undo sent mid-stroke was sequenced ahead of the stroke's own tail,
     // which then went out after it with no boundary of its own, while the

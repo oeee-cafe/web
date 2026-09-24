@@ -38,9 +38,34 @@ describe("a flood fill sent as the ground it covered", () => {
     expect(Array.from(restored)).toEqual(Array.from(region.coverage));
   });
 
-  it("refuses coverage that is not the size it claims", async () => {
-    const compressed = await deflateCoverage(new Uint8Array(2));
-    await expect(inflateCoverage(compressed, 64, 64)).rejects.toThrow(/needs/);
+  it("refuses coverage that is not the size it claims", () => {
+    const compressed = deflateCoverage(new Uint8Array(2));
+    expect(() => inflateCoverage(compressed, 64, 64)).toThrow(/needs/);
+  });
+
+  /**
+   * History written before this codec was synchronous was compressed by the
+   * browser's `CompressionStream("deflate")`, and clients still running that
+   * build read ours with its `DecompressionStream`. Both directions, against
+   * the browser's own implementation.
+   */
+  it("reads and writes the same bytes as the browser's deflate streams", async () => {
+    const { engine, layer } = boxed();
+    const region = engine.floodFillCapturingRegion(layer, 20, 20, 200, 100, 50, 255)!;
+    const through = async (bytes: Uint8Array, stream: TransformStream) =>
+      new Uint8Array(
+        await new Response(
+          new Blob([bytes.slice().buffer as ArrayBuffer]).stream().pipeThrough(stream),
+        ).arrayBuffer(),
+      );
+
+    const theirs = await through(region.coverage, new CompressionStream("deflate"));
+    expect(Array.from(inflateCoverage(theirs, region.width, region.height)))
+      .toEqual(Array.from(region.coverage));
+
+    const ours = deflateCoverage(region.coverage);
+    expect(Array.from(await through(ours, new DecompressionStream("deflate"))))
+      .toEqual(Array.from(region.coverage));
   });
 
   /**

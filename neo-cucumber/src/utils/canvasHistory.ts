@@ -1372,8 +1372,8 @@ export class CanvasHistory {
   /**
    * Applies a message without yielding, or declines.
    *
-   * Two message types need decoding -- a snapshot's PNG and a fill's coverage
-   * bitmap -- and both are cached against the message itself. A replay is
+   * A snapshot's PNG needs the browser's decoder, and the decoded layer is
+   * cached against the message itself. A replay is
    * re-applying messages that were applied once already, so the cache is warm
    * and this answers for all of them; only a message being seen for the first
    * time has to go the long way round.
@@ -1394,8 +1394,11 @@ export class CanvasHistory {
       return true;
     }
     if (msg.type === "fillRegion") {
-      const coverage = this.coverageCache.get(msg);
-      if (!coverage) return false;
+      let coverage = this.coverageCache.get(msg);
+      if (!coverage) {
+        coverage = inflateCoverage(msg.coverage, msg.width, msg.height);
+        this.coverageCache.set(msg, coverage);
+      }
       this.engine.paintCoveredPixels(
         source(actorKey(msg.targetOwner))[msg.layer],
         msg.x, msg.y, msg.width, msg.height, msg.color, coverage,
@@ -1417,7 +1420,8 @@ export class CanvasHistory {
   ): Promise<void> {
     if (this.applyMessageSync(msg, source, strokes)) return;
 
-    // Decode into the cache, then take the path above.
+    // Decode into the cache, then take the path above. Only a snapshot's PNG
+    // needs the browser's decoder; a fill's coverage inflates in place.
     if (msg.type === "snapshot") {
       this.snapshotCache.set(
         msg,
@@ -1426,11 +1430,6 @@ export class CanvasHistory {
           this.engine.imageWidth,
           this.engine.imageHeight
         )
-      );
-    } else if (msg.type === "fillRegion") {
-      this.coverageCache.set(
-        msg,
-        await inflateCoverage(msg.coverage, msg.width, msg.height)
       );
     }
     this.applyMessageSync(msg, source, strokes);

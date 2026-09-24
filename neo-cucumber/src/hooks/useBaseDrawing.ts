@@ -1155,8 +1155,11 @@ export const useBaseDrawing = (
           // to find; finishing the copy is how you get there.
           const engine = drawingEngineRef.current;
           if (params.brushType === "copy" && engine) {
+            // The pair the copy was taken from -- the engine's own clipboard
+            // came from `drawTarget` too -- not our own, which showed the
+            // wrong pixels while a copy from somebody else's layer was placed.
             const image = cropLayer(
-              engine.layers[params.layerType],
+              engine.drawTarget[params.layerType],
               engine.imageWidth,
               rect
             );
