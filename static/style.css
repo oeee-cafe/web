@@ -670,20 +670,6 @@ nav a:visited,
   flex-shrink: 0;
 }
 
-.comment-list {
-  padding-left: 0;
-  gap: 0.5em;
-  display: flex;
-  flex-direction: column;
-}
-
-.comment-list-item {
-  border: 1px solid var(--main-border-color);
-  padding: 0.3em;
-  display: flex;
-  flex-direction: row;
-}
-
 /* ---------------------------------------------------------------------------
    Notifications
 
