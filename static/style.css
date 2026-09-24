@@ -3690,9 +3690,9 @@ html[data-store] .supporter-elsewhere {
 .ds-page .post-stage-replay .neo-cucumber-replay-speed {
   display: inline-block;
   margin: 0;
-  padding: 2px 8px;
+  padding: var(--ds-segment-padding);
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--ds-radius-s);
   background: none;
   box-shadow: none;
   color: var(--ds-ink);
