@@ -315,7 +315,7 @@
       // Also called with the path being gone to, the moment it is asked for,
       // so the tab moves on the click rather than when the page arrives --
       // and with the page's own path again if it never does.
-      var HOME = /^\/(following|joined)?$/;
+      var HOME = /^\/((following|joined)(\/comments)?|comments)?$/;
       window.oeeeMarkCurrent = function (here) {
         var links = document.querySelectorAll("#menubar a[href]");
         for (var i = 0; i < links.length; i++) {
@@ -640,6 +640,11 @@
         }
         return html + "</div>";
       }
+      function commentRow() {
+        return '<div class="comment-row"><span class="notification-figure"><span class="notification-thumbnail">' +
+          '<span class="ds-skeleton-fill"></span></span></span><div class="comment-row-body">' +
+          bar("45%", 13) + bar("90%", 13, "ds-skeleton-gap") + bar("60%", 11, "ds-skeleton-gap") + "</div></div>";
+      }
       function gridHeader(label) {
         return '<div class="grid-header">' + bar(label, 16) +
           (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>";
@@ -655,15 +660,18 @@
         // Home's feeds: the switch, Per row, the comments beside the grid
         // (comments_aside_macro.jinja), the grid.
         [/^\/(following|joined)?$/, function () {
-          var comments = '<aside class="feed-comments"><div class="feed-comments-head">' + bar("90px", 16) +
-            '</div><div class="feed-comments-list">';
-          for (var i = 0; i < 6; i++) {
-            comments += '<div class="comment-row"><span class="notification-figure"><span class="notification-thumbnail">' +
-              '<span class="ds-skeleton-fill"></span></span></span><div class="comment-row-body">' +
-              bar("45%", 13) + bar("90%", 13, "ds-skeleton-gap") + bar("60%", 11, "ds-skeleton-gap") + "</div></div>";
-          }
+          var comments = '<aside class="feed-comments">' + bar("90px", 16, "feed-comments-title") +
+            '<div class="feed-comments-panel"><div class="feed-comments-list">';
+          for (var i = 0; i < 6; i++) comments += commentRow();
           return '<div class="center-wide"><section class="feed-layout has-comments"><div class="feed-header">' + bar("180px", 22) +
-            (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + comments + "</div></aside>" + postGrid() + "</section></div>";
+            (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + comments + "</div></div></aside>" + postGrid() + "</section></div>";
+        }],
+        // A Home feed's comments: the two pills, then the cards.
+        [/^\/((following|joined)\/)?comments$/, function () {
+          var html = '<div class="center-wide"><section class="feed-layout"><div class="feed-header">' + bar("260px", 22) +
+            '</div><div class="comment-grid">';
+          for (var i = 0; i < 8; i++) html += commentRow();
+          return html + "</div></section></div>";
         }],
         // The tag directory, whose cards are the community directory's.
         [/^\/tags$/, function () {

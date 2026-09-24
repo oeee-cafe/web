@@ -1,22 +1,19 @@
 {% extends "community.jinja" %}
-{% import "comment_card_macro.jinja" as comment_card_macro %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("recent-comments") }}
 {% endblock title %}
 {# The community page with the pill on its comments: the same card, then
    what has been said on its drawings as the profile shows a person's --
    a card each, as many across as the width holds, each the way to the
-   drawing it is on. #}
+   drawing it is on, loading as it is scrolled (comments_fragment.jinja). #}
 {% block community_body %}
   <section class="profile-section" role="region" aria-label="{{ ftl_get_message("recent-comments") }}">
     <div class="grid-header">
       {{ community_views("comments") }}
     </div>
-    {% if comments %}
+    {% if comments.rows %}
       <div class="comment-grid">
-        {% for comment in comments %}
-          {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
-        {% endfor %}
+        {% include "comments_fragment.jinja" %}
       </div>
     {% else %}
       <p class="profile-empty">{{ ftl_get_message("no-comments-yet") }}</p>

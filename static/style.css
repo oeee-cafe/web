@@ -4653,72 +4653,39 @@ html[data-app] .about-stores {
 /* ---------------------------------------------------------------------------
    The comments beside a feed (comments_aside_macro.jinja)
 
-   Narrower than a laptop it is a row of the same cards a profile's
-   comments are, between the feed's header and its grid, swiped across so
-   the drawings are still the first thing a scroll reaches. From 1024px it
-   is a column beside the grid: `.feed-layout` puts the header over the
-   grid, and the comments beside both, where they hold still while the
-   grid scrolls and scroll on their own when there are more than the window
-   holds. The heading stays put above them. Grid areas are Firefox 52, so
-   the floor lays it out; a sticky grid item that does not stick in some
-   engine only scrolls away with the page.
+   One panel of the rows a comments page has, at every width. Narrower
+   than a laptop it sits between the feed's header and its grid and shows
+   the latest three, with a link on to the page with the rest: a list that
+   scrolled inside the page, or kept pushing the drawings down, would cost
+   a phone more than it gave. From 1024px it is a column beside the grid:
+   `.feed-layout` puts the header over the grid and the comments beside
+   both, where they hold still while the grid scrolls, scroll on their own,
+   and load the next batch at the end (comments_fragment.jinja). Grid areas
+   are Firefox 52, so the floor lays it out; a sticky grid item that does
+   not stick in some engine only scrolls away with the page.
    --------------------------------------------------------------------------- */
 .feed-comments {
   min-width: 0;
   margin: var(--space-3) 0 var(--space-4);
 }
 
-.feed-comments-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: var(--ds-space-2);
-}
-
 .feed-comments-title {
-  margin: 0 var(--ds-space-3) 0 0;
+  margin: 0 0 var(--ds-space-2);
   font-size: var(--ds-text-m);
   font-weight: 600;
   line-height: var(--leading-tight);
 }
 
-.feed-comments-all,
-.feed-comments-all:visited {
-  color: var(--ds-muted);
-  font-size: var(--ds-text-s);
-  white-space: nowrap;
-}
-
-.feed-comments-all:hover {
-  color: var(--ds-ink);
-}
-
-.feed-comments-list {
-  display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-  /* Room for the cards' frames and, on a desktop, the scrollbar. */
-  padding: 1px 1px 6px;
-}
-
-.feed-comments-list > .comment-row,
-.feed-comments-list > .comment-row + .comment-row {
-  flex: 0 0 280px;
-  max-width: 80vw;
+.feed-comments-panel {
+  overflow: hidden;
   border: 1px solid var(--ds-line);
   border-radius: var(--ds-radius-m);
   background-color: var(--ds-surface);
 }
 
-.feed-comments-list > .comment-row + .comment-row {
-  margin-left: 8px;
-}
-
-.feed-comments-list > .comment-row:hover {
-  border-color: var(--ds-line-strong);
-  background-color: var(--ds-field);
+.feed-comments-list > .comment-row:nth-child(n+4),
+.feed-comments-list > .infinite-scroll-sentinel {
+  display: none;
 }
 
 /* Beside a feed a line holds the name and when, and the full handle
@@ -4728,11 +4695,44 @@ html[data-app] .about-stores {
   display: none;
 }
 
-/* Two lines a card, so the row is level. The height is for the engines
-   with no line clamp. */
+/* Two lines a row. The height is for the engines with no line clamp. */
 .feed-comments-list .comment-row-content {
   -webkit-line-clamp: 2;
   max-height: 3em;
+}
+
+.feed-comments-more,
+.feed-comments-more:visited {
+  display: block;
+  padding: 10px 14px;
+  border-top: 1px solid var(--ds-line);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-s);
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+.feed-comments-more:hover {
+  background-color: var(--ds-field);
+}
+
+/* Home's header: which feed and which half of it, side by side, the
+   second under the first when a phone has no room for both. Firefox 56:
+   no flex gap, so the margin keeps them apart. */
+.feed-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+
+.feed-choices > * {
+  margin: 4px var(--ds-space-3) 4px 0;
+}
+
+.feed-choices > :last-child {
+  margin-right: 0;
 }
 
 @media (min-width: 1024px) {
@@ -4774,36 +4774,26 @@ html[data-app] .about-stores {
     margin: 0;
   }
 
-  .feed-layout.has-comments .feed-comments-list {
+  .feed-layout.has-comments .feed-comments-panel {
     -webkit-box-flex: 1;
     flex: 1 1 auto;
-    flex-direction: column;
     min-height: 0;
-    padding: 0;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
-    border: 1px solid var(--ds-line);
-    border-radius: var(--ds-radius-m);
-    background-color: var(--ds-surface);
   }
 
-  .feed-layout.has-comments .feed-comments-list > .comment-row,
-  .feed-layout.has-comments .feed-comments-list > .comment-row + .comment-row {
-    flex: none;
-    max-width: none;
-    margin-left: 0;
-    border: 0;
-    border-radius: 0;
-    background-color: transparent;
+  .feed-layout.has-comments .feed-comments-list > .comment-row:nth-child(n+4) {
+    display: flex;
   }
 
-  .feed-layout.has-comments .feed-comments-list > .comment-row + .comment-row {
-    border-top: 1px solid var(--ds-line);
+  .feed-layout.has-comments .feed-comments-list > .infinite-scroll-sentinel {
+    display: block;
+    padding: var(--space-4);
   }
 
-  .feed-layout.has-comments .feed-comments-list > .comment-row:hover {
-    background-color: var(--ds-field);
+  .feed-layout.has-comments .feed-comments-more {
+    display: none;
   }
 
   .feed-layout.has-comments .feed-comments-list .comment-row-content {
@@ -4817,6 +4807,11 @@ html[data-app] .about-stores {
     top: calc(var(--ds-header-height, 53px) + var(--space-4));
     max-height: calc(100vh - var(--ds-header-height, 53px) - 2 * var(--space-4));
   }
+}
+
+/* A comments page's sentinel takes a row of its own under the cards. */
+.comment-grid > .infinite-scroll-sentinel {
+  grid-column: 1 / -1;
 }
 
 .not-found {

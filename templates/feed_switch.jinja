@@ -6,10 +6,22 @@
    one feed rather than places, so a switch on the feed rather than tabs
    in the toolbar -- which marks Home on all of them (oeeeMarkCurrent,
    toolbar.jinja). Links, so each is still its own address to go back to
-   and to share. `feed_switch` is the one showing (handlers/home.rs). #}
-{% set feeds = [("recent", "/"), ("following", "/following"), ("communities", "/joined")] %}
+   and to share. `feed_switch` is the one showing (handlers/home.rs).
+
+   On a feed's comments (feed_view, feed_views.jinja) each goes to the
+   other feed's comments, so switching feeds keeps to what is being read. #}
+{% if feed_view == "comments" %}
+  {% set feeds = [("recent", "/comments"), ("following", "/following/comments"), ("communities", "/joined/comments")] %}
+{% else %}
+  {% set feeds = [("recent", "/"), ("following", "/following"), ("communities", "/joined")] %}
+{% endif %}
 {% import "pill_macro.jinja" as pill %}
-<nav class="ds-segmented feed-switch" aria-label="{{ ftl_get_message("feed-switch") }}" {{ pill.in_place() }}>
+{# Its id names the view it is on. Pressing it keeps the id, so the morph
+   skips it and its thumb slides (pill_macro.jinja); pressing the view
+   pill beside it changes the id, and this is replaced whole, links and
+   all, rather than skipped with the other view's links. feed_views.jinja
+   is the same the other way round. #}
+<nav id="feed-switch-{{ feed_view or "drawings" }}" class="ds-segmented feed-switch" aria-label="{{ ftl_get_message("feed-switch") }}" {{ pill.in_place() }}>
   {% for name, path in feeds %}
     <a href="{{ path|safe }}"{% if feed_switch == name %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-" ~ name) }}</a>
   {% endfor %}
