@@ -394,6 +394,15 @@ struct AppleRequest {
     nonce: String,
     next: Option<String>,
     started_at: DateTime<Utc>,
+    /// The app's handoff this sign-in was started for (`crate::handoff`),
+    /// kept with the sign-in itself rather than beside it in the session: a
+    /// handoff someone started and walked away from must not take over the
+    /// next sign-in this browser makes -- linking Apple on /account, say --
+    /// which never asked to be handed anywhere. Absent for every sign-in
+    /// begun without `?handoff=`, and in a request stored before there was
+    /// one.
+    #[serde(default)]
+    handoff: Option<String>,
 }
 
 fn random_token() -> String {
@@ -425,12 +434,12 @@ pub async fn apple_sign_in(
         return Ok(Redirect::to(back_for(&auth_session)).into_response());
     };
 
-    remember_handoff(&session, &state, query.handoff.as_deref()).await;
     let request = AppleRequest {
         state: random_token(),
         nonce: random_token(),
         next: local_next(query.next.as_deref()),
         started_at: Utc::now(),
+        handoff: pending_handoff(&state, query.handoff.as_deref()).await,
     };
     let url = apple::authorize_url(
         config,
@@ -472,6 +481,7 @@ pub async fn apple_start(
         nonce: random_token(),
         next: local_next(form.next.as_deref()),
         started_at: Utc::now(),
+        handoff: None,
     };
     let answer = serde_json::json!({ "state": request.state, "nonce": request.nonce });
     session
@@ -603,7 +613,7 @@ async fn apple_sign_in_going(
         }
     };
 
-    if let Some(done) = handed_off(&session, &state, &identity).await {
+    if let Some(done) = handed_off(&state, request.handoff.as_deref(), &identity).await {
         return Ok(done);
     }
     sign_in_with(
@@ -627,6 +637,9 @@ struct GoogleRequest {
     nonce: String,
     next: Option<String>,
     started_at: DateTime<Utc>,
+    /// The app's handoff this sign-in was started for; see [`AppleRequest`].
+    #[serde(default)]
+    handoff: Option<String>,
 }
 
 fn google_redirect_uri(base_url: &str) -> String {
@@ -651,12 +664,12 @@ pub async fn google_sign_in(
         return Ok(Redirect::to(back_for(&auth_session)).into_response());
     };
 
-    remember_handoff(&session, &state, query.handoff.as_deref()).await;
     let request = GoogleRequest {
         state: random_token(),
         nonce: random_token(),
         next: local_next(query.next.as_deref()),
         started_at: Utc::now(),
+        handoff: pending_handoff(&state, query.handoff.as_deref()).await,
     };
     let url = google::authorize_url(
         config,
@@ -702,7 +715,7 @@ pub async fn google_callback(
         .filter(|request| answer.state.as_deref() == Some(request.state.as_str()));
     if request.is_none() {
         if let Some(oauth_state) = answer.state.as_deref() {
-            request = sent_to_google(&session, &state, oauth_state).await;
+            request = sent_to_google(&state, oauth_state).await;
         }
     }
     let Some(config) = state.config.google.as_ref() else {
@@ -758,6 +771,7 @@ pub async fn google_callback(
         &id_token,
         &request.nonce,
         request.next,
+        request.handoff.as_deref(),
         back,
     )
     .await
@@ -794,6 +808,7 @@ pub async fn google_start(
         nonce: random_token(),
         next: local_next(form.next.as_deref()),
         started_at: Utc::now(),
+        handoff: None,
     };
     // Which OAuth client each app signs in against is the app's own: Android is
     // built with the site's, iOS with one of its own (GoogleSignIn.kt,
@@ -896,20 +911,17 @@ async fn google_sign_in_going(
         id_token,
         &request.nonce,
         request.next,
+        request.handoff.as_deref(),
         back,
     )
     .await
 }
 
 /// The state and nonce of a sign-in an app sent the browser straight to Google
-/// for (`handoff::AtProvider`), with its handoff remembered in this browser's
-/// session as `/auth/google?handoff=` would have -- so everything after is
-/// the same as for a browser that came through this site first.
-async fn sent_to_google(
-    session: &Session,
-    state: &AppState,
-    oauth_state: &str,
-) -> Option<GoogleRequest> {
+/// for (`handoff::AtProvider`), carrying its handoff as `/auth/google?handoff=`
+/// would have -- so everything after is the same as for a browser that came
+/// through this site first.
+async fn sent_to_google(state: &AppState, oauth_state: &str) -> Option<GoogleRequest> {
     let request = match crate::handoff::back_from_provider(&state.redis_pool, oauth_state).await {
         Ok(request) => request?,
         Err(error) => {
@@ -917,12 +929,13 @@ async fn sent_to_google(
             return None;
         }
     };
-    remember_handoff(session, state, Some(&request.id)).await;
+    let handoff = pending_handoff(state, Some(&request.id)).await;
     Some(GoogleRequest {
         state: oauth_state.to_string(),
         nonce: request.nonce,
         next: None,
         started_at: Utc::now(),
+        handoff,
     })
 }
 
@@ -950,6 +963,7 @@ async fn finish_google_sign_in(
     id_token: &str,
     nonce: &str,
     next: Option<String>,
+    handoff: Option<&str>,
     back: &str,
 ) -> Result<Response, AppError> {
     let identity = match google::verify_id_token(config, id_token, nonce).await {
@@ -969,13 +983,11 @@ async fn finish_google_sign_in(
         }
     };
 
-    if let Some(done) = handed_off(session, state, &identity).await {
+    if let Some(done) = handed_off(state, handoff, &identity).await {
         return Ok(done);
     }
     sign_in_with(auth_session, session, messages, bundle, state, identity, next).await
 }
-
-const HANDOFF_KEY: &str = "identity.handoff";
 
 /// A handoff's id, short enough to follow one through the log and hashed so
 /// the log never holds the id itself -- which is as good as the sign-in it
@@ -984,18 +996,19 @@ fn handoff_mark(id: &str) -> String {
     sha256::digest(id).chars().take(8).collect()
 }
 
-/// Remembers, for the length of this browser's sign-in, which handoff it is
-/// being done on behalf of. Only an id that names a handoff still waiting is
+/// The handoff a browser sign-in is being started on behalf of, to keep with
+/// that sign-in's request. Only an id that names a handoff still waiting is
 /// kept: a made-up one is ignored rather than carried to the provider and
 /// back for nothing.
-async fn remember_handoff(session: &Session, state: &AppState, handoff: Option<&str>) {
-    let Some(id) = handoff else { return };
+async fn pending_handoff(state: &AppState, handoff: Option<&str>) -> Option<String> {
+    let id = handoff?;
     match crate::handoff::is_pending(&state.redis_pool, id).await {
-        Ok(true) => {
-            let _ = session.insert(HANDOFF_KEY, id.to_string()).await;
+        Ok(true) => Some(id.to_string()),
+        Ok(false) => None,
+        Err(error) => {
+            tracing::warn!("A handoff could not be looked up: {error:#}");
+            None
         }
-        Ok(false) => {}
-        Err(error) => tracing::warn!("A handoff could not be looked up: {error:#}"),
     }
 }
 
@@ -1009,13 +1022,13 @@ async fn remember_handoff(session: &Session, state: &AppState, handoff: Option<&
 /// [`handoff_claim`], where the person deciding is the one already signed
 /// in there.
 async fn handed_off(
-    session: &Session,
     state: &AppState,
+    handoff: Option<&str>,
     identity: &VerifiedIdentity,
 ) -> Option<Response> {
-    let id: String = session.remove(HANDOFF_KEY).await.ok().flatten()?;
-    let mark = handoff_mark(&id);
-    match crate::handoff::verified(&state.redis_pool, &id, identity).await {
+    let id = handoff?;
+    let mark = handoff_mark(id);
+    match crate::handoff::verified(&state.redis_pool, id, identity).await {
         // Claimed already, or waited too long: nothing is listening, so the
         // browser carries on as an ordinary sign-in.
         Ok(false) => {
@@ -1517,6 +1530,35 @@ mod tests {
         assert!(!from_this_site(&with("https://oeee.cafe.evil.test"), site));
         assert!(!from_this_site(&with("null"), site));
         assert!(!from_this_site(&HeaderMap::new(), site));
+    }
+
+    /// A sign-in's handoff travels in its own request, so one begun without
+    /// `?handoff=` carries none, and a request stored by the release before
+    /// this one -- still in someone's session across a deploy -- reads back
+    /// as carrying none rather than failing to read at all.
+    #[test]
+    fn a_sign_in_is_handed_off_only_when_it_was_started_for_it() {
+        let before = serde_json::json!({
+            "state": "s",
+            "nonce": "n",
+            "next": "/account",
+            "started_at": "2026-09-24T00:00:00Z",
+        });
+        let apple: AppleRequest = serde_json::from_value(before.clone()).expect("reads");
+        assert_eq!(apple.handoff, None);
+        let google: GoogleRequest = serde_json::from_value(before).expect("reads");
+        assert_eq!(google.handoff, None);
+
+        let started = AppleRequest {
+            state: "s".into(),
+            nonce: "n".into(),
+            next: None,
+            started_at: Utc::now(),
+            handoff: Some("h".into()),
+        };
+        let kept: AppleRequest =
+            serde_json::from_value(serde_json::to_value(&started).unwrap()).unwrap();
+        assert_eq!(kept.handoff.as_deref(), Some("h"));
     }
 
     #[test]
