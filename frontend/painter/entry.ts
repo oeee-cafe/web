@@ -230,6 +230,10 @@ void painter.ready
   .then(async () => {
     if (config.initialImageUrl) await painter.loadImage(config.initialImageUrl);
     if (config.mode.kind === "standard") movePageActionsIntoExtraToolbox();
+    // Hidden by the page until now: for a standard painter its place is the
+    // toolbox, which did not exist yet, and where the page parks it meanwhile
+    // is over the painter's own chrome.
+    saveButton.hidden = false;
     saveButton.disabled = false;
     offerPainterToApp(painter);
   })
