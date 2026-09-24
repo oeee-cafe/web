@@ -11,15 +11,16 @@
 //! nothing has to be bounced off a page of this site the way Apple's
 //! `form_post` answer is (see `web::handlers::identity`).
 //!
-//! The apps sign in themselves instead, because Google refuses this flow in
-//! an embedded web view: the Android app with Credential Manager, the iOS app
-//! in a browser of the system's (`ASWebAuthenticationSession`, which is not an
-//! embedded web view and which Google does allow). Each asks the site for a
-//! nonce from inside the page and posts the ID token it ends up with to
-//! `/auth/google`, where it is checked exactly as one traded for a code is.
-//! Credential Manager is given the site's own client id as its server client
-//! id, so Android's audience is the same one; iOS names its own OAuth client,
-//! which is what `app_ids` lists.
+//! Google refuses this flow in an embedded web view, which is what the apps
+//! are. The iOS, macOS and Windows apps run this same flow in a browser of
+//! the system's instead and hand the sign-in back (`handoff`). The Android
+//! app signs in with Credential Manager: it asks the site for a nonce from
+//! inside the page and posts the ID token it ends up with to `/auth/google`,
+//! where it is checked exactly as one traded for a code is. Credential
+//! Manager is given the site's own client id as its server client id, so its
+//! audience is the same one. `app_ids` lists any other audience to accept --
+//! the iOS app's own OAuth client, from when it signed in with Google itself,
+//! is no longer needed there.
 
 use anyhow::{anyhow, Result};
 use jsonwebtoken::{decode, decode_header, Algorithm, Validation};
