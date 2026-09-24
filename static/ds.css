@@ -1358,21 +1358,20 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   text-align: left;
 }
 
+.toolbar-menu-rule {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--ds-line);
+}
+
 .toolbar-menu-signout:hover {
   background-color: var(--ds-hover);
 }
 
-/* The theme choice, at the foot of a toolbar menu. */
+/* The theme and the language: the whole of the gear's menu, signed in
+   or out, so there is nothing above or below them to rule off. */
 .toolbar-theme {
-  margin-top: 4px;
   padding: 8px 10px 6px;
-  border-top: 1px solid var(--ds-line);
-}
-
-/* Signed out, the switch is all the menu holds. */
-.toolbar-menu-items .toolbar-theme:first-child {
-  margin-top: 0;
-  border-top: 0;
 }
 
 .toolbar-theme-label {
@@ -1403,21 +1402,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 
 .toolbar-language .ds-button {
   margin-top: 6px;
-}
-
-/* The switch, then a rule, then what the site is. */
-.toolbar-menu-items .toolbar-theme {
-  margin-bottom: 4px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--ds-line);
-}
-
-/* Signed out the switch is the whole menu -- what the site is has its own
-   button in the bar -- so there is nothing under the rule to divide from. */
-.toolbar-menu-items .toolbar-theme:last-child {
-  margin-bottom: 0;
-  padding-bottom: 6px;
-  border-bottom: 0;
 }
 
 /* When one row will not hold the name, the sections and the account --
