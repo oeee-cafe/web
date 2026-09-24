@@ -254,7 +254,11 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     for (const { key, label: name, panel } of panels) {
       const count = panel.count();
       const button = buttons.get(key);
-      if (button) button.textContent = count > 0 ? `${name} ${count}` : name;
+      const text = count > 0 ? `${name} ${count}` : name;
+      // Only on a change, for the same reason as the play button's label: a
+      // live session relabels every few seconds, and a press that straddled
+      // one would be lost in Safari.
+      if (button && button.textContent !== text) button.textContent = text;
     }
   };
   for (const { key, panel } of panels) {
@@ -380,7 +384,13 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     onProgress: (index, nowPlaying) => {
       position = index;
       playing = nowPlaying;
-      playButton.textContent = nowPlaying ? "Pause" : "Play";
+      // Written only when it changes. This runs every frame while playing,
+      // and replacing the button's text replaces the node under the pointer:
+      // Safari drops a click whose press and release land on different
+      // nodes, so a label rewritten sixty times a second made Pause all but
+      // impossible to press there.
+      const label = nowPlaying ? "Pause" : "Play";
+      if (playButton.textContent !== label) playButton.textContent = label;
       scrubber.value = String(index);
       const entry = index >= 0 ? drawn[index] : undefined;
       readout.textContent =
@@ -426,8 +436,8 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   scrubber.value = "-1";
 
   const togglePlay = () => {
-    if (playButton.textContent === "Play") player.play();
-    else player.pause();
+    if (playing) player.pause();
+    else player.play();
   };
   const step = (by: number) => seek?.(position + by);
   playButton.addEventListener("click", togglePlay);

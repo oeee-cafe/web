@@ -93,12 +93,16 @@ export function logPanel(seek: Seek): LogPanel {
     return chosenAt >= 0 ? chosenAt : rowAt(shown, position);
   };
 
-  const renderRow = (row: LogRow, at: number): HTMLElement => {
+  /** The elements on show, by the row each draws. Kept from one frame to the
+   * next and only restyled: this runs every frame while the log follows
+   * playback, and a row rebuilt under the pointer between press and release
+   * loses the click -- in every browser, and in Safari even when only its
+   * text is replaced. */
+  let rendered = new Map<LogRow, HTMLElement>();
+
+  const renderRow = (row: LogRow): HTMLElement => {
     const node = el(seek ? "button" : "div", "inspect-log-row");
     if (!row.drawable) node.classList.add("inspect-log-quiet");
-    if (at === current) node.classList.add("inspect-log-current");
-    if (at > current) node.classList.add("inspect-future");
-    node.style.top = `${at * ROW_HEIGHT}px`;
     node.append(
       el("span", "inspect-log-seq", String(row.seq)),
       el("span", "inspect-time", elapsed(row.at - startAt)),
@@ -124,6 +128,14 @@ export function logPanel(seek: Seek): LogPanel {
   /** Whether the current row is to be brought into view on the next frame. */
   let revealing = false;
 
+  /** Where a row sits and how it reads now; the only part that changes. */
+  const place = (node: HTMLElement, at: number) => {
+    const top = `${at * ROW_HEIGHT}px`;
+    if (node.style.top !== top) node.style.top = top;
+    node.classList.toggle("inspect-log-current", at === current);
+    node.classList.toggle("inspect-future", at > current);
+  };
+
   const render = () => {
     frame = null;
     spacer.style.height = `${shown.length * ROW_HEIGHT}px`;
@@ -145,8 +157,18 @@ export function logPanel(seek: Seek): LogPanel {
     const height = viewport.clientHeight || 400;
     const first = Math.max(0, Math.floor(top / ROW_HEIGHT) - OVERSCAN);
     const last = Math.min(shown.length, Math.ceil((top + height) / ROW_HEIGHT) + OVERSCAN);
-    spacer.textContent = "";
-    for (let at = first; at < last; at++) spacer.appendChild(renderRow(shown[at], at));
+    const next = new Map<LogRow, HTMLElement>();
+    for (let at = first; at < last; at++) {
+      const row = shown[at];
+      const node = rendered.get(row) ?? renderRow(row);
+      place(node, at);
+      if (node.parentNode !== spacer) spacer.appendChild(node);
+      next.set(row, node);
+    }
+    rendered.forEach((node, row) => {
+      if (!next.has(row)) node.remove();
+    });
+    rendered = next;
   };
   const schedule = () => {
     if (frame === null) frame = requestAnimationFrame(render);
