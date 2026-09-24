@@ -199,10 +199,10 @@ impl App {
             ));
         }
 
-        // The same, for what the App Store says about the purchases the iOS
-        // app has handed over: a refund takes the mark away within a day.
+        // The App Store tells the site of a refund itself; this finds the
+        // notifications it could not deliver (app_store.rs).
         if let Some(app_store) = self.state.config.app_store.clone() {
-            tokio::task::spawn(crate::app_store::recheck_supporters(
+            tokio::task::spawn(crate::app_store::sweep_notifications(
                 self.state.db_pool.clone(),
                 app_store,
             ));

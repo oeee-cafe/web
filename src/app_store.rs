@@ -34,8 +34,10 @@
 //! ever a cue. What it says happened is not recorded; the transaction it
 //! names is looked up again and whatever Apple says of it *now* is, so two
 //! notifications arriving out of order cannot leave the older one standing.
-//! The daily [`recheck_supporters`] stays as the net under a notification
-//! that never arrived.
+//! A notification that never arrived -- the site was down, or answered with
+//! an error -- is found by [`sweep_notifications`], which asks Apple once an
+//! hour for the ones it could not deliver. Nothing else asks Apple about a
+//! purchase once it has been recorded.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -557,68 +559,141 @@ pub async fn check(config: &AppStoreConfig) -> Result<()> {
     }
 }
 
-/// Asks the App Store again, once a day, about every purchase it has told us
-/// about, so a refund takes the mark away without anyone signing in. A check
-/// Apple cannot answer changes nothing. The catalogue is read afresh each
-/// time round, so a product added at /admin/store is known by the next one.
-///
-/// Both colours run this for a moment during a deploy, and asking twice is
-/// harmless.
-pub async fn recheck_supporters(db: sqlx::PgPool, config: AppStoreConfig) {
-    use crate::models::store_product;
-    use crate::models::supporter::{purchases_due_for_check, record_recheck, Store};
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryPage {
+    #[serde(default)]
+    notification_history: Vec<HistoryItem>,
+    #[serde(default)]
+    has_more: bool,
+    pagination_token: Option<String>,
+}
 
-    let mut every = tokio::time::interval(Duration::from_secs(10 * 60));
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryItem {
+    signed_payload: String,
+}
+
+/// How far back the sweep looks: past the three days Apple spends sending a
+/// notification again, so one that fails late in its life is still found.
+/// The sandbox keeps thirty days of history and production 180.
+const SWEEP_WINDOW: chrono::Duration = chrono::Duration::days(7);
+
+/// Pages of history the sweep reads before giving up for the hour: twenty a
+/// page, and a notification that never arrives is the exception.
+const SWEEP_MAX_PAGES: usize = 50;
+
+/// Every notification from the last [`SWEEP_WINDOW`] that has not reached
+/// the site, or that Apple is still retrying, as its signed payload: Get
+/// Notification History, with `onlyFailures`.
+async fn undelivered(config: &AppStoreConfig, api_url: &str) -> Result<Vec<String>> {
+    let until = Utc::now();
+    let body = json!({
+        "startDate": (until - SWEEP_WINDOW).timestamp_millis(),
+        "endDate": until.timestamp_millis(),
+        "onlyFailures": true,
+    });
+    let url = format!(
+        "{}/inApps/v1/notifications/history",
+        api_url.trim_end_matches('/')
+    );
+    let mut payloads = Vec::new();
+    let mut token: Option<String> = None;
+    for _ in 0..SWEEP_MAX_PAGES {
+        let mut request = http().post(&url).bearer_auth(api_token(config)?).json(&body);
+        if let Some(token) = &token {
+            request = request.query(&[("paginationToken", token)]);
+        }
+        let response = request.send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow!(
+                "the App Store answered the notification history with {status}: {body}"
+            ));
+        }
+        let page: HistoryPage = response.json().await?;
+        payloads.extend(page.notification_history.into_iter().map(|item| item.signed_payload));
+        match page.pagination_token.filter(|_| page.has_more) {
+            Some(next) => token = Some(next),
+            None => return Ok(payloads),
+        }
+    }
+    Err(anyhow!(
+        "the App Store's notification history went on past {SWEEP_MAX_PAGES} pages"
+    ))
+}
+
+/// Heeds every notification that has not reached the site, in production
+/// and in the sandbox, as it would have been heeded had it arrived.
+/// `heeded` is the payloads already dealt with, which are passed over: a
+/// notification that never arrives stays in the history as a failure for
+/// the whole window, and is only worth asking about once. Returns how many
+/// were dealt with this time.
+pub async fn sweep_once(
+    db: &sqlx::PgPool,
+    config: &AppStoreConfig,
+    heeded: &mut std::collections::HashSet<String>,
+) -> Result<usize> {
+    let mut dealt_with = 0;
+    for api_url in [&config.api_url, &config.sandbox_api_url] {
+        for payload in undelivered(config, api_url).await? {
+            if heeded.contains(&payload) {
+                continue;
+            }
+            let done = match read_notification(&payload, config, UnixTime::now()) {
+                Ok(Notice::Recheck {
+                    kind,
+                    transaction,
+                    product,
+                }) => match heed(db, config, &transaction, &product).await {
+                    Ok(heeded) => {
+                        tracing::info!(kind, ?heeded, "heeded an App Store notification that never arrived");
+                        true
+                    }
+                    // Left for the next sweep.
+                    Err(error) => {
+                        tracing::warn!(kind, "could not heed a missed App Store notification: {error:#}");
+                        false
+                    }
+                },
+                Ok(Notice::Test | Notice::Nothing { .. }) => true,
+                // Apple's history is Apple's, so this is a payload that has
+                // stopped checking out -- a certificate expired, say -- and
+                // asking again next hour will not change that.
+                Err(error) => {
+                    tracing::warn!("a missed App Store notification does not check out: {error:#}");
+                    true
+                }
+            };
+            if done {
+                heeded.insert(payload);
+                dealt_with += 1;
+            }
+        }
+    }
+    Ok(dealt_with)
+}
+
+/// Once an hour, the notifications Apple could not deliver: its answer to a
+/// refund the site was down for, or answered with an error. A notification
+/// that arrived was heeded as it came, so this asks Apple about nothing
+/// else -- one request an hour for each environment, however many packs
+/// have been sold, where a daily recheck of every purchase would grow with
+/// them.
+///
+/// What has been heeded is kept for the life of the process: a restart
+/// heeds the failures of the last week once more, which changes nothing.
+/// Both colours sweep for a moment during a deploy, which is harmless too.
+pub async fn sweep_notifications(db: sqlx::PgPool, config: AppStoreConfig) {
+    let mut heeded = std::collections::HashSet::new();
+    let mut every = tokio::time::interval(Duration::from_secs(60 * 60));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         every.tick().await;
-        let due = match db.begin().await {
-            Ok(mut tx) => purchases_due_for_check(&mut tx, Store::Apple, 100).await,
-            Err(error) => Err(error.into()),
-        };
-        let due = match due {
-            Ok(due) => due,
-            Err(error) => {
-                tracing::warn!("could not list App Store purchases to recheck: {error:#}");
-                continue;
-            }
-        };
-        if due.is_empty() {
-            continue;
-        }
-        let packs = match store_product::packs_in(&db, Store::Apple).await {
-            Ok(packs) => packs,
-            Err(error) => {
-                tracing::warn!("could not read the App Store's products: {error:#}");
-                continue;
-            }
-        };
-        // An empty catalogue is one nobody has filled in, not a refund of
-        // everything: asking would answer every purchase with "not ours".
-        if packs.is_empty() {
-            continue;
-        }
-        for due in due {
-            let owned = match look_up(&config, &packs, &due.transaction).await {
-                Ok(Some(answer)) => answer.owned,
-                // Apple no longer knows it, or it is no longer one of ours:
-                // either way it supports nothing.
-                Ok(None) => false,
-                Err(error) => {
-                    tracing::warn!("could not recheck an App Store purchase: {error:#}");
-                    continue;
-                }
-            };
-            let recorded = async {
-                let mut tx = db.begin().await?;
-                record_recheck(&mut tx, Store::Apple, &due.transaction, &due.product, owned)
-                    .await?;
-                tx.commit().await?;
-                anyhow::Ok(())
-            };
-            if let Err(error) = recorded.await {
-                tracing::warn!("could not record an App Store recheck: {error:#}");
-            }
+        if let Err(error) = sweep_once(&db, &config, &mut heeded).await {
+            tracing::warn!("could not read the App Store's notification history: {error:#}");
         }
     }
 }
@@ -798,6 +873,68 @@ mod tests {
                     }
                     Json(json!({"testNotificationToken": "test-token"})).into_response()
                 }),
+            )
+            .route(
+                "/{environment}/inApps/v1/notifications/history",
+                axum::routing::post(
+                    |headers: HeaderMap,
+                     Path(environment): Path<String>,
+                     axum::extract::Query(query): axum::extract::Query<HashMap<String, String>>,
+                     Json(body): Json<Value>| async move {
+                        if !token_is_ours(&headers) {
+                            return axum::http::StatusCode::UNAUTHORIZED.into_response();
+                        }
+                        // Apple's own limits on the request.
+                        let (Some(start), Some(end)) =
+                            (body["startDate"].as_i64(), body["endDate"].as_i64())
+                        else {
+                            return axum::http::StatusCode::BAD_REQUEST.into_response();
+                        };
+                        let now = Utc::now().timestamp_millis();
+                        if start >= end || now - start > 30 * 24 * 60 * 60 * 1000 {
+                            return axum::http::StatusCode::BAD_REQUEST.into_response();
+                        }
+                        if body["onlyFailures"] != json!(true) || environment == "sandbox" {
+                            return Json(json!({"notificationHistory": [], "hasMore": false}))
+                                .into_response();
+                        }
+                        // Two pages: the refunds Apple could not deliver, then
+                        // its test. 1000's refund has since been reversed, so
+                        // its record no longer says what is true of it.
+                        let refund = |id: &str, revoked: bool| {
+                            let revocation = if revoked {
+                                json!({"revocationDate": 1_790_000_000_000i64})
+                            } else {
+                                json!({})
+                            };
+                            json!({
+                                "signedPayload": signed(&notification(
+                                    "REFUND",
+                                    None,
+                                    Some(signed(&transaction(id, revocation))),
+                                )),
+                                "sendAttempts": [{"attemptDate": 1_790_000_000_000i64,
+                                                  "sendAttemptResult": "TIMED_OUT"}],
+                            })
+                        };
+                        match query.get("paginationToken").map(String::as_str) {
+                            None => Json(json!({
+                                "notificationHistory": [refund("1001", true), refund("1000", true)],
+                                "hasMore": true,
+                                "paginationToken": "page-2",
+                            }))
+                            .into_response(),
+                            Some("page-2") => Json(json!({
+                                "notificationHistory": [
+                                    {"signedPayload": signed(&json!({"notificationType": "TEST"}))}
+                                ],
+                                "hasMore": false,
+                            }))
+                            .into_response(),
+                            Some(_) => axum::http::StatusCode::BAD_REQUEST.into_response(),
+                        }
+                    },
+                ),
             );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -1042,9 +1179,15 @@ mod tests {
     /// asked, and the purchase an account handed over is revoked -- and a
     /// reversal, asked about the same way, would give it back. Against the
     /// database `DATABASE_URL` names, with what it adds taken away again.
+    /// The fake App Store's transaction ids are the database tests' purchase
+    /// owners, and a purchase is one row whoever records it, so those tests
+    /// take turns.
+    static PURCHASE_ROWS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     #[tokio::test]
     async fn a_refund_notification_revokes_the_purchase_it_names() {
         use crate::models::supporter::{record_purchase, Store};
+        let _turn = PURCHASE_ROWS.lock().await;
         let Ok(url) = std::env::var("DATABASE_URL") else { return };
         let Ok(db) = sqlx::PgPool::connect(&url).await else { return };
         let config = fake_app_store().await;
@@ -1105,6 +1248,75 @@ mod tests {
         assert_eq!(
             revoked,
             [("1000".to_string(), false), ("1001".to_string(), true)]
+        );
+    }
+
+    /// The notifications Apple could not deliver, found in its history and
+    /// heeded as they would have been: the refund revokes its purchase, and
+    /// a refund since reversed -- whose record in the history still says
+    /// refunded -- is answered by what Apple says of it now, and stands.
+    /// Each is dealt with once, however many sweeps see it.
+    #[tokio::test]
+    async fn a_sweep_heeds_what_never_arrived_by_what_is_true_now() {
+        use crate::models::supporter::{record_purchase, Store};
+        let _turn = PURCHASE_ROWS.lock().await;
+        let Ok(url) = std::env::var("DATABASE_URL") else { return };
+        let Ok(db) = sqlx::PgPool::connect(&url).await else { return };
+        let config = fake_app_store().await;
+
+        let added_product = sqlx::query(
+            "INSERT INTO store_products (store, product, year) VALUES ('apple', $1, $2)
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(PRODUCT_ID)
+        .bind(PACK_YEAR)
+        .execute(&db)
+        .await
+        .unwrap()
+        .rows_affected()
+            == 1;
+        let login = format!("sweep_{}", &Uuid::new_v4().simple().to_string()[..12]);
+        let buyer: Uuid = sqlx::query_scalar(
+            "INSERT INTO users (login_name, display_name, password_hash) VALUES ($1, $1, 'x') RETURNING id",
+        )
+        .bind(&login)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        let mut tx = db.begin().await.unwrap();
+        for id in ["1001", "1000"] {
+            let pack = OwnedProduct { product: PRODUCT_ID.to_string(), year: PACK_YEAR };
+            record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true).await.unwrap();
+        }
+        tx.commit().await.unwrap();
+
+        let mut heeded = std::collections::HashSet::new();
+        let first = sweep_once(&db, &config, &mut heeded).await;
+        let second = sweep_once(&db, &config, &mut heeded).await;
+        let revoked: Vec<(String, bool)> = sqlx::query_as(
+            "SELECT owner, revoked_at IS NOT NULL FROM supporter_purchases
+             WHERE user_id = $1 ORDER BY owner",
+        )
+        .bind(buyer)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+
+        sqlx::query("DELETE FROM users WHERE id = $1").bind(buyer).execute(&db).await.unwrap();
+        if added_product {
+            sqlx::query("DELETE FROM store_products WHERE store = 'apple' AND product = $1")
+                .bind(PRODUCT_ID)
+                .execute(&db)
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(first.unwrap(), 3, "two refunds and a test, over two pages");
+        assert_eq!(second.unwrap(), 0, "each once");
+        assert_eq!(
+            revoked,
+            [("1000".to_string(), false), ("1001".to_string(), true)],
+            "1000's record says refunded; Apple says it stands"
         );
     }
 
