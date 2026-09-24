@@ -146,6 +146,10 @@ export function mountOfflinePainter(
       if (!mounted) throw unmountedError();
       controller?.setParticipants(participants);
     },
+    setHiddenParticipants(actorIds) {
+      if (!mounted) throw unmountedError();
+      controller?.setHiddenParticipants(actorIds);
+    },
     setLayersOrigin(origin) {
       if (!mounted) throw unmountedError();
       controller?.setLayersOrigin(origin);

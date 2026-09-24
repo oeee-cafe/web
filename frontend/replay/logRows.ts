@@ -20,6 +20,13 @@ export type LogRow = {
   kind: string;
   /** Who sent it, by login name where the manifest says. */
   actor: string;
+  /** The session id it was sent under, for messages that carry one. */
+  sessionId: number | null;
+  /** Whose layers a mark went on, by session id; null for anything that is
+   * not a mark on a layer. */
+  target: number | null;
+  /** A mark made on somebody else's layers. */
+  onOther: boolean;
   summary: string;
   /** Whether it put anything on a canvas. The rest -- checkpoints, pointers
    * lifted -- are part of the record and not of the drawing. */
@@ -87,7 +94,6 @@ function summarize(names: Map<number, string>, message: DecodedMessage): string 
     case "eraseAll":
       return `${onLayer(names, message)} cleared`;
     case "undo":
-      return message.redo ? "redo" : "undo";
     case "undoPoint":
       return "";
     case "resetPoint":
@@ -116,6 +122,9 @@ export function logRows(entries: ArchivedEntry[], names: Map<number, string>): L
         at: entry.at,
         kind: "unknown",
         actor: entry.from,
+        sessionId: null,
+        target: null,
+        onOther: false,
         summary: `${entry.payload.length} bytes, type 0x${(entry.payload[0] ?? 0).toString(16).padStart(2, "0")}`,
         drawable,
         position,
@@ -125,8 +134,16 @@ export function logRows(entries: ArchivedEntry[], names: Map<number, string>): L
       index,
       seq: entry.seq,
       at: entry.at,
-      kind: message.type,
+      // A redo is the same message as an undo with a flag on it, and reads
+      // as the opposite act, so it is its own kind here.
+      kind: message.type === "undo" && message.redo ? "redo" : message.type,
       actor: actorOf(names, message),
+      sessionId: "userId" in message && typeof message.userId === "number" ? message.userId : null,
+      target: "targetOwner" in message ? message.targetOwner : null,
+      onOther:
+        "targetOwner" in message &&
+        typeof message.userId === "number" &&
+        message.targetOwner !== message.userId,
       summary: summarize(names, message),
       drawable,
       position,

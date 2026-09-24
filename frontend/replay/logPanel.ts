@@ -6,7 +6,7 @@
  * Rows are one fixed height so where each one sits is arithmetic.
  */
 
-import { el, type Panel, type Seek } from "./dom";
+import { el, type InspectorData, type Panel, type Seek } from "./dom";
 import { elapsed, type LogRow } from "./logRows";
 
 const ROW_HEIGHT = 20;
@@ -37,46 +37,31 @@ function option(value: string, label: string): HTMLOptionElement {
   return node;
 }
 
-export function logPanel(options: {
-  rows: LogRow[];
-  unavailable?: string;
-  startAt: number | null;
-  seek: Seek;
-}): Panel {
-  const { rows, seek } = options;
-  const startAt = options.startAt ?? 0;
-  const root = el("div", "inspect-panel");
+/** Refills a select with counted options, keeping what was chosen. */
+function refill(select: HTMLSelectElement, options: HTMLOptionElement[]) {
+  const chosen = select.value;
+  select.textContent = "";
+  for (const node of options) select.appendChild(node);
+  select.value = chosen;
+  if (select.value !== chosen) select.value = ALL;
+}
 
-  if (options.unavailable) {
-    root.appendChild(el("p", "inspect-empty", options.unavailable));
-    return { root, count: 0 };
-  }
-  // Unpadded, so the rows run edge to edge; only once there are rows.
-  root.classList.add("inspect-log-panel");
+export type LogPanel = Panel & {
+  /** Marks the row with this sequence as the one meant, for a link that
+   * named it. */
+  choose(seq: number): void;
+};
+
+export function logPanel(seek: Seek): LogPanel {
+  const root = el("div", "inspect-panel inspect-log-panel");
+  const message = el("p", "ds-help inspect-empty inspect-log-message");
 
   // Filters, by what a message was and by who sent it.
   const toolbar = el("div", "inspect-log-toolbar");
-  const kindSelect = el("select");
-  const kinds = new Map<string, number>();
-  const actors = new Map<string, number>();
-  for (const row of rows) {
-    kinds.set(row.kind, (kinds.get(row.kind) ?? 0) + 1);
-    actors.set(row.actor, (actors.get(row.actor) ?? 0) + 1);
-  }
-  kindSelect.append(
-    option(ALL, `All messages (${rows.length})`),
-    option(DRAWING, `Drawing only (${rows.filter((row) => row.drawable).length})`),
-  );
-  Array.from(kinds.keys())
-    .sort()
-    .forEach((kind) => kindSelect.appendChild(option(`kind:${kind}`, `${kind} (${kinds.get(kind)})`)));
-  const actorSelect = el("select");
-  actorSelect.appendChild(option(ALL, "Everyone"));
-  Array.from(actors.keys())
-    .sort()
-    .forEach((actor) => actorSelect.appendChild(option(actor, `${actor} (${actors.get(actor)})`)));
+  const kindSelect = el("select", "ds-select");
+  const actorSelect = el("select", "ds-select");
   const followLabel = el("label", "inspect-follow");
-  const follow = el("input");
+  const follow = el("input", "ds-check");
   follow.type = "checkbox";
   follow.checked = true;
   followLabel.append(follow, document.createTextNode(" Follow playback"));
@@ -88,10 +73,12 @@ export function logPanel(options: {
   const viewport = el("div", "inspect-log");
   const spacer = el("div", "inspect-log-spacer");
   viewport.appendChild(spacer);
-  const empty = el("p", "inspect-empty", "No messages match.");
-  root.append(toolbar, header, viewport, empty);
+  const empty = el("p", "ds-help inspect-empty", "No messages match.");
+  root.append(message, toolbar, header, viewport, empty);
 
-  let shown = rows;
+  let rows: LogRow[] = [];
+  let startAt = 0;
+  let shown: LogRow[] = [];
   /** Index into `shown` of the row the canvas stands at, -1 for none. */
   let current = -1;
   let position = -1;
@@ -123,17 +110,37 @@ export function logPanel(options: {
     if (seek) {
       (node as HTMLButtonElement).type = "button";
       node.addEventListener("click", () => {
+        // After the seek, which may report the canvas where it was before
+        // it moves; chosen first, the choice would not survive that.
+        seek(row.position, row.seq);
         chosen = row;
-        seek(row.position);
+        current = locate();
+        schedule();
       });
     }
     return node;
   };
 
+  /** Whether the current row is to be brought into view on the next frame. */
+  let revealing = false;
+
   const render = () => {
     frame = null;
     spacer.style.height = `${shown.length * ROW_HEIGHT}px`;
-    empty.style.display = shown.length === 0 ? "" : "none";
+    empty.style.display = shown.length === 0 && rows.length > 0 ? "" : "none";
+    // Only once the spacer has its height: scrolled before, the viewport is
+    // as short as its last contents and the scroll is clamped to nothing --
+    // which is what a link to a row did on arrival.
+    if (revealing) {
+      revealing = false;
+      if (follow.checked && current >= 0) {
+        const rowTop = current * ROW_HEIGHT;
+        const height = viewport.clientHeight;
+        if (rowTop < viewport.scrollTop || rowTop + ROW_HEIGHT > viewport.scrollTop + height) {
+          viewport.scrollTop = Math.max(0, rowTop - height / 2);
+        }
+      }
+    }
     const top = viewport.scrollTop;
     const height = viewport.clientHeight || 400;
     const first = Math.max(0, Math.floor(top / ROW_HEIGHT) - OVERSCAN);
@@ -145,17 +152,14 @@ export function logPanel(options: {
     if (frame === null) frame = requestAnimationFrame(render);
   };
 
-  /** Brings the current row into view, if following and it is not. */
+  /** Brings the current row into view, if following and it is not, on the
+   * next frame. */
   const reveal = () => {
-    if (!follow.checked || current < 0) return;
-    const rowTop = current * ROW_HEIGHT;
-    const height = viewport.clientHeight;
-    if (rowTop < viewport.scrollTop || rowTop + ROW_HEIGHT > viewport.scrollTop + height) {
-      viewport.scrollTop = Math.max(0, rowTop - height / 2);
-    }
+    revealing = true;
+    schedule();
   };
 
-  const applyFilter = () => {
+  const filter = () => {
     const kind = kindSelect.value;
     const actor = actorSelect.value;
     shown = rows.filter(
@@ -164,12 +168,15 @@ export function logPanel(options: {
         (actor === ALL || row.actor === actor),
     );
     current = locate();
+  };
+  const refilter = () => {
+    filter();
     viewport.scrollTop = 0;
     reveal();
     schedule();
   };
-  kindSelect.addEventListener("change", applyFilter);
-  actorSelect.addEventListener("change", applyFilter);
+  kindSelect.addEventListener("change", refilter);
+  actorSelect.addEventListener("change", refilter);
   follow.addEventListener("change", () => {
     reveal();
     schedule();
@@ -178,7 +185,49 @@ export function logPanel(options: {
 
   return {
     root,
-    count: rows.length,
+    count: () => rows.length,
+    setData(data: InspectorData) {
+      const unavailable = data.rows.length === 0 ? data.logUnavailable : undefined;
+      message.textContent = unavailable ?? (data.rows.length === 0 ? "Nothing recorded yet." : "");
+      message.style.display = message.textContent ? "" : "none";
+      for (const part of [toolbar, header, viewport]) {
+        part.style.display = data.rows.length === 0 ? "none" : "";
+      }
+      if (data.rows === rows) return;
+      rows = data.rows;
+      startAt = data.startAt ?? 0;
+      // A chosen row survives a live update only if it is still the same
+      // message; rows are rebuilt, so it is found again by its sequence.
+      if (chosen) {
+        const seq = chosen.seq;
+        chosen = rows.find((row) => row.seq === seq) ?? null;
+      }
+
+      const kinds = new Map<string, number>();
+      const actors = new Map<string, number>();
+      for (const row of rows) {
+        kinds.set(row.kind, (kinds.get(row.kind) ?? 0) + 1);
+        actors.set(row.actor, (actors.get(row.actor) ?? 0) + 1);
+      }
+      refill(kindSelect, [
+        option(ALL, `All messages (${rows.length})`),
+        option(DRAWING, `Drawing only (${rows.filter((row) => row.drawable).length})`),
+        ...Array.from(kinds.keys())
+          .sort()
+          .map((kind) => option(`kind:${kind}`, `${kind} (${kinds.get(kind)})`)),
+      ]);
+      refill(actorSelect, [
+        option(ALL, "Everyone"),
+        ...Array.from(actors.keys())
+          .sort()
+          .map((actor) => option(actor, `${actor} (${actors.get(actor)})`)),
+      ]);
+      // Filtered again in place: somebody reading row four hundred of a live
+      // log should not be thrown back to the top every few seconds.
+      filter();
+      reveal();
+      schedule();
+    },
     update(next) {
       position = next;
       if (chosen && chosen.position !== position) chosen = null;
@@ -187,6 +236,12 @@ export function logPanel(options: {
       schedule();
     },
     shown() {
+      reveal();
+      schedule();
+    },
+    choose(seq) {
+      chosen = rows.find((row) => row.seq === seq) ?? null;
+      current = locate();
       reveal();
       schedule();
     },

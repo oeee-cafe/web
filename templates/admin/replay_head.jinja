@@ -1,0 +1,9 @@
+{# What the server adds to the session inspector's <head> as it sends it: the
+   theme, and the design system with the admin pages' own sheet on top. The
+   inspector is a built page served as a file (neo-cucumber/dist-replay), so it
+   cannot include these itself -- the same arrangement as the collaborative
+   page (collaborate_chrome_head.jinja). Last in the head, so they come after
+   the painter's reset rather than being undone by it. #}
+{% include "theme_head.jinja" %}
+<link rel="stylesheet" href="{{ '/static/ds.css' | cachebuster | safe }}" />
+<link rel="stylesheet" href="{{ '/static/admin.css' | cachebuster | safe }}" />

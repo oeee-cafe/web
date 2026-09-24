@@ -301,6 +301,16 @@ export interface PainterHandle {
   ): void;
 
   /**
+   * Hide these participants' layers, and show everyone else's.
+   *
+   * The same switch the layers window's eye makes, for a host that shows no
+   * layers window -- the session replay, which picks whose marks to look at
+   * from its own list. A way of looking and not an edit: nothing is emitted,
+   * and saving still composites everyone.
+   */
+  setHiddenParticipants(actorIds: string[]): void;
+
+  /**
    * Place the layers window yourself.
    *
    * The painter opens it under its own columns and clear of the drawing, which

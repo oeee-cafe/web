@@ -337,6 +337,14 @@ impl ArchiveBuffer {
         Ok(raw.iter().filter_map(|entry| decode_buffered(entry)).collect())
     }
 
+    /// Everything waiting, for a reader that wants the recording as it
+    /// stands without writing anything out.
+    pub async fn peek_all(&self, room_uuid: Uuid) -> BufferResult<Vec<ArchivedMessage>> {
+        let mut conn = self.pool.get().await?;
+        let raw: Vec<Vec<u8>> = conn.lrange(buffer_key(room_uuid), 0, -1).await?;
+        Ok(raw.iter().filter_map(|entry| decode_buffered(entry)).collect())
+    }
+
     pub async fn drop_front(&self, room_uuid: Uuid, count: usize) -> BufferResult<()> {
         let mut conn = self.pool.get().await?;
         conn.ltrim::<_, ()>(buffer_key(room_uuid), count as isize, -1)
@@ -838,7 +846,13 @@ async fn write_chat(
     Ok(lines.len())
 }
 
-/// The transcript as stored, for the viewer and for staff reading one back.
+/// The transcript, for the viewer and for staff reading one back.
+///
+/// From the Redis buffer while it lasts, since that holds every line -- it is
+/// never trimmed as it is written out -- including the ones said since the
+/// last flush. Read there rather than flushed first: the inspector asks every
+/// few seconds while it follows a live room, and a flush per ask would write a
+/// sliver of a chunk per ask. Storage is the answer once the buffer expires.
 pub async fn read_chat(
     state: &AppState,
     room_uuid: Uuid,
@@ -846,6 +860,11 @@ pub async fn read_chat(
     let Some(bucket) = bucket(&state.config) else {
         return Ok(Vec::new());
     };
+    match buffered_chat(state, room_uuid).await {
+        Ok(held) if !held.is_empty() => return Ok(held),
+        Ok(_) => {}
+        Err(e) => warn!("Failed to read the buffered transcript for room {}: {}", room_uuid, e),
+    }
     let object = s3_client(&state.config)
         .get_object()
         .bucket(bucket)
@@ -1022,6 +1041,96 @@ pub async fn download_session(
         }
     })
     .await
+}
+
+/// The recording after `after`, as it stands, without writing anything out.
+///
+/// For following a live session: the inspector asks every few seconds, and
+/// `download_session` would flush on each ask and leave a chunk of a few
+/// messages behind every time. This reads the stored chunks that can hold
+/// anything later than `after` -- the one it falls inside and those after it,
+/// found by name -- and then whatever is still buffered in Redis.
+///
+/// May repeat messages at or before `after`, and may repeat one between a
+/// stored chunk and the buffer while a flush is under way; a reader keeps what
+/// is past the last sequence it has. Empty when there is nothing new.
+pub async fn read_tail(
+    state: &AppState,
+    room_uuid: Uuid,
+    after: u64,
+) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    let Some(bucket) = bucket(&state.config) else {
+        return Ok(Vec::new());
+    };
+    let client = s3_client(&state.config);
+    let listed = client
+        .list_objects_v2()
+        .bucket(bucket)
+        .prefix(format!("{ARCHIVE_R2_PREFIX}/{room_uuid}/"))
+        .send()
+        .await?;
+    let mut chunks: Vec<(u64, String)> = listed
+        .contents()
+        .iter()
+        .filter_map(|object| object.key())
+        .filter_map(|key| chunk_first_seq(key).map(|first| (first, key.to_string())))
+        .collect();
+    chunks.sort();
+    let keys = chunks_after(&chunks, after);
+
+    let mut out = assemble(keys, |key| {
+        let client = client.clone();
+        let bucket = bucket.to_string();
+        async move {
+            let object = client.get_object().bucket(bucket).key(&key).send().await?;
+            let bytes = object.body.collect().await?.into_bytes();
+            Ok(decompress(&bytes)?)
+        }
+    })
+    .await?;
+
+    let buffered = ArchiveBuffer::new(state.redis_pool.clone())
+        .peek_all(room_uuid)
+        .await?;
+    out.extend(encode_runs(
+        buffered.into_iter().filter(|message| message.seq > after).collect(),
+    ));
+    Ok(out)
+}
+
+/// The first sequence a chunk holds, from its name; None for anything under
+/// the prefix that is not a chunk.
+fn chunk_first_seq(key: &str) -> Option<u64> {
+    let name = key.rsplit('/').next()?;
+    let stem = name
+        .strip_suffix(CHUNK_SUFFIX)
+        .or_else(|| name.strip_suffix(CHUNK_SUFFIX_PLAIN))?;
+    stem.parse().ok()
+}
+
+/// The chunks that can hold a sequence past `after`: the last one starting at
+/// or before it, which it may fall inside, and every one starting later.
+/// `chunks` is sorted by first sequence.
+fn chunks_after(chunks: &[(u64, String)], after: u64) -> Vec<String> {
+    let from = chunks
+        .iter()
+        .rposition(|(first, _)| *first <= after)
+        .unwrap_or(0);
+    chunks[from..].iter().map(|(_, key)| key.clone()).collect()
+}
+
+/// Buffered messages as chunks, one per run of the same history. A reset
+/// replaces the history mid-buffer, and a chunk header names one.
+fn encode_runs(messages: Vec<ArchivedMessage>) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut start = 0;
+    for end in 1..=messages.len() {
+        if end == messages.len() || messages[end].history_id != messages[start].history_id {
+            out.extend(encode_chunk(messages[start].history_id, &messages[start..end]));
+            start = end;
+        }
+    }
+    out
 }
 
 /// Fetches a session's chunks and joins them into one log.
@@ -1364,6 +1473,49 @@ mod tests {
     /// would publish every session's traffic to anyone holding the id. An
     /// empty setting is the same as an absent one, because a config written
     /// out with the key blank means the same thing as one without it.
+    #[test]
+    fn a_tail_reads_the_chunk_it_falls_inside_and_every_later_one() {
+        let chunks: Vec<(u64, String)> = [1, 513, 1025]
+            .into_iter()
+            .map(|first| (first, chunk_key(Uuid::nil(), first)))
+            .collect();
+        let firsts = |after| -> Vec<u64> {
+            chunks_after(&chunks, after)
+                .iter()
+                .map(|key| chunk_first_seq(key).unwrap())
+                .collect()
+        };
+        assert_eq!(firsts(0), vec![1, 513, 1025]);
+        assert_eq!(firsts(600), vec![513, 1025]);
+        // At a chunk's first sequence the chunk before it is already read.
+        assert_eq!(firsts(1025), vec![1025]);
+        assert_eq!(firsts(5000), vec![1025]);
+        assert!(chunks_after(&[], 10).is_empty());
+    }
+
+    #[test]
+    fn only_chunks_are_read_as_chunks() {
+        assert_eq!(chunk_first_seq("collaborate-archive/x/000000000513.oeeelog.gz"), Some(513));
+        assert_eq!(chunk_first_seq("collaborate-archive/x/000000000001.oeeelog"), Some(1));
+        assert_eq!(chunk_first_seq("collaborate-archive/x/manifest.json"), None);
+        assert_eq!(chunk_first_seq("collaborate-archive/x/diagnostics/a-b.json"), None);
+    }
+
+    /// A reset replaces the history partway through what is buffered, and a
+    /// chunk header names one history, so the tail is as many chunks as there
+    /// are runs -- and still reads back as one log.
+    #[test]
+    fn a_tail_across_a_reset_names_each_history() {
+        let other = Uuid::from_u128(8);
+        let mut messages = vec![message(10, 1, b"a"), message(11, 2, b"b")];
+        let mut after_reset = message(12, 3, b"c");
+        after_reset.history_id = other;
+        messages.push(after_reset);
+        let decoded = decode_chunk(&encode_runs(messages.clone())).unwrap();
+        assert_eq!(decoded, messages);
+        assert!(encode_runs(Vec::new()).is_empty());
+    }
+
     #[test]
     fn a_report_key_says_when_it_was_filed_and_by_whom() {
         let (at, by) = filed_as(
