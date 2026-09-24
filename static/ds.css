@@ -1384,11 +1384,19 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   font-size: var(--ds-text-s);
 }
 
+/* As wide as the menu, the language's select below it included. The
+   segments share what their words leave over, so the chosen one still sits
+   the track's 2px from its edge: centred instead, a language with short
+   words (라이트, 다크, 시스템) left a margin of empty track at either end. */
 .toolbar-theme .ds-segmented {
   display: -webkit-box;
   display: flex;
-  -webkit-box-pack: center;
-  justify-content: center;
+}
+
+.toolbar-theme .ds-segmented > button {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  text-align: center;
 }
 
 /* The language, under the theme and inside the same rules. Spelled with
