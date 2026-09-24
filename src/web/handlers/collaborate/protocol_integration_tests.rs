@@ -21,7 +21,7 @@ use crate::redis::RedisPool;
 const SEQUENCED: u8 = 0x0a;
 const CAUGHT_UP: u8 = 0x0f;
 
-struct RedisProcess(Option<Child>);
+pub(super) struct RedisProcess(Option<Child>);
 
 impl Drop for RedisProcess {
     fn drop(&mut self) {
@@ -61,7 +61,7 @@ fn unused_port() -> u16 {
         .port()
 }
 
-async fn start_redis() -> (RedisProcess, String) {
+pub(super) async fn start_redis() -> (RedisProcess, String) {
     if let Ok(url) = std::env::var("OEEE_TEST_REDIS_URL") {
         wait_for_redis(&url).await;
         return (RedisProcess(None), url);
@@ -99,7 +99,7 @@ async fn wait_for_redis(url: &str) {
     panic!("collaboration test Redis did not become ready at {url}");
 }
 
-async fn redis_pool(url: &str) -> RedisPool {
+pub(super) async fn redis_pool(url: &str) -> RedisPool {
     let manager = RedisConnectionManager::new(url).expect("Redis manager");
     Pool::builder().build(manager).await.expect("Redis pool")
 }
