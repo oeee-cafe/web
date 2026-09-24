@@ -28,8 +28,6 @@ pub struct AppConfig {
 
     pub redis_url: String,
     pub redis_max_connections: u32,
-    #[serde_as(as = "DurationSeconds<u64>")]
-    pub redis_acquire_timeout: Duration,
 
     pub official_account_login_name: String,
 
@@ -56,7 +54,6 @@ pub struct AppConfig {
     pub archive_s3_bucket: Option<String>,
 
     pub smtp_host: String,
-    pub smtp_port: u16,
     pub smtp_user: String,
     pub smtp_password: String,
 
@@ -118,16 +115,6 @@ pub struct AppStoreConfig {
     /// The app the purchase has to have been made in: `cafe.oeee` for the
     /// iOS app. A transaction from any other bundle buys nothing here.
     pub bundle_id: String,
-    /// Deprecated: the packs live in the `store_products` table now, and
-    /// /admin/store changes them. Still read so a config that lists them
-    /// boots, and imported into the table on boot -- added where missing,
-    /// never changing a row already there (`store_product::import_configured`).
-    /// Nothing else reads it.
-    ///
-    /// A Supporter Pack per year, as `[[app_store.supporter_products]]`
-    /// tables of `year` and `product_id`.
-    #[serde(default)]
-    pub supporter_products: Vec<SupporterProduct>,
     /// Where the App Store Server API is, and where its sandbox is: a
     /// transaction production has never heard of is asked about there, so
     /// TestFlight and Xcode builds work without a second deployment. Only a
@@ -136,14 +123,6 @@ pub struct AppStoreConfig {
     pub api_url: String,
     #[serde(default = "default_app_store_sandbox_api_url")]
     pub sandbox_api_url: String,
-}
-
-/// A year's Supporter Pack in the App Store.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct SupporterProduct {
-    pub year: i32,
-    pub product_id: String,
 }
 
 fn default_app_store_api_url() -> String {
@@ -214,27 +193,9 @@ pub struct SteamConfig {
     /// A publisher Web API key (Steamworks > Users & Permissions > Manage
     /// Groups), not a user's key: AuthenticateUserTicket accepts no other.
     pub web_api_key: String,
-    /// Deprecated, as `app_store.supporter_products` is: the packs live in
-    /// the `store_products` table, this is imported into it on boot where
-    /// missing, and nothing else reads it. The app's own `app_id` is left
-    /// out of the import however it is listed: buying Oeee Cafe is not
-    /// supporting it.
-    ///
-    /// A Supporter Pack DLC per year, as `[[steam.supporter_apps]]` tables
-    /// of `year` and `app_id`.
-    #[serde(default)]
-    pub supporter_apps: Vec<SupporterApp>,
     /// Where the partner Web API is. Only a test changes it.
     #[serde(default = "default_steam_web_api_url")]
     pub web_api_url: String,
-}
-
-/// A year's Supporter Pack on Steam.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct SupporterApp {
-    pub year: i32,
-    pub app_id: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -295,15 +256,13 @@ mod tests {
     use super::*;
 
     /// The sample is the only written account of what a config looks like,
-    /// and a table shaped wrong is a server that does not boot. The packs
-    /// are the part with shape to get wrong: a table array inside a table,
-    /// one entry per year.
+    /// and a table shaped wrong is a server that does not boot.
     ///
     /// Only the tables this reads are deserialized, not the whole config:
     /// the sample leaves some required fields out entirely, which is its own
     /// problem and not this one's.
     #[test]
-    fn the_sample_configs_packs_parse_when_uncommented() {
+    fn the_sample_configs_tables_parse_when_uncommented() {
         #[derive(Deserialize)]
         struct Sample {
             steam: Option<SteamConfig>,
@@ -345,8 +304,6 @@ mod tests {
             .expect("the sample's tables deserialize");
 
         let steam = parsed.steam.expect("a [steam] table");
-        assert_eq!(steam.supporter_apps.len(), 1);
-        assert_eq!(steam.supporter_apps[0].year, 2026);
         assert_eq!(
             steam.web_api_url, "https://partner.steam-api.com",
             "the default is the real one"
@@ -355,12 +312,6 @@ mod tests {
 
         let store = parsed.app_store.expect("an [app_store] table");
         assert_eq!(store.bundle_id, "cafe.oeee");
-        assert_eq!(store.supporter_products.len(), 1);
-        assert_eq!(store.supporter_products[0].year, 2026);
-        assert_eq!(
-            store.supporter_products[0].product_id,
-            "cafe.oeee.supporter.2026"
-        );
         assert!(store.api_url.contains("api.storekit."));
         assert!(store.sandbox_api_url.contains("sandbox"));
 

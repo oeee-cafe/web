@@ -521,7 +521,6 @@ mod tests {
         SteamConfig {
             app_id: 480,
             web_api_key: "publisher-key".to_string(),
-            supporter_apps: vec![],
             web_api_url: format!("http://{addr}"),
         }
     }
@@ -648,7 +647,6 @@ mod tests {
         let config = SteamConfig {
             app_id: 480,
             web_api_key: "k".to_string(),
-            supporter_apps: vec![],
             // Nothing listens here; reaching it would be an error, not Invalid.
             web_api_url: "http://127.0.0.1:9".to_string(),
         };
@@ -680,7 +678,6 @@ mod tests {
         let mut config = SteamConfig {
             app_id: 480,
             web_api_key: "publisher-key".to_string(),
-            supporter_apps: vec![],
             web_api_url: format!("http://{addr}"),
         };
 

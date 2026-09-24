@@ -495,7 +495,6 @@ mod tests {
             key_id: KEY_ID.to_string(),
             private_key_path: PRIVATE_KEY_PATH.to_string(),
             bundle_id: BUNDLE_ID.to_string(),
-            supporter_products: vec![],
             api_url: format!("http://{addr}/production"),
             sandbox_api_url: format!("http://{addr}/sandbox"),
         }

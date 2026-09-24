@@ -145,15 +145,6 @@ impl App {
     pub async fn new(state: AppState) -> Result<Self, Box<dyn std::error::Error>> {
         sqlx::migrate!().run(&state.db_pool).await?;
 
-        // The packs the config still lists, into the catalogue that has
-        // replaced it: added where missing, and never changing a product
-        // already there (`store_product::import_configured`). Before
-        // anything is served, so the first boot of this release sells what
-        // the last one did.
-        let imported = store_product::import_configured(&state.db_pool, &state.config).await?;
-        if imported > 0 {
-            tracing::info!("added {imported} products from the config to the store catalogue");
-        }
         store_product::refresh_any_on_sale(&state.db_pool).await?;
 
         Ok(Self { state })
