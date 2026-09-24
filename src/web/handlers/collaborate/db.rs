@@ -344,6 +344,7 @@ pub async fn save_session_to_post(
         .put_object()
         .bucket(&state.config.aws_s3_bucket)
         .key(&s3_key)
+        .content_type(crate::image_store::PNG)
         .checksum_sha256(data_encoding::BASE64.encode(&hex::decode(&image_sha256)?))
         .body(aws_sdk_s3::primitives::ByteStream::from(png_data))
         .send()
