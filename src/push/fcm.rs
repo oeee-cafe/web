@@ -123,20 +123,108 @@ impl FcmClient {
 
         match result {
             Ok(_) => Ok(()),
-            Err(e) => {
-                let error_string = format!("{:?}", e);
-
-                // Check for invalid registration errors
-                if error_string.contains("UNREGISTERED")
-                    || error_string.contains("INVALID_ARGUMENT")
-                    || error_string.contains("NOT_FOUND")
-                    || error_string.contains("InvalidRegistration")
-                {
-                    return Err(PushError::InvalidToken);
-                }
-
-                Err(PushError::Other(anyhow::anyhow!("FCM error: {:?}", e)))
+            Err(google_fcm1::Error::BadRequest(ref body)) if token_is_dead(body) => {
+                Err(PushError::InvalidToken)
             }
+            Err(e) => Err(PushError::Other(anyhow::anyhow!("FCM error: {:?}", e))),
         }
+    }
+}
+
+/// Whether FCM refused the send because of the token, and so the device can be
+/// forgotten. Only two errors say that: `UNREGISTERED`, and `INVALID_ARGUMENT`
+/// when the field it objects to is the token. `INVALID_ARGUMENT` on its own is
+/// also what a malformed payload gets, and treating it as a dead token would
+/// delete every Android device a bad message was tried on.
+fn token_is_dead(body: &serde_json::Value) -> bool {
+    let Some(details) = body["error"]["details"].as_array() else {
+        return false;
+    };
+    details.iter().any(|detail| match detail["@type"].as_str() {
+        Some("type.googleapis.com/google.firebase.fcm.v1.FcmError") => {
+            detail["errorCode"] == "UNREGISTERED"
+        }
+        Some("type.googleapis.com/google.rpc.BadRequest") => detail["fieldViolations"]
+            .as_array()
+            .is_some_and(|violations| {
+                violations
+                    .iter()
+                    .any(|violation| violation["field"] == "message.token")
+            }),
+        _ => false,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::token_is_dead;
+    use serde_json::json;
+
+    #[test]
+    fn an_unregistered_token_is_dead() {
+        assert!(token_is_dead(&json!({"error": {
+            "code": 404,
+            "status": "NOT_FOUND",
+            "details": [{
+                "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+                "errorCode": "UNREGISTERED",
+            }],
+        }})));
+    }
+
+    #[test]
+    fn a_malformed_token_is_dead() {
+        assert!(token_is_dead(&json!({"error": {
+            "code": 400,
+            "status": "INVALID_ARGUMENT",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+                    "errorCode": "INVALID_ARGUMENT",
+                },
+                {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [{
+                        "field": "message.token",
+                        "description": "The registration token is not a valid FCM registration token",
+                    }],
+                },
+            ],
+        }})));
+    }
+
+    #[test]
+    fn a_malformed_payload_leaves_the_token_alone() {
+        assert!(!token_is_dead(&json!({"error": {
+            "code": 400,
+            "status": "INVALID_ARGUMENT",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+                    "errorCode": "INVALID_ARGUMENT",
+                },
+                {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [{
+                        "field": "message.android.notification.notification_count",
+                        "description": "Invalid value",
+                    }],
+                },
+            ],
+        }})));
+    }
+
+    #[test]
+    fn a_sender_mismatch_leaves_the_token_alone() {
+        // Our credentials, not the device: forgetting on this would empty the
+        // table the first time the service account was misconfigured.
+        assert!(!token_is_dead(&json!({"error": {
+            "code": 403,
+            "status": "PERMISSION_DENIED",
+            "details": [{
+                "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+                "errorCode": "SENDER_ID_MISMATCH",
+            }],
+        }})));
     }
 }
