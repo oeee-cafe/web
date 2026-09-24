@@ -360,6 +360,7 @@ pub async fn load_more_collaborative_posts(
             posts,
             "/api/collaborate/posts",
             query.offset,
+            query.period.as_deref(),
         ),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
     })?;
@@ -449,6 +450,7 @@ pub async fn collaborate_lobby(
             collaborative_posts,
             "/api/collaborate/posts",
             0,
+            None,
         ),
         // Three tiers rather than one flat list; the template renders them as
         // optgroups in that order.
@@ -1196,6 +1198,7 @@ mod tests {
                     Vec::new(),
                     "/api/collaborate/posts",
                     0,
+                    None,
                 ),
                 canvas_sizes => canvas_size_options(),
             participant_choices => MAX_PARTICIPANTS_CHOICES,

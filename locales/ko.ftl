@@ -29,6 +29,9 @@ feed-communities = 커뮤
 feed-recent-empty = 아직 그려진 그림이 없습니다.
 feed-following-empty = 동맹이 비어 있습니다. <a href="/communities">커뮤니티</a>에서 다른 사람과 동맹을 맺어 보세요!
 feed-communities-empty = 내 커뮤에 새 그림이 없습니다. <a href="/communities">커뮤니티</a>에서 가입할 곳을 찾아보세요!
+feed-period-month = { $month }월
+feed-period-month-year = { $year }년 { $month }월
+recent-comments-all = 댓글 모두 보기
 
 draw = 그리기!
 collaborate = 넷캔

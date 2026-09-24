@@ -1,6 +1,8 @@
 use super::ExtractFtlLang;
 use crate::app_error::AppError;
+use crate::feed_period;
 use crate::models::actor::Actor;
+use crate::models::comment::{find_recent_comments, CommentScope};
 use crate::models::post::{
     find_following_posts_by_user_id, find_member_community_posts, find_public_posts,
 };
@@ -26,24 +28,53 @@ use minijinja::context;
 /// case to a single extra fetch rather than eliminating it.
 pub(crate) const HOME_POSTS_PER_BATCH: i64 = 60;
 
+/// Comments in the list beside a feed (comments_aside_macro.jinja). About two
+/// screens of it on a wide window, where it scrolls on its own beside the
+/// grid; one swipe's worth of cards across a phone. Not paged: a community
+/// has its whole list on a page of its own, and Home's is a glance at what
+/// people are saying, not an archive.
+pub(crate) const SIDEBAR_COMMENTS: i64 = 20;
+
 /// Context every post feed hands to the shared card fragment. Home's feeds and
 /// the collaborate lobby differ only in which query fills `posts` and where the
 /// sentinel points, so everything else lives here rather than being written
 /// three times.
+///
+/// Every one of them is newest first, so the grid is broken up by month
+/// (feed_period.rs): `headings` holds, for each post, the heading it opens,
+/// if any. `after` is the month the previous batch ended in, which the
+/// sentinel hands on as `period`, so a batch that carries on a month does
+/// not head it a second time.
 pub(crate) fn feed_context(
     posts: Vec<crate::models::post::SerializablePostForHome>,
     fragment_path: &str,
     offset: i64,
+    after: Option<&str>,
 ) -> minijinja::Value {
+    let now = chrono::Utc::now();
+    let headings = feed_period::headings(posts.iter().map(|post| post.published_at), after, now);
+    let last_period = posts
+        .iter()
+        .rev()
+        .find_map(|post| post.published_at)
+        .map(|then| feed_period::period(then, now).key)
+        .or_else(|| after.map(str::to_string));
     let has_more = posts.len() as i64 == HOME_POSTS_PER_BATCH;
     let next_offset = offset + HOME_POSTS_PER_BATCH;
+    let mut next_url = format!(
+        "{}?offset={}&limit={}",
+        fragment_path, next_offset, HOME_POSTS_PER_BATCH
+    );
+    if let Some(key) = last_period {
+        // "2026-08": nothing to encode.
+        next_url.push_str("&period=");
+        next_url.push_str(&key);
+    }
     context! {
         posts,
+        headings,
         has_more,
-        next_url => format!(
-            "{}?offset={}&limit={}",
-            fragment_path, next_offset, HOME_POSTS_PER_BATCH
-        ),
+        next_url,
     }
 }
 
@@ -76,6 +107,17 @@ impl Feed {
             Feed::Recent => "/api/home/posts",
             Feed::Following => "/api/following/posts",
             Feed::Communities => "/api/joined/posts",
+        }
+    }
+
+    /// Whose comments go beside it: the same people's, or places', as its
+    /// drawings.
+    fn comment_scope(self, viewer: Option<&crate::models::user::User>) -> Option<CommentScope> {
+        match (self, viewer) {
+            (Feed::Recent, _) => Some(CommentScope::Public),
+            (Feed::Following, Some(user)) => Some(CommentScope::FollowedBy(user.id)),
+            (Feed::Communities, Some(user)) => Some(CommentScope::MemberOf(user.id)),
+            _ => None,
         }
     }
 
@@ -118,6 +160,19 @@ async fn feed_page(
     let posts = feed
         .posts(&mut tx, auth_session.user.as_ref(), HOME_POSTS_PER_BATCH, 0)
         .await?;
+    let comments = match feed.comment_scope(auth_session.user.as_ref()) {
+        Some(scope) => {
+            find_recent_comments(
+                &mut tx,
+                scope,
+                auth_session.user.as_ref().map(|u| u.id),
+                auth_session.user.as_ref().map_or(false, |u| u.show_sensitive_content),
+                SIDEBAR_COMMENTS,
+            )
+            .await?
+        }
+        None => Vec::new(),
+    };
     tx.commit().await?;
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("home.jinja")?;
@@ -125,7 +180,8 @@ async fn feed_page(
         current_user => auth_session.user,
         messages => messages.into_iter().collect::<Vec<_>>(),
         feed_switch => feed.name(),
-        feed => feed_context(posts, feed.batch_path(), 0),
+        feed => feed_context(posts, feed.batch_path(), 0, None),
+        comments,
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang
@@ -149,7 +205,7 @@ async fn feed_batch(
     let template: minijinja::Template<'_, '_> =
         state.env.get_template("post_feed_fragment.jinja")?;
     let rendered = template.render(context! {
-        feed => feed_context(posts, feed.batch_path(), query.offset),
+        feed => feed_context(posts, feed.batch_path(), query.offset, query.period.as_deref()),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
     })?;
     Ok(Html(rendered).into_response())
@@ -186,6 +242,8 @@ pub async fn my_communities_feed(
 pub struct LoadMoreQuery {
     pub offset: i64,
     pub limit: i64,
+    /// The month the previous batch ended in (feed_context).
+    pub period: Option<String>,
 }
 
 pub async fn load_more_public_posts(
@@ -282,6 +340,9 @@ pub struct AddReactionRequest {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Datelike;
+    use crate::models::comment::NotificationComment;
+    use crate::models::post::SerializablePostForHome;
     use crate::web::handlers::test_support;
     use minijinja::context;
     use serde_json::json;
@@ -532,6 +593,150 @@ mod tests {
             .expect("renders");
         assert!(rendered.contains("feed-communities-empty"));
         assert!(!rendered.contains("id=\"post-cols\""));
+    }
+
+    /// A post as the feed queries return it, published at `published_at`.
+    fn feed_post(i: u128, published_at: chrono::DateTime<chrono::Utc>) -> SerializablePostForHome {
+        SerializablePostForHome {
+            id: uuid::Uuid::from_u128(i),
+            title: Some(format!("Drawing {i}")),
+            author_id: uuid::Uuid::from_u128(999),
+            user_login_name: "artist".to_string(),
+            paint_duration: "0".to_string(),
+            stroke_count: 1,
+            viewer_count: 0,
+            image_filename: "abcdef.png".to_string(),
+            image_width: 300,
+            image_height: 300,
+            replay_filename: None,
+            is_sensitive: false,
+            community_slug: None,
+            community_name: None,
+            published_at: Some(published_at),
+            created_at: published_at,
+            updated_at: published_at,
+        }
+    }
+
+    fn render_fragment(feed: minijinja::Value) -> String {
+        test_support::env()
+            .get_template("post_feed_fragment.jinja")
+            .expect("template loads")
+            .render(context! {
+                feed,
+                r2_public_endpoint_url => "https://example.test",
+            })
+            .expect("renders")
+    }
+
+    /// The grid is broken up by month, with one heading over the first
+    /// drawing of each, rendered from what feed_context really hands the
+    /// template.
+    #[test]
+    fn a_heading_opens_each_month() {
+        let now = chrono::Utc::now();
+        let posts = vec![
+            feed_post(1, now),
+            feed_post(2, now),
+            feed_post(3, now - chrono::Duration::days(400)),
+        ];
+        let rendered = render_fragment(super::feed_context(posts, "/api/home/posts", 0, None));
+        assert_eq!(rendered.matches(r#"class="feed-period""#).count(), 2);
+        // This month, by its number alone...
+        let this_month = format!(
+            "feed-period-month(month={})",
+            now.with_timezone(&chrono_tz::Asia::Seoul).month()
+        );
+        assert!(rendered.contains(&this_month), "{rendered}");
+        // ...and a year ago, a month of another year, which says the year.
+        assert!(rendered.contains("feed-period-month-year(month="));
+        // The heading comes before the drawing it opens.
+        let heading = rendered.find(&this_month).unwrap();
+        let first = rendered.find("Drawing 1").unwrap();
+        assert!(heading < first);
+    }
+
+    /// A batch that carries on the month the last one ended in does not
+    /// repeat its heading, and hands on where it ended for the next one.
+    #[test]
+    fn a_batch_does_not_repeat_the_heading_above_it() {
+        let now = chrono::Utc::now();
+        let month = crate::feed_period::period(now, now).key;
+        let posts: Vec<_> = (0..super::HOME_POSTS_PER_BATCH as u128)
+            .map(|i| feed_post(i + 1, now))
+            .collect();
+        let rendered = render_fragment(super::feed_context(
+            posts,
+            "/api/home/posts",
+            60,
+            Some(&month),
+        ));
+        assert!(!rendered.contains("feed-period"), "the same month, no new heading");
+        assert!(
+            rendered.contains(&format!("&amp;period={month}")),
+            "the next batch is told"
+        );
+    }
+
+    fn sample_comment() -> NotificationComment {
+        let at = chrono::Utc::now();
+        NotificationComment {
+            id: uuid::Uuid::from_u128(10),
+            post_id: uuid::Uuid::from_u128(1),
+            actor_id: uuid::Uuid::from_u128(11),
+            content: Some("Lovely colours".to_string()),
+            content_html: None,
+            iri: None,
+            actor_name: "Commenter".to_string(),
+            actor_handle: "@commenter@oeee.test".to_string(),
+            actor_url: "https://oeee.test/@commenter".to_string(),
+            actor_login_name: Some("commenter".to_string()),
+            is_local: true,
+            updated_at: at,
+            created_at: at,
+            post_title: Some("A drawing".to_string()),
+            post_author_login_name: "someone".to_string(),
+            post_image_filename: Some("abcdef.png".to_string()),
+            post_image_width: Some(300),
+            post_image_height: Some(300),
+        }
+    }
+
+    /// What people are saying goes beside the grid, in the section that
+    /// lays the two out; with nothing said, the grid has the width alone.
+    #[test]
+    fn comments_go_beside_the_grid_when_there_are_any() {
+        let env = test_support::env();
+        let home = env.get_template("home.jinja").expect("template loads");
+        let with = home
+            .render(context! {
+                comments => vec![sample_comment()],
+                ..home_context(vec![sample_post()], false)
+            })
+            .expect("renders with comments");
+        // The toolbar's skeleton of this page (toolbar.jinja) carries the
+        // same classes in a script, so these look for what only the page
+        // itself says.
+        let aside_tag = r#"<aside class="feed-comments" aria-labelledby="feed-comments-title">"#;
+        assert!(with.contains(r#"<section class="feed-layout has-comments" role="region""#));
+        assert!(with.contains(aside_tag));
+        assert!(with.contains("Lovely colours"));
+        assert!(with.contains("/@someone/00000000-0000-0000-0000-000000000001"));
+        // Home's list has no page of its own to go on to.
+        assert!(!with.contains("feed-comments-all"));
+        // Header, then comments, then the grid: the order it reads in.
+        let aside = with.find(aside_tag).unwrap();
+        assert!(with.find(r#"<div class="feed-header">"#).unwrap() < aside);
+        assert!(aside < with.find("post-feed-grid").unwrap());
+
+        let without = home
+            .render(context! {
+                comments => Vec::<NotificationComment>::new(),
+                ..home_context(vec![sample_post()], false)
+            })
+            .expect("renders without comments");
+        assert!(!without.contains(aside_tag));
+        assert!(without.contains(r#"<section class="feed-layout" role="region""#));
     }
 
     #[test]

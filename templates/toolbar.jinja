@@ -652,10 +652,18 @@
         return html;
       }
       var SHAPES = [
-        // Home's feeds: the switch, Per row, the grid.
+        // Home's feeds: the switch, Per row, the comments beside the grid
+        // (comments_aside_macro.jinja), the grid.
         [/^\/(following|joined)?$/, function () {
-          return '<div class="center-wide"><div class="feed-header">' + bar("180px", 22) +
-            (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + postGrid() + "</div>";
+          var comments = '<aside class="feed-comments"><div class="feed-comments-head">' + bar("90px", 16) +
+            '</div><div class="feed-comments-list">';
+          for (var i = 0; i < 6; i++) {
+            comments += '<div class="comment-row"><span class="notification-figure"><span class="notification-thumbnail">' +
+              '<span class="ds-skeleton-fill"></span></span></span><div class="comment-row-body">' +
+              bar("45%", 13) + bar("90%", 13, "ds-skeleton-gap") + bar("60%", 11, "ds-skeleton-gap") + "</div></div>";
+          }
+          return '<div class="center-wide"><section class="feed-layout has-comments"><div class="feed-header">' + bar("180px", 22) +
+            (window.innerWidth > 600 ? bar("170px", 22) : "") + "</div>" + comments + "</div></aside>" + postGrid() + "</section></div>";
         }],
         // The tag directory, whose cards are the community directory's.
         [/^\/tags$/, function () {

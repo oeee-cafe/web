@@ -27,6 +27,35 @@ feed-communities = Communities
 feed-recent-empty = Nothing has been drawn yet.
 feed-following-empty = Your timeline is empty. Discover and follow other people from <a href="/communities">communities</a>!
 feed-communities-empty = Nothing new in your communities. Find one to join in <a href="/communities">communities</a>!
+feed-period-month = { $month ->
+    [1] January
+    [2] February
+    [3] March
+    [4] April
+    [5] May
+    [6] June
+    [7] July
+    [8] August
+    [9] September
+    [10] October
+    [11] November
+   *[12] December
+}
+feed-period-month-year = { $month ->
+    [1] January
+    [2] February
+    [3] March
+    [4] April
+    [5] May
+    [6] June
+    [7] July
+    [8] August
+    [9] September
+    [10] October
+    [11] November
+   *[12] December
+} { $year }
+recent-comments-all = All comments
 
 draw = Draw!
 collaborate = Collaborate

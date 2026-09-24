@@ -1,0 +1,33 @@
+{# What people are saying, beside a grid of drawings: Home's feeds, each
+   with the comments of its own people or places (handlers/home.rs,
+   Feed::comment_scope), and a community's drawings with the start of its
+   comments page, which `all_url` links to.
+
+   One markup for every width; style.css decides where it goes. On a wide
+   window it is a column beside the grid that stays in view as the grid
+   scrolls, and scrolls on its own when it is longer than the window. Below
+   that it is a row of cards between the feed's header and its grid, swiped
+   across rather than scrolled past, so a phone reaches the drawings at
+   once. The feed's section lays it out (`.feed-layout`), so it comes after
+   the header and before the grid, which is the order it reads in at every
+   width.
+
+   Nothing to show, nothing rendered, and the grid has the width to itself. #}
+{% import "comment_card_macro.jinja" as comment_card_macro %}
+{% macro comments_aside(comments, all_url=none) %}
+  {% if comments %}
+    <aside class="feed-comments" aria-labelledby="feed-comments-title">
+      <div class="feed-comments-head">
+        <h2 id="feed-comments-title" class="feed-comments-title">{{ ftl_get_message("recent-comments") }}</h2>
+        {% if all_url %}
+          <a class="feed-comments-all" href="{{ all_url }}">{{ ftl_get_message("recent-comments-all") }}</a>
+        {% endif %}
+      </div>
+      <div class="feed-comments-list">
+        {% for comment in comments %}
+          {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
+        {% endfor %}
+      </div>
+    </aside>
+  {% endif %}
+{% endmacro %}

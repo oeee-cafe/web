@@ -5,7 +5,21 @@
    load-more handlers for the rest, so it must not depend on anything those
    handlers do not pass. #}
 {% import "post_card.jinja" as card %}
+{# `feed.headings` is the heading each post opens, if any: the first
+   drawing of each month (feed_period.rs). A heading is an item of the
+   grid that takes its whole row, so a batch appended below goes on in the
+   same grid. #}
 {% for post in feed.posts %}
+  {% set heading = feed.headings[loop.index0] if feed.headings else none %}
+  {% if heading %}
+    <h3 class="feed-period">
+      {%- if heading.year -%}
+        {{ ftl_format_pattern("feed-period-month-year", {"month": heading.month, "year": heading.year}) }}
+      {%- else -%}
+        {{ ftl_format_pattern("feed-period-month", {"month": heading.month}) }}
+      {%- endif -%}
+    </h3>
+  {% endif %}
   {{ card.post_card(post, r2_public_endpoint_url, false) }}
 {% endfor %}
 
