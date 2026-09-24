@@ -47,6 +47,7 @@ import { useWebSocket, type ConnectionState, type SyncProgress } from "./hooks/u
 import { useRemoteCursors } from "./hooks/useRemoteCursors";
 import { reportDiagnostics, type DiagnosticContext } from "./diagnostics";
 import { refreshSessionPreview } from "./preview";
+import { PendingEchoes } from "./echoIds";
 import type { CollaborationMeta, Participant } from "./types";
 
 /** How long the owner waits for the server to confirm the end of the session
@@ -248,7 +249,7 @@ export default function App() {
   const catchupTimeoutRef = useRef<number | null>(null);
   const processingMessageRef = useRef(false);
   const isCatchingUpRef = useRef(true);
-  const pendingIdsRef = useRef(new Map<string, string[]>());
+  const pendingEchoesRef = useRef(new PendingEchoes());
   const pointerFrameRef = useRef<number | null>(null);
   const pendingPointerRef = useRef<{ x: number; y: number } | null>(null);
   /** When the last cursor position went out, and where it was. */
@@ -256,7 +257,8 @@ export default function App() {
   const lastSentPointerRef = useRef<{ x: number; y: number } | null>(null);
   const expectedSequenceRef = useRef(1);
   const appliedSequenceRef = useRef(0);
-  const canonicalOperationsRef = useRef(new Map<number, CanonicalPainterOperation>());
+  /** Held until their turn; `null` holds the place of one nobody can read. */
+  const canonicalOperationsRef = useRef(new Map<number, CanonicalPainterOperation | null>());
   /**
    * Snapshots of a pending checkpoint, by sequence then by participant.
    *
@@ -335,10 +337,7 @@ export default function App() {
     if (!ws || ws.readyState !== WebSocket.OPEN || localId === null || isCatchingUpRef.current) return;
     hasDrawnRef.current = true;
     const encoded = encodePainterOperation(localId, entry.operation);
-    const wireId = bytesId(new Uint8Array(encoded));
-    const queue = pendingIdsRef.current.get(wireId) ?? [];
-    queue.push(entry.id);
-    pendingIdsRef.current.set(wireId, queue);
+    pendingEchoesRef.current.record(bytesId(new Uint8Array(encoded)), entry.id);
     ws.send(encoded);
   // wsRef is created by the WebSocket hook below and is stable for its lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -506,9 +505,9 @@ export default function App() {
       while (true) {
         const expected = expectedSequenceRef.current;
         const operation = canonicalOperationsRef.current.get(expected);
-        if (operation) {
+        if (operation !== undefined) {
           canonicalOperationsRef.current.delete(expected);
-          await painter.applyCanonicalOperation(operation);
+          if (operation) await painter.applyCanonicalOperation(operation);
           appliedSequenceRef.current = expected;
           expectedSequenceRef.current = expected + 1;
           // Not while catching up: the painter takes no input until the replay
@@ -589,10 +588,13 @@ export default function App() {
     }
     const operation = decodePainterOperation(message);
     if (!operation || !("userId" in message) || typeof message.userId !== "number") return;
+    // Only our own echoes can be in the fork. The bytes carry the sender's
+    // session id, so nobody else's could match; there is no point searching
+    // the queue for them.
     const wireId = bytesId(raw);
-    const pendingIds = pendingIdsRef.current.get(wireId);
-    const id = pendingIds?.shift() ?? wireId;
-    if (pendingIds?.length === 0) pendingIdsRef.current.delete(wireId);
+    const id = message.userId === localIdRef.current
+      ? pendingEchoesRef.current.claim(wireId)
+      : wireId;
     const canonical: CanonicalPainterOperation = {
       id,
       actorId: String(message.userId),
@@ -603,11 +605,16 @@ export default function App() {
     await drainCanonical();
   }, [drainCanonical]);
 
+  const onUnreadableSequence = useCallback(async (sequence: number) => {
+    canonicalOperationsRef.current.set(sequence, null);
+    await drainCanonical();
+  }, [drainCanonical]);
+
   const onReconnectCanvas = useCallback(async (
     reconnecting: boolean, resumeSequence: number | null,
   ) => {
     clearCursors();
-    pendingIdsRef.current.clear();
+    pendingEchoesRef.current.clear();
     canonicalOperationsRef.current.clear();
     snapshotPairsRef.current.clear();
     snapshotCountsRef.current.clear();
@@ -700,6 +707,8 @@ export default function App() {
     await drainCanonical();
     return appliedSequenceRef.current >= lastSeqRef.current;
   }, [drainCanonical]);
+
+  const appliedCanonicalPosition = useCallback((): number => appliedSequenceRef.current, []);
 
   const canResumeCanonicalPosition = useCallback((): boolean =>
     painterRef.current?.isSynchronizationSettled() ?? false,
@@ -869,9 +878,11 @@ export default function App() {
     addParticipant, clearParticipants,
     addChatMessage,
     handleResetRequest, canUploadCheckpoint, onReconnectCanvas, onCanvasMessage,
+    onUnreadableSequence,
     onWelcome: handleWelcome,
     onResetPoint: handleResetPoint,
     verifyCanonicalPosition,
+    appliedCanonicalPosition,
     canResumeCanonicalPosition,
     onSessionEnded: handleSessionEnded,
     onSessionExpired: handleSessionExpired,
