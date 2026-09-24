@@ -3,7 +3,7 @@ import { act } from "react";
 import { mount } from "./public";
 import { DrawingEngine } from "./DrawingEngine";
 import { deflateCoverage } from "./utils/rasterCodec";
-import type { LocalPainterOperation } from "./operations";
+import type { LocalPainterOperation, PainterOperation } from "./operations";
 import {
   decodeMessage,
   decodePainterOperation,
@@ -31,6 +31,7 @@ const HEIGHT = 48;
  */
 function twoClients() {
   const relayed: string[] = [];
+  const sentOperations: PainterOperation[] = [];
   let sequence = 0;
   const clients = new Map<string, ReturnType<typeof mount>>();
 
@@ -45,6 +46,7 @@ function twoClients() {
     if (!operation) throw new Error(`${entry.operation.kind} lost its meaning`);
     sequence += 1;
     relayed.push(operation.kind);
+    sentOperations.push(operation);
     const at = sequence;
     return Promise.all(
       [...clients].map(([id, painter]) =>
@@ -60,7 +62,7 @@ function twoClients() {
   };
 
   const pending: Promise<unknown>[] = [];
-  const open = (id: string) => {
+  const open = (id: string, controls: "none" | "toolbox" = "none") => {
     const element = document.createElement("div");
     document.body.appendChild(element);
     let painter!: ReturnType<typeof mount>;
@@ -68,7 +70,7 @@ function twoClients() {
       painter = mount(element, {
         width: WIDTH, height: HEIGHT,
         mode: { kind: "standard" },
-        controls: { kind: "none" },
+        controls: { kind: controls },
         recordReplay: false,
         synchronization: {
           actorId: id,
@@ -83,6 +85,7 @@ function twoClients() {
   return {
     open,
     relayed,
+    sentOperations,
     /** Sends an operation the way a painter's own would go. */
     send: (from: string, operation: LocalPainterOperation["operation"]) =>
       relay(from, { id: `${from}:sent:${sequence + 1}`, actorId: from, operation }),
@@ -327,6 +330,127 @@ describe("two clients and the wire between them", () => {
     });
 
     expect(room.relayed.filter((kind) => kind === "undo")).toHaveLength(1);
+  });
+
+  it("finishes the stroke under the pen when the host disables drawing", async () => {
+    // A dropped socket or a replay disables drawing, and it can do so
+    // mid-stroke. The release that follows is ignored while disabled, so the
+    // gesture stayed open: nothing under the pen was handed over, the painter
+    // reported itself unsettled, and once re-enabled a plain hover kept
+    // drawing with no button down.
+    const room = twoClients();
+    const bob = room.open("2");
+    await act(async () => {
+      await bob.painter.ready;
+    });
+    act(() => {
+      bob.painter.setLocalActorId("2");
+    });
+    const canvas = bob.element.querySelector("#canvas") as HTMLCanvasElement;
+    const box = canvas.getBoundingClientRect();
+    const pointer = async (type: string, x: number, y: number, buttons = 1) => {
+      await act(async () => {
+        canvas.dispatchEvent(new PointerEvent(type, {
+          pointerId: 1, pointerType: "mouse", button: 0, buttons,
+          clientX: box.left + x, clientY: box.top + y,
+          bubbles: true, cancelable: true,
+        }));
+      });
+    };
+    const settle = async () => {
+      await act(async () => {
+        await room.settle();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
+    };
+
+    await pointer("pointerdown", 8, 8);
+    await pointer("pointermove", 20, 8);
+    act(() => { bob.painter.setInteractionEnabled(false); });
+    await settle();
+    expect(room.relayed).toContain("stroke");
+    expect(bob.painter.isSynchronizationSettled()).toBe(true);
+
+    const sent = room.relayed.length;
+    act(() => { bob.painter.setInteractionEnabled(true); });
+    await pointer("pointermove", 30, 8, 0);
+    await settle();
+    expect(room.relayed.length).toBe(sent);
+  });
+
+  it("puts text in the pair the painter is aimed at", async () => {
+    // The operation sent for the text named the selected participant's
+    // pair; the text itself was rasterised into our own. Everyone else saw
+    // it in one place and the author in another.
+    const room = twoClients();
+    const bob = room.open("2", "toolbox");
+    await act(async () => {
+      await bob.painter.ready;
+    });
+    act(() => {
+      bob.painter.setLocalActorId("2");
+      bob.painter.setParticipants([
+        { actorId: "1", name: "Alice" },
+        { actorId: "2", name: "Bob" },
+      ]);
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const button = (selector: string) => {
+      const found = bob.element.querySelector<HTMLButtonElement>(selector);
+      if (!found) throw new Error(`no ${selector}`);
+      return found;
+    };
+    await act(async () => { button('button[aria-label="Draw on Alice\'s layers"]').click(); });
+    // The shortcut table's T, rather than a tip in the toolbox: the pen tip
+    // cycles through its tools on each press, and its title is a phrase.
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "t", bubbles: true, cancelable: true,
+      }));
+    });
+
+    // A toolbox mount opens at a fitted zoom, so the press is placed by the
+    // canvas's on-screen size rather than in artwork pixels.
+    const canvas = bob.element.querySelector("#canvas") as HTMLCanvasElement;
+    const box = canvas.getBoundingClientRect();
+    for (const type of ["pointerdown", "pointerup"]) {
+      await act(async () => {
+        canvas.dispatchEvent(new PointerEvent(type, {
+          pointerId: 1, pointerType: "mouse", button: 0,
+          buttons: type === "pointerup" ? 0 : 1,
+          clientX: box.left + box.width * 0.1, clientY: box.top + box.height * 0.5,
+          bubbles: true, cancelable: true,
+        }));
+      });
+    }
+    const editor = bob.element.querySelector<HTMLDivElement>("[contenteditable]");
+    if (!editor) throw new Error("no text editor opened");
+    await act(async () => {
+      editor.textContent = "Hi";
+      editor.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Enter", bubbles: true, cancelable: true,
+      }));
+      await room.settle();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    expect(room.relayed).toContain("text");
+
+    // Alice joined first, so her pair sits on top: z 9000 and 9001. Bob's is
+    // the band below. See participantZIndex.
+    const inked = (zIndex: number) => {
+      const layer = Array.from(bob.element.querySelectorAll("canvas"))
+        .find((c) => Number(c.style.zIndex) === zIndex);
+      if (!layer) throw new Error(`no canvas at z ${zIndex}`);
+      const data = layer.getContext("2d")!.getImageData(0, 0, WIDTH, HEIGHT).data;
+      let count = 0;
+      for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count++;
+      return count;
+    };
+    expect(inked(9000)).toBeGreaterThan(0);
+    expect(inked(8990)).toBe(0);
   });
 
   it("ignores Ctrl+Z while the host has drawing disabled", async () => {

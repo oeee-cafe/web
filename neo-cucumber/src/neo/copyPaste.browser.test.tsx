@@ -39,6 +39,25 @@ describe("copy and paste, NEO's way", () => {
     expect(p.handle.tool).toBe("copy");
   });
 
+  it("previews the copy from the pair it was taken from", async () => {
+    // In a session the copy can be taken from another participant's layers.
+    // The clipboard already came from there; the picture shown while the
+    // copy was being placed was cropped from our own pair instead.
+    const p = await mountPainter("copy");
+    const engine = p.handle.api!.drawingEngine!;
+    engine.setDrawTarget("7");
+    engine.layersFor("7").background.fill(200);
+
+    await p.drag(4, 4, 16, 16);
+    await p.send("pointerdown", 30, 30);
+    await p.send("pointermove", 34, 30);
+
+    const floating = p.previews.find((display) => display?.kind === "floating");
+    expect(floating).toBeDefined();
+    if (floating?.kind !== "floating") throw new Error("no floating preview");
+    expect(floating.image.data[3]).toBe(200);
+  });
+
   it("moves the copy by the drag, at the size it was copied", async () => {
     const p = await mountPainter("rectFill");
     await p.drag(4, 4, 16, 16);

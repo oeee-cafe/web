@@ -946,4 +946,27 @@ mod history_admission_tests {
         assert!(!should_store_message(&Message::Binary(Vec::new().into())));
         assert!(!should_store_message(&Message::Text("0x16".into())));
     }
+
+    /// The frames the room hears for a join and for the end of a session are
+    /// built here, not relayed from the client. The client's own JOIN is 25
+    /// bytes, and its decoder refuses one shorter than 27: relaying it, as
+    /// the handler once did, meant nobody was ever told who joined.
+    #[test]
+    fn the_join_and_end_session_frames_are_what_the_client_decodes() {
+        use super::{end_session_frame, JoinMessage, MessageType};
+        use uuid::Uuid;
+        let owner = Uuid::new_v4();
+
+        let join = JoinMessage { user_id: owner, timestamp: 5, username: "ada".into() }.serialize();
+        assert_eq!(join[0], MessageType::Join as u8);
+        assert_eq!(join.len(), 27 + 3);
+        assert_eq!(u16::from_le_bytes([join[25], join[26]]), 3);
+        assert_eq!(&join[27..], b"ada");
+
+        let end = end_session_frame(owner, "/@ada/post");
+        assert_eq!(end[0], MessageType::EndSession as u8);
+        assert_eq!(&end[1..17], owner.as_bytes());
+        assert_eq!(u16::from_le_bytes([end[17], end[18]]) as usize, "/@ada/post".len());
+        assert_eq!(&end[19..], b"/@ada/post");
+    }
 }

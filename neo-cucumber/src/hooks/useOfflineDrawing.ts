@@ -691,12 +691,15 @@ export const useOfflineDrawing = (
    * the drawing back further than it went for anybody watching.
    */
   const wrappedUndo = useCallback(() => {
-    // Not while the pen is down, as NEO. In a session an undo sent mid-stroke
-    // was sequenced ahead of the stroke's own tail: the chunk still under the
-    // pointer went out after it, with no boundary of its own, and the pointer
-    // kept drawing onto a canvas the replay had just rolled back.
-    if (baseDrawing.isDrawingRef.current) return;
     if (onOperation) {
+      // Not while the pen is down. An undo sent mid-stroke was sequenced
+      // ahead of the stroke's own tail: the chunk still under the pointer
+      // went out after it, with no boundary of its own, and the pointer kept
+      // drawing onto a canvas the replay had just rolled back. Sessions only:
+      // NEO itself answers the key mid-stroke (its _keyDownHandler has no
+      // guard, and the stroke's undo step is pushed on the press), and the
+      // offline painter keeps whatever it did before.
+      if (baseDrawing.isDrawingRef.current) return;
       onOperation({ kind: "undo", redo: false });
       return;
     }
@@ -706,8 +709,8 @@ export const useOfflineDrawing = (
 
   // Redo, for the same reason and by the same rule.
   const wrappedRedo = useCallback(() => {
-    if (baseDrawing.isDrawingRef.current) return;
     if (onOperation) {
+      if (baseDrawing.isDrawingRef.current) return;
       onOperation({ kind: "undo", redo: true });
       return;
     }
