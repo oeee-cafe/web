@@ -10,6 +10,13 @@ export interface SessionExpiredModalProps {
     savedPostId?: string;
   } | null;
   isSaving: boolean;
+  /**
+   * Whether the drawing is still here to save or download. It is when the
+   * session expired under this tab; it is not when the page opened on a
+   * session that was already over, whose canvas the server no longer holds
+   * and this tab never had.
+   */
+  hasCanvas: boolean;
   onClose: () => void;
   onSaveToGallery: () => Promise<void>;
   onDownloadPNG: () => void;
@@ -21,6 +28,7 @@ export const SessionExpiredModal = ({
   isOwner,
   canvasMeta,
   isSaving,
+  hasCanvas,
   onClose,
   onSaveToGallery,
   onDownloadPNG,
@@ -79,14 +87,16 @@ export const SessionExpiredModal = ({
         <Icon icon="material-symbols:warning" width={28} height={28} />
       </div>
       <div className="mb-[12px]">
-        {isOwner
+        {!hasCanvas
+          ? t`This collaborative session has ended. Its drawing was not saved to the gallery and is no longer available.`
+          : isOwner
           ? canvasMeta?.savedPostId
             ? t`This collaborative session has ended due to inactivity. The session has already been saved to the gallery, but you can download it as a PNG.`
             : t`This collaborative session has ended due to inactivity. As the owner, you can save it to the gallery or download it as a PNG.`
           : t`This collaborative session has ended due to inactivity. You can save your work locally as a PNG before leaving.`}
       </div>
       <div className="flex flex-wrap justify-center gap-[6px]">
-        {isOwner ? (
+        {!hasCanvas ? null : isOwner ? (
           <>
             {!canvasMeta?.savedPostId && (
               <button
