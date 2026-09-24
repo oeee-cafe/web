@@ -5,4 +5,5 @@ pub mod htmx;
 pub mod language;
 pub mod presence;
 pub mod responses;
+pub mod session_store;
 pub mod state;

@@ -211,7 +211,7 @@ pub async fn unfollow_by_actor_ids(
     Ok(())
 }
 
-use crate::models::actor::Actor;
+use crate::models::actor::{Actor, ActorIri};
 
 pub async fn find_followers_by_actor_id(
     tx: &mut Transaction<'_, Postgres>,
@@ -221,7 +221,7 @@ pub async fn find_followers_by_actor_id(
         Actor,
         r#"
         SELECT 
-            a.id, a.iri, a.type as "type: _", a.username, a.instance_host, 
+            a.id, a.iri as "iri: ActorIri", a.type as "type: _", a.username, a.instance_host, 
             a.handle_host, a.handle, a.user_id, a.community_id, a.name, a.bio_html, 
             a.automatically_approves_followers, a.inbox_url, a.shared_inbox_url, 
             a.followers_url, a.sensitive, a.public_key_pem, a.private_key_pem, 

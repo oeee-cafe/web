@@ -379,7 +379,7 @@ pub async fn handle_join_message(
         broadcast_layers(db, room_uuid, state, user_id).await;
     }
 
-    Some(Message::Binary(join_message.serialize()))
+    Some(Message::Binary(join_message.serialize().into()))
 }
 
 async fn get_session_participants(
@@ -535,7 +535,7 @@ pub fn handle_chat_message(data: &[u8], user_id: Uuid, user_login_name: &str) ->
         message: chat_text.to_string(),
     };
 
-    Some(Message::Binary(chat_message.serialize()))
+    Some(Message::Binary(chat_message.serialize().into()))
 }
 
 pub async fn handle_end_session_message(data: &[u8], ctx: EndSessionContext<'_>) {
@@ -598,7 +598,7 @@ pub async fn handle_end_session_message(data: &[u8], ctx: EndSessionContext<'_>)
                             target_connection: None,
                             seq: None,
                             history_id: None,
-                            payload: ctx.msg.clone().into_data(),
+                            payload: ctx.msg.clone().into_data().to_vec(),
                         };
 
                         match ctx
@@ -709,7 +709,7 @@ fn to_room_broadcast(msg: &Message, connection_id: &str) -> super::redis_state::
         seq: None,
         history_id: None,
         payload: match msg {
-            Message::Binary(data) => data.clone(),
+            Message::Binary(data) => data.to_vec(),
             Message::Text(text) => text.as_bytes().to_vec(),
             _ => vec![],
         },
@@ -756,7 +756,7 @@ pub async fn sequence_and_broadcast(
     state: &AppState,
 ) -> Result<redis_messages::Sequenced, Box<dyn std::error::Error + Send + Sync>> {
     let payload = match msg {
-        Message::Binary(data) => data.clone(),
+        Message::Binary(data) => data.to_vec(),
         Message::Text(text) => text.as_bytes().to_vec(),
         _ => vec![],
     };

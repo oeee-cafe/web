@@ -1,4 +1,4 @@
-use a2::{
+use apns_h2::{
     Client, ClientConfig, DefaultNotificationBuilder, Endpoint, Error as A2Error, ErrorReason,
     NotificationBuilder, NotificationOptions,
 };
@@ -46,12 +46,12 @@ impl ApnsClient {
         data: Option<serde_json::Value>,
     ) -> Result<(), PushError> {
         let mut builder = DefaultNotificationBuilder::new()
-            .set_title(title)
-            .set_body(body)
-            .set_sound("default");
+            .title(title)
+            .body(body)
+            .sound("default");
 
         if let Some(badge_count) = badge {
-            builder = builder.set_badge(badge_count);
+            builder = builder.badge(badge_count);
         }
 
         // Build the notification payload with topic (bundle ID)

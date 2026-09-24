@@ -449,12 +449,12 @@ pub async fn do_move_link_down(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
     let rendered = template
-        .eval_to_state(context! {
+        .render_captured_to(context! {
             user => auth_session.user,
             links => links,
             ftl_lang,
-        })?
-        .render_block("links")?;
+        }, std::io::sink())?
+        .with_state_mut(|state| state.render_block("links"))?;
     Ok(Html(rendered).into_response())
 }
 
@@ -492,12 +492,12 @@ pub async fn do_move_link_up(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
     let rendered = template
-        .eval_to_state(context! {
+        .render_captured_to(context! {
             user => auth_session.user,
             links => links,
             ftl_lang,
-        })?
-        .render_block("links")?;
+        }, std::io::sink())?
+        .with_state_mut(|state| state.render_block("links"))?;
     Ok(Html(rendered).into_response())
 }
 
@@ -539,12 +539,12 @@ pub async fn do_delete_link(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
     let rendered = template
-        .eval_to_state(context! {
+        .render_captured_to(context! {
             user => auth_session.user,
             links => links,
             ftl_lang,
-        })?
-        .render_block("links")?;
+        }, std::io::sink())?
+        .with_state_mut(|state| state.render_block("links"))?;
     Ok(Html(rendered).into_response())
 }
 
@@ -586,12 +586,12 @@ pub async fn do_add_link(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
     let rendered = template
-        .eval_to_state(context! {
+        .render_captured_to(context! {
             user => auth_session.user,
             links => links,
             ftl_lang,
-        })?
-        .render_block("links")?;
+        }, std::io::sink())?
+        .with_state_mut(|state| state.render_block("links"))?;
     Ok(Html(rendered).into_response())
 }
 

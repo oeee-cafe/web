@@ -163,15 +163,15 @@ pub(crate) async fn render_community_page(
     let header = community_header_context(tx, &community).await?;
     if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
         let rendered = template
-            .eval_to_state(context! {
+            .render_captured_to(context! {
                 current_user => auth_session.user,
                 community => Some(&community),
                 header => header,
                 community_id => community_uuid.to_string(),
                 domain => state.config.domain.clone(),
                 ftl_lang
-            })?
-            .render_block("community_edit_block")?;
+            }, std::io::sink())?
+            .with_state_mut(|state| state.render_block("community_edit_block"))?;
         return Ok(Html(rendered).into_response());
     }
 
@@ -1006,15 +1006,15 @@ pub async fn hx_do_edit_community(
                 let header = community_header_context(&mut header_tx, &updated_community).await?;
                 header_tx.commit().await?;
                 let rendered = template
-                    .eval_to_state(context! {
+                    .render_captured_to(context! {
                         current_user => auth_session.user,
                         header => header,
                         community => updated_community,
                         community_id => updated_community.id.to_string(),
                         domain => state.config.domain.clone(),
                         ftl_lang
-                    })?
-                    .render_block("community_edit_block")?;
+                    }, std::io::sink())?
+                    .with_state_mut(|state| state.render_block("community_edit_block"))?;
 
                 Ok(Html(rendered).into_response())
             }

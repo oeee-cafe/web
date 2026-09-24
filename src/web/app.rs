@@ -104,7 +104,7 @@ use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_sessions::cookie::SameSite;
 use tower_sessions::{session_store::ExpiredDeletion, Expiry, SessionManagerLayer};
-use tower_sessions_sqlx_store::PostgresStore;
+use crate::web::session_store::PostgresStore;
 
 /// Everything served straight off disk.
 ///
@@ -155,12 +155,7 @@ impl App {
             db: self.state.db_pool.clone(),
         };
 
-        let session_store = PostgresStore::new(self.state.db_pool.clone())
-            .with_table_name("sessions")
-            .map_err(|e| anyhow::anyhow!("Failed to set table name: {}", e))?
-            .with_schema_name("public")
-            .map_err(|e| anyhow::anyhow!("Failed to set schema name: {}", e))?;
-        session_store.migrate().await?;
+        let session_store = PostgresStore::new(self.state.db_pool.clone());
 
         // Not `continuously_delete_expired`: that returns on the first error,
         // so one pool timeout ended the sweep for the life of the process and
@@ -232,11 +227,11 @@ impl App {
                 post(hx_mark_all_notifications_read),
             )
             .route(
-                "/notifications/:notification_id/mark-read",
+                "/notifications/{notification_id}/mark-read",
                 post(mark_notification_read),
             )
             .route(
-                "/notifications/:notification_id",
+                "/notifications/{notification_id}",
                 delete(delete_notification_handler),
             )
             .route("/account", get(account))
@@ -258,55 +253,55 @@ impl App {
             )
             .route("/account/delete", delete(delete_account_htmx))
             .route(
-                "/account/identities/:provider/unlink",
+                "/account/identities/{provider}/unlink",
                 post(do_unlink_identity),
             )
             .route("/comments", post(do_create_comment))
-            .route("/posts/:post_id/reactions/add", post(add_reaction))
-            .route("/posts/:post_id/reactions/remove", post(remove_reaction))
+            .route("/posts/{post_id}/reactions/add", post(add_reaction))
+            .route("/posts/{post_id}/reactions/remove", post(remove_reaction))
             .route("/communities/new", get(create_community_form))
-            .route("/communities/@:slug/members", get(members_page))
+            .route("/communities/@{slug}/members", get(members_page))
             .route(
-                "/communities/@:slug/members/:user_id",
+                "/communities/@{slug}/members/{user_id}",
                 delete(remove_member),
             )
-            .route("/communities/@:slug/leave", post(do_leave_community))
+            .route("/communities/@{slug}/leave", post(do_leave_community))
             .route(
-                "/communities/@:slug/invitations/:invitation_id",
+                "/communities/@{slug}/invitations/{invitation_id}",
                 delete(retract_invitation),
             )
-            .route("/communities/:id/members", get(get_members))
-            .route("/communities/:id/invite", post(invite_user))
-            .route("/communities/:id/members/:user_id", delete(remove_member))
-            .route("/invitations/:id/accept", post(do_accept_invitation))
-            .route("/invitations/:id/reject", post(do_reject_invitation))
+            .route("/communities/{id}/members", get(get_members))
+            .route("/communities/{id}/invite", post(invite_user))
+            .route("/communities/{id}/members/{user_id}", delete(remove_member))
+            .route("/invitations/{id}/accept", post(do_accept_invitation))
+            .route("/invitations/{id}/reject", post(do_reject_invitation))
             .route("/logout", post(do_logout))
             .route(
                 "/draw/finish",
                 post(draw_finish).layer(DefaultBodyLimit::max(10 * 1024 * 1024)),
             )
             .route("/posts/publish", post(post_publish))
-            .route("/posts/:id/edit", get(hx_edit_post))
-            .route("/posts/:id/relay", get(post_relay_view))
-            .route("/posts/:id", put(hx_do_edit_post))
-            .route("/posts/:id", delete(hx_delete_post))
-            .route("/@:login_name/:id/edit/community", get(post_edit_community))
+            .route("/posts/{id}/edit", get(hx_edit_post))
+            .route("/posts/{id}/relay", get(post_relay_view))
+            .route("/posts/{id}", put(hx_do_edit_post))
+            .route("/posts/{id}", delete(hx_delete_post))
+            .route("/@{login_name}/{id}/edit/community", get(post_edit_community))
             .route(
-                "/@:login_name/:id/edit/community",
+                "/@{login_name}/{id}/edit/community",
                 post(do_post_edit_community),
             )
             .route("/banners/draw", get(start_banner_draw))
             .route("/banners/draw/finish", post(banner_draw_finish))
-            .route("/posts/:id/publish", get(post_publish_form))
-            .route("/@:login_name/follow", post(do_follow_profile))
-            .route("/@:login_name/unfollow", post(do_unfollow_profile))
-            .route("/@:login_name/guestbook", post(do_write_guestbook_entry))
+            .route("/posts/{id}/publish", get(post_publish_form))
+            .route("/@{login_name}/follow", post(do_follow_profile))
+            .route("/@{login_name}/unfollow", post(do_unfollow_profile))
+            .route("/@{login_name}/guestbook", post(do_write_guestbook_entry))
             .route(
-                "/@:login_name/guestbook/:entry_id",
+                "/@{login_name}/guestbook/{entry_id}",
                 delete(do_delete_guestbook_entry),
             )
             .route(
-                "/@:login_name/guestbook/:entry_id/reply",
+                "/@{login_name}/guestbook/{entry_id}/reply",
                 post(do_reply_guestbook_entry),
             )
             // The push token the app handed the page (app_bridge.jinja).
@@ -317,49 +312,49 @@ impl App {
             .route("/admin", get(|| async { Redirect::to("/admin/posts") }))
             .route("/admin/posts", get(admin_posts))
             .route("/admin/posts-fragment", get(admin_posts_fragment))
-            .route("/admin/posts/:post_id", get(admin_post_detail))
-            .route("/admin/posts/:post_id/explicit", post(admin_flag_post))
+            .route("/admin/posts/{post_id}", get(admin_post_detail))
+            .route("/admin/posts/{post_id}/explicit", post(admin_flag_post))
             .route("/admin/users", get(admin_users))
-            .route("/admin/users/:login_name/posts", get(admin_user_posts))
+            .route("/admin/users/{login_name}/posts", get(admin_user_posts))
             .route("/admin/communities", get(admin_communities))
-            .route("/admin/communities/:slug/posts", get(admin_community_posts))
+            .route("/admin/communities/{slug}/posts", get(admin_community_posts))
             .route(
                 "/admin/collaborative-sessions",
                 get(admin_collaborative_sessions),
             )
             .route(
-                "/admin/collaborative-sessions/:uuid/archive",
+                "/admin/collaborative-sessions/{uuid}/archive",
                 get(download_collaborative_archive),
             )
             .route(
-                "/admin/collaborative-sessions/:uuid/diagnostics",
+                "/admin/collaborative-sessions/{uuid}/diagnostics",
                 get(download_collaborative_diagnostics),
             )
             .route(
-                "/admin/collaborative-sessions/:uuid/manifest",
+                "/admin/collaborative-sessions/{uuid}/manifest",
                 get(collaborative_archive_manifest),
             )
             .route(
-                "/admin/collaborative-sessions/:uuid/chat",
+                "/admin/collaborative-sessions/{uuid}/chat",
                 get(collaborative_session_chat),
             )
             .route(
-                "/admin/collaborative-sessions/:uuid/replay",
+                "/admin/collaborative-sessions/{uuid}/replay",
                 get(replay_collaborative_session),
             )
             .route("/admin/banners", get(admin_banners))
             .route("/admin/banners-fragment", get(admin_banners_fragment))
             .route(
-                "/admin/banners/:banner_id/explicit",
+                "/admin/banners/{banner_id}/explicit",
                 post(admin_flag_banner),
             )
             .route("/admin/store", get(admin_store).post(admin_add_store_product))
             .route(
-                "/admin/store/:store/:product/on-sale",
+                "/admin/store/{store}/{product}/on-sale",
                 post(admin_set_store_product_on_sale),
             )
             .route(
-                "/admin/store/:store/:product/sale-window",
+                "/admin/store/{store}/{product}/sale-window",
                 post(admin_set_store_product_sale_window),
             )
             .route_layer(login_required!(Backend, login_url = "/login"));
@@ -374,22 +369,22 @@ impl App {
 
         let activitypub_router = Router::new()
             .route("/.well-known/webfinger", get(activitypub_webfinger))
-            .route("/ap/users/:login_name", get(activitypub_get_user))
-            .route("/ap/posts/:post_id", get(activitypub_get_post))
+            .route("/ap/users/{login_name}", get(activitypub_get_user))
+            .route("/ap/posts/{post_id}", get(activitypub_get_post))
             .route(
-                "/ap/communities/:community_id",
+                "/ap/communities/{community_id}",
                 get(activitypub_get_community),
             )
             .route(
-                "/ap/users/:login_name/inbox",
+                "/ap/users/{login_name}/inbox",
                 post(activitypub_post_user_inbox),
             )
             .route(
-                "/ap/users/:login_name/followers",
+                "/ap/users/{login_name}/followers",
                 get(activitypub_post_user_followers),
             )
             .route(
-                "/ap/communities/:community_id/inbox",
+                "/ap/communities/{community_id}/inbox",
                 post(activitypub_post_community_inbox),
             )
             .route("/ap/inbox", post(activitypub_post_shared_inbox))
@@ -415,59 +410,59 @@ impl App {
             .route("/api/collaborate/posts", get(load_more_collaborative_posts))
             .route("/api/communities/cards", get(communities_fragment))
             .route(
-                "/api/communities/@:slug/posts",
+                "/api/communities/@{slug}/posts",
                 get(load_more_community_posts),
             )
             // The site's own report modals. Same work, HTML back.
-            .route("/posts/:post_id/report", post(hx_report_post))
-            .route("/@:login_name/report", post(hx_report_profile))
+            .route("/posts/{post_id}/report", post(hx_report_post))
+            .route("/@{login_name}/report", post(hx_report_profile))
             // Answers for itself when nobody is signed in, like the rest of
             // this router, rather than sending the button to /login.
-            .route("/comments/:comment_id", delete(do_delete_comment))
+            .route("/comments/{comment_id}", delete(do_delete_comment))
             .route("/communities", get(communities))
             .route("/communities", post(do_create_community))
-            .route("/communities/@:slug", get(redirect_community_to_unified))
-            .route("/communities/:id", get(community))
-            .route("/communities/:id", put(hx_do_edit_community))
-            .route("/communities/:id/delete", delete(hx_delete_community))
-            .route("/communities/:id/edit", get(hx_edit_community))
-            .route("/communities/:id/comments", get(community_comments))
-            .route("/communities/:id/embed", get(community_iframe))
+            .route("/communities/@{slug}", get(redirect_community_to_unified))
+            .route("/communities/{id}", get(community))
+            .route("/communities/{id}", put(hx_do_edit_community))
+            .route("/communities/{id}/delete", delete(hx_delete_community))
+            .route("/communities/{id}/edit", get(hx_edit_community))
+            .route("/communities/{id}/comments", get(community_comments))
+            .route("/communities/{id}/embed", get(community_iframe))
             .route("/search", get(search_page))
             .route("/tags", get(tag_discovery))
-            .route("/tags/:tag_name", get(tag_view))
-            .route("/tags/:tag_name/posts", get(load_more_tag_posts))
+            .route("/tags/{tag_name}", get(tag_view))
+            .route("/tags/{tag_name}/posts", get(load_more_tag_posts))
             .route("/api/tags/autocomplete", get(tag_autocomplete))
             .route("/api/tags/cards", get(tag_cards))
-            .route("/@:slug", get(profile_or_community))
-            .route("/@:login_name/embed", get(profile_iframe))
-            .route("/@:login_name/banners/embed", get(profile_banners_iframe))
-            .route("/@:login_name/settings/links", post(do_add_link))
-            .route("/@:login_name/settings/links/:id", delete(do_delete_link))
-            .route("/@:login_name/settings/links/:id/up", post(do_move_link_up))
+            .route("/@{slug}", get(profile_or_community))
+            .route("/@{login_name}/embed", get(profile_iframe))
+            .route("/@{login_name}/banners/embed", get(profile_banners_iframe))
+            .route("/@{login_name}/settings/links", post(do_add_link))
+            .route("/@{login_name}/settings/links/{id}", delete(do_delete_link))
+            .route("/@{login_name}/settings/links/{id}/up", post(do_move_link_up))
             .route(
-                "/@:login_name/settings/links/:id/down",
+                "/@{login_name}/settings/links/{id}/down",
                 post(do_move_link_down),
             )
-            .route("/@:login_name/settings", get(profile_settings))
-            .route("/@:login_name/settings/banners", get(banner_management))
-            .route("/banners/:banner_id/activate", post(do_activate_banner))
-            .route("/banners/:banner_id", delete(do_delete_banner))
-            .route("/@:login_name/guestbook", get(guestbook))
-            .route("/@:login_name/:post_id", get(post_view_by_login_name))
+            .route("/@{login_name}/settings", get(profile_settings))
+            .route("/@{login_name}/settings/banners", get(banner_management))
+            .route("/banners/{banner_id}/activate", post(do_activate_banner))
+            .route("/banners/{banner_id}", delete(do_delete_banner))
+            .route("/@{login_name}/guestbook", get(guestbook))
+            .route("/@{login_name}/{post_id}", get(post_view_by_login_name))
             .route(
-                "/@:login_name/:post_id/reactions",
+                "/@{login_name}/{post_id}/reactions",
                 get(post_reactions_detail),
             )
             .route(
-                "/@:login_name/:post_id/replay",
+                "/@{login_name}/{post_id}/replay",
                 get(post_replay_view_by_login_name),
             )
             .route(
-                "/@:login_name/:post_id/relay",
+                "/@{login_name}/{post_id}/relay",
                 get(post_relay_view_by_login_name),
             )
-            .route("/posts/:id", get(redirect_post_to_login_name))
+            .route("/posts/{id}", get(redirect_post_to_login_name))
             .route(
                 "/collaborate",
                 get(collaborate_lobby).post(create_collaborative_session_form),
@@ -477,15 +472,15 @@ impl App {
             .route("/collaborate/sessions", get(collaborate_sessions_fragment))
             .route("/collaborate/", get(serve_collaborative_app))
             .route(
-                "/collaborate/:uuid",
+                "/collaborate/{uuid}",
                 get(serve_collaborative_app).post(save_collaborative_session),
             )
-            .route("/collaborate/:uuid/ws", get(websocket_collaborate_handler))
+            .route("/collaborate/{uuid}/ws", get(websocket_collaborate_handler))
             // What the room's canvas looks like right now, rendered by a
             // participant's browser because the server cannot draw. See
             // handlers/collaborate/preview.rs.
             .route(
-                "/collaborate/:uuid/preview",
+                "/collaborate/{uuid}/preview",
                 get(serve_session_preview)
                     .put(upload_session_preview)
                     .layer(DefaultBodyLimit::max(
@@ -493,25 +488,25 @@ impl App {
                     )),
             )
             .route(
-                "/collaborate/:uuid/preview/claim",
+                "/collaborate/{uuid}/preview/claim",
                 post(claim_session_preview),
             )
             // What a client believed about its own position when something
             // told it otherwise. See handlers/collaborate/archive.rs.
             .route(
-                "/collaborate/:uuid/diagnostics",
+                "/collaborate/{uuid}/diagnostics",
                 post(report_session_diagnostics).layer(DefaultBodyLimit::max(
                     crate::web::handlers::collaborate::archive::MAX_DIAGNOSTIC_BYTES,
                 )),
             )
             .route("/api/auth", get(get_auth_info))
-            .route("/collaboration/:uuid/meta", get(get_collaboration_meta))
+            .route("/collaboration/{uuid}/meta", get(get_collaboration_meta))
             .route("/about", get(about))
             .route("/supporter", get(supporter_page))
             // What a store sold, handed over by the page in an app that
             // sells through it. See handlers/store.rs.
-            .route("/store/:store/purchases", post(do_store_purchase))
-            .route("/store/:store/tickets", post(do_store_ticket))
+            .route("/store/{store}/purchases", post(do_store_purchase))
+            .route("/store/{store}/tickets", post(do_store_ticket))
             .route("/design", get(design))
             .route("/privacy", get(privacy))
             .route("/policy", get(policy))
@@ -690,3 +685,4 @@ async fn shutdown_signal(
     // draining the plain HTTP connections.
     shutdown.signal();
 }
+

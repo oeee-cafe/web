@@ -3,7 +3,6 @@ use argon2::password_hash::{
     rand_core::OsRng, PasswordHashString, PasswordHasher, PasswordVerifier, SaltString,
 };
 use argon2::Argon2;
-use axum::async_trait;
 use axum_login::{AuthUser, AuthnBackend, UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -792,7 +791,6 @@ pub struct Backend {
     pub db: PgPool,
 }
 
-#[async_trait]
 impl AuthnBackend for Backend {
     type User = User;
     type Credentials = Credentials;

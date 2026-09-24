@@ -430,7 +430,7 @@ impl RedisMessageStore {
         let mut result = Vec::with_capacity(entries.len());
         for entry in &entries {
             match decode_entry(entry) {
-                Some((seq, payload)) => result.push((seq, Message::Binary(payload.to_vec()))),
+                Some((seq, payload)) => result.push((seq, Message::Binary(payload.to_vec().into()))),
                 None => debug!(
                     "Skipping malformed history entry in room {} ({} bytes)",
                     room_uuid,
@@ -482,7 +482,7 @@ return {history_id, redis.call('LRANGE', KEYS[2], 0, -1)}
         let history = entries
             .iter()
             .filter_map(|entry| decode_entry(entry))
-            .map(|(seq, payload)| (seq, Message::Binary(payload.to_vec())))
+            .map(|(seq, payload)| (seq, Message::Binary(payload.to_vec().into())))
             .collect();
         Ok((history_id, history))
     }

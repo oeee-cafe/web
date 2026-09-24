@@ -8,7 +8,7 @@ use activitypub_federation::protocol::context::WithContext;
 use activitypub_federation::protocol::public_key::PublicKey;
 use activitypub_federation::protocol::verification::verify_domains_match;
 use activitypub_federation::traits::{
-    ActivityHandler, Actor as ActivityPubFederationActor, Object,
+    Activity, Actor as ActivityPubFederationActor, Object,
 };
 
 use activitystreams_kinds::activity::{
@@ -87,7 +87,7 @@ fn extract_note_content(note: &Note) -> (String, Option<String>) {
 
     (markdown_content, html_content)
 }
-use crate::models::actor::{create_actor_for_user, Actor, ActorType};
+use crate::models::actor::{create_actor_for_user, Actor, ActorIri, ActorType};
 use crate::models::comment::{
     create_comment_from_activitypub, delete_comment_by_iri, find_comment_by_iri,
 };
@@ -230,6 +230,10 @@ impl Object for Actor {
     type Kind = ActorObject;
     type Error = AppError;
 
+    fn id(&self) -> &Url {
+        self.iri.url()
+    }
+
     async fn read_from_id(
         object_id: Url,
         data: &Data<Self::DataType>,
@@ -368,7 +372,7 @@ impl Object for Actor {
 
         Ok(Actor {
             name,
-            iri: id.to_string(),
+            iri: ActorIri::parse(id.to_string())?,
             inbox_url: inbox.to_string(),
             public_key_pem: public_key.public_key_pem,
             private_key_pem: None,
@@ -394,10 +398,6 @@ impl Object for Actor {
 }
 
 impl ActivityPubFederationActor for Actor {
-    fn id(&self) -> url::Url {
-        self.iri.parse().expect("IRI should be a valid URL")
-    }
-
     fn public_key_pem(&self) -> &str {
         &self.public_key_pem
     }
@@ -740,7 +740,7 @@ pub async fn activitypub_post_shared_inbox(
 /// List of all activities which this actor can receive.
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(untagged)]
-#[enum_delegate::implement(ActivityHandler)]
+#[enum_delegate::implement(Activity)]
 pub enum PersonAcceptedActivities {
     Create(Create),
     Follow(Follow),
@@ -761,7 +761,7 @@ pub struct UnknownActivity {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for UnknownActivity {
+impl Activity for UnknownActivity {
     type DataType = AppState;
     type Error = AppError;
 
@@ -820,7 +820,7 @@ impl ActivityHandler for UnknownActivity {
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(untagged)]
-#[enum_delegate::implement(ActivityHandler)]
+#[enum_delegate::implement(Activity)]
 pub enum GroupAcceptedActivities {
     Follow(Follow),
     Undo(Undo),
@@ -850,7 +850,7 @@ impl Follow {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for Follow {
+impl Activity for Follow {
     type DataType = AppState;
     type Error = AppError;
 
@@ -944,7 +944,7 @@ impl Accept {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for Accept {
+impl Activity for Accept {
     type DataType = AppState;
     type Error = AppError;
 
@@ -996,7 +996,7 @@ impl Undo {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for Undo {
+impl Activity for Undo {
     type DataType = AppState;
     type Error = AppError;
 
@@ -1281,7 +1281,7 @@ impl Create {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for Create {
+impl Activity for Create {
     type DataType = AppState;
     type Error = AppError;
 
@@ -1552,7 +1552,7 @@ impl Announce {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for Announce {
+impl Activity for Announce {
     type DataType = AppState;
     type Error = AppError;
 
@@ -1611,7 +1611,7 @@ impl Update {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for Update {
+impl Activity for Update {
     type DataType = AppState;
     type Error = AppError;
 
@@ -2028,7 +2028,7 @@ impl Delete {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for Delete {
+impl Activity for Delete {
     type DataType = AppState;
     type Error = AppError;
 
@@ -2184,7 +2184,7 @@ pub struct Like {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for Like {
+impl Activity for Like {
     type DataType = AppState;
     type Error = AppError;
 
@@ -2378,7 +2378,7 @@ pub struct EmojiReact {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for EmojiReact {
+impl Activity for EmojiReact {
     type DataType = AppState;
     type Error = AppError;
 
@@ -2629,7 +2629,7 @@ impl UpdateNote {
 }
 
 #[async_trait::async_trait]
-impl ActivityHandler for UpdateNote {
+impl Activity for UpdateNote {
     type DataType = AppState;
     type Error = AppError;
 

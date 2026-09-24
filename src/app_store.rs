@@ -33,7 +33,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -158,13 +158,7 @@ async fn signed_transaction(
 /// as well would mean walking the `x5c` chain to Apple's root, which proves
 /// the same thing the connection already did.
 fn read_transaction(jws: &str) -> Result<Transaction> {
-    let mut validation = Validation::new(Algorithm::ES256);
-    validation.insecure_disable_signature_validation();
-    validation.validate_exp = false;
-    validation.validate_aud = false;
-    validation.required_spec_claims.clear();
-    let data = decode::<Transaction>(jws, &DecodingKey::from_secret(&[]), &validation)?;
-    Ok(data.claims)
+    Ok(jsonwebtoken::dangerous::insecure_decode::<Transaction>(jws)?.claims)
 }
 
 /// What the App Store says about `transaction_id`, against `packs`: every
@@ -433,12 +427,7 @@ mod tests {
         if header.alg != Algorithm::ES256 || header.kid.as_deref() != Some(KEY_ID) {
             return false;
         }
-        let mut validation = Validation::new(Algorithm::ES256);
-        validation.insecure_disable_signature_validation();
-        validation.validate_aud = false;
-        validation.required_spec_claims.clear();
-        let Ok(claims) = decode::<Value>(bearer, &DecodingKey::from_secret(&[]), &validation)
-        else {
+        let Ok(claims) = jsonwebtoken::dangerous::insecure_decode::<Value>(bearer) else {
             return false;
         };
         claims.claims["iss"] == json!(ISSUER_ID)
@@ -479,11 +468,11 @@ mod tests {
 
         let app = Router::new()
             .route(
-                "/production/inApps/v1/transactions/:id",
+                "/production/inApps/v1/transactions/{id}",
                 get(|headers: HeaderMap, Path(id): Path<String>| answer("production", headers, id)),
             )
             .route(
-                "/sandbox/inApps/v1/transactions/:id",
+                "/sandbox/inApps/v1/transactions/{id}",
                 get(|headers: HeaderMap, Path(id): Path<String>| answer("sandbox", headers, id)),
             );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

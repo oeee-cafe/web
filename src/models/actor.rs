@@ -2,7 +2,7 @@ use activitypub_federation::activity_queue::queue_activity;
 use activitypub_federation::activity_sending::SendActivityTask;
 use activitypub_federation::config::Data;
 use activitypub_federation::protocol::context::WithContext;
-use activitypub_federation::traits::ActivityHandler;
+use activitypub_federation::traits::Activity;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -46,10 +46,70 @@ impl std::fmt::Display for ActorType {
     }
 }
 
+/// An actor's IRI as it is stored, and parsed.
+///
+/// `activitypub_federation` wants `Object::id` as a borrowed `Url`, so the
+/// parse happens once, when the row is decoded -- a malformed IRI is a
+/// decode error there rather than a panic wherever the id is asked for. The
+/// stored text is kept alongside and is what the string side shows, so a
+/// query or a `format!` sees exactly the value in the column, not `Url`'s
+/// normalisation of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ActorIri {
+    raw: String,
+    url: Url,
+}
+
+impl ActorIri {
+    pub fn parse(raw: String) -> Result<Self, url::ParseError> {
+        let url = Url::parse(&raw)?;
+        Ok(Self { raw, url })
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.raw
+    }
+
+    pub fn url(&self) -> &Url {
+        &self.url
+    }
+}
+
+impl std::ops::Deref for ActorIri {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.raw
+    }
+}
+
+impl std::fmt::Display for ActorIri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.raw)
+    }
+}
+
+impl Type<Postgres> for ActorIri {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as Type<Postgres>>::type_info()
+    }
+
+    fn compatible(ty: &sqlx::postgres::PgTypeInfo) -> bool {
+        <String as Type<Postgres>>::compatible(ty)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, Postgres> for ActorIri {
+    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let raw = <String as sqlx::Decode<Postgres>>::decode(value)?;
+        Ok(Self::parse(raw)?)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Actor {
     pub id: Uuid,
-    pub iri: String,
+    pub iri: ActorIri,
     pub url: String,
     pub r#type: ActorType,
     pub username: String,
@@ -81,7 +141,7 @@ impl Actor {
             Actor,
             r#"
             SELECT 
-                id, iri, type as "type: _", username, instance_host, handle_host, handle,
+                id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
                 user_id, community_id, name, bio_html, automatically_approves_followers,
                 inbox_url, shared_inbox_url, followers_url, sensitive,
                 public_key_pem, private_key_pem, url,
@@ -104,7 +164,7 @@ impl Actor {
             Actor,
             r#"
             SELECT 
-                id, iri, type as "type: _", username, instance_host, handle_host, handle,
+                id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
                 user_id, community_id, name, bio_html, automatically_approves_followers,
                 inbox_url, shared_inbox_url, followers_url, sensitive,
                 public_key_pem, private_key_pem, url,
@@ -126,7 +186,7 @@ impl Actor {
             Actor,
             r#"
             SELECT 
-                id, iri, type as "type: _", username, instance_host, handle_host, handle,
+                id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
                 user_id, community_id, name, bio_html, automatically_approves_followers,
                 inbox_url, shared_inbox_url, followers_url, sensitive,
                 public_key_pem, private_key_pem, url,
@@ -195,13 +255,13 @@ impl Actor {
                 url = EXCLUDED.url,
                 updated_at = $19
             RETURNING 
-                id, iri, type as "type: _", username, instance_host, handle_host, handle,
+                id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
                 user_id, community_id, name, bio_html, automatically_approves_followers,
                 inbox_url, shared_inbox_url, followers_url,
                 sensitive, public_key_pem, private_key_pem, url,
                 created_at, updated_at, published_at
             "#,
-            actor.iri,
+            actor.iri.as_str(),
             actor.r#type as _,
             actor.username,
             actor.instance_host,
@@ -237,8 +297,8 @@ impl Actor {
         data: &Data<AppState>,
     ) -> Result<(), AppError>
     where
-        A: ActivityHandler + Serialize + std::fmt::Debug + Send + Sync,
-        <A as ActivityHandler>::Error: From<anyhow::Error> + From<serde_json::Error>,
+        A: Activity + Serialize + std::fmt::Debug + Send + Sync,
+        <A as Activity>::Error: From<anyhow::Error> + From<serde_json::Error>,
     {
         // Print activity
         tracing::info!("Activity: {:?}", activity);
@@ -306,7 +366,7 @@ pub async fn create_actor_for_user(
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
         )
         RETURNING 
-            id, iri, type as "type: _", username, instance_host, handle_host, handle,
+            id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
             user_id, community_id, name, bio_html, automatically_approves_followers,
             inbox_url, shared_inbox_url, followers_url,
             sensitive, public_key_pem, private_key_pem, url,
@@ -387,7 +447,7 @@ pub async fn update_actor_for_user(
         SET username = $1, name = $2, handle = $3, url = $4, updated_at = now()
         WHERE user_id = $5
         RETURNING 
-            id, iri, type as "type: _", username, instance_host, handle_host, handle,
+            id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
             user_id, community_id, name, bio_html, automatically_approves_followers,
             inbox_url, shared_inbox_url, followers_url,
             sensitive, public_key_pem, private_key_pem, url,
@@ -423,7 +483,7 @@ pub async fn update_actor_for_community(
         SET username = $1, name = $2, handle = $3, url = $4, bio_html = $5, updated_at = now()
         WHERE community_id = $6
         RETURNING 
-            id, iri, type as "type: _", username, instance_host, handle_host, handle,
+            id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
             user_id, community_id, name, bio_html, automatically_approves_followers,
             inbox_url, shared_inbox_url, followers_url,
             sensitive, public_key_pem, private_key_pem, url,
@@ -484,7 +544,7 @@ pub async fn create_actor_for_community(
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
         )
         RETURNING 
-            id, iri, type as "type: _", username, instance_host, handle_host, handle,
+            id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
             user_id, community_id, name, bio_html, automatically_approves_followers,
             inbox_url, shared_inbox_url, followers_url,
             sensitive, public_key_pem, private_key_pem, url,
@@ -539,7 +599,7 @@ pub async fn backfill_actors_for_existing_communities(
             Actor,
             r#"
             SELECT 
-                id, iri, type as "type: _", username, instance_host, handle_host, handle,
+                id, iri as "iri: ActorIri", type as "type: _", username, instance_host, handle_host, handle,
                 user_id, community_id, name, bio_html, automatically_approves_followers,
                 inbox_url, shared_inbox_url, followers_url, sensitive,
                 public_key_pem, private_key_pem, url,
