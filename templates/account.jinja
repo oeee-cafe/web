@@ -1,6 +1,5 @@
 {% extends "base.jinja" %}
 {% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
-{% from "sign_in_providers_macro.jinja" import sign_in_providers %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("account") }}
 {% endblock title %}
@@ -74,14 +73,17 @@
         {% else %}
           <p class="ds-help">{{ ftl_get_message("account-linked-accounts-none") }}</p>
         {% endfor %}
-        {# The buttons /login signs in with, returning here, where the
-           provider is linked to this account rather than signed in with;
-           each only while it is not linked already. #}
-        {% set offer_steam = steam_enabled and not steam_linked %}
-        {% set offer_apple = apple_enabled and not apple_linked %}
-        {% set offer_google = google_enabled and not google_linked %}
-        {% if offer_steam or offer_apple or offer_google %}
-          {{ sign_in_providers(none, ftl_lang, "/account", offer_steam, offer_apple, offer_google) }}
+        {% if steam_enabled and not steam_linked %}
+          {# Followed only inside the Oeee Cafe app on Steam; see login.jinja. #}
+          <a class="ds-button auth-steam" href="/auth/steam/app?next=/account">{{ ftl_get_message("account-link-steam") }}</a>
+        {% endif %}
+        {% if apple_enabled and not apple_linked %}
+          {# Not inside most of the apps; see login.jinja. #}
+          <a class="ds-button auth-apple" href="/auth/apple?next=/account">{{ ftl_get_message("account-link-apple") }}</a>
+        {% endif %}
+        {% if google_enabled and not google_linked %}
+          {# Not inside most of the apps; see login.jinja. #}
+          <a class="ds-button auth-google" href="/auth/google?next=/account">{{ ftl_get_message("account-link-google") }}</a>
         {% endif %}
       </div>
     </section>

@@ -1837,12 +1837,9 @@ mod template_tests {
         assert!(with_password.contains(r#"name="password""#));
         assert!(!with_password.contains(r#"id="delete_login_name""#));
         assert!(with_password.contains("account-linked-accounts-none"));
-        // Linking uses /login's buttons, coming back here.
-        assert!(with_password.contains("/auth/steam/app?next=&#x2f;account"));
-        assert!(with_password.contains("/auth/apple?next=&#x2f;account"));
-        assert!(with_password.contains("/auth/google?next=&#x2f;account"));
-        assert!(with_password.contains("appleid.cdn-apple.com"));
-        assert!(with_password.contains("/static/signin/google-light.svg"));
+        assert!(with_password.contains("/auth/steam/app?next=/account"));
+        assert!(with_password.contains("/auth/apple?next=/account"));
+        assert!(with_password.contains("/auth/google?next=/account"));
 
         let without = render(
             false,

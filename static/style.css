@@ -3877,21 +3877,13 @@ html[data-store="steam"] .auth-steam {
 }
 
 .auth-card-providers .auth-submit,
-.auth-card-providers .auth-secondary,
-.auth-social .auth-secondary {
+.auth-card-providers .auth-secondary {
   height: 40px;
   padding: 0 12px;
   line-height: 38px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* On /account, where the card is wider than the pictures are drawn, the
-   buttons for linking another provider keep to the 330px column /login
-   has, rather than scaling up past it. */
-.settings-card .auth-social {
-  max-width: 330px;
 }
 
 /* Google draws its button in English only, so in the other languages it
@@ -3943,6 +3935,90 @@ html[data-store="steam"] .auth-steam {
   background-color: #131314;
   color: #e3e3e3;
 }
+
+/* Signing in with Apple, offered everywhere: a browser goes to Apple's page
+   and back, and in the apps the page takes the press itself
+   (app_sign_in.jinja). Black on light and white on dark, as Apple asks of
+   its sign-in buttons. */
+.ds-button.auth-apple,
+.ds-button.auth-apple:visited {
+  border-color: #000;
+  background-color: #000;
+  color: #fff;
+}
+
+.ds-button.auth-apple:hover {
+  border-color: #333;
+  background-color: #333;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ds-button.auth-apple,
+  :root:not([data-theme="light"]) .ds-button.auth-apple:visited {
+    border-color: #fff;
+    background-color: #fff;
+    color: #000;
+  }
+
+  :root:not([data-theme="light"]) .ds-button.auth-apple:hover {
+    border-color: #e5e5e5;
+    background-color: #e5e5e5;
+  }
+}
+
+:root[data-theme="dark"] .ds-button.auth-apple,
+:root[data-theme="dark"] .ds-button.auth-apple:visited {
+  border-color: #fff;
+  background-color: #fff;
+  color: #000;
+}
+
+:root[data-theme="dark"] .ds-button.auth-apple:hover {
+  border-color: #e5e5e5;
+  background-color: #e5e5e5;
+}
+
+/* Signing in with Google, offered everywhere. Google refuses its own
+   sign-in pages inside an embedded web view (`disallowed_useragent`), so in
+   the apps the page takes the press itself and goes round some other way
+   (app_sign_in.jinja). White with a grey edge in light and Google's dark
+   grey in dark, as Google asks of its sign-in buttons. */
+.ds-button.auth-google,
+.ds-button.auth-google:visited {
+  border-color: #747775;
+  background-color: #fff;
+  color: #1f1f1f;
+}
+
+.ds-button.auth-google:hover {
+  background-color: #f2f2f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ds-button.auth-google,
+  :root:not([data-theme="light"]) .ds-button.auth-google:visited {
+    border-color: #8e918f;
+    background-color: #131314;
+    color: #e3e3e3;
+  }
+
+  :root:not([data-theme="light"]) .ds-button.auth-google:hover {
+    background-color: #1e1f20;
+  }
+}
+
+:root[data-theme="dark"] .ds-button.auth-google,
+:root[data-theme="dark"] .ds-button.auth-google:visited {
+  border-color: #8e918f;
+  background-color: #131314;
+  color: #e3e3e3;
+}
+
+:root[data-theme="dark"] .ds-button.auth-google:hover {
+  background-color: #1e1f20;
+}
+
+
 
 /* The agreement: a box to tick, and the two pages it agrees to. */
 .auth-agree {

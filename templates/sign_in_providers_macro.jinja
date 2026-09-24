@@ -1,16 +1,14 @@
-{# Signing in with another provider: the Steam, Apple and Google buttons,
-   the same on /login, under "Or sign in with", and on /account, where they
-   link that provider to the account signed in (the path back to /account
-   is what makes it a link). Steam alone shows only in the Steam app, so a
-   section holding nothing else hides with it.
+{# Signing in with another provider, as a section of /login's card under
+   "Or sign in with". Steam alone shows only in the Steam app, so a section
+   holding nothing else hides with it.
 
    An imported macro does not see the page's context, so the language,
-   where the reader was going and which providers to offer are handed
-   over; `question`, if there is one, is the message key of a rule over
-   the buttons. #}
+   where the reader was going and which providers are on are handed over;
+   `question` is the message key over the buttons. The card around it
+   takes the buttons' 40px for its own (`auth-card-providers`, style.css). #}
 {% macro sign_in_providers(question, lang, next, steam_enabled, apple_enabled, google_enabled) -%}
   <div class="auth-social{% if steam_enabled and not apple_enabled and not google_enabled %} auth-steam{% endif %}">
-    {% if question %}<div class="auth-divider"><span>{{ ftl_get_message(question) }}</span></div>{% endif %}
+    <div class="auth-divider"><span>{{ ftl_get_message(question) }}</span></div>
     {% if steam_enabled %}
       {# Only the Oeee Cafe app on Steam can follow this: it stops the
          navigation, asks Steam for a ticket and posts it to /auth/steam.
