@@ -46,13 +46,18 @@ const MAX_CHAT_MESSAGES: usize = 100;
 /// replaced.
 pub const MAX_HISTORY_BYTES: u64 = 192 * 1024 * 1024;
 
+/// The most a checkpoint upload may weigh: two snapshots per seat of the
+/// largest session, each at `MAX_SNAPSHOT_BYTES`. The websocket handler holds
+/// a checkpoint in memory until its last snapshot arrives, so this is also the
+/// most one connection can make the process buffer -- without it the count
+/// limit alone allowed 510 snapshots of 4 MiB apiece.
+pub const MAX_CHECKPOINT_BYTES: u64 =
+    2 * (largest_session() as u64) * (super::protocol::MAX_SNAPSHOT_BYTES as u64);
+
 /// A checkpoint has to fit, with room left to draw on top of it. Checked here
 /// rather than trusted, because the three numbers it relates live in three
 /// files and only this relationship between them keeps a room drawable.
-const _: () = assert!(
-    MAX_HISTORY_BYTES
-        > 2 * (largest_session() as u64) * (super::protocol::MAX_SNAPSHOT_BYTES as u64)
-);
+const _: () = assert!(MAX_HISTORY_BYTES > MAX_CHECKPOINT_BYTES);
 
 /// The largest seat count a session can be created with. Two snapshots per
 /// participant is what a checkpoint is made of.
