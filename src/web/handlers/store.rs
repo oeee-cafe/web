@@ -33,6 +33,10 @@
 //! does not recognise, and 404 from a store this deployment is not set up to
 //! ask, or has never heard of.
 //!
+//! And from Apple itself, `POST /store/apple/notifications`: App Store
+//! Server Notifications, which say a purchase has been refunded or the like
+//! (`app_store::read_notification`).
+//!
 //! These are purchases, not sign-ins: nothing here signs anyone in or links
 //! an identity (see `models::supporter`), so a page that is mid-drawing is
 //! left as it was.
@@ -349,4 +353,73 @@ async fn google_play_purchase(
         }
     }
     Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[derive(Deserialize)]
+pub struct AppStoreNotification {
+    #[serde(rename = "signedPayload")]
+    signed_payload: String,
+}
+
+/// POST /store/apple/notifications -- App Store Server Notifications,
+/// version 2, which App Store Connect is given as both the production and
+/// the sandbox URL.
+///
+/// Anyone can post here, so nothing is done for a payload Apple did not
+/// sign, and nothing a signed one says is recorded as it stands: it names a
+/// transaction, which is looked up again, and what Apple says of it now is
+/// recorded against the purchase that transaction already is. A transaction
+/// no account has handed over is no purchase here yet, and is left for the
+/// app to hand over.
+///
+/// Apple sends a notification again, for up to three days, until it is
+/// answered with a 200. So everything that was read is a 200, whether or
+/// not there was anything to do, and only Apple being out of reach is not.
+pub async fn do_app_store_notification(
+    State(state): State<AppState>,
+    Json(body): Json<AppStoreNotification>,
+) -> Result<Response, AppError> {
+    let Some(config) = state.config.app_store.as_ref() else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let notice = match app_store::read_notification(
+        &body.signed_payload,
+        config,
+        rustls_pki_types::UnixTime::now(),
+    ) {
+        Ok(notice) => notice,
+        Err(error) => {
+            tracing::info!("turned away an App Store notification: {error:#}");
+            return Ok(StatusCode::BAD_REQUEST.into_response());
+        }
+    };
+    let (kind, transaction, product) = match notice {
+        app_store::Notice::Test => {
+            tracing::info!("the App Store's test notification arrived");
+            return Ok(StatusCode::OK.into_response());
+        }
+        app_store::Notice::Nothing { kind } => {
+            tracing::debug!(kind, "an App Store notification with nothing to do");
+            return Ok(StatusCode::OK.into_response());
+        }
+        app_store::Notice::Recheck {
+            kind,
+            transaction,
+            product,
+        } => (kind, transaction, product),
+    };
+    match app_store::heed(&state.db_pool, config, &transaction, &product).await {
+        Ok(app_store::Heeded::Recorded { owned }) => {
+            tracing::info!(kind, owned, "an App Store notification was checked");
+        }
+        Ok(app_store::Heeded::NotOurs) => {
+            tracing::debug!(kind, "an App Store notification about nothing of ours");
+        }
+        Err(error) => {
+            // Apple will send it again.
+            tracing::warn!(kind, "an App Store notification could not be checked: {error:#}");
+            return Ok(StatusCode::SERVICE_UNAVAILABLE.into_response());
+        }
+    }
+    Ok(StatusCode::OK.into_response())
 }

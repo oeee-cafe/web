@@ -26,6 +26,16 @@
 //! says it has never heard of the transaction, which is what [`look_up`]
 //! does -- one configuration serves both, and a sandbox purchase grants
 //! standing on a test server without granting it on the real one.
+//!
+//! **Refunds.** Apple tells the site itself when a purchase is refunded, a
+//! refund is reversed, or Family Sharing is taken away: App Store Server
+//! Notifications, which it POSTs to `/store/apple/notifications`, signed as
+//! its transactions are ([`read_notification`]). A notification is only
+//! ever a cue. What it says happened is not recorded; the transaction it
+//! names is looked up again and whatever Apple says of it *now* is, so two
+//! notifications arriving out of order cannot leave the older one standing.
+//! The daily [`recheck_supporters`] stays as the net under a notification
+//! that never arrived.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -180,7 +190,8 @@ impl std::fmt::Debug for TrustedRoot {
     }
 }
 
-/// Reads Apple's signed transaction, having checked that Apple signed it.
+/// Reads something Apple signed -- a transaction, a notification -- having
+/// checked that Apple signed it.
 ///
 /// The JWS names its signer in `x5c`: the leaf, Apple's WWDR intermediate
 /// and Apple's root. The leaf and the intermediate have to chain to *our*
@@ -189,20 +200,26 @@ impl std::fmt::Debug for TrustedRoot {
 /// signature has to be the leaf's. This is what Apple's own App Store Server
 /// Library checks, less the online revocation check.
 ///
-/// The transaction comes from Apple's API over TLS, so this is not the only
+/// A transaction comes from Apple's API over TLS, so this is not the only
 /// thing standing between a forged purchase and a Supporter Pack. But TLS
-/// only says which server answered; this says Apple signed what it said.
-fn read_transaction(jws: &str, root: TrustedRoot, now: UnixTime) -> Result<Transaction> {
+/// only says which server answered; this says Apple signed what it said. A
+/// notification comes from anyone who can reach the site, and this is all
+/// that says it came from Apple.
+fn read_signed<T: serde::de::DeserializeOwned>(
+    jws: &str,
+    root: TrustedRoot,
+    now: UnixTime,
+) -> Result<T> {
     let header = jsonwebtoken::decode_header(jws)?;
     if header.alg != Algorithm::ES256 {
-        return Err(anyhow!("the transaction is signed with {:?}, not ES256", header.alg));
+        return Err(anyhow!("the payload is signed with {:?}, not ES256", header.alg));
     }
     let chain = header
         .x5c
-        .ok_or_else(|| anyhow!("the transaction names no certificate chain"))?;
+        .ok_or_else(|| anyhow!("the payload names no certificate chain"))?;
     let [leaf, intermediate, _root] = chain.as_slice() else {
         return Err(anyhow!(
-            "the transaction's chain has {} certificates, not 3",
+            "the payload's chain has {} certificates, not 3",
             chain.len()
         ));
     };
@@ -213,12 +230,17 @@ fn read_transaction(jws: &str, root: TrustedRoot, now: UnixTime) -> Result<Trans
     let (_, leaf_certificate) = x509_parser::parse_x509_certificate(&leaf)?;
     let key = DecodingKey::from_ec_der(&leaf_certificate.public_key().subject_public_key.data);
     let mut validation = Validation::new(Algorithm::ES256);
-    // A transaction is a record of a purchase, not a token: it has no
+    // A transaction or a notification is a record, not a token: it has no
     // expiry, audience or subject to check.
     validation.validate_exp = false;
     validation.validate_aud = false;
     validation.required_spec_claims.clear();
-    Ok(jsonwebtoken::decode::<Transaction>(jws, &key, &validation)?.claims)
+    Ok(jsonwebtoken::decode::<T>(jws, &key, &validation)?.claims)
+}
+
+/// Apple's signed transaction.
+fn read_transaction(jws: &str, root: TrustedRoot, now: UnixTime) -> Result<Transaction> {
+    read_signed(jws, root, now)
 }
 
 /// That `leaf` and `intermediate` chain to `root` at `now`, and are the
@@ -361,6 +383,158 @@ pub(crate) fn may_ask_of(asked: &Asked, user_id: Uuid, per_minute: usize) -> boo
     }
     asks.push(now);
     true
+}
+
+/// The fields of a notification's payload (`responseBodyV2DecodedPayload`)
+/// this cares about.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NotificationPayload {
+    notification_type: String,
+    subtype: Option<String>,
+    data: Option<NotificationData>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NotificationData {
+    bundle_id: Option<String>,
+    /// The transaction it is about, signed on its own.
+    signed_transaction_info: Option<String>,
+}
+
+/// What a notification from Apple is a cue to do.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Notice {
+    /// Look the transaction up again and record whatever Apple says of it
+    /// now: a refund, a refund reversed, Family Sharing taken away, or
+    /// anything else about a purchase of ours.
+    Recheck {
+        kind: String,
+        transaction: String,
+        product: String,
+    },
+    /// Apple's test, asked for with `cli test-app-store-notifications`.
+    Test,
+    /// Signed by Apple, and nothing to do: about another app, or a kind
+    /// with no transaction in it.
+    Nothing { kind: String },
+}
+
+/// Reads a notification's `signedPayload`, having checked that Apple signed
+/// it and the transaction inside it. An error is a payload Apple did not
+/// sign, or one that is not a notification at all.
+///
+/// Which kind of notification it is decides nothing beyond whether there
+/// is a transaction to look at: REFUND, REFUND_REVERSED, REVOKE and the rest
+/// are all answered by asking Apple about the transaction again, so a kind
+/// Apple adds later is handled the day it arrives.
+pub fn read_notification(
+    signed_payload: &str,
+    config: &AppStoreConfig,
+    now: UnixTime,
+) -> Result<Notice> {
+    let payload: NotificationPayload = read_signed(signed_payload, config.trusted_root, now)?;
+    let kind = match &payload.subtype {
+        Some(subtype) => format!("{}/{subtype}", payload.notification_type),
+        None => payload.notification_type.clone(),
+    };
+    if payload.notification_type == "TEST" {
+        return Ok(Notice::Test);
+    }
+    let Some(data) = payload.data else {
+        return Ok(Notice::Nothing { kind });
+    };
+    if data.bundle_id.as_deref() != Some(config.bundle_id.as_str()) {
+        return Ok(Notice::Nothing { kind });
+    }
+    let Some(signed) = data.signed_transaction_info else {
+        return Ok(Notice::Nothing { kind });
+    };
+    let transaction = read_transaction(&signed, config.trusted_root, now)?;
+    if transaction.bundle_id != config.bundle_id {
+        return Ok(Notice::Nothing { kind });
+    }
+    Ok(Notice::Recheck {
+        kind,
+        transaction: transaction.original_transaction_id,
+        product: transaction.product_id,
+    })
+}
+
+/// What came of a [`Notice::Recheck`].
+#[derive(Debug, PartialEq, Eq)]
+pub enum Heeded {
+    /// The purchase stands, or does not, as Apple now says.
+    Recorded { owned: bool },
+    /// Not a pack the catalogue has, or a transaction Apple no longer
+    /// knows: nothing here to change.
+    NotOurs,
+}
+
+/// Looks the transaction a notification names up again and records what
+/// Apple says of it now against the purchase it already is. Only a purchase
+/// some account has handed over is changed; the notification makes none.
+/// An error is Apple out of reach, which Apple answers by sending the
+/// notification again.
+pub async fn heed(
+    db: &sqlx::PgPool,
+    config: &AppStoreConfig,
+    transaction: &str,
+    product: &str,
+) -> Result<Heeded> {
+    use crate::models::store_product;
+    use crate::models::supporter::{record_recheck, Store};
+
+    let packs = store_product::packs_in(db, Store::Apple).await?;
+    if !packs.iter().any(|pack| pack.product == product) {
+        return Ok(Heeded::NotOurs);
+    }
+    let Some(purchase) = look_up(config, &packs, transaction).await? else {
+        return Ok(Heeded::NotOurs);
+    };
+    let mut tx = db.begin().await?;
+    record_recheck(
+        &mut tx,
+        Store::Apple,
+        &purchase.transaction,
+        &purchase.pack.product,
+        purchase.owned,
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(Heeded::Recorded {
+        owned: purchase.owned,
+    })
+}
+
+#[derive(Deserialize)]
+struct TestNotificationResponse {
+    #[serde(rename = "testNotificationToken")]
+    test_notification_token: String,
+}
+
+/// Asks Apple to send the site a TEST notification, for `cli
+/// test-app-store-notifications`: Apple POSTs it to whatever URL App Store
+/// Connect has for production, and the site logs it when it arrives.
+/// Answers with the token Apple names it by.
+pub async fn request_test_notification(config: &AppStoreConfig) -> Result<String> {
+    let url = format!(
+        "{}/inApps/v1/notifications/test",
+        config.api_url.trim_end_matches('/')
+    );
+    let response = http()
+        .post(url)
+        .bearer_auth(api_token(config)?)
+        .send()
+        .await?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(anyhow!("the App Store answered with {status}: {body}"));
+    }
+    let answer: TestNotificationResponse = response.json().await?;
+    Ok(answer.test_notification_token)
 }
 
 /// A transaction id of the right shape that cannot be anybody's: Apple's
@@ -615,6 +789,15 @@ mod tests {
             .route(
                 "/sandbox/inApps/v1/transactions/{id}",
                 get(|headers: HeaderMap, Path(id): Path<String>| answer("sandbox", headers, id)),
+            )
+            .route(
+                "/production/inApps/v1/notifications/test",
+                axum::routing::post(|headers: HeaderMap| async move {
+                    if !token_is_ours(&headers) {
+                        return axum::http::StatusCode::UNAUTHORIZED.into_response();
+                    }
+                    Json(json!({"testNotificationToken": "test-token"})).into_response()
+                }),
             );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -741,6 +924,198 @@ mod tests {
 
     fn read(jws: &str) -> Result<Transaction> {
         read_transaction(jws, TEST_ROOT, UnixTime::now())
+    }
+
+    /// A notification as Apple sends it: the payload signed, with the
+    /// transaction it is about signed again inside it.
+    fn notification(kind: &str, subtype: Option<&str>, transaction: Option<String>) -> Value {
+        let mut payload = json!({
+            "notificationType": kind,
+            "notificationUUID": "002e14d5-51f5-4503-b5a8-c3a1af68eb20",
+            "data": {
+                "appAppleId": 1234567890,
+                "bundleId": BUNDLE_ID,
+                "environment": "Production",
+                "signedTransactionInfo": transaction,
+            },
+            "version": "2.0",
+            "signedDate": 1_790_000_000_000i64,
+        });
+        if let Some(subtype) = subtype {
+            payload["subtype"] = json!(subtype);
+        }
+        payload
+    }
+
+    fn test_config() -> AppStoreConfig {
+        AppStoreConfig {
+            issuer_id: ISSUER_ID.to_string(),
+            key_id: KEY_ID.to_string(),
+            private_key_path: PRIVATE_KEY_PATH.to_string(),
+            bundle_id: BUNDLE_ID.to_string(),
+            api_url: "http://127.0.0.1:9/production".to_string(),
+            sandbox_api_url: "http://127.0.0.1:9/sandbox".to_string(),
+            trusted_root: TEST_ROOT,
+        }
+    }
+
+    fn notice(payload: &Value) -> Result<Notice> {
+        read_notification(&signed(payload), &test_config(), UnixTime::now())
+    }
+
+    /// A refund, a reversal, Family Sharing taken away: each is a cue to
+    /// look the transaction up again, whatever it is called.
+    #[test]
+    fn a_notification_names_the_purchase_to_look_at_again() {
+        let refunded = signed(&transaction("1001", json!({"revocationDate": 1_790_000_000_000i64})));
+        for (kind, subtype, called) in [
+            ("REFUND", None, "REFUND"),
+            ("REFUND_REVERSED", None, "REFUND_REVERSED"),
+            ("REVOKE", None, "REVOKE"),
+            ("SOMETHING_NEW", Some("AND_SO_ON"), "SOMETHING_NEW/AND_SO_ON"),
+        ] {
+            assert_eq!(
+                notice(&notification(kind, subtype, Some(refunded.clone()))).unwrap(),
+                Notice::Recheck {
+                    kind: called.to_string(),
+                    transaction: "1001".to_string(),
+                    product: PRODUCT_ID.to_string(),
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn a_test_notification_is_a_test() {
+        assert_eq!(notice(&json!({"notificationType": "TEST"})).unwrap(), Notice::Test);
+    }
+
+    #[test]
+    fn a_notification_about_another_app_or_no_purchase_is_nothing() {
+        let mut elsewhere = notification("REFUND", None, Some(signed(&transaction("1000", json!({})))));
+        elsewhere["data"]["bundleId"] = json!("com.example.other");
+        assert!(matches!(notice(&elsewhere).unwrap(), Notice::Nothing { .. }));
+
+        // The payload says ours, the transaction inside it says otherwise.
+        let other = signed(&transaction("1003", json!({"bundleId": "com.example.other"})));
+        assert!(matches!(
+            notice(&notification("REFUND", None, Some(other))).unwrap(),
+            Notice::Nothing { .. }
+        ));
+
+        assert_eq!(
+            notice(&notification("EXTERNAL_PURCHASE_TOKEN", None, None)).unwrap(),
+            Notice::Nothing { kind: "EXTERNAL_PURCHASE_TOKEN".to_string() }
+        );
+    }
+
+    /// Anyone can post to the site. A payload Apple did not sign, or one
+    /// that carries a transaction Apple did not sign, is refused.
+    #[test]
+    fn a_notification_apple_did_not_sign_is_refused() {
+        let genuine = signed(&transaction("1000", json!({})));
+        let forged = signed_with(
+            &notification("REFUND", None, Some(genuine)),
+            IMPOSTOR_KEY,
+            &[LEAF, INTERMEDIATE, TEST_ROOT.0],
+        );
+        assert!(read_notification(&forged, &test_config(), UnixTime::now()).is_err());
+
+        let forged_inside = signed_with(
+            &transaction("1000", json!({})),
+            IMPOSTOR_KEY,
+            &[LEAF, INTERMEDIATE, TEST_ROOT.0],
+        );
+        assert!(notice(&notification("REFUND", None, Some(forged_inside))).is_err());
+
+        assert!(read_notification("not a jws", &test_config(), UnixTime::now()).is_err());
+        let under_another_root =
+            read_notification(&signed(&json!({"notificationType": "TEST"})), &{
+                let mut config = test_config();
+                config.trusted_root = TrustedRoot::default();
+                config
+            }, UnixTime::now());
+        assert!(under_another_root.is_err(), "only the configured root is trusted");
+    }
+
+    /// The whole of a refund arriving: the notification is a cue, Apple is
+    /// asked, and the purchase an account handed over is revoked -- and a
+    /// reversal, asked about the same way, would give it back. Against the
+    /// database `DATABASE_URL` names, with what it adds taken away again.
+    #[tokio::test]
+    async fn a_refund_notification_revokes_the_purchase_it_names() {
+        use crate::models::supporter::{record_purchase, Store};
+        let Ok(url) = std::env::var("DATABASE_URL") else { return };
+        let Ok(db) = sqlx::PgPool::connect(&url).await else { return };
+        let config = fake_app_store().await;
+
+        let added_product = sqlx::query(
+            "INSERT INTO store_products (store, product, year) VALUES ('apple', $1, $2)
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(PRODUCT_ID)
+        .bind(PACK_YEAR)
+        .execute(&db)
+        .await
+        .unwrap()
+        .rows_affected()
+            == 1;
+        let login = format!("notify_{}", &Uuid::new_v4().simple().to_string()[..12]);
+        let buyer: Uuid = sqlx::query_scalar(
+            "INSERT INTO users (login_name, display_name, password_hash) VALUES ($1, $1, 'x') RETURNING id",
+        )
+        .bind(&login)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        // "1001" is refunded at the fake App Store; "1000" is not.
+        let mut tx = db.begin().await.unwrap();
+        for id in ["1001", "1000"] {
+            let pack = OwnedProduct { product: PRODUCT_ID.to_string(), year: PACK_YEAR };
+            record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true).await.unwrap();
+        }
+        tx.commit().await.unwrap();
+
+        let refunded = heed(&db, &config, "1001", PRODUCT_ID).await;
+        let standing = heed(&db, &config, "1000", PRODUCT_ID).await;
+        let unknown = heed(&db, &config, "9999", PRODUCT_ID).await;
+        let elsewhere = heed(&db, &config, "1000", "cafe.oeee.not.in.the.catalogue").await;
+        let revoked: Vec<(String, bool)> = sqlx::query_as(
+            "SELECT owner, revoked_at IS NOT NULL FROM supporter_purchases
+             WHERE user_id = $1 ORDER BY owner",
+        )
+        .bind(buyer)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+
+        sqlx::query("DELETE FROM users WHERE id = $1").bind(buyer).execute(&db).await.unwrap();
+        if added_product {
+            sqlx::query("DELETE FROM store_products WHERE store = 'apple' AND product = $1")
+                .bind(PRODUCT_ID)
+                .execute(&db)
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(refunded.unwrap(), Heeded::Recorded { owned: false });
+        assert_eq!(standing.unwrap(), Heeded::Recorded { owned: true });
+        assert_eq!(unknown.unwrap(), Heeded::NotOurs);
+        assert_eq!(elsewhere.unwrap(), Heeded::NotOurs);
+        assert_eq!(
+            revoked,
+            [("1000".to_string(), false), ("1001".to_string(), true)]
+        );
+    }
+
+    #[tokio::test]
+    async fn apple_is_asked_for_a_test_notification_with_our_key() {
+        let config = fake_app_store().await;
+        assert_eq!(request_test_notification(&config).await.unwrap(), "test-token");
+
+        let mut refused = fake_app_store().await;
+        refused.key_id = "WRONGKEY00".to_string();
+        assert!(request_test_notification(&refused).await.is_err());
     }
 
     #[test]

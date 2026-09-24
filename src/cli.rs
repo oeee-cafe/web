@@ -50,6 +50,9 @@ enum Commands {
     SetRole { login_name: String, role: RoleArg },
     /// Check that the App Store will talk to us about purchases
     CheckAppStore,
+    /// Ask Apple to send the site a test App Store Server Notification,
+    /// which the serving container logs when it arrives
+    TestAppStoreNotifications,
     /// Check that Google Play will talk to us about purchases
     CheckGooglePlay,
     /// Mark every drawing in the public bucket as image/png, where it was
@@ -130,6 +133,25 @@ async fn run(args: impl IntoIterator<Item = String>) -> Result<()> {
         return Ok(());
     }
 
+    // Apple sends the test to whatever App Store Connect has as the
+    // production URL; the serving container logs it when it arrives.
+    if matches!(cli.command, Commands::TestAppStoreNotifications) {
+        let Some(store) = cfg.app_store.as_ref() else {
+            println!("no [app_store] table in the config");
+            exit(1);
+        };
+        match oeee_cafe::app_store::request_test_notification(store).await {
+            Ok(token) => println!(
+                "Apple is sending a test notification ({token}); the serving container logs \"the App Store's test notification arrived\" when it does"
+            ),
+            Err(error) => {
+                println!("Apple would not send one: {error:#}");
+                exit(1);
+            }
+        }
+        return Ok(());
+    }
+
     // The same for Google Play: the service account, and whether Play
     // Console has let it see the app.
     if matches!(cli.command, Commands::CheckGooglePlay) {
@@ -185,6 +207,7 @@ async fn run(args: impl IntoIterator<Item = String>) -> Result<()> {
     match &cli.command {
         // Answered above, before the database was opened.
         Commands::CheckAppStore
+        | Commands::TestAppStoreNotifications
         | Commands::CheckGooglePlay
         | Commands::SetImageContentType { .. } => unreachable!(),
         Commands::ListCommunities => {
