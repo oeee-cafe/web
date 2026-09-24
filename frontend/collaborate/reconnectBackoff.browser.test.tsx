@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, useEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { useWebSocket } from "./hooks/useWebSocket";
+import { useSessionLink, useWebSocket } from "./hooks/useWebSocket";
 import { type CollaborationMeta } from "./types";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -85,31 +85,12 @@ function Harness({ renderRef }: { renderRef: React.RefObject<(() => void) | null
   renderRef.current = () => setTick((tick) => tick + 1);
 
   const userIdRef = useRef<string | null>("user");
-  const userLoginNameRef = useRef("user");
-  const localUserJoinTimeRef = useRef(0);
-  const participantsRef = useRef(new Map());
-  const localIdRef = useRef<number | null>(null);
-  const lastSeqRef = useRef(0);
-  const shouldConnectRef = useRef(true);
-  const catchupTimeoutRef = useRef<number | null>(null);
-  const processingMessageRef = useRef(false);
-  const isCatchingUpRef = useRef(false);
+  const link = useSessionLink();
 
   const { connect } = useWebSocket({
+    link,
     canvasMeta,
     userIdRef,
-    userLoginNameRef,
-    localUserJoinTimeRef,
-    participantsRef,
-    localIdRef,
-    lastSeqRef,
-    shouldConnectRef,
-    catchupTimeoutRef,
-    processingMessageRef,
-    isCatchingUpRef,
-    setConnectionState: () => {},
-    setIsCatchingUp: () => {},
-    setSyncProgress: () => {},
     onSynchronizationError: () => {},
     createOrUpdateCursor: () => {},
     hideCursor: () => {},

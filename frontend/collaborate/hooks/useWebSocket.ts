@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import {
   decodeMessage,
   encodeJoin,
@@ -11,6 +11,41 @@ import { type CollaborationMeta } from "../types";
 import { acceptedResumeSequence } from "../synchronization";
 
 export type ConnectionState = "disconnected" | "connecting" | "connected";
+
+/**
+ * The connection as the session view renders it.
+ *
+ * Published as one value by the hook that owns the socket, and mirrored into
+ * `SessionLink` in the same write, so what a callback reads synchronously
+ * and what the page shows can never be two different answers. The page used
+ * to keep three states and copy one of them into a ref from an effect, and
+ * a message arriving between the state change and the effect read the copy.
+ */
+export interface SessionView {
+  connection: ConnectionState;
+  catchingUp: boolean;
+  progress: SyncProgress;
+}
+
+/**
+ * What the socket hook knows about this connection, readable at any moment.
+ *
+ * One object rather than a ref per field handed in by the page. The page
+ * makes it with `useSessionLink` so its callbacks can read it before the
+ * socket hook, which takes those callbacks, has been called; only the socket
+ * hook writes to it.
+ */
+export interface SessionLink {
+  connection: ConnectionState;
+  /** Drawing is held until the replay that follows a connect is applied. */
+  catchingUp: boolean;
+  /** The 1-byte id the server gave this connection; null until WELCOME. */
+  localId: number | null;
+  /** The highest canonical sequence received so far. */
+  lastSeq: number;
+  /** Whether the page wants a connection at all; false once it is leaving. */
+  shouldConnect: boolean;
+}
 
 export interface SyncProgress {
   phase: "joining" | "receiving" | "applying" | "ready";
@@ -45,27 +80,12 @@ const NON_OWNER_RESET_OFFER_DELAY_MS = 300;
  */
 const PROGRESS_PUBLISH_MS = 100;
 
-interface Participant {
-  userId: string;
-  username: string;
-  joinedAt: number;
-}
-
 interface WebSocketHookParams {
+  /** From `useSessionLink`; written here, read anywhere on the page. */
+  link: SessionLink;
   canvasMeta: CollaborationMeta | null;
+  /** The signed-in user, as the server knows them. */
   userIdRef: React.RefObject<string | null>;
-  userLoginNameRef: React.RefObject<string>;
-  localUserJoinTimeRef: React.RefObject<number>;
-  participantsRef: React.RefObject<Map<string, Participant>>;
-  localIdRef: React.RefObject<number | null>;
-  lastSeqRef: React.RefObject<number>;
-  shouldConnectRef: React.RefObject<boolean>;
-  catchupTimeoutRef: React.RefObject<number | null>;
-  processingMessageRef: React.RefObject<boolean>;
-  isCatchingUpRef: React.RefObject<boolean>;
-  setConnectionState: (state: ConnectionState) => void;
-  setIsCatchingUp: (catching: boolean) => void;
-  setSyncProgress: (progress: SyncProgress) => void;
   onSynchronizationError: (error: Error | null) => void;
   createOrUpdateCursor: (
     userId: string,
@@ -115,7 +135,7 @@ interface WebSocketHookParams {
   verifyCanonicalPosition: () => Promise<boolean>;
   /**
    * The last sequence actually on the canvas, which is what a reconnect
-   * resumes from. `lastSeqRef` is the last one received, and it runs ahead of
+   * resumes from. `link.lastSeq` is the last one received, and it runs ahead of
    * this across any gap -- a gap being the very thing that closes the socket.
    */
   appliedCanonicalPosition: () => number;
@@ -124,20 +144,24 @@ interface WebSocketHookParams {
   onSessionExpired: () => void;
 }
 
+const OPENING_PROGRESS: SyncProgress = {
+  phase: "joining", receivedSequence: 0, appliedSequence: 0, targetSequence: null,
+};
+
+/** The connection's readable state, with one identity for the page's life. */
+export const useSessionLink = (): SessionLink =>
+  useRef<SessionLink>({
+    connection: "connecting",
+    catchingUp: true,
+    localId: null,
+    lastSeq: 0,
+    shouldConnect: false,
+  }).current;
+
 export const useWebSocket = ({
+  link,
   canvasMeta,
   userIdRef,
-  localUserJoinTimeRef,
-  participantsRef,
-  localIdRef,
-  lastSeqRef,
-  shouldConnectRef,
-  catchupTimeoutRef,
-  processingMessageRef,
-  isCatchingUpRef,
-  setConnectionState,
-  setIsCatchingUp,
-  setSyncProgress,
   onSynchronizationError,
   createOrUpdateCursor,
   hideCursor,
@@ -158,9 +182,28 @@ export const useWebSocket = ({
   onSessionExpired,
 }: WebSocketHookParams) => {
   const wsRef = useRef<WebSocket | null>(null);
-  const messageQueueRef = useRef<
-    { message: DecodedMessage; raw: Uint8Array; seq?: number }[]
-  >([]);
+  const [view, setView] = useState<SessionView>({
+    connection: "connecting",
+    catchingUp: true,
+    progress: OPENING_PROGRESS,
+  });
+  /**
+   * The one writer of what the page renders. The link is updated in the
+   * same call, before React hears of it, so a message handled between this
+   * and the render reads the value the render will show.
+   */
+  const publish = useCallback((change: Partial<SessionView>) => {
+    if (change.connection !== undefined) link.connection = change.connection;
+    if (change.catchingUp !== undefined) link.catchingUp = change.catchingUp;
+    setView((current) => {
+      const next = { ...current, ...change };
+      return next.connection === current.connection &&
+        next.catchingUp === current.catchingUp &&
+        next.progress === current.progress
+        ? current
+        : next;
+    });
+  }, [link]);
   const historyIdRef = useRef<string | null>(null);
   const caughtUpRef = useRef(false);
   const replayTargetRef = useRef<number | null>(null);
@@ -253,7 +296,7 @@ export const useWebSocket = ({
         // carry on from it. Nothing has arrived on the new socket yet, so the
         // received position starts over from the same place.
         const applied = appliedCanonicalPosition();
-        lastSeqRef.current = applied;
+        link.lastSeq = applied;
         url.searchParams.set("history_id", historyIdRef.current);
         url.searchParams.set("after_seq", String(applied));
         resumeRequestedRef.current = true;
@@ -267,7 +310,7 @@ export const useWebSocket = ({
     }
     const url = new URL(`wss://${window.location.host}/collaborate/${sessionId}/ws`);
     return appendResumePosition(url);
-  }, [appliedCanonicalPosition, canResumeCanonicalPosition, lastSeqRef]);
+  }, [appliedCanonicalPosition, canResumeCanonicalPosition, link]);
 
   // Set after connectWebSocket is defined; lets the close handler retry
   // without depending on the callback identity.
@@ -287,7 +330,7 @@ export const useWebSocket = ({
       console.warn(
         `Giving up after ${RECONNECT_MAX_ATTEMPTS} reconnect attempts`
       );
-      setConnectionState("disconnected");
+      publish({ connection: "disconnected" });
       return;
     }
 
@@ -298,7 +341,7 @@ export const useWebSocket = ({
 
     // Stay in "connecting" so the UI shows the spinner rather than the
     // manual-reconnect modal while retries are still in flight.
-    setConnectionState("connecting");
+    publish({ connection: "connecting" });
     console.log(
       `Reconnecting in ${Math.round(delay)}ms (attempt ${attempt + 1}/${RECONNECT_MAX_ATTEMPTS})`
     );
@@ -306,11 +349,11 @@ export const useWebSocket = ({
       reconnectTimerRef.current = null;
       connectRef.current();
     }, delay);
-  }, [clearReconnectTimer, setConnectionState]);
+  }, [clearReconnectTimer, publish]);
 
   const connectWebSocket = useCallback(async () => {
     // Only connect if we should be connecting
-    if (!shouldConnectRef.current && wsRef.current) {
+    if (!link.shouldConnect && wsRef.current) {
       return;
     }
 
@@ -338,14 +381,14 @@ export const useWebSocket = ({
       wsRef.current = null;
     }
 
-    setConnectionState("connecting");
+    publish({ connection: "connecting" });
 
     // Check if we have user ID and canvas meta - don't proceed if not initialized
     if (!userIdRef.current || !canvasMeta) {
       console.error(
         "App not properly initialized - missing user ID or canvas meta"
       );
-      setConnectionState("disconnected");
+      publish({ connection: "disconnected" });
       isConnectingRef.current = false;
       return;
     }
@@ -368,7 +411,7 @@ export const useWebSocket = ({
       wsRef.current = ws;
     } catch (error) {
       console.error("Failed to create WebSocket:", error);
-      setConnectionState("disconnected");
+      publish({ connection: "disconnected" });
       isConnectingRef.current = false;
       return;
     }
@@ -377,7 +420,7 @@ export const useWebSocket = ({
 
     ws.onopen = async () => {
       console.log("WebSocket connected successfully:", ws.url);
-      setConnectionState("connected");
+      publish({ connection: "connected" });
       isConnectingRef.current = false;
       reconnectAttemptsRef.current = 0;
 
@@ -388,7 +431,7 @@ export const useWebSocket = ({
       reconnectPendingRef.current = reconnecting;
       if (!reconnecting) {
         await onReconnectCanvas(false, null);
-        lastSeqRef.current = 0;
+        link.lastSeq = 0;
         historyIdRef.current = null;
       }
       hasConnectedRef.current = true;
@@ -396,7 +439,7 @@ export const useWebSocket = ({
       replayTargetRef.current = null;
       synchronizationFailedRef.current = false;
       onSynchronizationError(null);
-      localIdRef.current = null; // reassigned by WELCOME
+      link.localId = null; // reassigned by WELCOME
 
       // Send initial join message to establish user presence
       try {
@@ -407,35 +450,20 @@ export const useWebSocket = ({
       }
 
       // Start catching up phase - drawing will be disabled
-      setIsCatchingUp(true);
-      setSyncProgress({
+      publish({ catchingUp: true });
+      publish({ progress: {
         phase: "joining",
         receivedSequence: 0,
         appliedSequence: 0,
         targetSequence: null,
-      });
+      } });
 
-      // The server ends this phase explicitly with CAUGHT_UP. A timer cannot
-      // distinguish an empty history from a delayed or truncated replay.
-      if (catchupTimeoutRef.current) clearTimeout(catchupTimeoutRef.current);
-      catchupTimeoutRef.current = null;
-
-      // Set join timestamp after a short delay to let stored messages arrive first
-      setTimeout(() => {
-        if (localUserJoinTimeRef.current === 0) {
-          // Only set if not already set
-          localUserJoinTimeRef.current = Date.now();
-        }
-      }, 100); // 100ms should be enough for stored messages
+      // The server ends this phase explicitly with CAUGHT_UP. A timer could
+      // not distinguish an empty history from a delayed or truncated replay.
     };
 
     const processIncomingData = async (data: ArrayBuffer | Blob) => {
       if (synchronizationFailedRef.current) return;
-      // Clear any existing catch-up timeout since we now end catch-up when queue is empty
-      if (catchupTimeoutRef.current) {
-        clearTimeout(catchupTimeoutRef.current);
-        catchupTimeoutRef.current = null;
-      }
 
       let arrayBuffer =
         data instanceof ArrayBuffer ? data : await data.arrayBuffer();
@@ -448,14 +476,14 @@ export const useWebSocket = ({
         if (reconnectPendingRef.current) {
           const resumeSequence = acceptedResumeSequence(
             resumeRequestedRef.current,
-            { historyId: historyIdRef.current, sequence: lastSeqRef.current },
+            { historyId: historyIdRef.current, sequence: link.lastSeq },
             sequenced.historyId,
             sequenced.seq,
             "entry",
           );
           await onReconnectCanvas(true, resumeSequence);
           reconnectPendingRef.current = false;
-          if (resumeSequence === null) lastSeqRef.current = 0;
+          if (resumeSequence === null) link.lastSeq = 0;
           historyIdRef.current = sequenced.historyId;
         }
         // No progress publish here. Every frame goes straight from this point
@@ -468,7 +496,7 @@ export const useWebSocket = ({
           historyIdRef.current = sequenced.historyId;
         } else if (historyIdRef.current !== sequenced.historyId) {
           console.error("Canonical history identity changed; reconnecting");
-          setIsCatchingUp(true);
+          publish({ catchingUp: true });
           ws.close(4000, "canonical history changed");
           return;
         }
@@ -496,29 +524,26 @@ export const useWebSocket = ({
         // an operation applied wrongly is worse than one not applied at all.
         console.warn(`Stepping over unreadable canonical message ${sequenced.seq}`);
         await onUnreadableSequence(sequenced.seq);
-        lastSeqRef.current = Math.max(lastSeqRef.current, sequenced.seq);
-        if (!isCatchingUpRef.current && !(await verifyCanonicalPosition())) {
-          setIsCatchingUp(true);
+        link.lastSeq = Math.max(link.lastSeq, sequenced.seq);
+        if (!link.catchingUp && !(await verifyCanonicalPosition())) {
+          publish({ catchingUp: true });
           ws.close(4000, "canonical sequence gap");
         }
         return;
       }
       const raw = new Uint8Array(arrayBuffer);
 
-      if (isCatchingUpRef.current) {
+      if (link.catchingUp) {
         // Pointer metadata describes the present moment, not replay state.
         if (message.type === "movePointer" || message.type === "pointerup") return;
-        // During catch-up, queue messages for sequential processing
-        messageQueueRef.current.push({ message, raw, seq: sequenced?.seq });
-        // Process queue immediately if not already processing
-        await processMessageQueue();
+        await applyDuringCatchUp(message, raw, sequenced?.seq);
       } else {
         await handleBinaryMessage(message, raw, sequenced?.seq);
 
         if (sequenced) {
-          lastSeqRef.current = Math.max(lastSeqRef.current, sequenced.seq);
+          link.lastSeq = Math.max(link.lastSeq, sequenced.seq);
           if (!(await verifyCanonicalPosition())) {
-            setIsCatchingUp(true);
+            publish({ catchingUp: true });
             ws.close(4000, "canonical sequence gap");
           }
         }
@@ -535,7 +560,7 @@ export const useWebSocket = ({
           const syncError = error instanceof Error ? error : new Error(String(error));
           synchronizationFailedRef.current = true;
           onSynchronizationError(syncError);
-          setIsCatchingUp(true);
+          publish({ catchingUp: true });
           if (ws.readyState === WebSocket.OPEN) {
             ws.close(4000, "synchronization processing failed");
           }
@@ -561,8 +586,8 @@ export const useWebSocket = ({
       isConnectingRef.current = false;
 
       // Leaving the session (unmount, or the session ended) - stay closed
-      if (!shouldConnectRef.current) {
-        setConnectionState("disconnected");
+      if (!link.shouldConnect) {
+        publish({ connection: "disconnected" });
         return;
       }
 
@@ -570,7 +595,7 @@ export const useWebSocket = ({
       // amount of retrying will change that
       if (event.code === WS_CLOSE_POLICY) {
         console.warn("Server refused the session join:", event.reason);
-        setConnectionState("disconnected");
+        publish({ connection: "disconnected" });
         return;
       }
 
@@ -580,70 +605,59 @@ export const useWebSocket = ({
       scheduleReconnect();
     };
 
-    // Process all queued messages immediately during catch-up
-    const processMessageQueue = async () => {
-      if (
-        processingMessageRef.current ||
-        messageQueueRef.current.length === 0
-      ) {
-        return;
-      }
+    /**
+     * When the catch-up readout last moved, and where it stood.
+     *
+     * A number on a progress readout, published at the rate a history
+     * replays. This is a state update on the session view -- the header, the
+     * chat, the modal -- and a join replaying five hundred messages was five
+     * hundred renders of all of it, for a counter nobody can read faster than
+     * it moves. Both live on the socket rather than in a ref because every
+     * connect starts a replay of its own.
+     */
+    let progressPublishedAt = 0;
 
-      processingMessageRef.current = true;
-      const totalMessages = messageQueueRef.current.length;
-      let publishedAt = 0;
-      let lastAppliedSeq = lastSeqRef.current;
+    /**
+     * One frame of the replay, applied in turn. The processing chain already
+     * runs these one at a time, in arrival order, so there is nothing to
+     * queue: a frame is applied the moment it is decoded, and catch-up ends
+     * once the server has said so and the canvas is at the position it said.
+     */
+    const applyDuringCatchUp = async (
+      message: DecodedMessage,
+      raw: Uint8Array,
+      seq: number | undefined,
+    ) => {
+      await handleBinaryMessage(message, raw, seq);
 
-      // Process all messages immediately without artificial delays
-      while (messageQueueRef.current.length > 0) {
-        const { message, raw, seq } = messageQueueRef.current.shift()!;
-
-        await handleBinaryMessage(message, raw, seq);
-
-        if (seq !== undefined) {
-          lastSeqRef.current = Math.max(lastSeqRef.current, seq);
-          lastAppliedSeq = seq;
-          // A number on a progress readout, published at the rate a history
-          // replays. This is a state update on the session view -- the header,
-          // the chat, the modal -- and a join replaying five hundred messages
-          // was five hundred renders of all of it, for a counter nobody can
-          // read faster than it moves.
-          const now = performance.now();
-          if (now - publishedAt >= PROGRESS_PUBLISH_MS) {
-            publishedAt = now;
-            setSyncProgress({
-              phase: "applying",
-              receivedSequence: lastSeqRef.current,
-              appliedSequence: seq,
-              targetSequence: replayTargetRef.current,
-            });
-          }
+      if (seq !== undefined) {
+        link.lastSeq = Math.max(link.lastSeq, seq);
+        const now = performance.now();
+        if (now - progressPublishedAt >= PROGRESS_PUBLISH_MS) {
+          progressPublishedAt = now;
+          publish({ progress: {
+            phase: "applying",
+            receivedSequence: link.lastSeq,
+            appliedSequence: seq,
+            targetSequence: replayTargetRef.current,
+          } });
         }
       }
 
-      // The last one always lands, whatever the throttle did with it: this is
-      // the number the readout finishes on.
-      setSyncProgress({
-        phase: "applying",
-        receivedSequence: lastSeqRef.current,
-        appliedSequence: lastAppliedSeq,
-        targetSequence: replayTargetRef.current,
-      });
-
-      processingMessageRef.current = false;
-      console.log(`✅ Processed ${totalMessages} messages from catch-up queue`);
-
-      // Queue exhaustion is not enough: a missing canonical sequence would
+      if (!caughtUpRef.current) return;
+      // The server's word is not enough: a missing canonical sequence would
       // otherwise enable editing on an incomplete canvas.
-      if (caughtUpRef.current && await verifyCanonicalPosition()) {
-        setIsCatchingUp(false);
-        setSyncProgress({
-          phase: "ready",
-          receivedSequence: lastSeqRef.current,
-          appliedSequence: lastSeqRef.current,
-          targetSequence: lastSeqRef.current,
+      if (await verifyCanonicalPosition()) {
+        publish({
+          catchingUp: false,
+          progress: {
+            phase: "ready",
+            receivedSequence: link.lastSeq,
+            appliedSequence: link.lastSeq,
+            targetSequence: link.lastSeq,
+          },
         });
-      } else if (caughtUpRef.current) {
+      } else {
         console.error("Canonical sequence gap after catch-up; reconnecting");
         ws.close(4000, "canonical sequence gap");
       }
@@ -680,7 +694,7 @@ export const useWebSocket = ({
 
             // Show remote users' cursors at their latest drawing position
             if (
-              message.userId !== localIdRef.current &&
+              message.userId !== link.localId &&
               (message.type === "stroke" || message.type === "fill")
             ) {
               const username =
@@ -703,7 +717,7 @@ export const useWebSocket = ({
 
           case "welcome": {
             console.log("Assigned session user id:", message.sessionId);
-            localIdRef.current = message.sessionId;
+            link.localId = message.sessionId;
             onWelcome(message.sessionId);
             break;
           }
@@ -718,20 +732,20 @@ export const useWebSocket = ({
             if (reconnectPendingRef.current) {
               const resumeSequence = resumeRequestedRef.current
                 && historyIdRef.current === message.historyId
-                && lastSeqRef.current === message.afterSeq
-                ? lastSeqRef.current
+                && link.lastSeq === message.afterSeq
+                ? link.lastSeq
                 : null;
               await onReconnectCanvas(true, resumeSequence);
               reconnectPendingRef.current = false;
-              if (resumeSequence === null) lastSeqRef.current = 0;
+              if (resumeSequence === null) link.lastSeq = 0;
               historyIdRef.current = message.historyId;
             }
-            setSyncProgress({
+            publish({ progress: {
               phase: "receiving",
               receivedSequence: message.afterSeq,
               appliedSequence: message.afterSeq,
               targetSequence: message.lastSeq,
-            });
+            } });
             break;
           }
 
@@ -739,14 +753,14 @@ export const useWebSocket = ({
             if (reconnectPendingRef.current) {
               const resumeSequence = acceptedResumeSequence(
                 resumeRequestedRef.current,
-                { historyId: historyIdRef.current, sequence: lastSeqRef.current },
+                { historyId: historyIdRef.current, sequence: link.lastSeq },
                 message.historyId,
                 message.lastSeq,
                 "caughtUp",
               );
               await onReconnectCanvas(true, resumeSequence);
               reconnectPendingRef.current = false;
-              if (resumeSequence === null) lastSeqRef.current = 0;
+              if (resumeSequence === null) link.lastSeq = 0;
               historyIdRef.current = message.historyId;
             }
             if (historyIdRef.current === null) {
@@ -756,21 +770,21 @@ export const useWebSocket = ({
               ws.close(4000, "caught-up history mismatch");
               break;
             }
-            lastSeqRef.current = message.lastSeq;
+            link.lastSeq = message.lastSeq;
             replayTargetRef.current = message.lastSeq;
             caughtUpRef.current = true;
-            setSyncProgress({
+            publish({ progress: {
               phase: "applying",
-              receivedSequence: lastSeqRef.current,
-              appliedSequence: Math.min(lastSeqRef.current, seq ?? lastSeqRef.current),
+              receivedSequence: link.lastSeq,
+              appliedSequence: Math.min(link.lastSeq, seq ?? link.lastSeq),
               targetSequence: message.lastSeq,
-            });
+            } });
             break;
           }
 
           case "pointerup": {
             // Hide cursor for remote users when they stop drawing
-            if (message.userId !== localIdRef.current) {
+            if (message.userId !== link.localId) {
               hideCursor(String(message.userId));
             }
             break;
@@ -782,8 +796,8 @@ export const useWebSocket = ({
             // arriving are from whenever the history was made, and drawing
             // them puts other people's cursors on a canvas that has not
             // finished being rebuilt.
-            if (isCatchingUpRef.current) break;
-            if (message.userId !== localIdRef.current) {
+            if (link.catchingUp) break;
+            if (message.userId !== link.localId) {
               const username =
                 idNamesRef.current.get(message.userId) || `#${message.userId}`;
               createOrUpdateCursor(
@@ -848,7 +862,6 @@ export const useWebSocket = ({
 
             // Clear existing participants to avoid inconsistencies
             // This ensures all clients have identical participant ordering from server
-            participantsRef.current?.clear();
             clearParticipants();
 
             // Sort participants by join timestamp (already sorted on the
@@ -902,15 +915,15 @@ export const useWebSocket = ({
             });
 
             if (message.postUrl) {
-              shouldConnectRef.current = false;
+              link.shouldConnect = false;
               onSessionEnded(message.postUrl);
             }
             break;
           }
 
           case "sessionExpired": {
-            shouldConnectRef.current = false;
-            setConnectionState("disconnected");
+            link.shouldConnect = false;
+            publish({ connection: "disconnected" });
             onSessionExpired();
             break;
           }
@@ -924,23 +937,14 @@ export const useWebSocket = ({
   }, [
     getWebSocketUrl,
     canvasMeta,
-    localIdRef,
-    lastSeqRef,
-    setConnectionState,
-    setIsCatchingUp,
-    setSyncProgress,
+    link,
+    publish,
     onSynchronizationError,
     createOrUpdateCursor,
     hideCursor,
     addParticipant,
     clearParticipants,
     addChatMessage,
-    catchupTimeoutRef,
-    isCatchingUpRef,
-    localUserJoinTimeRef,
-    participantsRef,
-    processingMessageRef,
-    shouldConnectRef,
     userIdRef,
     clearReconnectTimer,
     scheduleReconnect,
@@ -975,8 +979,9 @@ export const useWebSocket = ({
    * a real event can ask for.
    */
   const connect = useCallback(() => {
+    link.shouldConnect = true;
     connectRef.current();
-  }, []);
+  }, [link]);
 
   // Cleanup WebSocket on unmount
   useEffect(() => {
@@ -993,9 +998,23 @@ export const useWebSocket = ({
     };
   }, []);
 
+  /**
+   * Asks for no connection from here on: the page is leaving, or the session
+   * is over. A socket already open is closed; a close that follows is not
+   * retried.
+   */
+  const disconnect = useCallback(() => {
+    link.shouldConnect = false;
+    wsRef.current?.close();
+  }, [link]);
+
   return {
     wsRef,
+    /** Opens the connection and keeps it, until `disconnect`. */
     connect,
+    disconnect,
+    /** What the page renders about the connection; see `SessionView`. */
+    view,
     getWebSocketUrl,
   };
 };

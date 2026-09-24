@@ -43,7 +43,7 @@ import {
   encodeSnapshot,
   type DecodedMessage,
 } from "./binaryProtocol";
-import { useWebSocket, type ConnectionState, type SyncProgress } from "./hooks/useWebSocket";
+import { useSessionLink, useWebSocket } from "./hooks/useWebSocket";
 import { useRemoteCursors } from "./hooks/useRemoteCursors";
 import { reportDiagnostics, type DiagnosticContext } from "./diagnostics";
 import { refreshSessionPreview } from "./preview";
@@ -180,17 +180,12 @@ export default function App() {
   const [canvasMeta, setCanvasMeta] = useState<CollaborationMeta | null>(null);
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
-  const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
-  const [isCatchingUp, setIsCatchingUp] = useState(true);
   const [authError, setAuthError] = useState(false);
   const [roomFullError, setRoomFullError] = useState<{ currentUserCount: number; maxUsers: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [sessionEnding, setSessionEnding] = useState(false);
   const [saveConfirmation, setSaveConfirmation] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<SyncProgress>({
-    phase: "joining", receivedSequence: 0, appliedSequence: 0, targetSequence: null,
-  });
   const [synchronizationError, setSynchronizationError] = useState<string | null>(null);
 
   // The chat window opens where the toolbox's own windows do, and is held out
@@ -240,15 +235,14 @@ export default function App() {
   const hasDrawnRef = useRef(false);
   /** Set by the page's own ways out, which are not accidents to ask about. */
   const leavingRef = useRef(false);
-  const userLoginNameRef = useRef("");
-  const localUserJoinTimeRef = useRef(0);
-  const localIdRef = useRef<number | null>(null);
-  const lastSeqRef = useRef(0);
-  const participantsRef = useRef(participants);
-  const shouldConnectRef = useRef(false);
-  const catchupTimeoutRef = useRef<number | null>(null);
-  const processingMessageRef = useRef(false);
-  const isCatchingUpRef = useRef(true);
+  /**
+   * The connection as the socket hook knows it: our session id, the last
+   * canonical sequence received, whether the replay is still being applied.
+   * Read here synchronously, in the callbacks the hook is handed; written
+   * only by the hook. What the page *renders* about the connection is
+   * `view`, published by the same hook from the same writes.
+   */
+  const link = useSessionLink();
   const pendingEchoesRef = useRef(new PendingEchoes());
   const pointerFrameRef = useRef<number | null>(null);
   const pendingPointerRef = useRef<{ x: number; y: number } | null>(null);
@@ -274,7 +268,7 @@ export default function App() {
   const snapshotCountsRef = useRef(new Map<number, number>());
   const canonicalDrainRef = useRef<Promise<void>>(Promise.resolve());
   const { createOrUpdateCursor, hideCursor, clearCursors } = useRemoteCursors(
-    painterElementRef, localIdRef,
+    painterElementRef, link,
   );
   const chatAddMessageRef = useRef<((message: ChatMessage) => void) | null>(null);
   /**
@@ -303,7 +297,6 @@ export default function App() {
   );
   const noopChatMessage = useCallback(() => {}, []);
 
-  useEffect(() => { participantsRef.current = participants; }, [participants]);
   /**
    * Name the layers for the painter's participant toolbox.
    *
@@ -321,7 +314,6 @@ export default function App() {
         })),
     );
   }, [participants]);
-  useEffect(() => { isCatchingUpRef.current = isCatchingUp; }, [isCatchingUp]);
 
   const clearParticipants = useCallback(() => setParticipants(new Map()), []);
   const addParticipant = useCallback((
@@ -333,24 +325,24 @@ export default function App() {
 
   const onLocalOperation = useCallback((entry: LocalPainterOperation) => {
     const ws = wsRef.current;
-    const localId = localIdRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN || localId === null || isCatchingUpRef.current) return;
+    const localId = link.localId;
+    if (!ws || ws.readyState !== WebSocket.OPEN || localId === null || link.catchingUp) return;
     hasDrawnRef.current = true;
     const encoded = encodePainterOperation(localId, entry.operation);
     pendingEchoesRef.current.record(bytesId(new Uint8Array(encoded)), entry.id);
     ws.send(encoded);
   // wsRef is created by the WebSocket hook below and is stable for its lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [link]);
 
   const onLocalPointerUp = useCallback(() => {
     const ws = wsRef.current;
-    const localId = localIdRef.current;
+    const localId = link.localId;
     if (!ws || ws.readyState !== WebSocket.OPEN || localId === null) return;
     ws.send(encodePointerUp(localId));
   // wsRef is created by the WebSocket hook below and is stable for its lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [link]);
 
   const onLocalPointerMove = useCallback((position: { x: number; y: number } | null) => {
     if (!position) {
@@ -367,7 +359,7 @@ export default function App() {
       pointerFrameRef.current = null;
       const point = pendingPointerRef.current;
       const ws = wsRef.current;
-      const localId = localIdRef.current;
+      const localId = link.localId;
       if (!point || ws?.readyState !== WebSocket.OPEN || localId === null) return;
       // A frame is the display's rate, not a useful rate for somebody else's
       // cursor: on a 120Hz screen this fired twice as often as on a 60Hz one,
@@ -393,7 +385,7 @@ export default function App() {
     pointerFrameRef.current = requestAnimationFrame(sendPending);
   // wsRef is created by the WebSocket hook below and is stable for its lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onLocalPointerUp]);
+  }, [link, onLocalPointerUp]);
 
   useEffect(() => {
     const element = painterElementRef.current;
@@ -491,12 +483,6 @@ export default function App() {
     });
   }, []);
 
-  useEffect(() => {
-    painterRef.current?.setInteractionEnabled(
-      connectionState === "connected" && !isCatchingUp && !sessionEnding && !sessionExpired,
-    );
-  }, [connectionState, isCatchingUp, sessionEnding, sessionExpired]);
-
   const drainCanonical = useCallback(async () => {
     canonicalDrainRef.current = canonicalDrainRef.current.then(async () => {
       const painter = painterRef.current;
@@ -513,7 +499,7 @@ export default function App() {
           // Not while catching up: the painter takes no input until the replay
           // is done, so there is nothing to be responsive to and yielding
           // would only make the wait longer.
-          if (!isCatchingUpRef.current && performance.now() >= deadline) {
+          if (!link.catchingUp && performance.now() >= deadline) {
             await yieldToInput();
             deadline = performance.now() + CANONICAL_BUDGET_MS;
           }
@@ -562,7 +548,7 @@ export default function App() {
       }
     });
     await canonicalDrainRef.current;
-  }, [canvasMeta]);
+  }, [canvasMeta, link]);
 
   const onCanvasMessage = useCallback(async (
     message: DecodedMessage, raw: Uint8Array, sequence?: number,
@@ -597,7 +583,7 @@ export default function App() {
     // threshold, several megabytes of names nothing ever looked up. The
     // sequence is unique within a history, and a history is all a log spans.
     // The `#` keeps it apart from the painter's own `actor:counter` names.
-    const id = message.userId === localIdRef.current
+    const id = message.userId === link.localId
       ? pendingEchoesRef.current.claim(bytesId(raw))
       : `#${sequence}`;
     const canonical: CanonicalPainterOperation = {
@@ -608,7 +594,7 @@ export default function App() {
     };
     canonicalOperationsRef.current.set(sequence, canonical);
     await drainCanonical();
-  }, [drainCanonical]);
+  }, [drainCanonical, link]);
 
   const onUnreadableSequence = useCallback(async (sequence: number) => {
     canonicalOperationsRef.current.set(sequence, null);
@@ -637,13 +623,13 @@ export default function App() {
     const checkpoint: PainterCheckpoint = {
       sequence: 0, width: canvasMeta.width, height: canvasMeta.height,
       layers: [{
-        actorId: String(localIdRef.current ?? 0),
+        actorId: String(link.localId ?? 0),
         background: layer,
         foreground: layer,
       }],
     };
     await painterRef.current.applyCheckpoint(checkpoint);
-  }, [canvasMeta, clearCursors]);
+  }, [canvasMeta, clearCursors, link]);
 
   /**
    * What this client believed, for a report about why it was wrong.
@@ -656,14 +642,14 @@ export default function App() {
     (reason: string, detail?: string): DiagnosticContext => ({
       reason,
       detail,
-      localId: localIdRef.current,
+      localId: link.localId,
       appliedSequence: appliedSequenceRef.current,
       expectedSequence: expectedSequenceRef.current,
-      lastSeq: lastSeqRef.current,
-      catchingUp: isCatchingUpRef.current,
+      lastSeq: link.lastSeq,
+      catchingUp: link.catchingUp,
       settled: painterRef.current?.isSynchronizationSettled() ?? false,
     }),
-    [],
+    [link],
   );
 
   const handleResetPoint = useCallback(async (
@@ -710,8 +696,8 @@ export default function App() {
 
   const verifyCanonicalPosition = useCallback(async (): Promise<boolean> => {
     await drainCanonical();
-    return appliedSequenceRef.current >= lastSeqRef.current;
-  }, [drainCanonical]);
+    return appliedSequenceRef.current >= link.lastSeq;
+  }, [drainCanonical, link]);
 
   const appliedCanonicalPosition = useCallback((): number => appliedSequenceRef.current, []);
 
@@ -727,11 +713,10 @@ export default function App() {
    * server, another for the echo that confirms them.
    *
    * Safe to do at this point: WELCOME precedes the catch-up that gates
-   * drawing, and `onLocalOperation` refuses to emit while `localIdRef` is
+   * drawing, and `onLocalOperation` refuses to emit while `link.localId` is
    * null, so no local operation carries the placeholder identity.
    */
   const handleWelcome = useCallback((sessionId: number) => {
-    localIdRef.current = sessionId;
     painterRef.current?.setLocalActorId(String(sessionId));
   }, []);
 
@@ -769,17 +754,17 @@ export default function App() {
    */
   const canUploadCheckpoint = useCallback((): boolean => {
     const painter = painterRef.current;
-    if (!painter || localIdRef.current === null) return false;
+    if (!painter || link.localId === null) return false;
     return (
       painter.isSynchronizationSettled() &&
-      appliedSequenceRef.current >= lastSeqRef.current
+      appliedSequenceRef.current >= link.lastSeq
     );
-  }, []);
+  }, [link]);
 
   const handleResetRequest = useCallback(async () => {
     const painter = painterRef.current;
     const ws = wsRef.current;
-    const localId = localIdRef.current;
+    const localId = link.localId;
     if (!painter || !ws || ws.readyState !== WebSocket.OPEN || localId === null) return;
     // A reset checkpoint must describe confirmed canonical state, never a
     // pointer gesture or optimistic fork the server has not sequenced yet.
@@ -787,13 +772,13 @@ export default function App() {
       await drainCanonical();
       if (
         painter.isSynchronizationSettled() &&
-        appliedSequenceRef.current >= lastSeqRef.current
+        appliedSequenceRef.current >= link.lastSeq
       ) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (
       !painter.isSynchronizationSettled() ||
-      appliedSequenceRef.current < lastSeqRef.current
+      appliedSequenceRef.current < link.lastSeq
     ) return;
     const checkpoint = await painter.exportCheckpoint(appliedSequenceRef.current);
     // Each snapshot is stamped with the participant whose layer it is, not
@@ -810,7 +795,7 @@ export default function App() {
     snapshots.forEach((snapshot) => ws.send(snapshot));
   // wsRef is created by the WebSocket hook below and is stable for its lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drainCanonical]);
+  }, [drainCanonical, link]);
 
   /**
    * The canonical position this client's last uploaded preview described.
@@ -836,7 +821,7 @@ export default function App() {
     // history is streaming is the replay's own cursor rather than its target.
     // Every tick mid-replay therefore looks caught up, and the lobby would get
     // whatever fraction of the drawing had arrived by then.
-    if (isCatchingUpRef.current || !canUploadCheckpoint()) return;
+    if (link.catchingUp || !canUploadCheckpoint()) return;
     // Nothing has moved since this client last uploaded, so whatever is on the
     // lobby is already current. Other clients keep their own count and will
     // each refresh once after their own last upload, which is what eventually
@@ -859,7 +844,7 @@ export default function App() {
     } finally {
       previewInFlightRef.current = false;
     }
-  }, [canUploadCheckpoint]);
+  }, [canUploadCheckpoint, link]);
 
   // Stops as the session winds down: the canvas is about to become a post, and
   // the room's preview is deleted with the rest of its state. One that landed
@@ -872,12 +857,8 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [canvasMeta, sessionEnding, refreshPreview]);
 
-  const { wsRef, connect } = useWebSocket({
-    canvasMeta, userIdRef, userLoginNameRef, localUserJoinTimeRef,
-    participantsRef, localIdRef, lastSeqRef, shouldConnectRef,
-    catchupTimeoutRef, processingMessageRef, isCatchingUpRef,
-    setConnectionState, setIsCatchingUp,
-    setSyncProgress,
+  const { wsRef, connect, disconnect, view } = useWebSocket({
+    link, canvasMeta, userIdRef,
     onSynchronizationError: handleSynchronizationError,
     createOrUpdateCursor, hideCursor,
     addParticipant, clearParticipants,
@@ -893,6 +874,12 @@ export default function App() {
     onSessionExpired: handleSessionExpired,
   });
 
+  useEffect(() => {
+    painterRef.current?.setInteractionEnabled(
+      view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired,
+    );
+  }, [view.connection, view.catchingUp, sessionEnding, sessionExpired]);
+
   const initializeApp = useCallback(async () => {
     try {
       setInitializationError(null);
@@ -905,7 +892,6 @@ export default function App() {
       if (!authResponse.ok) throw new Error(`Auth failed: ${authResponse.status}`);
       const auth = await authResponse.json();
       userIdRef.current = auth.user_id;
-      userLoginNameRef.current = auth.login_name;
       localeRef.current = auth.preferred_locale || undefined;
       const response = await fetch(`/collaboration/${sessionId}/meta`, { credentials: "include" });
       if (!response.ok) throw new Error(`Failed to fetch collaboration meta: ${response.status}`);
@@ -920,7 +906,6 @@ export default function App() {
       }
       document.title = `Oeee Cafe - ${meta.title?.trim() || t`No Title`}`;
       setCanvasMeta(meta);
-      shouldConnectRef.current = true;
     } catch (error) {
       setInitializationError(error instanceof Error ? error.message : String(error));
       setAuthError(true);
@@ -942,9 +927,9 @@ export default function App() {
   // connection -- a dropped socket, a redeploy -- comes back through the
   // hook's own backoff.
   useEffect(() => {
-    if (canvasMeta && painterRef.current && shouldConnectRef.current) connect();
+    if (canvasMeta && painterRef.current) connect();
   }, [canvasMeta, connect]);
-  useEffect(() => () => { shouldConnectRef.current = false; wsRef.current?.close(); }, [wsRef]);
+  useEffect(() => () => disconnect(), [disconnect]);
 
   const downloadPng = useCallback(async () => {
     const png = await painterRef.current?.exportPng();
@@ -965,13 +950,13 @@ export default function App() {
         await drainCanonical();
         if (
           painterRef.current.isSynchronizationSettled() &&
-          appliedSequenceRef.current >= lastSeqRef.current
+          appliedSequenceRef.current >= link.lastSeq
         ) break;
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
       if (
         !painterRef.current.isSynchronizationSettled() ||
-        appliedSequenceRef.current < lastSeqRef.current
+        appliedSequenceRef.current < link.lastSeq
       ) {
         throw new Error("The shared drawing is still synchronizing; please try again");
       }
@@ -1001,7 +986,7 @@ export default function App() {
       setIsSaving(false);
       setSessionEnding(false);
     }
-  }, [drainCanonical, isSaving, wsRef]);
+  }, [drainCanonical, isSaving, link, wsRef]);
 
   const isOwner = canvasMeta?.ownerId === userIdRef.current;
 
@@ -1144,14 +1129,14 @@ export default function App() {
             <span className={NEO_TITLEBAR_DOT} />
             {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[12px] leading-[18px]">{canvasMeta.title}</span>}
           </div>
-          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={connectionState} isCatchingUp={isCatchingUp} />}
-          <Chat wsRef={wsRef} userId={userIdRef.current} participants={participants} connectionState={connectionState} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} />
+          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={view.connection} isCatchingUp={view.catchingUp} />}
+          <Chat wsRef={wsRef} userId={userIdRef.current} participants={participants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} />
           <div ref={chatResizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
             <span className={NEO_RESIZE_GRIP} />
           </div>
         </div>
         <div ref={painterElementRef} className="h-full w-full" />
-        <ConnectionStatusModal isCatchingUp={isCatchingUp} connectionState={connectionState} syncProgress={syncProgress} synchronizationError={synchronizationError} onReconnect={reload} onDownloadPNG={downloadPng} />
+        <ConnectionStatusModal isCatchingUp={view.catchingUp} connectionState={view.connection} syncProgress={view.progress} synchronizationError={synchronizationError} onReconnect={reload} onDownloadPNG={downloadPng} />
         {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => setSaveConfirmation(true)} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : <Trans>Save to Gallery</Trans>}</button>}
         <SaveConfirmationModal
           isOpen={saveConfirmation}
