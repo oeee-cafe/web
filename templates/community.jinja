@@ -128,7 +128,7 @@
     {# New drawing: the painter's choices, asked for when they are needed. #}
     <div id="community-draw-modal" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="community-draw-title">
       <div class="ds-modal-panel">
-        <h2 id="community-draw-title">{{ ftl_get_message("community-drawing-new") }}</h2>
+        <h2 id="community-draw-title" tabindex="-1">{{ ftl_get_message("community-drawing-new") }}</h2>
         {% if community.background_color %}
           {# Two-tone communities draw offline in the fixed pair of colours
              the community was created with, at one of two sizes. #}
@@ -188,8 +188,9 @@
       function showCommunityDrawModal() {
         var modal = document.getElementById("community-draw-modal");
         modal.style.display = "flex";
-        var first = modal.querySelector("select, input[type=radio]:checked");
-        if (first) first.focus();
+        // Focus the heading, not the first field: on iOS a focused <select>
+        // opens its picker, so the width wheel would come up with the modal.
+        document.getElementById("community-draw-title").focus();
       }
       function hideCommunityDrawModal() {
         document.getElementById("community-draw-modal").style.display = "none";

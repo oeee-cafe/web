@@ -267,7 +267,7 @@
        needed, as on a community's page. #}
     <div id="post-draw-modal" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="post-draw-title">
       <div class="ds-modal-panel">
-        <h2 id="post-draw-title">{{ ftl_get_message("post-reply-with-drawing") }}</h2>
+        <h2 id="post-draw-title" tabindex="-1">{{ ftl_get_message("post-reply-with-drawing") }}</h2>
         {% if two_tone %}
           <form action="/draw" method="post" onsubmit="setOrientationDimensions(this)">
             <input type="hidden" name="tool" value="neo" />
@@ -330,7 +330,7 @@
   {% if current_user and current_user.id != post.author_id %}
     <div id="report-modal" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="report-title">
       <div class="ds-modal-panel">
-        <h2 id="report-title">{{ ftl_get_message("post-report-title") }}</h2>
+        <h2 id="report-title" tabindex="-1">{{ ftl_get_message("post-report-title") }}</h2>
         {# `required` on the textarea is the empty-description check: htmx runs
            HTML5 validation before it will issue a request for a form. #}
         <form id="report-form"
@@ -414,7 +414,10 @@
       if (!modal) return;
       modal.style.display = open ? "flex" : "none";
       if (open) {
-        var first = modal.querySelector("textarea, select, input[type=radio]:checked");
+        // The report's description is there to be typed into, so it takes
+        // focus. Anything else focuses the heading: on iOS a focused <select>
+        // opens its picker, so the width wheel would come up with the modal.
+        var first = modal.querySelector("textarea") || modal.querySelector("h2");
         if (first) first.focus();
       }
     }
