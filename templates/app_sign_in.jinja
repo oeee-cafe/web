@@ -133,8 +133,7 @@
       askedSteam = false;
       if (told.cancelled) return;
       if (!told.ticket) {
-        if (window.dsAlert) window.dsAlert(STEAM_FAILED);
-        else window.alert(STEAM_FAILED);
+        window.dsAlert(STEAM_FAILED);
         return;
       }
       var post = document.createElement("form");
@@ -199,11 +198,11 @@
     var ASK_EVERY = 2000;
     var GIVE_UP_AFTER = 15 * 60 * 1000;
 
-    // A yes or no from the reader, in the site's own dialog where the page
-    // has one, as a plain question rather than a destructive one.
+    // A yes or no from the reader, in the site's own dialog
+    // (confirm_dialog.jinja, on every page this is), as a plain question
+    // rather than a destructive one.
     function agree(message) {
-      if (window.dsConfirm) return window.dsConfirm(message, OK, "plain");
-      return Promise.resolve(window.confirm(message));
+      return window.dsConfirm(message, OK, "plain");
     }
 
     function stop() {

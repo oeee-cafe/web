@@ -117,8 +117,9 @@
 </script>
 {# The same alert with nothing to decide: something the page has to say, and
    OK. `dsAlert(message)` stands in for the browser's alert(), which the
-   desktop app on Windows and the Android app draw as the web view's own box,
-   titled "oeee.cafe says". #}
+   Android app draws as the web view's own box, titled "oeee.cafe says", and
+   the Apple and Windows apps do not draw at all. The site calls neither
+   alert() nor confirm() (frontend/shared/siteDialog.ts). #}
 <div id="ds-alert" class="ds-modal ds-alert" style="display: none;" role="alertdialog" aria-modal="true" aria-describedby="ds-alert-message">
   <div class="ds-modal-panel ds-alert-panel">
     <p id="ds-alert-message" class="ds-alert-message"></p>

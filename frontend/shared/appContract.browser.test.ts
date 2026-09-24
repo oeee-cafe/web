@@ -603,18 +603,7 @@ describe("what a store gives an app", () => {
     expect(elsewhere.sent.some((message) => message.type === "signIn")).toBe(false);
   });
 
-  it("says so when Steam gives no ticket", async () => {
-    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
-    const said: string[] = [];
-    page.window.alert = (message?: string) => {
-      said.push(String(message));
-    };
-    page.window.document.querySelector<HTMLElement>(".auth-steam")!.click();
-    page.window.oeeeApp.signIn.answer({});
-    expect(said).toEqual(["app-steam-sign-in-failed"]);
-  });
-
-  it("says it in the site's own alert where the page has one", async () => {
+  it("says so in the site's own alert when Steam gives no ticket, never the browser's", async () => {
     const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
     const said: string[] = [];
     const site = page.window as unknown as { dsAlert: (message: string) => void };
