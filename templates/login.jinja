@@ -54,8 +54,9 @@
             {# Google's sign-in page, and back, in a browser. Google refuses
                its own pages in an embedded web view, so in every app the page
                takes the press itself (app_sign_in.jinja): Credential Manager
-               on Android, a browser of the system's on iOS and macOS, and on
-               Windows the browser, with the answer handed back. #}
+               on Android, and elsewhere this same page in a browser of the
+               system's -- a sheet on iOS and macOS, the browser on Windows --
+               with the answer handed back. #}
             <a class="ds-button auth-secondary auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-google") }}</a>
           {% endif %}
         </div>

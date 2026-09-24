@@ -11,7 +11,7 @@
 
    A sheet of the platform's own, which answers with an ID token for a
    nonce: Sign in with Apple on iOS and macOS, Credential Manager for Google
-   on Android, ASWebAuthenticationSession for Google on iOS and macOS.
+   on Android.
      1. the page asks the site for this sign-in's state and nonce (POST
         /auth/<provider>/start), which the site keeps in the web view's
         session;
@@ -24,8 +24,11 @@
         format=json, and the site checks both against the session
         (src/apple.rs, src/google.rs, identity.rs) and says where to go.
 
-   The system's browser, where there is no sheet: Apple on Android, both on
-   Windows.
+   The system's browser, where there is no sheet: Apple on Android, Google
+   on iOS and macOS (in ASWebAuthenticationSession, which Google allows),
+   both on Windows. Google on iOS and macOS once had a sheet of the app's
+   own, with an OAuth client and a token exchange of its own to keep; this
+   is the site's own sign-in, in the same system sheet.
      1. the page starts a handoff (POST /auth/handoff/start, src/handoff.rs)
         and sends the app  browse {url}  on the bridge; the app checks the
         URL is this site's and opens it in the browser, or calls
@@ -270,8 +273,8 @@
     // platform has one, the system's browser where it does not. The app is
     // the one the root is marked for (theme_head.jinja).
     var WAYS = {
-      ios: { apple: native, google: native },
-      macos: { apple: native, google: native },
+      ios: { apple: native, google: browser },
+      macos: { apple: native, google: browser },
       android: { apple: browser, google: native },
       windows: { apple: browser, google: browser }
     };

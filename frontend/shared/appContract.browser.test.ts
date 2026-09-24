@@ -628,7 +628,8 @@ describe("signing in for an app", () => {
   it("goes the way each app signs in with each provider", async () => {
     const ways: [string, "apple" | "google", string][] = [
       ["Mozilla/5.0 OeeeCafe platform/ios", "apple", "/auth/apple/start"],
-      ["Mozilla/5.0 OeeeCafe platform/ios", "google", "/auth/google/start"],
+      ["Mozilla/5.0 OeeeCafe platform/ios", "google", "/auth/handoff/start"],
+      ["Mozilla/5.0 OeeeCafe platform/macos", "google", "/auth/handoff/start"],
       ["Mozilla/5.0 OeeeCafe platform/macos", "apple", "/auth/apple/start"],
       ["Mozilla/5.0 OeeeCafe platform/windows", "google", "/auth/handoff/start"],
       ["Mozilla/5.0 OeeeCafe platform/windows", "apple", "/auth/handoff/start"],
