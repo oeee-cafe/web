@@ -123,6 +123,11 @@ pub struct AppStoreConfig {
     pub api_url: String,
     #[serde(default = "default_app_store_sandbox_api_url")]
     pub sandbox_api_url: String,
+    /// The root every signed transaction has to chain to: Apple's, built
+    /// in. Not configurable -- a root read from a file would be one more
+    /// thing that could be swapped -- and only a test changes it.
+    #[serde(skip)]
+    pub trusted_root: crate::app_store::TrustedRoot,
 }
 
 fn default_app_store_api_url() -> String {

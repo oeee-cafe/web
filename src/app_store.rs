@@ -33,7 +33,9 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use data_encoding::BASE64;
+use jsonwebtoken::{encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use rustls_pki_types::{CertificateDer, UnixTime};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -151,14 +153,125 @@ async fn signed_transaction(
     Ok(Some(body.signed_transaction_info))
 }
 
-/// Reads Apple's signed transaction without checking its signature.
+/// Apple Root CA - G3, from <https://www.apple.com/certificateauthority/>.
+/// SHA-256 `63:34:3A:BF:B8:9A:6A:03:EB:B5:7E:9B:3F:5F:A7:BE:7C:4F:5C:75:6F:30:17:B3:A8:C4:88:C3:65:3E:91:79`.
+const APPLE_ROOT_CA_G3: &[u8] = include_bytes!("certs/AppleRootCA-G3.cer");
+
+/// Apple's marker on a Worldwide Developer Relations intermediate.
+const WWDR_INTERMEDIATE_MARKER: &str = "1.2.840.113635.100.6.2.1";
+/// Apple's marker on the leaf that signs App Store receipts and
+/// transactions. It is what says what the leaf is for: the leaf carries no
+/// extended key usage.
+const RECEIPT_SIGNING_MARKER: &str = "1.2.840.113635.100.6.11.1";
+
+/// The root a signed transaction has to chain to. Apple's, except in tests.
+#[derive(Clone, Copy)]
+pub struct TrustedRoot(pub &'static [u8]);
+
+impl Default for TrustedRoot {
+    fn default() -> Self {
+        Self(APPLE_ROOT_CA_G3)
+    }
+}
+
+impl std::fmt::Debug for TrustedRoot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("TrustedRoot(..)")
+    }
+}
+
+/// Reads Apple's signed transaction, having checked that Apple signed it.
 ///
-/// It is not the app's word being read: this JWS came back from Apple's own
-/// API, over TLS, to a request signed with our key. Checking the signature
-/// as well would mean walking the `x5c` chain to Apple's root, which proves
-/// the same thing the connection already did.
-fn read_transaction(jws: &str) -> Result<Transaction> {
-    Ok(jsonwebtoken::dangerous::insecure_decode::<Transaction>(jws)?.claims)
+/// The JWS names its signer in `x5c`: the leaf, Apple's WWDR intermediate
+/// and Apple's root. The leaf and the intermediate have to chain to *our*
+/// copy of the root -- the one in the header is only Apple's say-so -- be
+/// valid at `now`, and each carry Apple's marker for what it is; then the
+/// signature has to be the leaf's. This is what Apple's own App Store Server
+/// Library checks, less the online revocation check.
+///
+/// The transaction comes from Apple's API over TLS, so this is not the only
+/// thing standing between a forged purchase and a Supporter Pack. But TLS
+/// only says which server answered; this says Apple signed what it said.
+fn read_transaction(jws: &str, root: TrustedRoot, now: UnixTime) -> Result<Transaction> {
+    let header = jsonwebtoken::decode_header(jws)?;
+    if header.alg != Algorithm::ES256 {
+        return Err(anyhow!("the transaction is signed with {:?}, not ES256", header.alg));
+    }
+    let chain = header
+        .x5c
+        .ok_or_else(|| anyhow!("the transaction names no certificate chain"))?;
+    let [leaf, intermediate, _root] = chain.as_slice() else {
+        return Err(anyhow!(
+            "the transaction's chain has {} certificates, not 3",
+            chain.len()
+        ));
+    };
+    let leaf = BASE64.decode(leaf.as_bytes())?;
+    let intermediate = BASE64.decode(intermediate.as_bytes())?;
+    verify_chain(&leaf, &intermediate, root, now)?;
+
+    let (_, leaf_certificate) = x509_parser::parse_x509_certificate(&leaf)?;
+    let key = DecodingKey::from_ec_der(&leaf_certificate.public_key().subject_public_key.data);
+    let mut validation = Validation::new(Algorithm::ES256);
+    // A transaction is a record of a purchase, not a token: it has no
+    // expiry, audience or subject to check.
+    validation.validate_exp = false;
+    validation.validate_aud = false;
+    validation.required_spec_claims.clear();
+    Ok(jsonwebtoken::decode::<Transaction>(jws, &key, &validation)?.claims)
+}
+
+/// That `leaf` and `intermediate` chain to `root` at `now`, and are the
+/// certificates Apple says they are.
+fn verify_chain(leaf: &[u8], intermediate: &[u8], root: TrustedRoot, now: UnixTime) -> Result<()> {
+    let root = CertificateDer::from(root.0);
+    let anchor = webpki::anchor_from_trusted_cert(&root)
+        .map_err(|error| anyhow!("the trusted root does not parse: {error}"))?;
+    let leaf_der = CertificateDer::from(leaf);
+    let end_entity = webpki::EndEntityCert::try_from(&leaf_der)
+        .map_err(|error| anyhow!("the signing certificate does not parse: {error}"))?;
+    end_entity
+        .verify_for_usage(
+            &[
+                webpki::ring::ECDSA_P256_SHA256,
+                webpki::ring::ECDSA_P256_SHA384,
+                webpki::ring::ECDSA_P384_SHA256,
+                webpki::ring::ECDSA_P384_SHA384,
+            ],
+            &[anchor],
+            &[CertificateDer::from(intermediate)],
+            now,
+            AnyExtendedKeyUsage,
+            None,
+            None,
+        )
+        .map_err(|error| anyhow!("the transaction's chain does not lead to Apple: {error}"))?;
+
+    if !has_extension(intermediate, WWDR_INTERMEDIATE_MARKER)? {
+        return Err(anyhow!("the intermediate is not Apple's WWDR certificate"));
+    }
+    if !has_extension(leaf, RECEIPT_SIGNING_MARKER)? {
+        return Err(anyhow!("the signing certificate is not for App Store receipts"));
+    }
+    Ok(())
+}
+
+fn has_extension(certificate: &[u8], oid: &str) -> Result<bool> {
+    let (_, certificate) = x509_parser::parse_x509_certificate(certificate)?;
+    Ok(certificate
+        .extensions()
+        .iter()
+        .any(|extension| extension.oid.to_id_string() == oid))
+}
+
+/// Apple's receipt-signing leaf carries no extended key usage, so none is
+/// asked for; its marker extension is checked instead.
+struct AnyExtendedKeyUsage;
+
+impl webpki::ExtendedKeyUsageValidator for AnyExtendedKeyUsage {
+    fn validate(&self, _: webpki::KeyPurposeIdIter<'_, '_>) -> Result<(), webpki::Error> {
+        Ok(())
+    }
 }
 
 /// What the App Store says about `transaction_id`, against `packs`: every
@@ -187,7 +300,7 @@ pub async fn look_up(
             None => return Ok(None),
         },
     };
-    let transaction = read_transaction(&signed)?;
+    let transaction = read_transaction(&signed, config.trusted_root, UnixTime::now())?;
 
     if transaction.bundle_id != config.bundle_id {
         return Ok(None);
@@ -349,10 +462,31 @@ mod tests {
     use serde_json::Value;
 
     /// A throwaway P-256 key, standing in for the one App Store Connect
-    /// issues. Apple signs its transactions with its own; the site never
-    /// sees that key, and never checks that signature (see
-    /// [`read_transaction`]), so the fake signs with this one.
+    /// issues -- and, since the fake App Store signs its transactions with
+    /// it, for Apple's receipt-signing key too: `testdata/app_store_x5c`'s
+    /// leaf certificates are for this key.
     const PRIVATE_KEY: &str = include_str!("testdata/app_store_test_key.p8");
+    /// A P-256 key that is not the leaf's.
+    const IMPOSTOR_KEY: &str = include_str!("testdata/app_store_x5c/impostor_key.p8");
+
+    /// The chains the fake signs under, shaped like Apple's (see
+    /// `testdata/app_store_x5c/generate.sh`), and the root they lead to.
+    const TEST_ROOT: TrustedRoot = TrustedRoot(include_bytes!("testdata/app_store_x5c/root.der"));
+    const LEAF: &[u8] = include_bytes!("testdata/app_store_x5c/leaf.der");
+    const INTERMEDIATE: &[u8] = include_bytes!("testdata/app_store_x5c/intermediate.der");
+    const UNMARKED_LEAF: &[u8] = include_bytes!("testdata/app_store_x5c/leaf_unmarked.der");
+    const UNMARKED_INTERMEDIATE: &[u8] =
+        include_bytes!("testdata/app_store_x5c/intermediate_unmarked.der");
+    const LEAF_UNDER_UNMARKED: &[u8] =
+        include_bytes!("testdata/app_store_x5c/leaf_under_unmarked.der");
+
+    /// Apple's own intermediate and current receipt-signing leaf, as they
+    /// arrive in every production transaction's `x5c`: copied from the
+    /// tests of Apple's app-store-server-library-python, which check them
+    /// at the moment below.
+    const APPLE_INTERMEDIATE: &[u8] = include_bytes!("testdata/app_store_x5c/apple_wwdr_g6.der");
+    const APPLE_LEAF: &[u8] = include_bytes!("testdata/app_store_x5c/apple_receipt_signing.der");
+    const WHEN_APPLE_CHECKS_THEM: u64 = 1_761_962_975;
     /// The same file, for the config to read the way the real one is read.
     const PRIVATE_KEY_PATH: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -435,11 +569,18 @@ mod tests {
             && claims.claims["bid"] == json!(BUNDLE_ID)
     }
 
+    /// Signed the way Apple signs: ES256, naming the chain in `x5c`.
     fn signed(transaction: &Value) -> String {
+        signed_with(transaction, PRIVATE_KEY, &[LEAF, INTERMEDIATE, TEST_ROOT.0])
+    }
+
+    fn signed_with(transaction: &Value, key: &str, chain: &[&[u8]]) -> String {
+        let mut header = Header::new(Algorithm::ES256);
+        header.x5c = Some(chain.iter().map(|der| BASE64.encode(der)).collect());
         encode(
-            &Header::new(Algorithm::ES256),
+            &header,
             transaction,
-            &EncodingKey::from_ec_pem(PRIVATE_KEY.as_bytes()).unwrap(),
+            &EncodingKey::from_ec_pem(key.as_bytes()).unwrap(),
         )
         .unwrap()
     }
@@ -486,6 +627,7 @@ mod tests {
             bundle_id: BUNDLE_ID.to_string(),
             api_url: format!("http://{addr}/production"),
             sandbox_api_url: format!("http://{addr}/sandbox"),
+            trusted_root: TEST_ROOT,
         }
     }
 
@@ -595,5 +737,88 @@ mod tests {
         let mut config = fake_app_store().await;
         config.private_key_path = "/nowhere/app-store.p8".to_string();
         assert!(look_up(&config, &packs(), "1000").await.is_err());
+    }
+
+    fn read(jws: &str) -> Result<Transaction> {
+        read_transaction(jws, TEST_ROOT, UnixTime::now())
+    }
+
+    #[test]
+    fn a_transaction_signed_under_the_chain_reads() {
+        let transaction = read(&signed(&transaction("1000", json!({})))).unwrap();
+        assert_eq!(transaction.product_id, PRODUCT_ID);
+    }
+
+    /// The production setting: a chain to any root but Apple's is refused,
+    /// whatever root the header itself carries.
+    #[test]
+    fn only_apples_root_is_trusted() {
+        let jws = signed(&transaction("1000", json!({})));
+        let error = read_transaction(&jws, TrustedRoot::default(), UnixTime::now())
+            .err()
+            .expect("our test root is not Apple's");
+        assert!(error.to_string().contains("does not lead to Apple"), "{error}");
+    }
+
+    /// The chain is right and the signature is somebody else's.
+    #[test]
+    fn the_signature_has_to_be_the_leafs() {
+        let jws = signed_with(
+            &transaction("1000", json!({})),
+            IMPOSTOR_KEY,
+            &[LEAF, INTERMEDIATE, TEST_ROOT.0],
+        );
+        assert!(read(&jws).is_err());
+    }
+
+    /// A certificate that chains to the root is not enough: each has to be
+    /// the one Apple's marker says it is.
+    #[test]
+    fn each_certificate_has_to_carry_apples_marker() {
+        for (what, chain) in [
+            ("leaf", [UNMARKED_LEAF, INTERMEDIATE, TEST_ROOT.0]),
+            ("intermediate", [LEAF_UNDER_UNMARKED, UNMARKED_INTERMEDIATE, TEST_ROOT.0]),
+        ] {
+            let jws = signed_with(&transaction("1000", json!({})), PRIVATE_KEY, &chain);
+            let error = read(&jws).err().unwrap_or_else(|| panic!("an unmarked {what}"));
+            assert!(error.to_string().contains("is not"), "{what}: {error}");
+        }
+    }
+
+    #[test]
+    fn a_transaction_without_its_chain_is_refused() {
+        let unchained = encode(
+            &Header::new(Algorithm::ES256),
+            &transaction("1000", json!({})),
+            &EncodingKey::from_ec_pem(PRIVATE_KEY.as_bytes()).unwrap(),
+        )
+        .unwrap();
+        assert!(read(&unchained).is_err(), "no x5c");
+
+        let short = signed_with(&transaction("1000", json!({})), PRIVATE_KEY, &[LEAF, INTERMEDIATE]);
+        assert!(read(&short).is_err(), "two certificates");
+    }
+
+    /// Apple's real chain, against the root built in: what every production
+    /// transaction is checked against, and what the fixtures above only
+    /// imitate. Its leaf carries no extended key usage, which is why none is
+    /// asked for.
+    #[test]
+    fn apples_own_chain_leads_to_the_built_in_root() {
+        let when = UnixTime::since_unix_epoch(Duration::from_secs(WHEN_APPLE_CHECKS_THEM));
+        verify_chain(APPLE_LEAF, APPLE_INTERMEDIATE, TrustedRoot::default(), when).unwrap();
+    }
+
+    #[test]
+    fn apples_chain_is_refused_once_its_leaf_expires() {
+        // The leaf is good until October 2027.
+        let later = UnixTime::since_unix_epoch(Duration::from_secs(1_830_000_000));
+        assert!(verify_chain(APPLE_LEAF, APPLE_INTERMEDIATE, TrustedRoot::default(), later).is_err());
+    }
+
+    #[test]
+    fn apples_chain_is_refused_under_another_root() {
+        let when = UnixTime::since_unix_epoch(Duration::from_secs(WHEN_APPLE_CHECKS_THEM));
+        assert!(verify_chain(APPLE_LEAF, APPLE_INTERMEDIATE, TEST_ROOT, when).is_err());
     }
 }

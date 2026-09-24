@@ -3836,6 +3836,8 @@ dependencies = [
  "rmp-serde",
  "rpassword",
  "rustls",
+ "rustls-pki-types",
+ "rustls-webpki",
  "sentry",
  "serde",
  "serde_json",
@@ -3854,6 +3856,7 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
+ "x509-parser",
  "yup-oauth2",
 ]
 
