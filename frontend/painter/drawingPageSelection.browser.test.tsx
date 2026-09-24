@@ -52,17 +52,19 @@ describe("a drawing page", () => {
   it("selects nothing when a drag crosses the toolbox", async () => {
     await mountPainter();
     const extras = document.querySelector<HTMLElement>(".toolbox-extras")!;
-    const theme = [...extras.querySelectorAll("button")].find((b) =>
-      /Dark|Light/.test(b.textContent ?? ""),
-    )!;
+    // From the zoom readout, the extras column's one run of text, across
+    // its neighbour.
     const readout = extras.querySelector<HTMLButtonElement>(
       'button[title="Reset zoom"]',
     )!;
+    const undo = extras.querySelector<HTMLButtonElement>(
+      'button[title="Undo"]',
+    )!;
 
     await act(async () => {
-      await userEvent.dragAndDrop(theme, readout, {
-        sourcePosition: { x: 30, y: 8 },
-        targetPosition: { x: 10, y: 8 },
+      await userEvent.dragAndDrop(readout, undo, {
+        sourcePosition: { x: 4, y: 7 },
+        targetPosition: { x: 20, y: 8 },
       });
     });
 
