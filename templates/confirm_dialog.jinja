@@ -42,6 +42,12 @@
       return text || control.getAttribute("aria-label") || control.getAttribute("title") || fallbackLabel;
     }
 
+    // A question whose yes destroys something is felt as a warning, as an
+    // app's own destructive alert is (theme_head.jinja).
+    function warn() {
+      if (window.oeeeApp && window.oeeeApp.connected()) window.oeeeApp.feel("warning");
+    }
+
     function close(confirmed) {
       var decide = pending;
       pending = null;
@@ -67,6 +73,7 @@
       ok.classList.remove("ds-button-primary");
       dialog.style.display = "flex";
       cancel.focus();
+      warn();
     });
 
     // The same question from a script of the site's own, in place of the
@@ -86,6 +93,7 @@
         ok.classList.toggle("ds-button-primary", tone === "plain");
         dialog.style.display = "flex";
         cancel.focus();
+        if (tone !== "plain") warn();
       });
     };
 

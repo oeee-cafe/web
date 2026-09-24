@@ -16,7 +16,7 @@
     </div>
     {% if current_user and current_user.id != user.id %}
       <form class="ds-card settings-card guestbook-compose"
-            id="guestbook-compose" data-haptic-done="success"
+            id="guestbook-compose"
             hx-post="/@{{ user.login_name }}/guestbook"
             hx-target="#guestbook-entries"
             hx-swap="afterbegin"

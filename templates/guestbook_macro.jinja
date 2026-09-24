@@ -16,7 +16,7 @@
       <details class="guestbook-reply-form">
         <summary class="ds-button ds-button-small">{{ ftl_get_message("guestbook-reply") }}</summary>
         {# The reply takes this whole disclosure's place once it is sent. #}
-        <form data-haptic-done="success" hx-post="/@{{ user.login_name }}/guestbook/{{ entry.id }}/reply"
+        <form hx-post="/@{{ user.login_name }}/guestbook/{{ entry.id }}/reply"
               hx-target="closest .guestbook-reply-form"
               hx-swap="outerHTML"
               hx-disable="find button">

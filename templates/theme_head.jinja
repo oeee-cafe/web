@@ -142,22 +142,52 @@
       event.preventDefault();
     });
   }
-  if (window.oeeeApp && window.oeeeApp.connected()) {
+  // In a function of its own, so what it keeps is not the window's.
+  (function () {
+    if (!window.oeeeApp || !window.oeeeApp.connected()) return;
     // Controls are felt as well as seen, as the apps' own are: "light",
     // "medium", "selection", "success", "warning", "error", sent to the app
     // as a haptic message (app_bridge.jinja). Sent to any app listening, not
     // to a kind of device: one that has nothing to feel them with -- a Mac,
     // Windows -- ignores them, as it ignores any message it does not use.
+    //
+    // Most of it is read off what the markup already says, so a new page is
+    // felt without asking: a primary button is a medium press, a request a
+    // press sent is felt as how it went, and a confirmation that destroys
+    // something is a warning (confirm_dialog.jinja). data-haptic on a control
+    // says otherwise for it, and data-haptic="none" silences everything
+    // inside the element that carries it.
     function feel(name) {
-      window.oeeeApp.feel(name);
+      if (name && name !== "none") window.oeeeApp.feel(name);
     }
+    // What sends a request that changes something, whose outcome is felt
+    // instead of the press: a control of htmx's own, or a form's submit
+    // button when the form posts.
+    function sends(control) {
+      if (control.closest("[hx-post], [hx-put], [hx-patch], [hx-delete]")) return true;
+      var form = control.form;
+      return !!form && control.matches('button:not([type]), button[type="submit"], input[type="submit"]') &&
+        (form.getAttribute("method") || "").toLowerCase() === "post";
+    }
+    // The control last felt on its press, so what it sent is not felt twice.
+    var pressed = null;
     document.addEventListener("click", function (event) {
       var target = event.target;
       if (!target || !target.closest) return;
-      // A control that says how it feels (data-haptic).
+      pressed = null;
+      // A control that says how it feels (data-haptic), or a quiet region.
       var control = target.closest("[data-haptic]");
       if (control) {
-        feel(control.getAttribute("data-haptic"));
+        var name = control.getAttribute("data-haptic");
+        if (name !== "none") pressed = control;
+        feel(name);
+        return;
+      }
+      // A primary button, unless what it sends will be felt when it is done.
+      var primary = target.closest(".ds-button-primary");
+      if (primary && !primary.disabled && !sends(primary)) {
+        pressed = primary;
+        feel("medium");
         return;
       }
       // A segmented control ticks when its choice changes, as a picker does;
@@ -170,33 +200,43 @@
     // So do a checkbox or a radio when it changes, and a slider at each step.
     document.addEventListener("change", function (event) {
       var target = event.target;
-      if (target && target.matches && target.matches('input[type="checkbox"], input[type="radio"]')) feel("selection");
+      if (target && target.matches && target.matches('input[type="checkbox"], input[type="radio"]') &&
+          !target.closest('[data-haptic="none"]')) feel("selection");
     }, true);
     document.addEventListener("input", function (event) {
       var target = event.target;
-      if (target && target.matches && target.matches('input[type="range"]')) feel("selection");
+      if (target && target.matches && target.matches('input[type="range"]') &&
+          !target.closest('[data-haptic="none"]')) feel("selection");
     }, true);
-    // What a press asked the site for: a failure is felt as one, and a form
-    // marked data-haptic-done is felt when it has gone through. Only a press
-    // or a submission -- a page loading more as it scrolls is not felt.
-    function pressed(ctx) {
+    // What a press asked the site for. A failure is felt as one; a change
+    // that went through is felt as a success, or as the form's
+    // data-haptic-done says, unless its press was felt already. Only a press
+    // or a submission -- a page loading more as it scrolls is not felt, and
+    // nor is a page a link fetched.
+    function byPress(ctx) {
       var event = ctx && ctx.sourceEvent;
       return !!event && (event.type === "click" || event.type === "submit");
     }
     document.addEventListener("htmx:after:request", function (event) {
       var ctx = event.detail && event.detail.ctx;
-      if (!pressed(ctx)) return;
+      if (!byPress(ctx)) return;
+      var source = ctx.sourceElement || event.target;
+      if (source && source.closest && source.closest('[data-haptic="none"]')) return;
       if (ctx.response && ctx.response.status >= 400) {
         feel("error");
         return;
       }
-      var done = event.target && event.target.closest ? event.target.closest("[data-haptic-done]") : null;
-      if (done) feel(done.getAttribute("data-haptic-done"));
+      var method = ((ctx.request && ctx.request.method) || "GET").toUpperCase();
+      if (method === "GET") return;
+      var from = ctx.sourceEvent.submitter || ctx.sourceEvent.target;
+      if (pressed && from && pressed.contains(from)) return;
+      var done = source && source.closest ? source.closest("[data-haptic-done]") : null;
+      feel(done ? done.getAttribute("data-haptic-done") : "success");
     });
     document.addEventListener("htmx:error", function (event) {
-      if (pressed(event.detail && event.detail.ctx)) feel("error");
+      if (byPress(event.detail && event.detail.ctx)) feel("error");
     });
-  }
+  })();
   try {
     var theme = localStorage.getItem("neo-cucumber-theme");
     if (theme === "light" || theme === "dark") {

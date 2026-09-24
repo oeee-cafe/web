@@ -93,6 +93,8 @@ interface Options {
   supporter?: string[];
   /** The page has the loading bar, as every page with the toolbar has (loading_bar.jinja). */
   loadingBar?: boolean;
+  /** The page has the site's own confirm and alert (confirm_dialog.jinja), as base.jinja includes. */
+  confirmDialog?: boolean;
 }
 
 /** /supporter's own script, which is all of it that talks to an app. */
@@ -160,7 +162,8 @@ async function open(options: Options = {}): Promise<Page> {
       .map((product) => `<button class="supporter-buy" data-product="${product}"></button>`)
       .join("")}
     ${options.supporter ? `<button class="supporter-restore"></button>${supporterScript()}` : ""}
-    ${options.loadingBar ? template("loading_bar.jinja") : ""}`;
+    ${options.loadingBar ? template("loading_bar.jinja") : ""}
+    ${options.confirmDialog ? template("confirm_dialog.jinja") : ""}`;
   const html = `<!doctype html><html><head>${before}
     <style>:root { --ds-ground: #ccccff; --ds-grid: #bbbbff; } body { background: rgb(255, 255, 255); }</style>
     ${presence}${HEAD}</head><body>${body}</body></html>`;
@@ -362,6 +365,104 @@ describe("what the site tells the apps", () => {
     page.window.document.body.appendChild(button);
     button.click();
     expect(last(page, "haptic")).toEqual({ v: 1, type: "haptic", name: "light" });
+  });
+});
+
+describe("what the site's controls feel like, read off the markup", () => {
+  const felt = (page: Page) => page.sent.filter((message) => message.type === "haptic").map((m) => m.name);
+
+  function add(page: Page, html: string): HTMLElement {
+    // Nothing here is really sent: a form sent would take the page away.
+    page.window.document.addEventListener("submit", (event) => event.preventDefault());
+    const holder = page.window.document.createElement("div");
+    holder.innerHTML = html;
+    page.window.document.body.appendChild(holder);
+    return holder.firstElementChild as HTMLElement;
+  }
+
+  /** What htmx says when a request is done (htmx 4's ctx, as far as the head reads it). */
+  function done(page: Page, source: HTMLElement, init: { event: Event; method: string; status: number }) {
+    source.dispatchEvent(
+      new page.window.CustomEvent("htmx:after:request", {
+        bubbles: true,
+        detail: {
+          ctx: {
+            sourceElement: source,
+            sourceEvent: init.event,
+            request: { method: init.method },
+            response: { status: init.status },
+          },
+        },
+      }),
+    );
+  }
+
+  const submitOf = (page: Page, form: HTMLElement) => {
+    const event = new page.window.Event("submit", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "target", { value: form });
+    return event;
+  };
+  const clickOn = (page: Page, element: HTMLElement) => {
+    const event = new page.window.MouseEvent("click", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "target", { value: element });
+    return event;
+  };
+
+  it("feels a primary button as a medium press, and a plain one not at all", async () => {
+    const page = await open();
+    add(page, '<button class="ds-button ds-button-primary">Draw</button>').click();
+    add(page, '<button class="ds-button">Cancel</button>').click();
+    expect(felt(page)).toEqual(["medium"]);
+  });
+
+  it("feels a change a press sent when it has gone through, not when it was pressed", async () => {
+    const page = await open();
+    const form = add(page, '<form hx-post="/follow"><button type="submit" class="ds-button ds-button-primary">Follow</button></form>');
+    form.querySelector("button")!.dispatchEvent(new page.window.MouseEvent("click", { bubbles: true }));
+    expect(felt(page)).toEqual([]);
+    done(page, form, { event: submitOf(page, form), method: "POST", status: 200 });
+    expect(felt(page)).toEqual(["success"]);
+  });
+
+  it("feels a failure as one, and a fetch or a request nobody pressed for not at all", async () => {
+    const page = await open();
+    const form = add(page, '<form hx-post="/comments"><button>Post</button></form>');
+    done(page, form, { event: submitOf(page, form), method: "POST", status: 500 });
+    done(page, form, { event: submitOf(page, form), method: "GET", status: 200 });
+    done(page, form, { event: new page.window.Event("load"), method: "POST", status: 200 });
+    expect(felt(page)).toEqual(["error"]);
+  });
+
+  it("feels a request as the form says, and as its press when that was felt already", async () => {
+    const page = await open();
+    const form = add(page, '<form hx-post="/x" data-haptic-done="light"><button>Go</button></form>');
+    done(page, form, { event: submitOf(page, form), method: "POST", status: 200 });
+    const reaction = add(page, '<button hx-post="/react" data-haptic="light">heart</button>');
+    reaction.click();
+    done(page, reaction, { event: clickOn(page, reaction), method: "POST", status: 200 });
+    expect(felt(page)).toEqual(["light", "light"]);
+  });
+
+  it("feels nothing inside data-haptic=none", async () => {
+    const page = await open();
+    const quiet = add(
+      page,
+      '<div data-haptic="none"><button class="ds-button-primary">A</button><form hx-post="/y"><input type="checkbox"></form></div>',
+    );
+    quiet.querySelector("button")!.click();
+    quiet.querySelector("input")!.click();
+    const form = quiet.querySelector("form")!;
+    done(page, form, { event: submitOf(page, form), method: "POST", status: 200 });
+    expect(felt(page)).toEqual([]);
+  });
+
+  it("warns when a confirmation would destroy something, and not when it would not", async () => {
+    const page = await open({ confirmDialog: true });
+    const ask = (page.window as unknown as { dsConfirm(text: string, action?: string, tone?: string): Promise<boolean> })
+      .dsConfirm;
+    void ask("Delete this?", "Delete");
+    void ask("Leave?", "Leave", "plain");
+    expect(felt(page)).toEqual(["warning"]);
   });
 });
 
