@@ -233,7 +233,6 @@ tag-no-posts = No posts with this tag yet
 tag-discovery = Tags
 tag-search-placeholder = Search tags...
 search = Search
-searching = Searching…
 search-results-for = Search results for
 search-placeholder = Search drawings
 search-posts = Drawings
