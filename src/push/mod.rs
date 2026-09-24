@@ -96,8 +96,14 @@ impl PushService {
         title: &str,
         body: &str,
         badge: Option<u32>,
-        data: Option<serde_json::Value>,
+        url: &str,
+        mut data: serde_json::Map<String, serde_json::Value>,
     ) -> Result<()> {
+        // The page tapping it opens, a path on the site. Every push has one: the apps open
+        // it and have nothing of their own to fall back on.
+        data.insert("url".to_string(), serde_json::json!(url));
+        let data = Some(serde_json::Value::Object(data));
+
         // Get user's tokens from database
         let mut tx = self.db_pool.begin().await?;
 

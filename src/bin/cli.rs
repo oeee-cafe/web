@@ -258,7 +258,8 @@ async fn main() -> Result<()> {
                             "Test Push Notification",
                             "This is a test notification from the CLI",
                             Some(1),
-                            None,
+                            "/notifications",
+                            serde_json::Map::new(),
                         )
                         .await
                     {
