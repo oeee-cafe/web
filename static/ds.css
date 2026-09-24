@@ -47,6 +47,10 @@
   --ds-radius-s: 4px;
   --ds-radius-m: 6px;
   --ds-control-height: 30px;
+  /* A segment of a segmented control -- the toolbar's sections and every
+     .ds-segmented alike: 3px above and below and 11px a side, which with
+     20px of line and the track's 2px and border comes to the bar's 30px. */
+  --ds-segment-padding: 3px 11px;
   /* Ground: NEO's own -- the lavender the painter has always stood on, and
      its 14px grid -- so the site and the painter are one surface. Dark is
      NEO's night blue. */
@@ -791,11 +795,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   margin-left: 2px;
 }
 
-/* A pixel shorter and a tighter corner than the toolbar's other links,
-   for the 2px of track around them (.ds-segmented). */
+/* A segment's padding and corner, as every segmented control's
+   (.ds-segmented), rather than the toolbar's other links'. */
 .nav-bar .toolbar-sections a {
-  padding-top: 3px;
-  padding-bottom: 3px;
+  padding: var(--ds-segment-padding);
   border-radius: var(--ds-radius-s);
 }
 
@@ -2737,7 +2740,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page .ds-segmented > button {
   display: inline-block;
   margin: 0;
-  padding: 2px 12px;
+  padding: var(--ds-segment-padding);
   border: 0;
   border-radius: var(--ds-radius-s);
   background: none;
