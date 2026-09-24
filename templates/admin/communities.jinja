@@ -1,61 +1,66 @@
 {% extends "admin/base.jinja" %}
+{% set admin_section = "communities" %}
 {% macro sort_link(key, label) %}
   <a href="?sort={{ key }}" {% if sort == key %}class="admin-sort-active"{% endif %}>
     {{ label }}{% if sort == key %} ▾{% endif %}
   </a>
 {% endmacro %}
 {% block admin_content %}
-  <h2>Communities</h2>
-  <p class="muted">
-    Includes unlisted and private communities. "Last active" is the most recent
-    post; live collaborative sessions are not counted.
-  </p>
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>{{ sort_link("name", "Name") }}</th>
-        <th>Slug</th>
-        <th>Visibility</th>
-        <th>Posts</th>
-        <th>{{ sort_link("active", "Last active") }}</th>
-        <th>{{ sort_link("created", "Created") }}</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for community in communities %}
+  <div class="admin-head">
+    <h1 class="admin-title">Communities</h1>
+    <p class="ds-help">
+      Includes unlisted and private communities. "Last active" is the most recent
+      post; live collaborative sessions are not counted.
+    </p>
+  </div>
+  <div class="admin-table-scroll">
+    <table>
+      <thead>
         <tr>
-          <td>{{ community.name }}</td>
-          <td>@{{ community.slug }}</td>
-          <td>
-            {% if community.visibility != "public" %}
-              <span class="admin-tag {{ community.visibility }}">{{ community.visibility }}</span>
-            {% else %}
-              {{ community.visibility }}
-            {% endif %}
-          </td>
-          <td>{{ community.post_count }}</td>
-          <td>
-            {% if community.last_active_at %}
-              {{ community.last_active_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-            {% else %}
-              <span class="muted">never</span>
-            {% endif %}
-          </td>
-          <td>{{ community.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
-          <td>
-            {% if community.deleted_at %}
-              <span class="admin-tag deleted">deleted</span>
-            {% else %}
-              active
-            {% endif %}
-          </td>
-          <td>
-            <a href="/admin/communities/{{ community.slug }}/posts">posts →</a>
-          </td>
+          <th>{{ sort_link("name", "Name") }}</th>
+          <th>Slug</th>
+          <th>Visibility</th>
+          <th>Posts</th>
+          <th>{{ sort_link("active", "Last active") }}</th>
+          <th>{{ sort_link("created", "Created") }}</th>
+          <th>Status</th>
+          <th></th>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for community in communities %}
+          <tr>
+            <td>{{ community.name }}</td>
+            <td>@{{ community.slug }}</td>
+            <td>
+              {% if community.visibility != "public" %}
+                <span class="admin-tag {{ community.visibility }}">{{ community.visibility }}</span>
+              {% else %}
+                {{ community.visibility }}
+              {% endif %}
+            </td>
+            <td>{{ community.post_count }}</td>
+            <td>
+              {% if community.last_active_at %}
+                {{ community.last_active_at|datetimeformat(format="short", tz="Asia/Seoul") }}
+              {% else %}
+                <span class="muted">never</span>
+              {% endif %}
+            </td>
+            <td>{{ community.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
+            <td>
+              {% if community.deleted_at %}
+                <span class="admin-tag deleted">deleted</span>
+              {% else %}
+                active
+              {% endif %}
+            </td>
+            <td>
+              <a href="/admin/communities/{{ community.slug }}/posts">posts →</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% endblock admin_content %}

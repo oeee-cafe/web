@@ -316,8 +316,9 @@ nav a:visited,
 
    The square is a padding-ratio box rather than `aspect-ratio`, which
    Firefox 56 does not have. `grid-gap` is its spelling; `gap` is everyone
-   else's. The admin grid keeps its own layout; everything here is scoped to
-   `.posts-grid`.
+   else's. Everything here is scoped to
+   `.posts-grid`, which the admin grid wears too, with its own column count
+   (admin.css).
    --------------------------------------------------------------------------- */
 /* A drawing its artist marked sensitive, blurred in every grid until it is
    opened. post_card.jinja puts the class on the image. */
@@ -473,25 +474,6 @@ nav a:visited,
 :root[data-homecols-density="dense"] .posts-grid .post-card-when,
 :root[data-homecols-density="bare"] .posts-grid .post-card-meta {
   display: none;
-}
-
-/* The admin grid still draws its cards with the old box. */
-.admin-grid .posts-grid-item {
-  overflow: hidden;
-  border: 1px solid var(--main-border-color);
-}
-
-.admin-grid .post-card-meta {
-  padding: var(--space-1) var(--space-2);
-  border-top: 1px solid var(--main-border-color);
-}
-
-.admin-grid .posts-grid-item img {
-  width: 100%;
-  height: auto;
-  vertical-align: bottom;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
 }
 
 /* A phone keeps three a row whatever was chosen on a wider screen -- eight

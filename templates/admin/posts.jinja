@@ -1,5 +1,6 @@
 {% extends "admin/base.jinja" %}
 {% from "per_row_macro.jinja" import per_row %}
+{% set admin_section = "posts" %}
 {% block admin_content %}
   {# Applied before first paint so the grid does not flash at the default width. #}
   <script>
@@ -13,23 +14,27 @@
     {{ per_row(id="admin-cols", var="--admin-cols", key="adminPostCols", default=6) }}
   </div>
 
-  <h2>
-    All posts
-    {%- if filter_author %} by @{{ filter_author }}{% endif -%}
-    {%- if filter_community %} in @{{ filter_community }}{% endif %}
-  </h2>
-  <p class="muted">{{ total }} post(s) across every user and community.</p>
+  <div class="admin-head">
+    <h1 class="admin-title">
+      All posts
+      {%- if filter_author %} by @{{ filter_author }}{% endif -%}
+      {%- if filter_community %} in @{{ filter_community }}{% endif %}
+    </h1>
+    <p class="ds-help">{{ total }} post(s) across every user and community.</p>
+  </div>
 
-  <form class="admin-filters" method="get" action="/admin/posts">
+  <form class="ds-card admin-filters" method="get" action="/admin/posts">
     <label>
-      Author
+      <span class="ds-label">Author</span>
       <input type="text"
              name="author"
              placeholder="login name"
+             autocapitalize="none"
+             spellcheck="false"
              value="{{ filter_author or '' }}" />
     </label>
     <label>
-      Community
+      <span class="ds-label">Community</span>
       <select name="community">
         <option value="">All communities</option>
         {% for community in communities %}
@@ -40,13 +45,13 @@
         {% endfor %}
       </select>
     </label>
-    <label>
+    <label class="admin-check">
       <input type="checkbox"
              name="drafts"
              {% if include_drafts %}checked{% endif %} />
       Include drafts
     </label>
-    <label>
+    <label class="admin-check">
       <input type="checkbox"
              name="deleted"
              {% if include_deleted %}checked{% endif %} />
@@ -58,11 +63,11 @@
   {% if posts %}
     {# The grid is the htmx swap target: the sentinel replaces itself with the
        next batch, which ends with a fresh sentinel. #}
-    <div class="admin-grid adjustable">
+    <div class="posts-grid admin-grid adjustable">
       {% include "admin/posts_fragment.jinja" %}
     </div>
   {% else %}
-    <p>No posts match this filter.</p>
+    <p class="ds-card admin-empty">No posts match this filter.</p>
   {% endif %}
 
 {% endblock admin_content %}

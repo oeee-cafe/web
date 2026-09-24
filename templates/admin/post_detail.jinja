@@ -1,82 +1,92 @@
 {% extends "admin/base.jinja" %}
+{% set admin_section = "posts" %}
 {% block admin_content %}
-  <h2>{{ post.title or "(untitled)" }}</h2>
-  <p>
-    {% if not post.published_at %}<span class="admin-tag draft">draft</span>{% endif %}
-    {% if post.deleted_at %}
-      <span class="admin-tag deleted">deleted{% if post.deletion_reason %}: {{ post.deletion_reason }}{% endif %}</span>
-    {% endif %}
-    {% if post.is_sensitive_by_author %}<span class="admin-tag sensitive">sensitive</span>{% endif %}
-    {% if post.is_explicit %}<span class="admin-tag deleted">explicit</span>{% endif %}
-    {% if post.community_visibility and post.community_visibility != "public" %}
-      <span class="admin-tag {{ post.community_visibility }}">{{ post.community_visibility }}</span>
-    {% endif %}
-  </p>
-
-  <img width="{{ post.image_width }}"
-       height="{{ post.image_height }}"
-       alt="{{ post.title or 'Untitled' }}"
-       src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
-
-  {% include "admin/post_flag_panel.jinja" %}
-
-  <table class="admin-table">
-    <tr>
-      <th>Post ID</th>
-      <td>{{ post.id }}</td>
-    </tr>
-    <tr>
-      <th>Author</th>
-      <td>
-        <a href="/admin/users/{{ post.author_login_name }}/posts">@{{ post.author_login_name }}</a>
-        ({{ post.author_display_name }})
-      </td>
-    </tr>
-    <tr>
-      <th>Community</th>
-      <td>
-        {% if post.community_slug %}
-          <a href="/admin/communities/{{ post.community_slug }}/posts">{{ post.community_name }}</a>
-          — {{ post.community_visibility }}
-        {% else %}
-          <span class="muted">none</span>
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <th>Created</th>
-      <td>{{ post.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
-    </tr>
-    <tr>
-      <th>Published</th>
-      <td>
-        {% if post.published_at %}
-          {{ post.published_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-        {% else %}
-          <span class="muted">never (draft)</span>
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <th>Deleted</th>
-      <td>
-        {% if post.deleted_at %}
-          {{ post.deleted_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-          ({{ post.deletion_reason or "no reason recorded" }})
-        {% else %}
-          <span class="muted">no</span>
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <th>Views</th>
-      <td>{{ post.viewer_count }}</td>
-    </tr>
-  </table>
-
-  {% if post.published_at and not post.deleted_at %}
-    <p>
-      <a href="/@{{ post.author_login_name }}/{{ post.id }}">View on site →</a>
+  <div class="admin-head">
+    <h1 class="admin-title">{{ post.title or "(untitled)" }}</h1>
+    <p class="admin-tags">
+      {% if not post.published_at %}<span class="admin-tag draft">draft</span>{% endif %}
+      {% if post.deleted_at %}
+        <span class="admin-tag deleted">deleted{% if post.deletion_reason %}: {{ post.deletion_reason }}{% endif %}</span>
+      {% endif %}
+      {% if post.is_sensitive_by_author %}<span class="admin-tag sensitive">sensitive</span>{% endif %}
+      {% if post.is_explicit %}<span class="admin-tag deleted">explicit</span>{% endif %}
+      {% if post.community_visibility and post.community_visibility != "public" %}
+        <span class="admin-tag {{ post.community_visibility }}">{{ post.community_visibility }}</span>
+      {% endif %}
     </p>
-  {% endif %}
+  </div>
+
+  {# The drawing at its own size, framed as the painter frames its canvas,
+     and beside it (below, on a phone) what staff act on and look up. #}
+  <div class="admin-post">
+    <img class="admin-drawing admin-post-drawing"
+         width="{{ post.image_width }}"
+         height="{{ post.image_height }}"
+         alt="{{ post.title or 'Untitled' }}"
+         src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
+
+    <div class="admin-post-side ds-stack">
+      {% include "admin/post_flag_panel.jinja" %}
+
+      <table>
+        <tr>
+          <th scope="row">Post ID</th>
+          <td><code>{{ post.id }}</code></td>
+        </tr>
+        <tr>
+          <th scope="row">Author</th>
+          <td>
+            <a href="/admin/users/{{ post.author_login_name }}/posts">@{{ post.author_login_name }}</a>
+            ({{ post.author_display_name }})
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Community</th>
+          <td>
+            {% if post.community_slug %}
+              <a href="/admin/communities/{{ post.community_slug }}/posts">{{ post.community_name }}</a>
+              — {{ post.community_visibility }}
+            {% else %}
+              <span class="muted">none</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Created</th>
+          <td>{{ post.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Published</th>
+          <td>
+            {% if post.published_at %}
+              {{ post.published_at|datetimeformat(format="short", tz="Asia/Seoul") }}
+            {% else %}
+              <span class="muted">never (draft)</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Deleted</th>
+          <td>
+            {% if post.deleted_at %}
+              {{ post.deleted_at|datetimeformat(format="short", tz="Asia/Seoul") }}
+              ({{ post.deletion_reason or "no reason recorded" }})
+            {% else %}
+              <span class="muted">no</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Views</th>
+          <td>{{ post.viewer_count }}</td>
+        </tr>
+      </table>
+
+      {% if post.published_at and not post.deleted_at %}
+        <div>
+          <a class="ds-button" href="/@{{ post.author_login_name }}/{{ post.id }}">View on site →</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
 {% endblock admin_content %}
