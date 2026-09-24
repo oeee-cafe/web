@@ -1235,6 +1235,51 @@ mod tests {
         }
     }
 
+    /// A mark is centred on its words by the design system and by nothing
+    /// else (ds.css, `.ds-marked`): each one drawn is a `.ds-mark`, and every
+    /// template that draws one puts it in an element that is a `.ds-marked`
+    /// or a `.ds-marked-block`, written on the line that draws it or the
+    /// three before -- an element's attributes may take a line each. A mark nudged into place by a rule of its own sat low in one
+    /// emoji font and stretched the line in another.
+    #[test]
+    fn every_mark_is_centred_by_the_design_system() {
+        let templates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
+        let macro_file = std::fs::read_to_string(templates.join("supporter_badge_macro.jinja")).unwrap();
+        let marks = macro_file.matches(r#"class="supporter-mark ds-mark""#).count();
+        assert_eq!(marks, SELLING.len(), "every store's mark is a .ds-mark");
+
+        let mut drawn = 0;
+        let mut stack = vec![templates];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                if path.file_name().is_some_and(|name| name == "supporter_badge_macro.jinja") {
+                    continue;
+                }
+                let text = std::fs::read_to_string(&path).unwrap_or_default();
+                let lines: Vec<&str> = text.lines().collect();
+                for (at, line) in lines.iter().enumerate() {
+                    if !line.contains("supporter_mark(") || line.contains("import") {
+                        continue;
+                    }
+                    drawn += 1;
+                    let around = lines[at.saturating_sub(3)..=at].join(" ");
+                    assert!(
+                        around.contains("ds-marked"),
+                        "{}:{} draws a mark outside a .ds-marked",
+                        path.display(),
+                        at + 1
+                    );
+                }
+            }
+        }
+        assert!(drawn >= 5, "found the templates that draw marks");
+    }
+
     /// Artwork and a name for each, in the one file that draws them.
     #[test]
     fn every_platform_has_its_own_mark() {

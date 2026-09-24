@@ -2829,6 +2829,47 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   text-align: center;
 }
 
+/* A mark before words -- an emoji, most often -- centred on them.
+
+   An emoji's glyph box is its font's, not the text's, and each system's
+   emoji font sits it differently, so a nudge onto the baseline that suits
+   one (vertical-align: -2px, once) leaves the mark low in the next and
+   stretches the line around it. Centring the two as a row does not depend
+   on the font. The element holding both is .ds-marked -- or .ds-marked-block
+   where it is a line of its own -- and the mark in it .ds-mark; nothing
+   else about the mark's alignment is written anywhere.
+
+   Under .ds-page, so a page's own rule for the element's display (a chip's
+   inline-block, a label's block) does not quietly undo the row. */
+.ds-page .ds-marked {
+  display: -webkit-inline-box;
+  display: inline-flex;
+  -webkit-box-align: center;
+  align-items: center;
+}
+
+.ds-page .ds-marked-block {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+  align-items: center;
+}
+
+.ds-marked > .ds-mark,
+.ds-marked-block > .ds-mark {
+  display: block;
+  flex: none;
+  margin-right: 4px;
+  line-height: 1;
+}
+
+/* A mark with no words after it -- a supporter's badge beside a name -- has
+   nothing to keep apart from. A class, because CSS cannot see that the text
+   after a mark is not there. */
+.ds-marked.ds-marked-alone > .ds-mark {
+  margin-right: 0;
+}
+
 /* A surface on the ground: settings groups, forms, anything that is a box. */
 .ds-card {
   padding: var(--ds-space-4);

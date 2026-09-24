@@ -15,19 +15,22 @@
    a platform without a mark below wears nothing at all.
 
    `supporter_mark()` is the mark alone, for a chip that spells the platform
-   out beside it, and `supporter_badge()` the small inline mark. A page that
+   out beside it, and `supporter_badge()` the small inline mark. The mark is
+   a .ds-mark, and whatever holds it and its words is a .ds-marked or a
+   .ds-marked-block (ds.css), which is all that centres it -- every call site's element carries it,
+   and `every_mark_is_centred_by_the_design_system` checks they do. A page that
    knows several people passes the marks of the supporters among them, by
    login name, and asks for each name it prints; a name that is not a
    supporter is not in there and gets nothing. #}
 {% macro supporter_mark(mark) -%}
   {%- if mark == "steam" -%}
-    <span class="supporter-mark" aria-hidden="true">🎮</span>
+    <span class="supporter-mark ds-mark" aria-hidden="true">🎮</span>
   {%- elif mark == "apple" -%}
-    <span class="supporter-mark" aria-hidden="true">🍎</span>
+    <span class="supporter-mark ds-mark" aria-hidden="true">🍎</span>
   {%- elif mark == "microsoft" -%}
-    <span class="supporter-mark" aria-hidden="true">🛍️</span>
+    <span class="supporter-mark ds-mark" aria-hidden="true">🛍️</span>
   {%- elif mark == "google" -%}
-    <span class="supporter-mark" aria-hidden="true">▶️</span>
+    <span class="supporter-mark ds-mark" aria-hidden="true">▶️</span>
   {%- endif -%}
 {%- endmacro %}
 
@@ -49,6 +52,6 @@
       defaulted before they are asked. -#}
   {%- set mark = (supporters or {})[login_name] -%}
   {%- if mark -%}
-    <a class="supporter-badge" href="/about#supporters" title="{{ supporter_mark_name(mark) }}" aria-label="{{ supporter_mark_name(mark) }}">{{ supporter_mark(mark) }}</a>
+    <a class="supporter-badge ds-marked ds-marked-alone" href="/about#supporters" title="{{ supporter_mark_name(mark) }}" aria-label="{{ supporter_mark_name(mark) }}">{{ supporter_mark(mark) }}</a>
   {%- endif -%}
 {%- endmacro %}

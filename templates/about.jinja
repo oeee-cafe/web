@@ -46,7 +46,7 @@
         <p class="ds-help about-supporters-thanks">{{ ftl_get_message("about-supporters-thanks") }}</p>
         <div class="profile-chips">
           {% for supporter in supporters %}
-            <a class="profile-chip supporter-chip" href="/@{{ supporter.login_name }}" title="@{{ supporter.login_name }}">{{ supporter_mark(supporter.mark) }}{{ supporter.display_name }}</a>
+            <a class="profile-chip supporter-chip ds-marked" href="/@{{ supporter.login_name }}" title="@{{ supporter.login_name }}">{{ supporter_mark(supporter.mark) }}{{ supporter.display_name }}</a>
           {% endfor %}
         </div>
       </section>
