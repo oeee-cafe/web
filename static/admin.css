@@ -172,10 +172,14 @@
 }
 
 /* A row is one line: a date broken after its year reads as two, and the
-   table scrolls rather than squeezing. */
-.admin-page th,
-.admin-page td {
+   table scrolls rather than squeezing. Centred on the row's height, which a
+   canvas preview or a row of buttons sets taller than the text beside it --
+   the design system's table tops its cells for prose, and these hold none.
+   Written as specifically as that rule (ds.css), or it loses to it. */
+.ds-page .admin-page table:not([class]) th,
+.ds-page .admin-page table:not([class]) td {
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .admin-page th a {
