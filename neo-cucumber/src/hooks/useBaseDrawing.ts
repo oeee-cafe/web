@@ -91,6 +91,15 @@ function applyMask(engine: DrawingEngine, state: DrawingState): void {
   ];
 }
 
+/**
+ * What the drawing hook tells a recorder.
+ *
+ * Every callback that records a mark carries the layer and the mask it was
+ * drawn through, taken from the settings this hook froze at the press. The
+ * recorder keeps no copy of its own: it used to, filled in on the freehand
+ * press only, and a shape tool that skipped that press recorded the mask of
+ * whatever freehand stroke came before it.
+ */
 interface DrawingEventCallbacks {
   onPointerDown?: () => void;
   onDrawLine?: (
@@ -103,7 +112,9 @@ interface DrawingEventCallbacks {
     r: number,
     g: number,
     b: number,
-    opacity: number
+    opacity: number,
+    layer: "foreground" | "background",
+    mask: Mask
   ) => void;
   onDrawPoint?: (
     x: number,
@@ -113,7 +124,9 @@ interface DrawingEventCallbacks {
     r: number,
     g: number,
     b: number,
-    opacity: number
+    opacity: number,
+    layer: "foreground" | "background",
+    mask: Mask
   ) => void;
   /** The colour under a right press, for the caller to adopt. */
   onPickColor?: (color: { r: number; g: number; b: number }) => void;
@@ -127,19 +140,14 @@ interface DrawingEventCallbacks {
     r: number,
     g: number,
     b: number,
-    opacity: number
+    opacity: number,
+    layer: "foreground" | "background",
+    mask: Mask
   ) => void;
   onPointerUp?: () => void;
   /** The rubber-band rectangle as it is dragged, or null when it ends. */
   onRegionPreview?: (rect: RegionRect | null) => void;
   /** A straight line was drawn from `from` to `to`. */
-  /**
-   * The mask on these is the one the shape was drawn through -- frozen with
-   * the rest of the settings at the press. The recorder used to take it from
-   * the last *freehand* press instead, which is the only path that told it
-   * about masks, so a rectangle dragged out after the mask was switched on
-   * was masked on this canvas and unmasked in the replay and the room.
-   */
   onLine?: (
     from: { x: number; y: number },
     to: { x: number; y: number },
@@ -539,6 +547,7 @@ export const useBaseDrawing = (
     const g = parseInt(active.color.slice(3, 5), 16);
     const b = parseInt(active.color.slice(5, 7), 16);
     const effectiveOpacity = active.opacity;
+    const mask = maskFrom(active);
 
     applyMask(drawingEngineRef.current, active);
 
@@ -548,7 +557,10 @@ export const useBaseDrawing = (
     // own applying the stroke (via the canvas history), so the direct engine
     // application below is skipped.
     if (operation === "fill") {
-      callbacks?.onFill?.(Math.floor(coords.x), Math.floor(coords.y), r, g, b, effectiveOpacity);
+      callbacks?.onFill?.(
+        Math.floor(coords.x), Math.floor(coords.y), r, g, b, effectiveOpacity,
+        active.layerType, mask,
+      );
       if (!remoteSyncRef.current) {
         drawingEngineRef.current.doFloodFill(
           targetLayer,
@@ -569,7 +581,9 @@ export const useBaseDrawing = (
         r,
         g,
         b,
-        effectiveOpacity
+        effectiveOpacity,
+        active.layerType,
+        mask
       );
       if (!remoteSyncRef.current) {
         drawingEngineRef.current.drawLine(
@@ -597,7 +611,9 @@ export const useBaseDrawing = (
         r,
         g,
         b,
-        effectiveOpacity
+        effectiveOpacity,
+        active.layerType,
+        mask
       );
       if (!remoteSyncRef.current) {
         // Segments run from the NEW point back to the previous one, matching
