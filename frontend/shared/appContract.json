@@ -97,6 +97,48 @@
       "app": "android",
       "form": "handheld",
       "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 OeeeCafe store/apple platform/ios",
+      "app": "ios",
+      "form": "handheld",
+      "store": "apple"
+    },
+    {
+      "agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0 OeeeCafe store/steam platform/windows",
+      "app": "windows",
+      "form": "desktop",
+      "store": "steam"
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe store/applesauce platform/macos",
+      "app": "macos",
+      "form": "desktop",
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe store/microsoft platform/windows store/steam",
+      "app": "windows",
+      "form": "desktop",
+      "store": "microsoft"
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe store/apple Chrome/140 platform/ios",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe store/apple",
+      "app": null,
+      "form": null,
+      "store": null
+    },
+    {
+      "agent": "Mozilla/5.0 OeeeCafe store/apple platform/tv",
+      "app": null,
+      "form": null,
+      "store": null
     }
   ],
   "messages": {

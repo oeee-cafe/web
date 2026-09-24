@@ -14,10 +14,12 @@
   //   OeeeCafe platform/<app> [store/<store>]
   //
   // (WebTabController.swift, WebTabController.kt, chrome.rs in
-  // oeee-cafe-desktop) -- the store, when there is one, straight after the
-  // platform, and each read only as a word of its own -- and it marks the root here, before the page paints,
-  // so nothing that differs in an app flashes up and away. Three marks, one
-  // question each:
+  // oeee-cafe-desktop) -- the platform and the store, when there is one, in
+  // either order, each a space after the last. The first of each counts, and
+  // anything else ends the run, so a store/ further along is not the app's;
+  // and each is read only as a word of its own. It marks the root here,
+  // before the page paints, so nothing that differs in an app flashes up and
+  // away. Three marks, one question each:
   //
   //   data-app    which app: "ios", "android", "macos" or "windows"
   //   data-form   the kind of device it is on: "handheld" for the phone and
@@ -35,12 +37,23 @@
   // trusted for being marked, and a purchase is checked with the store.
   (function () {
     var ua = navigator.userAgent;
-    var mark = /\bOeeeCafe platform\/(ios|android|macos|windows)(?: store\/(apple|microsoft|steam))?\b/.exec(ua);
-    if (!mark) return;
+    var run = /\bOeeeCafe((?: (?:platform|store)\/\w+)+)/g;
+    var found, app, store;
+    while (!app && (found = run.exec(ua))) {
+      var words = {};
+      found[1].replace(/ (platform|store)\/(\w+)/g, function (_, key, value) {
+        if (!words.hasOwnProperty(key)) words[key] = value;
+      });
+      if (/^(ios|android|macos|windows)$/.test(words.platform || "")) {
+        app = words.platform;
+        if (/^(apple|microsoft|steam)$/.test(words.store || "")) store = words.store;
+      }
+    }
+    if (!app) return;
     var root = document.documentElement;
-    root.setAttribute("data-app", mark[1]);
-    root.setAttribute("data-form", mark[1] === "ios" || mark[1] === "android" ? "handheld" : "desktop");
-    if (mark[2]) root.setAttribute("data-store", mark[2]);
+    root.setAttribute("data-app", app);
+    root.setAttribute("data-form", app === "ios" || app === "android" ? "handheld" : "desktop");
+    if (store) root.setAttribute("data-store", store);
   })();
   if (document.documentElement.getAttribute("data-app") === "ios") {
     // The reader's text size (Dynamic Type), for the design system's type

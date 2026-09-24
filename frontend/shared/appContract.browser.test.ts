@@ -345,7 +345,8 @@ describe("what the site tells the apps", () => {
   it("marks the root with which app, what kind of device, and where it sells, from the user agent", async () => {
     // The cases the apps build their user agents against, and the server
     // reads its store from (Store::from_user_agent): only these names, only
-    // as words of their own, and the store straight after the platform.
+    // as words of their own, and the platform and store in one run, either
+    // way round.
     const marks = (root: HTMLElement) =>
       ["data-app", "data-form", "data-store"].map((name) => root.getAttribute(name));
     for (const { agent, app, form, store } of contract.userAgents) {

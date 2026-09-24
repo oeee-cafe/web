@@ -106,22 +106,40 @@ impl Store {
     ///
     /// The same rule as theme_head.jinja's, which marks the root
     /// `data-store` for the page's scripts: an app ends its user agent with
-    /// `OeeeCafe platform/<app> [store/<store>]`, the store straight after
-    /// the platform. Both read the words whole, as a regular expression's
-    /// `\b` does -- `platform/iosx` names no app. It decides which buttons
+    /// `OeeeCafe platform/<app> [store/<store>]`, the two in either order,
+    /// each a space after the last. The first of each counts, and anything
+    /// else ends the run, so a `store/` further along the user agent is not
+    /// the app's. Both read the words whole, as a regular expression's `\b`
+    /// does -- `platform/iosx` names no app. It decides which buttons
     /// /supporter draws and nothing else: nothing is trusted for being named
     /// here, and a purchase is checked with the store.
     pub fn from_user_agent(user_agent: &str) -> Option<Self> {
-        const MARK: &str = "OeeeCafe platform/";
-        let rest = user_agent.match_indices(MARK).find_map(|(at, _)| {
+        const MARK: &str = "OeeeCafe";
+        user_agent.match_indices(MARK).find_map(|(at, _)| {
             if user_agent[..at].chars().next_back().is_some_and(is_word) {
                 return None;
             }
-            word_at(&user_agent[at + MARK.len()..], &["ios", "android", "macos", "windows"])
-                .map(|(_, rest)| rest)
-        })?;
-        let (store, _) = word_at(rest.strip_prefix(" store/")?, &["apple", "microsoft", "steam"])?;
-        Store::parse(store)
+            let (mut platform, mut store) = (None, None);
+            let mut rest = &user_agent[at + MARK.len()..];
+            while let Some((key, after)) = rest
+                .strip_prefix(' ')
+                .and_then(|token| word_at(token, &["platform", "store"]))
+            {
+                let Some(value) = after.strip_prefix('/') else {
+                    break;
+                };
+                let end = value.find(|c| !is_word(c)).unwrap_or(value.len());
+                if end == 0 {
+                    break;
+                }
+                let slot = if key == "platform" { &mut platform } else { &mut store };
+                slot.get_or_insert(&value[..end]);
+                rest = &value[end..];
+            }
+            ["ios", "android", "macos", "windows"]
+                .contains(&platform?)
+                .then(|| store.and_then(Store::parse))
+        })?
     }
 }
 
