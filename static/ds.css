@@ -1248,7 +1248,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 
 /* The account menu's button, and the guest's theme button in its place:
    a square with the same border, fill and corners as every other button in
-   the bar, holding your initial or the theme's icon. */
+   the bar, holding a person or a gear. */
 .toolbar-avatar {
   border: 1px solid var(--ds-line-strong);
   background-color: var(--ds-surface);

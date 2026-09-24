@@ -1799,7 +1799,7 @@ mod template_tests {
             .expect("toolbar renders");
         assert!(out.contains(r#"<a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="3" aria-label="drafts (3)" title="drafts (3)"><svg"#));
         // Drafts are the square's alone: no line in the account menu, and
-        // the initial does not pulse.
+        // the person does not pulse.
         assert!(!out.contains("toolbar-menu-drafts"));
         assert!(!out.contains("toolbar-avatar-pulse"));
     }
