@@ -55,7 +55,10 @@ feed-period-month-year = { $month ->
     [11] November
    *[12] December
 } { $year }
-recent-comments-all = All comments
+feed-view-drawings = Drawings
+feed-view-comments = Comments
+recent-comments-more = More comments
+loading-more-comments = Loading more comments...
 
 draw = Draw!
 collaborate = Collaborate

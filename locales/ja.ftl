@@ -31,7 +31,10 @@ feed-following-empty = タイムラインが空です。 <a href="/communities">
 feed-communities-empty = 参加しているコミュニティに新しいお絵かきはありません。<a href="/communities">コミュニティ</a>で参加先を探しましょう！
 feed-period-month = { $month }月
 feed-period-month-year = { $year }年{ $month }月
-recent-comments-all = コメントをすべて見る
+feed-view-drawings = お絵かき
+feed-view-comments = コメント
+recent-comments-more = コメントをもっと見る
+loading-more-comments = コメントを読み込み中...
 
 draw = 描きましょう！
 collaborate = 一緒に描く

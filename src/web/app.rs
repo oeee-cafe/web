@@ -44,7 +44,7 @@ use crate::web::handlers::community::{
     communities, communities_fragment, community, community_comments, community_iframe,
     create_community_form, do_accept_invitation, do_create_community, do_leave_community,
     do_reject_invitation, get_members, hx_delete_community, hx_do_edit_community, hx_edit_community,
-    invite_user, load_more_community_posts, members_page, redirect_community_to_unified,
+    invite_user, load_more_community_comments, load_more_community_posts, members_page, redirect_community_to_unified,
     remove_member, retract_invitation,
 };
 use crate::web::handlers::devices::register_device_handler;
@@ -55,8 +55,10 @@ use crate::web::handlers::tag::{
     tag_autocomplete, tag_cards, tag_discovery, tag_view, load_more_tag_posts,
 };
 use crate::web::handlers::home::{
-    do_delete_comment, home, load_more_public_posts, load_more_community_feed_posts,
-    load_more_timeline_posts, my_communities_feed, my_timeline,
+    do_delete_comment, following_comments_page, home, joined_comments_page,
+    load_more_community_feed_posts, load_more_following_comments, load_more_joined_comments,
+    load_more_public_posts, load_more_recent_comments, load_more_timeline_posts,
+    my_communities_feed, my_timeline, recent_comments_page,
 };
 use crate::web::handlers::notifications::{
     delete_notification_handler, get_unread_notification_count, hx_mark_all_notifications_read,
@@ -218,6 +220,10 @@ impl App {
             .route("/joined", get(my_communities_feed))
             .route("/api/following/posts", get(load_more_timeline_posts))
             .route("/api/joined/posts", get(load_more_community_feed_posts))
+            .route("/following/comments", get(following_comments_page))
+            .route("/joined/comments", get(joined_comments_page))
+            .route("/api/following/comments", get(load_more_following_comments))
+            .route("/api/joined/comments", get(load_more_joined_comments))
             .route("/notifications", get(list_notifications))
             .route("/api/notifications/items", get(notifications_fragment))
             .route(
@@ -431,6 +437,14 @@ impl App {
             )
             .route("/.well-known/assetlinks.json", get(android_assetlinks))
             .route("/api/home/posts", get(load_more_public_posts))
+            // GET beside the protected router's POST (creating a comment);
+            // axum merges the two methods on the one path.
+            .route("/comments", get(recent_comments_page))
+            .route("/api/home/comments", get(load_more_recent_comments))
+            .route(
+                "/api/communities/@{slug}/comments",
+                get(load_more_community_comments),
+            )
             .route("/api/collaborate/posts", get(load_more_collaborative_posts))
             .route("/api/communities/cards", get(communities_fragment))
             .route(

@@ -2,7 +2,7 @@ use super::ExtractFtlLang;
 use crate::app_error::AppError;
 use crate::feed_period;
 use crate::models::actor::Actor;
-use crate::models::comment::{find_recent_comments, CommentScope};
+use crate::models::comment::{find_recent_comments, CommentScope, NotificationComment};
 use crate::models::post::{
     find_following_posts_by_user_id, find_member_community_posts, find_public_posts,
 };
@@ -28,12 +28,48 @@ use minijinja::context;
 /// case to a single extra fetch rather than eliminating it.
 pub(crate) const HOME_POSTS_PER_BATCH: i64 = 60;
 
-/// Comments in the list beside a feed (comments_aside_macro.jinja). About two
-/// screens of it on a wide window, where it scrolls on its own beside the
-/// grid; one swipe's worth of cards across a phone. Not paged: a community
-/// has its whole list on a page of its own, and Home's is a glance at what
-/// people are saying, not an archive.
-pub(crate) const SIDEBAR_COMMENTS: i64 = 20;
+/// Comments fetched a batch, beside a feed (comments_aside_macro.jinja) and
+/// on a list of them (comments_fragment.jinja). More than a wide window's
+/// column holds, so its sentinel starts out of sight.
+pub(crate) const COMMENTS_PER_BATCH: i64 = 30;
+
+/// Context for comments_fragment.jinja: a batch of comments, and where the
+/// next one comes from while there may be one -- a full batch -- keyed by
+/// the last comment in this one (find_recent_comments).
+pub(crate) fn comments_context(rows: Vec<NotificationComment>, batch_path: &str) -> minijinja::Value {
+    let next_url = match rows.last() {
+        Some(last) if rows.len() as i64 == COMMENTS_PER_BATCH => {
+            Some(format!("{}?after={}", batch_path, last.id))
+        }
+        _ => None,
+    };
+    context! { rows, next_url }
+}
+
+/// A batch of comments in `scope`, as `viewer` may see them.
+pub(crate) async fn comments_batch(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    scope: CommentScope,
+    viewer: Option<&crate::models::user::User>,
+    after: Option<Uuid>,
+) -> Result<Vec<NotificationComment>, AppError> {
+    Ok(find_recent_comments(
+        tx,
+        scope,
+        viewer.map(|user| user.id),
+        viewer.map_or(false, |user| user.show_sensitive_content),
+        after,
+        COMMENTS_PER_BATCH,
+    )
+    .await?)
+}
+
+/// A comment list's next batch: `after` is the last comment of the one
+/// before.
+#[derive(Deserialize)]
+pub struct CommentsQuery {
+    pub after: Option<Uuid>,
+}
 
 /// Context every post feed hands to the shared card fragment. Home's feeds and
 /// the collaborate lobby differ only in which query fills `posts` and where the
@@ -110,14 +146,36 @@ impl Feed {
         }
     }
 
-    /// Whose comments go beside it: the same people's, or places', as its
-    /// drawings.
-    fn comment_scope(self, viewer: Option<&crate::models::user::User>) -> Option<CommentScope> {
+    /// Whose comments go with it: the same people's, or places', as its
+    /// drawings. Following and Communities are the reader's own, so nobody
+    /// signed in has either.
+    fn comment_scope(
+        self,
+        viewer: Option<&crate::models::user::User>,
+    ) -> Result<CommentScope, AppError> {
         match (self, viewer) {
-            (Feed::Recent, _) => Some(CommentScope::Public),
-            (Feed::Following, Some(user)) => Some(CommentScope::FollowedBy(user.id)),
-            (Feed::Communities, Some(user)) => Some(CommentScope::MemberOf(user.id)),
-            _ => None,
+            (Feed::Recent, _) => Ok(CommentScope::Public),
+            (Feed::Following, Some(user)) => Ok(CommentScope::FollowedBy(user.id)),
+            (Feed::Communities, Some(user)) => Ok(CommentScope::MemberOf(user.id)),
+            _ => Err(AppError::Unauthorized),
+        }
+    }
+
+    /// Its comments, as a page of their own (feed_comments_page).
+    fn comments_path(self) -> &'static str {
+        match self {
+            Feed::Recent => "/comments",
+            Feed::Following => "/following/comments",
+            Feed::Communities => "/joined/comments",
+        }
+    }
+
+    /// Where the next batch of its comments comes from.
+    fn comments_batch_path(self) -> &'static str {
+        match self {
+            Feed::Recent => "/api/home/comments",
+            Feed::Following => "/api/following/comments",
+            Feed::Communities => "/api/joined/comments",
         }
     }
 
@@ -160,19 +218,8 @@ async fn feed_page(
     let posts = feed
         .posts(&mut tx, auth_session.user.as_ref(), HOME_POSTS_PER_BATCH, 0)
         .await?;
-    let comments = match feed.comment_scope(auth_session.user.as_ref()) {
-        Some(scope) => {
-            find_recent_comments(
-                &mut tx,
-                scope,
-                auth_session.user.as_ref().map(|u| u.id),
-                auth_session.user.as_ref().map_or(false, |u| u.show_sensitive_content),
-                SIDEBAR_COMMENTS,
-            )
-            .await?
-        }
-        None => Vec::new(),
-    };
+    let scope = feed.comment_scope(auth_session.user.as_ref())?;
+    let comments = comments_batch(&mut tx, scope, auth_session.user.as_ref(), None).await?;
     tx.commit().await?;
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("home.jinja")?;
@@ -180,13 +227,122 @@ async fn feed_page(
         current_user => auth_session.user,
         messages => messages.into_iter().collect::<Vec<_>>(),
         feed_switch => feed.name(),
+        feed_view => "drawings",
         feed => feed_context(posts, feed.batch_path(), 0, None),
-        comments,
+        comments => comments_context(comments, feed.comments_batch_path()),
+        comments_url => feed.comments_path(),
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang
     })?;
     Ok(Html(rendered).into_response())
+}
+
+/// A feed's comments as a page of their own, loading as it is scrolled: where
+/// a phone, which has no room beside the grid for them, goes on to from the
+/// few it shows above it, and the other half of the drawings | comments
+/// switch at every width.
+async fn feed_comments_page(
+    feed: Feed,
+    auth_session: AuthSession,
+    state: AppState,
+    ftl_lang: String,
+    messages: Messages,
+) -> Result<axum::response::Response, AppError> {
+    let scope = feed.comment_scope(auth_session.user.as_ref())?;
+    let mut tx = state.db_pool.begin().await?;
+    let common_ctx =
+        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let comments = comments_batch(&mut tx, scope, auth_session.user.as_ref(), None).await?;
+    tx.commit().await?;
+
+    let rendered = state.env.get_template("home_comments.jinja")?.render(context! {
+        current_user => auth_session.user,
+        messages => messages.into_iter().collect::<Vec<_>>(),
+        feed_switch => feed.name(),
+        feed_view => "comments",
+        comments => comments_context(comments, feed.comments_batch_path()),
+        draft_post_count => common_ctx.draft_post_count,
+        unread_notification_count => common_ctx.unread_notification_count,
+        ftl_lang
+    })?;
+    Ok(Html(rendered).into_response())
+}
+
+/// A feed's next batch of comments, and the sentinel for the one after.
+async fn feed_comments_batch(
+    feed: Feed,
+    auth_session: AuthSession,
+    state: AppState,
+    query: CommentsQuery,
+) -> Result<axum::response::Response, AppError> {
+    let scope = feed.comment_scope(auth_session.user.as_ref())?;
+    let mut tx = state.db_pool.begin().await?;
+    let comments = comments_batch(&mut tx, scope, auth_session.user.as_ref(), query.after).await?;
+    tx.commit().await?;
+
+    let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
+        comments => comments_context(comments, feed.comments_batch_path()),
+        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+    })?;
+    Ok(Html(rendered).into_response())
+}
+
+/// GET /comments
+pub async fn recent_comments_page(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    messages: Messages,
+) -> Result<impl IntoResponse, AppError> {
+    feed_comments_page(Feed::Recent, auth_session, state, ftl_lang, messages).await
+}
+
+/// GET /following/comments
+pub async fn following_comments_page(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    messages: Messages,
+) -> Result<impl IntoResponse, AppError> {
+    feed_comments_page(Feed::Following, auth_session, state, ftl_lang, messages).await
+}
+
+/// GET /joined/comments
+pub async fn joined_comments_page(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    messages: Messages,
+) -> Result<impl IntoResponse, AppError> {
+    feed_comments_page(Feed::Communities, auth_session, state, ftl_lang, messages).await
+}
+
+/// GET /api/home/comments
+pub async fn load_more_recent_comments(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Query(query): Query<CommentsQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    feed_comments_batch(Feed::Recent, auth_session, state, query).await
+}
+
+/// GET /api/following/comments
+pub async fn load_more_following_comments(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Query(query): Query<CommentsQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    feed_comments_batch(Feed::Following, auth_session, state, query).await
+}
+
+/// GET /api/joined/comments
+pub async fn load_more_joined_comments(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Query(query): Query<CommentsQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    feed_comments_batch(Feed::Communities, auth_session, state, query).await
 }
 
 /// A feed's next batch of cards, and the sentinel for the one after.
@@ -375,6 +531,9 @@ mod tests {
             },
             current_user => json!(null),
             feed_switch => "recent",
+            feed_view => "drawings",
+            comments => super::comments_context(Vec::new(), "/api/home/comments"),
+            comments_url => "/comments",
             messages => Vec::<serde_json::Value>::new(),
             draft_post_count => 0,
             unread_notification_count => 0,
@@ -406,7 +565,8 @@ mod tests {
 
     /// Home's feeds are orders of one feed, so they are a switch where its
     /// heading was rather than tabs in the toolbar -- for someone signed in.
-    /// Signed out there is only Recent, which keeps its heading.
+    /// Signed out there is only Recent, headed by its drawings | comments
+    /// pill, which says both in full.
     #[test]
     fn home_switches_between_its_feeds_in_place_of_a_heading() {
         let env = test_support::env();
@@ -416,7 +576,8 @@ mod tests {
             .render(home_context(vec![sample_post()], false))
             .expect("home.jinja renders");
         assert!(!signed_out.contains("feed-switch"), "one feed signed out, no switch");
-        assert!(signed_out.contains(r#"<h2 class="home-section-title">recent-drawings</h2>"#));
+        assert!(signed_out.contains(r#"<a href="/" aria-current="page">recent-drawings</a>"#));
+        assert!(signed_out.contains(r#"<a href="/comments">recent-comments</a>"#));
 
         let signed_in = |feed_switch: &str| {
             home.render(context! {
@@ -710,7 +871,7 @@ mod tests {
         let home = env.get_template("home.jinja").expect("template loads");
         let with = home
             .render(context! {
-                comments => vec![sample_comment()],
+                comments => super::comments_context(vec![sample_comment()], "/api/home/comments"),
                 ..home_context(vec![sample_post()], false)
             })
             .expect("renders with comments");
@@ -722,21 +883,87 @@ mod tests {
         assert!(with.contains(aside_tag));
         assert!(with.contains("Lovely colours"));
         assert!(with.contains("/@someone/00000000-0000-0000-0000-000000000001"));
-        // Home's list has no page of its own to go on to.
-        assert!(!with.contains("feed-comments-all"));
+        // One comment is all there is, so a phone, which shows three, has
+        // nowhere further to go, and there is no next batch.
+        assert!(!with.contains("feed-comments-more"));
+        assert!(!with.contains("infinite-scroll-sentinel"));
         // Header, then comments, then the grid: the order it reads in.
         let aside = with.find(aside_tag).unwrap();
         assert!(with.find(r#"<div class="feed-header">"#).unwrap() < aside);
         assert!(aside < with.find("post-feed-grid").unwrap());
 
         let without = home
-            .render(context! {
-                comments => Vec::<NotificationComment>::new(),
-                ..home_context(vec![sample_post()], false)
-            })
+            .render(home_context(vec![sample_post()], false))
             .expect("renders without comments");
         assert!(!without.contains(aside_tag));
         assert!(without.contains(r#"<section class="feed-layout" role="region""#));
+    }
+
+    /// A full batch beside the grid loads the next from after its last
+    /// comment, and a phone, which shows the first three, is sent on to the
+    /// feed's comments page.
+    #[test]
+    fn a_full_batch_of_comments_loads_on_and_links_to_the_rest() {
+        let rows: Vec<NotificationComment> = (0..super::COMMENTS_PER_BATCH as u128)
+            .map(|i| NotificationComment {
+                id: uuid::Uuid::from_u128(100 + i),
+                ..sample_comment()
+            })
+            .collect();
+        let last = uuid::Uuid::from_u128(100 + super::COMMENTS_PER_BATCH as u128 - 1);
+        let rendered = test_support::env()
+            .get_template("home.jinja")
+            .expect("template loads")
+            .render(context! {
+                current_user => json!({"login_name": "someone"}),
+                feed_switch => "following",
+                comments => super::comments_context(rows, "/api/following/comments"),
+                comments_url => "/following/comments",
+                ..home_context(vec![sample_post()], false)
+            })
+            .expect("renders");
+        assert!(rendered.contains(&format!(
+            r#"hx-get="&#x2f;api&#x2f;following&#x2f;comments?after={last}""#
+        )));
+        assert!(rendered.contains(
+            r#"<a class="feed-comments-more" href="&#x2f;following&#x2f;comments">"#
+        ));
+    }
+
+    /// A feed's comments are a page of their own, the other half of its
+    /// drawings | comments pill, and switching feeds there keeps to
+    /// comments. Each pill is named for the other's choice, so a morph
+    /// replaces the one not pressed rather than keeping its old links.
+    #[test]
+    fn a_feeds_comments_are_a_page_that_keeps_to_comments() {
+        let env = test_support::env();
+        let page = |feed_switch: &str, feed_view: &str, template: &str| {
+            env.get_template(template)
+                .expect("template loads")
+                .render(context! {
+                    current_user => json!({"login_name": "someone"}),
+                    feed_switch,
+                    feed_view,
+                    comments => super::comments_context(vec![sample_comment()], "/api/joined/comments"),
+                    ..home_context(vec![sample_post()], false)
+                })
+                .expect("renders")
+        };
+        let comments = page("communities", "comments", "home_comments.jinja");
+        assert!(comments.contains(r#"<div class="comment-grid">"#));
+        assert!(comments.contains("Lovely colours"));
+        assert!(!comments.contains(r#"id="post-feed-grid""#), "no drawings under it");
+        assert!(comments.contains(r#"<a href="/joined/comments" aria-current="page">feed-communities</a>"#));
+        assert!(comments.contains(r#"<a href="/following/comments">feed-following</a>"#));
+        assert!(comments.contains(r#"<a href="/comments">feed-recent</a>"#));
+        assert!(comments.contains(r#"<a href="/joined">feed-view-drawings</a>"#));
+        assert!(comments.contains(r#"<a href="/joined/comments" aria-current="page">feed-view-comments</a>"#));
+        assert!(comments.contains(r#"id="feed-switch-comments""#));
+        assert!(comments.contains(r#"id="feed-views-communities""#));
+
+        let drawings = page("communities", "drawings", "home.jinja");
+        assert!(drawings.contains(r#"id="feed-switch-drawings""#));
+        assert!(drawings.contains(r#"<a href="/joined/comments">feed-view-comments</a>"#));
     }
 
     #[test]

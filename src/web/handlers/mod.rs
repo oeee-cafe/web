@@ -783,7 +783,7 @@ mod community_page_tests {
             .get_template("community_comments.jinja")
             .expect("comments loads")
             .render(context! {
-                comments => json!([{
+                comments => json!({"rows": [{
                     "id": "0c8f0000-0000-0000-0000-000000000001",
                     "post_id": "0c8f0000-0000-0000-0000-000000000002",
                     "actor_id": "0c8f0000-0000-0000-0000-000000000003",
@@ -802,7 +802,7 @@ mod community_page_tests {
                     "post_image_filename": "abcdef.png",
                     "post_image_width": 300,
                     "post_image_height": 300,
-                }]),
+                }], "next_url": null}),
                 ..base()
             })
             .expect("comments render");
@@ -1067,24 +1067,31 @@ mod community_page_tests {
                 community_id => "00000000-0000-0000-0000-000000000001",
                 domain => "oeee.test",
                 feed => feed_context(posts, "/api/communities/@open/posts", 0, None),
-                comments => vec![json!({
-                    "post_id": "00000000-0000-0000-0000-000000000001",
-                    "post_author_login_name": "artist",
-                    "post_title": "Drawing 0",
-                    "actor_name": "Commenter",
-                    "actor_handle": "@commenter@oeee.test",
-                    "content": "Lovely colours",
-                    "created_at": "2026-01-02T03:04:05Z",
-                })],
+                comments => json!({
+                    "rows": [{
+                        "post_id": "00000000-0000-0000-0000-000000000001",
+                        "post_author_login_name": "artist",
+                        "post_title": "Drawing 0",
+                        "actor_name": "Commenter",
+                        "actor_handle": "@commenter@oeee.test",
+                        "content": "Lovely colours",
+                        "created_at": "2026-01-02T03:04:05Z",
+                    }],
+                    "next_url": "/api/communities/@open/comments?after=00000000-0000-0000-0000-000000000009",
+                }),
                 ftl_lang => "en",
             })
             .expect("community renders");
 
-        // What is said on its drawings goes beside them, and goes on to the
-        // community's own page of comments.
+        // What is said on its drawings goes beside them, loads on from this
+        // community's own endpoint, and -- where a phone shows only the
+        // first few -- goes on to the community's own page of comments.
         assert!(rendered.contains(r#"<aside class="feed-comments" aria-labelledby"#));
         assert!(rendered.contains(
-            r#"<a class="feed-comments-all" href="&#x2f;communities&#x2f;@open&#x2f;comments">"#
+            r#"hx-get="&#x2f;api&#x2f;communities&#x2f;@open&#x2f;comments?after=00000000-0000-0000-0000-000000000009""#
+        ));
+        assert!(rendered.contains(
+            r#"<a class="feed-comments-more" href="&#x2f;communities&#x2f;@open&#x2f;comments">"#
         ));
 
         // Minijinja escapes the slashes and the ampersand in an attribute; the

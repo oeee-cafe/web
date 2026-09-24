@@ -1,0 +1,24 @@
+{# One batch of comments plus the sentinel that pulls the next, as
+   post_feed_fragment.jinja is for drawings. `comments` is built by
+   comments_context() in handlers/home.rs: `rows`, and `next_url` while a
+   full batch says there may be more. Rendered inline for the first batch
+   -- beside a feed (comments_aside_macro.jinja), on a feed's comments page
+   (home_comments.jinja), on a community's (community_comments.jinja) --
+   and standalone by the load-more handlers for the rest, so it must not
+   depend on anything those handlers do not pass.
+
+   Beside a feed the list scrolls on its own, and the sentinel is revealed
+   when that list is scrolled to it: htmx watches with an
+   IntersectionObserver, which counts the list's own clipping. #}
+{% import "comment_card_macro.jinja" as comment_card_macro %}
+{% for comment in comments.rows %}
+  {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
+{% endfor %}
+{% if comments.next_url %}
+  <div class="infinite-scroll-sentinel"
+       hx-get="{{ comments.next_url }}"
+       hx-trigger="revealed"
+       hx-swap="outerHTML">
+    <span class="loading-indicator">{{ ftl_get_message("loading-more-comments") }}</span>
+  </div>
+{% endif %}

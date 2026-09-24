@@ -1,6 +1,6 @@
 use crate::app_error::AppError;
 use crate::models::actor::create_actor_for_community;
-use crate::models::comment::{find_recent_comments, CommentScope};
+use crate::models::comment::CommentScope;
 use crate::models::community::{
     accept_invitation, add_community_member, create_community, create_invitation, find_community_by_id,
     find_community_by_slug, get_communities_members_count, get_community_members_with_details,
@@ -16,7 +16,8 @@ use crate::models::notification::{format_community_invitation_message, get_user_
 use crate::models::post::{find_published_posts_by_community_id, find_recent_posts_by_communities};
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession};
 use crate::web::handlers::home::{
-    feed_context, LoadMoreQuery, HOME_POSTS_PER_BATCH, SIDEBAR_COMMENTS,
+    comments_batch, comments_context, feed_context, CommentsQuery, LoadMoreQuery,
+    HOME_POSTS_PER_BATCH,
 };
 use crate::web::handlers::{parse_id_with_legacy_support, ParsedId};
 use crate::web::handlers::render_403;
@@ -199,12 +200,11 @@ pub(crate) async fn render_community_page(
         viewer_show_sensitive,
     )
     .await?;
-    let comments = find_recent_comments(
+    let comments = comments_batch(
         tx,
         CommentScope::Community(community_uuid),
-        viewer_user_id,
-        viewer_show_sensitive,
-        SIDEBAR_COMMENTS,
+        auth_session.user.as_ref(),
+        None,
     )
     .await?;
     let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
@@ -217,7 +217,7 @@ pub(crate) async fn render_community_page(
         domain => state.config.domain.clone(),
         unread_notification_count => common_ctx.unread_notification_count,
         feed => feed_context(posts, &community_posts_path(&community.slug), 0, None),
-        comments,
+        comments => comments_context(comments, &community_comments_path(&community.slug)),
         draft_post_count => common_ctx.draft_post_count,
         ftl_lang,
     })?;
@@ -228,6 +228,47 @@ pub(crate) async fn render_community_page(
 /// so the route and the URL the page emits cannot disagree.
 fn community_posts_path(slug: &str) -> String {
     format!("/api/communities/@{}/posts", slug)
+}
+
+/// The same, for the community's comments: beside its drawings and on its
+/// comments page.
+fn community_comments_path(slug: &str) -> String {
+    format!("/api/communities/@{}/comments", slug)
+}
+
+/// GET /api/communities/@:slug/comments — the next batch of a community's
+/// comments plus the sentinel for the one after. It repeats the pages'
+/// visibility check, because the endpoint can be called on its own.
+pub async fn load_more_community_comments(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Query(query): Query<CommentsQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let community = find_community_by_slug(&mut tx, slug)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Community".to_string()))?;
+    if community.visibility == CommunityVisibility::Private {
+        let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
+        if !is_user_member(&mut tx, user.id, community.id).await? {
+            return Err(AppError::Forbidden);
+        }
+    }
+    let comments = comments_batch(
+        &mut tx,
+        CommentScope::Community(community.id),
+        auth_session.user.as_ref(),
+        query.after,
+    )
+    .await?;
+    tx.commit().await?;
+
+    let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
+        comments => comments_context(comments, &community_comments_path(&community.slug)),
+        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+    })?;
+    Ok(Html(rendered).into_response())
 }
 
 /// GET /api/communities/@:slug/posts — the next batch of a community's cards
@@ -1163,13 +1204,13 @@ pub async fn community_comments(
         }
     }
 
-    // The whole of what the drawings page's list is the start of.
-    let comments = find_recent_comments(
+    // The whole of what the drawings page's list is the start of, loading
+    // as it is scrolled.
+    let comments = comments_batch(
         &mut tx,
         CommentScope::Community(community_uuid),
-        auth_session.user.as_ref().map(|u| u.id),
-        auth_session.user.as_ref().map_or(false, |u| u.show_sensitive_content),
-        100,
+        auth_session.user.as_ref(),
+        None,
     )
     .await?;
     let header = community_header_context(&mut tx, &community).await?;
@@ -1183,7 +1224,7 @@ pub async fn community_comments(
         community => community,
         header => header,
         community_id => community_uuid.to_string(),
-        comments => comments,
+        comments => comments_context(comments, &community_comments_path(&community.slug)),
         domain => state.config.domain.clone(),
         unread_notification_count => common_ctx.unread_notification_count,
         draft_post_count => common_ctx.draft_post_count,

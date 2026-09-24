@@ -391,11 +391,16 @@ pub enum CommentScope {
 /// the drawing, so a list that ignored this would show what the grid
 /// beside it blurs or hides. An artist answering on their own drawing is
 /// left out; what the list is for is what others said.
+///
+/// `after` is the last comment of the previous batch, for a list that loads
+/// as it is scrolled. Paging by it rather than by offset keeps a batch from
+/// repeating a row when someone comments while the list is being read.
 pub async fn find_recent_comments(
     tx: &mut Transaction<'_, Postgres>,
     scope: CommentScope,
     viewer_user_id: Option<Uuid>,
     viewer_show_sensitive: bool,
+    after: Option<Uuid>,
     limit: i64,
 ) -> Result<Vec<NotificationComment>> {
     let (community_id, member_id, follower_id) = match scope {
@@ -454,8 +459,13 @@ pub async fn find_recent_comments(
             WHERE follows.following_actor_id = comments.actor_id
             AND followers.user_id = $6
         ))
+        AND (
+            $7::uuid IS NULL
+            OR (comments.created_at, comments.id)
+                < (SELECT created_at, id FROM comments WHERE id = $7)
+        )
         ORDER BY comments.created_at DESC, comments.id DESC
-        LIMIT $7
+        LIMIT $8
         "#,
         viewer_show_sensitive,
         viewer_user_id,
@@ -463,6 +473,7 @@ pub async fn find_recent_comments(
         community_id,
         member_id,
         follower_id,
+        after,
         limit
     )
     .fetch_all(&mut **tx)

@@ -10,6 +10,9 @@
 {% endblock head %}
 {% from "comments_aside_macro.jinja" import comments_aside %}
 {% block content %}
+  {# A batch from comments_context() (handlers/home.rs); a render that only
+     wants the page's frame may leave it out. #}
+  {% set comments = comments if comments is defined else {} %}
   {% include "post_feed_head.jinja" %}
   <div class="center-wide">
     {# Home's feeds, all four on this one page: the grid of drawings is the
@@ -18,19 +21,15 @@
        the same for every one; only the query behind `feed` differs
        (handlers/home.rs, Feed). Beside it, what people are saying in the
        same feed (comments_aside_macro.jinja). #}
-    <section class="feed-layout{% if comments %} has-comments{% endif %}" role="region" aria-label="{{ ftl_get_message("feed-" ~ feed_switch) }}">
+    <section class="feed-layout{% if comments.rows %} has-comments{% endif %}" role="region" aria-label="{{ ftl_get_message("feed-" ~ feed_switch) }}">
       <div class="feed-header">
-        {% if current_user %}
-          {% include "feed_switch.jinja" %}
-        {% else %}
-          <h2 class="home-section-title">{{ ftl_get_message("recent-drawings") }}</h2>
-        {% endif %}
+        {% include "feed_choices.jinja" %}
         {# Only with drawings to arrange: an empty feed has no columns to set. #}
         {% if feed.posts and feed.posts|length > 0 %}
           {% include "post_feed_controls.jinja" %}
         {% endif %}
       </div>
-      {{ comments_aside(comments) }}
+      {{ comments_aside(comments, comments_url) }}
       {% if feed.posts and feed.posts|length > 0 %}
         <div class="posts-grid" id="post-feed-grid">
           {% include "post_feed_fragment.jinja" %}

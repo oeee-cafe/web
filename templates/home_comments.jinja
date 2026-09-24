@@ -1,0 +1,24 @@
+{% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("feed-" ~ feed_switch) }} | {{ ftl_get_message("recent-comments") }}
+{% endblock title %}
+{% block content %}
+  {# A Home feed's comments, the other half of its drawings | comments pill
+     (feed_views.jinja): what the list beside its grid is the start of, a
+     card each as a community's comments page has them, loading as it is
+     scrolled (comments_fragment.jinja). #}
+  <div class="center-wide">
+    <section class="feed-layout" role="region" aria-label="{{ ftl_get_message("feed-" ~ feed_switch) }}">
+      <div class="feed-header">
+        {% include "feed_choices.jinja" %}
+      </div>
+      {% if comments.rows %}
+        <div class="comment-grid">
+          {% include "comments_fragment.jinja" %}
+        </div>
+      {% else %}
+        <p>{{ ftl_get_message("no-comments-yet") }}</p>
+      {% endif %}
+    </section>
+  </div>
+{% endblock content %}

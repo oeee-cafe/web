@@ -118,8 +118,8 @@
        the header block above: saving or cancelling the edit form renders
        that block alone, and minijinja still walks the rest to reach it. #}
     {% set feed_posts = feed.posts if feed is defined else [] %}
-    {% set aside_comments = comments if comments is defined else [] %}
-    <section class="profile-section feed-layout{% if aside_comments %} has-comments{% endif %}" role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
+    {% set aside_comments = comments if comments is defined else {} %}
+    <section class="profile-section feed-layout{% if aside_comments.rows %} has-comments{% endif %}" role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
       <div class="grid-header">
         {{ community_views("drawings") }}
         {# Only with posts to arrange: an empty feed has no columns to set. #}

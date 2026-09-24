@@ -1,0 +1,10 @@
+{# The start of a Home feed's header, on its drawings (home.jinja) and its
+   comments (home_comments.jinja): which feed, for someone signed in, and
+   whether its drawings or its comments. Signed out there is one feed, and
+   the second pill alone heads the page. #}
+<div class="feed-choices">
+  {% if current_user %}
+    {% include "feed_switch.jinja" %}
+  {% endif %}
+  {% include "feed_views.jinja" %}
+</div>
