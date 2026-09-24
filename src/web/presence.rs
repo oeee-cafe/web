@@ -1,8 +1,9 @@
 //! What someone is doing on a page, for their Steam friends to see.
 //!
-//! The Oeee Cafe app on Steam reads this from `<meta name="oeee-presence">`
-//! on each page it loads and hands it to Steam as rich presence ("Drawing in
-//! 오이카페 모에화"). The site only says what the page is; the words are
+//! Each page says it in `<meta name="oeee-presence">`, which the page passes
+//! to the app in its `page` message (`presence`, `community` and `group`,
+//! app_bridge.jinja), and the Oeee Cafe app on Steam hands it to Steam as
+//! rich presence ("Drawing in 오이카페 모에화"). The site only says what the page is; the words are
 //! Steam's, from the localisation file uploaded with the app
 //! (`steam/rich_presence.vdf` in oeee-cafe-desktop). A page without the tag
 //! is browsing.

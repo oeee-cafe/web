@@ -28,10 +28,11 @@
 //! page of its own ([`do_apple_sign_in`]).
 //!
 //! Google comes back by a GET, which a Lax cookie is sent with, so
-//! [`google_callback`] is the whole of it. What the phone apps post to
-//! [`do_google_sign_in`] is made by the page, as the Steam app's post is:
-//! Google will not sign in inside a web view at all, so each app does it its
-//! own way and hands the ID token back to the page.
+//! [`google_callback`] is the whole of it. Google will not sign in inside a
+//! web view at all, so the apps go round it: the iOS, macOS and Windows apps
+//! in a browser of the system's ([`handoff_start`]), and the Android app
+//! with Credential Manager, whose ID token the page posts to
+//! [`do_google_sign_in`] as the Steam app's page posts its ticket.
 
 use axum::extract::{Path, Query, State};
 use axum::http::header::ORIGIN;
@@ -459,11 +460,11 @@ pub struct AppleStartForm {
     next: Option<String>,
 }
 
-/// A sign-in for the iOS app to make natively: the state and nonce it hands
-/// Apple, kept in the web view's session as `/auth/apple` keeps them for a
-/// browser. The app asks from inside the page, so the answer is this
-/// session's; another site's page gets neither the session nor, without
-/// CORS, the answer.
+/// A sign-in for the iOS and macOS apps to make natively: the state and
+/// nonce they hand Apple, kept in the web view's session as `/auth/apple`
+/// keeps them for a browser. The app asks from inside the page, so the
+/// answer is this session's; another site's page gets neither the session
+/// nor, without CORS, the answer.
 pub async fn apple_start(
     session: Session,
     State(state): State<AppState>,
@@ -782,11 +783,11 @@ pub struct GoogleStartForm {
     next: Option<String>,
 }
 
-/// A sign-in for the phone apps to make themselves: the nonce they hand
-/// Google, kept in the web view's session as `/auth/google` keeps it for a
-/// browser. Google refuses its own sign-in pages inside an embedded web view,
-/// so neither app can take the browser's way round -- Android asks Credential
-/// Manager, iOS a browser of the system's.
+/// A sign-in for the Android app to make itself, with Credential Manager: the
+/// nonce it hands Google, kept in the web view's session as `/auth/google`
+/// keeps it for a browser. Google refuses its own sign-in pages inside an
+/// embedded web view; the other apps sign in in a browser of the system's
+/// instead ([`handoff_start`]).
 ///
 /// The app asks from inside the page, so the answer is this session's;
 /// another site's page gets neither the session nor, without CORS, the
