@@ -1,6 +1,6 @@
 {% extends "base.jinja" %}
 {% block title %}
-  {{ super() }} | {{ ftl_get_message("feed-" ~ feed_switch) }} | {{ ftl_get_message("recent-comments") }}
+  {{ super() }} | {{ ftl_get_message("feed-" ~ feed_switch) }} | {{ ftl_get_message("feed-view-comments") }}
 {% endblock title %}
 {% block content %}
   {# A Home feed's comments, the other half of its drawings | comments pill

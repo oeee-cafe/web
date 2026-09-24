@@ -775,8 +775,8 @@ mod community_page_tests {
             .render(base())
             .expect("community renders");
         let on_drawings = pill(&drawings);
-        assert!(on_drawings.contains(r#"<a href="/communities/@open" aria-current="page">recent-drawings</a>"#));
-        assert!(on_drawings.contains(r#"<a href="/communities/@open/comments">recent-comments</a>"#));
+        assert!(on_drawings.contains(r#"<a href="/communities/@open" aria-current="page">feed-view-drawings</a>"#));
+        assert!(on_drawings.contains(r#"<a href="/communities/@open/comments">feed-view-comments</a>"#));
         assert!(on_drawings.contains("hx-boost:inherited"), "switched in place");
 
         let comments = env
@@ -807,8 +807,8 @@ mod community_page_tests {
             })
             .expect("comments render");
         let on_comments = pill(&comments);
-        assert!(on_comments.contains(r#"<a href="/communities/@open">recent-drawings</a>"#));
-        assert!(on_comments.contains(r#"<a href="/communities/@open/comments" aria-current="page">recent-comments</a>"#));
+        assert!(on_comments.contains(r#"<a href="/communities/@open">feed-view-drawings</a>"#));
+        assert!(on_comments.contains(r#"<a href="/communities/@open/comments" aria-current="page">feed-view-comments</a>"#));
         assert!(comments.contains("Draw with us"), "under the same card");
         assert!(comments.contains(r#"<div class="comment-grid">"#));
         assert!(comments.contains("멋져요"));
@@ -3317,8 +3317,8 @@ mod template_tests {
         let links_in = drawings.replace("&#x2f;", "/");
         assert!(drawings.contains(r#"<aside class="feed-comments" aria-labelledby"#));
         assert!(drawings.contains(r#"id="post-feed-grid""#));
-        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC" aria-current="page">recent-drawings</a>"#));
-        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments">recent-comments</a>"#));
+        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC" aria-current="page">feed-view-drawings</a>"#));
+        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments">feed-view-comments</a>"#));
         assert!(links_in.contains(r#"hx-get="/api/tags/%EA%B7%B8%EB%A6%BC/comments?after="#));
         assert!(links_in.contains(r#"<a class="feed-comments-more" href="/tags/%EA%B7%B8%EB%A6%BC/comments">"#));
 
@@ -3328,7 +3328,7 @@ mod template_tests {
         assert!(said.contains(r#"<div class="comment-grid">"#));
         assert!(said.contains("Lovely colours"));
         assert!(!said.contains(r#"id="post-feed-grid""#), "no drawings under it");
-        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments" aria-current="page">recent-comments</a>"#));
+        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments" aria-current="page">feed-view-comments</a>"#));
         assert!(links_in.contains(r#"hx-get="/api/tags/%EA%B7%B8%EB%A6%BC/comments?after="#));
     }
 

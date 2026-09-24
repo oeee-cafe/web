@@ -133,8 +133,6 @@ password-repeat = 确认密码
 display-name = 昵称
 
 latest-active-public-community = 最近活跃的公开社区
-recent-drawings = 最近的作品
-recent-comments = 最近的评论
 no-comments-yet = 暂无评论
 
 community-stats-posts = 帖子

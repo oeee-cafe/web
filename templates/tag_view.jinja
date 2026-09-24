@@ -34,8 +34,8 @@
 {% macro tag_views(chosen) %}
   {% set here = "/tags/" ~ tag.name|urlencode %}
   <nav class="ds-segmented" aria-label="#{{ tag.display_name }}" {{ pill.in_place() }}>
-    <a href="{{ here }}"{% if chosen == "drawings" %} aria-current="page"{% endif %}>{{ ftl_get_message("recent-drawings") }}</a>
-    <a href="{{ here }}/comments"{% if chosen == "comments" %} aria-current="page"{% endif %}>{{ ftl_get_message("recent-comments") }}</a>
+    <a href="{{ here }}"{% if chosen == "drawings" %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-view-drawings") }}</a>
+    <a href="{{ here }}/comments"{% if chosen == "comments" %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-view-comments") }}</a>
   </nav>
 {% endmacro %}
 {% block content %}
@@ -63,7 +63,7 @@
        and same infinite scroll as / and a community page, and the same
        comments beside it (comments_aside_macro.jinja). #}
     {% set aside_comments = comments if comments is defined else {} %}
-    <section class="profile-section feed-layout{% if aside_comments.rows %} has-comments{% endif %}" role="region" aria-label="{{ ftl_get_message("recent-drawings") }}">
+    <section class="profile-section feed-layout{% if aside_comments.rows %} has-comments{% endif %}" role="region" aria-label="{{ ftl_get_message("feed-view-drawings") }}">
       <div class="grid-header">
         {{ tag_views("drawings") }}
         {% if feed.posts %}

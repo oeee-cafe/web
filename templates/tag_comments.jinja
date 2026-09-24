@@ -1,12 +1,12 @@
 {% extends "tag_view.jinja" %}
 {% block title %}
-  {{ super() }} | {{ ftl_get_message("recent-comments") }}
+  {{ super() }} | {{ ftl_get_message("feed-view-comments") }}
 {% endblock title %}
 {# The tag's page with the pill on its comments: the same card, then what
    has been said on its drawings, a card each as a community's comments
    page has them, loading as it is scrolled (comments_fragment.jinja). #}
 {% block tag_body %}
-  <section class="profile-section" role="region" aria-label="{{ ftl_get_message("recent-comments") }}">
+  <section class="profile-section" role="region" aria-label="{{ ftl_get_message("feed-view-comments") }}">
     <div class="grid-header">
       {{ tag_views("comments") }}
     </div>
