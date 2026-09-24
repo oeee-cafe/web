@@ -64,6 +64,7 @@ struct Room {
     state: AppState,
     room: Uuid,
     users: Vec<Uuid>,
+    community_id: Option<Uuid>,
 }
 
 impl Drop for Room {
@@ -115,6 +116,12 @@ impl Room {
         .execute(&self.db)
         .await
         .expect("delete session");
+        if let Some(community_id) = self.community_id {
+            sqlx::query!("DELETE FROM communities WHERE id = $1", community_id)
+                .execute(&self.db)
+                .await
+                .expect("delete community");
+        }
         sqlx::query!("DELETE FROM users WHERE id = ANY($1)", &self.users)
             .execute(&self.db)
             .await
@@ -181,6 +188,12 @@ fn test_config(db_url: &str, redis_url: &str) -> AppConfig {
 /// A room with `seats` seats and two users who may sit in it, behind the real
 /// handler. None when there is no database to put them in.
 async fn open_room(seats: i32) -> Option<Room> {
+    open_room_in(seats, None).await
+}
+
+/// The same, with the session opened in a community of the given visibility
+/// by its owner, who is made a member of it.
+async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
     let db_url = std::env::var("DATABASE_URL").ok()?;
     let db = PgPool::connect(&db_url).await.ok()?;
     let (redis, redis_url) = start_redis().await;
@@ -198,13 +211,38 @@ async fn open_room(seats: i32) -> Option<Room> {
         .expect("insert user");
         users.push(id);
     }
+    let community_id: Option<Uuid> = match community {
+        None => None,
+        Some(visibility) => {
+            let id: Uuid = sqlx::query_scalar(
+                "INSERT INTO communities (owner_id, name, slug, description, visibility) \
+                 VALUES ($1, 'handler test', $2, '', $3::community_visibility) RETURNING id",
+            )
+            .bind(users[0])
+            .bind(format!("handler-test-{}", &Uuid::new_v4().to_string()[..8]))
+            .bind(visibility)
+            .fetch_one(&db)
+            .await
+            .expect("insert community");
+            sqlx::query!(
+                "INSERT INTO community_members (community_id, user_id, role) VALUES ($1, $2, 'owner')",
+                id,
+                users[0]
+            )
+            .execute(&db)
+            .await
+            .expect("owner membership");
+            Some(id)
+        }
+    };
     let room: Uuid = sqlx::query_scalar!(
         r#"
-        INSERT INTO collaborative_sessions (owner_id, title, width, height, is_public, max_participants)
-        VALUES ($1, 'handler test', 64, 48, false, $2) RETURNING id
+        INSERT INTO collaborative_sessions (owner_id, title, width, height, is_public, max_participants, community_id)
+        VALUES ($1, 'handler test', 64, 48, false, $2, $3) RETURNING id
         "#,
         users[0],
-        seats
+        seats,
+        community_id
     )
     .fetch_one(&db)
     .await
@@ -236,6 +274,7 @@ async fn open_room(seats: i32) -> Option<Room> {
         state,
         room,
         users,
+        community_id,
     })
 }
 
@@ -696,6 +735,61 @@ async fn finishing_a_session_sends_everyone_to_the_post_and_closes_the_room() {
         let mut late = room.connect(1, None).await;
         let goodbye = next_close(&mut late).await.expect("a close, not a welcome");
         assert_eq!(u16::from(goodbye.code), 1008);
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// A session in a private community is for the community's members, as its
+/// posts are. The lobby and the preview already hid it from everyone else;
+/// the join took anyone with the link.
+#[tokio::test]
+async fn a_room_in_a_private_community_admits_members_only() {
+    let Some(room) = open_room_in(4, Some("private")).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        // The owner, a member by construction.
+        let mut alice = room.connect(0, None).await;
+        opening(&mut alice).await;
+
+        // Bob holds the link and nothing else.
+        let mut bob = room.connect(1, None).await;
+        let goodbye = next_close(&mut bob).await.expect("a close, not a welcome");
+        assert_eq!(u16::from(goodbye.code), 1008);
+        assert_eq!(
+            room.active_participants().await,
+            vec![room.users[0]],
+            "no seat was taken"
+        );
+
+        // Made a member, he is let in.
+        sqlx::query!(
+            "INSERT INTO community_members (community_id, user_id) VALUES ($1, $2)",
+            room.community_id.unwrap(),
+            room.users[1]
+        )
+        .execute(&room.db)
+        .await
+        .expect("membership");
+        let mut bob = room.connect(1, None).await;
+        opening(&mut bob).await;
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// An unlisted community is reachable by link, as its pages are.
+#[tokio::test]
+async fn a_room_in_an_unlisted_community_admits_the_link() {
+    let Some(room) = open_room_in(4, Some("unlisted")).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut bob = room.connect(1, None).await;
+        opening(&mut bob).await;
     })
     .await;
     room.teardown().await;

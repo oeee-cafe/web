@@ -38,6 +38,44 @@ pub async fn get_session_info(
     }))
 }
 
+/// Whether this user may be in the room at all.
+///
+/// A session in a private community is for that community's members, the
+/// way its posts are: the lobby and the preview already hide it from
+/// everybody else, but the join and the metadata took anyone holding the
+/// link. The owner is let in regardless, since they had to be a member to
+/// open it there. A public or unlisted community, or none, is open to the
+/// link.
+pub async fn viewer_may_enter(
+    db: &Pool<Postgres>,
+    room_uuid: Uuid,
+    user_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM collaborative_sessions cs
+            LEFT JOIN communities c ON cs.community_id = c.id
+            WHERE cs.id = $1
+              AND (
+                c.id IS NULL
+                OR c.visibility <> 'private'
+                OR cs.owner_id = $2
+                OR EXISTS(
+                    SELECT 1 FROM community_members cm
+                    WHERE cm.community_id = c.id AND cm.user_id = $2
+                )
+              )
+        ) AS "may_enter!"
+        "#,
+        room_uuid,
+        user_id,
+    )
+    .fetch_one(db)
+    .await
+}
+
 pub async fn check_existing_participant(
     db: &Pool<Postgres>,
     room_uuid: Uuid,
@@ -383,7 +421,8 @@ pub async fn save_session_to_post(
     let participant_names: Vec<String> =
         participants.iter().map(|p| p.login_name.clone()).collect();
 
-    let _description = if participant_names.len() > 1 {
+    // The post's body: who drew it. The title is the session's own.
+    let description = if participant_names.len() > 1 {
         format!(
             "Collaborative drawing with {} participants: {}",
             participant_names.len(),
@@ -392,6 +431,12 @@ pub async fn save_session_to_post(
     } else {
         "Collaborative drawing".to_string()
     };
+    let title = session
+        .title
+        .as_deref()
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
+        .map(str::to_string);
 
     let community_id = session.community_id;
 
@@ -429,13 +474,15 @@ pub async fn save_session_to_post(
     let post_id = Uuid::new_v4();
     sqlx::query!(
         r#"
-        INSERT INTO posts (id, author_id, community_id, image_id, is_sensitive, published_at)
-        VALUES ($1, $2, $3, $4, false, NOW())
+        INSERT INTO posts (id, author_id, community_id, image_id, is_sensitive, published_at, title, content)
+        VALUES ($1, $2, $3, $4, false, NOW(), $5, $6)
         "#,
         post_id,
         owner_id,
         community_id,
         image_id,
+        title,
+        description,
     )
     .execute(&mut *tx)
     .await?;
