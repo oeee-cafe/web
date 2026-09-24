@@ -306,8 +306,12 @@ async fn cleanup_inactive_sessions(
         return Ok(());
     }
 
-    let mut tx = db.begin().await?;
-
+    // Each session on its own, committed as it goes: the seal below reads
+    // `ended_at` through the pool, so an update held in a transaction across
+    // the whole batch was invisible to it and every inactive session was
+    // sealed with no end time. It also kept a connection, on a Postgres
+    // shared with other apps, open across a round of object writes per
+    // session.
     for session in inactive_sessions {
         let session_id = session.id;
 
@@ -368,7 +372,7 @@ async fn cleanup_inactive_sessions(
             "UPDATE collaborative_sessions SET ended_at = NOW() WHERE id = $1",
             session_id
         )
-        .execute(&mut *tx)
+        .execute(db)
         .await
         {
             error!("Failed to mark session {} as ended: {}", session_id, e);
@@ -384,7 +388,7 @@ async fn cleanup_inactive_sessions(
             "#,
             session_id
         )
-        .execute(&mut *tx)
+        .execute(db)
         .await
         {
             warn!(
@@ -444,8 +448,6 @@ async fn cleanup_inactive_sessions(
         );
         *inactive_sessions_cleaned += 1;
     }
-
-    tx.commit().await?;
 
     if *inactive_sessions_cleaned > 0 {
         info!(
