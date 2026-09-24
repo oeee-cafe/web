@@ -1,0 +1,16 @@
+{% import "comment_card_macro.jinja" as comment_card_macro %}
+{# One batch of a profile's comments plus the sentinel that pulls the next.
+   Rendered inline by profile.jinja for the first batch and standalone by
+   /@{login_name}/comments for every scrolled batch, so it must not depend
+   on anything that handler does not pass. #}
+{% for comment in comments %}
+  {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message) }}
+{% endfor %}
+{% if comments_next_url %}
+  <div class="infinite-scroll-sentinel"
+       hx-get="{{ comments_next_url }}"
+       hx-trigger="revealed"
+       hx-swap="outerHTML">
+    <span class="loading-indicator">{{ ftl_get_message("loading-more-posts") }}</span>
+  </div>
+{% endif %}

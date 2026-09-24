@@ -77,7 +77,7 @@ use crate::web::handlers::profile::{
     banner_management, do_activate_banner, do_add_link, do_delete_banner, do_delete_guestbook_entry,
     do_delete_link, do_follow_profile, do_move_link_down, do_move_link_up, do_reply_guestbook_entry,
     do_unfollow_profile, do_write_guestbook_entry, guestbook, profile_banners_iframe,
-    profile_iframe, profile_or_community, profile_settings,
+    profile_comments_fragment, profile_iframe, profile_or_community, profile_settings,
 };
 use crate::web::handlers::report::{hx_report_post, hx_report_profile};
 use crate::web::handlers::search::search_page;
@@ -449,6 +449,7 @@ impl App {
             .route("/banners/{banner_id}/activate", post(do_activate_banner))
             .route("/banners/{banner_id}", delete(do_delete_banner))
             .route("/@{login_name}/guestbook", get(guestbook))
+            .route("/@{login_name}/comments", get(profile_comments_fragment))
             .route("/@{login_name}/{post_id}", get(post_view_by_login_name))
             .route(
                 "/@{login_name}/{post_id}/reactions",

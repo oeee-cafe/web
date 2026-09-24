@@ -2249,12 +2249,14 @@ mod template_tests {
         assert!(at("data-profile-panel=\"public\"") < at("data-profile-panel=\"following\""));
     }
 
-    /// What they have said gets its own tab, a row per comment leading to
-    /// the drawing it is on; someone who has said nothing gets no tab.
+    /// What they have said gets its own tab, counted in full, a row per
+    /// comment leading to the drawing it is on, and a sentinel that scrolls
+    /// in the next batch while there is one; someone who has said nothing
+    /// gets no tab.
     #[test]
     fn the_profile_lists_what_its_owner_has_said() {
         let env = test_support::env();
-        let render = |comments: serde_json::Value| {
+        let render = |comments: serde_json::Value, comment_count: i64, comments_next_url: Option<&str>| {
             env.get_template("profile.jinja")
                 .expect("profile loads")
                 .render(context! {
@@ -2269,6 +2271,8 @@ mod template_tests {
                     followings => Vec::<serde_json::Value>::new(),
                     achievements => Vec::<serde_json::Value>::new(),
                     comments,
+                    comment_count,
+                    comments_next_url,
                     public_community_posts => Vec::<serde_json::Value>::new(),
                     private_community_posts => Vec::<serde_json::Value>::new(),
                     domain => "oeee.cafe",
@@ -2297,14 +2301,33 @@ mod template_tests {
             "post_image_filename": "abcdef.png",
             "post_image_width": 300,
             "post_image_height": 300,
-        }]));
+        }]), 45, Some("/@oeee/comments?after=0c8f0000-0000-0000-0000-000000000001"));
         assert!(with.contains(r#"data-profile-tab="comments""#));
         assert!(with.contains(r#"data-profile-panel="comments""#));
         assert!(with.contains(r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002""#));
         assert!(with.contains("멋져요"));
         assert!(with.contains("고양이"));
+        assert!(with.contains(r#"<span class="profile-tab-count">45</span>"#));
+        // Minijinja escapes the slashes in an attribute; the browser reads
+        // them back as the URL.
+        assert!(with.replace("&#x2f;", "/").contains(
+            r#"hx-get="/@oeee/comments?after=0c8f0000-0000-0000-0000-000000000001""#
+        ));
 
-        let without = render(json!([]));
+        // The scrolled batches come from the fragment alone, which has to
+        // stand without the profile's context.
+        let last_batch = env
+            .get_template("profile_comments_fragment.jinja")
+            .expect("fragment loads")
+            .render(context! {
+                comments => json!([]),
+                comments_next_url => None::<String>,
+                ftl_lang => "en",
+            })
+            .expect("fragment renders");
+        assert!(!last_batch.contains("infinite-scroll-sentinel"));
+
+        let without = render(json!([]), 0, None);
         assert!(!without.contains("data-profile-tab=\"comments\""));
         assert!(!without.contains("data-profile-panel=\"comments\""));
     }
