@@ -28,11 +28,14 @@
 {% endblock head %}
 {# What of the community is showing under its card -- its drawings, or
    what has been said on them -- as a pill of links, each its own address
-   (/communities/@slug and /communities/@slug/comments), switched in place.
+   (/@slug and /communities/@slug/comments), switched in place. The
+   drawings are at the community's own address rather than
+   /communities/@slug, which only redirects there, so the pill does not
+   take a redirect on every switch or leave the old form in the bar.
    community_comments.jinja is this page with the other one chosen. #}
 {% macro community_views(chosen) %}
   <nav class="ds-segmented" aria-label="{{ community.name }}" {{ pill.in_place() }}>
-    <a href="/communities/@{{ community.slug }}"{% if chosen == "drawings" %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-view-drawings") }}</a>
+    <a href="/@{{ community.slug }}"{% if chosen == "drawings" %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-view-drawings") }}</a>
     <a href="/communities/@{{ community.slug }}/comments"{% if chosen == "comments" %} aria-current="page"{% endif %}>{{ ftl_get_message("feed-view-comments") }}</a>
   </nav>
 {% endmacro %}
