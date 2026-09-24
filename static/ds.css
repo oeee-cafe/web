@@ -1019,8 +1019,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 
 /* Unread fills the bell in the accent, the Draw button's lime, outlined in
    its ink as that button's brush is: the shape changes as well as the
-   colour, and the width does not (nav_notifications.jinja). */
-.toolbar-end .toolbar-bell-unread svg {
+   colour, and the width does not (nav_notifications.jinja). A guest's
+   drafts square fills the same way while this browser holds some. */
+.toolbar-end .toolbar-bell-unread svg,
+.toolbar-end .toolbar-drafts-some svg {
   color: var(--ds-accent-ink);
   fill: var(--ds-accent);
 }
@@ -1422,10 +1424,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   border-top: 1px solid var(--ds-line);
 }
 
-/* Signed out, the drafts link comes first and is hidden until there are
-   drafts, so the switch is first in all but the markup. */
-.toolbar-menu-items .toolbar-theme:first-child,
-.toolbar-menu-items .toolbar-menu-drafts[hidden] + .toolbar-theme {
+/* Signed out, the switch is all the menu holds. */
+.toolbar-menu-items .toolbar-theme:first-child {
   margin-top: 0;
   border-top: 0;
 }
