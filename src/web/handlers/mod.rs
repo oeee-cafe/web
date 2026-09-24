@@ -1776,8 +1776,30 @@ mod template_tests {
             "signed in, About is the last item of the account menu"
         );
         assert_eq!(signed_in.matches(r#"href="/about""#).count(), 1);
-        // Drafts are in the account menu, so the bar has no square for them.
-        assert!(!signed_in.contains("toolbar-drafts\" href"));
+        // Signed in with none, the drafts square is there but hidden, for
+        // the script to show if this browser holds some.
+        assert!(signed_in.contains(r#"toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" hidden aria-label="drafts""#));
+    }
+
+    /// Drafts on the server show the drafts square from the first paint,
+    /// counted in its label, beside the account menu's line for them.
+    #[test]
+    fn an_account_with_drafts_has_the_drafts_square_in_the_bar() {
+        let env = test_support::env();
+        let out = env
+            .get_template("toolbar.jinja")
+            .expect("toolbar loads")
+            .render(context! {
+                current_user => json!({"id": "00000000-0000-0000-0000-000000000001", "login_name": "oeee", "display_name": "오이"}),
+                messages => Vec::<serde_json::Value>::new(),
+                draft_post_count => 3,
+                unread_notification_count => 0,
+                ftl_lang => "en",
+            })
+            .expect("toolbar renders");
+        assert!(out.contains(r#"<a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="3" aria-label="drafts (3)" title="drafts (3)"><svg"#));
+        assert!(out.contains(r#"class="toolbar-menu-drafts""#));
+        assert!(!out.contains("toolbar-avatar-pulse"));
     }
 
     /// Which platform's mark to wear is only a question for someone who
