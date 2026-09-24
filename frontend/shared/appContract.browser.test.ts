@@ -750,11 +750,11 @@ describe("signing in for an app", () => {
     expect(finished.frame.contentWindow!.location.pathname).toBe("/after");
   }, 10000);
 
-  it("sends the Apple apps' browser straight to Google, and the others through the site", async () => {
+  it("sends Google's browser sign-in straight to Google, and Apple's through the site", async () => {
     const cases: [string, "apple" | "google", string | null][] = [
       ["Mozilla/5.0 OeeeCafe platform/ios", "google", "provider"],
       ["Mozilla/5.0 OeeeCafe platform/macos", "google", "provider"],
-      ["Mozilla/5.0 OeeeCafe platform/windows", "google", null],
+      ["Mozilla/5.0 OeeeCafe platform/windows", "google", "provider"],
       ["Mozilla/5.0 OeeeCafe platform/windows", "apple", null],
       ["Mozilla/5.0 OeeeCafe platform/android", "apple", null],
     ];
