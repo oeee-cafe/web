@@ -267,7 +267,7 @@ pub async fn saved_post_path(
 
     Ok(row.and_then(|row| {
         row.saved_post_id
-            .map(|post_id| format!("/@{}/{}", row.login_name, post_id))
+            .map(|post_id| crate::models::post::post_page_path(&row.login_name, post_id))
     }))
 }
 

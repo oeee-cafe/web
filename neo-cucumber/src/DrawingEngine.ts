@@ -172,6 +172,9 @@ export class DrawingEngine {
   public maskType = 0;
   public maskColor: [number, number, number] = [0, 0, 0];
 
+  /** Uploads per DOM canvas slot; see `domUploadCount`. */
+  private domUploads = new Map<string, number>();
+
   // Stroke continuation state accessors: collaborative replay tracks a
   // per-user stroke state externally so line-joint deduplication is a
   // deterministic function of the canonical message sequence
@@ -478,6 +481,17 @@ export class DrawingEngine {
     return this.domContexts[slotKey(owner, layerName)];
   }
 
+  /**
+   * How many times a participant's layer has been painted onto its DOM
+   * canvas. Counts uploads rather than writes to the buffer, so it names
+   * what is on screen right now -- a write that is still batched has not
+   * changed the screen yet -- which is what lets the preview backdrop read
+   * each canvas back once per change instead of once per pointer move.
+   */
+  public domUploadCount(layerName: LayerName, owner: LayerOwner = this.localOwner): number {
+    return this.domUploads.get(slotKey(owner, layerName)) ?? 0;
+  }
+
   // Attach DOM canvases for direct updating
   public attachDOMCanvases(
     backgroundCanvas: HTMLCanvasElement,
@@ -492,6 +506,9 @@ export class DrawingEngine {
 
     for (const [layer, canvas] of pairs) {
       const key = slotKey(owner, layer);
+      // A new surface under the same name: whatever was read off the old
+      // one no longer describes the screen.
+      this.domUploads.set(key, (this.domUploads.get(key) ?? 0) + 1);
       this.domCanvases[key] = canvas;
       const ctx = canvas.getContext("2d");
       if (ctx) {
@@ -534,6 +551,7 @@ export class DrawingEngine {
     const region = this.pendingUpdates.get(key);
     if (!domCtx || !layerData || !region) return;
     this.pendingUpdates.delete(key);
+    this.domUploads.set(key, (this.domUploads.get(key) ?? 0) + 1);
 
     if (region === "all") {
       // The buffer itself, not a copy of it. `ImageData` wraps what it is
@@ -1184,12 +1202,21 @@ export class DrawingEngine {
     this.neo.setClipboard(data);
   }
 
-  /** Clears a whole layer, NEO's EraseAllTool. */
+  /**
+   * Clears a whole layer, NEO's EraseAllTool.
+   *
+   * Unsaid, the pair is the draw target -- as for every interactive method
+   * here that takes its buffers as an option. The canonical appliers always
+   * say whose; it is the pointer's own tools that used to default to our own
+   * pair while the operation they emitted named the selected participant's,
+   * and each of text, bezier and eraseAll had that bug on its own.
+   */
   public eraseAll(layer: "foreground" | "background", targets?: LayerBuffers): void {
-    this.withTargets(targets, () =>
+    const pair = targets ?? this.drawTarget;
+    this.withTargets(pair, () =>
       this.neo.eraseAll(layer === "foreground" ? 1 : 0)
     );
-    this.queueUpdateIfLive((targets ?? (this.layers as unknown as LayerBuffers))[layer]);
+    this.queueUpdateIfLive(pair[layer]);
   }
 
   /**
@@ -1219,7 +1246,7 @@ export class DrawingEngine {
     this.neo.doText(0, x, y, packed, alpha, text, fontSize, fontFamily);
 
     const drawn = scratch.getImageData(0, 0, this.imageWidth, this.imageHeight).data;
-    const target = into ?? this.layers[layer];
+    const target = into ?? this.drawTarget[layer];
     for (let i = 0; i < target.length; i += 4) {
       const a1 = drawn[i + 3] / 255;
       if (a1 === 0) continue;
@@ -1250,8 +1277,9 @@ export class DrawingEngine {
     this.neo._currentWidth = brushSize;
     this.neo._currentMaskType = this.maskType;
     this.neo._currentMask = this.maskColor;
+    const into = target ?? this.drawTarget[layer];
     this.neo.drawBezier(
-      this.surfaceFor(target ?? this.layers[layer]),
+      this.surfaceFor(into),
       points[0], points[1], points[2], points[3],
       points[4], points[5], points[6], points[7],
       DrawingEngine.lineTypeFor(brushType)
@@ -1259,7 +1287,7 @@ export class DrawingEngine {
     this.neo.prevLine = null;
     // Whoever's buffer it was, as every other kernel here does: a bezier
     // aimed at another participant's layers is on screen too.
-    this.queueUpdateIfLive(target ?? this.layers[layer]);
+    this.queueUpdateIfLive(into);
   }
 
   /**

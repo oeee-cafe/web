@@ -154,14 +154,16 @@ async fn cleanup_ended_sessions(
     db: &sqlx::Pool<sqlx::Postgres>,
     ended_sessions_cleaned: &mut i32,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Sessions that ended recently. Every key this pass could still find --
-    // the archive buffer with the longest life, at a day -- has expired well
-    // inside this window, so an older session has nothing left to clean; and
-    // without the bound the sweep revisited every session that had ever
-    // ended, on every pass, forever, each costing a round of Redis calls.
+    // Sessions that ended recently. Every key this pass could still find has
+    // a lifetime, the archive buffer's the longest, so a session older than
+    // twice that has nothing left to clean; and without the bound the sweep
+    // revisited every session that had ever ended, on every pass, forever,
+    // each costing a round of Redis calls.
+    let window_secs = (2 * super::collaborate::archive::ARCHIVE_BUFFER_TTL) as f64;
     let ended_sessions = sqlx::query!(
         "SELECT id FROM collaborative_sessions \
-         WHERE ended_at IS NOT NULL AND ended_at > NOW() - INTERVAL '2 days'"
+         WHERE ended_at IS NOT NULL AND ended_at > NOW() - make_interval(secs => $1)",
+        window_secs
     )
     .fetch_all(db)
     .await?;

@@ -4,7 +4,7 @@ import {
   compositeLayersToCanvas,
   downloadCanvasAsPNG as downloadCanvas,
 } from "../utils/canvasExport";
-import { inJoinOrder, participantZIndex } from "../neo/canvasStack";
+import { bottomFirst, inJoinOrder, participantZIndex } from "../neo/canvasStack";
 
 interface UseOfflineCanvasParams {
   canvasWidth: number;
@@ -128,9 +128,7 @@ export const useOfflineCanvas = ({
       if (!drawingEngine) return null;
 
       const layers: HTMLCanvasElement[] = [];
-      // Bottom of the stack first, which is the reverse of join order: the
-      // earliest joiner composites on top.
-      for (const owner of inJoinOrder(drawingEngine.ownerIds()).reverse()) {
+      for (const owner of bottomFirst(drawingEngine.ownerIds())) {
         for (const layer of ["background", "foreground"] as const) {
           const canvas = drawingEngine.getLayerCanvas(layer, owner);
           if (canvas) layers.push(canvas);
