@@ -1,26 +1,20 @@
-# To use sccache caching, enable BuildKit before running docker-compose:
-#   export DOCKER_BUILDKIT=1
-#   export COMPOSE_DOCKER_CLI_BUILD=1
-# Or run with: DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose build
-
 # Blue/green: two identical app services, one serving at a time, with `proxy`
 # holding the published port across the switch. Compose has no rolling update
-# outside Swarm, so deploy.sh drives the sequence -- see the header there.
+# outside Swarm, so deploy-server.sh drives the sequence -- see the header there.
 #
 # Room state, sequencing and presence all live in Redis, and sessions live in
 # Postgres, so it does not matter to a client which colour it lands on: a
 # drawing session survives the swap by reconnecting and resuming from its last
 # canonical sequence number.
 x-oeee-cafe: &oeee-cafe
-  build:
-    context: .
-    dockerfile: Dockerfile
-    args:
-      # deploy.sh exports this from the checked-out commit.
-      GIT_COMMIT: ${GIT_COMMIT:-}
-  # Both colours run the same image; deploy.sh rebuilds this tag and then
-  # starts whichever colour is idle from it.
+  # Both colours run the same image. It is built on another machine and loaded
+  # here by deploy.sh, and deploy-server.sh points this tag at it before
+  # starting whichever colour is idle. There is deliberately no `build:`: a
+  # build here is what used to peg this machine's CPU on every deploy.
   image: oeee-cafe:current
+  # Without a `build:`, a missing image would send compose to Docker Hub for
+  # someone else's `oeee-cafe`. Fail instead.
+  pull_policy: never
   volumes:
     - ./config:/app/config:ro
   networks:

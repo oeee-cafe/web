@@ -33,7 +33,13 @@ Linux CI box whose locale data disagrees with the one that will run it.
 
 ### Deploys
 
-`deploy.sh` is blue/green: `oeee-cafe-blue` and `oeee-cafe-green` take turns,
+`deploy.sh` runs on the development Mac, not the server: it builds
+`oeee-cafe:<commit>` from origin/main in a clean checkout of its own, ships
+the image over ssh (host alias `oeee-cafe-deploy` in `~/.ssh/config`), and
+runs `deploy-server.sh <commit>` there. Nothing compiles on the server, and
+its compose file has no `build:` on purpose.
+
+The switch is blue/green: `oeee-cafe-blue` and `oeee-cafe-green` take turns,
 and the `proxy` container (Caddy) owns the published port so it is never
 rebound. Which colour is live is written in `proxy/upstream.caddy` — that file
 is generated and gitignored, and reading it is how anything else (`cli.sh`, a
