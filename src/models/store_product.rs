@@ -31,7 +31,6 @@ use serde::Serialize;
 use sqlx::{query, query_as, Postgres, Transaction};
 
 use super::supporter::{OwnedProduct, Store};
-use crate::config::AppConfig;
 
 /// One product in the catalogue.
 #[derive(Clone, Debug, Serialize)]
@@ -230,59 +229,6 @@ pub async fn set_sale_window(
     .await?
     .rows_affected();
     Ok(changed == 1)
-}
-
-/// The products the config still lists, from before the catalogue was a
-/// table: `[[app_store.supporter_products]]` and `[[steam.supporter_apps]]`,
-/// leaving out the Steam app itself as those lists always did -- buying Oeee
-/// Cafe is not supporting it.
-pub fn configured(config: &AppConfig) -> Vec<(Store, OwnedProduct)> {
-    let mut products = Vec::new();
-    if let Some(app_store) = config.app_store.as_ref() {
-        for pack in &app_store.supporter_products {
-            products.push((
-                Store::Apple,
-                OwnedProduct {
-                    product: pack.product_id.clone(),
-                    year: pack.year,
-                },
-            ));
-        }
-    }
-    if let Some(steam) = config.steam.as_ref() {
-        for pack in &steam.supporter_apps {
-            if pack.app_id != steam.app_id {
-                products.push((
-                    Store::Steam,
-                    OwnedProduct {
-                        product: pack.app_id.to_string(),
-                        year: pack.year,
-                    },
-                ));
-            }
-        }
-    }
-    products
-}
-
-/// Brings what the config lists into the catalogue, on boot.
-///
-/// Only ever adds. A product already here is left as it is -- taken off sale
-/// at /admin/store, it stays off however long the config goes on listing it
-/// -- so running this on every boot, from either colour, changes nothing
-/// after the first. The config tables are kept parseable so a server whose
-/// config still has them boots, and so the first boot of this release
-/// starts with the packs it was selling rather than with none.
-pub async fn import_configured(db: &sqlx::PgPool, config: &AppConfig) -> Result<u64> {
-    let mut tx = db.begin().await?;
-    let mut added = 0;
-    for (store, pack) in configured(config) {
-        if add(&mut tx, store, &pack.product, pack.year, None).await? {
-            added += 1;
-        }
-    }
-    tx.commit().await?;
-    Ok(added)
 }
 
 /// A product on sale, as the window it is sold in. What [`any_on_sale`]
