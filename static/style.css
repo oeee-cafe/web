@@ -3100,9 +3100,19 @@ html[data-store] .supporter-elsewhere {
 
 /* A supporter: the chips on the accent, one for every platform they
    support on, each with that platform's mark before the word and the date
-   it started after it. */
+   it started after it.
+
+   The mark and the word are a row centred across the chip, as the badge
+   beside a name is. An emoji's glyph box is not the text's, and sits
+   differently from one system's emoji font to the next, so nudging it onto
+   the baseline by a pixel or two left it low in some fonts and made the
+   chip taller than the chips beside it. */
 .profile-chip.supporter-chip,
 .profile-chip.supporter-chip:visited {
+  display: -webkit-inline-box;
+  display: inline-flex;
+  -webkit-box-align: center;
+  align-items: center;
   border-color: var(--ds-accent-line);
   background-color: var(--ds-accent);
   color: var(--ds-accent-ink);
@@ -3113,8 +3123,9 @@ html[data-store] .supporter-elsewhere {
 }
 
 .supporter-chip .supporter-mark {
+  display: block;
   margin-right: 4px;
-  vertical-align: -2px;
+  line-height: 1;
 }
 
 /* The same mark before a platform's name where a supporter chooses which of
