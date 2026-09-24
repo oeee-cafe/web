@@ -408,11 +408,45 @@ describe("what the site's controls feel like, read off the markup", () => {
     return event;
   };
 
-  it("feels a primary button as a medium press, and a plain one not at all", async () => {
+  it("feels a primary button as a medium press, and any other button as a light one", async () => {
     const page = await open();
     add(page, '<button class="ds-button ds-button-primary">Draw</button>').click();
     add(page, '<button class="ds-button">Cancel</button>').click();
-    expect(felt(page)).toEqual(["medium"]);
+    add(page, '<a class="ds-button" href="#">Sign up</a>').click();
+    add(page, '<button class="ds-button" disabled>Nothing</button>').click();
+    expect(felt(page)).toEqual(["medium", "light", "light"]);
+  });
+
+  it("feels what looks pressable, and not a link in text or a card", async () => {
+    const page = await open();
+    page.window.document.addEventListener("click", (event) => event.preventDefault());
+    const pressables = [
+      '<a class="profile-chip" href="#">#tag</a>',
+      '<button class="ds-notice-close"><svg></svg></button>',
+      '<a class="auth-provider auth-apple" href="#"><img alt=""></a>',
+      '<button class="neo-button bg-(--neo-icon)">Undo</button>',
+      '<details class="toolbar-menu"><summary><span class="ds-button profile-more-button">⋯</span></summary></details>',
+      '<details class="reaction-custom"><summary class="reaction-button reaction-add"><svg></svg></summary></details>',
+    ];
+    for (const html of pressables) {
+      const element = add(page, html);
+      (element.querySelector("svg, img, span") ?? element).dispatchEvent(
+        new page.window.MouseEvent("click", { bubbles: true, cancelable: true }),
+      );
+    }
+    add(page, '<p>Read the <a href="#">guidelines</a></p>').querySelector("a")!.click();
+    add(page, '<div class="posts-grid-item"><a href="#"><img alt=""></a></div>').querySelector("a")!.click();
+    add(page, '<button class="neo-button" aria-pressed="false" data-haptic="none">Pen</button>').click();
+    expect(felt(page)).toEqual(["light", "light", "light", "light", "light", "light"]);
+  });
+
+  it("feels a plain button's request by how it went, not by its press", async () => {
+    const page = await open();
+    const remove = add(page, '<button class="ds-button" hx-delete="/comments/1">Delete</button>');
+    remove.click();
+    expect(felt(page)).toEqual([]);
+    done(page, remove, { event: clickOn(page, remove), method: "DELETE", status: 200 });
+    expect(felt(page)).toEqual(["success"]);
   });
 
   it("feels a change a press sent when it has gone through, not when it was pressed", async () => {
@@ -422,6 +456,33 @@ describe("what the site's controls feel like, read off the markup", () => {
     expect(felt(page)).toEqual([]);
     done(page, form, { event: submitOf(page, form), method: "POST", status: 200 });
     expect(felt(page)).toEqual(["success"]);
+  });
+
+  it("feels the toolbar's buttons as a light press, and its sections as a tick", async () => {
+    const page = await open();
+    const bar = add(
+      page,
+      `<nav class="nav-bar">
+        <div class="toolbar-sections ds-segmented"><a href="/" aria-current="page">Home</a><a href="/tags">Tags</a></div>
+        <a class="toolbar-live" href="/collaborate"><span class="toolbar-live-dot"></span>Live</a>
+        <a class="toolbar-square toolbar-button toolbar-bell" href="/notifications"><svg></svg></a>
+        <details class="toolbar-menu"><summary><span class="toolbar-square toolbar-avatar"></span></summary></details>
+        <button class="toolbar-square toolbar-draw" data-haptic="medium">Draw</button>
+      </nav>`,
+    );
+    // Following them would take the test page away.
+    bar.addEventListener("click", (event) => {
+      if ((event.target as Element).closest("a")) event.preventDefault();
+    });
+    const press = (selector: string) =>
+      bar.querySelector(selector)!.dispatchEvent(new page.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    press(".toolbar-sections a[aria-current]");
+    press('.toolbar-sections a[href="/tags"]');
+    press(".toolbar-live-dot");
+    press(".toolbar-bell svg");
+    press(".toolbar-avatar");
+    press(".toolbar-draw");
+    expect(felt(page)).toEqual(["selection", "light", "light", "light", "medium"]);
   });
 
   it("feels a posted form's primary button as a press, unless htmx is the one sending it", async () => {

@@ -20,7 +20,7 @@ import {
   type PainterCheckpointLayers,
   type PainterHandle,
 } from "neo-cucumber";
-import { offerPainterToApp } from "../shared/appBridge";
+import { feelInApp, offerPainterToApp } from "../shared/appBridge";
 import { say } from "../shared/siteDialog";
 import "./app.css";
 import { Chat } from "./components/Chat";
@@ -965,6 +965,8 @@ export default function App() {
       });
       if (!response.ok) throw new Error(`Failed to save drawing: ${response.status}`);
       const result = await response.json();
+      // Committed: what follows only ends the session around it.
+      feelInApp("success");
       if (socket.readyState !== WebSocket.OPEN) {
         throw new Error("The session was saved, but the connection closed before finalization; reload to continue");
       }
@@ -978,6 +980,7 @@ export default function App() {
         window.location.assign(result.post_url);
       }, SAVE_CONFIRMATION_TIMEOUT_MS);
     } catch (error) {
+      feelInApp("error");
       say(error instanceof Error ? error.message : String(error));
       setIsSaving(false);
       setSessionEnding(false);

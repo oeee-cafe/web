@@ -120,6 +120,8 @@ export const SimplifiedToolbox = ({
             title={t`Background pen`}
             aria-label={t`Background pen`}
             aria-pressed={selectedPaletteIndex === TWO_TONE_BACKGROUND_PEN_INDEX}
+            // A colour, and colours are not felt (NeoColorTips).
+            data-haptic="none"
             onClick={() => onSelectPen(TWO_TONE_BACKGROUND_PEN_INDEX)}
             className={`${NEO_BUTTON} ${
               selectedPaletteIndex === TWO_TONE_BACKGROUND_PEN_INDEX
@@ -139,6 +141,7 @@ export const SimplifiedToolbox = ({
             title={t`Foreground pen`}
             aria-label={t`Foreground pen`}
             aria-pressed={selectedPaletteIndex === TWO_TONE_FOREGROUND_PEN_INDEX}
+            data-haptic="none"
             onClick={() => onSelectPen(TWO_TONE_FOREGROUND_PEN_INDEX)}
             className={`${NEO_BUTTON} ${
               selectedPaletteIndex === TWO_TONE_FOREGROUND_PEN_INDEX

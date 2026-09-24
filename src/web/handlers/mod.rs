@@ -2158,7 +2158,7 @@ mod template_tests {
             "the toolbar is the painter page's first row"
         );
         if let Some(painter_css) = rendered.find("offline.css") {
-            let ds_css = rendered.find("ds.css").unwrap();
+            let ds_css = rendered.find("/static/ds.css").unwrap();
             assert!(painter_css < ds_css, "ds.css loads after the painter's reset");
         }
     }
@@ -2542,19 +2542,21 @@ mod template_tests {
         let at = |needle: &str| visitor.find(needle).unwrap_or_else(|| panic!("no {needle}"));
         assert!(at("/@oeee/follow") < at("/@oeee/guestbook"));
         assert!(at("/@oeee/guestbook") < at(r#"<details class="toolbar-menu profile-more">"#));
-        assert!(at("profile-more") < at("showProfileReportModal()"));
+        assert!(at(r#"<details class="toolbar-menu profile-more">"#) < at("showProfileReportModal()"));
         // Their banner, not a link for someone who cannot redraw it.
         assert!(visitor.contains(r#"<span class="profile-banner">"#));
 
         let owner = render(json!({"id": "u1", "login_name": "oeee", "display_name": "오이"}));
-        assert!(!owner.contains("profile-more"));
+        // The head names the menu's items among what is felt as a press
+        // (theme_head.jinja), so it is the menu itself that is looked for.
+        assert!(!owner.contains(r#"<details class="toolbar-menu profile-more">"#));
         assert!(owner.contains(r#"<a class="profile-banner" href="/banners/draw""#));
         assert!(owner.contains(r#"data-profile-tab="private""#));
 
         let signed_out = render(json!(null));
         assert!(signed_out.contains("/@oeee/guestbook"));
         assert!(!signed_out.contains("/@oeee/follow"));
-        assert!(!signed_out.contains("profile-more"));
+        assert!(!signed_out.contains(r#"<details class="toolbar-menu profile-more">"#));
     }
 
     /// What the Steam app reads to tell friends what someone is doing: the

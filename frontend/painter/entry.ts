@@ -7,7 +7,7 @@ import {
   type PainterMode,
   type PainterHandle,
 } from "neo-cucumber";
-import { offerPainterToApp } from "../shared/appBridge";
+import { feelInApp, type Haptic, offerPainterToApp } from "../shared/appBridge";
 import { say } from "../shared/siteDialog";
 import {
   blobToArrayBuffer,
@@ -85,6 +85,7 @@ async function submitBanner(
 
   await postDrawing<{ banner_id: string }>("/banners/draw/finish", form);
   onSaved();
+  feelInApp("success");
   window.location.href = profileUrl;
 }
 
@@ -136,6 +137,7 @@ async function submitPost(
   if (kept) await deleteLocalDraft(draft.id).catch(console.error);
 
   onPosted();
+  feelInApp("success");
   window.location.href = `/posts/${result.post_id}/publish`;
   return { draft, kept, posted: true };
 }
@@ -259,6 +261,8 @@ void painter.ready
 interface DialogChoice {
   key: string;
   label: string;
+  /** How pressing it feels in an app, when not NEO's light press (theme_head.jinja). */
+  haptic?: Haptic;
 }
 
 /**
@@ -310,6 +314,7 @@ function askInPainter(
       const button = document.createElement("button");
       button.type = "button";
       button.className = NEO_BUTTON;
+      if (choice.haptic) button.dataset.haptic = choice.haptic;
       button.textContent = choice.label;
       button.addEventListener("click", () => close(choice.key));
       return button;
@@ -349,7 +354,7 @@ async function confirmSave(): Promise<boolean> {
     : pageSaveButton.dataset.confirm || "Save this drawing?";
   const answer = await askInPainter(saveLabel, question, [
     { key: "cancel", label: pageSaveButton.dataset.cancel || "Cancel" },
-    { key: "save", label: saveLabel },
+    { key: "save", label: saveLabel, haptic: "medium" },
   ]);
   return answer === "save";
 }
@@ -393,6 +398,9 @@ async function afterGuestSave(draft: LocalDraft, kept: boolean): Promise<void> {
   }
 }
 
+// The save is a fetch, which the page's own listeners (theme_head.jinja)
+// never hear the end of, so how it went is felt from here; its presses are
+// NEO's buttons, and felt there.
 saveButton.addEventListener("click", () => {
   saveButton.disabled = true;
   void confirmSave().then(async (confirmed) => {
@@ -406,6 +414,7 @@ saveButton.addEventListener("click", () => {
         leaving = true;
       }).catch((error) => {
         console.error(error);
+        feelInApp("error");
         say("Failed to save drawing. Please try again.");
       });
       saveButton.disabled = false;
@@ -418,16 +427,20 @@ saveButton.addEventListener("click", () => {
       });
       if (posted) return;
       if (!config.userId) {
+        feelInApp(kept ? "success" : "error");
         await afterGuestSave(draft, kept);
       } else if (kept) {
         // Signed in, but the upload failed: it waits in the drafts page.
         markKept();
+        feelInApp("warning");
         say(words.uploadFailedKept || "Couldn't post this drawing. It's kept in your drafts on this device.");
       } else {
+        feelInApp("error");
         say(words.uploadFailedLost || "Failed to save drawing. Please try again.");
       }
     } catch (error) {
       console.error(error);
+      feelInApp("error");
       say("Failed to save drawing. Please try again.");
     }
     saveButton.disabled = false;

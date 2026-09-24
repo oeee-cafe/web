@@ -206,9 +206,15 @@ export const NEO_PANEL =
   "border-r border-b border-r-(--neo-panel-shadow) border-b-(--neo-panel-shadow) " +
   "cursor-default";
 
-/** The bevel and behaviour every control in the chrome shares. */
+/**
+ * The bevel and behaviour every control in the chrome shares.
+ *
+ * `neo-button` styles nothing. It is how a host page tells these apart from
+ * the rest of its markup -- the site feels them as a light press in its apps
+ * (theme_head.jinja), and a utility class is no name to find a button by.
+ */
 const BUTTON_FACE =
-  "bg-(--neo-icon) text-(--neo-text) rounded-none leading-[1.2] " +
+  "neo-button bg-(--neo-icon) text-(--neo-text) rounded-none leading-[1.2] " +
   "border-t border-l border-t-(--neo-bevel-light) border-l-(--neo-bevel-light) " +
   "border-r border-b border-r-(--neo-panel-shadow) border-b-(--neo-panel-shadow) " +
   "hover:not-disabled:bg-(--neo-bk2) " +

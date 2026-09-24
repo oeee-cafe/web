@@ -14,6 +14,7 @@ import {
   localDraftsAvailable,
   type LocalDraft,
 } from "../shared/localDrafts";
+import { feelInApp } from "../shared/appBridge";
 import { downloadPng, UploadError, uploadLocalDraft } from "../shared/drawingUpload";
 import { ask, say } from "../shared/siteDialog";
 
@@ -71,6 +72,8 @@ async function post(draft: LocalDraft, card: HTMLElement, trigger: HTMLButtonEle
       const result = await uploadLocalDraft(draft, { withoutCommunity });
       await deleteLocalDraft(draft.id).catch(console.error);
       removeCard(card);
+      // A fetch, so the page's listeners (theme_head.jinja) never hear how it went.
+      feelInApp("success");
       window.location.href = `/posts/${result.post_id}/publish`;
       return;
     } catch (error) {
@@ -86,6 +89,7 @@ async function post(draft: LocalDraft, card: HTMLElement, trigger: HTMLButtonEle
         window.location.href = `/login?next=${encodeURIComponent(DRAFTS_PATH)}`;
         return;
       } else {
+        feelInApp("error");
         say(words.postFailed || "Couldn't post this drawing.");
       }
       trigger.disabled = false;

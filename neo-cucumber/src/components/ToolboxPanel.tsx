@@ -171,6 +171,8 @@ export const ToolboxPanel = ({
                     type="button"
                     onClick={() => onUpdateBrushType("pan")}
                     aria-pressed={drawingState.brushType === "pan"}
+                    // A tool, and tools are not felt (NeoToolTip).
+                    data-haptic="none"
                     title={labels.tools.pan}
                     className={`${NEO_ICON_BUTTON} ${
                       drawingState.brushType === "pan" ? NEO_BUTTON_ON : ""
@@ -312,6 +314,7 @@ export const ToolboxPanel = ({
                     type="button"
                     onClick={() => onUpdateBrushType(tool)}
                     aria-pressed={drawingState.brushType === tool}
+                    data-haptic="none"
                     title={labels.tools[tool] ?? tool}
                     className={`${NEO_ICON_BUTTON} ${
                       drawingState.brushType === tool ? NEO_BUTTON_ON : ""
