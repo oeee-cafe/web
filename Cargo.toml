@@ -13,7 +13,9 @@ default-run = "oeee-cafe"
 name = "cli"
 
 [profile.release]
-debug = true
+# File and line numbers in panics and backtraces, without the full DWARF
+# that made each binary 500-700MB and every image 1.4GB.
+debug = "line-tables-only"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
