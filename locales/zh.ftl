@@ -231,7 +231,6 @@ tag-no-posts = 暂无使用此标签的作品
 tag-discovery = 标签
 tag-search-placeholder = 搜索标签...
 search = 搜索
-searching = 搜索中…
 search-results-for = 搜索结果
 search-placeholder = 搜索作品
 search-posts = 作品

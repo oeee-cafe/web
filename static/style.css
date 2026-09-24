@@ -2760,14 +2760,6 @@ nav a:visited,
   opacity: 0.5;
 }
 
-/* The three debounced search boxes. They cannot use hx-disable — disabling an
-   input mid-keystroke drops what is being typed — so this is the only way they
-   can say a request is in flight. htmx's own stylesheet does the showing and
-   hiding via .htmx-indicator; this only places it. */
-.search-indicator {
-  margin-left: var(--space-2);
-}
-
 /* ---------------------------------------------------------------------------
    Profile
 

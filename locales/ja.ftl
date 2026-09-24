@@ -231,7 +231,6 @@ tag-no-posts = このタグがついた投稿はまだありません
 tag-discovery = タグ
 tag-search-placeholder = タグを検索...
 search = 検索
-searching = 検索中…
 search-results-for = 検索結果
 search-placeholder = 絵を検索
 search-posts = 絵

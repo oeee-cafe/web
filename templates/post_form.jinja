@@ -160,11 +160,7 @@
                      hx-get="/api/tags/autocomplete"
                      hx-trigger="keyup changed delay:300ms"
                      hx-target="#tag-suggestions"
-                     hx-vals='js:{q: document.getElementById("tags-input").value.split(/[\s,\u3001\uFF0C#\uFF03]+/).pop()}'
-                     hx-indicator="#tag-autocomplete-indicator" />
-              <span id="tag-autocomplete-indicator"
-                    class="htmx-indicator search-indicator"
-                    role="status">{{ ftl_get_message("searching") }}</span>
+                     hx-vals='js:{q: document.getElementById("tags-input").value.split(/[\s,\u3001\uFF0C#\uFF03]+/).pop()}' />
               <div id="tag-suggestions"
                    class="tag-autocomplete"
                    role="listbox"

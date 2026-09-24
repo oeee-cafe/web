@@ -34,12 +34,8 @@
                hx-trigger="input changed delay:300ms, search"
                hx-target="#tag-results"
                hx-swap="innerHTML"
-               hx-include="[name='sort']"
-               hx-indicator="#tag-search-indicator" />
+               hx-include="[name='sort']" />
         <input type="hidden" name="sort" value="{{ sort_by }}" />
-        <span id="tag-search-indicator"
-              class="htmx-indicator search-indicator"
-              role="status">{{ ftl_get_message("searching") }}</span>
       </form>
     </div>
 

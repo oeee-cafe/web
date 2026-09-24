@@ -551,6 +551,15 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   z-index: 2;
 }
 
+/* The veil is the page switch's only wait. The request class it hangs on
+   is an ancestor of the feed's sentinel, whose spinner shows for any
+   request above it (style.css), so without this "loading more" turned at
+   the foot of a list nothing was loading. */
+.ds-content.htmx-request .loading-indicator {
+  opacity: 0;
+  visibility: hidden;
+}
+
 @-webkit-keyframes ds-veil {
   from { opacity: 0; }
   to { opacity: 0.55; }
@@ -3332,15 +3341,15 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 /* ---------------------------------------------------------------------------
    The spinner
 
-   For waits with no page shape to promise -- loading more of a list, a
-   search in flight -- a cucumber turning, the site's own mark for "working
-   on it". The words stay in the page at no size, for a screen reader to say;
-   the eye gets the cucumber. `.loading-indicator` and `.search-indicator`,
-   the site's two older waits, are drawn as it too.
+   For loading more of a list, the one wait with no page shape to promise
+   -- a cucumber turning, the site's own mark for "working on it". The
+   words stay in the page at no size, for a screen reader to say; the eye
+   gets the cucumber. `.loading-indicator`, the feeds' sentinel, is drawn
+   as it too. Searches as you type show nothing while they are out: the
+   results swap in where they were.
    --------------------------------------------------------------------------- */
 .ds-spinner,
-.loading-indicator,
-.search-indicator {
+.loading-indicator {
   display: inline-block;
   font-size: 0;
   line-height: 0;
@@ -3348,8 +3357,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 }
 
 .ds-spinner::before,
-.loading-indicator::before,
-.search-indicator::before {
+.loading-indicator::before {
   content: "\1F952";
   display: inline-block;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
@@ -3357,10 +3365,6 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   line-height: 1;
   -webkit-animation: ds-spin 1.1s linear infinite;
   animation: ds-spin 1.1s linear infinite;
-}
-
-.search-indicator::before {
-  font-size: 16px;
 }
 
 @-webkit-keyframes ds-spin {
@@ -3376,8 +3380,7 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 /* Without motion, it breathes instead of turning. */
 @media (prefers-reduced-motion: reduce) {
   .ds-spinner::before,
-  .loading-indicator::before,
-  .search-indicator::before {
+  .loading-indicator::before {
     -webkit-animation: ds-breathe 1.4s ease-in-out infinite;
     animation: ds-breathe 1.4s ease-in-out infinite;
   }

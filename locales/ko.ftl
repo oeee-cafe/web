@@ -231,7 +231,6 @@ tag-no-posts = 이 태그가 달린 게시물이 아직 없습니다
 tag-discovery = 태그
 tag-search-placeholder = 태그 검색...
 search = 검색
-searching = 검색 중…
 search-results-for = 검색 결과
 search-placeholder = 그림 검색
 search-posts = 그림
