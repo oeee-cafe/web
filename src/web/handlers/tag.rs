@@ -5,7 +5,10 @@ use crate::models::tag::{
 };
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
-use crate::web::handlers::home::{feed_context, HOME_POSTS_PER_BATCH};
+use crate::models::comment::CommentScope;
+use crate::web::handlers::home::{
+    comments_batch, comments_context, feed_context, CommentsQuery, HOME_POSTS_PER_BATCH,
+};
 use crate::web::handlers::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::{Path, Query, State};
@@ -69,13 +72,38 @@ async fn tag_not_found(
     Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
 
-/// GET /tags/:tag_name — one tag's drawings.
-pub async fn tag_view(
+/// Which half of a tag's page is showing: its drawings, or what has been
+/// said on them. A pill apart, as a community's are (tag_view.jinja).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TagView {
+    Drawings,
+    Comments,
+}
+
+impl TagView {
+    fn url(self, name: &str) -> String {
+        match self {
+            TagView::Drawings => tag_url(name),
+            TagView::Comments => format!("{}/comments", tag_url(name)),
+        }
+    }
+}
+
+/// `/api/tags/<name>/comments`: where a tag's list of comments loads its
+/// next batch from.
+fn tag_comments_path(name: &str) -> String {
+    format!("/api/tags/{}/comments", urlencoding::encode(name))
+}
+
+/// A tag's page: the card, then its drawings with the comments on them
+/// beside, or those comments alone.
+async fn tag_page(
+    view: TagView,
     auth_session: AuthSession,
-    State(state): State<AppState>,
-    ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    Path(requested): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
+    state: AppState,
+    ftl_lang: String,
+    requested: String,
+) -> Result<axum::response::Response, AppError> {
     let name = match canonicalize(&requested) {
         Requested::Canonical(name) => name,
         Requested::Elsewhere(name) if name.is_empty() => {
@@ -85,7 +113,7 @@ pub async fn tag_view(
             return Ok(response);
         }
         Requested::Elsewhere(name) => {
-            return Ok(Redirect::permanent(&tag_url(&name)).into_response())
+            return Ok(Redirect::permanent(&view.url(&name)).into_response())
         }
     };
 
@@ -104,27 +132,40 @@ pub async fn tag_view(
 
     // The total comes back from the same query as the posts, over the same
     // filter, so the count in the heading is the number of drawings below it.
+    // The comments half shows no drawings, but still counts them for the
+    // card, and still has the latest for the link preview.
+    let limit = match view {
+        TagView::Drawings => HOME_POSTS_PER_BATCH,
+        TagView::Comments => 1,
+    };
     let (posts, post_count) = find_posts_by_tag(
         &mut tx,
         &name,
-        HOME_POSTS_PER_BATCH,
+        limit,
         0,
         viewer_user_id,
         viewer_show_sensitive,
     )
     .await?;
+    let comments =
+        comments_batch(&mut tx, CommentScope::Tag(tag.id), auth_session.user.as_ref(), None)
+            .await?;
 
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
     tx.commit().await?;
 
-    let template = state.env.get_template("tag_view.jinja")?;
+    let template = state.env.get_template(match view {
+        TagView::Drawings => "tag_view.jinja",
+        TagView::Comments => "tag_comments.jinja",
+    })?;
     let rendered = template.render(context! {
         current_user => auth_session.user,
         tag => tag,
         post_count,
         feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), 0, None),
+        comments => comments_context(comments, &tag_comments_path(&name)),
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang
@@ -133,11 +174,60 @@ pub async fn tag_view(
     Ok(Html(rendered).into_response())
 }
 
+/// GET /tags/:tag_name — one tag's drawings.
+pub async fn tag_view(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    Path(requested): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    tag_page(TagView::Drawings, auth_session, state, ftl_lang, requested).await
+}
+
+/// GET /tags/:tag_name/comments — what has been said on its drawings.
+pub async fn tag_comments(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    Path(requested): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    tag_page(TagView::Comments, auth_session, state, ftl_lang, requested).await
+}
+
+/// GET /api/tags/:tag_name/comments — the next batch of a tag's comments
+/// and the sentinel for the one after.
+pub async fn load_more_tag_comments(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Path(requested): Path<String>,
+    Query(query): Query<CommentsQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let name = normalize_tag(&requested);
+    let mut tx = state.db_pool.begin().await?;
+    let tag = find_tag_by_name(&mut tx, &name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Tag".to_string()))?;
+    let comments = comments_batch(
+        &mut tx,
+        CommentScope::Tag(tag.id),
+        auth_session.user.as_ref(),
+        query.after,
+    )
+    .await?;
+    tx.commit().await?;
+
+    let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
+        comments => comments_context(comments, &tag_comments_path(&name)),
+        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+    })?;
+    Ok(Html(rendered).into_response())
+}
+
 #[derive(Deserialize)]
 pub struct LoadMoreQuery {
     offset: i64,
     limit: i64,
-    /// The stretch of time the previous batch ended in (home::feed_context).
+    /// The month the previous batch ended in (home::feed_context).
     period: Option<String>,
 }
 

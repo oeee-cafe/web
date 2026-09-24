@@ -3266,6 +3266,72 @@ mod template_tests {
         assert!(rendered.contains("tag-no-posts"));
     }
 
+    /// What is said on a tag's drawings goes beside them, as on a
+    /// community's page, and is the other half of a pill: /tags/name and
+    /// /tags/name/comments, each loading on from the tag's own endpoint.
+    /// A tag in a non-Latin script keeps its escaping in all of them.
+    #[test]
+    fn a_tags_comments_go_beside_its_drawings_and_on_a_page_of_their_own() {
+        let env = test_support::env();
+        let comments = json!({
+            "rows": [{
+                "post_id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                "post_author_login_name": "someone",
+                "post_title": "Tandemaus",
+                "actor_name": "Commenter",
+                "actor_handle": "@commenter@oeee.test",
+                "content": "Lovely colours",
+                "created_at": "2026-08-02T00:00:00Z",
+            }],
+            "next_url": "/api/tags/%EA%B7%B8%EB%A6%BC/comments?after=00000000-0000-0000-0000-000000000009",
+        });
+        let render = |template: &str| {
+            env.get_template(template)
+                .unwrap_or_else(|e| panic!("{template} loads: {e:#}"))
+                .render(context! {
+                    tag => json!({ "name": "그림", "display_name": "그림", "post_count": 1 }),
+                    post_count => 1,
+                    feed => json!({
+                        "posts": [{
+                            "id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                            "title": "Tandemaus",
+                            "user_login_name": "someone",
+                            "image_filename": "abcdef.png",
+                            "image_width": 300,
+                            "image_height": 300,
+                            "is_sensitive": false,
+                            "community_slug": null,
+                            "community_name": null,
+                            "published_at": "2026-08-01T00:00:00Z",
+                        }],
+                        "has_more": false,
+                        "next_url": "",
+                    }),
+                    comments => comments.clone(),
+                    ..chrome()
+                })
+                .unwrap_or_else(|e| panic!("{template} renders: {e:#}"))
+        };
+
+        let drawings = render("tag_view.jinja");
+        let links_in = drawings.replace("&#x2f;", "/");
+        assert!(drawings.contains(r#"<aside class="feed-comments" aria-labelledby"#));
+        assert!(drawings.contains(r#"id="post-feed-grid""#));
+        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC" aria-current="page">recent-drawings</a>"#));
+        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments">recent-comments</a>"#));
+        assert!(links_in.contains(r#"hx-get="/api/tags/%EA%B7%B8%EB%A6%BC/comments?after="#));
+        assert!(links_in.contains(r#"<a class="feed-comments-more" href="/tags/%EA%B7%B8%EB%A6%BC/comments">"#));
+
+        let said = render("tag_comments.jinja");
+        let links_in = said.replace("&#x2f;", "/");
+        assert!(said.contains("tag-post-count(count=1)"), "under the same card");
+        assert!(said.contains(r#"<div class="comment-grid">"#));
+        assert!(said.contains("Lovely colours"));
+        assert!(!said.contains(r#"id="post-feed-grid""#), "no drawings under it");
+        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments" aria-current="page">recent-comments</a>"#));
+        assert!(links_in.contains(r#"hx-get="/api/tags/%EA%B7%B8%EB%A6%BC/comments?after="#));
+    }
+
     #[test]
     fn the_tag_suggestions_are_options_a_keyboard_can_reach() {
         // The menu used to be plain <li>s that only answered a click, inside a

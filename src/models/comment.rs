@@ -382,6 +382,9 @@ pub enum CommentScope {
     /// Everything said in one community. Whoever asks has already been let
     /// into it.
     Community(Uuid),
+    /// Everything said on the public drawings carrying one tag: a tag's
+    /// page.
+    Tag(Uuid),
 }
 
 /// The latest comments in `scope`, newest first, for the lists beside a
@@ -403,14 +406,15 @@ pub async fn find_recent_comments(
     after: Option<Uuid>,
     limit: i64,
 ) -> Result<Vec<NotificationComment>> {
-    let (community_id, member_id, follower_id) = match scope {
-        CommentScope::Public => (None, None, None),
-        CommentScope::FollowedBy(user_id) => (None, None, Some(user_id)),
-        CommentScope::MemberOf(user_id) => (None, Some(user_id), None),
-        CommentScope::Community(community_id) => (Some(community_id), None, None),
+    let (community_id, member_id, follower_id, tag_id) = match scope {
+        CommentScope::Public => (None, None, None, None),
+        CommentScope::FollowedBy(user_id) => (None, None, Some(user_id), None),
+        CommentScope::MemberOf(user_id) => (None, Some(user_id), None, None),
+        CommentScope::Community(community_id) => (Some(community_id), None, None, None),
+        CommentScope::Tag(tag_id) => (None, None, None, Some(tag_id)),
     };
-    // Public and Following are the public feeds' drawings; the other two
-    // are a member's or already checked.
+    // Public, Following and a tag are the public feeds' drawings; a
+    // member's communities and a community let in are not.
     let public_only = community_id.is_none() && member_id.is_none();
     let comments = sqlx::query_as!(
         NotificationComment,
@@ -459,6 +463,11 @@ pub async fn find_recent_comments(
             WHERE follows.following_actor_id = comments.actor_id
             AND followers.user_id = $6
         ))
+        AND ($9::uuid IS NULL OR EXISTS (
+            SELECT 1 FROM post_tags
+            WHERE post_tags.post_id = posts.id
+            AND post_tags.tag_id = $9
+        ))
         AND (
             $7::uuid IS NULL
             OR (comments.created_at, comments.id)
@@ -474,7 +483,8 @@ pub async fn find_recent_comments(
         member_id,
         follower_id,
         after,
-        limit
+        limit,
+        tag_id
     )
     .fetch_all(&mut **tx)
     .await?;
