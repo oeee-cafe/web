@@ -134,6 +134,11 @@ interface DrawingEventCallbacks {
   isVirtualRight?: () => boolean;
   /** Called once the armed press has been spent, so the button can release. */
   onVirtualRightUsed?: () => void;
+  /**
+   * A flood fill was asked for. Returns true when the recorder ran the flood
+   * itself -- a session does, to capture what it covered -- so this hook does
+   * not flood the same seed a second time.
+   */
   onFill?: (
     x: number,
     y: number,
@@ -143,7 +148,7 @@ interface DrawingEventCallbacks {
     opacity: number,
     layer: "foreground" | "background",
     mask: Mask
-  ) => void;
+  ) => boolean | void;
   onPointerUp?: () => void;
   /** The rubber-band rectangle as it is dragged, or null when it ends. */
   onRegionPreview?: (rect: RegionRect | null) => void;
@@ -229,9 +234,13 @@ export const useBaseDrawing = (
   containerRef?: React.RefObject<HTMLDivElement | null>,
   isDrawingDisabled: boolean = false,
   callbacks?: DrawingEventCallbacks,
-  // In remote-sync (collaborative) mode the callbacks own applying strokes to
-  // the layers and undo history; this hook only tracks pointer state.
-  remoteSync: boolean = false
+  /**
+   * Whether to keep the snapshot stack that offline undo restores from. A
+   * session's undo is a message every client replays, and its painter never
+   * reads the stack -- but it was still taking two tiled layer snapshots per
+   * gesture and holding thirty of them.
+   */
+  snapshotUndo: boolean = true
 ) => {
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const drawingEngineRef = useRef<DrawingEngine | null>(null);
@@ -249,6 +258,11 @@ export const useBaseDrawing = (
   const isInitializedRef = useRef(false);
   const onHistoryChangeRef = useRef(onHistoryChange);
   const isDrawingRef = useRef(false);
+  const freehandRef = useRef({
+    get current() {
+      return drawingStateRef.current.isDrawing;
+    },
+  }).current;
 
   const history = useCanvasHistory(30);
 
@@ -373,7 +387,7 @@ export const useBaseDrawing = (
 
   const currentDrawingStateRef = useRef(drawingState);
   const isDrawingDisabledRef = useRef(isDrawingDisabled);
-  const remoteSyncRef = useRef(remoteSync);
+  const snapshotUndoRef = useRef(snapshotUndo);
   // Settings captured at pointer down and held for the duration of the stroke,
   // NEO's prepareDrawing. Null between strokes.
   const strokeParamsRef = useRef<DrawingState | null>(null);
@@ -486,8 +500,8 @@ export const useBaseDrawing = (
   }, [isDrawingDisabled]);
 
   useEffect(() => {
-    remoteSyncRef.current = remoteSync;
-  }, [remoteSync]);
+    snapshotUndoRef.current = snapshotUndo;
+  }, [snapshotUndo]);
 
   // Convert screen coordinates to canvas coordinates
   const getCanvasCoordinates = useCallback((clientX: number, clientY: number) => {
@@ -553,15 +567,13 @@ export const useBaseDrawing = (
 
     const targetLayer = drawingEngineRef.current.drawTarget[active.layerType];
 
-    // Callbacks run before the local apply; in remote-sync mode they fully
-    // own applying the stroke (via the canvas history), so the direct engine
-    // application below is skipped.
+    // Callbacks run before the local apply.
     if (operation === "fill") {
-      callbacks?.onFill?.(
+      const applied = callbacks?.onFill?.(
         Math.floor(coords.x), Math.floor(coords.y), r, g, b, effectiveOpacity,
         active.layerType, mask,
       );
-      if (!remoteSyncRef.current) {
+      if (!applied) {
         drawingEngineRef.current.doFloodFill(
           targetLayer,
           Math.floor(coords.x),
@@ -585,7 +597,7 @@ export const useBaseDrawing = (
         active.layerType,
         mask
       );
-      if (!remoteSyncRef.current) {
+      {
         drawingEngineRef.current.drawLine(
           targetLayer,
           coords.x,
@@ -615,7 +627,7 @@ export const useBaseDrawing = (
         active.layerType,
         mask
       );
-      if (!remoteSyncRef.current) {
+      {
         // Segments run from the NEW point back to the previous one, matching
         // NEO (freeHandMoveHandler, and freeHandFast on replay). Bresenham is
         // direction-sensitive, so drawing prev->new here would leave the live
@@ -641,6 +653,7 @@ export const useBaseDrawing = (
 
   // Save current state to history
   const saveToHistory = useCallback(() => {
+    if (!snapshotUndoRef.current) return;
     if (
       drawingEngineRef.current &&
       drawingEngineRef.current.layers.foreground &&
@@ -817,10 +830,8 @@ export const useBaseDrawing = (
           // Acts on the press itself, with nothing to drag out
           if (isImmediateTool(strokeParamsRef.current.brushType)) {
             const layer = strokeParamsRef.current.layerType;
-            if (!remoteSyncRef.current) {
-              drawingEngineRef.current?.eraseAll(layer);
-              saveToHistory();
-            }
+            drawingEngineRef.current?.eraseAll(layer);
+            saveToHistory();
             callbacks?.onEraseAll?.(layer);
             onDrawingChangeRef.current?.();
             cleanupPointerState(e.pointerId);
@@ -900,9 +911,7 @@ export const useBaseDrawing = (
 
           if (currentDrawingStateRef.current.brushType === "fill") {
             performDrawing("fill", coords);
-            if (!remoteSyncRef.current) {
-              saveToHistory();
-            }
+            saveToHistory();
             isDrawingRef.current = false;
           } else {
             // A pen's samples get averaged; a touch digitiser's are smooth
@@ -976,9 +985,7 @@ export const useBaseDrawing = (
         // a stroke that starts where the last one ended, while the replay --
         // which does reset -- still draws it. Remote-sync mode drives this
         // state externally per user, so leave it alone there.
-        if (!remoteSyncRef.current) {
-          drawingEngineRef.current?.setStrokeState(null);
-        }
+        drawingEngineRef.current?.setStrokeState(null);
       }
     };
 
@@ -1036,7 +1043,7 @@ export const useBaseDrawing = (
           a: params.opacity,
         };
         const brush = brushTypeFor(params.brushType);
-        if (!remoteSyncRef.current && drawingEngineRef.current) {
+        if (drawingEngineRef.current) {
           applyMask(drawingEngineRef.current, params);
           drawingEngineRef.current.drawBezier(
             params.layerType,
@@ -1068,7 +1075,7 @@ export const useBaseDrawing = (
             a: params.opacity,
           };
           const brush = brushTypeFor(params.brushType);
-          if (!remoteSyncRef.current && drawingEngineRef.current) {
+          if (drawingEngineRef.current) {
             applyMask(drawingEngineRef.current, params);
             // Drawn new -> previous, as NEO draws every segment
             drawingEngineRef.current.drawLine(
@@ -1099,7 +1106,7 @@ export const useBaseDrawing = (
           const layer = params.layerType;
           pasteRef.current = null;
           callbacks?.onPastePreview?.(null);
-          if (!remoteSyncRef.current && drawingEngineRef.current) {
+          if (drawingEngineRef.current) {
             drawingEngineRef.current.applyRegionTool(
               "paste",
               layer,
@@ -1142,7 +1149,7 @@ export const useBaseDrawing = (
             b: parseInt(params.color.slice(5, 7), 16),
             a: params.opacity,
           };
-          if (!remoteSyncRef.current && drawingEngineRef.current) {
+          if (drawingEngineRef.current) {
             applyMask(drawingEngineRef.current, params);
             drawingEngineRef.current.applyRegionTool(
               params.brushType,
@@ -1268,9 +1275,7 @@ export const useBaseDrawing = (
       // Before the history entry and before the stroke is closed: these
       // segments belong to the stroke that is ending.
       if (drawingStateRef.current.isDrawing) finishSmoothedStroke();
-      if (!remoteSyncRef.current) {
-        saveToHistory();
-      }
+      saveToHistory();
       callbacks?.onPointerUp?.();
       isDrawingRef.current = false;
     };
@@ -1564,6 +1569,11 @@ export const useBaseDrawing = (
   return {
     context: contextRef.current,
     setInteractionSuspended,
+    /**
+     * Whether a freehand stroke is under the pen right now, as distinct from
+     * `isDrawingRef`, which is up for every gesture a press begins.
+     */
+    freehandRef,
     drawingEngine: drawingEngineRef.current,
     initializeDrawing,
     undo: handleUndo,

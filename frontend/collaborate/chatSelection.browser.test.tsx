@@ -11,14 +11,15 @@ import "./app.css";
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 /**
- * The session page refuses selection, and the transcript is what it lets back
- * in.
+ * The session page refuses selection, the transcript included.
  *
- * A message is the one thing on a drawing page that is there to be read, so
- * it can be dragged across and copied. Everything around it -- the buttons
- * beside the log, and the toolbox the drag would otherwise reach -- stays
- * unselectable, because a selection is a mode that eats the next press and
- * nothing on a page of buttons ever clears it.
+ * Messages used to be the one exception, so they could be copied out, and on
+ * iOS that meant a long press anywhere in the chat raised the loupe and a
+ * selection over the log -- in the window people keep open while they draw.
+ * So nothing on the page selects except the places you type; see
+ * frontend/shared/selection.css. This pins that the transcript stayed out of
+ * the exception after it was taken away: for a while the stylesheet said one
+ * thing and this test the other.
  */
 
 let host: HTMLElement | null = null;
@@ -80,13 +81,13 @@ afterEach(() => {
 });
 
 describe("the collaborative session page", () => {
-  it("lets a message be selected, and nothing around it", async () => {
+  it("lets nothing be selected, the messages included", async () => {
     const rendered = await renderChat();
 
     const said = [...rendered.querySelectorAll<HTMLElement>("span")].find(
       (el) => el.textContent === "worth copying",
     )!;
-    expect(getComputedStyle(said).userSelect).toBe("text");
+    expect(getComputedStyle(said).userSelect).toBe("none");
 
     // The chrome the drag would otherwise cross.
     const button = document.body.querySelector<HTMLElement>("button")!;

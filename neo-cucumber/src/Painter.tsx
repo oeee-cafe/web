@@ -263,8 +263,13 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
    * server-assigned id replace it through `setLocalActorId` once they know it.
    */
   const localActorIdRef = useRef(synchronization?.actorId ?? "");
+  // The same name as state, for what is rendered from it: the layers window
+  // read the ref, and a ref does not re-render, so it showed the old name
+  // until something unrelated did.
+  const [localActorId, setLocalActorIdShown] = useState(localActorIdRef.current);
   const setLocalActorId = useCallback((actorId: string) => {
     localActorIdRef.current = actorId;
+    setLocalActorIdShown(actorId);
     synchronizationHistoryRef.current?.setLocalUserId(actorId);
     // The engine keys layer pairs by actor too. Leaving its pair under the
     // old name would give one person two of them: the one they have been
@@ -432,13 +437,16 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       // The local cursor is painted from every move, always: it is this
       // screen's own pointer and it has to keep up with the pen.
       handleHoverMove(at);
-      // The room is told only while the pen is up. A stroke already says where
-      // the pen is -- each chunk carries the points it drew, and that is what
-      // moves this user's cursor on everybody else's screen -- so a pointer
-      // message sent during one is the same position again, at a second rate,
-      // fanned out to every participant and decoded by all of them. Drawpile
-      // draws the same line: its canvas view emits `pointerMoved` only in the
-      // branch where the pen is not down.
+      // The room is told except during a freehand stroke. A stroke already
+      // says where the pen is -- each chunk carries the points it drew, and
+      // that is what moves this user's cursor on everybody else's screen -- so
+      // a pointer message sent during one is the same position again, at a
+      // second rate, fanned out to every participant and decoded by all of
+      // them. Drawpile draws the same line: its canvas view emits
+      // `pointerMoved` only in the branch where the pen is not down. A
+      // rectangle, line or bezier being dragged out sends no points of its
+      // own, so those still report -- silenced too, this user's cursor stood
+      // at the press point on every other screen for the whole drag.
       // `null` is "the pointer is gone", not a position, and always goes out:
       // it is what retires this user's cursor on the other screens.
       if (at !== null && strokeActiveRef.current?.current) return;
@@ -521,6 +529,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     recordText,
     emitOperation,
     isDrawingRef,
+    freehandRef,
     setInteractionSuspended,
     flushPendingStroke,
   } = useOfflineDrawing(
@@ -556,7 +565,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
   previewEngineRef.current = drawingEngine ?? null;
   const flushPendingStrokeRef = useRef(flushPendingStroke);
   flushPendingStrokeRef.current = flushPendingStroke;
-  strokeActiveRef.current = isDrawingRef;
+  strokeActiveRef.current = freehandRef;
 
   useEffect(() => {
     if (!drawingEngine || !synchronization) {
@@ -571,6 +580,9 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     });
     synchronizationHistoryRef.current = history;
     return () => {
+      // Stops following the engine's renames, or every history this effect
+      // ever made keeps renaming savepoints nobody will restore.
+      history.dispose();
       if (synchronizationHistoryRef.current === history) {
         synchronizationHistoryRef.current = null;
       }
@@ -873,7 +885,15 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       }
       synchronizationHistoryRef.current?.reset();
       appliedCheckpointRef.current = checkpoint;
-      domCanvasUpdateRef.current();
+      // Through the engine's own queue rather than a forced repaint: this is
+      // what counts as a write to each pair, and the participant thumbnails
+      // redraw only when a pair's write count has moved. Painted straight
+      // onto the canvases, a checkpoint left every thumbnail showing what
+      // was there before it.
+      for (const actorId of drawingEngine.ownerIds()) {
+        drawingEngine.queueLayerUpdate("background", actorId);
+        drawingEngine.queueLayerUpdate("foreground", actorId);
+      }
     },
     [drawingEngine, canvasWidth, canvasHeight],
   );
@@ -1320,8 +1340,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
                 // draw, and NEO's own layer button already covers their pair.
                 participantLayers={participantLayers.length > 1 ? participantLayers : undefined}
                 hiddenOwners={hiddenOwners}
-                targetOwner={targetOwner ?? localActorIdRef.current}
-                localActorId={localActorIdRef.current}
+                targetOwner={targetOwner ?? localActorId}
+                localActorId={localActorId}
                 onToggleOwnerVisible={toggleOwnerVisible}
                 onSelectTargetOwner={selectTargetOwner}
                 layersOrigin={layersOrigin ?? undefined}

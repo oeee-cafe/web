@@ -548,6 +548,47 @@ describe("undo while the pen is down", () => {
 });
 
 describe("the fill tool, in a session", () => {
+  it("floods the layer once", async () => {
+    // The recorder floods the layer itself, to capture what the flood
+    // covered, and used to hand back nothing to say so -- so the drawing
+    // hook flooded the same seed a second time, with a full-layer compare
+    // on top, for every click.
+    const { api, send } = await mountWithTool("fill", {}, () => {});
+    const engine = api.drawingEngine!;
+    let floods = 0;
+    const flood = engine.doFloodFill.bind(engine);
+    engine.doFloodFill = (...args: Parameters<typeof flood>) => {
+      floods += 1;
+      return flood(...args);
+    };
+    await send("pointerdown", 12, 12);
+    await send("pointerup", 12, 12);
+    expect(floods).toBe(1);
+    expect(engine.layers.background[(12 * W + 12) * 4 + 3]).toBeGreaterThan(0);
+  });
+
+  it("keeps no undo snapshots of its own", async () => {
+    // A session's undo is a message every client replays; the offline
+    // snapshot stack is never read there, and was still copying both layers
+    // after every gesture and keeping thirty of them.
+    // Both start with the blank canvas's entry; only the offline one grows.
+    const { api, send } = await mountWithTool("solid", {}, () => {});
+    const opened = api.history.getHistoryInfo().historyLength;
+    await send("pointerdown", 8, 8);
+    await act(async () => { await sleep(20); });
+    await send("pointermove", 20, 8);
+    await send("pointerup", 20, 8);
+    expect(api.history.getHistoryInfo().historyLength).toBe(opened);
+
+    const offline = await mountWithTool("solid");
+    const offlineOpened = offline.api.history.getHistoryInfo().historyLength;
+    await offline.send("pointerdown", 8, 8);
+    await act(async () => { await sleep(20); });
+    await offline.send("pointermove", 20, 8);
+    await offline.send("pointerup", 20, 8);
+    expect(offline.api.history.getHistoryInfo().historyLength).toBe(offlineOpened + 1);
+  });
+
   it("emits the fill in the turn it floods", async () => {
     // The coverage used to be compressed through the browser's streams, so
     // the operation reached the fork a few milliseconds after the pixels

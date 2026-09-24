@@ -116,9 +116,6 @@ export const useOfflineDrawing = (
   );
   const isFirstPointRef = useRef<boolean>(false);
   const hasCreatedStepRef = useRef<boolean>(false);
-  const pendingStrokeRef = useRef<
-    Extract<PainterOperation, { kind: "stroke" }> | null
-  >(null);
   const strokeBoundaryEmittedRef = useRef(false);
   /**
    * Segments of the stroke in progress that have been drawn locally but not
@@ -234,7 +231,6 @@ export const useOfflineDrawing = (
       // The actual step() call will happen in onDrawLine/onDrawPoint when data is recorded
       isFirstPointRef.current = true;
       hasCreatedStepRef.current = false;
-      pendingStrokeRef.current = null;
       strokeChunkRef.current = null;
       strokeBoundaryEmittedRef.current = false;
     }, []),
@@ -271,19 +267,6 @@ export const useOfflineDrawing = (
         }
 
         const to = { x: Math.round(toX), y: Math.round(toY) };
-        if (!pendingStrokeRef.current) {
-          pendingStrokeRef.current = {
-            kind: "stroke",
-            layer,
-            brushSize,
-            brush: brushType as PainterBrush,
-            color: { r: safeR, g: safeG, b: safeB, a: alpha },
-            points: [{ x: Math.round(fromX), y: Math.round(fromY) }, to],
-            mask,
-          };
-        } else {
-          pendingStrokeRef.current.points.push(to);
-        }
         emitStrokeOperation({
           kind: "stroke",
           layer,
@@ -358,7 +341,7 @@ export const useOfflineDrawing = (
           return;
         }
 
-        pendingStrokeRef.current = {
+        emitStrokeOperation({
           kind: "stroke",
           layer,
           brushSize,
@@ -366,8 +349,7 @@ export const useOfflineDrawing = (
           color: { r: safeR, g: safeG, b: safeB, a: alpha },
           points: [{ x: Math.round(x), y: Math.round(y) }],
           mask,
-        };
-        emitStrokeOperation(pendingStrokeRef.current);
+        });
 
         // Single point stroke - create new action frame
         if (!hasCreatedStepRef.current) {
@@ -442,7 +424,7 @@ export const useOfflineDrawing = (
         actionRecorderRef.current.push("floodFill", layer, Math.round(x), Math.round(y), color);
 
         const engine = engineRef.current;
-        if (!onOperation || !engine) return;
+        if (!onOperation || !engine) return false;
 
         // Run it here and send what it covered. A seed replayed elsewhere
         // floods whatever that layer holds at the time, which after an undo
@@ -451,7 +433,8 @@ export const useOfflineDrawing = (
         const region = engine.floodFillCapturingRegion(
           target, Math.round(x), Math.round(y), safeR, safeG, safeB, alpha,
         );
-        if (!region) return;
+        // The layer is flooded either way; what is sent is what it covered.
+        if (!region) return true;
 
         const { x: rx, y: ry, width, height, coverage } = region;
         // In the same turn as the flood, so the operation is in the fork
@@ -466,6 +449,7 @@ export const useOfflineDrawing = (
           coverage: deflateCoverage(coverage),
           mask,
         });
+        return true;
       },
       [emitOperation, onOperation]
     ),
@@ -637,18 +621,14 @@ export const useOfflineDrawing = (
     ),
 
     onPointerUp: useCallback(() => {
-      if (pendingStrokeRef.current && !onOperation) {
-        emitOperation(pendingStrokeRef.current);
-      }
       // Whatever the last chunk did not reach a threshold with still has to go
       // out, or the tail of every stroke would be visible only to its author.
       flushStrokeChunk();
       strokeChunkRef.current = null;
-      pendingStrokeRef.current = null;
       isFirstPointRef.current = false;
       hasCreatedStepRef.current = false;
       onPointerRelease?.();
-    }, [emitOperation, onOperation, onPointerRelease, flushStrokeChunk]),
+    }, [onPointerRelease, flushStrokeChunk]),
   };
 
   // Get base drawing functionality
@@ -663,7 +643,8 @@ export const useOfflineDrawing = (
     onDrawingChange,
     containerRef,
     isDrawingDisabled,
-    callbacks
+    callbacks,
+    !onOperation
   );
   // Filled once the hook above has built it; the callbacks handed into it read
   // this rather than a binding that does not exist yet when they are made.

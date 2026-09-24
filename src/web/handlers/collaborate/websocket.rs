@@ -118,7 +118,7 @@ impl PendingReset {
     /// has grown past what a checkpoint may weigh: from then on it is
     /// counted off and dropped like an unselected uploader's, so one
     /// connection cannot make the process hold 510 snapshots of 4 MiB.
-    fn take_snapshot(&mut self, data: &[u8]) -> bool {
+    fn take_snapshot(&mut self, data: Vec<u8>) -> bool {
         if !self.accepted {
             return false;
         }
@@ -128,7 +128,7 @@ impl PendingReset {
             self.payloads = Vec::new();
             return true;
         }
-        self.payloads.push(data.to_vec());
+        self.payloads.push(data);
         false
     }
 }
@@ -270,7 +270,7 @@ pub async fn handle_socket(
     let room_subscription = room_listener.subscription();
 
     let (redis_tx, mut redis_rx) =
-        mpsc::channel::<std::sync::Arc<super::redis_state::RoomBroadcast>>(OUTGOING_QUEUE_LIMIT);
+        mpsc::channel::<std::sync::Arc<super::room_fanout::Delivery>>(OUTGOING_QUEUE_LIMIT);
     let (close_tx, close_rx) = tokio::sync::oneshot::channel::<Goodbye>();
     // Two paths can decide this connection is over -- a client that has stopped
     // draining, and a client that sent a frame this protocol does not have --
@@ -283,7 +283,7 @@ pub async fn handle_socket(
         loop {
             match room_listener.receiver.recv().await {
                 Ok(room_msg) => {
-                    if !should_forward_to_connection(&room_msg, &connection_id_clone) {
+                    if !should_forward_to_connection(&room_msg.broadcast, &connection_id_clone) {
                         continue;
                     }
                     match redis_tx.try_send(room_msg) {
@@ -412,14 +412,15 @@ pub async fn handle_socket(
                     let Some(room_msg) = next else {
                         break;
                     };
-                    let msg = match room_msg.history_id.zip(room_msg.seq) {
+                    let broadcast = &room_msg.broadcast;
+                    let msg = match (broadcast.history_id.zip(broadcast.seq), &room_msg.sequenced) {
                         // Skip sequenced messages already delivered via history replay
-                        Some((history_id, s)) if history_id == history_identity && s <= max_history_seq => continue,
-                        // `wrap_sequenced` builds its own buffer, so the shared
-                        // payload is only read here; the clone below is the
-                        // ephemeral path, which is a pointer position at most.
-                        Some((history_id, s)) => Message::Binary(wrap_sequenced(history_id, s, &room_msg.payload).into()),
-                        None => Message::Binary(room_msg.payload.clone().into()),
+                        (Some((history_id, s)), _) if history_id == history_identity && s <= max_history_seq => continue,
+                        // Built once by the fanout for the whole room; this is
+                        // a reference count, not a copy.
+                        (Some(_), Some(frame)) => Message::Binary(frame.clone()),
+                        // The ephemeral path, which is a pointer position at most.
+                        _ => Message::Binary(broadcast.payload.clone().into()),
                     };
                     if sender.send(msg).await.is_err() {
                         debug!("WebSocket send failed");
@@ -801,7 +802,7 @@ mod reset_upload_tests {
         let snapshot = vec![0u8; MAX_SNAPSHOT_BYTES];
         let fits = (MAX_CHECKPOINT_BYTES as usize) / MAX_SNAPSHOT_BYTES;
         for _ in 0..fits {
-            assert!(!reset.take_snapshot(&snapshot));
+            assert!(!reset.take_snapshot(snapshot.clone()));
         }
         assert_eq!(reset.payloads.len(), fits);
         reset
@@ -816,19 +817,19 @@ mod reset_upload_tests {
     fn drops_the_upload_the_moment_it_outweighs_a_checkpoint() {
         let mut reset = filled();
         let snapshot = vec![0u8; MAX_SNAPSHOT_BYTES];
-        assert!(reset.take_snapshot(&[0u8; 1]));
+        assert!(reset.take_snapshot(vec![0u8; 1]));
         assert!(!reset.accepted);
         // Nothing is held for an upload that will not be applied, and the
         // snapshots that follow are counted off without being kept.
         assert!(reset.payloads.is_empty());
-        assert!(!reset.take_snapshot(&snapshot));
+        assert!(!reset.take_snapshot(snapshot));
         assert!(reset.payloads.is_empty());
     }
 
     #[test]
     fn an_unselected_upload_is_never_kept() {
         let mut reset = upload(false);
-        assert!(!reset.take_snapshot(&[0u8; 64]));
+        assert!(!reset.take_snapshot(vec![0u8; 64]));
         assert!(reset.payloads.is_empty());
         assert_eq!(reset.bytes, 0);
     }
@@ -1116,48 +1117,50 @@ async fn handle_incoming_messages(
             );
         }
 
-        let mut msg = Message::Binary(data.into());
-
-        if let Message::Binary(data) = &msg {
-            // Session reset upload: RESET_BEGIN announces the snapshots, then
-            // the snapshots are captured here — they replace history instead
-            // of being sequenced or broadcast (live clients already have this
-            // state; only late joiners replay the reset)
-            if let Some(reset) = pending_reset.as_mut() {
-                if data.first() == Some(&(messages::MessageType::Snapshot as u8)) {
-                    if reset.take_snapshot(data) {
-                        // Heavier than any checkpoint a room this size can
-                        // make. The room is freed to ask somebody else.
-                        warn!(
-                            "Discarding a checkpoint over {} bytes from connection {} in room {}",
-                            redis_messages::MAX_CHECKPOINT_BYTES, ctx.connection_id, ctx.room_uuid
-                        );
-                        let _ = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await;
-                    }
-                    reset.remaining -= 1;
-                    if reset.remaining == 0 {
-                        let reset = pending_reset.take().expect("pending reset exists");
-                        if reset.accepted {
-                            finish_reset(&ctx, reset).await;
-                        }
-                    }
-                    continue;
+        // Session reset upload: RESET_BEGIN announces the snapshots, then the
+        // snapshots are captured here -- they replace history instead of being
+        // sequenced or broadcast (live clients already have this state; only
+        // late joiners replay the reset). Before the frame is built, so the
+        // bytes are moved into the upload rather than copied a second time:
+        // a checkpoint is up to 64 MiB of them.
+        if let Some(reset) = pending_reset.as_mut() {
+            if data.first() == Some(&(messages::MessageType::Snapshot as u8)) {
+                if reset.take_snapshot(data) {
+                    // Heavier than any checkpoint a room this size can
+                    // make. The room is freed to ask somebody else.
+                    warn!(
+                        "Discarding a checkpoint over {} bytes from connection {} in room {}",
+                        redis_messages::MAX_CHECKPOINT_BYTES, ctx.connection_id, ctx.room_uuid
+                    );
+                    let _ = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await;
                 }
-            }
-            if data.first() == Some(&(messages::MessageType::ResetBegin as u8)) {
-                pending_reset = parse_reset_begin(data, &ctx).await;
+                reset.remaining -= 1;
+                if reset.remaining == 0 {
+                    let reset = pending_reset.take().expect("pending reset exists");
+                    if reset.accepted {
+                        finish_reset(&ctx, reset).await;
+                    }
+                }
                 continue;
             }
-
-            // Validation above guarantees a type byte.
-            let msg_type = data[0];
-            if msg_type < 0x10 {
-                msg = match process_server_message(msg_type, data, &ctx).await {
-                    Some(processed_msg) => processed_msg,
-                    None => continue,
-                };
-            }
         }
+        if data.first() == Some(&(messages::MessageType::ResetBegin as u8)) {
+            pending_reset = parse_reset_begin(&data, &ctx).await;
+            continue;
+        }
+
+        // Validation above guarantees a type byte. A server message becomes
+        // whatever its handler builds from it; a client message is forwarded
+        // as it is.
+        let msg_type = data[0];
+        let msg = if msg_type < 0x10 {
+            match process_server_message(msg_type, &data, &ctx).await {
+                Some(processed_msg) => processed_msg,
+                None => continue,
+            }
+        } else {
+            Message::Binary(data.into())
+        };
 
         if messages::should_store_message(&msg) {
             // History messages go through the atomic sequencer, which stores
