@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
 import { decodeMessage, unwrapSequenced } from "./binaryProtocol";
 import {
-  FakeServer, HISTORY_ID, type FakeSocket, inkAt, installRoom, mountSession,
-  pointer, pressUndo, settle, settleUntil, sockets, stroke, uninstallRoom,
+  FakeServer, type FakeSocket, inkAt, installRoom, mountSession,
+  pointer, pressUndo, settle, settleUntil, sockets, uninstallRoom,
 } from "./test/fakeRoom";
+import { HISTORY_ID, stroke } from "./test/frames";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -82,6 +83,9 @@ describe("a session, joined and drawn in", () => {
     // The server sequenced everything it was sent, and the echoes came back.
     await settleUntil(() => deliveredSequences(socket).length >= server.entries.length);
     expect(deliveredSequences(socket)).toEqual(server.entries.map((entry) => entry.seq));
+    // The DOM canvases are uploaded on animation frames, so a look at them is
+    // a bounded wait rather than an instant read.
+    await settleUntil(() => inkAt(MARK.mine));
     expect(inkAt(MARK.mine), "the stroke, confirmed").toBe(true);
   });
 
@@ -99,7 +103,7 @@ describe("a session, joined and drawn in", () => {
     expect(sentKinds(socket).filter((kind) => kind === "undo")).toHaveLength(1);
 
     await settleUntil(() => deliveredSequences(socket).length >= server.entries.length);
-    await settle();
+    await settleUntil(() => !inkAt(MARK.mine));
     expect(inkAt(MARK.mine), "the stroke, after its undo was echoed").toBe(false);
   });
 
@@ -149,6 +153,7 @@ describe("a session whose socket drops", () => {
     await settleUntil(() => sentKinds(next).includes("stroke"));
     await settleUntil(() => deliveredSequences(next).length >= server.lastSeq - applied);
     expect(deliveredSequences(next)[0]).toBe(applied + 1);
+    await settleUntil(() => inkAt(MARK.afterReconnect));
     expect(inkAt(MARK.afterReconnect), "a stroke after the reconnect").toBe(true);
   });
 
@@ -186,6 +191,7 @@ describe("a session whose socket drops", () => {
     await settleUntil(() => sentKinds(next).includes("stroke"));
     await settleUntil(() => deliveredSequences(next).length >= server.entries.length);
     expect(server.lastSeq).toBeGreaterThan(1);
+    await settleUntil(() => inkAt(MARK.afterReconnect));
     expect(inkAt(MARK.afterReconnect)).toBe(true);
   });
 

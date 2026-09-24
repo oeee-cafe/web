@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
+import { inkAt, installRoom, layerPng, mountSession, settle, uninstallRoom } from "./test/fakeRoom";
 import {
-  caughtUp, inkAt, installRoom, layerPng, mountSession, replayStart, resetPoint,
-  sequenced, settle, snapshot, stroke, uninstallRoom, welcome,
-} from "./test/fakeRoom";
+  caughtUp, replayStart, resetPoint, sequenced, snapshot, stroke, welcome,
+} from "./test/frames";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
