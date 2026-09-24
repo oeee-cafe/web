@@ -96,6 +96,8 @@ export {
  * `./components/materialSymbols` for what is bundled.
  */
 export { Icon, type IconProps } from "./components/Icon";
+/** Where a host's own marks go in the canvas stack, relative to the painter's. */
+export { CANVAS_Z_INDEX } from "./neo/canvasStack";
 
 /**
  * Lingui, set up the way the painter sets itself up, for a host with catalogs

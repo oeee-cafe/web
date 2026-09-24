@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { CANVAS_Z_INDEX } from "neo-cucumber";
 
 const CURSOR_IDLE_MS = 1500;
 const CURSOR_FADE_MS = 300;
@@ -129,7 +130,10 @@ export const useRemoteCursors = (
       if (!parent) return;
       const color = cursorColor(username);
       const element = document.createElement("div");
-      element.className = "pointer-events-none absolute z-30 transition-opacity duration-300";
+      element.className = "pointer-events-none absolute transition-opacity duration-300";
+      // A number from the painter's own stack, not a utility: its layers sit
+      // in the thousands, and a z-30 tag was drawn under all of them.
+      element.style.zIndex = String(CANVAS_Z_INDEX.collaborators);
       element.setAttribute("aria-hidden", "true");
       // Positioned by transform from the container's origin, so the numbers
       // written per frame are the drawing coordinates as they arrive.
