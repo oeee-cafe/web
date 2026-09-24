@@ -162,12 +162,17 @@
     }
     // What sends a request that changes something, whose outcome is felt
     // instead of the press: a control of htmx's own, or a form's submit
-    // button when the form posts.
+    // button when the form posts and htmx sends it (boosted). A form that
+    // posts by loading the next page has no outcome here to feel -- the page
+    // is gone before it -- so its press is felt instead; nearly every form
+    // on the site is one, since only the toolbar and the pills are boosted.
     function sends(control) {
       if (control.closest("[hx-post], [hx-put], [hx-patch], [hx-delete]")) return true;
       var form = control.form;
       return !!form && control.matches('button:not([type]), button[type="submit"], input[type="submit"]') &&
-        (form.getAttribute("method") || "").toLowerCase() === "post";
+        (form.getAttribute("method") || "").toLowerCase() === "post" &&
+        !!window.htmx && !!form.closest('[hx-boost\\:inherited="true"]') &&
+        !form.closest('[hx-boost="false"]');
     }
     // The control last felt on its press, so what it sent is not felt twice.
     var pressed = null;

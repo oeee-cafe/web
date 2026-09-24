@@ -424,6 +424,26 @@ describe("what the site's controls feel like, read off the markup", () => {
     expect(felt(page)).toEqual(["success"]);
   });
 
+  it("feels a posted form's primary button as a press, unless htmx is the one sending it", async () => {
+    const page = await open();
+    // Posted by loading the next page: nothing is left to feel how it went.
+    const plain = add(page, '<form method="post" action="/posts/publish"><button class="ds-button ds-button-primary">Publish</button></form>');
+    plain.querySelector("button")!.click();
+    expect(felt(page)).toEqual(["medium"]);
+    (page.window as unknown as { htmx: object }).htmx = {};
+    const boosted = add(
+      page,
+      '<div hx-boost:inherited="true"><form method="post" action="/x"><button class="ds-button ds-button-primary">Go</button></form></div>',
+    );
+    boosted.querySelector("button")!.click();
+    const unboosted = add(
+      page,
+      '<div hx-boost:inherited="true"><form method="post" action="/draw" hx-boost="false"><button class="ds-button ds-button-primary">Draw</button></form></div>',
+    );
+    unboosted.querySelector("button")!.click();
+    expect(felt(page)).toEqual(["medium", "medium"]);
+  });
+
   it("feels a failure as one, and a fetch or a request nobody pressed for not at all", async () => {
     const page = await open();
     const form = add(page, '<form hx-post="/comments"><button>Post</button></form>');
