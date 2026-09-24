@@ -23,7 +23,7 @@ use crate::models::post::{
 };
 use crate::models::community::{find_community_by_slug, CommunityVisibility};
 use crate::web::handlers::community::render_community_page;
-use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession};
+use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession, User};
 use crate::web::context::CommonContext;
 use crate::web::state::AppState;
 use anyhow::Error;
@@ -32,7 +32,7 @@ use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
 use axum::extract::{Path, Query};
 use axum::http::{uri::Uri, HeaderMap};
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Redirect};
 use axum::{extract::State, http::StatusCode, response::Html, Form};
 
 use minijinja::context;
@@ -181,92 +181,6 @@ pub async fn do_unfollow_profile(
     Ok(Html(rendered).into_response())
 }
 
-pub async fn profile(
-    auth_session: AuthSession,
-    ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    State(state): State<AppState>,
-    Path(login_name): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-    let user = find_user_by_login_name(&mut tx, &login_name)
-        .await?
-        .ok_or_else(|| AppError::NotFound("User".to_string()))?;
-
-    let published_posts = find_published_posts_by_author_id(&mut tx, user.id).await?;
-    use crate::models::community::CommunityVisibility;
-    let public_community_posts = published_posts
-        .iter()
-        .filter(|post| {
-            post.community_visibility == Some(CommunityVisibility::Public)
-                || post.community_visibility.is_none()
-        })
-        .collect::<Vec<_>>();
-    let private_community_posts = published_posts
-        .iter()
-        .filter(|post| {
-            post.community_visibility != Some(CommunityVisibility::Public)
-                && post.community_visibility.is_some()
-        })
-        .collect::<Vec<_>>();
-
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-
-    let mut is_current_user_following = false;
-    if let Some(current_user) = auth_session.user.clone() {
-        is_current_user_following = is_following(&mut tx, current_user.id, user.id).await?;
-    }
-
-    let followings = find_followings_by_user_id(&mut tx, user.id, 9999, 0, false).await?;
-    let comment_count = count_public_comments_by_user(&mut tx, user.id).await?;
-    let (comments, comments_next_url) =
-        comments_batch(&mut tx, &user.login_name, user.id, None).await?;
-
-    let banner = match user.banner_id {
-        Some(banner_id) => Some(find_banner_by_id(&mut tx, banner_id).await?),
-        None => None,
-    };
-
-    let achievements = list_achievements(&mut tx, user.id).await?;
-    let supporter_standings = standings(&mut tx, user.id).await?;
-    let links = find_links_by_user_id(&mut tx, user.id).await?;
-    let links = links
-        .iter()
-        .map(|link| {
-            let target = if link.url.starts_with(&state.config.base_url) {
-                "_self"
-            } else {
-                "_blank"
-            };
-            (link, target)
-        })
-        .collect::<Vec<_>>();
-
-    let template: minijinja::Template<'_, '_> = state.env.get_template("profile.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        links,
-        banner,
-        is_following => is_current_user_following,
-        followings,
-        comments,
-        comment_count,
-        comments_next_url,
-        achievements,
-        supporter_standings,
-        user => Some(user),
-        domain => state.config.domain.clone(),
-        public_community_posts,
-        private_community_posts,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
-
-    Ok(Html(rendered).into_response())
-}
-
 /// How many of a profile's comments one scroll brings in.
 const COMMENTS_PER_BATCH: i64 = 20;
 
@@ -290,25 +204,152 @@ async fn comments_batch(
     Ok((comments, next_url))
 }
 
+/// Which of a profile's tabs an address asks for (profile.jinja).
+#[derive(Clone, Copy, PartialEq)]
+enum ProfileTab {
+    Public,
+    Private,
+    Comments,
+}
+
+impl ProfileTab {
+    fn name(self) -> &'static str {
+        match self {
+            ProfileTab::Public => "public",
+            ProfileTab::Private => "private",
+            ProfileTab::Comments => "comments",
+        }
+    }
+}
+
+/// A person's profile, showing `tab`. A tab that is not there to show --
+/// someone else's private drawings, the comments of someone who has said
+/// nothing -- sends the address back to the profile itself, so no link
+/// lands on a switch with nothing chosen.
+async fn render_profile(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    state: &AppState,
+    auth_session: &AuthSession,
+    ftl_lang: String,
+    user: User,
+    tab: ProfileTab,
+) -> Result<axum::response::Response, AppError> {
+    let is_owner = auth_session.user.as_ref().map(|u| u.id) == Some(user.id);
+    if tab == ProfileTab::Private && !is_owner {
+        return Ok(Redirect::to(&format!("/@{}", user.login_name)).into_response());
+    }
+
+    let comment_count = count_public_comments_by_user(tx, user.id).await?;
+    if tab == ProfileTab::Comments && comment_count == 0 {
+        return Ok(Redirect::to(&format!("/@{}", user.login_name)).into_response());
+    }
+
+    let published_posts = find_published_posts_by_author_id(tx, user.id).await?;
+    let public_community_posts = published_posts
+        .iter()
+        .filter(|post| {
+            post.community_visibility == Some(CommunityVisibility::Public)
+                || post.community_visibility.is_none()
+        })
+        .collect::<Vec<_>>();
+    let private_community_posts = published_posts
+        .iter()
+        .filter(|post| {
+            post.community_visibility != Some(CommunityVisibility::Public)
+                && post.community_visibility.is_some()
+        })
+        .collect::<Vec<_>>();
+
+    let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+
+    let mut is_current_user_following = false;
+    if let Some(current_user) = auth_session.user.as_ref() {
+        is_current_user_following = is_following(tx, current_user.id, user.id).await?;
+    }
+
+    let followings = find_followings_by_user_id(tx, user.id, 9999, 0, false).await?;
+    let (comments, comments_next_url) =
+        comments_batch(tx, &user.login_name, user.id, None).await?;
+
+    let banner = match user.banner_id {
+        Some(banner_id) => Some(find_banner_by_id(tx, banner_id).await?),
+        None => None,
+    };
+
+    let achievements = list_achievements(tx, user.id).await?;
+    let supporter_standings = standings(tx, user.id).await?;
+    let links = find_links_by_user_id(tx, user.id).await?;
+    let links = links
+        .iter()
+        .map(|link| {
+            let target = if link.url.starts_with(&state.config.base_url) {
+                "_self"
+            } else {
+                "_blank"
+            };
+            (link, target)
+        })
+        .collect::<Vec<_>>();
+
+    let template: minijinja::Template<'_, '_> = state.env.get_template("profile.jinja")?;
+    let rendered = template.render(context! {
+        current_user => auth_session.user,
+        links,
+        banner,
+        is_following => is_current_user_following,
+        followings,
+        comments,
+        comment_count,
+        comments_next_url,
+        tab => tab.name(),
+        achievements,
+        supporter_standings,
+        user => Some(user),
+        domain => state.config.domain.clone(),
+        public_community_posts,
+        private_community_posts,
+        draft_post_count => common_ctx.draft_post_count,
+        unread_notification_count => common_ctx.unread_notification_count,
+        ftl_lang,
+    })?;
+
+    Ok(Html(rendered).into_response())
+}
+
 #[derive(Deserialize)]
 pub struct ProfileCommentsQuery {
     after: Option<Uuid>,
 }
 
-/// GET /@{login_name}/comments -- the next batch of a profile's comments and
-/// the sentinel after it, for the Comments tab's infinite scroll.
-pub async fn profile_comments_fragment(
+/// GET /@{login_name}/comments -- the profile with its Comments tab showing.
+/// With `after`, only the next batch of comments and the sentinel after it,
+/// for the tab's infinite scroll.
+pub async fn profile_comments(
+    auth_session: AuthSession,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(login_name): Path<String>,
     Query(query): Query<ProfileCommentsQuery>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<axum::response::Response, AppError> {
     let mut tx = state.db_pool.begin().await?;
     let user = find_user_by_login_name(&mut tx, &login_name)
         .await?
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+
+    let Some(after) = query.after else {
+        return render_profile(
+            &mut tx,
+            &state,
+            &auth_session,
+            ftl_lang,
+            user,
+            ProfileTab::Comments,
+        )
+        .await;
+    };
+
     let (comments, comments_next_url) =
-        comments_batch(&mut tx, &user.login_name, user.id, query.after).await?;
+        comments_batch(&mut tx, &user.login_name, user.id, Some(after)).await?;
     tx.commit().await?;
 
     let rendered = state
@@ -320,7 +361,22 @@ pub async fn profile_comments_fragment(
             ftl_lang,
         })?;
 
-    Ok(Html(rendered))
+    Ok(Html(rendered).into_response())
+}
+
+/// GET /@{login_name}/private -- their own profile with the drawings only
+/// they see showing.
+pub async fn profile_private(
+    auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+) -> Result<axum::response::Response, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let user = find_user_by_login_name(&mut tx, &login_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+    render_profile(&mut tx, &state, &auth_session, ftl_lang, user, ProfileTab::Private).await
 }
 
 pub async fn profile_or_community(
@@ -336,78 +392,8 @@ pub async fn profile_or_community(
 
     // First, try to find a user by login_name
     if let Some(user) = find_user_by_login_name(&mut tx, &slug).await? {
-        // User found - render profile page
-        let published_posts = find_published_posts_by_author_id(&mut tx, user.id).await?;
-        let public_community_posts = published_posts
-            .iter()
-            .filter(|post| {
-                post.community_visibility == Some(CommunityVisibility::Public)
-                    || post.community_visibility.is_none()
-            })
-            .collect::<Vec<_>>();
-        let private_community_posts = published_posts
-            .iter()
-            .filter(|post| {
-                post.community_visibility != Some(CommunityVisibility::Public)
-                    && post.community_visibility.is_some()
-            })
-            .collect::<Vec<_>>();
-
-        let common_ctx =
-            CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-
-        let mut is_current_user_following = false;
-        if let Some(current_user) = auth_session.user.clone() {
-            is_current_user_following = is_following(&mut tx, current_user.id, user.id).await?;
-        }
-
-        let followings = find_followings_by_user_id(&mut tx, user.id, 9999, 0, false).await?;
-        let comment_count = count_public_comments_by_user(&mut tx, user.id).await?;
-        let (comments, comments_next_url) =
-            comments_batch(&mut tx, &user.login_name, user.id, None).await?;
-
-        let banner = match user.banner_id {
-            Some(banner_id) => Some(find_banner_by_id(&mut tx, banner_id).await?),
-            None => None,
-        };
-
-        let achievements = list_achievements(&mut tx, user.id).await?;
-        let supporter_standings = standings(&mut tx, user.id).await?;
-        let links = find_links_by_user_id(&mut tx, user.id).await?;
-        let links = links
-            .iter()
-            .map(|link| {
-                let target = if link.url.starts_with(&state.config.base_url) {
-                    "_self"
-                } else {
-                    "_blank"
-                };
-                (link, target)
-            })
-            .collect::<Vec<_>>();
-
-        let template: minijinja::Template<'_, '_> = state.env.get_template("profile.jinja")?;
-        let rendered = template.render(context! {
-            current_user => auth_session.user,
-            links,
-            banner,
-            is_following => is_current_user_following,
-            followings,
-            comments,
-            comment_count,
-            comments_next_url,
-            achievements,
-            supporter_standings,
-            user => Some(user),
-            domain => state.config.domain.clone(),
-            public_community_posts,
-            private_community_posts,
-            draft_post_count => common_ctx.draft_post_count,
-            unread_notification_count => common_ctx.unread_notification_count,
-            ftl_lang,
-        })?;
-
-        return Ok(Html(rendered).into_response());
+        return render_profile(&mut tx, &state, &auth_session, ftl_lang, user, ProfileTab::Public)
+            .await;
     }
 
     // User not found - try to find a community by slug

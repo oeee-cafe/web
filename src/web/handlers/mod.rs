@@ -737,6 +737,84 @@ mod community_page_tests {
         );
     }
 
+    /// Under the card, a pill between the drawings and the comments, each
+    /// its own address; the comments page is the same page with the other
+    /// one chosen, its comments as cards in a grid.
+    #[test]
+    fn the_drawings_and_the_comments_are_a_pill_apart() {
+        let env = test_support::env();
+        let base = || {
+            context! {
+                current_user => json!(null),
+                messages => Vec::<serde_json::Value>::new(),
+                draft_post_count => 0,
+                unread_notification_count => 0,
+                community => json!({
+                    "id": "00000000-0000-0000-0000-000000000001",
+                    "name": "Open Studio",
+                    "description": "Draw with us",
+                    "slug": "open",
+                    "visibility": "public",
+                    "owner_id": "00000000-0000-0000-0000-000000000002",
+                }),
+                community_id => "00000000-0000-0000-0000-000000000001",
+                domain => "oeee.test",
+                ftl_lang => "en",
+            }
+        };
+        let pill = |html: &str| {
+            let html = html.replace("&#x2f;", "/");
+            let start = html.find(r#"<nav class="ds-segmented""#).expect("a pill");
+            let end = start + html[start..].find("</nav>").unwrap();
+            html[start..end].to_string()
+        };
+
+        let drawings = env
+            .get_template("community.jinja")
+            .expect("community loads")
+            .render(base())
+            .expect("community renders");
+        let on_drawings = pill(&drawings);
+        assert!(on_drawings.contains(r#"<a href="/communities/@open" aria-current="page">recent-drawings</a>"#));
+        assert!(on_drawings.contains(r#"<a href="/communities/@open/comments">recent-comments</a>"#));
+        assert!(on_drawings.contains("hx-boost:inherited"), "switched in place");
+
+        let comments = env
+            .get_template("community_comments.jinja")
+            .expect("comments loads")
+            .render(context! {
+                comments => json!([{
+                    "id": "0c8f0000-0000-0000-0000-000000000001",
+                    "post_id": "0c8f0000-0000-0000-0000-000000000002",
+                    "actor_id": "0c8f0000-0000-0000-0000-000000000003",
+                    "content": "멋져요",
+                    "content_html": null,
+                    "iri": null,
+                    "actor_name": "오이",
+                    "actor_handle": "@oeee@oeee.cafe",
+                    "actor_url": "https://oeee.cafe/@oeee",
+                    "actor_login_name": "oeee",
+                    "is_local": true,
+                    "updated_at": "2026-09-22T00:00:00Z",
+                    "created_at": "2026-09-22T00:00:00Z",
+                    "post_title": "고양이",
+                    "post_author_login_name": "cat",
+                    "post_image_filename": "abcdef.png",
+                    "post_image_width": 300,
+                    "post_image_height": 300,
+                }]),
+                ..base()
+            })
+            .expect("comments render");
+        let on_comments = pill(&comments);
+        assert!(on_comments.contains(r#"<a href="/communities/@open">recent-drawings</a>"#));
+        assert!(on_comments.contains(r#"<a href="/communities/@open/comments" aria-current="page">recent-comments</a>"#));
+        assert!(comments.contains("Draw with us"), "under the same card");
+        assert!(comments.contains(r#"<div class="comment-grid">"#));
+        assert!(comments.contains("멋져요"));
+        assert!(!comments.contains(r#"id="post-feed-grid""#), "no drawings under it");
+    }
+
     /// The header says who keeps the community and how much is in it, and
     /// drawing is its primary action: the painter's choices are asked for in
     /// a dialog when it is pressed, rather than sitting open on the page.
@@ -2332,6 +2410,38 @@ mod template_tests {
             .expect("fragment renders");
         assert!(!last_batch.contains("infinite-scroll-sentinel"));
 
+        // Each tab is a link to its own address, and the address picks the
+        // one showing: /@oeee shows the drawings, /@oeee/comments the
+        // comments, with the column control that only drawings have hidden.
+        let links = with.replace("&#x2f;", "/");
+        assert!(links.contains(r#"<a href="/@oeee" data-profile-tab="public" aria-current="page">"#));
+        assert!(links.contains(r#"<a href="/@oeee/comments" data-profile-tab="comments">"#));
+        assert!(with.contains(r#"<div data-profile-panel="comments" hidden>"#));
+        let on_comments = env
+            .get_template("profile.jinja")
+            .unwrap()
+            .render(context! {
+                user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
+                banner => json!(null),
+                links => Vec::<serde_json::Value>::new(),
+                followings => Vec::<serde_json::Value>::new(),
+                achievements => Vec::<serde_json::Value>::new(),
+                comments => json!([]),
+                comment_count => 3,
+                tab => "comments",
+                public_community_posts => json!([{"id": "p1", "title": "t", "image_filename": "abcdef.png", "image_width": 300, "image_height": 300}]),
+                private_community_posts => Vec::<serde_json::Value>::new(),
+                domain => "oeee.cafe",
+                is_following => false,
+                ..chrome()
+            })
+            .unwrap()
+            .replace("&#x2f;", "/");
+        assert!(on_comments.contains(r#"<a href="/@oeee/comments" data-profile-tab="comments" aria-current="page">"#));
+        assert!(on_comments.contains(r#"<div data-profile-panel="comments">"#));
+        assert!(on_comments.contains(r#"<div data-profile-panel="public" hidden>"#));
+        assert!(on_comments.contains("<div data-profile-per-row hidden>"));
+
         let without = render(json!([]), 0, None);
         assert!(!without.contains("data-profile-tab=\"comments\""));
         assert!(!without.contains("data-profile-panel=\"comments\""));
@@ -2598,6 +2708,45 @@ mod template_tests {
         assert!(!nobody.contains("data-profile-tab"), "one grid, no switch");
         assert!(!nobody.contains("profile-follows"));
         assert!(nobody.contains(r#"<div class="profile-section-label">profile-tab-drawings</div>"#));
+    }
+
+    /// On their own profile, what the private drawings are sits beside the
+    /// switch rather than over the grid, and only while that tab is chosen;
+    /// /@name/private is the address that chooses it.
+    #[test]
+    fn the_private_note_sits_beside_the_switch() {
+        let env = test_support::env();
+        let render = |tab: &str| {
+            env.get_template("profile.jinja")
+                .expect("profile loads")
+                .render(context! {
+                    user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
+                    current_user => json!({"id": "u1", "login_name": "oeee"}),
+                    banner => json!(null),
+                    links => Vec::<serde_json::Value>::new(),
+                    followings => Vec::<serde_json::Value>::new(),
+                    achievements => Vec::<serde_json::Value>::new(),
+                    comment_count => 0,
+                    tab,
+                    public_community_posts => Vec::<serde_json::Value>::new(),
+                    private_community_posts => Vec::<serde_json::Value>::new(),
+                    domain => "oeee.cafe",
+                    is_following => false,
+                    messages => Vec::<serde_json::Value>::new(),
+                    draft_post_count => 0,
+                    unread_notification_count => 0,
+                    ftl_lang => "en",
+                })
+                .expect("profile renders")
+                .replace("&#x2f;", "/")
+        };
+        let private = render("private");
+        let at = |needle: &str| private.find(needle).unwrap_or_else(|| panic!("no {needle}"));
+        assert!(private.contains(r#"<a href="/@oeee/private" data-profile-tab="private" aria-current="page">"#));
+        assert!(private.contains(r#"<p class="profile-panel-note" data-profile-note="private">"#));
+        assert!(at("profile-tabs-bar") < at("profile-panel-note"));
+        assert!(at("profile-panel-note") < at("data-profile-panel=\"public\""));
+        assert!(render("public").contains(r#"data-profile-note="private" hidden>"#));
     }
 
     /// What a visitor can do about someone: follow them and sign their

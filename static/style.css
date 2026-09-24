@@ -3409,7 +3409,7 @@ html[data-store] .supporter-elsewhere {
   box-sizing: border-box;
 }
 
-.ds-page .profile-tabs > button {
+.ds-page .profile-tabs > a {
   -webkit-box-flex: 0;
   flex: 0 1 auto;
   min-width: 0;
@@ -3417,10 +3417,24 @@ html[data-store] .supporter-elsewhere {
   text-overflow: ellipsis;
 }
 
+/* The switch, and to its right what the chosen tab means, where it has
+   something to say; under it when the row is too narrow for both. */
+.profile-tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .profile-panel-note {
-  margin: 0 0 var(--ds-space-2);
+  margin: 0 0 0 var(--ds-space-3);
   color: var(--ds-muted);
   font-size: var(--ds-text-s);
+}
+
+.profile-panel-note[hidden] {
+  display: none;
 }
 
 .community-draw-choice {

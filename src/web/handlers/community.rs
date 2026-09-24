@@ -160,8 +160,15 @@ pub(crate) async fn render_community_page(
     // Cancelling the edit form swaps the header back in on its own; the feed
     // below it is untouched, so it is not worth a query. The template renders
     // its grid from whatever `feed` holds, and copes with it being absent.
+    //
+    // Only for a request aimed at part of the page: the pill between the
+    // drawings and the comments boosts to this address, and htmx restores
+    // history from it, and both of those want the whole page (they send
+    // `HX-Request-Type: full`).
     let header = community_header_context(tx, &community).await?;
-    if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
+    let wants_header_only = headers.get("HX-Request") == Some(&HeaderValue::from_static("true"))
+        && headers.get("HX-Request-Type") != Some(&HeaderValue::from_static("full"));
+    if wants_header_only {
         let rendered = template
             .render_captured_to(context! {
                 current_user => auth_session.user,
@@ -1142,6 +1149,7 @@ pub async fn community_comments(
 
     // Get more comments for the dedicated comments page (100 instead of 5)
     let comments = find_latest_comments_in_community(&mut tx, community_uuid, 100).await?;
+    let header = community_header_context(&mut tx, &community).await?;
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
@@ -1150,6 +1158,8 @@ pub async fn community_comments(
     let rendered = template.render(context! {
         current_user => auth_session.user,
         community => community,
+        header => header,
+        community_id => community_uuid.to_string(),
         comments => comments,
         domain => state.config.domain.clone(),
         unread_notification_count => common_ctx.unread_notification_count,
