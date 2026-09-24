@@ -7,8 +7,15 @@
    else, so a page can show it by passing those four. #}
 {# Light, dark or the system's: the same switch as the painter's Dark button,
    stored under the same name, so the two never disagree. Chosen here, it
-   applies at once and to every page after (theme_head.jinja). #}
-{% macro theme_choices() %}
+   applies at once and to every page after (theme_head.jinja).
+
+   Under it, the language, for the signed out as much as the signed in: kept
+   in a cookie, and on the account too when there is one (web/language.rs).
+   A form rather than a script, since a page in a new language is a new
+   document anyway; unboosted, so it is one, <html lang> and all. Each name
+   is written in its own language, which is how anyone who cannot read the
+   page they are on finds theirs. #}
+{% macro preference_choices() %}
   <div class="toolbar-theme">
     <span class="toolbar-theme-label">{{ ftl_get_message("theme") }}</span>
     <div class="ds-segmented" role="group" aria-label="{{ ftl_get_message("theme") }}">
@@ -16,6 +23,31 @@
       <button type="button" data-theme-choice="dark" aria-pressed="false">{{ ftl_get_message("theme-dark") }}</button>
       <button type="button" data-theme-choice="system" aria-pressed="false">{{ ftl_get_message("theme-system") }}</button>
     </div>
+    <form class="toolbar-language" action="/language" method="post" hx-boost="false">
+      <label class="toolbar-theme-label" for="toolbar-language">{{ ftl_get_message("language") }}</label>
+      {# Signed in, what the account says. Signed out the server does not
+         know whether the page is in this language because it was chosen or
+         because the browser asked for it, so the language in use is marked,
+         and the script below moves the mark to Auto when nothing was
+         chosen. #}
+      {% set chosen = (current_user.preferred_language|lower if current_user.preferred_language else "auto") if current_user else ftl_lang %}
+      <select class="ds-select" id="toolbar-language" name="language" onchange="this.form.submit()"{% if not current_user %} data-guest{% endif %}>
+        <option value="auto"{% if chosen == "auto" %} selected{% endif %}>{{ ftl_get_message("account-language-auto") }}</option>
+        {% for code, name in [("ko", "한국어"), ("ja", "日本語"), ("en", "English"), ("zh", "中文")] %}
+          <option value="{{ code }}" lang="{{ code }}"{% if chosen == code %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+      {% if not current_user %}
+        <script>
+          (function () {
+            if (!/(?:^|;\s*)lang=/.test(document.cookie)) {
+              document.getElementById("toolbar-language").value = "auto";
+            }
+          })();
+        </script>
+      {% endif %}
+      <noscript><button type="submit" class="ds-button ds-button-small">{{ ftl_get_message("account-language-settings-save") }}</button></noscript>
+    </form>
   </div>
 {% endmacro %}
 {# Boost scoped to the nav, not the body.
@@ -217,17 +249,18 @@
             </form>
             {# The menu's foot, the same signed in or out: the theme, then
                a rule, then what the site is. #}
-            {{ theme_choices() }}
+            {{ preference_choices() }}
             <a class="toolbar-menu-about" href="/about">{{ ftl_get_message("nav-about-menu") }}</a>
           </div>
         </details>
       {% else %}
         {# Where your initial would be, the theme in use, opening onto the
-           three-way switch and nothing else: what the site is and this
-           browser's drafts have their own buttons in the bar above, since
-           a theme square is not where anyone would look for either. #}
+           three-way switch and the language and nothing else: what the
+           site is and this browser's drafts have their own buttons in the
+           bar above, since a theme square is not where anyone would look
+           for either. #}
         <details class="toolbar-menu toolbar-theme-menu">
-          <summary aria-label="{{ ftl_get_message("theme") }}" title="{{ ftl_get_message("theme") }}">
+          <summary aria-label="{{ ftl_get_message("theme-and-language") }}" title="{{ ftl_get_message("theme-and-language") }}">
             <span class="toolbar-square toolbar-avatar toolbar-avatar-guest" aria-hidden="true">
               <svg class="toolbar-theme-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>
               <svg class="toolbar-theme-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></svg>
@@ -235,7 +268,7 @@
             </span>
           </summary>
           <div class="toolbar-menu-items">
-            {{ theme_choices() }}
+            {{ preference_choices() }}
           </div>
         </details>
       {% endif %}

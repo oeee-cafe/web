@@ -6,7 +6,7 @@ use crate::models::email_verification_challenge::{
 use crate::models::user::{
     delete_user_with_activity, find_user_by_id, update_password, update_user_email_verified_at,
     update_user_preferred_language, update_user_show_sensitive_content, update_user_with_activity,
-    AuthSession, DeleteConfirmation, Language,
+    AuthSession, DeleteConfirmation,
 };
 use crate::models::identity::list_identities_for_user;
 use crate::models::supporter::{
@@ -14,11 +14,12 @@ use crate::models::supporter::{
 };
 use crate::web::context::CommonContext;
 use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
+use crate::web::language::{language_set_cookie, parse_language};
 use crate::web::state::AppState;
 use axum::response::{IntoResponse, Redirect};
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{header, StatusCode},
     response::Html,
     Form,
 };
@@ -123,22 +124,23 @@ pub async fn save_language(
 ) -> Result<impl IntoResponse, AppError> {
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
-    let language = match form.language.as_deref() {
-        Some("ko") => Some(Language::Ko),
-        Some("ja") => Some(Language::Ja),
-        Some("en") => Some(Language::En),
-        Some("zh") => Some(Language::Zh),
-        _ => None,
-    };
+    let language = parse_language(form.language.as_deref());
     let _ = update_user_preferred_language(
         &mut tx,
         auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id,
-        language,
+        language.clone(),
     )
     .await;
     let _ = tx.commit().await;
 
-    Ok(Redirect::to("/account").into_response())
+    // The toolbar's choice is kept in a cookie too, for after signing out;
+    // left alone, it would go on choosing after "Auto" was picked here.
+    let mut response = Redirect::to("/account").into_response();
+    response.headers_mut().insert(
+        header::SET_COOKIE,
+        language_set_cookie(language.as_ref(), state.config.env == "production"),
+    );
+    Ok(response)
 }
 
 #[derive(Deserialize)]

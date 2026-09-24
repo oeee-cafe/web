@@ -533,6 +533,7 @@ impl App {
             .route("/auth/welcome", get(identity_welcome))
             .route("/auth/welcome", post(do_identity_welcome))
             .route("/auth/cancel", post(cancel_pending_identity))
+            .route("/language", post(crate::web::language::set_language))
             .route("/password-reset", get(password_reset_request_page))
             .route("/password-reset", post(password_reset_request))
             .route("/password-reset/verify", get(password_reset_verify_page))
@@ -543,6 +544,12 @@ impl App {
             // extensions and a failed request can be explained in the
             // language the reader chose rather than the one they asked for.
             .layer(axum::middleware::from_fn(crate::web::htmx::error_banner))
+            // Outside the banner, which reads the header this rewrites: a
+            // signed out reader's chosen language, standing in for their
+            // browser's (web/language.rs).
+            .layer(axum::middleware::from_fn(
+                crate::web::language::language_cookie,
+            ))
             .layer(MessagesManagerLayer)
             .layer(auth_layer)
             .with_state(self.state.clone())

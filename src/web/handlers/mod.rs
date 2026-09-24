@@ -2633,6 +2633,52 @@ mod template_tests {
     }
 
     #[test]
+    fn the_toolbar_marks_the_language_in_use() {
+        // The macro reads the page's context from inside the toolbar, and
+        // `preferred_language` arrives as a string or as nothing, so this is
+        // rendered with the shapes the handlers really pass.
+        let render = |current_user: serde_json::Value, ftl_lang: &str| {
+            test_support::env()
+                .get_template("home.jinja")
+                .unwrap_or_else(|e| panic!("home.jinja loads: {e:#}"))
+                .render(context! {
+                    feed => context! {
+                        posts => Vec::<serde_json::Value>::new(),
+                        has_more => false,
+                        next_url => "",
+                    },
+                    current_user => current_user,
+                    messages => Vec::<serde_json::Value>::new(),
+                    draft_post_count => 0,
+                    unread_notification_count => 0,
+                    ftl_lang => ftl_lang,
+                })
+                .unwrap_or_else(|e| panic!("home.jinja renders: {e:#}"))
+        };
+
+        let chose = render(
+            json!({ "login_name": "artist", "id": "u1", "preferred_language": "ja" }),
+            "ja",
+        );
+        assert!(chose.contains(r#"<option value="ja" lang="ja" selected>"#));
+        assert!(!chose.contains(r#"<option value="auto" selected>"#));
+        assert!(!chose.contains("data-guest"));
+
+        let auto = render(
+            json!({ "login_name": "artist", "id": "u1", "preferred_language": null }),
+            "ko",
+        );
+        assert!(auto.contains(r#"<option value="auto" selected>"#));
+
+        // Signed out, the language in use; the page's script moves it to
+        // Auto when no cookie chose it.
+        let guest = render(serde_json::Value::Null, "zh");
+        assert!(guest.contains(r#"<option value="zh" lang="zh" selected>"#));
+        assert!(guest.contains("data-guest"));
+        assert!(guest.contains(r#"action="/language" method="post" hx-boost="false""#));
+    }
+
+    #[test]
     fn nothing_in_the_boosted_nav_reaches_a_module_bundle() {
         // The nav carries hx-boost. A boosted navigation swaps the body and
         // re-runs its scripts by cloning the tags, which does *not* re-evaluate
@@ -2702,6 +2748,9 @@ mod template_tests {
             // out of boost besides, so the signed out document is a fresh
             // one.
             "/logout",
+            // The language choice: a redirect back to the page it was made
+            // on, from a form that opts out of boost for the same reason.
+            "/language",
         ];
 
         for (attr, _) in [("href=\"", 0), ("action=\"", 0)] {
