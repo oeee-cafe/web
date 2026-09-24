@@ -48,7 +48,8 @@ brand assets, used under its sign-in branding guidelines; not covered by
 this repository's licence.
 
 `static/signin/google-light.svg` and `google-dark.svg` are the kit's
-square "Sign in with Google" buttons for Android and web, and
+square "Sign in with Google" buttons for Android and web, their background
+widened from 180 to 330 and the G and words moved to its centre, and
 `google-mark.svg` is its square G-only button cropped to the G, without the
 button behind it. Each has one addition: flat wedges in the gradient's own
 colours under the G, which the gradient covers wherever it draws, for
