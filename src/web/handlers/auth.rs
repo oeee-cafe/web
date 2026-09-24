@@ -37,6 +37,9 @@ pub async fn signup(
     let rendered: String = template.render(context! {
         messages => messages.into_iter().collect::<Vec<_>>(),
         next => next,
+        steam_enabled => state.config.steam.is_some(),
+        apple_enabled => state.config.apple.is_some(),
+        google_enabled => state.config.google.is_some(),
         ftl_lang
     })?;
 

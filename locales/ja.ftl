@@ -484,6 +484,7 @@ sign-in-other-ways = 他の方法でログイン
 sign-in-no-account = アカウントをお持ちでない方
 signup-agree = コミュニティガイドラインとプライバシーポリシーに同意します。
 signup-agree-required = 登録するには、コミュニティガイドラインとプライバシーポリシーに同意してください。
+sign-up-other-ways = 他の方法で登録
 sign-up-have-account = すでにアカウントをお持ちの方
 about-apps = アプリ
 app-store-badge = App Storeからダウンロード

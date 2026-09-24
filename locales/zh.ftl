@@ -484,6 +484,7 @@ sign-in-other-ways = 使用其他方式登录
 sign-in-no-account = 还没有账号？
 signup-agree = 我同意社区准则和隐私政策。
 signup-agree-required = 注册前请同意社区准则和隐私政策。
+sign-up-other-ways = 使用其他方式注册
 sign-up-have-account = 已有账号？
 about-apps = 应用
 app-store-badge = 在 App Store 下载
