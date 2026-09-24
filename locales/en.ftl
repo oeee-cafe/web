@@ -494,6 +494,7 @@ app-store-badge = Download on the App Store
 google-play-badge = Get it on Google Play
 about-elsewhere = Elsewhere
 about-documents = Documents
+about-version = Version
 post-no-reactions = No reactions yet.
 sign-in-with-steam = Sign in with Steam
 steam-sign-in-app-only = Signing in with Steam works in the Oeee Cafe app on Steam.

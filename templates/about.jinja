@@ -74,5 +74,16 @@
         </div>
       </section>
     {% endif %}
+
+    {% if git_commit %}
+      {# Which commit is serving, for anyone reporting a bug; unset outside
+         a deployed image, and then there is nothing to say. #}
+      <section class="profile-section">
+        <div class="profile-section-label">{{ ftl_get_message("about-version") }}</div>
+        <div class="profile-chips">
+          <a class="profile-chip about-version" href="https://github.com/oeee-cafe/web/commit/{{ git_commit }}" target="_blank" rel="noopener" title="{{ git_commit }}">{{ git_commit[:12] }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+        </div>
+      </section>
+    {% endif %}
   </div>
 {% endblock content %}

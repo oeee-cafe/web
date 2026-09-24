@@ -4079,6 +4079,10 @@ html[data-store="steam"] .auth-steam {
   font-size: var(--ds-text-base);
 }
 
+.about-page .about-version {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
 .about-supporters-thanks {
   margin: 0 0 var(--ds-space-3);
   max-width: 60ch;
