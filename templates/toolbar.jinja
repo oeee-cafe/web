@@ -186,14 +186,14 @@
         <a class="toolbar-square toolbar-button toolbar-about" href="/about" aria-label="{{ ftl_get_message("nav-about-menu") }}" title="{{ ftl_get_message("nav-about-menu") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 17h2v-6h-2zm1-8q.425 0 .713-.288T13 8t-.288-.712T12 7t-.712.288T11 8t.288.713T12 9m0 13q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg></a>
         <a class="toolbar-square toolbar-button toolbar-sign-in" href="/login" aria-label="{{ ftl_get_message("sign-in") }}" title="{{ ftl_get_message("sign-in") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21v-2h7V5h-7V3h7q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21zm-2-4l-1.375-1.45l2.55-2.55H3v-2h8.175l-2.55-2.55L10 7l5 5z"/></svg></a>
         {# Drawings saved in this browser while signed out, which is the
-           only place they are: a square of its own, always there so the
-           bar is one width whether or not there are any. While there are,
-           it lights up as 넷캔 does, with 넷캔's own pulsing light on its
-           corner, and the count is in its label; the script at the foot of
-           this nav does both. Beside Draw, whose work it holds. Unboosted
-           for the reason the account menu's link is. A page with a folded
-           corner, stroked like the bell beside it. #}
-        <a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" aria-label="{{ ftl_get_message("drafts") }}" title="{{ ftl_get_message("drafts") }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h9l5 5v14h-14z"/><path d="M14.5 2.5v5h5"/></svg><span class="toolbar-live-dot" aria-hidden="true"></span></a>
+           only place they are: a square of its own, and only while there
+           are some. The script at the foot of this nav shows it when it
+           finds them, lit as 넷캔 is, with 넷캔's own pulsing light on its
+           corner and the count in its label. A guest has none on the
+           server, so it arrives hidden. Beside Draw, whose work it holds.
+           Unboosted for the reason the account menu's link is. A page with
+           a folded corner, stroked like the bell beside it. #}
+        <a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" hidden aria-label="{{ ftl_get_message("drafts") }}" title="{{ ftl_get_message("drafts") }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h9l5 5v14h-14z"/><path d="M14.5 2.5v5h5"/></svg><span class="toolbar-live-dot" aria-hidden="true"></span></a>
       {% endif %}
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
@@ -854,12 +854,12 @@
       function show(local) {
         if (!local) return;
         var total = (parseInt(link.getAttribute("data-server-count"), 10) || 0) + local;
+        link.hidden = false;
         if (/(^| )toolbar-drafts( |$)/.test(link.className)) {
-          // The guest's square: lit, and counted in its words.
+          // The guest's square: counted in its words.
           var label = link.getAttribute("aria-label") + " (" + total + ")";
           link.setAttribute("aria-label", label);
           link.setAttribute("title", label);
-          link.className += " toolbar-drafts-some";
           return;
         }
         var badge = link.querySelector(".toolbar-badge");
