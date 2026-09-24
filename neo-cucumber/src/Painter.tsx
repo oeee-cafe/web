@@ -57,6 +57,7 @@ import type {
   PainterSessionArchive,
 } from "./public";
 import { CanvasHistory } from "./utils/canvasHistory";
+import { paintThumbnail } from "./utils/thumbnail";
 import { layerToPngBlob, pngDataToLayer } from "./utils/canvasSnapshot";
 
 interface PainterProps {
@@ -178,30 +179,31 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
    * already what is on screen, and reading the buffers would mean copying a
    * whole layer into an ImageData for every participant on every refresh.
    */
-  const thumbnailGenerations = useRef(new Map<string, string>());
+  // Keyed by the thumbnail itself, not by whose it is. A row's canvas can be
+  // replaced -- the layers window closing and opening again, a participant
+  // re-keyed -- and a fresh canvas is blank whatever was painted into the
+  // last one, so remembering it per participant left it blank until they
+  // next drew.
+  const thumbnailGenerations = useRef(new WeakMap<HTMLCanvasElement, string>());
   const drawThumbnail = useCallback(
     (actorId: string, target: HTMLCanvasElement) => {
       const engine = drawingEngineRef.current;
-      const context = target.getContext("2d");
-      if (!engine || !context) return;
+      if (!engine) return;
       // Nothing to redraw for somebody who has stopped drawing. Scaling two
       // full-size canvases down is real work, it runs for every participant on
       // a timer, and in a room where one person is drawing it was redrawing
       // everybody else's unchanged picture alongside theirs. The engine counts
       // every write to a participant's layers, so it can say.
       const generation = engine.layerGeneration(actorId);
-      const painted = `${target.width}x${target.height}:${generation}`;
-      if (thumbnailGenerations.current.get(actorId) === painted) return;
-      thumbnailGenerations.current.set(actorId, painted);
-      context.clearRect(0, 0, target.width, target.height);
-      for (const layer of ["background", "foreground"] as const) {
-        const source = engine.domCanvasFor(layer, actorId);
-        // A participant who has not drawn has no canvas yet, and an empty
-        // thumbnail is the honest picture of that.
-        if (source) {
-          context.drawImage(source, 0, 0, target.width, target.height);
-        }
-      }
+      const painted = `${actorId}:${target.width}x${target.height}:${generation}`;
+      if (thumbnailGenerations.current.get(target) === painted) return;
+      thumbnailGenerations.current.set(target, painted);
+      // A participant who has not drawn has no canvas yet, and blank paper
+      // is the honest picture of that.
+      const sources = (["background", "foreground"] as const)
+        .map((layer) => engine.domCanvasFor(layer, actorId))
+        .filter((source): source is HTMLCanvasElement => source !== undefined);
+      paintThumbnail(target, sources);
     },
     [],
   );
@@ -229,7 +231,15 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
   const [openedAtFittedZoom, setOpenedAtFittedZoom] = useState(false);
   const operationCounterRef = useRef(0);
   const synchronizationHistoryRef = useRef<CanvasHistory | null>(null);
-  const appliedCheckpointRef = useRef<PainterCheckpoint | undefined>(undefined);
+  /**
+   * The checkpoint the canonical log is relative to, for the session archive.
+   *
+   * A reset point leaves only its sequence here: the pixels are the history's
+   * base savepoint, and they are encoded if an archive is ever asked for.
+   */
+  const appliedCheckpointRef = useRef<
+    PainterCheckpoint | { sequence: number; encoded?: undefined } | undefined
+  >(undefined);
   const synchronization = config.synchronization;
   /**
    * Who this painter is on the canonical stream. Mounting has to name someone
@@ -830,6 +840,42 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     [drawingEngine, canvasWidth, canvasHeight],
   );
 
+  /**
+   * The applied checkpoint as PNGs, encoding a reset point's on first ask.
+   *
+   * Read before anything is awaited, so the canonical log returned beside it
+   * is relative to the same point; and the base savepoint is read in the
+   * same turn, before another reset could replace it.
+   */
+  const encodedCheckpoint = useCallback(
+    async (history: CanvasHistory): Promise<PainterCheckpoint | undefined> => {
+      const applied = appliedCheckpointRef.current;
+      if (!applied || "layers" in applied) return applied;
+      const base = [...history.baseLayers()];
+      const checkpoint: PainterCheckpoint = {
+        sequence: applied.sequence,
+        width: canvasWidth,
+        height: canvasHeight,
+        layers: await Promise.all(
+          base.map(async ([actorId, pair]) => {
+            const [background, foreground] = await Promise.all([
+              layerToPngBlob(pair.background, canvasWidth, canvasHeight),
+              layerToPngBlob(pair.foreground, canvasWidth, canvasHeight),
+            ]);
+            return { actorId, background, foreground };
+          }),
+        ),
+      };
+      // Kept, so a second export does not encode it again -- unless a newer
+      // checkpoint arrived while this one was encoding.
+      if (appliedCheckpointRef.current === applied) {
+        appliedCheckpointRef.current = checkpoint;
+      }
+      return checkpoint;
+    },
+    [canvasWidth, canvasHeight],
+  );
+
   const exportSessionArchive = useCallback(async (): Promise<PainterSessionArchive> => {
     if (!drawingEngine) throw new Error("Painter is not ready");
     const history = synchronizationHistoryRef.current;
@@ -838,10 +884,10 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       format: "neo-cucumber-session",
       version: 1,
       canvas: { width: canvasWidth, height: canvasHeight, mode: config.mode },
-      checkpoint: appliedCheckpointRef.current,
+      checkpoint: await encodedCheckpoint(history),
       operations: history.getCanonicalOperations(),
     };
-  }, [drawingEngine, canvasWidth, canvasHeight, config.mode]);
+  }, [drawingEngine, canvasWidth, canvasHeight, config.mode, encodedCheckpoint]);
 
   const synchronizationTrace = useCallback(
     () => synchronizationHistoryRef.current?.synchronizationTrace() ?? [],
@@ -851,24 +897,13 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
   const compactCanonicalHistory = useCallback(async (sequence: number): Promise<void> => {
     const history = synchronizationHistoryRef.current;
     if (!history) throw new Error("Painter is not in controlled mode");
-    const base = await history.handleResetPoint(sequence);
-    if (!base) return;
-    const layers = await Promise.all(
-      [...base].map(async ([actorId, pair]) => {
-        const [background, foreground] = await Promise.all([
-          layerToPngBlob(pair.background, canvasWidth, canvasHeight),
-          layerToPngBlob(pair.foreground, canvasWidth, canvasHeight),
-        ]);
-        return { actorId, background, foreground };
-      }),
-    );
-    appliedCheckpointRef.current = {
-      sequence,
-      width: canvasWidth,
-      height: canvasHeight,
-      layers,
-    };
-  }, [canvasWidth, canvasHeight]);
+    if (!(await history.handleResetPoint(sequence))) return;
+    // Only the sequence. Every client in the room compacts at every reset
+    // point, and encoding each participant's pair to PNG here -- for an
+    // archive that is almost never exported -- was the hitch the whole room
+    // felt every five hundred messages.
+    appliedCheckpointRef.current = { sequence };
+  }, []);
 
   const isSynchronizationSettled = useCallback((): boolean =>
     !isDrawingRef.current && !(synchronizationHistoryRef.current?.hasPendingLocal ?? false),
