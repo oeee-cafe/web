@@ -505,6 +505,16 @@ pub struct ArchiveParticipant {
     pub login_name: String,
 }
 
+/// An error from storage, with the reason in it.
+///
+/// The SDK's own Display for a failed request is the two words "service
+/// error"; what R2 actually said -- AccessDenied, NoSuchBucket -- is further
+/// down the source chain, and printing the error with `{}` drops it. Every
+/// place that logs or returns a storage failure goes through this.
+pub fn describe(e: &(dyn std::error::Error + 'static)) -> String {
+    aws_sdk_s3::error::DisplayErrorContext(e).to_string()
+}
+
 /// The bucket client, built the same way the image upload builds it.
 pub fn s3_client(config: &AppConfig) -> aws_sdk_s3::Client {
     let credentials = aws_sdk_s3::config::Credentials::new(
@@ -600,13 +610,21 @@ pub async fn flush_room(state: &AppState, room_uuid: Uuid) -> usize {
     let chatted = match write_chat(state, room_uuid).await {
         Ok(lines) => lines,
         Err(e) => {
-            warn!("Failed to store the transcript for room {}: {}", room_uuid, e);
+            warn!(
+                "Failed to store the transcript for room {}: {}",
+                room_uuid,
+                describe(&*e)
+            );
             0
         }
     };
     if written > 0 || chatted > 0 {
         if let Err(e) = write_manifest(state, room_uuid, false).await {
-            warn!("Failed to write the archive manifest for room {}: {}", room_uuid, e);
+            warn!(
+                "Failed to write the archive manifest for room {}: {}",
+                room_uuid,
+                describe(&*e)
+            );
         }
     }
     if let Err(e) = buffer.release(room_uuid).await {
@@ -656,7 +674,11 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
         {
             // Left in the buffer on purpose: the next flush writes the same
             // chunk to the same key.
-            warn!("Failed to store an archive chunk for room {}: {}", room_uuid, e);
+            warn!(
+                "Failed to store an archive chunk for room {}: {}",
+                room_uuid,
+                describe(&e)
+            );
             return written;
         }
 
@@ -712,7 +734,11 @@ pub async fn seal_room(state: &AppState, room_uuid: Uuid, force: bool) {
     }
     let flushed = flush_room(state, room_uuid).await;
     if let Err(e) = write_manifest(state, room_uuid, true).await {
-        warn!("Failed to seal the archive for room {}: {}", room_uuid, e);
+        warn!(
+            "Failed to seal the archive for room {}: {}",
+            room_uuid,
+            describe(&*e)
+        );
         return;
     }
     info!(
