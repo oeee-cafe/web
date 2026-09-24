@@ -17,7 +17,6 @@ import {
   type CanonicalPainterOperation,
   type LocalPainterOperation,
   type PainterCheckpoint,
-  type PainterCheckpointLayers,
   type PainterHandle,
 } from "neo-cucumber";
 import { feelInApp, offerPainterToApp } from "../shared/appBridge";
@@ -48,6 +47,7 @@ import { useRemoteCursors } from "./hooks/useRemoteCursors";
 import { reportDiagnostics, type DiagnosticContext } from "./diagnostics";
 import { refreshSessionPreview } from "./preview";
 import { PendingEchoes } from "./echoIds";
+import { CanonicalFeed } from "./canonicalFeed";
 import type { CollaborationMeta, Participant } from "./types";
 
 /** How long the owner waits for the server to confirm the end of the session
@@ -74,48 +74,6 @@ const PREVIEW_ATTEMPT_INTERVAL_MS = 15000;
  * screen and looks no different to anybody watching.
  */
 const POINTER_BROADCAST_MS = 33;
-
-/**
- * How long the canonical stream may hold the main thread before it has to let
- * go of it.
- *
- * There is one thread here, and applying somebody else's marks runs on the
- * same one that is meant to be following this user's pen. A burst -- three
- * people drawing, or the tail of a catch-up -- used to be applied to
- * exhaustion, because every `await` inside it is a microtask and microtasks
- * are not a yield: the queue drains completely before the browser is allowed
- * to deliver the next pointer event.
- *
- * Drawpile bounds the same work at about 0.2ms per batch, which it can afford
- * because its paint engine has a thread to itself and is emptied again on the
- * next tick. Ours has to share, so the budget is most of a frame rather than a
- * fraction of one, and what follows it is a real yield.
- */
-const CANONICAL_BUDGET_MS = 6;
-
-/**
- * Hands the thread back long enough for input to be delivered.
- *
- * `scheduler.yield` resumes at a priority above an ordinary task, so the drain
- * picks up again ahead of anything incidental; without it a message channel is
- * the cheapest macrotask that still lets the browser run pending input first.
- * A `setTimeout` is not a substitute -- nested timeouts are clamped to 4ms,
- * which would cost more than the work being interrupted.
- */
-const yieldToInput = (): Promise<void> => {
-  const { scheduler } = globalThis as unknown as {
-    scheduler?: { yield?: () => Promise<void> };
-  };
-  if (typeof scheduler?.yield === "function") return scheduler.yield();
-  return new Promise((resolve) => {
-    const channel = new MessageChannel();
-    channel.port1.onmessage = () => {
-      channel.port1.close();
-      resolve();
-    };
-    channel.port2.postMessage(null);
-  });
-};
 
 const getSessionId = (): string => {
   const id = window.location.pathname.split("/")[2];
@@ -249,24 +207,11 @@ export default function App() {
   /** When the last cursor position went out, and where it was. */
   const pointerSentAtRef = useRef(0);
   const lastSentPointerRef = useRef<{ x: number; y: number } | null>(null);
-  const expectedSequenceRef = useRef(1);
-  const appliedSequenceRef = useRef(0);
-  /** Held until their turn; `null` holds the place of one nobody can read. */
-  const canonicalOperationsRef = useRef(new Map<number, CanonicalPainterOperation | null>());
   /**
-   * Snapshots of a pending checkpoint, by sequence then by participant.
-   *
-   * Every snapshot of one reset carries the same sequence, and a checkpoint
-   * now covers a layer pair per participant, so the group is only whole once
-   * RESET_POINT has said how many snapshots to expect and that many have
-   * arrived. Applying a partial group would blank whoever was still in
-   * flight.
+   * The canonical stream on its way to the canvas: what has arrived out of
+   * turn, what is on the canvas, and the checkpoint being assembled.
    */
-  const snapshotPairsRef = useRef(
-    new Map<number, Map<string, Partial<Pick<PainterCheckpointLayers, "background" | "foreground">>>>(),
-  );
-  const snapshotCountsRef = useRef(new Map<number, number>());
-  const canonicalDrainRef = useRef<Promise<void>>(Promise.resolve());
+  const feed = useRef(new CanonicalFeed({ mayYield: () => !link.catchingUp })).current;
   const { createOrUpdateCursor, hideCursor, clearCursors } = useRemoteCursors(
     painterElementRef, link,
   );
@@ -484,71 +429,10 @@ export default function App() {
   }, []);
 
   const drainCanonical = useCallback(async () => {
-    canonicalDrainRef.current = canonicalDrainRef.current.then(async () => {
-      const painter = painterRef.current;
-      if (!painter || !canvasMeta) return;
-      let deadline = performance.now() + CANONICAL_BUDGET_MS;
-      while (true) {
-        const expected = expectedSequenceRef.current;
-        const operation = canonicalOperationsRef.current.get(expected);
-        if (operation !== undefined) {
-          canonicalOperationsRef.current.delete(expected);
-          if (operation) await painter.applyCanonicalOperation(operation);
-          appliedSequenceRef.current = expected;
-          expectedSequenceRef.current = expected + 1;
-          // Not while catching up: the painter takes no input until the replay
-          // is done, so there is nothing to be responsive to and yielding
-          // would only make the wait longer.
-          if (!link.catchingUp && performance.now() >= deadline) {
-            await yieldToInput();
-            deadline = performance.now() + CANONICAL_BUDGET_MS;
-          }
-          continue;
-        }
-
-        // A checkpoint is a legal jump over compacted history. Every
-        // participant's pair must arrive before it replaces the canvas and
-        // advances the sequence, which is what the announced count settles.
-        const isWhole = (sequence: number, owners: Map<string, Partial<PainterCheckpointLayers>>) => {
-          const expectedCount = snapshotCountsRef.current.get(sequence);
-          if (expectedCount === undefined) return false;
-          let held = 0;
-          for (const pair of owners.values()) {
-            held += (pair.background ? 1 : 0) + (pair.foreground ? 1 : 0);
-          }
-          return held >= expectedCount;
-        };
-        const checkpointSequence = [...snapshotPairsRef.current.entries()]
-          .filter(([sequence, owners]) => sequence >= expected && isWhole(sequence, owners))
-          .map(([sequence]) => sequence)
-          .sort((a, b) => a - b)[0];
-        if (checkpointSequence === undefined) break;
-        const owners = snapshotPairsRef.current.get(checkpointSequence)!;
-        await painter.applyCheckpoint({
-          sequence: checkpointSequence,
-          width: canvasMeta.width,
-          height: canvasMeta.height,
-          layers: [...owners]
-            // Ascending session id is join order, and it never changes, so
-            // every client composites the same stack.
-            .sort(([a], [b]) => Number(a) - Number(b))
-            .map(([actorId, pair]) => ({
-              actorId,
-              background: pair.background!,
-              foreground: pair.foreground!,
-            })),
-        });
-        snapshotPairsRef.current.delete(checkpointSequence);
-        snapshotCountsRef.current.delete(checkpointSequence);
-        for (const sequence of canonicalOperationsRef.current.keys()) {
-          if (sequence <= checkpointSequence) canonicalOperationsRef.current.delete(sequence);
-        }
-        appliedSequenceRef.current = checkpointSequence;
-        expectedSequenceRef.current = checkpointSequence + 1;
-      }
-    });
-    await canonicalDrainRef.current;
-  }, [canvasMeta, link]);
+    const painter = painterRef.current;
+    if (!painter || !canvasMeta) return;
+    await feed.drain(painter, canvasMeta);
+  }, [canvasMeta, feed]);
 
   const onCanvasMessage = useCallback(async (
     message: DecodedMessage, raw: Uint8Array, sequence?: number,
@@ -558,17 +442,13 @@ export default function App() {
     }
     if (message.type === "snapshot") {
       const pngBytes = new Uint8Array(message.pngData).slice();
-      const owners = snapshotPairsRef.current.get(sequence) ?? new Map();
-      // Whose layer this is, not who sent it. One client uploads the whole
-      // checkpoint on everyone's behalf, so `userId` is the same uploader for
-      // every snapshot in it -- keying by that collapsed all of them onto one
-      // participant, left the checkpoint one pair short of the count that says
-      // it is whole, and so stopped it from ever being applied.
-      const actorId = String(message.targetOwner);
-      const pair = owners.get(actorId) ?? {};
-      pair[message.layer] = new Blob([pngBytes.buffer as ArrayBuffer], { type: "image/png" });
-      owners.set(actorId, pair);
-      snapshotPairsRef.current.set(sequence, owners);
+      // Whose layer this is, not who sent it; see `holdSnapshot`.
+      feed.holdSnapshot(
+        sequence,
+        String(message.targetOwner),
+        message.layer,
+        new Blob([pngBytes.buffer as ArrayBuffer], { type: "image/png" }),
+      );
       await drainCanonical();
       return;
     }
@@ -592,30 +472,25 @@ export default function App() {
       sequence,
       operation,
     };
-    canonicalOperationsRef.current.set(sequence, canonical);
+    feed.hold(canonical);
     await drainCanonical();
-  }, [drainCanonical, link]);
+  }, [drainCanonical, feed, link]);
 
   const onUnreadableSequence = useCallback(async (sequence: number) => {
-    canonicalOperationsRef.current.set(sequence, null);
+    feed.holdUnreadable(sequence);
     await drainCanonical();
-  }, [drainCanonical]);
+  }, [drainCanonical, feed]);
 
   const onReconnectCanvas = useCallback(async (
     reconnecting: boolean, resumeSequence: number | null,
   ) => {
     clearCursors();
     pendingEchoesRef.current.clear();
-    canonicalOperationsRef.current.clear();
-    snapshotPairsRef.current.clear();
-    snapshotCountsRef.current.clear();
     if (reconnecting && resumeSequence !== null) {
-      expectedSequenceRef.current = resumeSequence + 1;
-      appliedSequenceRef.current = resumeSequence;
+      feed.restart(resumeSequence);
       return;
     }
-    expectedSequenceRef.current = 1;
-    appliedSequenceRef.current = 0;
+    feed.restart(0);
     if (!reconnecting || !canvasMeta || !painterRef.current) return;
     const layer = await blankLayer(canvasMeta.width, canvasMeta.height);
     // No participant's layers survive a full replay, so the checkpoint names
@@ -629,7 +504,7 @@ export default function App() {
       }],
     };
     await painterRef.current.applyCheckpoint(checkpoint);
-  }, [canvasMeta, clearCursors, link]);
+  }, [canvasMeta, clearCursors, feed, link]);
 
   /**
    * What this client believed, for a report about why it was wrong.
@@ -643,13 +518,13 @@ export default function App() {
       reason,
       detail,
       localId: link.localId,
-      appliedSequence: appliedSequenceRef.current,
-      expectedSequence: expectedSequenceRef.current,
+      appliedSequence: feed.applied,
+      expectedSequence: feed.expected,
       lastSeq: link.lastSeq,
       catchingUp: link.catchingUp,
       settled: painterRef.current?.isSynchronizationSettled() ?? false,
     }),
-    [link],
+    [feed, link],
   );
 
   const handleResetPoint = useCallback(async (
@@ -659,7 +534,7 @@ export default function App() {
     if (!painter) return;
     // The snapshots of this checkpoint all carry `baseSequence`, and knowing
     // how many there are is what lets the drain tell whole from half-arrived.
-    snapshotCountsRef.current.set(baseSequence, snapshotCount);
+    feed.announceCheckpoint(baseSequence, snapshotCount);
     await drainCanonical();
     // A client that was in the room for the checkpoint is already past its
     // base and has nothing to restore: the server broadcasts the point alone,
@@ -673,7 +548,7 @@ export default function App() {
     // Staying put instead leaves the position behind `lastSeq`, which is what
     // `verifyCanonicalPosition` already watches for: the socket closes on the
     // gap and the replay is asked for again.
-    if (appliedSequenceRef.current < baseSequence) {
+    if (feed.applied < baseSequence) {
       console.error(
         `Checkpoint at ${baseSequence} could not be applied; leaving the canonical position behind`,
       );
@@ -688,18 +563,15 @@ export default function App() {
       return;
     }
     await painter.compactCanonicalHistory(baseSequence);
-    if (sequence !== undefined) {
-      appliedSequenceRef.current = sequence;
-      expectedSequenceRef.current = sequence + 1;
-    }
-  }, [drainCanonical, diagnosticContext]);
+    if (sequence !== undefined) feed.advanceTo(sequence);
+  }, [drainCanonical, diagnosticContext, feed]);
 
   const verifyCanonicalPosition = useCallback(async (): Promise<boolean> => {
     await drainCanonical();
-    return appliedSequenceRef.current >= link.lastSeq;
-  }, [drainCanonical, link]);
+    return feed.applied >= link.lastSeq;
+  }, [drainCanonical, feed, link]);
 
-  const appliedCanonicalPosition = useCallback((): number => appliedSequenceRef.current, []);
+  const appliedCanonicalPosition = useCallback((): number => feed.applied, [feed]);
 
   const canResumeCanonicalPosition = useCallback((): boolean =>
     painterRef.current?.isSynchronizationSettled() ?? false,
@@ -757,9 +629,9 @@ export default function App() {
     if (!painter || link.localId === null) return false;
     return (
       painter.isSynchronizationSettled() &&
-      appliedSequenceRef.current >= link.lastSeq
+      feed.applied >= link.lastSeq
     );
-  }, [link]);
+  }, [feed, link]);
 
   const handleResetRequest = useCallback(async () => {
     const painter = painterRef.current;
@@ -772,15 +644,15 @@ export default function App() {
       await drainCanonical();
       if (
         painter.isSynchronizationSettled() &&
-        appliedSequenceRef.current >= link.lastSeq
+        feed.applied >= link.lastSeq
       ) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (
       !painter.isSynchronizationSettled() ||
-      appliedSequenceRef.current < link.lastSeq
+      feed.applied < link.lastSeq
     ) return;
-    const checkpoint = await painter.exportCheckpoint(appliedSequenceRef.current);
+    const checkpoint = await painter.exportCheckpoint(feed.applied);
     // Each snapshot is stamped with the participant whose layer it is, not
     // with the uploader: one client uploads the whole canvas on everyone's
     // behalf, and the owner byte is what puts each pair back where it came
@@ -830,7 +702,7 @@ export default function App() {
     // Different from, rather than ahead of: a checkpoint or a replaced history
     // can put the canonical position *behind* where this client last uploaded
     // from, and a room that had been drawn in would then never refresh again.
-    const sequence = appliedSequenceRef.current;
+    const sequence = feed.applied;
     if (sequence === previewSequenceRef.current) return;
     previewInFlightRef.current = true;
     try {
@@ -844,7 +716,7 @@ export default function App() {
     } finally {
       previewInFlightRef.current = false;
     }
-  }, [canUploadCheckpoint, link]);
+  }, [canUploadCheckpoint, feed, link]);
 
   // Stops as the session winds down: the canvas is about to become a post, and
   // the room's preview is deleted with the rest of its state. One that landed
@@ -950,13 +822,13 @@ export default function App() {
         await drainCanonical();
         if (
           painterRef.current.isSynchronizationSettled() &&
-          appliedSequenceRef.current >= link.lastSeq
+          feed.applied >= link.lastSeq
         ) break;
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
       if (
         !painterRef.current.isSynchronizationSettled() ||
-        appliedSequenceRef.current < link.lastSeq
+        feed.applied < link.lastSeq
       ) {
         throw new Error("The shared drawing is still synchronizing; please try again");
       }
@@ -986,7 +858,7 @@ export default function App() {
       setIsSaving(false);
       setSessionEnding(false);
     }
-  }, [drainCanonical, isSaving, link, wsRef]);
+  }, [drainCanonical, feed, isSaving, link, wsRef]);
 
   const isOwner = canvasMeta?.ownerId === userIdRef.current;
 
@@ -1008,7 +880,7 @@ export default function App() {
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (leavingRef.current || sessionOverRef.current) return;
-      const roomHasDrawing = appliedSequenceRef.current > 0;
+      const roomHasDrawing = feed.applied > 0;
       if (!hasDrawnRef.current && !(isOwner && roomHasDrawing)) return;
       event.preventDefault();
       // Chrome shows its own wording, but only when returnValue is set.
@@ -1016,7 +888,7 @@ export default function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isOwner]);
+  }, [feed, isOwner]);
 
   const reload = useCallback(() => {
     leavingRef.current = true;
