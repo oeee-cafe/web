@@ -2,7 +2,7 @@ use super::state::{AppState, Shutdown};
 use crate::models::store_product;
 use crate::models::user::Backend;
 use crate::web::handlers::about::{about, design};
-use crate::web::handlers::store::{do_store_purchase, do_store_ticket};
+use crate::web::handlers::store::{do_app_store_notification, do_store_purchase, do_store_ticket};
 use crate::web::handlers::supporter::supporter_page;
 use crate::web::handlers::account::{
     account, delete_account_htmx, edit_account, edit_password, request_email_verification_code,
@@ -574,6 +574,7 @@ impl App {
             // What a store sold, handed over by the page in an app that
             // sells through it. See handlers/store.rs.
             .route("/store/{store}/purchases", post(do_store_purchase))
+            .route("/store/apple/notifications", post(do_app_store_notification))
             .route("/store/{store}/tickets", post(do_store_ticket))
             .route("/design", get(design))
             .route("/privacy", get(privacy))
