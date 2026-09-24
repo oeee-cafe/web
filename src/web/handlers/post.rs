@@ -2959,9 +2959,7 @@ pub async fn add_reaction(
     let mut tx = db.begin().await?;
     let user_id = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id;
     let post_id = Uuid::parse_str(&post_id)?;
-    let Some(emoji) = normalize_emoji(&form.emoji) else {
-        return Ok(StatusCode::UNPROCESSABLE_ENTITY.into_response());
-    };
+    let emoji = normalize_emoji(&form.emoji);
 
     // Get the actor for this user
     let actor = Actor::find_by_user_id(&mut tx, user_id)
@@ -3004,23 +3002,30 @@ pub async fn add_reaction(
         .unwrap_or(&String::new())
         .clone();
 
-    // Typing an emoji you have already reacted with is not an error; the
-    // reaction is simply there.
-    if find_user_reaction(&mut tx, post_id, actor.id, emoji)
-        .await?
-        .is_some()
-    {
-        let reaction_counts = get_reaction_counts(&mut tx, post_id, Some(actor.id)).await?;
-        tx.commit().await?;
-        let template = state.env.get_template("post_reactions.jinja")?;
-        let rendered = template.render(context! {
-            current_user => auth_session.user,
-            reaction_counts => reaction_counts,
-            post_id => post_id.to_string(),
-            login_name => login_name,
-        })?;
-        return Ok(Html(rendered).into_response());
-    }
+    // Something that is not one emoji, or one you have already reacted
+    // with, leaves the reactions as they are. htmx swaps an error response
+    // in too, so answering with the block unchanged is what keeps it there.
+    let emoji = match emoji {
+        Some(emoji)
+            if find_user_reaction(&mut tx, post_id, actor.id, emoji)
+                .await?
+                .is_none() =>
+        {
+            emoji
+        }
+        _ => {
+            let reaction_counts = get_reaction_counts(&mut tx, post_id, Some(actor.id)).await?;
+            tx.commit().await?;
+            let template = state.env.get_template("post_reactions.jinja")?;
+            let rendered = template.render(context! {
+                current_user => auth_session.user,
+                reaction_counts => reaction_counts,
+                post_id => post_id.to_string(),
+                login_name => login_name,
+            })?;
+            return Ok(Html(rendered).into_response());
+        }
+    };
 
     let reaction = create_reaction(
         &mut tx,
