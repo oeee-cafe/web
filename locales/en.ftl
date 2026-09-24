@@ -143,7 +143,6 @@ draw-guest-save-confirm = Save this drawing in this browser? You can post it fro
 draw-guest-saved-title = Saved in this browser
 draw-guest-saved = This drawing is only in this browser, not on the site. Clearing this site's data deletes it, and so does Safari after a week without a visit. Sign in or sign up to post it from your drafts, or download a copy.
 draw-download-png = Download PNG
-draw-done = Done
 draw-keep-drawing = Keep drawing
 draw-local-save-failed = This browser can't keep drawings, which usually means a private window. Download the PNG to keep a copy.
 draw-upload-failed-kept = Couldn't post this drawing. It's kept in your drafts in this browser, and you can post it from there.
