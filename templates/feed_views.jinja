@@ -2,19 +2,17 @@
    them, as a community page's pill does (community.jinja): each its own
    address -- /, /comments; /following, /following/comments; /joined,
    /joined/comments -- switched in place. Beside the feed switch for
-   someone signed in, where its short names read as a second choice of the
-   same feed; signed out it is the page's only heading, and says it in
-   full. `feed_switch` and `feed_view` are the ones showing
-   (handlers/home.rs). #}
+   someone signed in; signed out it is the page's only heading.
+   `feed_switch` and `feed_view` are the ones showing (handlers/home.rs). #}
 {% import "pill_macro.jinja" as pill %}
 {% set drawings = {"recent": "/", "following": "/following", "communities": "/joined"}[feed_switch] %}
 {% set said = {"recent": "/comments", "following": "/following/comments", "communities": "/joined/comments"}[feed_switch] %}
 {# Its id names the feed, for the reason feed_switch.jinja gives. #}
 <nav id="feed-views-{{ feed_switch }}" class="ds-segmented feed-views" aria-label="{{ ftl_get_message("feed-" ~ feed_switch) }}" {{ pill.in_place() }}>
   <a href="{{ drawings|safe }}"{% if feed_view != "comments" %} aria-current="page"{% endif %}>
-    {{- ftl_get_message("feed-view-drawings" if current_user else "recent-drawings") -}}
+    {{- ftl_get_message("feed-view-drawings") -}}
   </a>
   <a href="{{ said|safe }}"{% if feed_view == "comments" %} aria-current="page"{% endif %}>
-    {{- ftl_get_message("feed-view-comments" if current_user else "recent-comments") -}}
+    {{- ftl_get_message("feed-view-comments") -}}
   </a>
 </nav>

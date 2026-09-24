@@ -566,7 +566,7 @@ mod tests {
     /// Home's feeds are orders of one feed, so they are a switch where its
     /// heading was rather than tabs in the toolbar -- for someone signed in.
     /// Signed out there is only Recent, headed by its drawings | comments
-    /// pill, which says both in full.
+    /// pill.
     #[test]
     fn home_switches_between_its_feeds_in_place_of_a_heading() {
         let env = test_support::env();
@@ -576,8 +576,8 @@ mod tests {
             .render(home_context(vec![sample_post()], false))
             .expect("home.jinja renders");
         assert!(!signed_out.contains("feed-switch"), "one feed signed out, no switch");
-        assert!(signed_out.contains(r#"<a href="/" aria-current="page">recent-drawings</a>"#));
-        assert!(signed_out.contains(r#"<a href="/comments">recent-comments</a>"#));
+        assert!(signed_out.contains(r#"<a href="/" aria-current="page">feed-view-drawings</a>"#));
+        assert!(signed_out.contains(r#"<a href="/comments">feed-view-comments</a>"#));
 
         let signed_in = |feed_switch: &str| {
             home.render(context! {

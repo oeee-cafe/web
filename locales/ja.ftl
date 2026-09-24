@@ -133,8 +133,6 @@ password-repeat = PW (もう一度)
 display-name = ニックネーム
 
 latest-active-public-community = 最近の活動公開コミュニティ
-recent-drawings = 最近のお絵かき
-recent-comments = 最近のコメント
 no-comments-yet = まだコメントがありません
 
 community-stats-posts = 投稿

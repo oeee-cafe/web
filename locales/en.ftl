@@ -157,8 +157,6 @@ password-repeat = Password (again)
 display-name = Display name
 
 latest-active-public-community = Recently active public communities
-recent-drawings = Recent posts
-recent-comments = Recent comments
 no-comments-yet = No comments yet
 
 community-stats-posts = posts

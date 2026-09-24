@@ -18,7 +18,7 @@
 {% macro comments_aside(comments, more_url) %}
   {% if comments.rows %}
     <aside class="feed-comments" aria-labelledby="feed-comments-title">
-      <h2 id="feed-comments-title" class="feed-comments-title">{{ ftl_get_message("recent-comments") }}</h2>
+      <h2 id="feed-comments-title" class="feed-comments-title">{{ ftl_get_message("feed-view-comments") }}</h2>
       <div class="feed-comments-panel">
         <div class="feed-comments-list">
           {% include "comments_fragment.jinja" %}
