@@ -1017,11 +1017,12 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   color: var(--ds-ink);
 }
 
-/* Unread fills the bell in the badge's orange: the shape changes as well
-   as the colour, and the width does not (nav_notifications.jinja). */
+/* Unread fills the bell in the accent, the Draw button's lime, outlined in
+   its ink as that button's brush is: the shape changes as well as the
+   colour, and the width does not (nav_notifications.jinja). */
 .toolbar-end .toolbar-bell-unread svg {
-  color: var(--ds-badge);
-  fill: currentColor;
+  color: var(--ds-accent-ink);
+  fill: var(--ds-accent);
 }
 
 /* Search is a form rather than one of those links, and its button is a
@@ -1226,8 +1227,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   margin-left: 4px;
   padding: 0 4px;
   border-radius: 8px;
-  background-color: var(--ds-badge);
-  color: #000;
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
@@ -1255,19 +1256,23 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-color: var(--ds-ground);
 }
 
-/* On the square's top right corner, over it rather than beside it. */
+/* Centred on the square's top right corner: a quarter of it over the
+   square, the rest outside. */
 .toolbar-dot {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -4px;
+  right: -4px;
   width: 8px;
   height: 8px;
   border-radius: 4px;
   background-color: var(--ds-danger);
 }
 
+/* Drafts in the accent, ringed so the lime holds against a light bar. An
+   unverified email keeps the red above. */
 .toolbar-dot-drafts {
-  background-color: var(--ds-badge);
+  background-color: var(--ds-accent);
+  box-shadow: 0 0 0 1px var(--ds-accent-line);
 }
 
 .toolbar-menu {
@@ -2827,8 +2832,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   -moz-box-sizing: border-box;
   box-sizing: border-box;
   border-radius: 8px;
-  background-color: var(--ds-badge);
-  color: #000;
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
