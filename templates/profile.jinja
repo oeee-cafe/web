@@ -228,14 +228,15 @@
         </div>
       {% endif %}
       {% if comment_count %}
-        {# What they have said, as a community's recent comments are laid
-           out: the drawing, what was said, and the row the way to it. Only
-           on drawings this profile would show anyone. The rest arrive as
-           the list is scrolled; the sentinel sits in the hidden panel
-           harmlessly, since htmx watches it with an IntersectionObserver
-           and nothing hidden intersects. #}
+        {# What they have said: a card each, the drawing, what was said,
+           and the card the way to it, in as many columns as the width
+           holds -- comments are short, and one to a row across a wide
+           screen was mostly empty. Only on drawings this profile would
+           show anyone. The rest arrive as the grid is scrolled; the
+           sentinel sits in the hidden panel harmlessly, since htmx watches
+           it with an IntersectionObserver and nothing hidden intersects. #}
         <div data-profile-panel="comments" hidden>
-          <div class="comment-list">
+          <div class="comment-grid">
             {% include "profile_comments_fragment.jinja" %}
           </div>
         </div>
