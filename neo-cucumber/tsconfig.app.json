@@ -43,6 +43,7 @@
     "src",
     "../frontend/painter",
     "../frontend/collaborate",
+    "../frontend/replay",
     "../frontend/shared",
     "vite/**/*.browser.test.ts"
   ]

@@ -339,6 +339,12 @@ impl App {
                 get(collaborative_session_chat),
             )
             .route(
+                "/admin/collaborative-sessions/{uuid}",
+                get(replay_collaborative_session),
+            )
+            // Where the inspector used to live, kept so links already pasted
+            // somewhere still open it.
+            .route(
                 "/admin/collaborative-sessions/{uuid}/replay",
                 get(replay_collaborative_session),
             )

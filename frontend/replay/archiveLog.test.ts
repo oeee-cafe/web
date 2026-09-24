@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  chatOffsets,
   decodeArchive,
   isRenderable,
+  positionAt,
   type ArchiveManifest,
 } from "./archiveLog";
 
@@ -166,21 +166,33 @@ describe("whether a recording can be rendered", () => {
   });
 });
 
-describe("placing a transcript against a recording", () => {
-  const line = (at: number) => ({ at, user_id: "u", login_name: "miro", message: "hi" });
+describe("placing a moment against a recording", () => {
+  const times = [1_000, 1_000, 4_500, 300_000];
 
-  /** Read against the first recorded message, so a conversation arrives as the
-   * drawing does rather than all at once at the top. */
-  it("measures each line from the first recorded message", () => {
-    expect(chatOffsets([line(1_000), line(4_500)], 1_000)).toEqual([0, 3_500]);
+  it("finds the last message sequenced at or before it", () => {
+    expect(positionAt(times, 4_500)).toBe(2);
+    expect(positionAt(times, 4_499)).toBe(1);
+    // A burst inside one millisecond is all there at once.
+    expect(positionAt(times, 1_000)).toBe(1);
   });
 
   /**
-   * Chat carries the sender's clock and the log carries the server's, so a
-   * line can be stamped before the first message. It belongs at the start
-   * rather than at a negative offset nothing can scroll to.
+   * By the clock, not by the player's schedule. The schedule caps a pause at a
+   * second or so, and a line said just before the drawing resumed after five
+   * minutes' quiet belongs before the stroke that ended the quiet.
    */
-  it("keeps a line stamped before the recording at the start", () => {
-    expect(chatOffsets([line(500)], 1_000)).toEqual([0]);
+  it("keeps a long pause as long as it was", () => {
+    expect(positionAt(times, 299_999)).toBe(2);
+  });
+
+  /** Chat carries the sender's clock, so a line can be stamped before the
+   * first message; it belongs on the blank canvas. */
+  it("puts a moment before the recording on the blank canvas", () => {
+    expect(positionAt(times, 500)).toBe(-1);
+    expect(positionAt([], 500)).toBe(-1);
+  });
+
+  it("puts a moment after the recording on the finished canvas", () => {
+    expect(positionAt(times, 900_000)).toBe(3);
   });
 });
