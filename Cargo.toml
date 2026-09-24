@@ -85,6 +85,11 @@ hyper-rustls = { version = "0.27", features = ["http1", "http2", "ring"] }
 rustls = { version = "0.23", features = ["ring"] }
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
 emojis = "0.9.0"
+# Walking the x5c chain on the App Store's signed transactions to Apple's
+# root; see app_store::read_transaction.
+rustls-pki-types = "1.15.1"
+rustls-webpki = { version = "0.103.15", features = ["ring"] }
+x509-parser = "0.18.1"
 
 [dependencies.sqlx]
 version = "0.8.6"
