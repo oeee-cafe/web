@@ -954,10 +954,12 @@ export class CanvasHistory {
   /**
    * Squashes all entries at or below the session reset's base sequence into a
    * new base savepoint. Their undo state is frozen; memory is reclaimed.
+   *
+   * Says whether there was anything to squash. The layers at the cut are
+   * `baseLayers()` afterwards, for whoever wants them -- which is rarely
+   * anyone, so they are not copied out on the chance.
    */
-  async handleResetPoint(
-    baseSeq: number
-  ): Promise<Map<ActorKey, OwnerLayers> | null> {
+  async handleResetPoint(baseSeq: number): Promise<boolean> {
     this.record({
       source: "reset",
       op: "resetPoint",
@@ -972,7 +974,7 @@ export class CanvasHistory {
     ) {
       cut++;
     }
-    if (cut === 0) return null;
+    if (cut === 0) return false;
 
     // Compute the state at the cut into temporary buffers, one pair per
     // participant, allocated as the replay first mentions each of them.
@@ -1023,15 +1025,19 @@ export class CanvasHistory {
         .map((s) => ({ ...s, index: s.index - cut })),
     ];
     this.notify();
-    return new Map(
-      [...layers].map(([owner, pair]) => [
-        owner,
-        {
-          foreground: new Uint8ClampedArray(pair.foreground),
-          background: new Uint8ClampedArray(pair.background),
-        },
-      ])
-    );
+    return true;
+  }
+
+  /**
+   * Every participant's layers as of the base savepoint: the last reset
+   * point, or the canvas `reset()` found.
+   *
+   * The savepoint's own arrays, not copies. Nothing writes into a savepoint
+   * once it is taken -- restoring one copies out of it -- so they are safe to
+   * read, and must not be written.
+   */
+  baseLayers(): ReadonlyMap<ActorKey, Readonly<OwnerLayers>> {
+    return this.savepoints[0].layers;
   }
 
   private async applyCanonical(

@@ -501,6 +501,19 @@ describe("public painter lifecycle", () => {
     const compactedArchive = await painter.exportSessionArchive();
     expect(compactedArchive.operations).toEqual([]);
     expect(compactedArchive.checkpoint).toMatchObject({ sequence: 1, width: 24, height: 16 });
+    // Encoded only now, from the history's base, and still both pairs.
+    expect(compactedArchive.checkpoint!.layers.map((entry) => entry.actorId).sort()).toEqual([
+      "alice",
+      "bob",
+    ]);
+    const compactedBob = compactedArchive.checkpoint!.layers.find((entry) => entry.actorId === "bob")!;
+    const compactedBitmap = await createImageBitmap(compactedBob.background);
+    const compactedSample = document.createElement("canvas");
+    compactedSample.width = compactedBitmap.width;
+    compactedSample.height = compactedBitmap.height;
+    compactedSample.getContext("2d")!.drawImage(compactedBitmap, 0, 0);
+    expect([...compactedSample.getContext("2d")!.getImageData(2, 2, 1, 1).data]).toEqual([49, 120, 66, 255]);
+    compactedBitmap.close();
     expect(painter.isSynchronizationSettled()).toBe(true);
 
     await act(async () => {
