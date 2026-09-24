@@ -1,5 +1,5 @@
 # Build Rust binary
-FROM rust:1.90 AS rust-builder
+FROM rust:1.98 AS rust-builder
 WORKDIR /app
 
 # Install sccache prebuilt binary
