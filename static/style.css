@@ -4573,6 +4573,42 @@ html[data-app] .about-stores {
   font-size: var(--ds-text-s);
 }
 
+/* The same rows as cards in columns, for a profile's comments: short
+   enough that one to a row across a wide screen was mostly empty. Cards in
+   a grid row stretch to the tallest, so a row of them reads level. */
+.comment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-gap: 8px;
+  gap: 8px;
+}
+
+.comment-grid > .comment-row,
+.comment-grid > .comment-row + .comment-row {
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+}
+
+.comment-grid > .comment-row:hover {
+  border-color: var(--ds-line-strong);
+  background-color: var(--ds-field);
+}
+
+.comment-grid .notification-figure,
+.comment-grid .notification-thumbnail {
+  width: 64px;
+  height: 64px;
+}
+
+/* A column narrower than a card's minimum would push the grid wider than
+   the phone; there it is one column at whatever width there is. */
+@media (max-width: 400px) {
+  .comment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .not-found {
   text-align: center;
 }
