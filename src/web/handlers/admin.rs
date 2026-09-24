@@ -606,14 +606,21 @@ pub async fn download_collaborative_archive(
         .and_then(|value| value.to_str().ok())
         .is_some_and(|value| value.contains("gzip"));
 
-    let compressed = wants_gzip
-        .then(|| crate::web::handlers::collaborate::archive::compress(&archive))
-        .transpose()
-        // Not worth failing a download over; it is only smaller.
-        .unwrap_or_else(|e| {
-            tracing::warn!("Could not compress the archive for {}: {}", room_uuid, e);
-            None
-        });
+    let compressed = if wants_gzip {
+        // Off the runtime: this is the whole session in one go, and a large
+        // one is hundreds of milliseconds of CPU.
+        match crate::web::handlers::collaborate::archive::compress_off_thread(archive.clone()).await
+        {
+            Ok(compressed) => Some(compressed),
+            // Not worth failing a download over; it is only smaller.
+            Err(e) => {
+                tracing::warn!("Could not compress the archive for {}: {}", room_uuid, e);
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     let mut response = axum::response::Response::builder()
         .header(header::CONTENT_TYPE, "application/octet-stream")
