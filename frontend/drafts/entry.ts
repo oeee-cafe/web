@@ -15,7 +15,7 @@ import {
   type LocalDraft,
 } from "../shared/localDrafts";
 import { downloadPng, UploadError, uploadLocalDraft } from "../shared/drawingUpload";
-import { say } from "../shared/siteDialog";
+import { ask, say } from "../shared/siteDialog";
 
 interface DraftsWords {
   untitled: string;
@@ -30,8 +30,6 @@ interface DraftsWords {
   unavailable: string;
 }
 
-type Confirm = (text: string, action?: string, tone?: "plain") => Promise<boolean>;
-
 const section = document.getElementById("local-drafts");
 const grid = document.getElementById("local-drafts-grid");
 const guestEmpty = document.getElementById("local-drafts-empty");
@@ -40,12 +38,6 @@ const words = JSON.parse(
 ) as Partial<DraftsWords>;
 const userId = section?.dataset.userId || null;
 const DRAFTS_PATH = "/posts/drafts";
-
-/** The site's own question (confirm_dialog.jinja), or the browser's where there is none. */
-function ask(text: string, action?: string, tone?: "plain"): Promise<boolean> {
-  const site = (window as unknown as { dsConfirm?: Confirm }).dsConfirm;
-  return site ? site(text, action, tone) : Promise.resolve(window.confirm(text));
-}
 
 function button(label: string, primary = false): HTMLButtonElement {
   const element = document.createElement("button");
