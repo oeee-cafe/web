@@ -12,6 +12,13 @@
 export const CANVAS_Z_INDEX = {
   background: 1,
   foreground: 2,
+  /**
+   * The other participants' pointer tags, which a host places in the same
+   * container. Above every layer -- a tag under somebody's drawing is a tag
+   * nobody can find -- and below this painter's own previews and cursor, so
+   * nobody else's pointer covers what the person here is aiming.
+   */
+  collaborators: 9900,
   preview: 10000,
   cursor: 10001,
   textEditor: 10002,
