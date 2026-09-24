@@ -17,6 +17,16 @@
    - Firefox 56 reads it unbuilt: no flex `gap`, no :is() or :where(),
      prefixed `appearance` and `user-select`. What that engine cannot do
      (accent-color, for one) is an enhancement, never the only styling.
+   - A `:hover` rule sits inside
+     `@media (hover: hover), (min--moz-device-pixel-ratio: 0)`, here and in
+     style.css. A touch screen reports hover on the element last tapped and
+     keeps it there until the next tap lands somewhere else, so an
+     unguarded highlight stays lit under the finger after it has lifted,
+     which is the surest sign that a native app is a web page. The second
+     query is for Firefox before 64, which knows no `hover` feature and
+     would otherwise lose every highlight: it reads the first query as
+     `not all` and matches the second. Rules that only give the hovered
+     state what the resting one already has are left as they are.
 
    Light and dark follow the site's one rule: the system decides unless the
    painter's switch has chosen, in which case `data-theme` on the root says.
@@ -847,8 +857,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   font-weight: 600;
 }
 
-.nav-bar .toolbar-links a.toolbar-live:hover {
-  background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .nav-bar .toolbar-links a.toolbar-live:hover {
+    background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
+  }
 }
 
 /* A 10px box the light fills, rather than a dot with its rim worked out
@@ -900,8 +912,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background-image: linear-gradient(rgba(122, 190, 40, 0.14), rgba(122, 190, 40, 0.14));
 }
 
-.nav-bar .toolbar-end .toolbar-drafts:hover {
-  background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .nav-bar .toolbar-end .toolbar-drafts:hover {
+    background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
+  }
 }
 
 .toolbar-drafts .toolbar-live-dot {
@@ -937,17 +951,21 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   color: var(--ds-ink);
 }
 
-.toolbar-links a:hover {
-  background-color: var(--ds-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-links a:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
 /* The chosen section keeps its raise under the pointer, which
    `.toolbar-links a:hover` would otherwise take (.ds-segmented draws it at
    rest). The sections only: 넷캔 stays as it is on its own pages. */
-.nav-bar .toolbar-sections a[aria-current="page"]:hover {
-  background-color: var(--ds-thumb);
-  box-shadow: inset 0 0 0 1px var(--ds-line-strong);
-  font-weight: 600;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .nav-bar .toolbar-sections a[aria-current="page"]:hover {
+    background-color: var(--ds-thumb);
+    box-shadow: inset 0 0 0 1px var(--ds-line-strong);
+    font-weight: 600;
+  }
 }
 
 /* The bar's end is squares, all of them: search, the Supporter Pack, the
@@ -1012,8 +1030,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   color: var(--ds-ink);
 }
 
-.toolbar-end .toolbar-button:hover {
-  background-color: var(--ds-ground);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-end .toolbar-button:hover {
+    background-color: var(--ds-ground);
+  }
 }
 
 .toolbar-end .toolbar-button:visited {
@@ -1069,8 +1089,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   transition: background-color 160ms ease;
 }
 
-.toolbar-end .toolbar-search-pill:hover {
-  background-color: var(--ds-ground);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-end .toolbar-search-pill:hover {
+    background-color: var(--ds-ground);
+  }
 }
 
 /* Open, it wears the field's fill and the focus ring, because from here
@@ -1209,8 +1231,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   box-shadow: var(--ds-shadow-raise);
 }
 
-.toolbar-end .toolbar-draw:hover {
-  background-color: var(--ds-accent-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-end .toolbar-draw:hover {
+    background-color: var(--ds-accent-hover);
+  }
 }
 
 /* Only the form's own vertical margins: its left one is the gap to the
@@ -1238,9 +1262,14 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   text-align: center;
 }
 
-.toolbar-menu summary:hover .toolbar-avatar,
 .toolbar-menu[open] .toolbar-avatar {
   background-color: var(--ds-ground);
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-menu summary:hover .toolbar-avatar {
+    background-color: var(--ds-ground);
+  }
 }
 
 /* Centred on the square's top right corner: a quarter of it over the
@@ -1311,8 +1340,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   color: var(--ds-ink);
 }
 
-.toolbar-menu-items a:hover {
-  background-color: var(--ds-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-menu-items a:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
 /* Signing out is a POST, so the one item here that is not a link is a
@@ -1345,8 +1376,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   border-top: 1px solid var(--ds-line);
 }
 
-.toolbar-menu-signout:hover {
-  background-color: var(--ds-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-menu-signout:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
 /* The theme and the language: the whole of the gear's menu, signed in
@@ -1672,12 +1705,14 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   appearance: none;
 }
 
-.ds-button:hover,
-.ds-page button:not([class]):hover,
-.ds-page input[type="submit"]:not([class]):hover,
-.ds-page input[type="button"]:not([class]):hover,
-.ds-page input[type="reset"]:not([class]):hover {
-  background-color: var(--ds-ground);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-button:hover,
+  .ds-page button:not([class]):hover,
+  .ds-page input[type="submit"]:not([class]):hover,
+  .ds-page input[type="button"]:not([class]):hover,
+  .ds-page input[type="reset"]:not([class]):hover {
+    background-color: var(--ds-ground);
+  }
 }
 
 .ds-button-primary,
@@ -1687,8 +1722,10 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   font-weight: 600;
 }
 
-.ds-button-primary:hover {
-  background-color: var(--ds-accent-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-button-primary:hover {
+    background-color: var(--ds-accent-hover);
+  }
 }
 
 .ds-button-quiet,
@@ -1698,8 +1735,10 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   box-shadow: none;
 }
 
-.ds-button-quiet:hover {
-  background-color: var(--ds-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-button-quiet:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
 .ds-button-danger,
@@ -1710,8 +1749,10 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   font-weight: 600;
 }
 
-.ds-button-danger:hover {
-  background-color: var(--ds-danger-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-button-danger:hover {
+    background-color: var(--ds-danger-hover);
+  }
 }
 
 /* For a row of actions inside a list -- a comment's, a notification's --
@@ -1814,9 +1855,11 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   display: none;
 }
 
-.ds-select:hover,
-.ds-page select:not([class]):hover {
-  background-color: var(--ds-ground);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-select:hover,
+  .ds-page select:not([class]):hover {
+    background-color: var(--ds-ground);
+  }
 }
 
 .ds-select option,
@@ -1892,10 +1935,12 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   border-radius: 50%;
 }
 
-.ds-page input[type="checkbox"]:hover,
-.ds-page input[type="radio"]:hover,
-.ds-check:hover {
-  border-color: var(--ds-ink);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-page input[type="checkbox"]:hover,
+  .ds-page input[type="radio"]:hover,
+  .ds-check:hover {
+    border-color: var(--ds-ink);
+  }
 }
 
 .ds-page input[type="checkbox"]:checked,
@@ -1907,10 +1952,12 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   background-color: var(--ds-accent);
 }
 
-.ds-page input[type="checkbox"]:checked:hover,
-.ds-page input[type="radio"]:checked:hover,
-.ds-check:checked:hover {
-  background-color: var(--ds-accent-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-page input[type="checkbox"]:checked:hover,
+  .ds-page input[type="radio"]:checked:hover,
+  .ds-check:checked:hover {
+    background-color: var(--ds-accent-hover);
+  }
 }
 
 .ds-page input[type="checkbox"]:checked,
@@ -1934,17 +1981,21 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   opacity: 0.45;
 }
 
-.ds-page input[type="checkbox"]:disabled:hover,
-.ds-page input[type="radio"]:disabled:hover,
-.ds-check:disabled:hover {
-  border-color: var(--ds-frame);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-page input[type="checkbox"]:disabled:hover,
+  .ds-page input[type="radio"]:disabled:hover,
+  .ds-check:disabled:hover {
+    border-color: var(--ds-frame);
+  }
 }
 
-.ds-page input[type="checkbox"]:disabled:checked:hover,
-.ds-page input[type="radio"]:disabled:checked:hover,
-.ds-check:disabled:checked:hover {
-  border-color: var(--ds-accent-line);
-  background-color: var(--ds-accent);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-page input[type="checkbox"]:disabled:checked:hover,
+  .ds-page input[type="radio"]:disabled:checked:hover,
+  .ds-check:disabled:checked:hover {
+    border-color: var(--ds-accent-line);
+    background-color: var(--ds-accent);
+  }
 }
 
 .ds-check:focus {
@@ -2232,10 +2283,12 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   font-weight: 600;
 }
 
-.ds-page form input[type="submit"]:not([class]):hover,
-.ds-page form button[type="submit"]:not([class]):hover,
-.ds-page form button:not([type]):not([class]):hover {
-  background-color: var(--ds-accent-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-page form input[type="submit"]:not([class]):hover,
+  .ds-page form button[type="submit"]:not([class]):hover,
+  .ds-page form button:not([type]):not([class]):hover {
+    background-color: var(--ds-accent-hover);
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -2525,8 +2578,10 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   cursor: default;
 }
 
-.ds-page details:not([class]) > summary:hover {
-  background-color: var(--ds-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-page details:not([class]) > summary:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
 .ds-page details:not([class])[open] > summary {
@@ -2736,9 +2791,11 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   text-decoration: none;
 }
 
-.ds-page .ds-segmented > button:hover,
-.ds-segmented > *:hover {
-  background-color: var(--ds-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-page .ds-segmented > button:hover,
+  .ds-segmented > *:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
 .ds-segmented > * + *,
@@ -3044,10 +3101,12 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   appearance: none;
 }
 
-.ds-notice-close:hover,
-.ds-page .ds-notice-close:hover {
-  background-color: var(--ds-hover);
-  opacity: 1;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-notice-close:hover,
+  .ds-page .ds-notice-close:hover {
+    background-color: var(--ds-hover);
+    opacity: 1;
+  }
 }
 
 .ds-notice-close:active,
@@ -3318,9 +3377,11 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   margin-bottom: var(--ds-space-4);
 }
 
-.ds-skeleton .community-card:hover {
-  -webkit-transform: none;
-  transform: none;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-skeleton .community-card:hover {
+    -webkit-transform: none;
+    transform: none;
+  }
 }
 
 @-webkit-keyframes ds-breathe {

@@ -361,8 +361,10 @@ nav a:visited,
   box-shadow: 0 0 0 1px var(--ds-frame);
 }
 
-.posts-grid .posts-grid-item > a:first-child:hover {
-  box-shadow: 0 0 0 1px var(--ds-ink);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .posts-grid .posts-grid-item > a:first-child:hover {
+    box-shadow: 0 0 0 1px var(--ds-ink);
+  }
 }
 
 .posts-grid .posts-grid-item > a:first-child:active {
@@ -459,8 +461,10 @@ nav a:visited,
   text-decoration: none;
 }
 
-.post-card-byline a:hover {
-  color: var(--ds-ink);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .post-card-byline a:hover {
+    color: var(--ds-ink);
+  }
 }
 
 /* The captions say less as the squares narrow: past six a row only who
@@ -630,8 +634,10 @@ nav a:visited,
   margin-bottom: 0;
 }
 
-.comment-card-link:hover .comment {
-  border-color: var(--main-highlight-color);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .comment-card-link:hover .comment {
+    border-color: var(--main-highlight-color);
+  }
 }
 
 .comment-card-link:focus .comment {
@@ -787,8 +793,10 @@ nav a:visited,
   box-shadow: var(--ds-shadow-raise);
 }
 
-.notification:hover {
-  background-color: var(--ds-field);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .notification:hover {
+    background-color: var(--ds-field);
+  }
 }
 
 /* Unread: a dot in the margin, and the row a shade toward the accent. */
@@ -968,9 +976,11 @@ nav a:visited,
   cursor: default;
 }
 
-.notification-icon-button:hover {
-  background-color: var(--ds-hover);
-  color: var(--ds-ink);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .notification-icon-button:hover {
+    background-color: var(--ds-hover);
+    color: var(--ds-ink);
+  }
 }
 
 /* Revealed with the row where there is a pointer to hover with. */
@@ -1244,8 +1254,10 @@ nav a:visited,
   color: var(--ds-ink);
 }
 
-.post-thread-card:hover {
-  box-shadow: 0 0 0 0.5px var(--ds-frame), 0 4px 12px rgba(40, 40, 90, 0.14);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .post-thread-card:hover {
+    box-shadow: 0 0 0 0.5px var(--ds-frame), 0 4px 12px rgba(40, 40, 90, 0.14);
+  }
 }
 
 .post-thread-thumb {
@@ -1374,8 +1386,10 @@ nav a:visited,
   font-variant-numeric: tabular-nums;
 }
 
-.reaction-button:hover {
-  background-color: var(--ds-ground);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .reaction-button:hover {
+    background-color: var(--ds-ground);
+  }
 }
 
 .reaction-button.reacted {
@@ -1384,8 +1398,10 @@ nav a:visited,
   font-weight: 600;
 }
 
-.reaction-button.reacted:hover {
-  background-color: var(--ds-accent-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .reaction-button.reacted:hover {
+    background-color: var(--ds-accent-hover);
+  }
 }
 
 .reaction-button-readonly {
@@ -1547,9 +1563,11 @@ nav a:visited,
   font-weight: 500;
 }
 
-.tag-item a:hover {
-  background-color: var(--main-nav-bg-color);
-  border-color: var(--main-highlight-color);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .tag-item a:hover {
+    background-color: var(--main-nav-bg-color);
+    border-color: var(--main-highlight-color);
+  }
 }
 
 .tag-post-count {
@@ -1603,12 +1621,17 @@ nav a:visited,
   border-bottom: none;
 }
 
-.tag-autocomplete-item:hover,
 /* Arrow keys move this, so it has to look the same as hovering: the menu is
    reachable from the keyboard now, and a highlight only the mouse can produce
    would leave that navigation invisible. */
 .tag-autocomplete-item.is-active {
   background-color: var(--main-nav-bg-color);
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .tag-autocomplete-item:hover {
+    background-color: var(--main-nav-bg-color);
+  }
 }
 
 .tag-autocomplete-list {
@@ -1855,9 +1878,11 @@ nav a:visited,
   margin-left: auto;
 }
 
-.community-drawing-card input[type="submit"]:hover {
-  background-color: var(--main-highlight-color);
-  border-color: var(--main-highlight-color);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .community-drawing-card input[type="submit"]:hover {
+    background-color: var(--main-highlight-color);
+    border-color: var(--main-highlight-color);
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1971,8 +1996,10 @@ nav a:visited,
   border-bottom-right-radius: var(--ds-radius-m);
 }
 
-.move-row:hover {
-  background-color: var(--ds-field);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .move-row:hover {
+    background-color: var(--ds-field);
+  }
 }
 
 .move-row:active {
@@ -2214,8 +2241,10 @@ nav a:visited,
   color: var(--ds-ink);
 }
 
-.community-card:hover {
-  box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .community-card:hover {
+    box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
+  }
 }
 
 .community-card:active {
@@ -2451,9 +2480,14 @@ nav a:visited,
 
 /* One highlight for both the pointer and the arrow keys, so the two never
    disagree about which row Enter would take. */
-.combobox-option:hover,
 .combobox-option[data-active] {
   background-color: var(--ds-hover);
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .combobox-option:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
 .combobox-option[aria-selected="true"] .combobox-option-name {
@@ -2573,8 +2607,10 @@ nav a:visited,
   box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
 }
 
-.session-card:not(.is-full):hover {
-  box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .session-card:not(.is-full):hover {
+    box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
+  }
 }
 
 .session-card:not(.is-full):active {
@@ -2734,8 +2770,10 @@ nav a:visited,
   border-bottom: 2px solid var(--main-border-color);
 }
 
-.members-table tbody tr:hover {
-  background-color: rgba(128, 128, 128, 0.05);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .members-table tbody tr:hover {
+    background-color: rgba(128, 128, 128, 0.05);
+  }
 }
 
 .members-table tbody tr:nth-child(even) {
@@ -2956,8 +2994,10 @@ nav a:visited,
   image-rendering: pixelated;
 }
 
-a.profile-banner:hover {
-  box-shadow: 0 0 0 1px var(--ds-ink);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  a.profile-banner:hover {
+    box-shadow: 0 0 0 1px var(--ds-ink);
+  }
 }
 
 /* On your own profile with no banner yet: its place, and the way to fill it. */
@@ -2978,9 +3018,11 @@ a.profile-banner:hover {
   text-decoration: none;
 }
 
-.profile-banner.profile-banner-blank:hover {
-  border-color: var(--ds-ink);
-  color: var(--ds-ink);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .profile-banner.profile-banner-blank:hover {
+    border-color: var(--ds-ink);
+    color: var(--ds-ink);
+  }
 }
 
 @media (max-width: 900px) {
@@ -3022,8 +3064,10 @@ a.profile-banner:hover {
   text-align: left;
 }
 
-.profile-more-item:hover {
-  background-color: var(--ds-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .profile-more-item:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
 .profile-more .toolbar-menu-items {
@@ -3043,8 +3087,10 @@ a.profile-banner:hover {
   white-space: nowrap;
 }
 
-.profile-chip:hover {
-  background-color: var(--ds-ground);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .profile-chip:hover {
+    background-color: var(--ds-ground);
+  }
 }
 
 /* The Supporter Pack's own page and the heart that leads to it.
@@ -3108,8 +3154,10 @@ html[data-store] .supporter-elsewhere {
   color: var(--ds-accent-ink);
 }
 
-.profile-chip.supporter-chip:hover {
-  background-color: var(--ds-accent-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .profile-chip.supporter-chip:hover {
+    background-color: var(--ds-accent-hover);
+  }
 }
 
 /* The same mark beside a supporter's name wherever a page prints it. An
@@ -3249,9 +3297,11 @@ html[data-store] .supporter-elsewhere {
   text-decoration: none;
 }
 
-.profile-follow:hover {
-  border-color: var(--ds-line-strong);
-  background-color: var(--ds-ground);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .profile-follow:hover {
+    border-color: var(--ds-line-strong);
+    background-color: var(--ds-ground);
+  }
 }
 
 .profile-follow-banner {
@@ -3567,12 +3617,16 @@ html[data-store] .supporter-elsewhere {
   border-top: 1px solid var(--ds-line);
 }
 
-.community-form-choice:hover {
-  background-color: var(--ds-hover);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .community-form-choice:hover {
+    background-color: var(--ds-hover);
+  }
 }
 
-.community-form-choice.is-fixed:hover {
-  background-color: transparent;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .community-form-choice.is-fixed:hover {
+    background-color: transparent;
+  }
 }
 
 .community-form-choice:not(.is-fixed):active {
@@ -3793,8 +3847,10 @@ html[data-store] .supporter-elsewhere {
 }
 
 /* Before the viewer has taken them over they are there but inert. */
-.ds-page .post-stage-replay .ds-segmented > button:disabled:not([aria-pressed="true"]):hover {
-  background-color: transparent;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-page .post-stage-replay .ds-segmented > button:disabled:not([aria-pressed="true"]):hover {
+    background-color: transparent;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -3917,8 +3973,10 @@ html[data-store="steam"] .auth-steam {
   height: auto;
 }
 
-.auth-provider:hover {
-  opacity: 0.9;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .auth-provider:hover {
+    opacity: 0.9;
+  }
 }
 
 .auth-provider .auth-provider-dark {
@@ -4027,9 +4085,11 @@ html[data-store="steam"] .auth-steam {
   color: #fff;
 }
 
-.ds-button.auth-apple:hover {
-  border-color: #333;
-  background-color: #333;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-button.auth-apple:hover {
+    border-color: #333;
+    background-color: #333;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -4040,9 +4100,11 @@ html[data-store="steam"] .auth-steam {
     color: #000;
   }
 
-  :root:not([data-theme="light"]) .ds-button.auth-apple:hover {
-    border-color: #e5e5e5;
-    background-color: #e5e5e5;
+  @media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+    :root:not([data-theme="light"]) .ds-button.auth-apple:hover {
+      border-color: #e5e5e5;
+      background-color: #e5e5e5;
+    }
   }
 }
 
@@ -4053,9 +4115,11 @@ html[data-store="steam"] .auth-steam {
   color: #000;
 }
 
-:root[data-theme="dark"] .ds-button.auth-apple:hover {
-  border-color: #e5e5e5;
-  background-color: #e5e5e5;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  :root[data-theme="dark"] .ds-button.auth-apple:hover {
+    border-color: #e5e5e5;
+    background-color: #e5e5e5;
+  }
 }
 
 /* Signing in with Google, offered everywhere. Google refuses its own
@@ -4070,8 +4134,10 @@ html[data-store="steam"] .auth-steam {
   color: #1f1f1f;
 }
 
-.ds-button.auth-google:hover {
-  background-color: #f2f2f2;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-button.auth-google:hover {
+    background-color: #f2f2f2;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -4082,8 +4148,10 @@ html[data-store="steam"] .auth-steam {
     color: #e3e3e3;
   }
 
-  :root:not([data-theme="light"]) .ds-button.auth-google:hover {
-    background-color: #1e1f20;
+  @media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+    :root:not([data-theme="light"]) .ds-button.auth-google:hover {
+      background-color: #1e1f20;
+    }
   }
 }
 
@@ -4094,8 +4162,10 @@ html[data-store="steam"] .auth-steam {
   color: #e3e3e3;
 }
 
-:root[data-theme="dark"] .ds-button.auth-google:hover {
-  background-color: #1e1f20;
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  :root[data-theme="dark"] .ds-button.auth-google:hover {
+    background-color: #1e1f20;
+  }
 }
 
 
@@ -4271,8 +4341,10 @@ html[data-app] .about-stores {
   box-shadow: 0 0 0 1px var(--ds-frame);
 }
 
-.about-banner:hover {
-  box-shadow: 0 0 0 1px var(--ds-ink);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .about-banner:hover {
+    box-shadow: 0 0 0 1px var(--ds-ink);
+  }
 }
 
 .about-banner:active {
@@ -4511,8 +4583,10 @@ html[data-app] .about-stores {
   align-items: flex-start;
 }
 
-.comment-row:hover {
-  background-color: var(--ds-field);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .comment-row:hover {
+    background-color: var(--ds-field);
+  }
 }
 
 .member-initial {
@@ -4651,9 +4725,11 @@ html[data-app] .about-stores {
   background-color: var(--ds-surface);
 }
 
-.comment-grid > .comment-row:hover {
-  border-color: var(--ds-line-strong);
-  background-color: var(--ds-field);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .comment-grid > .comment-row:hover {
+    border-color: var(--ds-line-strong);
+    background-color: var(--ds-field);
+  }
 }
 
 .comment-grid .notification-figure,
@@ -4733,8 +4809,10 @@ html[data-app] .about-stores {
   text-decoration: none;
 }
 
-.feed-comments-more:hover {
-  background-color: var(--ds-field);
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .feed-comments-more:hover {
+    background-color: var(--ds-field);
+  }
 }
 
 /* Home's header: which feed and which half of it, side by side, the
