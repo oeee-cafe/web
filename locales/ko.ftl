@@ -492,6 +492,7 @@ app-store-badge = App Store에서 다운로드하기
 google-play-badge = Google Play에서 받으세요
 about-elsewhere = 다른 곳에서
 about-documents = 문서
+about-version = 버전
 post-no-reactions = 아직 반응이 없습니다.
 sign-in-with-steam = Steam으로 로그인
 steam-sign-in-app-only = Steam 로그인은 Steam용 오이카페 앱에서 할 수 있습니다.

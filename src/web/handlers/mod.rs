@@ -2447,6 +2447,29 @@ mod template_tests {
         assert!(!render(json!([])).contains(r#"id="supporters""#));
     }
 
+    /// The commit that is serving, linked to on GitHub, and nothing at all
+    /// outside a deployed image.
+    #[test]
+    fn the_about_page_names_the_commit_it_runs() {
+        let env = test_support::env();
+        let render = |git_commit: Option<&str>| {
+            env.get_template("about.jinja")
+                .expect("about loads")
+                .render(context! {
+                    supporters => Vec::<serde_json::Value>::new(),
+                    users_with_public_posts_and_banner => Vec::<serde_json::Value>::new(),
+                    git_commit,
+                    ..chrome()
+                })
+                .expect("about renders")
+        };
+        let sha = "e6851d5a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e";
+        let about = render(Some(sha));
+        assert!(about.contains(&format!(r#"href="https://github.com/oeee-cafe/web/commit/{sha}""#)));
+        assert!(about.contains(">e6851d5a0b1c<span"), "{about}");
+        assert!(!render(None).contains("about-version"));
+    }
+
     /// Following, behind its own tab with its count: everyone the same
     /// shape, a banner where they have drawn one and a frame of the same
     /// size holding their name where they have not. No tab at all for

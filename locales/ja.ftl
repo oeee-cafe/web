@@ -492,6 +492,7 @@ app-store-badge = App Storeからダウンロード
 google-play-badge = Google Play で手に入れよう
 about-elsewhere = ほかの場所で
 about-documents = ドキュメント
+about-version = バージョン
 post-no-reactions = まだリアクションはありません。
 sign-in-with-steam = Steamでログイン
 steam-sign-in-app-only = SteamでのログインはSteam版OEEEカフェアプリで利用できます。
