@@ -888,6 +888,107 @@ async fn checkpoint_compaction_keeps_operations_that_race_after_its_base() {
     .expect("checkpoint race scenario timed out");
 }
 
+/// A resume reads only what the client missed, from where it sits in the
+/// list, and the whole history when the position it names is not one this
+/// history can continue from.
+#[tokio::test]
+async fn a_resume_reads_only_the_history_after_its_position() {
+    let harness = start_harness().await;
+    let store = RedisMessageStore::new(harness.pool.clone());
+    let channel = format!("oeee:pubsub:{}", harness.room);
+    let sequences = |entries: &[(u64, AxumMessage)]| {
+        entries.iter().map(|(seq, _)| *seq).collect::<Vec<_>>()
+    };
+
+    let (history_id, _) = store
+        .get_history_snapshot(harness.room)
+        .await
+        .expect("identity");
+    for index in 0..5u8 {
+        store
+            .sequence_and_publish(harness.room, &[0x16, index], "conn-a", &channel)
+            .await
+            .expect("sequence");
+    }
+
+    let since = store
+        .get_history_since(harness.room, Some((history_id, 3)))
+        .await
+        .expect("since");
+    assert_eq!(
+        (since.history_id, since.max_seq, since.after_seq),
+        (history_id, 5, 3)
+    );
+    assert_eq!(sequences(&since.entries), vec![4, 5]);
+    if let AxumMessage::Binary(payload) = &since.entries[0].1 {
+        assert_eq!(
+            &payload[..],
+            &[0x16, 3],
+            "entry 4 is the fourth message sent"
+        );
+    }
+
+    let whole = store
+        .get_history_since(harness.room, None)
+        .await
+        .expect("since");
+    assert_eq!(
+        (whole.after_seq, sequences(&whole.entries)),
+        (0, vec![1, 2, 3, 4, 5])
+    );
+    let elsewhere = store
+        .get_history_since(harness.room, Some((Uuid::new_v4(), 3)))
+        .await
+        .expect("since");
+    assert_eq!((elsewhere.after_seq, elsewhere.entries.len()), (0, 5));
+    let beyond = store
+        .get_history_since(harness.room, Some((history_id, 6)))
+        .await
+        .expect("since");
+    assert_eq!((beyond.after_seq, beyond.entries.len()), (0, 5));
+    let current = store
+        .get_history_since(harness.room, Some((history_id, 5)))
+        .await
+        .expect("since");
+    assert_eq!((current.after_seq, current.entries.len()), (5, 0));
+
+    // After a checkpoint the list starts with two snapshots at the base, so
+    // the arithmetic has to step over them.
+    store
+        .apply_reset(harness.room, 3, &[vec![0x02, 1, 1, 0], vec![0x02, 1, 1, 1]])
+        .await
+        .expect("checkpoint");
+    let at_base = store
+        .get_history_since(harness.room, Some((history_id, 3)))
+        .await
+        .expect("since");
+    assert_eq!(
+        (at_base.after_seq, sequences(&at_base.entries)),
+        (3, vec![4, 5])
+    );
+    let past_base = store
+        .get_history_since(harness.room, Some((history_id, 4)))
+        .await
+        .expect("since");
+    assert_eq!(
+        (past_base.after_seq, sequences(&past_base.entries)),
+        (4, vec![5])
+    );
+    let before_base = store
+        .get_history_since(harness.room, Some((history_id, 2)))
+        .await
+        .expect("since");
+    assert_eq!(
+        (before_base.after_seq, sequences(&before_base.entries)),
+        (2, vec![3, 3, 4, 5])
+    );
+    let all = store
+        .get_history_since(harness.room, None)
+        .await
+        .expect("since");
+    assert_eq!(sequences(&all.entries), vec![3, 3, 4, 5]);
+}
+
 #[tokio::test]
 async fn future_checkpoint_is_rejected_without_mutating_history() {
     let harness = start_harness().await;

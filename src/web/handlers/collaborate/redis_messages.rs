@@ -216,6 +216,19 @@ pub fn effective_auto_reset_bytes(base_bytes: u64) -> u64 {
     (base_bytes + AUTO_RESET_THRESHOLD_BYTES).min(MAX_HISTORY_BYTES / 10 * 9)
 }
 
+/// A history as a connecting client is sent it; see `get_history_since`.
+#[derive(Debug)]
+pub struct HistorySince {
+    pub history_id: Uuid,
+    /// The highest sequence in the history, whether or not it is sent.
+    pub max_seq: u64,
+    /// The position the client resumes after: what it asked for when that
+    /// was on this history and not past its end, else zero.
+    pub after_seq: u64,
+    /// Every entry after `after_seq`, in order.
+    pub entries: Vec<(u64, Message)>,
+}
+
 /// What became of a message handed to the sequencer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sequenced {
@@ -490,6 +503,99 @@ return {history_id, redis.call('LRANGE', KEYS[2], 0, -1)}
             .map(|(seq, payload)| (seq, Message::Binary(payload.to_vec().into())))
             .collect();
         Ok((history_id, history))
+    }
+
+    /// The history a connecting client has to be sent: its identity, its
+    /// current position, and the entries after the position the client asked
+    /// to resume from -- or all of them, when that position is not on this
+    /// history or is past its end.
+    ///
+    /// Read from Redis at the resume position rather than whole and skipped
+    /// in the process. A history is the last checkpoint plus up to the
+    /// auto-reset threshold of messages, and a reconnecting client usually
+    /// wants the last few of them; every resume used to copy all of it out
+    /// of Redis to throw most away. The list is dense in sequence from its
+    /// first entry, except that a checkpoint's snapshots share the base
+    /// sequence at the front, so the index of the first entry to send is
+    /// arithmetic -- checked against its neighbours before it is trusted,
+    /// and the whole list read if the check fails.
+    pub async fn get_history_since(
+        &self,
+        room_uuid: Uuid,
+        resume: Option<(Uuid, u64)>,
+    ) -> Result<HistorySince, Box<dyn std::error::Error + Send + Sync>> {
+        const SINCE_SCRIPT: &str = r#"
+local history_id = redis.call('GET', KEYS[1])
+if not history_id then
+    history_id = ARGV[1]
+    redis.call('SET', KEYS[1], history_id)
+end
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+redis.call('EXPIRE', KEYS[2], tonumber(ARGV[2]))
+redis.call('EXPIRE', KEYS[3], tonumber(ARGV[2]))
+redis.call('EXPIRE', KEYS[4], tonumber(ARGV[2]))
+redis.call('EXPIRE', KEYS[5], tonumber(ARGV[2]))
+local function seq_at(index)
+    local entry = redis.call('LINDEX', KEYS[2], index)
+    if not entry then return nil end
+    return tonumber(string.match(entry, '^(%d+):'))
+end
+local len = redis.call('LLEN', KEYS[2])
+local max_seq = 0
+if len > 0 then max_seq = seq_at(-1) or 0 end
+local after = 0
+local resume_seq = tonumber(ARGV[4])
+if ARGV[3] == history_id and resume_seq <= max_seq then after = resume_seq end
+local start = 0
+if after > 0 and len > 0 then
+    local first_seq = seq_at(0) or 0
+    if after >= first_seq then
+        local leading = 0
+        while leading < len and seq_at(leading) == first_seq do
+            leading = leading + 1
+        end
+        local guess = leading + (after - first_seq)
+        local ok = guess <= len
+        if ok and guess < len then ok = (seq_at(guess) or 0) > after end
+        if ok and guess > 0 then ok = (seq_at(guess - 1) or 0) <= after end
+        if ok then start = guess end
+    end
+end
+return {history_id, tostring(max_seq), tostring(after), redis.call('LRANGE', KEYS[2], start, -1)}
+"#;
+        let (resume_history, resume_seq) = match resume {
+            Some((history_id, seq)) => (history_id.to_string(), seq),
+            None => (String::new(), 0),
+        };
+        let mut conn = self.pool.get().await?;
+        let (history_id, max_seq, after_seq, entries): (String, String, String, Vec<Vec<u8>>) =
+            redis::Script::new(SINCE_SCRIPT)
+                .key(history_id_key(room_uuid))
+                .key(history_key(room_uuid))
+                .key(seq_key(room_uuid))
+                .key(bytes_key(room_uuid))
+                .key(reset_base_key(room_uuid))
+                .arg(Uuid::new_v4().to_string())
+                .arg(MESSAGE_HISTORY_TTL)
+                .arg(resume_history)
+                .arg(resume_seq)
+                .invoke_async(&mut *conn)
+                .await?;
+        let after_seq: u64 = after_seq.parse()?;
+        let entries = entries
+            .iter()
+            .filter_map(|entry| decode_entry(entry))
+            // The slice starts where the arithmetic said; the filter is what
+            // makes the answer right whatever it said.
+            .filter(|(seq, _)| *seq > after_seq)
+            .map(|(seq, payload)| (seq, Message::Binary(payload.to_vec().into())))
+            .collect();
+        Ok(HistorySince {
+            history_id: Uuid::parse_str(&history_id)?,
+            max_seq: max_seq.parse()?,
+            after_seq,
+            entries,
+        })
     }
 
     /// Keep a live session's canonical timeline alive even while nobody is
