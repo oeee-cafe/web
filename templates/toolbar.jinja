@@ -156,12 +156,12 @@
         {# Drawings saved in this browser while signed out, which is the
            only place they are: a square of its own, always there so the
            bar is one width whether or not there are any. While there are,
-           its page fills in the accent as the unread bell does, and the
-           count is in its label; the script at the foot of this nav does
-           both. Beside Draw, whose work it holds. Unboosted for the reason
-           the account menu's link is. A page with a folded corner, drawn
-           to stroke like the bell so that it can be filled. #}
-        <a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" aria-label="{{ ftl_get_message("drafts") }}" title="{{ ftl_get_message("drafts") }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h9l5 5v14h-14z"/><path d="M14.5 2.5v5h5"/></svg></a>
+           it lights up as 넷캔 does, with 넷캔's own pulsing light on its
+           corner, and the count is in its label; the script at the foot of
+           this nav does both. Beside Draw, whose work it holds. Unboosted
+           for the reason the account menu's link is. A page with a folded
+           corner, stroked like the bell beside it. #}
+        <a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" aria-label="{{ ftl_get_message("drafts") }}" title="{{ ftl_get_message("drafts") }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h9l5 5v14h-14z"/><path d="M14.5 2.5v5h5"/></svg><span class="toolbar-live-dot" aria-hidden="true"></span></a>
       {% endif %}
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
@@ -822,7 +822,7 @@
         if (!local) return;
         var total = (parseInt(link.getAttribute("data-server-count"), 10) || 0) + local;
         if (/(^| )toolbar-drafts( |$)/.test(link.className)) {
-          // The guest's square: filled, and counted in its words.
+          // The guest's square: lit, and counted in its words.
           var label = link.getAttribute("aria-label") + " (" + total + ")";
           link.setAttribute("aria-label", label);
           link.setAttribute("title", label);

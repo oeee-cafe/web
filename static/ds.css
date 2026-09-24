@@ -914,6 +914,37 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   margin-left: auto;
 }
 
+/* A guest's drafts, while this browser holds some: the square is tinted
+   and edged as 넷캔 is, and 넷캔's own light pulses on its top right
+   corner -- centred on it, as the unverified-email dot is on the initial,
+   so the square is the same size with drafts or without. Hidden until the
+   toolbar's script finds some. */
+.nav-bar .toolbar-end .toolbar-drafts {
+  position: relative;
+}
+
+.nav-bar .toolbar-end .toolbar-drafts-some,
+.nav-bar .toolbar-end .toolbar-drafts-some:visited {
+  border-color: rgba(60, 103, 18, 0.5);
+  background-image: linear-gradient(rgba(122, 190, 40, 0.14), rgba(122, 190, 40, 0.14));
+}
+
+.nav-bar .toolbar-end .toolbar-drafts-some:hover {
+  background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
+}
+
+.toolbar-drafts .toolbar-live-dot {
+  display: none;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  margin: 0;
+}
+
+.toolbar-drafts-some .toolbar-live-dot {
+  display: block;
+}
+
 .toolbar-end > * + * {
   margin-left: 8px;
 }
@@ -1019,10 +1050,8 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 
 /* Unread fills the bell in the accent, the Draw button's lime, outlined in
    its ink as that button's brush is: the shape changes as well as the
-   colour, and the width does not (nav_notifications.jinja). A guest's
-   drafts square fills the same way while this browser holds some. */
-.toolbar-end .toolbar-bell-unread svg,
-.toolbar-end .toolbar-drafts-some svg {
+   colour, and the width does not (nav_notifications.jinja). */
+.toolbar-end .toolbar-bell-unread svg {
   color: var(--ds-accent-ink);
   fill: var(--ds-accent);
 }
