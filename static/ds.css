@@ -1369,6 +1369,16 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   text-decoration: none;
 }
 
+/* The count is centred on the label rather than sat on its baseline: a
+   10px figure on a 14px word's baseline rides a couple of pixels low,
+   and further for Hangul, whose glyphs centre higher than Latin's. */
+.toolbar-menu-items .toolbar-menu-drafts {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+  align-items: center;
+}
+
 .toolbar-menu-items a:visited {
   color: var(--ds-ink);
 }
