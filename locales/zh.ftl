@@ -145,7 +145,6 @@ draw-guest-save-confirm = 要把这幅画保存在此浏览器中吗？登录后
 draw-guest-saved-title = 已保存在此浏览器中
 draw-guest-saved = 这幅画只在此浏览器中，不在网站上。清除本站数据会删除它，在 Safari 中一周不访问也会被删除。登录或注册后可以从草稿中发布，也可以先下载一份副本。
 draw-download-png = 下载 PNG
-draw-done = 完成
 draw-keep-drawing = 继续绘制
 draw-local-save-failed = 此浏览器无法保存画作，通常是因为使用了隐私窗口。请下载 PNG 以保留副本。
 draw-upload-failed-kept = 无法发布这幅画。它已保存在此浏览器的草稿中，可以在那里发布。

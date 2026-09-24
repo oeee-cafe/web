@@ -53,14 +53,12 @@ interface PainterWords {
   localSaveFailed: string;
   uploadFailedKept: string;
   uploadFailedLost: string;
-  signIn: string;
-  signUp: string;
   downloadPng: string;
-  done: string;
+  ok: string;
   keepDrawing: string;
 }
 
-/** Where a guest's drawing waits for them, and where signing in returns to. */
+/** Where a guest's drawing waits for them. */
 const DRAFTS_PATH = "/posts/drafts";
 
 /**
@@ -375,9 +373,7 @@ async function afterGuestSave(draft: LocalDraft, kept: boolean): Promise<void> {
       words.guestSaved || "This drawing is only in this browser.",
       [
         { key: "download", label: words.downloadPng || "Download PNG" },
-        { key: "sign-up", label: words.signUp || "Sign up" },
-        { key: "sign-in", label: words.signIn || "Sign in" },
-        { key: "done", label: words.done || "Done" },
+        { key: "ok", label: words.ok || "OK" },
       ],
     );
     if (answer === "download") {
@@ -385,18 +381,9 @@ async function afterGuestSave(draft: LocalDraft, kept: boolean): Promise<void> {
       // Still worth saying where the drawing is, and offering the rest.
       continue;
     }
-    const next = `?next=${encodeURIComponent(DRAFTS_PATH)}`;
-    const destination =
-      answer === "sign-up"
-        ? `/signup${next}`
-        : answer === "sign-in"
-          ? `/login${next}`
-          : answer === "done"
-            ? DRAFTS_PATH
-            : null;
-    if (destination) {
+    if (answer === "ok") {
       leaving = true;
-      window.location.href = destination;
+      window.location.href = DRAFTS_PATH;
     }
     return;
   }

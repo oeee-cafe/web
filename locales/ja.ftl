@@ -145,7 +145,6 @@ draw-guest-save-confirm = この絵をこのブラウザに保存しますか？
 draw-guest-saved-title = このブラウザに保存しました
 draw-guest-saved = この絵はサイトではなく、このブラウザにだけあります。サイトのデータを消去すると消え、Safari では一週間アクセスしないと消えます。ログインか新規登録をすると下書きから投稿できます。コピーをダウンロードしておくこともできます。
 draw-download-png = PNG をダウンロード
-draw-done = 完了
 draw-keep-drawing = 描き続ける
 draw-local-save-failed = このブラウザには絵を保存できません。多くの場合、プライベートウィンドウが原因です。コピーを残すには PNG をダウンロードしてください。
 draw-upload-failed-kept = 絵を投稿できませんでした。このブラウザの下書きに残っているので、そこから投稿できます。
