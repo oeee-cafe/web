@@ -777,18 +777,6 @@ fn should_forward_to_connection(
     }
 }
 
-fn accepted_resume_sequence(
-    history_id: Uuid,
-    current_max_seq: u64,
-    resume_position: Option<(Uuid, u64)>,
-) -> u64 {
-    match resume_position {
-        Some((resume_history_id, resume_seq))
-            if resume_history_id == history_id && resume_seq <= current_max_seq => resume_seq,
-        _ => 0,
-    }
-}
-
 #[cfg(test)]
 mod reset_upload_tests {
     use super::PendingReset;
@@ -842,8 +830,7 @@ mod reset_upload_tests {
 #[cfg(test)]
 mod forwarding_tests {
     use super::{
-        accepted_resume_sequence, replay_batch, replay_batches, should_forward_to_connection,
-        REPLAY_BATCH_BYTES,
+        replay_batch, replay_batches, should_forward_to_connection, REPLAY_BATCH_BYTES,
     };
     use crate::web::handlers::collaborate::messages::MessageType;
     use crate::web::handlers::collaborate::redis_state::RoomBroadcast;
@@ -1036,17 +1023,6 @@ mod forwarding_tests {
         );
     }
 
-    #[test]
-    fn resumes_only_a_position_on_the_current_history() {
-        let history_id = Uuid::new_v4();
-        assert_eq!(accepted_resume_sequence(history_id, 12, Some((history_id, 7))), 7);
-        assert_eq!(
-            accepted_resume_sequence(history_id, 12, Some((Uuid::new_v4(), 7))),
-            0
-        );
-        assert_eq!(accepted_resume_sequence(history_id, 12, Some((history_id, 13))), 0);
-        assert_eq!(accepted_resume_sequence(history_id, 12, None), 0);
-    }
 }
 
 // Returns the history's identity and the highest sequence number the replay
@@ -1128,23 +1104,30 @@ async fn send_history_to_new_connection(
 ) -> Option<(Uuid, u64)> {
     let redis_store = redis_messages::RedisMessageStore::new(state.redis_pool.clone());
 
-    let mut max_seq = 0;
-    match redis_store.get_history_snapshot(room_uuid).await {
-        Ok((history_id, history)) => {
-            let current_max_seq = history.iter().map(|(seq, _)| *seq).max().unwrap_or(0);
-            let after_seq = accepted_resume_sequence(
-                history_id, current_max_seq, resume_position,
-            );
+    match redis_store
+        .get_history_since(room_uuid, resume_position)
+        .await
+    {
+        Ok(since) => {
+            let redis_messages::HistorySince { history_id, max_seq: current_max_seq, after_seq, entries } =
+                since;
+            // Sent, or already on the client's canvas: what the live stream
+            // may skip. Rises with what is fed below.
+            let mut max_seq = after_seq;
             match resume_position {
-                Some((resume_history_id, resume_seq)) if after_seq == resume_seq
-                    && resume_history_id == history_id => {
+                Some((resume_history_id, resume_seq))
+                    if after_seq == resume_seq && resume_history_id == history_id =>
+                {
                     debug!(
                         "Resuming connection {} in history {} after seq {}",
                         connection_id, history_id, resume_seq
                     );
                 }
                 Some(_) => {
-                    debug!("Resume position rejected for {}; sending full history", connection_id);
+                    debug!(
+                        "Resume position rejected for {}; sending full history",
+                        connection_id
+                    );
                 }
                 None => {}
             }
@@ -1157,18 +1140,13 @@ async fn send_history_to_new_connection(
                 warn!("Failed to send replay boundary to {}", connection_id);
                 return Some((history_id, after_seq));
             }
-            let mut to_send: Vec<(u64, &[u8])> = Vec::new();
-            for (seq, stored_msg) in history.iter() {
-                if *seq <= after_seq {
-                    max_seq = max_seq.max(*seq);
-                    continue;
-                }
-                let payload = match stored_msg {
-                    Message::Binary(data) => &data[..],
-                    _ => continue,
-                };
-                to_send.push((*seq, payload));
-            }
+            let to_send: Vec<(u64, &[u8])> = entries
+                .iter()
+                .filter_map(|(seq, stored)| match stored {
+                    Message::Binary(data) => Some((*seq, &data[..])),
+                    _ => None,
+                })
+                .collect();
             // `feed` rather than `send`: `send` flushes each frame on its
             // own, and the flush below covers all of them.
             let mut fed = true;
@@ -1192,7 +1170,7 @@ async fn send_history_to_new_connection(
             }
             debug!(
                 "Sent {} stored messages from Redis to new connection {} (max seq {})",
-                history.len(),
+                to_send.len(),
                 connection_id,
                 max_seq
             );
