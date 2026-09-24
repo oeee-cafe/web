@@ -22,4 +22,4 @@ if [[ -t 0 ]]; then
     tty_flags=(-i -t)
 fi
 
-exec docker exec "${tty_flags[@]}" "$container" ./cli -c config/config.toml "$@"
+exec docker exec "${tty_flags[@]}" "$container" ./oeee-cafe cli -c config/config.toml "$@"
