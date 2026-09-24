@@ -28,7 +28,7 @@ feed-following = 동맹
 feed-communities = 커뮤
 feed-recent-empty = 아직 그려진 그림이 없습니다.
 feed-following-empty = 동맹이 비어 있습니다. <a href="/communities">커뮤니티</a>에서 다른 사람과 동맹을 맺어 보세요!
-feed-communities-empty = 내 커뮤니티에 새 그림이 없습니다. <a href="/communities">커뮤니티</a>에서 가입할 곳을 찾아보세요!
+feed-communities-empty = 내 커뮤에 새 그림이 없습니다. <a href="/communities">커뮤니티</a>에서 가입할 곳을 찾아보세요!
 
 draw = 그리기!
 collaborate = 넷캔
@@ -261,7 +261,7 @@ collaborate-sign-in-to-create = 로그인하고 넷캔을 시작해 보세요
 collaborate-finished-drawings = 완성된 넷캔 그림
 collaborate-community-none = 커뮤니티 없음
 collaborate-community-search-placeholder = 커뮤니티 검색
-collaborate-community-group-yours = 내 커뮤니티
+collaborate-community-group-yours = 내 커뮤
 collaborate-community-group-participated = 그림을 올린 커뮤니티
 collaborate-community-group-public = 다른 공개 커뮤니티
 collaborate-community-no-matches = 일치하는 커뮤니티가 없습니다
@@ -273,7 +273,7 @@ collaborate-session-preview-alt = 지금 이 캔버스의 모습
 
 welcome = { $name }님, 환영합니다!
 
-my-communities = 내 커뮤니티
+my-communities = 내 커뮤
 my-communities-nil = 만들거나 참여 중인 커뮤니티가 없습니다.
 
 official-communities = 공식 커뮤니티
@@ -477,7 +477,7 @@ community-guidelines-content = { brand }는 모든 사용자에게 안전하고 
 personal-post = 개인 게시물
 communities-tab-public = 공개
 communities-tab-official = 공식
-communities-tab-yours = 내 커뮤니티
+communities-tab-yours = 내 커뮤
 nav-about = 소개
 nav-about-menu = 오이카페?
 post-move-to = { $communityName }(으)로 이동
