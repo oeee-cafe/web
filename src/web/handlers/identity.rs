@@ -1080,9 +1080,10 @@ pub struct HandoffStartForm {
     next: Option<String>,
     /// "provider" sends the browser straight to the provider's own page
     /// rather than through this site's first (`handoff::AtProvider`). Only
-    /// Google, and only asked for by the apps that open the browser in a
-    /// sheet that names the first page's domain: the others check that the
-    /// URL they open is this site's.
+    /// Google, and only asked for by the apps that will open Google's page:
+    /// iOS and macOS, whose sheet names the first page's domain, and
+    /// Windows, where it saves a stop here. Android opens only this site's
+    /// URLs (app_sign_in.jinja).
     at: Option<String>,
 }
 

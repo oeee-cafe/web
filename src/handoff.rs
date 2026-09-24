@@ -247,10 +247,11 @@ const AT_PROVIDER_PREFIX: &str = "oeee:handoff-at-provider:";
 /// The iOS and macOS apps open the browser in `ASWebAuthenticationSession`,
 /// which first asks whether the app may "use" the first page's domain to sign
 /// in. Sent to this site first, that named oeee.cafe under a Sign in with
-/// Google button; sent to Google, it names Google. The cost is that the
-/// browser's session cookie cannot carry the handoff and the nonce to the
-/// callback, since the browser never visits this site before Google, so they
-/// are kept here under the OAuth `state` instead. The `state` is as good as
+/// Google button; sent to Google, it names Google. The Windows app is sent
+/// straight there too, which saves its browser the stop here. The cost is
+/// that the browser's session cookie cannot carry the handoff and the nonce
+/// to the callback, since the browser never visits this site before Google,
+/// so they are kept here under the OAuth `state` instead. The `state` is as good as
 /// the handoff's id -- it is in the URL the browser is given -- and gets the
 /// same treatment: random, never logged, used once, and gone when the
 /// handoff is.
