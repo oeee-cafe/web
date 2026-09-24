@@ -501,6 +501,14 @@ return {history_id, redis.call('LRANGE', KEYS[2], 0, -1)}
             .expire(seq_key(room_uuid), MESSAGE_HISTORY_TTL as i64)
             .expire(bytes_key(room_uuid), MESSAGE_HISTORY_TTL as i64)
             .expire(reset_base_key(room_uuid), MESSAGE_HISTORY_TTL as i64)
+            // The session user ids are part of the same timeline: every
+            // stroke in the history is stamped with one. Let the map lapse
+            // while the history survives and the next joiner is handed id 1
+            // again, and draws on whichever layers that id already owns.
+            .expire(
+                format!("{}{}", super::redis_state::USER_ID_PREFIX, room_uuid),
+                MESSAGE_HISTORY_TTL as i64,
+            )
             .query_async(&mut *conn)
             .await?;
         Ok(())
