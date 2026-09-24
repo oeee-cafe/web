@@ -80,6 +80,9 @@ export default defineConfig({
             "react-dom/client",
             "react/jsx-runtime",
             "react/jsx-dev-runtime",
+            // Discovered mid-run otherwise, and the reload that follows
+            // restarts whichever files were open with React resolved to null.
+            "fflate",
           ],
         },
         test: {

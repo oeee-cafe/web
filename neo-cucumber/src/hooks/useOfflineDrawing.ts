@@ -464,17 +464,17 @@ export const useOfflineDrawing = (
         if (!region) return;
 
         const { x: rx, y: ry, width, height, coverage } = region;
-        void deflateCoverage(coverage).then((compressed) => {
-          emitOperation({
-            kind: "fill-region",
-            layer: layerName,
-            at: { x: rx, y: ry },
-            width,
-            height,
-            color: { r: safeR, g: safeG, b: safeB, a: alpha },
-            coverage: compressed,
-            mask: strokeMaskRef.current,
-          });
+        // In the same turn as the flood, so the operation is in the fork
+        // before anything else can be emitted or a checkpoint asked for.
+        emitOperation({
+          kind: "fill-region",
+          layer: layerName,
+          at: { x: rx, y: ry },
+          width,
+          height,
+          color: { r: safeR, g: safeG, b: safeB, a: alpha },
+          coverage: deflateCoverage(coverage),
+          mask: strokeMaskRef.current,
         });
       },
       [drawingState.layerType, emitOperation, onOperation]

@@ -350,9 +350,10 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       canvasHeight,
       drawingState.zoomLevel / 100,
       drawingState.bgVisible,
-      drawingState.fgVisible
+      drawingState.fgVisible,
+      hiddenOwners
     );
-  }, [canvasWidth, canvasHeight, drawingState.zoomLevel, drawingState.bgVisible, drawingState.fgVisible]);
+  }, [canvasWidth, canvasHeight, drawingState.zoomLevel, drawingState.bgVisible, drawingState.fgVisible, hiddenOwners]);
   const handleRegionPreview = useCallback((rect: RegionRect | null) => {
     const ctx = previewCanvasRef.current?.getContext("2d");
     if (ctx) drawRegionPreview(ctx, rect, previewBackdrop(), drawingState.brushType);
@@ -486,8 +487,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
 
   // Use the offline drawing hook
   const {
-    undo,
-    redo,
+    undo: undoWhenEnabled,
+    redo: redoWhenEnabled,
     drawingEngine,
     getReplayBlob,
     getActionCount,
@@ -529,6 +530,21 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     config.recordReplay ?? true,
     placement,
   );
+
+  /**
+   * Undo and redo, only while the painter takes input at all.
+   *
+   * The pointer was already refused while a host has drawing disabled -- a
+   * replay in progress, a canvas being exported to save -- but the toolbox
+   * buttons and the shortcut were not, so an undo clicked then went out to
+   * the room behind the very export it changed the answer to.
+   */
+  const undo = useCallback(() => {
+    if (interactionEnabled) undoWhenEnabled();
+  }, [interactionEnabled, undoWhenEnabled]);
+  const redo = useCallback(() => {
+    if (interactionEnabled) redoWhenEnabled();
+  }, [interactionEnabled, redoWhenEnabled]);
   previewEngineRef.current = drawingEngine ?? null;
   const flushPendingStrokeRef = useRef(flushPendingStroke);
   flushPendingStrokeRef.current = flushPendingStroke;
@@ -607,6 +623,10 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       }
       if (e.key !== "Enter" || e.shiftKey) return;
       e.preventDefault();
+      // Disabled means no marks, the keyboard's included: a box opened before
+      // a host disabled drawing must not commit into a replay, or after the
+      // canvas has been exported for saving. Escape still closes it.
+      if (!interactionEnabled) return;
 
       const value = textBoxRef.current?.textContent ?? "";
       if (!textAt || !drawingEngine || !value) {
@@ -662,7 +682,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       domCanvasUpdateRef.current();
       setTextAt(null);
     },
-    [textAt, drawingEngine, drawingState, recordText, emitOperation]
+    [textAt, drawingEngine, drawingState, recordText, emitOperation, interactionEnabled]
   );
 
   // Zoom controls
@@ -1269,7 +1289,11 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
                 // which already has codes for every one of these.
                 tools={ALL_TOOLS}
                 drawingState={drawingState}
-                historyState={historyState}
+                historyState={
+                  interactionEnabled
+                    ? historyState
+                    : { canUndo: false, canRedo: false }
+                }
                 paletteColors={paletteColors}
                 selectedPaletteIndex={selectedPaletteIndex}
                 currentZoom={currentZoom}
