@@ -39,17 +39,34 @@ struct Goodbye {
     reason: Cow<'static, str>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ResumeQuery {
     history_id: Option<Uuid>,
     after_seq: Option<u64>,
+    /// `batch` asks for the replay as REPLAY_BATCH frames. A client that does
+    /// not say so predates them and gets one SEQUENCED frame per message.
+    replay: Option<String>,
 }
 
 impl ResumeQuery {
-    fn position(self) -> Option<(Uuid, u64)> {
+    fn position(&self) -> Option<(Uuid, u64)> {
         self.history_id.zip(self.after_seq)
     }
+
+    fn batched(&self) -> bool {
+        self.replay.as_deref() == Some("batch")
+    }
 }
+
+/// How much history one REPLAY_BATCH holds before compression.
+///
+/// A replay is up to the auto-reset threshold of messages, every one of them
+/// a WebSocket frame with a 25-byte envelope and, on the client, a turn of
+/// the processing chain. Batched, a join is a few frames, and the stroke
+/// points inside them -- int16 pairs that repeat their high bytes -- deflate
+/// to a fraction of their size. The batch is bounded so the client can start
+/// applying before the whole history has arrived.
+const REPLAY_BATCH_BYTES: usize = 256 * 1024;
 
 // How many messages a room may add on top of its last checkpoint before the
 // server asks for a new one (Drawpile's auto-reset). Keeps catch-up for late
@@ -144,7 +161,15 @@ pub async fn websocket_collaborate_handler(
         .user
         .ok_or_else(|| anyhow::anyhow!("Authentication required"))?;
     Ok(ws.on_upgrade(move |socket| {
-        handle_socket(socket, room_uuid, state, user.id, user.login_name, resume.position())
+        handle_socket(
+            socket,
+            room_uuid,
+            state,
+            user.id,
+            user.login_name,
+            resume.position(),
+            resume.batched(),
+        )
     }))
 }
 
@@ -155,6 +180,7 @@ pub async fn handle_socket(
     user_id: Uuid,
     user_login_name: String,
     resume_position: Option<(Uuid, u64)>,
+    batched_replay: bool,
 ) {
     let (mut sender, mut receiver) = socket.split();
 
@@ -349,7 +375,12 @@ pub async fn handle_socket(
     // Send history to new connection, remembering the highest sequence number
     // it contained so the live stream can skip messages history already covered
     let (history_identity, max_history_seq) = match send_history_to_new_connection(
-        &state, room_uuid, &mut sender, &connection_id, resume_position,
+        &state,
+        room_uuid,
+        &mut sender,
+        &connection_id,
+        resume_position,
+        batched_replay,
     )
     .await
     {
@@ -837,7 +868,11 @@ mod reset_upload_tests {
 
 #[cfg(test)]
 mod forwarding_tests {
-    use super::{accepted_resume_sequence, should_forward_to_connection};
+    use super::{
+        accepted_resume_sequence, replay_batch, replay_batches, should_forward_to_connection,
+        REPLAY_BATCH_BYTES,
+    };
+    use crate::web::handlers::collaborate::messages::MessageType;
     use crate::web::handlers::collaborate::redis_state::RoomBroadcast;
     use uuid::Uuid;
 
@@ -931,6 +966,103 @@ mod forwarding_tests {
         assert_eq!(reset_snapshot_count(&[0x0c, 0, 0]), None);
     }
 
+    fn inflate_batch(frame: &[u8]) -> (Uuid, u32, Vec<(u64, Vec<u8>)>) {
+        use flate2::read::ZlibDecoder;
+        use std::io::Read;
+        assert_eq!(frame[0], MessageType::ReplayBatch as u8);
+        let history_id = Uuid::from_slice(&frame[1..17]).unwrap();
+        let count = u32::from_le_bytes(frame[17..21].try_into().unwrap());
+        let mut body = Vec::new();
+        ZlibDecoder::new(&frame[21..]).read_to_end(&mut body).unwrap();
+        let mut entries = Vec::new();
+        let mut at = 0;
+        while at < body.len() {
+            let seq = u64::from_le_bytes(body[at..at + 8].try_into().unwrap());
+            let len = u32::from_le_bytes(body[at + 8..at + 12].try_into().unwrap()) as usize;
+            entries.push((seq, body[at + 12..at + 12 + len].to_vec()));
+            at += 12 + len;
+        }
+        (history_id, count, entries)
+    }
+
+    #[test]
+    fn a_replay_batch_carries_every_message_with_its_sequence() {
+        let history_id = Uuid::new_v4();
+        let stroke = vec![0x16u8; 40];
+        let frame = replay_batch(history_id, &[(7, &[0x14, 1][..]), (8, &stroke[..])]);
+        let (id, count, entries) = inflate_batch(&frame);
+        assert_eq!(id, history_id);
+        assert_eq!(count, 2);
+        assert_eq!(entries, vec![(7, vec![0x14, 1]), (8, stroke)]);
+    }
+
+    #[test]
+    fn a_replay_is_cut_into_batches_of_about_the_bound_and_never_loses_order() {
+        let history_id = Uuid::new_v4();
+        let messages: Vec<(u64, Vec<u8>)> =
+            (1..=10).map(|seq| (seq, vec![seq as u8; 100])).collect();
+        let batches = replay_batches(
+            history_id,
+            messages.iter().map(|(seq, bytes)| (*seq, &bytes[..])),
+            250,
+        );
+        // 100-byte messages, 250 to a batch: two per batch, ten across five.
+        assert_eq!(batches.len(), 5);
+        let replayed: Vec<(u64, Vec<u8>)> = batches
+            .iter()
+            .flat_map(|batch| inflate_batch(batch).2)
+            .collect();
+        assert_eq!(replayed, messages);
+    }
+
+    #[test]
+    fn a_message_larger_than_the_bound_is_a_batch_of_its_own() {
+        let history_id = Uuid::new_v4();
+        let snapshot = vec![0x02u8; 1000];
+        let batches = replay_batches(
+            history_id,
+            [(1, &[0x14, 1][..]), (2, &snapshot[..]), (3, &[0x14, 1][..])],
+            100,
+        );
+        assert_eq!(batches.len(), 3);
+        assert_eq!(inflate_batch(&batches[1]).2, vec![(2, snapshot)]);
+    }
+
+    #[test]
+    fn a_batched_replay_is_smaller_than_the_frames_it_replaces() {
+        let history_id = Uuid::new_v4();
+        // Stroke chunks as a client sends them: a 12-byte header, 32 points
+        // of int16 pairs walking across the canvas, a 4-byte mask.
+        let chunks: Vec<Vec<u8>> = (0..200u16)
+            .map(|chunk| {
+                let mut bytes = vec![0x16, 3, 3, 0, 4, 0, 0, 0, 0, 255, 32, 0];
+                for point in 0..32u16 {
+                    let x = chunk * 3 + point;
+                    let y = 200 + (point % 5);
+                    bytes.extend_from_slice(&x.to_le_bytes());
+                    bytes.extend_from_slice(&y.to_le_bytes());
+                }
+                bytes.extend_from_slice(&[0, 0, 0, 0]);
+                bytes
+            })
+            .collect();
+        let entries: Vec<(u64, &[u8])> = chunks
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (i as u64 + 1, &c[..]))
+            .collect();
+        let framed: usize = entries.iter().map(|(_, c)| 25 + c.len()).sum();
+        let batched: usize =
+            replay_batches(history_id, entries.iter().copied(), REPLAY_BATCH_BYTES)
+                .iter()
+                .map(Vec::len)
+                .sum();
+        assert!(
+            batched * 2 < framed,
+            "batched {batched} bytes against {framed} framed"
+        );
+    }
+
     #[test]
     fn resumes_only_a_position_on_the_current_history() {
         let history_id = Uuid::new_v4();
@@ -948,12 +1080,73 @@ mod forwarding_tests {
 // reached (0 for an empty history), or None when the history could not be
 // read at all -- in which case the client was told nothing and must not be
 // left waiting.
+/// One REPLAY_BATCH frame: the history id, how many messages, then the
+/// messages as `[seq:8][len:4][bytes]` runs under zlib.
+///
+/// `[0x10][history_id:16][count:4][zlib(entries)]`, all little-endian. Each
+/// entry is what the same message's SEQUENCED frame would carry after its
+/// envelope, so a client applies one exactly as it applies the other.
+pub(super) fn replay_batch(history_id: Uuid, entries: &[(u64, &[u8])]) -> Vec<u8> {
+    use flate2::write::ZlibEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+
+    let body_len: usize = entries.iter().map(|(_, bytes)| 12 + bytes.len()).sum();
+    let mut body = Vec::with_capacity(body_len);
+    for (seq, bytes) in entries {
+        body.extend_from_slice(&seq.to_le_bytes());
+        body.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+        body.extend_from_slice(bytes);
+    }
+    let mut frame = Vec::with_capacity(21 + body_len / 2);
+    frame.push(messages::MessageType::ReplayBatch as u8);
+    frame.extend_from_slice(history_id.as_bytes());
+    frame.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+    // Fast: a join is waiting on this, and the win over sending the bytes as
+    // they are comes from the first pass, not from the last percent.
+    let mut encoder = ZlibEncoder::new(frame, Compression::fast());
+    encoder
+        .write_all(&body)
+        .expect("writing to a Vec cannot fail");
+    encoder
+        .finish()
+        .expect("finishing a Vec-backed encoder cannot fail")
+}
+
+/// Splits a replay into batches of about `max_bytes` of history each.
+///
+/// A message larger than the bound is a batch of its own: a checkpoint's
+/// snapshots are each a PNG of the whole canvas.
+pub(super) fn replay_batches<'a>(
+    history_id: Uuid,
+    entries: impl IntoIterator<Item = (u64, &'a [u8])>,
+    max_bytes: usize,
+) -> Vec<Vec<u8>> {
+    let mut batches = Vec::new();
+    let mut pending: Vec<(u64, &[u8])> = Vec::new();
+    let mut pending_bytes = 0;
+    for entry in entries {
+        if !pending.is_empty() && pending_bytes + entry.1.len() > max_bytes {
+            batches.push(replay_batch(history_id, &pending));
+            pending.clear();
+            pending_bytes = 0;
+        }
+        pending_bytes += entry.1.len();
+        pending.push(entry);
+    }
+    if !pending.is_empty() {
+        batches.push(replay_batch(history_id, &pending));
+    }
+    batches
+}
+
 async fn send_history_to_new_connection(
     state: &AppState,
     room_uuid: Uuid,
     sender: &mut SplitSink<WebSocket, Message>,
     connection_id: &str,
     resume_position: Option<(Uuid, u64)>,
+    batched: bool,
 ) -> Option<(Uuid, u64)> {
     let redis_store = redis_messages::RedisMessageStore::new(state.redis_pool.clone());
 
@@ -986,6 +1179,7 @@ async fn send_history_to_new_connection(
                 warn!("Failed to send replay boundary to {}", connection_id);
                 return Some((history_id, after_seq));
             }
+            let mut to_send: Vec<(u64, &[u8])> = Vec::new();
             for (seq, stored_msg) in history.iter() {
                 if *seq <= after_seq {
                     max_seq = max_seq.max(*seq);
@@ -995,19 +1189,40 @@ async fn send_history_to_new_connection(
                     Message::Binary(data) => &data[..],
                     _ => continue,
                 };
-                let wrapped = Message::Binary(wrap_sequenced(history_id, *seq, payload).into());
-                // `feed` rather than `send`: a replay is up to the whole
-                // auto-reset threshold of messages, and `send` flushes each one
-                // on its own. The flush below covers all of them, so a join
-                // costs a few writes instead of one per stored operation.
-                if sender.feed(wrapped).await.is_err() {
-                    warn!(
-                        "Failed to send stored message to new connection {}",
-                        connection_id
-                    );
-                    break;
+                to_send.push((*seq, payload));
+            }
+            // `feed` rather than `send`: a replay is up to the whole
+            // auto-reset threshold of messages, and `send` flushes each one
+            // on its own. The flush below covers all of them, so a join
+            // costs a few writes instead of one per stored operation.
+            let mut fed = true;
+            if batched {
+                let last = to_send.last().map(|(seq, _)| *seq);
+                for batch in replay_batches(history_id, to_send.iter().copied(), REPLAY_BATCH_BYTES)
+                {
+                    if sender.feed(Message::Binary(batch.into())).await.is_err() {
+                        fed = false;
+                        break;
+                    }
                 }
-                max_seq = max_seq.max(*seq);
+                if fed {
+                    max_seq = max_seq.max(last.unwrap_or(0));
+                }
+            } else {
+                for (seq, payload) in &to_send {
+                    let wrapped = Message::Binary(wrap_sequenced(history_id, *seq, payload).into());
+                    if sender.feed(wrapped).await.is_err() {
+                        fed = false;
+                        break;
+                    }
+                    max_seq = max_seq.max(*seq);
+                }
+            }
+            if !fed {
+                warn!(
+                    "Failed to send stored message to new connection {}",
+                    connection_id
+                );
             }
             if sender.flush().await.is_err() {
                 warn!("Failed to flush replayed history to {}", connection_id);

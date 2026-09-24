@@ -98,6 +98,8 @@ export {
 export { Icon, type IconProps } from "./components/Icon";
 /** Where a host's own marks go in the canvas stack, relative to the painter's. */
 export { CANVAS_Z_INDEX } from "./neo/canvasStack";
+/** zlib, as the painter already carries it for fill coverage on the wire. */
+export { deflateZlib, inflateZlib } from "./utils/rasterCodec";
 
 /**
  * Lingui, set up the way the painter sets itself up, for a host with catalogs

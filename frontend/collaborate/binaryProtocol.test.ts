@@ -16,11 +16,12 @@ import {
   encodeText,
   MSG_TYPE,
   REGION_TOOL,
+  unwrapReplayBatch,
   unwrapSequenced,
   isCanvasHistoryMessage,
 } from "./binaryProtocol";
-import type { PainterRegionTool as RegionTool } from "neo-cucumber";
-import type { PainterOperation } from "neo-cucumber";
+import { HISTORY_ID, replayBatch, stroke, uuidBytes } from "./test/frames";
+import { deflateZlib, type PainterOperation, type PainterRegionTool as RegionTool } from "neo-cucumber";
 
 const ID = 3;
 const COLOR = { r: 12, g: 200, b: 255, a: 128 };
@@ -88,6 +89,49 @@ describe("canonical history positions", () => {
       afterSeq: 40,
       lastSeq: 99,
     });
+  });
+});
+
+describe("a replay batch", () => {
+  const frame = (bytes: Uint8Array): ArrayBuffer =>
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
+  it("unwraps every message with its sequence, in order", () => {
+    const entries = [
+      { seq: 7, payload: Uint8Array.from([MSG_TYPE.UNDO_POINT, 3]) },
+      { seq: 8, payload: stroke(3, { x: 4, y: 4 }) },
+      { seq: 2 ** 32 + 9, payload: Uint8Array.from([MSG_TYPE.UNDO, 3, 0]) },
+    ];
+    const batch = unwrapReplayBatch(frame(replayBatch(entries)));
+    expect(batch?.historyId).toBe(HISTORY_ID);
+    expect(batch?.entries.map((entry) => entry.seq)).toEqual([7, 8, 2 ** 32 + 9]);
+    expect(batch?.entries.map((entry) => Array.from(new Uint8Array(entry.payload))))
+      .toEqual(entries.map((entry) => Array.from(entry.payload)));
+    // What comes out is what a SEQUENCED frame would have carried.
+    expect(decodeMessage(batch!.entries[1].payload)?.type).toBe("stroke");
+  });
+
+  it("is refused whole when its count and its contents disagree", () => {
+    const good = replayBatch([{ seq: 1, payload: Uint8Array.from([MSG_TYPE.UNDO_POINT, 3]) }]);
+    const lying = good.slice();
+    new DataView(lying.buffer).setUint32(17, 2, true);
+    expect(unwrapReplayBatch(frame(lying))).toBeNull();
+  });
+
+  it("is refused whole when it will not inflate or an entry is cut short", () => {
+    const head = new Uint8Array(21);
+    head[0] = MSG_TYPE.REPLAY_BATCH;
+    head.set(uuidBytes(HISTORY_ID), 1);
+    new DataView(head.buffer).setUint32(17, 1, true);
+    expect(unwrapReplayBatch(frame(new Uint8Array([...head, 1, 2, 3, 4, 5])))).toBeNull();
+
+    // A body whose one entry claims forty bytes and carries three.
+    const body = new Uint8Array(12 + 3);
+    new DataView(body.buffer).setBigUint64(0, 1n, true);
+    new DataView(body.buffer).setUint32(8, 40, true);
+    expect(unwrapReplayBatch(frame(new Uint8Array([...head, ...deflateZlib(body)])))).toBeNull();
+
+    expect(unwrapReplayBatch(frame(new Uint8Array([MSG_TYPE.REPLAY_BATCH])))).toBeNull();
   });
 });
 

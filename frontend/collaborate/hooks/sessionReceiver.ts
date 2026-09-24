@@ -1,5 +1,7 @@
 import {
   decodeMessage,
+  MSG_TYPE,
+  unwrapReplayBatch,
   unwrapSequenced,
   type DecodedMessage,
   isCanvasHistoryMessage,
@@ -181,12 +183,45 @@ export class SessionReceiver {
   async receive(socket: ReceiverSocket, data: ArrayBuffer | Blob): Promise<void> {
     if (this.failed) return;
 
-    let arrayBuffer = data instanceof ArrayBuffer ? data : await data.arrayBuffer();
+    const arrayBuffer = data instanceof ArrayBuffer ? data : await data.arrayBuffer();
 
-    // History messages arrive wrapped in a SEQUENCED envelope carrying their
-    // canonical position; the position is recorded only after the message
-    // has been fully applied so lastSeq always describes the canvas state.
-    const sequenced = unwrapSequenced(arrayBuffer);
+    // A replay batch is several sequenced messages at once, and each is
+    // applied exactly as its own SEQUENCED frame would be. Only during a
+    // replay: the server sends them at no other time, and a batch that
+    // arrived live would be something else pretending.
+    if (new Uint8Array(arrayBuffer, 0, 1)[0] === MSG_TYPE.REPLAY_BATCH) {
+      if (!this.link.catchingUp) return;
+      const batch = unwrapReplayBatch(arrayBuffer);
+      if (!batch) {
+        console.error("Unreadable replay batch; reconnecting");
+        socket.close(WS_CLOSE_RESYNC, "unreadable replay batch");
+        return;
+      }
+      for (const entry of batch.entries) {
+        if (this.failed) return;
+        await this.receiveFrame(socket, entry.payload, {
+          historyId: batch.historyId, seq: entry.seq, payload: entry.payload,
+        });
+      }
+      return;
+    }
+
+    await this.receiveFrame(socket, arrayBuffer, unwrapSequenced(arrayBuffer));
+  }
+
+  /**
+   * One message, with its canonical position when it has one.
+   *
+   * History messages arrive wrapped in a SEQUENCED envelope carrying their
+   * canonical position; the position is recorded only after the message has
+   * been fully applied so lastSeq always describes the canvas state.
+   */
+  private async receiveFrame(
+    socket: ReceiverSocket,
+    frame: ArrayBuffer,
+    sequenced: { historyId: string; seq: number; payload: ArrayBuffer } | null,
+  ): Promise<void> {
+    let arrayBuffer = frame;
     if (sequenced) {
       if (this.reconnectPending) {
         await this.settleResume(

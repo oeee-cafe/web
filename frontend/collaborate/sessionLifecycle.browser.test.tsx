@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
-import { decodeMessage, unwrapSequenced } from "./binaryProtocol";
+import { decodeMessage, unwrapReplayBatch, unwrapSequenced } from "./binaryProtocol";
 import {
   FakeServer, type FakeSocket, inkAt, installRoom, mountSession,
   pointer, pressUndo, settle, settleUntil, sockets, uninstallRoom,
@@ -41,6 +41,17 @@ function deliveredSequences(socket: FakeSocket): number[] {
   return socket.delivered
     .map((frame) => unwrapSequenced(new Uint8Array(frame).buffer as ArrayBuffer))
     .flatMap((sequenced) => (sequenced ? [sequenced.seq] : []));
+}
+
+/** Every sequence delivered, whether framed on its own or inside a batch. */
+function replayedSequences(socket: FakeSocket): number[] {
+  return socket.delivered.flatMap((frame) => {
+    const buffer = new Uint8Array(frame).buffer as ArrayBuffer;
+    const batch = unwrapReplayBatch(buffer);
+    if (batch) return batch.entries.map((entry) => entry.seq);
+    const sequenced = unwrapSequenced(buffer);
+    return sequenced ? [sequenced.seq] : [];
+  });
 }
 
 let server: FakeServer;
@@ -119,6 +130,37 @@ describe("a session, joined and drawn in", () => {
   });
 });
 
+describe("a join into a room with history", () => {
+  it("asks for the replay in batches and comes out at the room's canvas", async () => {
+    server.sequence(stroke(1, MARK.theirs));
+    server.sequence(stroke(2, MARK.mine));
+    const socket = await mountSession();
+    expect(new URL(socket.url).searchParams.get("replay")).toBe("batch");
+    await act(async () => server.admit(socket, 3));
+    await settle(12);
+
+    // One frame carried the whole history.
+    expect(socket.delivered.filter((frame) => frame[0] === 0x10)).toHaveLength(1);
+    expect(deliveredSequences(socket), "no message framed on its own").toEqual([]);
+    await settleUntil(() => inkAt(MARK.theirs) && inkAt(MARK.mine));
+    // And drawing is live at the right position.
+    await pointer().drag(MARK.afterReconnect, { x: MARK.afterReconnect.x + 12, y: MARK.afterReconnect.y });
+    await settleUntil(() => deliveredSequences(socket).length > 0);
+    expect(deliveredSequences(socket)[0]).toBe(3);
+  });
+
+  it("still joins a server that sends a frame per message, whatever it asked for", async () => {
+    server.batches = false;
+    server.sequence(stroke(1, MARK.theirs));
+    server.sequence(stroke(2, MARK.mine));
+    const socket = await mountSession();
+    await act(async () => server.admit(socket, 3));
+    await settle(12);
+    expect(deliveredSequences(socket)).toEqual([1, 2]);
+    await settleUntil(() => inkAt(MARK.theirs) && inkAt(MARK.mine));
+  });
+});
+
 describe("a session whose socket drops", () => {
   it("comes back on its own, resumes from the last applied sequence, and keeps the canvas", async () => {
     const socket = await mountSession();
@@ -182,14 +224,14 @@ describe("a session whose socket drops", () => {
 
     // The refused position means a full replay of the new history, onto a
     // canvas cleared of what the old one held.
-    expect(deliveredSequences(next)).toEqual([1]);
+    expect(replayedSequences(next)).toEqual([1]);
     expect(inkAt(MARK.theirs), "the new history's stroke").toBe(true);
     expect(inkAt(MARK.mine), "a stroke the new history never had").toBe(false);
 
     // And the next stroke is sequenced on the new history.
     await pointer().drag(MARK.afterReconnect, { x: MARK.afterReconnect.x + 12, y: MARK.afterReconnect.y });
     await settleUntil(() => sentKinds(next).includes("stroke"));
-    await settleUntil(() => deliveredSequences(next).length >= server.entries.length);
+    await settleUntil(() => replayedSequences(next).length >= server.entries.length);
     expect(server.lastSeq).toBeGreaterThan(1);
     await settleUntil(() => inkAt(MARK.afterReconnect));
     expect(inkAt(MARK.afterReconnect)).toBe(true);

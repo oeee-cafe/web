@@ -259,6 +259,9 @@ export const useWebSocket = ({
         ? `ws://localhost:3000/collaborate/${sessionId}/ws`
         : `wss://${window.location.host}/collaborate/${sessionId}/ws`,
     );
+    // The replay as batches, for a server that has them; one that does not
+    // ignores the ask and sends a frame per message.
+    url.searchParams.set("replay", "batch");
     // Resume only what the painter can carry on from: a settled fork at the
     // applied position. Anything else is a full replay.
     const resume = receiver.resumeFrom(

@@ -1,5 +1,5 @@
 import { encodePainterOperation, MSG_TYPE } from "../binaryProtocol";
-import type { PainterOperation } from "neo-cucumber";
+import { deflateZlib, type PainterOperation } from "neo-cucumber";
 
 /**
  * Frames as the server sends them, built by hand from the wire format in
@@ -41,6 +41,22 @@ export const caughtUp = (lastSeq: number, historyId = HISTORY_ID) =>
 
 export const sequenced = (seq: number, payload: Uint8Array, historyId = HISTORY_ID) =>
   concat(Uint8Array.from([MSG_TYPE.SEQUENCED]), uuidBytes(historyId), u64(seq), payload);
+
+/** Several sequenced messages in one compressed frame, as a join receives them. */
+export const replayBatch = (
+  entries: { seq: number; payload: Uint8Array }[], historyId = HISTORY_ID,
+) => {
+  const body = concat(...entries.flatMap(({ seq, payload }) => {
+    const length = new Uint8Array(4);
+    new DataView(length.buffer).setUint32(0, payload.length, true);
+    return [u64(seq), length, payload];
+  }));
+  const count = new Uint8Array(4);
+  new DataView(count.buffer).setUint32(0, entries.length, true);
+  return concat(
+    Uint8Array.from([MSG_TYPE.REPLAY_BATCH]), uuidBytes(historyId), count, deflateZlib(body),
+  );
+};
 
 export const resetPoint = (baseSeq: number, count: number) => {
   const out = new Uint8Array(11);

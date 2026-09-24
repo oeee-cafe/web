@@ -31,6 +31,19 @@ export function deflateCoverage(coverage: Uint8Array): Uint8Array {
 }
 
 /**
+ * The same zlib, for a host with bytes of its own to compress -- the
+ * collaborative host's replay batches. Exported from here so the host does
+ * not carry a second copy of the compressor for the same format.
+ */
+export function deflateZlib(bytes: Uint8Array): Uint8Array {
+  return zlibSync(bytes);
+}
+
+export function inflateZlib(bytes: Uint8Array): Uint8Array {
+  return unzlibSync(bytes);
+}
+
+/**
  * Restores raw RGBA, refusing anything that is not the size it claims -- a
  * short buffer would otherwise be blitted as a band of transparent pixels
  * across somebody's drawing.
