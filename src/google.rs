@@ -18,9 +18,7 @@
 //! inside the page and posts the ID token it ends up with to `/auth/google`,
 //! where it is checked exactly as one traded for a code is. Credential
 //! Manager is given the site's own client id as its server client id, so its
-//! audience is the same one. `app_ids` lists any other audience to accept --
-//! the iOS app's own OAuth client, from when it signed in with Google itself,
-//! is no longer needed there.
+//! audience is the same one, and the only one a token is accepted for.
 
 use anyhow::{anyhow, Result};
 use jsonwebtoken::{decode, decode_header, Algorithm, Validation};
@@ -137,10 +135,7 @@ pub async fn verify_id_token(
 
     let mut validation = Validation::new(Algorithm::RS256);
     validation.set_issuer(&ISSUERS);
-    let audiences: Vec<&str> = std::iter::once(config.client_id.as_str())
-        .chain(config.app_ids.iter().map(String::as_str))
-        .collect();
-    validation.set_audience(&audiences);
+    validation.set_audience(&[config.client_id.as_str()]);
     validation.set_required_spec_claims(&["exp", "iss", "aud", "sub"]);
     let claims = match decode::<Claims>(id_token, &key, &validation) {
         Ok(data) => data.claims,
@@ -196,8 +191,6 @@ mod tests {
     const KID: &str = "test-key";
     const CLIENT_ID: &str = "123.apps.googleusercontent.com";
     const SECRET: &str = "a-client-secret";
-    /// The iOS app's own OAuth client, which its tokens name as audience.
-    const APP_ID: &str = "456.apps.googleusercontent.com";
 
     /// Google's key set and token endpoint, on a port of their own. The
     /// token endpoint trades the code `"good"` for a token of `claims`, and
@@ -240,7 +233,6 @@ mod tests {
         GoogleConfig {
             client_id: CLIENT_ID.to_string(),
             client_secret: SECRET.to_string(),
-            app_ids: vec![APP_ID.to_string()],
             keys_url: format!("http://{addr}/certs"),
             token_url: format!("http://{addr}/token"),
         }
@@ -303,21 +295,6 @@ mod tests {
             .await
             .unwrap()
             .is_some());
-    }
-
-    /// The iOS app signs in with its own OAuth client, and posts the token.
-    #[tokio::test]
-    async fn the_ios_apps_token_names_the_app_and_is_accepted() {
-        let config = fake_google(claims()).await;
-        let identity = verify_id_token(
-            &config,
-            &token(with(claims(), "aud", json!(APP_ID))),
-            "the-nonce",
-        )
-        .await
-        .unwrap()
-        .unwrap();
-        assert_eq!(identity.subject, "110169484474386276334");
     }
 
     #[tokio::test]
@@ -423,7 +400,6 @@ mod tests {
         let config = GoogleConfig {
             client_id: CLIENT_ID.to_string(),
             client_secret: SECRET.to_string(),
-            app_ids: Vec::new(),
             keys_url: String::new(),
             token_url: String::new(),
         };
