@@ -4,8 +4,16 @@ use serde::Serialize;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
-// Available emoji reactions
-pub const AVAILABLE_EMOJIS: &[&str] = &["❤️", "🎉", "😂", "😲", "🤔", "😢", "👀"];
+// The reactions every post offers a button for. Any other emoji can be
+// reacted with too; it gets a button once someone has used it.
+pub const AVAILABLE_EMOJIS: &[&str] = &["❤️", "🎉", "😂", "😲", "👏", "😢"];
+
+/// The fully-qualified form of `input` if it is exactly one emoji, so that
+/// "❤" and "❤️" count as the same reaction. Anything else, including text
+/// that merely contains an emoji, is `None`.
+pub fn normalize_emoji(input: &str) -> Option<&'static str> {
+    emojis::get(input.trim()).map(|emoji| emoji.as_str())
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Reaction {
@@ -276,4 +284,34 @@ pub async fn find_user_reaction(
     .await?;
 
     Ok(reaction)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_emoji;
+
+    #[test]
+    fn a_single_emoji_is_accepted_in_its_qualified_form() {
+        assert_eq!(normalize_emoji("👏"), Some("👏"));
+        assert_eq!(normalize_emoji("❤"), Some("❤️"));
+        assert_eq!(normalize_emoji(" 👍🏽 "), Some("👍🏽"));
+        assert_eq!(normalize_emoji("👩‍👩‍👧"), Some("👩‍👩‍👧"));
+        assert_eq!(normalize_emoji("🇰🇷"), Some("🇰🇷"));
+    }
+
+    #[test]
+    fn anything_but_one_emoji_is_refused() {
+        assert_eq!(normalize_emoji(""), None);
+        assert_eq!(normalize_emoji("a"), None);
+        assert_eq!(normalize_emoji("👏👏"), None);
+        assert_eq!(normalize_emoji("👏 nice"), None);
+        assert_eq!(normalize_emoji("\"}'"), None);
+    }
+
+    #[test]
+    fn every_default_emoji_is_already_normalized() {
+        for emoji in super::AVAILABLE_EMOJIS {
+            assert_eq!(normalize_emoji(emoji), Some(*emoji));
+        }
+    }
 }

@@ -23,7 +23,8 @@ use crate::models::post::{
     increment_post_viewer_count, publish_post, SerializableThreadedPost,
 };
 use crate::models::reaction::{
-    create_reaction, delete_reaction, find_reactions_by_post_id, get_reaction_counts, ReactionDraft,
+    create_reaction, delete_reaction, find_reactions_by_post_id, find_user_reaction,
+    get_reaction_counts, normalize_emoji, ReactionDraft,
 };
 use crate::models::user::{find_user_by_id, AuthSession, Language};
 use crate::web::context::CommonContext;
@@ -2958,6 +2959,9 @@ pub async fn add_reaction(
     let mut tx = db.begin().await?;
     let user_id = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id;
     let post_id = Uuid::parse_str(&post_id)?;
+    let Some(emoji) = normalize_emoji(&form.emoji) else {
+        return Ok(StatusCode::UNPROCESSABLE_ENTITY.into_response());
+    };
 
     // Get the actor for this user
     let actor = Actor::find_by_user_id(&mut tx, user_id)
@@ -2993,22 +2997,41 @@ pub async fn add_reaction(
         return Ok(StatusCode::NOT_FOUND.into_response());
     }
 
-    let reaction = create_reaction(
-        &mut tx,
-        ReactionDraft {
-            post_id,
-            actor_id: actor.id,
-            emoji: form.emoji.clone(),
-        },
-        &state.config.domain,
-    )
-    .await?;
     let login_name = post
         .as_ref()
         .and_then(|p| p.get("login_name"))
         .and_then(|l| l.as_ref())
         .unwrap_or(&String::new())
         .clone();
+
+    // Typing an emoji you have already reacted with is not an error; the
+    // reaction is simply there.
+    if find_user_reaction(&mut tx, post_id, actor.id, emoji)
+        .await?
+        .is_some()
+    {
+        let reaction_counts = get_reaction_counts(&mut tx, post_id, Some(actor.id)).await?;
+        tx.commit().await?;
+        let template = state.env.get_template("post_reactions.jinja")?;
+        let rendered = template.render(context! {
+            current_user => auth_session.user,
+            reaction_counts => reaction_counts,
+            post_id => post_id.to_string(),
+            login_name => login_name,
+        })?;
+        return Ok(Html(rendered).into_response());
+    }
+
+    let reaction = create_reaction(
+        &mut tx,
+        ReactionDraft {
+            post_id,
+            actor_id: actor.id,
+            emoji: emoji.to_string(),
+        },
+        &state.config.domain,
+    )
+    .await?;
 
     // Get post author's actor for sending ActivityPub activity
     let post_author_id = post
@@ -3102,7 +3125,7 @@ pub async fn add_reaction(
                         &actor.iri,
                     )?),
                     object: post_url.parse()?,
-                    content: form.emoji.clone(),
+                    content: emoji.to_string(),
                     r#type: "EmojiReact".to_string(),
                     id: reaction.iri.parse()?,
                     to: vec![post_author_actor.iri.to_string()],
@@ -3196,7 +3219,6 @@ pub async fn remove_reaction(
     }
 
     // Find the reaction before deleting (need IRI for Undo activity)
-    use crate::models::reaction::find_user_reaction;
     let existing_reaction = find_user_reaction(&mut tx, post_id, actor.id, &form.emoji).await?;
 
     let _ = delete_reaction(&mut tx, post_id, actor.id, &form.emoji).await;
