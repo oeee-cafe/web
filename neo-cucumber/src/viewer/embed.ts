@@ -64,7 +64,8 @@ const icon = (name: string, path: string) =>
  * The controls as a page renders them before this script has arrived:
  * everything disabled and nothing to read, because the words are in this
  * script's catalog and not the server's. Rewind, Play and Skip to end are
- * one pill, as a player's transport is, and the speeds another. The three
+ * the design system's raised buttons, since they act rather than choose; the
+ * speeds are a choice, and a segmented pill. The three icons
  * are Material Symbols (skip-previous, play-arrow, pause, skip-next), inline
  * as the site's toolbar draws them: the viewer has no React for
  * ../components/Icon, and the page has to draw them before any script. So the
@@ -78,7 +79,7 @@ const icon = (name: string, path: string) =>
  */
 export function controlsMarkup(): string {
   const button = (control: string, icons: string) =>
-    `<button class="neo-cucumber-replay-button" type="button" data-replay-control="${control}" disabled>${icons}</button>`;
+    `<button class="neo-cucumber-replay-button ds-button" type="button" data-replay-control="${control}" disabled>${icons}</button>`;
   const speeds = SPEEDS.map(
     (speed, index) =>
       `<button class="neo-cucumber-replay-speed" type="button" aria-pressed="${index === DEFAULT_SPEED_INDEX}" disabled>${speed.label}</button>`
@@ -87,7 +88,7 @@ export function controlsMarkup(): string {
     '<div class="neo-cucumber-replay-controls">' +
     '<input class="neo-cucumber-replay-seek" type="range" min="0" max="1000" value="1000" disabled>' +
     '<div class="neo-cucumber-replay-buttons">' +
-    '<div class="neo-cucumber-replay-transport ds-segmented">' +
+    '<div class="neo-cucumber-replay-transport">' +
     button("rewind", icon("rewind", "M5.5 18V6h2v12zm13 0l-9-6l9-6z")) +
     button("play", icon("play", "M8 19V5l11 7z") + icon("pause", "M14 19V5h4v14zm-8 0V5h4v14z")) +
     button("skip", icon("skip", "M16.5 18V6h2v12zm-11 0V6l9 6z")) +
