@@ -1424,19 +1424,19 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    right for one language, and wrong in the desktop app, whose window
    controls take 96px of the row.
 
-   The row is four equal quarters: the three sections and 넷캔. Every
-   item grows from nothing, and the bases below are what make the shares
-   come out equal although the sections sit in a track and 넷캔 does not.
-   A section is its 3px + 3px of padding; 넷캔 its own 10px + 12px and its
-   1px + 1px of border, 24px; so the group starts from three of 넷캔's
-   24px and the 10px its own track spends -- 2px of padding and 1px of
-   border a side, and the 2px between each pair: 82px, measured border to border so that the painter pages'
-   border-box reset cannot change it. With the group growing three times
-   as fast as 넷캔, each section ends up exactly as wide as 넷캔. A label
-   too long for its quarter ends in an ellipsis; 넷캔, whose words are not
-   in an element of their own, keeps its width and its padding instead,
-   and the sections share what is left. It takes the sections' smaller
-   type here, which is also what lets a long name fit its quarter. */
+   The row is four equal quarters: the three sections and 넷캔. Every item
+   grows from nothing, and the bases below are what make the shares come
+   out equal although the sections sit in a track and 넷캔 does not. A
+   section is its 3px + 3px of padding; 넷캔 its own 10px + 12px and its 1px
+   + 1px of border, 24px; so the group starts from three of 넷캔's 24px and
+   the 10px its own track spends -- 2px of padding and 1px of border a
+   side, and the 2px between each pair: 82px, measured border to border so
+   that the painter pages' border-box reset cannot change it. With the
+   group growing three times as fast as 넷캔, each section ends up exactly
+   as wide as 넷캔. A label too long for its quarter is never cut to fit it:
+   that item, a section or 넷캔, keeps its own width, and the others share
+   what is left. 넷캔 takes the sections' smaller type here, which is also
+   what lets a long name fit its quarter. */
 .nav-bar.is-stacked .toolbar-links {
   order: 3;
   width: 100%;
@@ -1446,7 +1446,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .nav-bar.is-stacked .toolbar-sections {
   -webkit-box-flex: 3;
   flex: 3 1 82px;
-  min-width: 0;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
 }
@@ -1454,13 +1453,10 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 .nav-bar.is-stacked .toolbar-sections a {
   -webkit-box-flex: 1;
   flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
   padding-right: 3px;
   padding-left: 3px;
   font-size: var(--ds-text-s);
   text-align: center;
-  text-overflow: ellipsis;
 }
 
 .nav-bar.is-stacked .toolbar-links a.toolbar-live,
