@@ -91,7 +91,8 @@ describe("playback pacing", () => {
     });
     const wall = performance.now() - started;
     replay.destroy();
-    painter?.unmount();
+    // Assigned inside `newPainter`, which the narrowing above cannot see.
+    (painter as PainterHandle | null)?.unmount();
     host.remove();
     expect(applied).toBe(replay.length - 1);
     return wall;

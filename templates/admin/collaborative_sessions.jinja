@@ -110,14 +110,14 @@
               {% if not session.ended_at %}
                 <a href="/collaborate/{{ session.id }}">open →</a>
               {% endif %}
-              {# The recording of this session's canonical stream, for replaying
-                 it back through the client when a canvas came out wrong. Offered
-                 for every row: an ended session is exactly the one worth
-                 examining, and the archive outlives the room. #}
-              <a href="/admin/collaborative-sessions/{{ session.id }}/replay">replay</a>
-              <a href="/admin/collaborative-sessions/{{ session.id }}/archive">log</a>
-              <a href="/admin/collaborative-sessions/{{ session.id }}/chat">chat</a>
-              <a href="/admin/collaborative-sessions/{{ session.id }}/diagnostics">reports</a>
+              {# The recording of this session's canonical stream, played back
+                 with its log, its conversation and any reports beside it.
+                 Offered for every row: an ended session is exactly the one
+                 worth examining, and the archive outlives the room. #}
+              <a href="/admin/collaborative-sessions/{{ session.id }}">inspect</a>
+              {# The raw file, for running it through something that is not
+                 this site. #}
+              <a href="/admin/collaborative-sessions/{{ session.id }}/archive" download>log ↓</a>
             </td>
           </tr>
         {% endfor %}

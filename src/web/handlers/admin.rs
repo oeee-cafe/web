@@ -637,8 +637,9 @@ pub async fn download_collaborative_archive(
 fn require_recording(state: &AppState) -> Result<(), AppError> {
     match crate::web::handlers::collaborate::archive::bucket(&state.config) {
         Some(_) => Ok(()),
+        // Worded for the " not found" `NotFound` appends.
         None => Err(AppError::NotFound(
-            "Collaborative sessions are not recorded on this deployment: archive_s3_bucket is not configured".to_string(),
+            "Recording storage (archive_s3_bucket is unset on this deployment)".to_string(),
         )),
     }
 }
@@ -716,8 +717,9 @@ pub async fn collaborative_session_chat(
     Ok(axum::Json(lines).into_response())
 }
 
-/// GET /admin/collaborative-sessions/:uuid/replay — the recording, played
-/// back through the painter that drew it.
+/// GET /admin/collaborative-sessions/:uuid — the recording, played back
+/// through the painter that drew it, with the log, the conversation and the
+/// reports read against it.
 ///
 /// The page holds no permission of its own: it fetches the manifest and the
 /// log from the two admin endpoints above, so serving it to anyone else would
@@ -1549,26 +1551,17 @@ mod tests {
                 "preview_version": null,
             })),
         ]);
+        // One place for everything kept about a session -- the replay, the
+        // log, the conversation and the reports are read against each other.
+        assert!(rendered.contains(
+            "href=\"/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009\""
+        ));
+        assert!(rendered.contains(
+            "href=\"/admin/collaborative-sessions/00000000-0000-0000-0000-00000000000c\""
+        ));
+        // And the raw file beside it.
         assert!(rendered.contains(
             "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/archive"
-        ));
-        assert!(rendered.contains(
-            "/admin/collaborative-sessions/00000000-0000-0000-0000-00000000000c/archive"
-        ));
-        // And the reports filed against it, which are read together with the
-        // stream they disagree with.
-        assert!(rendered.contains(
-            "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/diagnostics"
-        ));
-        // The recording is worth more played than read, so the viewer comes
-        // first on the row.
-        assert!(rendered.contains(
-            "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/replay"
-        ));
-        // What was said, which is kept beside the recording and never entered
-        // canonical history.
-        assert!(rendered.contains(
-            "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/chat"
         ));
     }
 

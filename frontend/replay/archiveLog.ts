@@ -173,13 +173,24 @@ export type ArchivedChat = {
 };
 
 /**
- * Where each line of the transcript falls on the recording's timeline.
+ * How far into the drawing the canvas had got at a moment, as the index of
+ * the last drawing message sequenced at or before it; -1 before the first.
  *
- * Chat carries the sender's own clock and the log carries the server's, so the
- * two are not the same measurement -- this lines them up by wall-clock time
- * against the first recorded message, which is close enough to read a
- * conversation against a drawing and is not offered as anything more.
+ * By wall-clock time on both sides, never by the player's schedule: that one
+ * shortens every idle pause, so a line said after five quiet minutes would be
+ * placed as if they had lasted a second. Chat and reports carry the sender's
+ * own clock and the log carries the server's, so this is close enough to read
+ * a conversation against a drawing and is not offered as anything more.
+ *
+ * `times` is ascending, as sequencing makes it.
  */
-export function chatOffsets(chat: ArchivedChat[], firstMessageAt: number): number[] {
-  return chat.map((line) => Math.max(0, line.at - firstMessageAt));
+export function positionAt(times: number[], at: number): number {
+  let low = 0;
+  let high = times.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (times[middle] <= at) low = middle + 1;
+    else high = middle;
+  }
+  return low - 1;
 }

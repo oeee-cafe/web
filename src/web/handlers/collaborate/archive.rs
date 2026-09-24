@@ -1091,7 +1091,7 @@ pub async fn read_manifest(
 pub async fn download_diagnostics(
     state: &AppState,
     room_uuid: Uuid,
-) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<FiledDiagnostic>, Box<dyn std::error::Error + Send + Sync>> {
     let Some(bucket) = bucket(&state.config) else {
         return Ok(Vec::new());
     };
@@ -1122,11 +1122,55 @@ pub async fn download_diagnostics(
             .await?;
         let bytes = object.body.collect().await?.into_bytes();
         match serde_json::from_slice(&bytes) {
-            Ok(report) => reports.push(report),
+            Ok(report) => {
+                let (filed_at, filed_by) = filed_as(&key);
+                reports.push(FiledDiagnostic {
+                    filed_at,
+                    filed_by,
+                    key,
+                    report,
+                })
+            }
             Err(e) => warn!("Skipping unreadable diagnostic {}: {}", key, e),
         }
     }
     Ok(reports)
+}
+
+/// One report, with what only its storage key knows.
+///
+/// The body is whatever the client posted, and the client does not say who
+/// it is -- the server does, by writing the authenticated login name into the
+/// key. A reader comparing two clients needs that name beside the report.
+#[derive(Debug, Serialize)]
+pub struct FiledDiagnostic {
+    /// When the server received it, as written into the key.
+    pub filed_at: Option<String>,
+    pub filed_by: Option<String>,
+    pub key: String,
+    pub report: serde_json::Value,
+}
+
+/// Reads `.../diagnostics/<timestamp>-<login>.json` back into its parts.
+///
+/// Split at the first hyphen: the timestamp has none, and a login name may.
+fn filed_as(key: &str) -> (Option<String>, Option<String>) {
+    let Some(name) = key
+        .rsplit('/')
+        .next()
+        .and_then(|name| name.strip_suffix(".json"))
+    else {
+        return (None, None);
+    };
+    match name.split_once('-') {
+        Some((at, by)) => {
+            let at = chrono::NaiveDateTime::parse_from_str(at, "%Y%m%dT%H%M%S%.3fZ")
+                .ok()
+                .map(|at| at.and_utc().to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+            (at, Some(by.to_string()))
+        }
+        None => (None, None),
+    }
 }
 
 /// Records a message that has just been sequenced, when the sequence says so.
@@ -1320,6 +1364,21 @@ mod tests {
     /// would publish every session's traffic to anyone holding the id. An
     /// empty setting is the same as an absent one, because a config written
     /// out with the key blank means the same thing as one without it.
+    #[test]
+    fn a_report_key_says_when_it_was_filed_and_by_whom() {
+        let (at, by) = filed_as(
+            "collaborate-archive/00000000-0000-0000-0000-000000000001/diagnostics/20260924T084655.527Z-some-one.json",
+        );
+        assert_eq!(at.as_deref(), Some("2026-09-24T08:46:55.527Z"));
+        // A hyphen in the login name stays in the login name.
+        assert_eq!(by.as_deref(), Some("some-one"));
+    }
+
+    #[test]
+    fn a_report_key_of_another_shape_is_not_guessed_at() {
+        assert_eq!(filed_as("collaborate-archive/x/diagnostics/report.json"), (None, None));
+    }
+
     #[test]
     fn recording_is_off_until_a_bucket_is_named_for_it() {
         assert_eq!(selected_bucket(None), None);
