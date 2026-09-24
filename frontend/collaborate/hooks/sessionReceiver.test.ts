@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { SessionReceiver, type ReceiverHandlers, type ReceiverSocket } from "./sessionReceiver";
 import type { SessionLink, SessionView } from "./useWebSocket";
 import {
-  caughtUp, concat, HISTORY_ID, replayStart, sequenced, stroke, u64, uuidBytes, welcome,
+  caughtUp, concat, HISTORY_ID, replayBatch, replayStart, sequenced, stroke, u64, uuidBytes,
+  welcome,
 } from "../test/frames";
 import { encodeEndSession, encodeMovePointer, encodePointerUp, MSG_TYPE } from "../binaryProtocol";
 
@@ -132,6 +133,32 @@ describe("a first connection", () => {
     });
     expect(page.receiver.historyId).toBe(HISTORY_ID);
     expect(page.closed).toEqual([]);
+  });
+
+  it("takes a batched replay exactly as it takes the same messages framed one by one", async () => {
+    const page = new Page();
+    await page.join(3, 3);
+    await page.receive(replayBatch([
+      { seq: 1, payload: stroke(1, { x: 4, y: 4 }) },
+      { seq: 2, payload: Uint8Array.from([0xfe, 1, 2]) },
+      { seq: 3, payload: stroke(2, { x: 8, y: 4 }) },
+    ]));
+    expect(page.calledWith("onCanvasMessage")).toEqual(["onCanvasMessage(stroke,1)", "onCanvasMessage(stroke,3)"]);
+    expect(page.calledWith("onUnreadableSequence")).toEqual(["onUnreadableSequence(2)"]);
+    expect(page.link.lastSeq).toBe(3);
+    await page.receive(caughtUp(3));
+    expect(page.link.catchingUp).toBe(false);
+    expect(page.closed).toEqual([]);
+  });
+
+  it("hangs up on a batch it cannot read rather than applying part of one", async () => {
+    const page = new Page();
+    await page.join(3, 2);
+    const batch = replayBatch([{ seq: 1, payload: stroke(1, { x: 4, y: 4 }) }]);
+    new DataView(batch.buffer).setUint32(17, 5, true);
+    await page.receive(batch);
+    expect(page.calledWith("onCanvasMessage")).toEqual([]);
+    expect(page.closed).toEqual([{ code: 4000, reason: "unreadable replay batch" }]);
   });
 
   it("hangs up on a gap the server's CAUGHT_UP would otherwise paper over", async () => {
@@ -287,6 +314,13 @@ describe("a live session", () => {
     expect(page.closed).toEqual([{ code: 4000, reason: "canonical history changed" }]);
     expect(page.link.catchingUp, "drawing held until the replay").toBe(true);
     expect(page.calledWith("onCanvasMessage"), "nothing from the other history applied").toEqual([]);
+  });
+
+  it("ignores a replay batch that arrives once it is live", async () => {
+    const page = await live();
+    await page.receive(replayBatch([{ seq: 1, payload: stroke(1, { x: 4, y: 4 }) }]));
+    expect(page.calledWith("onCanvasMessage")).toEqual([]);
+    expect(page.link.lastSeq).toBe(0);
   });
 
   it("hangs up on a sequence gap rather than drawing past it", async () => {

@@ -1,8 +1,9 @@
-import type {
-  PainterOperation,
-  PainterBrush as WireBrushType,
-  PainterMask as Mask,
-  PainterRegionTool as RegionTool,
+import {
+  inflateZlib,
+  type PainterOperation,
+  type PainterBrush as WireBrushType,
+  type PainterMask as Mask,
+  type PainterRegionTool as RegionTool,
 } from "neo-cucumber";
 
 const NO_MASK: Mask = { type: 0, r: 0, g: 0, b: 0 };
@@ -11,7 +12,8 @@ const NO_MASK: Mask = { type: 0, r: 0, g: 0, b: 0 };
  *
  * Message Types:
  * - 0x00-0x0F: Server messages (parsed by server)
- * - 0x10+: Client messages (broadcast only)
+ * - 0x10: REPLAY_BATCH, server to client only; the server range is full
+ * - 0x11+: Client messages (broadcast only)
  *
  * Canvas messages carry a 1-byte session-scoped user id (assigned by the
  * server via WELCOME, Drawpile's "context id") instead of a 16-byte UUID.
@@ -87,8 +89,12 @@ export const MSG_TYPE = {
   WELCOME: 0x0e,
   // Declares the history identity and exact position reached by replay.
   CAUGHT_UP: 0x0f,
+  // Several sequenced history messages in one compressed frame, sent to a
+  // client whose URL asked for its replay that way. The server refuses the
+  // byte from a client, so one can only come from the server.
+  REPLAY_BATCH: 0x10,
 
-  // Client messages (>= 0x10) - server just broadcasts
+  // Client messages (> 0x10) - server just broadcasts
   FILL: 0x12,
   POINTER_UP: 0x13,
   // Ephemeral collaborator pointer position; never enters canvas history.
@@ -558,6 +564,44 @@ export function unwrapSequenced(
     seq: readUint64LE(buffer, 17),
     payload: data.slice(25),
   };
+}
+
+/**
+ * Unwraps a REPLAY_BATCH into the sequenced messages it carries.
+ *
+ * `[0x10][historyId:16][count:4][zlib([seq:8][len:4][message]...)]`. Each
+ * entry is what a SEQUENCED frame of the same message carries after its
+ * envelope. A batch that does not inflate, or whose entries do not add up to
+ * its count, is refused whole rather than applied in part: a replay missing
+ * a message would fail the position check and be asked for again, but one
+ * with a message cut short would put a wrong operation on the canvas.
+ */
+export function unwrapReplayBatch(
+  data: ArrayBuffer,
+): { historyId: string; entries: { seq: number; payload: ArrayBuffer }[] } | null {
+  const buffer = new Uint8Array(data);
+  if (buffer.length < 21 || buffer[0] !== MSG_TYPE.REPLAY_BATCH) return null;
+  const historyId = bytesToUuid(buffer.slice(1, 17));
+  const count = readUint32LE(buffer, 17);
+  let body: Uint8Array;
+  try {
+    body = inflateZlib(buffer.subarray(21));
+  } catch {
+    return null;
+  }
+  const entries: { seq: number; payload: ArrayBuffer }[] = [];
+  let at = 0;
+  while (at < body.length) {
+    if (at + 12 > body.length) return null;
+    const seq = readUint64LE(body, at);
+    const length = readUint32LE(body, at + 8);
+    at += 12;
+    if (at + length > body.length) return null;
+    entries.push({ seq, payload: body.slice(at, at + length).buffer as ArrayBuffer });
+    at += length;
+  }
+  if (entries.length !== count) return null;
+  return { historyId, entries };
 }
 
 /**
