@@ -580,7 +580,12 @@ pub async fn download_collaborative_archive(
 ) -> Result<Response, AppError> {
     let archive = crate::web::handlers::collaborate::archive::download_session(&state, room_uuid)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to read the archive: {}", e))?;
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read the archive: {}",
+                crate::web::handlers::collaborate::archive::describe(&*e)
+            )
+        })?;
     if archive.is_empty() {
         return Err(AppError::NotFound("No archive for this session".to_string()));
     }
@@ -638,7 +643,12 @@ pub async fn download_collaborative_diagnostics(
     let reports =
         crate::web::handlers::collaborate::archive::download_diagnostics(&state, room_uuid)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to read the reports: {}", e))?;
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read the reports: {}",
+                    crate::web::handlers::collaborate::archive::describe(&*e)
+                )
+            })?;
     Ok(axum::Json(reports).into_response())
 }
 
@@ -651,7 +661,12 @@ pub async fn collaborative_archive_manifest(
 ) -> Result<Response, AppError> {
     let manifest = crate::web::handlers::collaborate::archive::read_manifest(&state, room_uuid)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to read the manifest: {}", e))?;
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read the manifest: {}",
+                crate::web::handlers::collaborate::archive::describe(&*e)
+            )
+        })?;
     match manifest {
         Some(manifest) => Ok(axum::Json(manifest).into_response()),
         None => Err(AppError::NotFound("No recording for this session".to_string())),
@@ -672,7 +687,12 @@ pub async fn collaborative_session_chat(
 ) -> Result<Response, AppError> {
     let lines = crate::web::handlers::collaborate::archive::read_chat(&state, room_uuid)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to read the transcript: {}", e))?;
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read the transcript: {}",
+                crate::web::handlers::collaborate::archive::describe(&*e)
+            )
+        })?;
     Ok(axum::Json(lines).into_response())
 }
 
