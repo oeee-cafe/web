@@ -1399,3 +1399,144 @@ describe("savepoint memory", () => {
     expect(history.savepointBytesForTest()).toBe(SIZE * SIZE * 4 * 2);
   });
 });
+
+describe("the pen the local user is holding", () => {
+  /**
+   * A controlled painter draws straight into the engine between the messages
+   * this history applies, so whatever an applied operation leaves in the
+   * engine's pen, the local stroke's next segment is drawn with. It used to
+   * leave the remote author's continuation state there, so the local stroke
+   * joined onto somebody else's endpoint here and onto its own everywhere
+   * else -- a doubled or missing joint pixel only its author could see.
+   */
+  it("is handed back as it was after somebody else's operations", async () => {
+    const { engine, history } = setup();
+    const copied = { pasted: 42 } as unknown as ImageData;
+    engine.setStrokeState([[5, 5], [4, 4]]);
+    engine.maskType = 2;
+    engine.maskColor = [1, 2, 3];
+    engine.setClipboard(copied);
+
+    await remote(history, encodeUndoPoint(REMOTE), 1);
+    await remote(history, stroke(REMOTE, 10, 10, 200), 2);
+    await remote(
+      history,
+      encodeLine(REMOTE, REMOTE, "foreground", 1, "solid", { r: 9, g: 0, b: 0, a: 255 }, { x: 1, y: 1 }, { x: 3, y: 3 }),
+      3,
+    );
+    await remote(
+      history,
+      encodeRegion(REMOTE, REMOTE, "foreground", "copy", { x: 0, y: 0, width: 2, height: 2 }, { r: 0, g: 0, b: 0, a: 255 }, 1),
+      4,
+    );
+
+    expect(engine.getStrokeState()).toEqual([[5, 5], [4, 4]]);
+    expect(engine.maskType).toBe(2);
+    expect(engine.maskColor).toEqual([1, 2, 3]);
+    expect(engine.getClipboard()).toBe(copied);
+  });
+
+  /**
+   * A copy before a savepoint and its paste after it: the replay has to paste
+   * what was copied *there*, not whatever its author copied last.
+   */
+  it("replays a paste with the copy that was current at its position", async () => {
+    const { engine, history } = setup();
+    const region = (tool: "copy" | "paste", x: number, y: number) =>
+      encodeRegion(REMOTE, REMOTE, "foreground", tool, { x, y, width: 1, height: 1 }, { r: 0, g: 0, b: 0, a: 255 }, 1);
+    await remote(history, stroke(REMOTE, 1, 1, 50), 1);
+    await remote(history, region("copy", 1, 1), 2);
+    history.takeSavepointForTest();
+    await remote(history, region("paste", 5, 5), 3);
+    await remote(history, stroke(REMOTE, 1, 1, 90), 4);
+    await remote(history, region("copy", 1, 1), 5);
+    expect(redFor(engine, REMOTE, 5, 5)).toBe(50);
+
+    // A third person's undo rebuilds everything after the savepoint.
+    await remote(history, encodeUndoPoint(3), 6);
+    await remote(history, stroke(3, 9, 9, 10), 7);
+    await remote(history, encodeUndo(3, false), 8);
+
+    expect(redFor(engine, REMOTE, 5, 5)).toBe(50);
+  });
+});
+
+describe("the stroke under the pointer", () => {
+  const LOCAL_POINT = { x: 3, y: 3 };
+  const inProgress = (history: CanvasHistory, engine: FakeEngine) => {
+    let drawing = true;
+    let flushed = 0;
+    let counter = 0;
+    // Like the painter's own: a flush with nothing new since the last one
+    // sends nothing.
+    let unsent = true;
+    history.setLocalWork({
+      drawing: () => drawing,
+      flush: () => {
+        if (!unsent) return;
+        unsent = false;
+        flushed += 1;
+        counter += 1;
+        history.registerOptimisticOperation({
+          id: `local:${counter}`,
+          actorId: String(LOCAL),
+          operation: {
+            kind: "stroke",
+            layer: "foreground",
+            brushSize: 1,
+            brush: "solid",
+            color: { r: 150, g: 0, b: 0, a: 255 },
+            points: [LOCAL_POINT],
+            mask: { type: 0, r: 0, g: 0, b: 0 },
+          },
+        });
+      },
+    });
+    // What the pointer has painted and not yet handed over.
+    engine.layers.foreground[(LOCAL_POINT.y * SIZE + LOCAL_POINT.x) * 4] = 150;
+    return {
+      flushed: () => flushed,
+      lift: () => {
+        drawing = false;
+      },
+    };
+  };
+
+  it("survives a replay that happens before it is handed over", async () => {
+    const { engine, history } = setup();
+    inProgress(history, engine);
+    await remote(history, encodeUndoPoint(REMOTE), 1);
+    await remote(history, stroke(REMOTE, 10, 10, 200), 2);
+    await remote(history, encodeUndo(REMOTE, false), 3);
+
+    expect(redFor(engine, REMOTE, 10, 10)).toBe(0);
+    expect(red(engine, LOCAL_POINT.x, LOCAL_POINT.y)).toBe(150);
+  });
+
+  it("is handed over before somebody marks the layers it is on, and only then", async () => {
+    const { engine, history } = setup();
+    const pen = inProgress(history, engine);
+    await remote(history, stroke(REMOTE, 10, 10, 200), 1);
+    expect(pen.flushed()).toBe(0);
+
+    await remote(
+      history,
+      encodeStroke(REMOTE, LOCAL, "foreground", 1, "solid", 90, 0, 0, 255, [LOCAL_POINT]),
+      2,
+    );
+    expect(pen.flushed()).toBe(1);
+  });
+
+  it("keeps savepoints from being taken until it is finished", async () => {
+    const { engine, history } = setup();
+    const pen = inProgress(history, engine);
+    for (let seq = 1; seq <= 70; seq++) {
+      await remote(history, stroke(REMOTE, seq % SIZE, 0, seq), seq);
+    }
+    expect(history.savepointCountForTest()).toBe(1);
+
+    pen.lift();
+    await remote(history, stroke(REMOTE, 1, 1, 1), 71);
+    expect(history.savepointCountForTest()).toBe(2);
+  });
+});

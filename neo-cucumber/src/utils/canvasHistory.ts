@@ -68,7 +68,20 @@ type StrokeState = [[number, number], [number, number]] | null;
  * across the canvas. Every lookup goes through `actorKey` to prevent that.
  */
 type ActorKey = string;
-type StrokeStates = Map<ActorKey, StrokeState>;
+/**
+ * What each actor's next operation depends on besides the layers: where their
+ * pen left off, and what they last copied.
+ *
+ * Both are part of a position in history, not of the client replaying it. A
+ * replay from a savepoint has to paste the copy that was current *there*, and
+ * a pass that runs history into scratch buffers -- compaction -- must not
+ * leave its older copy behind as the live one. So the clipboards travel with
+ * the continuation states, cloned and restored with them, rather than living
+ * in one map that every pass writes into.
+ */
+class StrokeStates extends Map<ActorKey, StrokeState> {
+  readonly clipboards = new Map<ActorKey, ImageData | null>();
+}
 
 const actorKey = (id: HistoryActorId): ActorKey => String(id);
 
@@ -245,7 +258,12 @@ function transportId(bytes: Uint8Array): string {
 }
 
 function cloneStrokes(strokes: StrokeStates): StrokeStates {
-  const copy: StrokeStates = new Map();
+  const copy = new StrokeStates();
+  // Shared rather than copied: a copy makes a new ImageData and nothing
+  // writes into one after, so two positions can hold the same image.
+  for (const [userId, clipboard] of strokes.clipboards) {
+    copy.clipboards.set(userId, clipboard);
+  }
   for (const [userId, state] of strokes) {
     copy.set(
       userId,
@@ -381,6 +399,19 @@ export class CanvasHistory {
   private localUserId: HistoryActorId = -1;
   /** Whose pair local marks land in; our own unless the host redirects it. */
   private localTargetOwner: ActorKey = actorKey(-1);
+  /**
+   * The stroke the pointer is painting, which this history cannot see yet.
+   *
+   * A controlled painter draws straight into the engine and hands its stroke
+   * over in chunks, so for up to a chunk's worth of time there are pixels on
+   * the canvas that no entry here accounts for. A replay would restore a
+   * savepoint over them and nothing would put them back -- the chunk arrives
+   * afterwards through `registerOptimisticOperation`, which paints nothing,
+   * and its echo is taken as already on screen -- leaving a gap only its
+   * author sees. A savepoint taken then would hold them in a position they
+   * come after, and draw them twice on the next replay.
+   */
+  private localWork: { drawing: () => boolean; flush: () => void } | null = null;
   private onChange?: (canUndo: boolean, canRedo: boolean) => void;
 
   private entries: Entry[] = [];
@@ -399,9 +430,7 @@ export class CanvasHistory {
   private canonicalLog: CanonicalPainterOperation[] = [];
   private openBatch: OpenBatch | null = null;
   // Per-user stroke continuation state of the currently rendered canvas
-  private liveStrokes: StrokeStates = new Map();
-  /** One clipboard per user, so a paste replays the sender's copy. */
-  private readonly clipboards = new Map<ActorKey, ImageData | null>();
+  private liveStrokes = new StrokeStates();
   private snapshotCache = new WeakMap<HistorySnapshot, Uint8ClampedArray>();
   /**
    * Decoded raster marks, so a replay does not decode the same PNG again for
@@ -496,7 +525,13 @@ export class CanvasHistory {
     this.fork = [];
     this.canonicalLog = [];
     this.openBatch = null;
-    this.liveStrokes = new Map();
+    // Copies survive a checkpoint, as they do in the room: a paste after it
+    // still reads what its author copied before it.
+    const clipboards = this.liveStrokes.clipboards;
+    this.liveStrokes = new StrokeStates();
+    for (const [userId, clipboard] of clipboards) {
+      this.liveStrokes.clipboards.set(userId, clipboard);
+    }
     // Cleared before capturing, not after: `captureLayers` shares the last
     // savepoint's arrays for anyone who has not drawn since it, and with the
     // dirty set just emptied that is everyone. Leaving the old savepoints in
@@ -512,7 +547,7 @@ export class CanvasHistory {
         index: 0,
         layers: captured.layers,
         generations: captured.generations,
-        strokes: new Map(),
+        strokes: cloneStrokes(this.liveStrokes),
       },
     ];
     this.notify();
@@ -679,6 +714,11 @@ export class CanvasHistory {
     this.fork.push({ id: entry.id, msg, area: affectedArea(msg) });
     if (msg.type === "undoPoint") {
       this.liveStrokes.set(actorKey(entry.actorId), null);
+    } else if (msg.type === "region" && msg.tool === "copy") {
+      // The copy was made on the canvas, not here, so the engine holds it and
+      // this history does not. Without it, a remote op that swapped clipboards
+      // before the paste arrived would find nothing to hand back.
+      this.liveStrokes.clipboards.set(actorKey(entry.actorId), this.engine.getClipboard());
     }
     this.notify();
   }
@@ -814,11 +854,42 @@ export class CanvasHistory {
     }));
   }
 
+  /** Tells this history how to see and hand over the stroke in progress. */
+  setLocalWork(localWork: { drawing: () => boolean; flush: () => void } | null): void {
+    this.localWork = localWork;
+  }
+
+  /**
+   * Puts the stroke in progress into the fork, where replays and the
+   * concurrency check can see it. Registration is synchronous, so it is there
+   * when this returns.
+   */
+  private flushLocalWork(): void {
+    if (this.localWork?.drawing()) this.localWork.flush();
+  }
+
   private async handleCanonicalMessage(
     id: string,
     msg: HistoryOperation,
     seq?: number,
   ): Promise<void> {
+    // Somebody else's mark on the pair the pointer is painting: it has to be
+    // checked against the stroke in progress, so that stroke has to be in the
+    // fork first. Only then, because a flush is a message for the whole room,
+    // and people drawing on their own layers never contend.
+    if (
+      this.localWork?.drawing() &&
+      !("userId" in msg && actorKey(msg.userId) === actorKey(this.localUserId))
+    ) {
+      const area = affectedArea(msg);
+      if (
+        area.kind === "everything" ||
+        (area.kind === "pixels" && area.owner === this.localTargetOwner)
+      ) {
+        this.flushLocalWork();
+      }
+    }
+
     // Echo of our own fork head: already on the canvas (except undo/undoPoint
     // which take effect now)
     const actor = "userId" in msg ? actorKey(msg.userId) : "";
@@ -1167,6 +1238,8 @@ export class CanvasHistory {
    * the unconfirmed fork on top.
    */
   private async replayFrom(sp: Savepoint): Promise<void> {
+    // Before the restore wipes it: in the fork, it is re-applied below.
+    this.flushLocalWork();
     this.restoreLayers(sp);
     const strokes = cloneStrokes(sp.strokes);
     for (let i = sp.index; i < this.entries.length; i++) {
@@ -1280,8 +1353,9 @@ export class CanvasHistory {
   }
 
   private maybeSavepoint(): void {
-    // Savepoints must capture confirmed-only state
-    if (this.hasPendingLocal) return;
+    // Savepoints must capture confirmed-only state, and a stroke still under
+    // the pointer is not even in the fork yet
+    if (this.hasPendingLocal || this.localWork?.drawing()) return;
     const last = this.latestSavepoint();
     if (this.entries.length - last.index < SAVEPOINT_INTERVAL) return;
     const captured = this.captureLayers();
@@ -1370,7 +1444,39 @@ export class CanvasHistory {
     }
   }
 
+  /**
+   * Applies one operation, leaving the engine's pen as it found it.
+   *
+   * The engine has one pen -- continuation state, mask, clipboard -- and the
+   * person at this client is holding it: their stroke paints straight into
+   * the engine as the pointer moves, between the messages that arrive here.
+   * Every operation below borrows the pen for its author and must hand it
+   * back, or the local stroke's next segment continues from somebody else's
+   * endpoint and joins differently here than on every other client, and a
+   * paste in progress drops whatever a remote region op last copied.
+   */
   private applyDrawSync(
+    msg: HistoryOperation,
+    source: LayerSource,
+    strokes: StrokeStates
+  ): void {
+    const pen = {
+      stroke: this.engine.getStrokeState(),
+      maskType: this.engine.maskType,
+      maskColor: this.engine.maskColor,
+      clipboard: this.engine.getClipboard(),
+    };
+    try {
+      this.applyDrawWithPen(msg, source, strokes);
+    } finally {
+      this.engine.setStrokeState(pen.stroke);
+      this.engine.maskType = pen.maskType;
+      this.engine.maskColor = pen.maskColor;
+      this.engine.setClipboard(pen.clipboard);
+    }
+  }
+
+  private applyDrawWithPen(
     msg: HistoryOperation,
     source: LayerSource,
     strokes: StrokeStates
@@ -1406,16 +1512,19 @@ export class CanvasHistory {
         // sender copied rather than whatever the receiver last copied -- which
         // is usually nothing.
         const targets = layers;
-        this.engine.setClipboard(this.clipboards.get(actorKey(msg.userId)) ?? null);
+        this.engine.setClipboard(strokes.clipboards.get(actorKey(msg.userId)) ?? null);
         this.engine.applyRegionTool(
           msg.tool, msg.layer, msg.rect, msg.color, msg.brushSize, targets
         );
         if (msg.tool === "copy") {
-          this.clipboards.set(actorKey(msg.userId), this.engine.getClipboard());
+          strokes.clipboards.set(actorKey(msg.userId), this.engine.getClipboard());
         }
         break;
       }
       case "line":
+        // A line is a stroke of its own, so it starts with no joint to skip,
+        // as NEO's line tool does -- not wherever this client's pen last was.
+        this.engine.setStrokeState(null);
         this.engine.drawLine(
           layers[msg.layer],
           // Drawn new -> previous, as NEO draws every segment
@@ -1426,6 +1535,7 @@ export class CanvasHistory {
         this.engine.setStrokeState(null);
         break;
       case "bezier":
+        this.engine.setStrokeState(null);
         this.engine.drawBezier(
           msg.layer,
           msg.points as [number, number, number, number, number, number, number, number],
