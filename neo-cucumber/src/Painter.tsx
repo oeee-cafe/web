@@ -207,6 +207,9 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     },
     [],
   );
+  const setHiddenParticipants = useCallback((actorIds: string[]) => {
+    setHiddenOwners(new Set(actorIds));
+  }, []);
   const toggleOwnerVisible = useCallback((actorId: string) => {
     setHiddenOwners((current) => {
       const next = new Set(current);
@@ -957,6 +960,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       setInteractionEnabled,
       setLocalActorId,
       setParticipants,
+      setHiddenParticipants,
       setLayersOrigin,
       applyCanonicalOperation,
       exportCheckpoint,
@@ -968,7 +972,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       // The owning mount adapter replaces this with its React-root teardown.
       unmount: () => {},
     }),
-    [save, exportPng, exportReplay, loadImage, undo, redo, command, setLocalActorId, setParticipants, setLayersOrigin, applyCanonicalOperation, exportCheckpoint, applyCheckpoint, exportSessionArchive, compactCanonicalHistory, isSynchronizationSettled, synchronizationTrace],
+    [save, exportPng, exportReplay, loadImage, undo, redo, command, setLocalActorId, setParticipants, setHiddenParticipants, setLayersOrigin, applyCanonicalOperation, exportCheckpoint, applyCheckpoint, exportSessionArchive, compactCanonicalHistory, isSynchronizationSettled, synchronizationTrace],
   );
 
   // Point the engine, the history and the emitter at the selected participant

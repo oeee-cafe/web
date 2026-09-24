@@ -94,10 +94,12 @@ async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
 
-/** Opaque pixels around a point, across every mounted layer. */
-function inkAt(point: { x: number; y: number }): boolean {
+/** Opaque pixels around a point, across every mounted layer -- or only the
+ * ones on show, for asking what a viewer would see. */
+function inkAt(point: { x: number; y: number }, shownOnly = false): boolean {
   for (const canvas of document.querySelectorAll("canvas")) {
     if (canvas.width !== WIDTH || canvas.height !== HEIGHT) continue;
+    if (shownOnly && canvas.style.display === "none") continue;
     const context = canvas.getContext("2d");
     if (!context) continue;
     const x0 = Math.max(0, point.x - 4);
@@ -108,16 +110,21 @@ function inkAt(point: { x: number; y: number }): boolean {
   return false;
 }
 
-async function harness(marks: Parameters<typeof archive>[0]) {
+async function harness(marks: Parameters<typeof archive>[0], painters: PainterHandle[] = []) {
   const host = document.createElement("div");
   document.body.appendChild(host);
   hosts.push(host);
   const entries = decodeArchive(archive(marks)) as ArchivedEntry[];
   const painter = await newPainter(host);
+  painters.push(painter);
   const replay = createReplay({
     painter,
     entries,
-    remount: () => newPainter(host),
+    remount: async () => {
+      const next = await newPainter(host);
+      painters.push(next);
+      return next;
+    },
   });
   return { replay, entries };
 }
@@ -179,6 +186,58 @@ describe("replaying a recording", () => {
     await replay.seek(-1);
     await settle();
     expect(inkAt(FIRST)).toBe(false);
+  });
+
+  /**
+   * A live session grows while it is watched. What arrives later has to land
+   * exactly as it would have had it been there from the start.
+   */
+  it("takes messages recorded since and plays them after the rest", async () => {
+    const whole = decodeArchive(
+      archive([
+        { user: 1, at: 1000, point: FIRST },
+        { user: 2, at: 1200, point: SECOND },
+      ]),
+    ) as ArchivedEntry[];
+    const { replay } = await harness([{ user: 1, at: 1000, point: FIRST }]);
+    await replay.seek(replay.length - 1);
+    expect(replay.length).toBe(1);
+
+    replay.append(whole.slice(1));
+    expect(replay.length).toBe(2);
+    await settle();
+    // Appending moves nothing by itself.
+    expect(inkAt(SECOND)).toBe(false);
+
+    await replay.seek(replay.length - 1);
+    await settle();
+    expect(inkAt(FIRST)).toBe(true);
+    expect(inkAt(SECOND)).toBe(true);
+  });
+
+  /** Looking at one person's marks alone is how "my strokes vanished" gets
+   * answered. Hiding is a view: the pixels are still there. */
+  it("hides a participant's layers and shows them again", async () => {
+    const painters: PainterHandle[] = [];
+    const { replay } = await harness(
+      [
+        { user: 1, at: 1000, point: FIRST },
+        { user: 2, at: 1200, point: SECOND },
+      ],
+      painters,
+    );
+    await replay.seek(replay.length - 1);
+    const painter = painters[painters.length - 1];
+
+    painter.setHiddenParticipants(["2"]);
+    await settle();
+    expect(inkAt(FIRST, true)).toBe(true);
+    expect(inkAt(SECOND, true)).toBe(false);
+    expect(inkAt(SECOND)).toBe(true);
+
+    painter.setHiddenParticipants([]);
+    await settle();
+    expect(inkAt(SECOND, true)).toBe(true);
   });
 
   it("plays forward on its own and stops at the end", async () => {

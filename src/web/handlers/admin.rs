@@ -702,10 +702,6 @@ pub async fn collaborative_session_chat(
     State(state): State<AppState>,
 ) -> Result<Response, AppError> {
     require_recording(&state)?;
-    // A session that is still going, or never drew five hundred marks, has
-    // its conversation only in Redis until something flushes it -- the same
-    // reason the archive download flushes first.
-    crate::web::handlers::collaborate::archive::flush_room(&state, room_uuid).await;
     let lines = crate::web::handlers::collaborate::archive::read_chat(&state, room_uuid)
         .await
         .map_err(|e| {
@@ -715,6 +711,97 @@ pub async fn collaborative_session_chat(
             )
         })?;
     Ok(axum::Json(lines).into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TailQuery {
+    #[serde(default)]
+    after: u64,
+}
+
+/// GET /admin/collaborative-sessions/:uuid/archive/tail?after=N — what has been
+/// recorded since sequence N, for following a live session without flushing
+/// it on every look.
+pub async fn collaborative_archive_tail(
+    _admin: AdminUser,
+    Path(room_uuid): Path<Uuid>,
+    Query(query): Query<TailQuery>,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    require_recording(&state)?;
+    let tail = crate::web::handlers::collaborate::archive::read_tail(&state, room_uuid, query.after)
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read the recording: {}",
+                crate::web::handlers::collaborate::archive::describe(&*e)
+            )
+        })?;
+    Ok((
+        [(header::CONTENT_TYPE, "application/octet-stream")],
+        tail,
+    )
+        .into_response())
+}
+
+/// Who holds which session id right now, for naming the marks of somebody
+/// who joined after the manifest was last written.
+#[derive(serde::Serialize)]
+struct Seat {
+    session_id: u8,
+    login_name: String,
+}
+
+#[derive(serde::Serialize)]
+struct SessionDetails {
+    session: crate::models::admin::AdminCollaborativeSession,
+    participants: Vec<crate::models::admin::AdminSessionParticipant>,
+    seats: Vec<Seat>,
+}
+
+/// GET /admin/collaborative-sessions/:uuid/details — what the database knows
+/// about a session, for the inspector's header: the recording itself does not
+/// carry a title, an owner or a community.
+pub async fn collaborative_session_details(
+    _admin: AdminUser,
+    Path(room_uuid): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let session = crate::models::admin::find_collaborative_session(&mut tx, room_uuid)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Session".to_string()))?;
+    let participants =
+        crate::models::admin::find_collaborative_session_participants(&mut tx, room_uuid).await?;
+    tx.commit().await?;
+
+    // The live assignment expires with the room; the manifest's copy is the
+    // record after that, and an empty list here says only that it has gone.
+    let assigned = state
+        .redis_state
+        .get_user_ids(room_uuid)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!("Could not read the seats for {}: {}", room_uuid, e);
+            Default::default()
+        });
+    let mut seats: Vec<Seat> = participants
+        .iter()
+        .filter_map(|participant| {
+            assigned.get(&participant.user_id).map(|session_id| Seat {
+                session_id: *session_id,
+                login_name: participant.login_name.clone(),
+            })
+        })
+        .collect();
+    seats.sort_by_key(|seat| seat.session_id);
+
+    Ok(axum::Json(SessionDetails {
+        session,
+        participants,
+        seats,
+    })
+    .into_response())
 }
 
 /// GET /admin/collaborative-sessions/:uuid — the recording, played back
@@ -727,10 +814,24 @@ pub async fn collaborative_session_chat(
 pub async fn replay_collaborative_session(
     _admin: AdminUser,
     Path(_room_uuid): Path<Uuid>,
+    State(state): State<AppState>,
 ) -> Result<Response, AppError> {
     let html = std::fs::read_to_string("neo-cucumber/dist-replay/index.html")
         .map_err(|_| anyhow::anyhow!("The replay viewer has not been built"))?;
-    Ok(Html(html).into_response())
+    let head = state
+        .env
+        .get_template("admin/replay_head.jinja")?
+        .render(context! {})?;
+    Ok(Html(with_head(&html, &head)).into_response())
+}
+
+/// `html` with `head` added at the end of its <head>, or unchanged if it has
+/// none to add to.
+fn with_head(html: &str, head: &str) -> String {
+    match html.find("</head>") {
+        Some(at) => format!("{}{}{}", &html[..at], head, &html[at..]),
+        None => html.to_string(),
+    }
 }
 
 /// The catalogue a store at a time, as /admin/store lists it.
@@ -1563,6 +1664,26 @@ mod tests {
         assert!(rendered.contains(
             "/admin/collaborative-sessions/00000000-0000-0000-0000-000000000009/archive"
         ));
+    }
+
+    /// The inspector is a built page, and the design system reaches it only
+    /// through what the server adds to its head -- after the painter's reset,
+    /// or the reset would undo it.
+    #[test]
+    fn the_inspector_is_given_the_design_system_after_its_own_sheet() {
+        let head = test_env()
+            .get_template("admin/replay_head.jinja")
+            .expect("template loads")
+            .render(context! {})
+            .expect("renders");
+        assert!(head.contains("/static/ds.css"));
+        assert!(head.contains("/static/admin.css"));
+        let page = super::with_head(
+            "<html><head><link rel=\"stylesheet\" href=\"/static/replay/replay.css\"></head><body></body></html>",
+            &head,
+        );
+        assert!(page.find("replay.css").unwrap() < page.find("/static/ds.css").unwrap());
+        assert!(page.find("/static/ds.css").unwrap() < page.find("</head>").unwrap());
     }
 
     /// Sorting and filtering have to survive each other: a status link that

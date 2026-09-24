@@ -434,6 +434,37 @@ pub async fn find_all_collaborative_sessions(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<AdminCollaborativeSession>> {
+    find_collaborative_sessions(tx, sort, status, None, limit, offset).await
+}
+
+/// One session as the list shows it, for the page that inspects it.
+pub async fn find_collaborative_session(
+    tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
+) -> Result<Option<AdminCollaborativeSession>> {
+    Ok(find_collaborative_sessions(
+        tx,
+        AdminSort::Active,
+        AdminSessionStatus::All,
+        Some(id),
+        1,
+        0,
+    )
+    .await?
+    .into_iter()
+    .next())
+}
+
+/// One query for both, so a session reads the same on the list and on its
+/// own page.
+async fn find_collaborative_sessions(
+    tx: &mut Transaction<'_, Postgres>,
+    sort: AdminSort,
+    status: AdminSessionStatus,
+    only: Option<Uuid>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<AdminCollaborativeSession>> {
     let rows = query!(
         r#"
         SELECT
@@ -457,9 +488,10 @@ pub async fn find_all_collaborative_sessions(
         JOIN users u ON cs.owner_id = u.id
         LEFT JOIN communities c ON cs.community_id = c.id
         LEFT JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
-        WHERE $1 = 'all'
+        WHERE ($1 = 'all'
            OR ($1 = 'live' AND cs.ended_at IS NULL)
-           OR ($1 = 'ended' AND cs.ended_at IS NOT NULL)
+           OR ($1 = 'ended' AND cs.ended_at IS NOT NULL))
+          AND ($5::uuid IS NULL OR cs.id = $5)
         GROUP BY cs.id, u.login_name, c.slug, c.name, c.visibility
         ORDER BY
             CASE WHEN $2 = 'created' THEN cs.created_at END DESC,
@@ -471,6 +503,7 @@ pub async fn find_all_collaborative_sessions(
         sort.as_sql(),
         limit,
         offset,
+        only,
     )
     .fetch_all(&mut **tx)
     .await?;
@@ -497,6 +530,43 @@ pub async fn find_all_collaborative_sessions(
             preview_version: None,
         })
         .collect())
+}
+
+/// Somebody who has been in a session, as its inspector lists them.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminSessionParticipant {
+    pub user_id: Uuid,
+    pub login_name: String,
+    pub display_name: String,
+    pub joined_at: chrono::NaiveDateTime,
+    pub left_at: Option<chrono::NaiveDateTime>,
+    pub is_active: bool,
+}
+
+/// Everyone who has ever joined a session, in the order they first did.
+pub async fn find_collaborative_session_participants(
+    tx: &mut Transaction<'_, Postgres>,
+    session_id: Uuid,
+) -> Result<Vec<AdminSessionParticipant>> {
+    Ok(query_as!(
+        AdminSessionParticipant,
+        r#"
+        SELECT
+            csp.user_id,
+            u.login_name,
+            u.display_name,
+            csp.joined_at,
+            csp.left_at,
+            csp.is_active
+        FROM collaborative_sessions_participants csp
+        JOIN users u ON csp.user_id = u.id
+        WHERE csp.session_id = $1
+        ORDER BY csp.joined_at
+        "#,
+        session_id,
+    )
+    .fetch_all(&mut **tx)
+    .await?)
 }
 
 /// A banner as the review queue shows it.

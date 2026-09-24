@@ -1,6 +1,7 @@
 /**
- * The session page: a recording played back, with its log, its conversation
- * and its clients' reports beside it, all tied to the same position.
+ * The session page: a recording played back, with its log, its conversation,
+ * its people and its clients' reports beside it, all tied to one position --
+ * and, for a session still going, kept up to date as it goes.
  *
  * Staff-only by where it gets its data. Every endpoint is behind the admin
  * extractor, so a page served to anybody else fetches 403s and says so -- the
@@ -16,13 +17,20 @@ import {
   type ArchivedEntry,
 } from "./archiveLog";
 import { chatPanel } from "./chatPanel";
-import { el, type Panel, type Seek } from "./dom";
+import { el, type InspectorData, type Panel, type Seek, type SessionDetails } from "./dom";
+import { header } from "./header";
 import { logPanel } from "./logPanel";
-import { logRows, type LogRow } from "./logRows";
+import { logRows } from "./logRows";
+import { markers } from "./markers";
+import { peoplePanel } from "./peoplePanel";
 import { createReplay, drawableEntries, type ReplayHandle } from "./player";
-import { reportsPanel, type FiledReport } from "./reportsPanel";
+import { filedAt, reportsPanel, type FiledReport } from "./reportsPanel";
 
 const SPEEDS = [1, 2, 4, 16];
+
+/** How often a live session is asked what is new. Each ask is a listing and
+ * a Redis read on the server, never a flush. */
+const LIVE_POLL_MS = 5000;
 
 /** The one participant a replay does not have. Named so it cannot collide
  * with a session id, which are the small integers the room assigns. */
@@ -59,112 +67,160 @@ function unavailable(loaded: Loaded<unknown>, what: string): string | undefined 
   return `Could not read the ${what}: ${loaded.message}.`;
 }
 
+/** A log's bytes as entries: nothing for an empty answer, which is what a
+ * tail with nothing new is. */
+function entriesOf(bytes: Uint8Array): ArchivedEntry[] | null {
+  return bytes.length === 0 ? [] : decodeArchive(bytes);
+}
+
+/**
+ * Where the address says to look: `#<tab>` and optionally `&seq=<n>`, so a
+ * link can hand somebody the canvas, the tab and the row at one moment.
+ */
+function readHash(): { tab: string | null; seq: number | null } {
+  const [tab, ...rest] = window.location.hash.slice(1).split("&");
+  let seq: number | null = null;
+  for (const part of rest) {
+    const [key, value] = part.split("=");
+    if (key === "seq" && /^\d+$/.test(value ?? "")) seq = Number(value);
+  }
+  return { tab: tab || null, seq };
+}
+
+function writeHash(tab: string, seq: number | null) {
+  try {
+    history.replaceState(null, "", `#${tab}${seq !== null ? `&seq=${seq}` : ""}`);
+  } catch {
+    // Only a convenience.
+  }
+}
+
 export async function mountReplay(host: HTMLElement, session: string): Promise<void> {
   const base = `/admin/collaborative-sessions/${session}`;
 
-  const header = el("header", "inspect-header");
-  const back = el("a", "inspect-back", "← Sessions");
-  back.href = "/admin/collaborative-sessions";
-  const heading = el("h1", "inspect-title", `Session ${session.slice(0, 8)}`);
-  heading.title = session;
-  const links = el("span", "inspect-links");
-  const logLink = el("a", undefined, "log ↓");
+  const head = header(session);
+  const logLink = el("a", "ds-button ds-button-quiet ds-button-small", "log ↓");
   logLink.href = `${base}/archive`;
   logLink.setAttribute("download", "");
-  const manifestLink = el("a", undefined, "manifest");
+  const manifestLink = el("a", "ds-button ds-button-quiet ds-button-small", "manifest");
   manifestLink.href = `${base}/manifest`;
-  links.append(logLink, manifestLink);
-  header.append(back, heading, links);
-  const status = el("p", "replay-status", "Loading…");
-  host.append(header, status);
+  const copyLink = el("button", "ds-button ds-button-quiet ds-button-small", "copy link");
+  copyLink.type = "button";
+  copyLink.title = "A link to this tab at this moment";
+  copyLink.addEventListener("click", () => {
+    const href = window.location.href;
+    const done = () => {
+      copyLink.textContent = "copied";
+      setTimeout(() => (copyLink.textContent = "copy link"), 1500);
+    };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(href).then(done, () => window.prompt("Link", href));
+    } else {
+      window.prompt("Link", href);
+    }
+  });
+  head.links.append(copyLink, logLink, manifestLink);
+  const status = el("p", "ds-help replay-status", "Loading…");
+  host.append(head.root, status);
 
-  const [manifestLoaded, logLoaded, chatLoaded, reportsLoaded] = await Promise.all([
+  const [manifestLoaded, logLoaded, chatLoaded, reportsLoaded, detailsLoaded] = await Promise.all([
     load<ArchiveManifest>(`${base}/manifest`, (response) => response.json()),
     load(`${base}/archive`, async (response) => new Uint8Array(await response.arrayBuffer())),
     load<ArchivedChat[]>(`${base}/chat`, (response) => response.json()),
     load<FiledReport[]>(`${base}/diagnostics`, (response) => response.json()),
+    load<SessionDetails>(`${base}/details`, (response) => response.json()),
   ]);
 
+  let details = detailsLoaded.ok ? detailsLoaded.value : null;
+  head.setDetails(details, unavailable(detailsLoaded, "session"));
   const manifest = manifestLoaded.ok ? manifestLoaded.value : null;
-  const decoded = logLoaded.ok ? decodeArchive(logLoaded.value) : null;
-  const entries: ArchivedEntry[] = decoded ?? [];
-  // Only a manifest and a log together are a recording: the manifest says how
-  // big the canvas is and who each session id was.
-  const recorded = manifest !== null && decoded !== null;
-  const noRecording = !manifestLoaded.ok
-    ? manifestLoaded.status === 404
+  // A 404 for the log is a session with nothing stored yet, which a live one
+  // can still grow out of; anything else is a failure to say.
+  const decoded = logLoaded.ok ? entriesOf(logLoaded.value) : logLoaded.status === 404 ? [] : null;
+  let entries: ArchivedEntry[] = decoded ?? [];
+  const logProblem = !logLoaded.ok
+    ? logLoaded.status === 404
       ? "No recording for this session."
-      : unavailable(manifestLoaded, "manifest")
-    : !logLoaded.ok
-      ? logLoaded.status === 404
-        ? "No recording for this session."
-        : unavailable(logLoaded, "log")
-      : decoded === null
-        ? "That file is not a recording."
-        : undefined;
+      : unavailable(logLoaded, "log")
+    : decoded === null
+      ? "That file is not a recording."
+      : undefined;
+  let live = details !== null && !details.session.ended_at;
+  let chat: ArchivedChat[] = chatLoaded.ok ? chatLoaded.value : [];
+  let chatUnavailable = unavailable(chatLoaded, "transcript");
+  let reports: FiledReport[] = reportsLoaded.ok ? reportsLoaded.value : [];
+  let reportsUnavailable = unavailable(reportsLoaded, "reports");
 
-  const sessionNames = new Map<number, string>();
-  const traceNames = new Map<string, string>();
-  for (const participant of manifest?.participants ?? []) {
-    sessionNames.set(participant.session_id, participant.login_name);
-    traceNames.set(String(participant.session_id), participant.login_name);
-  }
-
-  const rows: LogRow[] = logRows(entries, sessionNames);
-  const drawn = drawableEntries(entries).map((held) => held.entry);
-  const drawTimes = drawn.map((entry) => entry.at);
-  const startAt = entries.length > 0 ? entries[0].at : null;
-  /** The canvas once the recording has reached `seq`. */
-  const positionOfSeq = (seq: number) => {
-    let low = 0;
-    let high = rows.length;
-    while (low < high) {
-      const middle = (low + high) >> 1;
-      if (rows[middle].seq <= seq) low = middle + 1;
-      else high = middle;
+  /** Session id to login name: the manifest's record, and over it whoever the
+   * room says holds each id now -- somebody who joined after the manifest was
+   * last written is named only there. */
+  const names = new Map<number, string>();
+  const learnNames = () => {
+    for (const participant of manifest?.participants ?? []) {
+      names.set(participant.session_id, participant.login_name);
     }
-    return low > 0 ? rows[low - 1].position : -1;
+    for (const seat of details?.seats ?? []) names.set(seat.session_id, seat.login_name);
   };
+  learnNames();
+
+  const build = (): InspectorData => {
+    const rows = logRows(entries, names);
+    const drawTimes = drawableEntries(entries).map((held) => held.entry.at);
+    return {
+      rows,
+      drawTimes,
+      startAt: entries.length > 0 ? entries[0].at : null,
+      names,
+      logUnavailable: logProblem,
+      chat,
+      chatUnavailable,
+      reports,
+      reportsUnavailable,
+      details,
+      positionOfSeq: (seq: number) => {
+        let low = 0;
+        let high = rows.length;
+        while (low < high) {
+          const middle = (low + high) >> 1;
+          if (rows[middle].seq <= seq) low = middle + 1;
+          else high = middle;
+        }
+        return low > 0 ? rows[low - 1].position : -1;
+      },
+    };
+  };
+  let data = build();
+
+  // What the canvas is: the manifest's record, or for a session that has not
+  // written one yet, the database's.
+  const canvas = manifest?.canvas ?? (details ? { width: details.session.width, height: details.session.height } : null);
 
   let replay: ReplayHandle | null = null;
-  const seek: Seek = recorded
-    ? (position: number) => {
+  /** The message somebody chose, for the address; see `Seek`. */
+  let chosenSeq: number | null = null;
+  /** Where the canvas stands and whether it is playing, as last reported. */
+  let position = -1;
+  let playing = false;
+  const seek: Seek = canvas
+    ? (position: number, seq?: number) => {
         if (!replay) return;
-        replay.pause();
+        // Paused before the choice is recorded, not after: pausing reports
+        // where the canvas still is, and a choice already made would be
+        // dropped as not matching it.
+        if (playing) replay.pause();
+        chosenSeq = seq ?? null;
         void replay.seek(position);
       }
     : undefined;
 
+  let mounted: PainterHandle | null = null;
+  const people = peoplePanel((hidden) => mounted?.setHiddenParticipants(hidden));
+  const log = logPanel(seek);
   const panels: { key: string; label: string; panel: Panel }[] = [
-    {
-      key: "chat",
-      label: "Chat",
-      panel: chatPanel({
-        chat: chatLoaded.ok ? chatLoaded.value : [],
-        unavailable: unavailable(chatLoaded, "transcript"),
-        drawTimes,
-        startAt,
-        seek,
-      }),
-    },
-    {
-      key: "log",
-      label: "Log",
-      panel: logPanel({ rows, unavailable: recorded ? undefined : noRecording, startAt, seek }),
-    },
-    {
-      key: "reports",
-      label: "Reports",
-      panel: reportsPanel({
-        reports: reportsLoaded.ok ? reportsLoaded.value : [],
-        unavailable: unavailable(reportsLoaded, "reports"),
-        drawTimes,
-        positionOfSeq,
-        names: traceNames,
-        startAt,
-        seek,
-      }),
-    },
+    { key: "log", label: "Log", panel: log },
+    { key: "chat", label: "Chat", panel: chatPanel(seek) },
+    { key: "people", label: "People", panel: people },
+    { key: "reports", label: "Reports", panel: reportsPanel(seek) },
   ];
 
   const stage = el("div", "replay-stage");
@@ -172,47 +228,54 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   const canvasHost = el("div", "replay-canvas");
   const controls = el("div", "replay-controls");
   main.append(canvasHost, controls);
-  const side = el("aside", "inspect-side");
-  const tabs = el("nav", "inspect-tabs");
-  side.appendChild(tabs);
+  const side = el("aside", "ds-card inspect-side");
+  const tabs = el("nav", "ds-segmented inspect-tabs");
+  const tabBar = el("div", "inspect-tab-bar");
+  tabBar.appendChild(tabs);
+  side.appendChild(tabBar);
   stage.append(main, side);
   host.appendChild(stage);
 
-  // The tab is kept in the address, so a link to a session's reports opens on
-  // its reports.
+  let tab = "log";
+  let hashSeq: number | null = null;
   const buttons = new Map<string, HTMLButtonElement>();
   const select = (key: string) => {
+    tab = key;
     for (const { key: other, panel } of panels) {
       const on = other === key;
       panel.root.style.display = on ? "" : "none";
-      buttons.get(other)?.setAttribute("aria-selected", on ? "true" : "false");
+      buttons.get(other)?.setAttribute("aria-pressed", on ? "true" : "false");
       if (on) panel.shown?.();
     }
-    try {
-      history.replaceState(null, "", `#${key}`);
-    } catch {
-      // Only a convenience.
+    writeHash(tab, hashSeq);
+  };
+  const label = () => {
+    for (const { key, label: name, panel } of panels) {
+      const count = panel.count();
+      const button = buttons.get(key);
+      if (button) button.textContent = count > 0 ? `${name} ${count}` : name;
     }
   };
-  for (const { key, label, panel } of panels) {
-    const button = el("button", "inspect-tab", panel.count > 0 ? `${label} ${panel.count}` : label);
+  for (const { key, panel } of panels) {
+    const button = el("button", "inspect-tab");
     button.type = "button";
-    button.setAttribute("role", "tab");
     button.addEventListener("click", () => select(key));
     buttons.set(key, button);
     tabs.appendChild(button);
     side.appendChild(panel.root);
+    panel.setData(data);
   }
-  const hashed = window.location.hash.slice(1);
-  const byCount = (key: string) => (panels.find((entry) => entry.key === key)?.panel.count ?? 0) > 0;
+  label();
+  const asked = readHash();
+  const has = (key: string) => (panels.find((entry) => entry.key === key)?.panel.count() ?? 0) > 0;
   // Reports first when there are any: somebody who filed one is why this page
   // is usually open.
   select(
-    panels.some((entry) => entry.key === hashed)
-      ? hashed
-      : byCount("reports")
+    asked.tab && panels.some((entry) => entry.key === asked.tab)
+      ? asked.tab
+      : has("reports")
         ? "reports"
-        : byCount("chat")
+        : has("chat")
           ? "chat"
           : "log",
   );
@@ -221,9 +284,9 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     for (const { panel } of panels) panel.update?.(position, playing);
   };
 
-  if (!recorded || !manifest) {
+  if (!canvas) {
     canvasHost.classList.add("replay-canvas-missing");
-    canvasHost.textContent = noRecording ?? "No recording for this session.";
+    canvasHost.textContent = logProblem ?? "No recording for this session.";
     controls.style.display = "none";
     status.textContent = "";
     // Everything said and reported is at its end state: there is no drawing
@@ -232,12 +295,6 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     return;
   }
 
-  // A recording that does not start at the room's first message is missing
-  // whatever a checkpoint squashed, and drawing it would present a fragment as
-  // the finished picture.
-  const partial = !isRenderable(manifest);
-
-  let mounted: PainterHandle | null = null;
   const newPainter = async (): Promise<PainterHandle> => {
     // Unmounted before the host is cleared, not after: `unmount` releases
     // listeners and framework roots by taking its own nodes out, and emptying
@@ -246,8 +303,8 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     mounted = null;
     canvasHost.textContent = "";
     const painter = mount(canvasHost, {
-      width: manifest.canvas.width,
-      height: manifest.canvas.height,
+      width: canvas.width,
+      height: canvas.height,
       mode: { kind: "standard" },
       // No toolbox: nothing here is editable, and a replay that offered a
       // brush would be inviting somebody to draw on the record.
@@ -261,11 +318,11 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     await painter.ready;
     painter.setInteractionEnabled(false);
     painter.setParticipants(
-      manifest.participants.map((participant) => ({
-        actorId: String(participant.session_id),
-        name: participant.login_name,
-      })),
+      Array.from(names.entries()).map(([id, name]) => ({ actorId: String(id), name })),
     );
+    // A seek backwards starts from a fresh painter, and whoever was hidden
+    // should stay hidden through it.
+    painter.setHiddenParticipants(people.hidden());
     mounted = painter;
     return painter;
   };
@@ -276,19 +333,29 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   // panel has nowhere to go but underneath.
   main.style.width = `${Math.max(canvasHost.offsetWidth, 420)}px`;
 
-  const playButton = el("button", "replay-button", "Play");
-  const restartButton = el("button", "replay-button", "Restart");
-  const stepBackButton = el("button", "replay-button", "◀");
+  const playButton = el("button", "ds-button ds-button-primary ds-button-small replay-play", "Play");
+  const restartButton = el("button", "ds-button ds-button-small", "Restart");
+  const stepBackButton = el("button", "ds-button ds-button-small", "◀");
   stepBackButton.title = "One mark back (←)";
-  const stepButton = el("button", "replay-button", "▶");
+  const stepButton = el("button", "ds-button ds-button-small", "▶");
   stepButton.title = "One mark forward (→)";
-  const endButton = el("button", "replay-button", "Jump to end");
-  const speedButton = el("button", "replay-button", "1×");
-  const scrubber = el("input", "replay-scrubber");
+  const endButton = el("button", "ds-button ds-button-small", "Jump to end");
+  const speedButton = el("button", "ds-button ds-button-small", "1×");
+  const scrub = el("div", "replay-scrub");
+  const scrubber = el("input", "ds-range replay-scrubber");
   scrubber.type = "range";
   scrubber.min = "-1";
   scrubber.step = "1";
+  const markerStrip = el("div", "replay-markers");
+  scrub.append(scrubber, markerStrip);
   const readout = el("span", "replay-readout");
+  const liveLabel = el("label", "replay-live");
+  const followLive = el("input", "ds-check");
+  followLive.type = "checkbox";
+  followLive.checked = true;
+  liveLabel.append(followLive, document.createTextNode(" Follow live"));
+  liveLabel.title = "Fetch what is drawn and said as it happens, and stay at the end";
+  liveLabel.style.display = live ? "" : "none";
 
   controls.append(
     playButton,
@@ -297,52 +364,76 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     stepButton,
     endButton,
     speedButton,
-    scrubber,
+    liveLabel,
+    scrub,
     readout,
   );
 
   let speedIndex = 0;
-  let position = -1;
+  let drawn = drawableEntries(entries).map((held) => held.entry);
 
   replay = createReplay({
     painter,
     entries,
     remount: newPainter,
-    onProgress: (index, playing) => {
+    onProgress: (index, nowPlaying) => {
       position = index;
-      playButton.textContent = playing ? "Pause" : "Play";
+      playing = nowPlaying;
+      playButton.textContent = nowPlaying ? "Pause" : "Play";
       scrubber.value = String(index);
       const entry = index >= 0 ? drawn[index] : undefined;
       readout.textContent =
         `${index + 1} / ${replay?.length ?? 0}` +
         (entry ? `  ·  seq ${entry.seq}  ·  ${new Date(entry.at).toISOString()}` : "");
-      update(index, playing);
+      update(index, nowPlaying);
+      if (!nowPlaying) {
+        // The chosen message when it still stands for this canvas, and the
+        // mark that made it otherwise.
+        if (chosenSeq !== null && data.positionOfSeq(chosenSeq) !== index) chosenSeq = null;
+        hashSeq = chosenSeq ?? (entry ? entry.seq : null);
+        writeHash(tab, hashSeq);
+      }
     },
   });
   const player = replay;
 
-  scrubber.max = String(player.length - 1);
+  const drawMarkers = () => {
+    markerStrip.textContent = "";
+    const span = Math.max(1, player.length);
+    const found = markers({
+      rows: data.rows,
+      drawTimes: data.drawTimes,
+      chat: data.chat,
+      reports: data.reports
+        .map((filed) => ({ at: filedAt(filed), label: `${filed.filed_by ?? "someone"}: ${filed.report.reason ?? "report"}` }))
+        .filter((report) => Number.isFinite(report.at)),
+    });
+    for (const marker of found) {
+      const tick = el("button", `replay-marker replay-marker-${marker.kind}`);
+      tick.type = "button";
+      tick.title = marker.label;
+      tick.style.left = `${((marker.position + 1) / span) * 100}%`;
+      tick.addEventListener("click", () => seek?.(marker.position));
+      markerStrip.appendChild(tick);
+    }
+  };
+  const sized = () => {
+    scrubber.max = String(player.length - 1);
+    drawMarkers();
+  };
+  sized();
   scrubber.value = "-1";
 
   const togglePlay = () => {
     if (playButton.textContent === "Play") player.play();
     else player.pause();
   };
-  const step = (by: number) => {
-    player.pause();
-    void player.seek(position + by);
-  };
+  const step = (by: number) => seek?.(position + by);
   playButton.addEventListener("click", togglePlay);
-  restartButton.addEventListener("click", () => {
-    player.pause();
-    void player.seek(-1);
-  });
+  restartButton.addEventListener("click", () => seek?.(-1));
   stepBackButton.addEventListener("click", () => step(-1));
   stepButton.addEventListener("click", () => step(1));
-  endButton.addEventListener("click", () => {
-    player.pause();
-    void player.seek(player.length - 1);
-  });
+  endButton.addEventListener("click", () => seek?.(player.length - 1));
   speedButton.addEventListener("click", () => {
     speedIndex = (speedIndex + 1) % SPEEDS.length;
     player.setSpeed(SPEEDS[speedIndex]);
@@ -351,10 +442,7 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   // On release rather than on drag: a seek backwards rebuilds the canvas from
   // the first message, and doing that for every pixel of a drag would be a
   // hundred rebuilds nobody asked for.
-  scrubber.addEventListener("change", () => {
-    player.pause();
-    void player.seek(Number(scrubber.value));
-  });
+  scrubber.addEventListener("change", () => seek?.(Number(scrubber.value)));
   // Space and the arrows, unless somebody is typing or choosing in a control
   // that wants them.
   document.addEventListener("keydown", (event) => {
@@ -373,19 +461,118 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
     }
   });
 
-  const participants = manifest.participants
-    .map((participant) => `${participant.login_name} (${participant.session_id})`)
-    .join(", ");
-  status.textContent =
-    `${player.length} drawing messages of ${entries.length} recorded` +
-    `  ·  ${manifest.canvas.width}×${manifest.canvas.height}` +
-    `  ·  started ${manifest.started_at}` +
-    (participants ? `  ·  ${participants}` : "") +
-    (manifest.sealed ? "" : "  ·  not sealed") +
-    (partial
-      ? `  ·  INCOMPLETE: this recording starts at sequence ${manifest.recording.first_seq}, so everything before it is missing`
-      : "");
-  if (partial) status.classList.add("replay-incomplete");
+  const describe = () => {
+    const partial = manifest !== null && !isRenderable(manifest);
+    const who = Array.from(names.entries())
+      .map(([id, name]) => `${name} (${id})`)
+      .join(", ");
+    status.textContent =
+      `${player.length} drawing messages of ${entries.length} recorded` +
+      `  ·  ${canvas.width}×${canvas.height}` +
+      (who ? `  ·  ${who}` : "") +
+      (manifest && !manifest.sealed && !live ? "  ·  not sealed" : "") +
+      (entries.length === 0 && logProblem ? `  ·  ${logProblem}` : "") +
+      (partial
+        ? `  ·  INCOMPLETE: this recording starts at sequence ${manifest.recording.first_seq}, so everything before it is missing`
+        : "");
+    // Said loudly, because a fragment looks exactly like a finished picture.
+    status.className = partial ? "ds-notice ds-notice-warning replay-status" : "ds-help replay-status";
+  };
+  describe();
   readout.textContent = `0 / ${player.length}`;
   update(-1, false);
+
+  // A link that named a moment opens on it.
+  if (asked.seq !== null) {
+    const seq = asked.seq;
+    seek?.(data.positionOfSeq(seq), seq);
+    log.choose(seq);
+  }
+
+  if (!live) return;
+
+  // Following a live session: ask what is new, add it to everything, and if
+  // the canvas was at the end, keep it there.
+  let lastSeq = entries.length > 0 ? entries[entries.length - 1].seq : 0;
+  const poll = async () => {
+    const [tailLoaded, chatNow, reportsNow, detailsNow] = await Promise.all([
+      load(`${base}/archive/tail?after=${lastSeq}`, async (response) => new Uint8Array(await response.arrayBuffer())),
+      load<ArchivedChat[]>(`${base}/chat`, (response) => response.json()),
+      load<FiledReport[]>(`${base}/diagnostics`, (response) => response.json()),
+      load<SessionDetails>(`${base}/details`, (response) => response.json()),
+    ]);
+    const namesBefore = Array.from(names.entries()).join();
+    if (detailsNow.ok) {
+      details = detailsNow.value;
+      head.setDetails(details);
+      learnNames();
+      if (details.session.ended_at) live = false;
+    }
+    // The tail can repeat what is already here -- the chunk the last sequence
+    // fell inside, or a message caught between the buffer and a flush -- so
+    // only what is past the end is new, and each sequence once.
+    const seen = new Set<number>();
+    const fresh = (tailLoaded.ok ? entriesOf(tailLoaded.value) ?? [] : [])
+      .filter((entry) => entry.seq > lastSeq && !seen.has(entry.seq) && (seen.add(entry.seq), true))
+      .sort((a, b) => a.seq - b.seq);
+    const moreChat = chatNow.ok && chatNow.value.length !== chat.length;
+    const moreReports = reportsNow.ok && reportsNow.value.length !== reports.length;
+    const renamed = Array.from(names.entries()).join() !== namesBefore;
+    if (fresh.length === 0 && !moreChat && !moreReports && !renamed && detailsNow.ok) {
+      // Details alone can change what the people tab says about who is in
+      // the room.
+      data = { ...data, details };
+      people.setData(data);
+      return;
+    }
+
+    const wasAtEnd = !playing && position === player.length - 1;
+    if (fresh.length > 0) {
+      entries = entries.concat(fresh);
+      lastSeq = fresh[fresh.length - 1].seq;
+      player.append(fresh);
+      drawn = drawableEntries(entries).map((held) => held.entry);
+    }
+    if (chatNow.ok) {
+      chat = chatNow.value;
+      chatUnavailable = undefined;
+    }
+    if (reportsNow.ok) {
+      reports = reportsNow.value;
+      reportsUnavailable = undefined;
+    }
+    if (renamed) {
+      mounted?.setParticipants(Array.from(names.entries()).map(([id, name]) => ({ actorId: String(id), name })));
+    }
+    data = build();
+    for (const { panel } of panels) panel.setData(data);
+    label();
+    sized();
+    describe();
+    if (fresh.length > 0 && wasAtEnd && followLive.checked) {
+      chosenSeq = null;
+      await player.seek(player.length - 1);
+    } else {
+      // Nothing moved, but the readout's count and the dimming did.
+      update(position, playing);
+      readout.textContent = `${position + 1} / ${player.length}`;
+    }
+  };
+
+  const schedule = () => {
+    window.setTimeout(async () => {
+      // Not while nobody is looking, and not once the session is over: its
+      // last answer is its final one.
+      if (followLive.checked && !document.hidden) {
+        try {
+          await poll();
+        } catch (error) {
+          console.error("Could not follow the session", error);
+        }
+      }
+      if (live) schedule();
+      else liveLabel.style.display = "none";
+    }, LIVE_POLL_MS);
+  };
+  schedule();
 }

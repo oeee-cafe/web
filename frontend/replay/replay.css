@@ -1,62 +1,84 @@
-/* Staff-only chrome, deliberately plain: this is a tool for reading a
-   recording, not a page anybody is shown. */
-body {
-  margin: 0;
-  padding: 1rem;
-  font-family: system-ui, sans-serif;
-  font-size: 14px;
-  color: #222;
-  background: #f5f5f5;
+/* The inspector's own layout. Everything it is drawn with -- the ground,
+   ink, lines, controls, tags and notices -- is the design system's
+   (static/ds.css) and the admin pages' (static/admin.css), which the server
+   adds to this page's head after this sheet (admin/replay_head.jinja). Only
+   what those have no component for is here, and it is written in their
+   tokens so it follows the theme with them. */
+
+html {
+  background-color: var(--ds-ground);
+  background-image: linear-gradient(var(--ds-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
+  background-size: 14px 14px;
 }
 
-button {
-  font: inherit;
+body {
+  margin: 0;
+  padding: var(--ds-space-4);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-base);
 }
 
 .inspect-header {
+  margin-bottom: var(--ds-space-2);
+}
+
+.inspect-header-top {
   display: flex;
-  align-items: baseline;
-  gap: 1rem;
+  align-items: center;
+  gap: var(--ds-space-3);
   flex-wrap: wrap;
-  margin-bottom: 0.25rem;
-}
-
-.inspect-back,
-.inspect-links a {
-  color: #2a55c0;
-  text-decoration: none;
-}
-
-.inspect-back:hover,
-.inspect-links a:hover {
-  text-decoration: underline;
 }
 
 .inspect-title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+}
+
+.inspect-title-id {
+  margin-left: var(--ds-space-2);
+  color: var(--ds-faint);
   font-family: ui-monospace, monospace;
+  font-size: var(--ds-text-s);
+  font-weight: normal;
 }
 
 .inspect-links {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ds-space-1);
   margin-left: auto;
-  font-size: 0.85rem;
+}
+
+.inspect-meta {
+  margin: var(--ds-space-1) 0 0;
+}
+
+.inspect-meta a,
+.inspect-person a {
+  color: var(--ds-link, var(--ds-ink));
+}
+
+.inspect-muted {
+  color: var(--ds-muted);
+}
+
+.admin-tag.inspect-tag-live {
+  border-color: var(--ds-accent-line);
+  background-color: var(--ds-success-surface);
+  color: var(--ds-success-text);
+}
+
+.admin-tag.inspect-tag-danger {
+  border-color: var(--ds-danger);
+  background-color: var(--ds-danger-surface);
+  color: var(--ds-danger-text);
+  font-family: ui-monospace, monospace;
 }
 
 .replay-status {
-  margin: 0 0 0.75rem 0;
-  font-size: 0.8rem;
-  color: #555;
-}
-
-/* A recording that does not start at the room's first message cannot produce
-   the drawing, and the canvas below it is a fragment. Said loudly, because a
-   fragment looks exactly like a finished picture. */
-.replay-incomplete {
-  color: #7a1020;
-  font-weight: 600;
+  margin: 0 0 var(--ds-space-3);
 }
 
 /* Canvas and everything read against it side by side: the point of keeping a
@@ -64,7 +86,7 @@ button {
    at the time. */
 .replay-stage {
   display: flex;
-  gap: 1rem;
+  gap: var(--ds-space-4);
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -74,101 +96,136 @@ button {
   max-width: 100%;
 }
 
+/* Framed the way the painter frames its canvas: a drawing has no corners. */
 .replay-canvas {
   position: relative;
   display: inline-block;
   max-width: 100%;
   overflow: auto;
-  background: #fff;
-  border: 1px solid #ccc;
+  border: 1px solid var(--ds-frame);
+  background-color: var(--ds-field);
 }
 
 .replay-canvas-missing {
-  padding: 3rem 2rem;
-  color: #666;
+  padding: var(--ds-space-6) var(--ds-space-5);
+  color: var(--ds-muted);
 }
 
 .replay-controls {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.75rem;
+  gap: var(--ds-space-1);
   flex-wrap: wrap;
+  margin-top: var(--ds-space-3);
 }
 
-.replay-button {
-  padding: 0.2rem 0.6rem;
-  border: 1px solid #bbb;
-  border-radius: 4px;
-  background: #fff;
-  cursor: pointer;
+.replay-play {
+  min-width: 64px;
 }
 
-.replay-button:hover {
-  background: #eef2fb;
+.replay-live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  margin-left: var(--ds-space-2);
+  font-size: var(--ds-text-s);
 }
 
-.replay-scrubber {
-  flex: 1 1 240px;
-  min-width: 160px;
+/* The scrubber, with the moments worth jumping to marked beneath it. */
+.replay-scrub {
+  position: relative;
+  flex: 1 1 100%;
+  padding-bottom: 12px;
+}
+
+.replay-scrubber.ds-range {
+  width: 100%;
+}
+
+.replay-markers {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 10px;
+}
+
+.replay-marker {
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 10px;
+  margin-left: -3px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  background-color: var(--ds-muted);
+}
+
+.replay-marker:hover {
+  -webkit-transform: scaleY(1.4);
+  transform: scaleY(1.4);
+}
+
+.replay-marker-chat {
+  background-color: var(--ds-line-strong);
+}
+
+.replay-marker-report {
+  background-color: var(--ds-danger);
+}
+
+.replay-marker-checkpoint {
+  background-color: var(--ds-focus);
+}
+
+.replay-marker-quiet {
+  width: 10px;
+  margin-left: -5px;
+  background-color: var(--ds-badge);
 }
 
 .replay-readout {
+  color: var(--ds-muted);
   font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
-  color: #444;
+  font-size: var(--ds-text-xs);
 }
 
 /* The side column is as tall as the window allows, so the log scrolls inside
-   it and the canvas stays in view beside it. */
-.inspect-side {
+   it and the canvas stays in view beside it. The card's padding is the
+   panels' business, since the log runs edge to edge. */
+.inspect-side.ds-card {
   flex: 1 1 380px;
   min-width: 300px;
-  height: calc(100vh - 7rem);
+  height: calc(100vh - 9rem);
   min-height: 360px;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border: 1px solid #ccc;
+  padding: 0;
+  overflow: hidden;
 }
 
-.inspect-tabs {
-  display: flex;
-  border-bottom: 1px solid #ccc;
+.inspect-tab-bar {
   flex: 0 0 auto;
-}
-
-.inspect-tab {
-  padding: 0.45rem 0.9rem;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  cursor: pointer;
-  color: #555;
-}
-
-.inspect-tab[aria-selected="true"] {
-  color: #111;
-  font-weight: 600;
-  border-bottom-color: #2a55c0;
+  padding: var(--ds-space-2);
+  border-bottom: 1px solid var(--ds-line);
 }
 
 .inspect-panel {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0.5rem;
+  padding: var(--ds-space-2) var(--ds-space-3);
 }
 
 .inspect-empty {
-  margin: 0.25rem 0;
-  color: #777;
+  margin: var(--ds-space-1) 0;
 }
 
 .inspect-time {
+  color: var(--ds-faint);
   font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
-  color: #777;
+  font-size: var(--ds-text-xs);
 }
 
 /* Later than the canvas has reached. Dimmed rather than hidden, so the shape
@@ -177,35 +234,42 @@ button {
   opacity: 0.4;
 }
 
+/* Rows that move the canvas: list items, not buttons to look at. */
+.inspect-chat-line,
+.inspect-log-row {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  text-align: left;
+}
+
+button.inspect-chat-line:hover,
+button.inspect-log-row:hover {
+  background-color: var(--ds-hover);
+}
+
 /* Chat */
 .inspect-chat-line {
   display: block;
   width: 100%;
   margin: 0;
-  padding: 0.2rem 0.3rem;
-  border: 0;
-  background: none;
-  text-align: left;
-  line-height: 1.35;
-  cursor: pointer;
-  border-radius: 3px;
-}
-
-div.inspect-chat-line {
-  cursor: default;
-}
-
-button.inspect-chat-line:hover {
-  background: #eef2fb;
+  padding: 3px var(--ds-space-1);
+  border-radius: var(--ds-radius-s);
+  font-size: var(--ds-text-m);
+  line-height: 1.4;
 }
 
 .inspect-chat-line .inspect-time {
-  margin-right: 0.5rem;
+  margin-right: var(--ds-space-2);
 }
 
 .inspect-chat-who {
+  margin-right: var(--ds-space-1);
   font-weight: 600;
-  margin-right: 0.4rem;
 }
 
 .inspect-chat-said {
@@ -221,18 +285,24 @@ button.inspect-chat-line:hover {
   padding: 0;
 }
 
+.inspect-log-message {
+  padding: var(--ds-space-2) var(--ds-space-3);
+}
+
 .inspect-log-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--ds-space-2);
   flex-wrap: wrap;
-  padding: 0.5rem;
   flex: 0 0 auto;
+  padding: var(--ds-space-2) var(--ds-space-3);
 }
 
 .inspect-follow {
-  font-size: 0.8rem;
-  color: #444;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  font-size: var(--ds-text-s);
 }
 
 .inspect-log {
@@ -251,19 +321,15 @@ button.inspect-chat-line:hover {
 .inspect-log-row {
   display: grid;
   grid-template-columns: 3.6rem 4.2rem 6rem 5.5rem 1fr;
-  grid-gap: 0.4rem;
+  grid-gap: var(--ds-space-2);
   align-items: center;
   box-sizing: border-box;
   height: 20px;
   width: 100%;
   margin: 0;
-  padding: 0 0.5rem;
-  border: 0;
-  background: none;
-  text-align: left;
-  font-size: 0.75rem;
+  padding: 0 var(--ds-space-3);
+  font-size: var(--ds-text-s);
   white-space: nowrap;
-  cursor: pointer;
 }
 
 .inspect-log .inspect-log-row {
@@ -279,14 +345,9 @@ button.inspect-chat-line:hover {
 
 .inspect-log-head {
   flex: 0 0 auto;
-  color: #777;
-  border-bottom: 1px solid #e3e3e3;
-  cursor: default;
-  padding-right: 1.3rem;
-}
-
-button.inspect-log-row:hover {
-  background: #eef2fb;
+  border-bottom: 1px solid var(--ds-line);
+  color: var(--ds-muted);
+  font-weight: 600;
 }
 
 .inspect-log-seq {
@@ -299,127 +360,157 @@ button.inspect-log-row:hover {
 }
 
 .inspect-log-summary {
-  color: #444;
+  color: var(--ds-muted);
 }
 
 /* Part of the record and not of the drawing: pointers lifted, checkpoints. */
 .inspect-log-quiet .inspect-log-kind,
 .inspect-log-quiet .inspect-log-summary {
-  color: #999;
+  color: var(--ds-faint);
 }
 
-.inspect-log-current {
-  background: #fff4c2;
+.inspect-log-current,
+button.inspect-log-current:hover {
+  background-color: var(--ds-selected);
   opacity: 1;
 }
 
-/* Reports */
-.inspect-report {
-  padding: 0.5rem 0.25rem 0.75rem;
-  border-bottom: 1px solid #e3e3e3;
+/* Facts: a label and its value, in a wrapping row. */
+.inspect-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--ds-space-3);
+  margin: 0 0 var(--ds-space-1);
+  font-family: ui-monospace, monospace;
+  font-size: var(--ds-text-s);
 }
 
-.inspect-report:last-child {
+.inspect-fact-label {
+  margin-right: var(--ds-space-1);
+  color: var(--ds-muted);
+  font-family: var(--ds-font);
+}
+
+.inspect-bad {
+  color: var(--ds-danger-text);
+  font-weight: 600;
+}
+
+.inspect-warn {
+  color: var(--ds-warning-text);
+}
+
+/* Reports */
+.inspect-report,
+.inspect-person {
+  padding: var(--ds-space-2) 0 var(--ds-space-3);
+  border-bottom: 1px solid var(--ds-line);
+}
+
+.inspect-report:last-child,
+.inspect-person:last-child {
   border-bottom: 0;
 }
 
 .inspect-report-title {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: var(--ds-space-2);
   flex-wrap: wrap;
-  margin: 0 0 0.35rem;
-  font-size: 0.9rem;
+  margin: 0 0 var(--ds-space-1);
+  font-size: var(--ds-text-base);
   font-weight: normal;
-}
-
-.inspect-tag {
-  padding: 0 0.4rem;
-  border-radius: 3px;
-  background: #f1e3e5;
-  color: #7a1020;
-  font-size: 0.75rem;
-  font-family: ui-monospace, monospace;
-}
-
-.inspect-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem 0.9rem;
-  margin: 0 0 0.35rem;
-  font-size: 0.8rem;
-  font-family: ui-monospace, monospace;
-}
-
-.inspect-fact-label {
-  margin-right: 0.3rem;
-  color: #777;
-  font-family: system-ui, sans-serif;
-}
-
-.inspect-bad {
-  color: #a0102a;
-  font-weight: 600;
-}
-
-.inspect-warn {
-  color: #8a5a00;
 }
 
 .inspect-report-detail,
 .inspect-raw {
-  margin: 0.35rem 0;
-  padding: 0.4rem;
+  margin: var(--ds-space-1) 0;
+  padding: var(--ds-space-2);
   max-height: 20rem;
   overflow: auto;
-  background: #f7f7f7;
-  font-size: 0.75rem;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-field);
+  font-size: var(--ds-text-s);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.inspect-report-actions {
+.inspect-report-actions,
+.inspect-people-actions {
   display: flex;
-  gap: 0.4rem;
+  gap: var(--ds-space-1);
   flex-wrap: wrap;
-  margin: 0.35rem 0;
+  margin: var(--ds-space-2) 0;
 }
 
 .inspect-report details {
-  margin-top: 0.35rem;
-  font-size: 0.8rem;
+  margin-top: var(--ds-space-1);
+  font-size: var(--ds-text-s);
 }
 
 .inspect-report summary {
-  cursor: pointer;
-  color: #444;
+  color: var(--ds-muted);
 }
 
 .inspect-trace {
-  margin-top: 0.35rem;
+  margin-top: var(--ds-space-1);
   border-collapse: collapse;
   font-family: ui-monospace, monospace;
-  font-size: 0.72rem;
+  font-size: var(--ds-text-xs);
 }
 
 .inspect-trace th,
 .inspect-trace td {
-  padding: 0.05rem 0.5rem 0.05rem 0;
+  padding: 1px var(--ds-space-2) 1px 0;
   text-align: left;
 }
 
 .inspect-trace th {
-  color: #777;
+  color: var(--ds-muted);
   font-weight: normal;
 }
 
 /* What a desync is made of: a client's own work not ending up where it
    thought. */
 .inspect-trace-trouble td {
-  color: #a0102a;
+  color: var(--ds-danger-text);
   font-weight: 600;
 }
 
 .inspect-trace-replay td {
-  color: #8a5a00;
+  color: var(--ds-warning-text);
+}
+
+/* People */
+.inspect-person-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--ds-space-1);
+}
+
+.inspect-person-show {
+  display: inline-flex;
+}
+
+.inspect-person-when {
+  margin: 0 0 var(--ds-space-1);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+/* Their marks across the recording, as bars. */
+.inspect-spark {
+  display: flex;
+  align-items: flex-end;
+  height: 20px;
+  border-bottom: 1px solid var(--ds-line);
+}
+
+.inspect-spark-bar {
+  flex: 1 1 0;
+  margin-right: 1px;
+  background-color: var(--ds-line-strong);
 }

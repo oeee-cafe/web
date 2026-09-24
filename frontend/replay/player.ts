@@ -102,6 +102,11 @@ export type ReplayHandle = {
   play(): void;
   pause(): void;
   setSpeed(speed: number): void;
+  /**
+   * Adds messages recorded since, for a session still going. They join the
+   * end of the schedule; where the canvas is does not change.
+   */
+  append(entries: ArchivedEntry[]): void;
   readonly length: number;
   destroy(): void;
 };
@@ -223,6 +228,20 @@ export function createReplay(options: ReplayOptions): ReplayHandle {
     },
     setSpeed(next: number) {
       speed = next > 0 ? next : 1;
+    },
+    append(entries: ArchivedEntry[]) {
+      // The same schedule `timeline` would have made had these been there
+      // from the start: each is due its capped gap after the one before.
+      for (const held of drawableEntries(entries)) {
+        const last = drawable.length - 1;
+        if (last < 0) {
+          due.push(0);
+        } else {
+          const gap = held.entry.at - drawable[last].entry.at;
+          due.push(due[last] + (Number.isFinite(gap) && gap > 0 ? Math.min(gap, MAX_GAP_MS) : 0));
+        }
+        drawable.push(held);
+      }
     },
     destroy() {
       destroyed = true;

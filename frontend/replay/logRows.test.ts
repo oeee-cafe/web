@@ -45,6 +45,8 @@ describe("reading a recording as a log", () => {
   it("says whose layer a mark went on when it was not the sender's", () => {
     const [row] = logRows([entry(1, encodePainterOperation(1, stroke("2")))], NAMES);
     expect(row.summary.startsWith("oeee's fg")).toBe(true);
+    expect(row.onOther).toBe(true);
+    expect(logRows([entry(1, encodePainterOperation(1, stroke()))], NAMES)[0].onOther).toBe(false);
   });
 
   it("falls back to the session id for someone the manifest does not name", () => {
@@ -71,7 +73,13 @@ describe("reading a recording as a log", () => {
       [false, 0],
       [true, 1],
     ]);
-    expect(rows[2]).toMatchObject({ actor: "oeee", summary: "undo" });
+    expect(rows[2]).toMatchObject({ actor: "oeee", kind: "undo", sessionId: 2 });
+  });
+
+  /** A redo reads as the opposite act, so it is filtered and counted apart. */
+  it("gives a redo a kind of its own", () => {
+    const [row] = logRows([entry(1, encodePainterOperation(2, { kind: "undo", redo: true }))], NAMES);
+    expect(row.kind).toBe("redo");
   });
 
   /** A message type written after this build is still a row, not a hole. */

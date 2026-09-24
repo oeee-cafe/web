@@ -8,7 +8,7 @@
  */
 
 import { positionAt } from "./archiveLog";
-import { el, type Panel, type Seek } from "./dom";
+import { el, type InspectorData, type Panel, type Seek } from "./dom";
 import { elapsed } from "./logRows";
 
 /** One entry of the painter's synchronisation trace; see `HistoryTraceEvent`. */
@@ -80,41 +80,45 @@ function traceTable(trace: TraceEvent[], names: Map<string, string>): HTMLElemen
   return table;
 }
 
-export function reportsPanel(options: {
-  reports: FiledReport[];
-  unavailable?: string;
-  drawTimes: number[];
-  /** The canvas position once the recording has reached a sequence. */
-  positionOfSeq: (seq: number) => number;
-  /** Session id, as the trace writes it, to login name. */
-  names: Map<string, string>;
-  startAt: number | null;
-  seek: Seek;
-}): Panel {
-  const { reports, drawTimes, positionOfSeq, names, startAt, seek } = options;
+/** When a report was filed, by the server's clock where known; the report's
+ * own `at` is the client's and is the fallback. NaN when neither says. */
+export function filedAt(filed: FiledReport): number {
+  const when = filed.filed_at ?? filed.report.at ?? null;
+  return when ? Date.parse(when) : NaN;
+}
+
+export function reportsPanel(seek: Seek): Panel {
   const root = el("div", "inspect-panel inspect-reports");
+  let reports: FiledReport[] | null = null;
+  let unavailable: string | undefined;
+  /** Read when a button is pressed, so a live session's growth is counted. */
+  let current: InspectorData | null = null;
 
-  if (options.unavailable) {
-    root.appendChild(el("p", "inspect-empty", options.unavailable));
-    return { root, count: 0 };
-  }
-  if (reports.length === 0) {
-    root.appendChild(el("p", "inspect-empty", "No client filed a report."));
-    return { root, count: 0 };
-  }
+  const render = (data: InspectorData) => {
+    root.textContent = "";
+    if (data.reportsUnavailable) {
+      root.appendChild(el("p", "ds-help inspect-empty", data.reportsUnavailable));
+      return;
+    }
+    if (data.reports.length === 0) {
+      root.appendChild(el("p", "ds-help inspect-empty", "No client filed a report."));
+      return;
+    }
+    for (const filed of data.reports) root.appendChild(card(filed));
+  };
 
-  for (const filed of reports) {
+  const card = (filed: FiledReport): HTMLElement => {
     const report = filed.report;
-    const card = el("section", "inspect-report");
+    const names = new Map<string, string>();
+    current?.names.forEach((name, id) => names.set(String(id), name));
+    const startAt = current?.startAt ?? null;
+    const section = el("section", "inspect-report");
 
-    // Filed by the server's clock, which is the log's; the report's own `at`
-    // is the client's and is the fallback.
-    const when = filed.filed_at ?? report.at ?? null;
-    const whenMs = when ? Date.parse(when) : NaN;
+    const whenMs = filedAt(filed);
     const title = el("h3", "inspect-report-title");
     title.append(
       el("span", "inspect-chat-who", filed.filed_by ?? "someone"),
-      el("span", "inspect-tag", report.reason ?? "no reason given"),
+      el("span", "admin-tag inspect-tag-danger", report.reason ?? "no reason given"),
       el(
         "span",
         "inspect-time",
@@ -125,7 +129,7 @@ export function reportsPanel(options: {
           : "",
       ),
     );
-    card.appendChild(title);
+    section.appendChild(title);
 
     const facts = el("p", "inspect-facts");
     const applied = report.appliedSequence;
@@ -145,25 +149,29 @@ export function reportsPanel(options: {
     if (typeof report.settled === "boolean") {
       facts.appendChild(fact("settled", report.settled ? "yes" : "no", report.settled ? undefined : "inspect-warn"));
     }
-    card.appendChild(facts);
-    if (report.detail) card.appendChild(el("pre", "inspect-report-detail", report.detail));
+    section.appendChild(facts);
+    if (report.detail) section.appendChild(el("pre", "inspect-report-detail", report.detail));
 
     if (seek) {
       const actions = el("p", "inspect-report-actions");
       if (Number.isFinite(whenMs)) {
-        const button = el("button", "replay-button", "Canvas when filed");
+        const button = el("button", "ds-button ds-button-small", "Canvas when filed");
         button.type = "button";
-        button.addEventListener("click", () => seek(positionAt(drawTimes, whenMs)));
+        button.addEventListener("click", () => {
+          if (current) seek(positionAt(current.drawTimes, whenMs));
+        });
         actions.appendChild(button);
       }
       if (typeof applied === "number") {
-        const button = el("button", "replay-button", `Canvas at seq ${applied}`);
+        const button = el("button", "ds-button ds-button-small", `Canvas at seq ${applied}`);
         button.type = "button";
         button.title = "Where this client believed it had got to";
-        button.addEventListener("click", () => seek(positionOfSeq(applied)));
+        button.addEventListener("click", () => {
+          if (current) seek(current.positionOfSeq(applied), applied);
+        });
         actions.appendChild(button);
       }
-      card.appendChild(actions);
+      section.appendChild(actions);
     }
 
     const trace = Array.isArray(report.trace) ? report.trace : [];
@@ -178,16 +186,29 @@ export function reportsPanel(options: {
         ),
       );
       details.appendChild(traceTable(trace, names));
-      card.appendChild(details);
+      section.appendChild(details);
     }
 
     const raw = el("details");
     raw.appendChild(el("summary", undefined, "Raw report"));
     raw.appendChild(el("pre", "inspect-raw", JSON.stringify(filed, null, 2)));
-    card.appendChild(raw);
+    section.appendChild(raw);
+    return section;
+  };
 
-    root.appendChild(card);
-  }
-
-  return { root, count: reports.length };
+  return {
+    root,
+    count: () => (reports ? reports.length : 0),
+    setData(data: InspectorData) {
+      current = data;
+      // Rebuilt only when a report arrives: a live session asks every few
+      // seconds, and a rebuild would close the trace somebody was reading.
+      if (reports && data.reports.length === reports.length && data.reportsUnavailable === unavailable) {
+        return;
+      }
+      reports = data.reports;
+      unavailable = data.reportsUnavailable;
+      render(data);
+    },
+  };
 }

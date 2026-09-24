@@ -19,7 +19,8 @@ use crate::web::handlers::admin::{
     admin_community_posts, admin_flag_banner, admin_flag_post, admin_post_detail, admin_posts,
     admin_add_store_product, admin_posts_fragment, admin_set_store_product_on_sale,
     admin_set_store_product_sale_window, admin_store,
-    admin_user_posts, admin_users, collaborative_archive_manifest, collaborative_session_chat,
+    admin_user_posts, admin_users, collaborative_archive_manifest, collaborative_archive_tail,
+    collaborative_session_details, collaborative_session_chat,
     download_collaborative_archive, download_collaborative_diagnostics,
     replay_collaborative_session,
 };
@@ -325,6 +326,14 @@ impl App {
             .route(
                 "/admin/collaborative-sessions/{uuid}/archive",
                 get(download_collaborative_archive),
+            )
+            .route(
+                "/admin/collaborative-sessions/{uuid}/archive/tail",
+                get(collaborative_archive_tail),
+            )
+            .route(
+                "/admin/collaborative-sessions/{uuid}/details",
+                get(collaborative_session_details),
             )
             .route(
                 "/admin/collaborative-sessions/{uuid}/diagnostics",
