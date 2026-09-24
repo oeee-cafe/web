@@ -40,7 +40,7 @@ export const SaveConfirmationModal = ({
         <button type="button" onClick={onCancel} className={NEO_BUTTON}>
           <Trans>Cancel</Trans>
         </button>
-        <button type="button" onClick={onConfirm} className={NEO_BUTTON}>
+        <button type="button" onClick={onConfirm} className={NEO_BUTTON} data-haptic="medium">
           <Trans>Save to Gallery</Trans>
         </button>
       </div>

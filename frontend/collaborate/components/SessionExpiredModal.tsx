@@ -93,6 +93,7 @@ export const SessionExpiredModal = ({
                 onClick={handleSaveToGallery}
                 disabled={isSaving}
                 type="button"
+                data-haptic="medium"
                 className={`${NEO_BUTTON} flex items-center gap-[4px] disabled:cursor-not-allowed`}
               >
                 {isSaving ? (

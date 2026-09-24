@@ -34,3 +34,17 @@ export function offerPainterToApp(painter: PainterHandle): () => void {
     if (app.painter === offered) delete app.painter;
   };
 }
+
+/** The haptics the apps play, as theme_head.jinja names them. */
+export type Haptic = "light" | "medium" | "selection" | "success" | "warning" | "error";
+
+/**
+ * A press or an outcome felt in the app, for what the page's own listeners
+ * (theme_head.jinja) cannot see: a painter's chrome, or a request made with
+ * fetch rather than htmx, whose result is known only here. Nothing happens
+ * outside an app.
+ */
+export function feelInApp(name: Haptic): void {
+  const app = (window as unknown as { oeeeApp?: { connected(): boolean; feel(name: string): void } }).oeeeApp;
+  if (app && app.connected()) app.feel(name);
+}
