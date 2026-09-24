@@ -4194,6 +4194,7 @@ html[data-app] .about-stores {
 .publish-foot .delete-form {
   margin: 0;
   padding: 0;
+  border-top: 0;
 }
 
 /* ---------------------------------------------------------------------------
