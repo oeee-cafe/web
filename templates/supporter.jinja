@@ -1,5 +1,6 @@
 {% extends "base.jinja" %}
 {% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
+{% from "app_stores_macro.jinja" import app_stores %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("supporter-pack") }}
 {% endblock title %}
@@ -29,47 +30,57 @@
 
     <section class="profile-section">
       <div class="profile-section-label">{{ ftl_format_pattern("supporter-pack-year", {"year": this_year}) }}</div>
-      <div class="ds-card settings-card supporter-pack-card">
+      {# A stack: every line and row below is one gap from the last,
+         whichever of them this reader gets. What the pack is reads at the
+         page's own size; the notes after it are muted, not smaller. #}
+      <div class="ds-card settings-card ds-stack supporter-pack-card">
         {% if supports_this_year %}
-          <p class="ds-help supporter-thanks">
+          <p class="supporter-thanks">
             {{ supporter_mark(worn_mark) }}{{ ftl_format_pattern("supporter-pack-have", {"year": this_year}) }}
           </p>
         {% else %}
-          <p class="ds-help">{{ ftl_get_message("supporter-pack-what") }}</p>
+          <p>{{ ftl_get_message("supporter-pack-what") }}</p>
         {% endif %}
 
         {% if not current_user %}
+          <p class="ds-help">{{ ftl_get_message("supporter-pack-sign-in") }}</p>
           <div class="supporter-actions">
             <a class="ds-button ds-button-primary" href="/login?next=/supporter">{{ ftl_get_message("sign-in") }}</a>
           </div>
-          <p class="ds-help">{{ ftl_get_message("supporter-pack-sign-in") }}</p>
-          <p class="ds-help supporter-elsewhere">{{ ftl_get_message("supporter-pack-elsewhere") }}</p>
         {% else %}
-          <div class="supporter-actions">
-            {% for offer in offers %}
-              <button type="button"
-                      class="ds-button ds-button-primary supporter-buy"
-                      data-product="{{ offer.product }}"
-                      data-haptic="medium">{{ offer.label or ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ offer.product }}"></span></button>
-            {% endfor %}
-            {# Restoring is the App Store's word for it: the same purchase
-               handed over again, which gives a pack back to whoever is
-               signed in without ever making a second one. Steam has no such
-               thing -- it says what an account owns every time it is
-               asked -- and the Microsoft Store build hands its key over
-               again by itself. #}
-            {% if restorable %}
-              <button type="button" class="ds-button supporter-restore">{{ ftl_get_message("supporter-pack-restore") }}</button>
-            {% endif %}
-          </div>
+          {# Drawn only when there is a button to put in it: a row with
+             nothing in it would still be a gap in the stack. #}
+          {% if offers|length > 0 or restorable %}
+            <div class="supporter-actions">
+              {% for offer in offers %}
+                <button type="button"
+                        class="ds-button ds-button-primary supporter-buy"
+                        data-product="{{ offer.product }}"
+                        data-haptic="medium">{{ offer.label or ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ offer.product }}"></span></button>
+              {% endfor %}
+              {# Restoring is the App Store's word for it: the same purchase
+                 handed over again, which gives a pack back to whoever is
+                 signed in without ever making a second one. Steam has no such
+                 thing -- it says what an account owns every time it is
+                 asked -- and the Microsoft Store build hands its key over
+                 again by itself. #}
+              {% if restorable %}
+                <button type="button" class="ds-button supporter-restore">{{ ftl_get_message("supporter-pack-restore") }}</button>
+              {% endif %}
+            </div>
+          {% endif %}
           {# What became of the last press, once the store or the site has
              answered it (the script below). #}
           <p class="ds-help supporter-status" role="status" aria-live="polite" hidden></p>
           {% if nothing_this_year %}
             <p class="ds-help">{{ ftl_format_pattern("supporter-pack-none", {"year": this_year}) }}</p>
           {% endif %}
-          <p class="ds-help supporter-elsewhere">{{ ftl_get_message("supporter-pack-elsewhere") }}</p>
         {% endif %}
+        {# Where the pack is sold, for a browser: the line, and the apps
+           that sell it. An app that sells is marked `data-store` and hides
+           the line; any app is marked `data-app` and hides the badges. #}
+        <p class="ds-help supporter-elsewhere">{{ ftl_get_message("supporter-pack-elsewhere") }}</p>
+        {{ app_stores(ftl_lang) }}
       </div>
     </section>
 

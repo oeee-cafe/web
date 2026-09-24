@@ -2944,15 +2944,31 @@ html[data-store] .supporter-elsewhere {
   display: none;
 }
 
+/* The pack's card is a `.ds-stack`, which spaces its lines; this is only
+   their size. What the pack is reads at the page's own size, as the lede
+   above it does, and the notes under it keep `.ds-help`'s muted colour
+   without its smaller type. */
+.supporter-pack-card {
+  font-size: var(--ds-text-base);
+  line-height: 1.5;
+}
+
+.supporter-pack-card > p {
+  max-width: 60ch;
+}
+
+.supporter-pack-card .ds-help {
+  font-size: inherit;
+}
+
+.supporter-pack-card > .about-stores {
+  margin-top: var(--ds-space-3);
+}
+
 .supporter-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ds-space-2);
-  margin-top: var(--ds-space-3);
-}
-
-.supporter-actions:empty {
-  margin-top: 0;
 }
 
 /* The price the store told the app, after the button's words. Empty until
@@ -2966,10 +2982,6 @@ html[data-store] .supporter-elsewhere {
 }
 
 /* What became of the last press: the store's answer, or the site's. */
-.supporter-status {
-  margin-top: var(--ds-space-3);
-}
-
 .supporter-status-error {
   color: var(--ds-danger-text);
 }
@@ -3992,12 +4004,16 @@ html[data-store="steam"] .auth-steam {
   line-height: 1.5;
 }
 
-/* The stores' badges: the store's mark, a small line naming the devices
-   and the store's name under it. Black on light and white on dark, as the
-   stores draw their own. */
+/* The stores' official badges, as the stores serve them. Apple's is the
+   badge and nothing else; Google's PNG carries 29px of clear space above
+   and below its 192px of artwork out of 250, so it is drawn taller and the
+   clear space taken back, which puts both badges' artwork at 40px. Neither
+   is recoloured for dark mode: each store makes one black badge, with its
+   own border, for any background. */
 .about-stores {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   margin-top: var(--ds-space-4);
 }
 
@@ -4005,77 +4021,24 @@ html[data-app] .about-stores {
   display: none;
 }
 
-.about-store,
-.about-store:visited {
-  display: flex;
-  align-items: center;
-  min-width: 170px;
-  padding: 7px 16px 7px 12px;
-  border: 1px solid #000;
-  border-radius: var(--ds-radius-m);
-  background-color: #000;
-  color: #fff;
-  text-decoration: none;
-}
-
-.about-store:hover {
-  border-color: #333;
-  background-color: #333;
+.about-store {
+  display: block;
+  line-height: 0;
 }
 
 .about-store:active {
   filter: brightness(0.9);
 }
 
-.about-store-mark {
-  flex: none;
-  width: 26px;
-  height: 26px;
-  margin-right: 10px;
+.about-store-badge {
+  display: block;
+  width: auto;
+  height: 40px;
 }
 
-.about-store-text {
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-
-.about-store-for {
-  font-size: var(--ds-text-s);
-  line-height: 1.2;
-  opacity: 0.85;
-}
-
-.about-store-name {
-  font-size: var(--ds-text-xl);
-  font-weight: 600;
-  line-height: 1.15;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .about-store,
-  :root:not([data-theme="light"]) .about-store:visited {
-    border-color: #fff;
-    background-color: #fff;
-    color: #000;
-  }
-
-  :root:not([data-theme="light"]) .about-store:hover {
-    border-color: #e5e5e5;
-    background-color: #e5e5e5;
-  }
-}
-
-:root[data-theme="dark"] .about-store,
-:root[data-theme="dark"] .about-store:visited {
-  border-color: #fff;
-  background-color: #fff;
-  color: #000;
-}
-
-:root[data-theme="dark"] .about-store:hover {
-  border-color: #e5e5e5;
-  background-color: #e5e5e5;
+.about-store-badge-google {
+  height: 52px;
+  margin: -6px 0;
 }
 
 /* Four banners a row at every width, each scaled to a quarter of it in
