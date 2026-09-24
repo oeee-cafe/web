@@ -1760,8 +1760,8 @@ mod template_tests {
             "Draw is the filled button signed out too: a guest can draw"
         );
         assert!(
-            out.contains(r#"<a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" aria-label="drafts" title="drafts"><svg"#),
-            "and this browser's drafts are a square of their own, there whether or not it holds any"
+            out.contains(r#"<a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" hidden aria-label="drafts" title="drafts"><svg"#),
+            "and this browser's drafts are a square of their own, hidden until the script finds some"
         );
         // The theme square opens onto the three-way switch and nothing
         // else: one link to `/about` in the whole bar, and it is not that
