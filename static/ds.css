@@ -1413,9 +1413,18 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
    right for one language, and wrong in the desktop app, whose window
    controls take 96px of the row.
 
-   Each section grows from its own label's width rather than taking an
-   equal share, so a long label is not cut to fit beside a short one; the
-   ellipsis is only for a language that still overflows. */
+   The row is four equal quarters: the three sections and 넷캔. Every
+   item grows from nothing, and the bases below are what make the shares
+   come out equal although the sections sit in a track and 넷캔 does not.
+   A section is its 3px + 3px of padding; 넷캔 the same and its 1px + 1px
+   of border, 8px; so the group is three of those plus the 10px its own
+   track spends -- 2px of padding and 1px of border a side, and the 2px
+   between each pair -- 34px, measured border to border so that the
+   painter pages' border-box reset cannot change it. With the group
+   growing three times as fast as 넷캔, each section ends up exactly as
+   wide as 넷캔. A label too long for its quarter ends in an ellipsis; 넷캔,
+   whose words are not in an element of their own, keeps its width
+   instead, and the sections share what is left. */
 .nav-bar.is-stacked .toolbar-links {
   order: 3;
   width: 100%;
@@ -1423,14 +1432,16 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 }
 
 .nav-bar.is-stacked .toolbar-sections {
-  -webkit-box-flex: 1;
-  flex: 1 1 auto;
+  -webkit-box-flex: 3;
+  flex: 3 1 34px;
   min-width: 0;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 .nav-bar.is-stacked .toolbar-sections a {
   -webkit-box-flex: 1;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   padding-right: 3px;
@@ -1438,6 +1449,16 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   font-size: var(--ds-text-s);
   text-align: center;
   text-overflow: ellipsis;
+}
+
+.nav-bar.is-stacked .toolbar-links a.toolbar-live,
+.nav-bar.is-stacked .toolbar-links a.toolbar-live:visited {
+  -webkit-box-flex: 1;
+  flex: 1 1 0;
+  -webkit-box-pack: center;
+  justify-content: center;
+  padding-right: 3px;
+  padding-left: 3px;
 }
 
 /* Room around both rows: the first is the height of a phone's own title
