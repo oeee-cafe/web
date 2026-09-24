@@ -91,7 +91,7 @@ pub async fn get_collaboration_meta(
     )
     .fetch_optional(db)
     .await?
-    .ok_or_else(|| anyhow::anyhow!("Session not found or not active"))?;
+    .ok_or_else(|| AppError::NotFound("Session".to_string()))?;
 
     let user_count = sqlx::query_scalar!(
         r#"
