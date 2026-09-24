@@ -22,7 +22,8 @@ pub mod error_codes {
 /// Check if an error should be filtered from Sentry reporting.
 ///
 /// Federation errors caused by what another server sent — a login page where
-/// an actor should be, a tombstone, a bad signature — are not bugs here and
+/// an actor should be, a tombstone, a bad signature, or nothing at all because
+/// the instance is gone (qoto.org, masto.bg) — are not bugs here and
 /// arrive at whatever rate the fediverse sends them. Matching on the variant
 /// rather than the message matters: each new way a remote can answer with
 /// HTML words the serde error differently, and one such wording was 13k
@@ -45,6 +46,8 @@ fn should_filter_from_sentry(err: &anyhow::Error) -> bool {
                     | FederationError::WebfingerResolveFailed(..)
                     | FederationError::RequestLimit
                     | FederationError::ResponseBodyLimit
+                    | FederationError::Reqwest(..)
+                    | FederationError::ReqwestMiddleware(..)
             )
         )
     })
