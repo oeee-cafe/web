@@ -247,9 +247,13 @@ body {
   text-align: left;
 }
 
+/* Rows rather than buttons to look at, so hovering is what says they do
+   something: the wash every control takes, and a bar at the edge that
+   marks the one the canvas would go to. */
 button.inspect-chat-line:hover,
 button.inspect-log-row:hover {
   background-color: var(--ds-hover);
+  box-shadow: inset 3px 0 0 var(--ds-line-strong);
 }
 
 /* Chat */

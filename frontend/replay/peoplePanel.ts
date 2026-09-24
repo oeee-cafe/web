@@ -153,7 +153,7 @@ export function peoplePanel(onHidden: (actorIds: string[]) => void): Panel & { h
       if (id !== null) head.appendChild(el("span", "admin-tag", `#${id}`));
       if (person.inRoom) head.appendChild(el("span", "admin-tag inspect-tag-live", "in the room"));
       if (id !== null && seated.length > 1) {
-        const only = el("button", "ds-button ds-button-quiet ds-button-small", "Only");
+        const only = el("button", "ds-button ds-button-small", "Only");
         only.type = "button";
         only.title = "Hide everyone else's layers";
         only.addEventListener("click", () => {

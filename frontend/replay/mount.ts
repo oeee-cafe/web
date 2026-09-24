@@ -100,12 +100,12 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   const base = `/admin/collaborative-sessions/${session}`;
 
   const head = header(session);
-  const logLink = el("a", "ds-button ds-button-quiet ds-button-small", "log ↓");
+  const logLink = el("a", "ds-button ds-button-small", "log ↓");
   logLink.href = `${base}/archive`;
   logLink.setAttribute("download", "");
-  const manifestLink = el("a", "ds-button ds-button-quiet ds-button-small", "manifest");
+  const manifestLink = el("a", "ds-button ds-button-small", "manifest");
   manifestLink.href = `${base}/manifest`;
-  const copyLink = el("button", "ds-button ds-button-quiet ds-button-small", "copy link");
+  const copyLink = el("button", "ds-button ds-button-small", "copy link");
   copyLink.type = "button";
   copyLink.title = "A link to this tab at this moment";
   copyLink.addEventListener("click", () => {
