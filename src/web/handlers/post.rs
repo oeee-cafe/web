@@ -61,7 +61,7 @@ async fn get_community_slug_url(
 ) -> Result<String, AppError> {
     let community = find_community_by_id(tx, community_id).await?;
     if let Some(community) = community {
-        Ok(format!("/communities/@{}", community.slug))
+        Ok(format!("/@{}", community.slug))
     } else {
         Ok(format!("/communities/{}", community_id)) // Fallback to UUID if community not found
     }

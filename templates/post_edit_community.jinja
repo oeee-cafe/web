@@ -69,7 +69,7 @@
         <div class="move-subject-where">
           <span>{{ ftl_get_message("post-current-community") }}</span>
           {% if current_community %}
-            <a class="profile-chip" href="/communities/@{{ current_community.slug }}">{{ current_community.name }}</a>
+            <a class="profile-chip" href="/@{{ current_community.slug }}">{{ current_community.name }}</a>
           {% else %}
             <span class="profile-chip">{{ ftl_get_message("post-personal-post") }}</span>
           {% endif %}

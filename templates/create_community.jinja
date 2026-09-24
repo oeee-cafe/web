@@ -16,9 +16,9 @@
         <label class="ds-label" for="community-form-slug">ID</label>
         <input class="ds-input" type="text" name="slug" id="community-form-slug" required
                autocomplete="off" autocapitalize="off" spellcheck="false"
-               oninput="document.getElementById('community-form-slug-path').textContent = '/communities/@' + this.value" />
+               oninput="document.getElementById('community-form-slug-path').textContent = '/@' + this.value" />
         {# Where the community will live, as it is typed. #}
-        <span class="ds-help" id="community-form-slug-path">/communities/@</span>
+        <span class="ds-help" id="community-form-slug-path">/@</span>
       </div>
       <div class="form-field">
         <label class="ds-label" for="community-form-description">{{ ftl_get_message("community-description") }}</label>

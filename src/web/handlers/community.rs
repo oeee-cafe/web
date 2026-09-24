@@ -73,7 +73,7 @@ pub async fn community(
         let community = find_community_by_id(&mut tx, uuid).await?;
         if let Some(community) = &community {
             // Redirect UUID to @slug format
-            return Ok(Redirect::to(&format!("/communities/@{}", community.slug)).into_response());
+            return Ok(Redirect::to(&format!("/@{}", community.slug)).into_response());
         } else {
             None
         }
@@ -872,7 +872,7 @@ pub async fn do_create_community(
         match create_actor_for_community(&mut tx, &community, &state.config).await {
             Ok(_) => {
                 let _ = tx.commit().await;
-                Ok(Redirect::to(&format!("/communities/@{}", community.slug)).into_response())
+                Ok(Redirect::to(&format!("/@{}", community.slug)).into_response())
             }
             Err(e) => {
                 let _ = tx.rollback().await;
@@ -2182,7 +2182,7 @@ mod tests {
                 r2_public_endpoint_url => "https://example.test",
             })
             .expect("renders standalone");
-        assert!(rendered.contains("/communities/@open"));
+        assert!(rendered.contains(r#"href="/@open""#));
         assert!(rendered.contains("hx-trigger=\"revealed\""));
     }
 

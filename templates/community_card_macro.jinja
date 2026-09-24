@@ -11,7 +11,7 @@
    averages a dozen characters across the site and half of all communities have
    none. #}
 {% macro community_card(community, r2_public_endpoint_url) %}
-  <a class="community-card" href="/communities/@{{ community.slug }}" title="{{ community.description if community.description else community.name }}">
+  <a class="community-card" href="/@{{ community.slug }}" title="{{ community.description if community.description else community.name }}">
     <span class="community-card-cover">
       {% for post in community.recent_posts %}
         <span class="community-card-cell">
