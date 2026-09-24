@@ -27,13 +27,19 @@
   --ds-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
     "Apple SD Gothic Neo", "Malgun Gothic", "Hiragino Sans", "Yu Gothic UI", system-ui,
     Arial, sans-serif;
-  --ds-text-xs: 11px;
-  --ds-text-s: 12px;
-  --ds-text-m: 13px;
-  --ds-text-base: 14px;
-  --ds-text-l: 16px;
-  --ds-text-xl: 20px;
-  --ds-text-2xl: 26px;
+  /* The type scale, each step times --ds-text-scale -- which is decided in
+     one place, "The text scale" below, and nowhere else. Anything else
+     drawn to sit with the type (a line height, a button that holds a
+     line) multiplies its pixels by the same factor rather than having a
+     size of its own under some condition. */
+  --ds-text-scale: 1;
+  --ds-text-xs: calc(11px * var(--ds-text-scale, 1));
+  --ds-text-s: calc(12px * var(--ds-text-scale, 1));
+  --ds-text-m: calc(13px * var(--ds-text-scale, 1));
+  --ds-text-base: calc(14px * var(--ds-text-scale, 1));
+  --ds-text-l: calc(16px * var(--ds-text-scale, 1));
+  --ds-text-xl: calc(20px * var(--ds-text-scale, 1));
+  --ds-text-2xl: calc(26px * var(--ds-text-scale, 1));
   /* Space: a 4px scale. */
   --ds-space-1: 4px;
   --ds-space-2: 8px;
@@ -192,59 +198,44 @@
   display: none !important;
 }
 
-/* In the apps the reader's text size can be the site's: how much larger or
+/* ---------------------------------------------------------------------------
+   The text scale
+
+   The one place --ds-text-scale is decided. Every step of the type scale
+   (:root, above), and every size drawn to go with it, reads it; nothing
+   anywhere else redefines a token or sizes something under a condition of
+   its own. At 1 every size is the pixel it is written as.
+
+   In the apps the reader's text size can be the site's: how much larger or
    smaller than the default the system's setting is arrives as
    --oeee-text-scale on the root -- on iOS the page measures it itself
    (theme_head.jinja), and on Android the app sets it (SiteBridge.kt in
-   oeee-cafe-android) -- and every step of the type scale follows it. Text
-   grows and shrinks; pictures, the spaces between things and the painter
-   do not, as in the system's own apps.
+   oeee-cafe-android). Text grows and shrinks; pictures, the spaces
+   between things and the painter do not, as in the system's own apps. An
+   app that says nothing -- the Mac and Windows windows, or any app before
+   it has said -- is drawn at 1. It is kept within 0.8 and 2, as far as
+   these layouts were drawn to go. `clamp()` is newer than the Firefox 56
+   floor, which is why it is only ever inside rules keyed on data-app: no
+   browser carries it, and a custom property's value is not parsed until
+   it is used.
 
-   It is keyed on any app rather than on the phones, and an app that says
-   nothing -- the Mac and Windows windows, or any app before it has said --
-   is drawn at 1, since everything that scales reads --ds-text-scale with a
-   fallback of 1. So a tablet, or a desktop app that one day follows its
-   system's text size, needs nothing here.
-
-   The scale arrives as the system has it, and --ds-text-scale is that
-   kept within 0.8 and 2, as far as these layouts were drawn to go.
-   `clamp()` is newer than the Firefox 56 floor, which is why it is only
-   ever inside this rule: no browser carries data-app, and a custom
-   property's value is not parsed until it is used. */
+   A narrow screen reads a size larger, the way Hacker News's does: one
+   breakpoint, by width alone, under which the scale is 1.15. 750px takes
+   in every phone upright and an iPad mini upright (744px), whose pixel is
+   a fifth smaller than the larger iPads' and on which the wide layout's
+   13px read as a page zoomed out. Width alone, because asking what points
+   at the screen -- `pointer: coarse` -- took in a phone on its side as
+   well, and the text grew when it was turned. The Mac and Windows apps are
+   left out: a window made narrow is still on a desk, and its first row is
+   set against the window's own controls. In the phone and tablet apps the
+   factor rides on the reader's own text size. */
 html[data-app] {
   --ds-text-scale: clamp(0.8, var(--oeee-text-scale, 1), 2);
-  --ds-text-xs: calc(11px * var(--ds-text-scale, 1));
-  --ds-text-s: calc(12px * var(--ds-text-scale, 1));
-  --ds-text-m: calc(13px * var(--ds-text-scale, 1));
-  --ds-text-base: calc(14px * var(--ds-text-scale, 1));
-  --ds-text-l: calc(16px * var(--ds-text-scale, 1));
-  --ds-text-xl: calc(20px * var(--ds-text-scale, 1));
-  --ds-text-2xl: calc(26px * var(--ds-text-scale, 1));
 }
 
-/* A narrow screen reads a size larger, the way Hacker News's does: one
-   breakpoint, by width alone, under which the type grows. 750px takes in
-   every phone upright and an iPad mini upright (744px), whose pixel is a
-   fifth smaller than the larger iPads' and on which the wide layout's 13px
-   read as a page zoomed out. Width alone, because asking what points at
-   the screen -- `pointer: coarse` -- took in a phone on its side as well,
-   and the text grew when it was turned.
-
-   The Mac and Windows apps are left out: a window made narrow is still on
-   a desk, and its first row is set against the window's own controls. In
-   the phone and tablet apps the factor rides on the reader's own text
-   size. What is sized by the scale grows with it -- the type, its line
-   heights, the toolbar's squares. */
 @media (max-width: 750px) {
   :root:not([data-form="desktop"]) {
     --ds-text-scale: 1.15;
-    --ds-text-xs: calc(11px * var(--ds-text-scale, 1));
-    --ds-text-s: calc(12px * var(--ds-text-scale, 1));
-    --ds-text-m: calc(13px * var(--ds-text-scale, 1));
-    --ds-text-base: calc(14px * var(--ds-text-scale, 1));
-    --ds-text-l: calc(16px * var(--ds-text-scale, 1));
-    --ds-text-xl: calc(20px * var(--ds-text-scale, 1));
-    --ds-text-2xl: calc(26px * var(--ds-text-scale, 1));
   }
 
   :root[data-form="handheld"] {
