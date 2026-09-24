@@ -385,6 +385,7 @@
       var script = document.createElement("script");
       script.src = "{{ '/static/viewer/neo-cucumber-replay.js' | cachebuster | safe }}";
       script.onload = function () {
+        var drawing = box.querySelector("img[data-oeee-drawing]");
         var viewer = window.NeoCucumberReplay.mount(box, {
           replay: box.getAttribute("data-replay"),
           poster: box.getAttribute("data-poster"),
@@ -392,6 +393,15 @@
           height: parseInt(box.getAttribute("data-height"), 10),
           lang: box.getAttribute("data-lang")
         });
+        // The viewer empties the box and draws the drawing again as its
+        // poster, so the mark that lets a long press in the iOS app open its
+        // menu for the drawing (ds.css, app_bridge.jinja) goes over to the
+        // poster, with the drawing's name.
+        var poster = box.querySelector(".neo-cucumber-replay-poster");
+        if (drawing && poster) {
+          poster.setAttribute("data-oeee-drawing", "");
+          poster.alt = drawing.alt;
+        }
         // The replay routes send NEO replays here, to be played at once.
         if (location.hash === "#replay") viewer.play();
       };
