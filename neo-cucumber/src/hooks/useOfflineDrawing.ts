@@ -691,6 +691,11 @@ export const useOfflineDrawing = (
    * the drawing back further than it went for anybody watching.
    */
   const wrappedUndo = useCallback(() => {
+    // Not while the pen is down, as NEO. In a session an undo sent mid-stroke
+    // was sequenced ahead of the stroke's own tail: the chunk still under the
+    // pointer went out after it, with no boundary of its own, and the pointer
+    // kept drawing onto a canvas the replay had just rolled back.
+    if (baseDrawing.isDrawingRef.current) return;
     if (onOperation) {
       onOperation({ kind: "undo", redo: false });
       return;
@@ -701,6 +706,7 @@ export const useOfflineDrawing = (
 
   // Redo, for the same reason and by the same rule.
   const wrappedRedo = useCallback(() => {
+    if (baseDrawing.isDrawingRef.current) return;
     if (onOperation) {
       onOperation({ kind: "undo", redo: true });
       return;
