@@ -2,7 +2,7 @@ import { useRef, useCallback } from "react";
 import { useBaseDrawing, type DrawingState } from "./useBaseDrawing";
 import { ActionRecorder } from "../utils/ActionRecorder";
 import { deflateCoverage } from "../utils/rasterCodec";
-import { maskFrom, NO_MASK, type Mask } from "../neo/mask";
+import type { Mask } from "../neo/mask";
 import type { BrushType } from "../types/drawing";
 import type { PainterBrush, PainterOperation } from "../operations";
 import {
@@ -116,16 +116,6 @@ export const useOfflineDrawing = (
   );
   const isFirstPointRef = useRef<boolean>(false);
   const hasCreatedStepRef = useRef<boolean>(false);
-  // Layer captured at pointer down, alongside the settings useBaseDrawing
-  // freezes for the stroke, so the frame header cannot disagree with the
-  // layer the engine actually drew into.
-  const strokeLayerRef = useRef<number | null>(null);
-  /**
-   * The mask the stroke started with, frozen alongside the layer. A stroke is
-   * drawn with the settings it opened with, so reading the live mask when the
-   * frame is written could record a mask the canvas was never drawn through.
-   */
-  const strokeMaskRef = useRef<Mask>(NO_MASK);
   const pendingStrokeRef = useRef<
     Extract<PainterOperation, { kind: "stroke" }> | null
   >(null);
@@ -244,14 +234,10 @@ export const useOfflineDrawing = (
       // The actual step() call will happen in onDrawLine/onDrawPoint when data is recorded
       isFirstPointRef.current = true;
       hasCreatedStepRef.current = false;
-      strokeLayerRef.current =
-        drawingState.layerType === "foreground" ? 1 : 0;
-      strokeMaskRef.current = maskFrom(drawingState);
       pendingStrokeRef.current = null;
       strokeChunkRef.current = null;
       strokeBoundaryEmittedRef.current = false;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [drawingState.layerType, drawingState.maskType, drawingState.maskColor]),
+    }, []),
 
     onDrawLine: useCallback(
       (
@@ -264,11 +250,10 @@ export const useOfflineDrawing = (
         r: number,
         g: number,
         b: number,
-        opacity: number
+        opacity: number,
+        layer: "foreground" | "background",
+        mask: Mask
       ) => {
-        const layer =
-          strokeLayerRef.current ??
-          (drawingState.layerType === "foreground" ? 1 : 0);
         // Opacity is already in [0, 255] range - clamp and ensure no NaN
         const alpha = Math.max(0, Math.min(255, Math.floor(opacity || 0)));
         const lineType = lineTypeForBrush(brushType);
@@ -289,24 +274,24 @@ export const useOfflineDrawing = (
         if (!pendingStrokeRef.current) {
           pendingStrokeRef.current = {
             kind: "stroke",
-            layer: layer === 1 ? "foreground" : "background",
+            layer,
             brushSize,
             brush: brushType as PainterBrush,
             color: { r: safeR, g: safeG, b: safeB, a: alpha },
             points: [{ x: Math.round(fromX), y: Math.round(fromY) }, to],
-            mask: strokeMaskRef.current,
+            mask,
           };
         } else {
           pendingStrokeRef.current.points.push(to);
         }
         emitStrokeOperation({
           kind: "stroke",
-          layer: layer === 1 ? "foreground" : "background",
+          layer,
           brushSize,
           brush: brushType as PainterBrush,
           color: { r: safeR, g: safeG, b: safeB, a: alpha },
           points: [{ x: Math.round(fromX), y: Math.round(fromY) }, to],
-          mask: strokeMaskRef.current,
+          mask,
         });
 
         // Only create action frame and push header once per stroke
@@ -321,16 +306,16 @@ export const useOfflineDrawing = (
           // records as (previous, new) so the replay draws that first segment.
           actionRecorderRef.current.push(
             "freeHand",
-            layer,
+            layer === "foreground" ? 1 : 0,
             safeR,
             safeG,
             safeB,
             alpha,
-            strokeMaskRef.current.r,
-            strokeMaskRef.current.g,
-            strokeMaskRef.current.b,
+            mask.r,
+            mask.g,
+            mask.b,
             brushSize,
-            strokeMaskRef.current.type,
+            mask.type,
             lineType,
             Math.round(fromX),
             Math.round(fromY),
@@ -342,7 +327,7 @@ export const useOfflineDrawing = (
           actionRecorderRef.current.push(Math.round(toX), Math.round(toY));
         }
       },
-      [drawingState.layerType, emitStrokeOperation]
+      [emitStrokeOperation]
     ),
 
     onDrawPoint: useCallback(
@@ -354,11 +339,10 @@ export const useOfflineDrawing = (
         r: number,
         g: number,
         b: number,
-        opacity: number
+        opacity: number,
+        layer: "foreground" | "background",
+        mask: Mask
       ) => {
-        const layer =
-          strokeLayerRef.current ??
-          (drawingState.layerType === "foreground" ? 1 : 0);
         // Opacity is already in [0, 255] range - clamp and ensure no NaN
         const alpha = Math.max(0, Math.min(255, Math.floor(opacity || 0)));
         const lineType = lineTypeForBrush(brushType);
@@ -376,12 +360,12 @@ export const useOfflineDrawing = (
 
         pendingStrokeRef.current = {
           kind: "stroke",
-          layer: layer === 1 ? "foreground" : "background",
+          layer,
           brushSize,
           brush: brushType as PainterBrush,
           color: { r: safeR, g: safeG, b: safeB, a: alpha },
           points: [{ x: Math.round(x), y: Math.round(y) }],
-          mask: strokeMaskRef.current,
+          mask,
         };
         emitStrokeOperation(pendingStrokeRef.current);
 
@@ -392,16 +376,16 @@ export const useOfflineDrawing = (
         }
         actionRecorderRef.current.push(
           "freeHand",
-          layer,
+          layer === "foreground" ? 1 : 0,
           safeR,
           safeG,
           safeB,
           alpha,
-          strokeMaskRef.current.r,
-          strokeMaskRef.current.g,
-          strokeMaskRef.current.b,
+          mask.r,
+          mask.g,
+          mask.b,
           brushSize,
-          strokeMaskRef.current.type,
+          mask.type,
           lineType,
           Math.round(x),
           Math.round(y),
@@ -409,7 +393,7 @@ export const useOfflineDrawing = (
           Math.round(y)
         );
       },
-      [drawingState.layerType, emitStrokeOperation]
+      [emitStrokeOperation]
     ),
 
     // The eyedropper reports a colour rather than drawing one, so it neither
@@ -420,10 +404,17 @@ export const useOfflineDrawing = (
     onVirtualRightUsed: onVirtualRightUsed,
 
     onFill: useCallback(
-      (x: number, y: number, r: number, g: number, b: number, opacity: number) => {
-        const layer =
-          strokeLayerRef.current ??
-          (drawingState.layerType === "foreground" ? 1 : 0);
+      (
+        x: number,
+        y: number,
+        r: number,
+        g: number,
+        b: number,
+        opacity: number,
+        layerName: "foreground" | "background",
+        mask: Mask
+      ) => {
+        const layer = layerName === "foreground" ? 1 : 0;
         // Opacity is already in [0, 255] range - clamp and ensure no NaN
         const alpha = Math.max(0, Math.min(255, Math.floor(opacity || 0)));
 
@@ -451,7 +442,6 @@ export const useOfflineDrawing = (
         actionRecorderRef.current.push("floodFill", layer, Math.round(x), Math.round(y), color);
 
         const engine = engineRef.current;
-        const layerName = layer === 1 ? "foreground" : "background";
         if (!onOperation || !engine) return;
 
         // Run it here and send what it covered. A seed replayed elsewhere
@@ -474,10 +464,10 @@ export const useOfflineDrawing = (
           height,
           color: { r: safeR, g: safeG, b: safeB, a: alpha },
           coverage: deflateCoverage(coverage),
-          mask: strokeMaskRef.current,
+          mask,
         });
       },
-      [drawingState.layerType, emitOperation, onOperation]
+      [emitOperation, onOperation]
     ),
 
     onRegionPreview,
@@ -657,7 +647,6 @@ export const useOfflineDrawing = (
       pendingStrokeRef.current = null;
       isFirstPointRef.current = false;
       hasCreatedStepRef.current = false;
-      strokeLayerRef.current = null;
       onPointerRelease?.();
     }, [emitOperation, onOperation, onPointerRelease, flushStrokeChunk]),
   };

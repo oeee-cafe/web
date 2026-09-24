@@ -495,6 +495,27 @@ describe("copy and paste", () => {
   // reads -- is covered in copyPaste.browser.test.tsx.
 });
 
+describe("a freehand stroke", () => {
+  it("records the mask and layer it was drawn through", async () => {
+    // The recorder now takes both from the settings the drawing hook froze
+    // at the press, the same way every shape tool does; it keeps no copy of
+    // its own to go stale.
+    const { api, send } = await mountWithTool("solid", {
+      layerType: "foreground", maskType: 3, maskColor: "#0000ff",
+    });
+    await send("pointerdown", 8, 8);
+    await act(async () => { await sleep(20); });
+    await send("pointermove", 20, 8);
+    await send("pointerup", 20, 8);
+
+    const frame = await lastFrame(api);
+    expect(frame[0]).toBe("freeHand");
+    expect(frame[1]).toBe(1);
+    expect(frame.slice(6, 9)).toEqual([0, 0, 255]);
+    expect(frame[10]).toBe(3);
+  });
+});
+
 describe("undo while the pen is down", () => {
   it("does nothing until the stroke is over", async () => {
     // Offline, the snapshot popped was the one taken before the *previous*
