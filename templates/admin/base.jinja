@@ -1,10 +1,14 @@
 {% extends "base.jinja" %}
+{% import "pill_macro.jinja" as pill %}
 {# Staff-only chrome. The banner is deliberately loud: these pages show private
    communities, unpublished drafts and removed posts, so it should never be
    ambiguous which context you are looking at.
 
    Each page names its section with `{% set admin_section = "..." %}` above
-   its blocks, which marks that section in the pill. #}
+   its blocks, which marks that section in the pill. The pill switches the
+   page in place (pill_macro.jinja): as an ordinary link, the press started
+   the thumb's slide and the page load froze it partway, at neither item's
+   width. #}
 {% block title %}Admin · {{ ftl_get_message("brand") }}{% endblock title %}
 {% block head %}
   <link rel="stylesheet"
@@ -19,7 +23,7 @@
       Admin — showing content that bypasses normal visibility rules
     </div>
     <div class="admin-bar">
-      <nav class="ds-segmented admin-nav" aria-label="Admin">
+      <nav class="ds-segmented admin-nav" aria-label="Admin" {{ pill.in_place() }}>
         <a href="/admin/posts"{% if admin_section == "posts" %} aria-current="page"{% endif %}>All posts</a>
         <a href="/admin/users"{% if admin_section == "users" %} aria-current="page"{% endif %}>Users</a>
         <a href="/admin/communities"{% if admin_section == "communities" %} aria-current="page"{% endif %}>Communities</a>
