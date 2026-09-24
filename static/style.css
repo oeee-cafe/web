@@ -3738,25 +3738,33 @@ html[data-store] .supporter-elsewhere {
   margin: 0 6px 6px 0;
 }
 
-/* Rewind, play and skip, and the speeds: two of the design system's
-   segmented controls (.ds-segmented), the speeds at the far end. Only the
-   speeds have a choice, so only they draw a thumb. */
+/* Rewind, play and skip are the design system's buttons (.ds-button),
+   raised, since each does something; the speeds are a choice, and its
+   segmented control (.ds-segmented), at the far end. */
+.post-stage-replay .neo-cucumber-replay-transport {
+  display: -webkit-box;
+  display: flex;
+}
+
+.post-stage-replay .neo-cucumber-replay-transport > * + * {
+  margin-left: 4px;
+}
+
 .post-stage-replay .neo-cucumber-replay-speeds {
   margin-left: auto;
 }
 
-/* An icon stands where a segment's 20px line of words would, so both
-   pills are one height. It needs less room a side than a word does, and
-   with a word's 11px the two pills came to 309px, past the smallest
-   drawing's 300 -- every such stage broke its row in two. */
+/* An icon stands where a line of words would, 20px, so a button comes to
+   the speeds' 32px. It needs less room a side than a word does: at a
+   button's 14px the row is wider than the smallest drawing's 300px, and
+   every such stage broke it in two. */
 .post-stage-replay .neo-cucumber-replay-icon {
   width: calc(20px * var(--ds-text-scale, 1));
   height: calc(20px * var(--ds-text-scale, 1));
 }
 
-.ds-page .post-stage-replay .neo-cucumber-replay-transport > button {
-  padding-right: 6px;
-  padding-left: 6px;
+.post-stage-replay .neo-cucumber-replay-transport > .ds-button {
+  padding: 5px 6px;
 }
 
 /* Before the viewer has taken them over they are there but inert. */
