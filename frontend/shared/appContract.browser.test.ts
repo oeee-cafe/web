@@ -625,6 +625,41 @@ describe("signing in for an app", () => {
     page.window.oeeeApp.signIn.unopened();
   }, 10000);
 
+  it("asks once more when the browser is put away, and lets the handoff go only if it had not finished", async () => {
+    const handoff = { id: "I", secret: "X", url: "/auth/apple?handoff=I" };
+    const waiting = await open({
+      answers: { "/auth/handoff/start": handoff, "/auth/handoff/claim": { status: "waiting" } },
+    });
+    const claims = () => waiting.asked.filter((request) => request.url === "/auth/handoff/claim");
+    const starts = () => waiting.asked.filter((request) => request.url === "/auth/handoff/start");
+    expect(press(waiting, "apple")).toBe(true);
+    await settle();
+    await settle();
+    waiting.window.oeeeApp.signIn.unopened();
+    await settle();
+    await settle();
+    expect(claims()).toHaveLength(1);
+    // Let go: the clock asks no more, and the button starts a new one.
+    await new Promise((resolve) => setTimeout(resolve, 2300));
+    expect(claims()).toHaveLength(1);
+    expect(press(waiting, "apple")).toBe(true);
+    await settle();
+    expect(starts()).toHaveLength(2);
+    waiting.window.oeeeApp.signIn.unopened();
+
+    // Put away just after signing in there: the last ask finds it.
+    const finished = await open({
+      answers: { "/auth/handoff/start": handoff, "/auth/handoff/claim": { status: "ready", next: "/after" } },
+    });
+    expect(press(finished, "apple")).toBe(true);
+    await settle();
+    await settle();
+    const left = new Promise((resolve) => finished.frame.addEventListener("load", resolve, { once: true }));
+    finished.window.oeeeApp.signIn.unopened();
+    await left;
+    expect(finished.frame.contentWindow!.location.pathname).toBe("/after");
+  }, 10000);
+
   it("goes the way each app signs in with each provider", async () => {
     const ways: [string, "apple" | "google", string][] = [
       ["Mozilla/5.0 OeeeCafe platform/ios", "apple", "/auth/apple/start"],
