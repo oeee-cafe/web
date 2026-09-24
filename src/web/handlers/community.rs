@@ -164,13 +164,17 @@ pub(crate) async fn render_community_page(
     // below it is untouched, so it is not worth a query. The template renders
     // its grid from whatever `feed` holds, and copes with it being absent.
     //
-    // Only for a request aimed at part of the page: the pill between the
-    // drawings and the comments boosts to this address, and htmx restores
-    // history from it, and both of those want the whole page (they send
-    // `HX-Request-Type: full`).
+    // Only when the Cancel asks for it by name (`Oeee-Part: header`,
+    // community_edit.jinja). Every other htmx request here wants the whole
+    // page: the pill between the drawings and the comments boosts to this
+    // address, and htmx restores history from it. Telling them apart by
+    // `HX-Request-Type: full` was not enough, because htmx's preload fetches
+    // a hovered pill before that header is set -- so hovering Drawings and
+    // then clicking it swapped the header alone in for the whole content
+    // area, and the page went blank below the toolbar.
     let header = community_header_context(tx, &community).await?;
     let wants_header_only = headers.get("HX-Request") == Some(&HeaderValue::from_static("true"))
-        && headers.get("HX-Request-Type") != Some(&HeaderValue::from_static("full"));
+        && headers.get("Oeee-Part") == Some(&HeaderValue::from_static("header"));
     if wants_header_only {
         let rendered = template
             .render_captured_to(context! {

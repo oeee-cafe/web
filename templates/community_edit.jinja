@@ -57,7 +57,9 @@
       {% endif %}
     </div>
     <div class="form-actions community-form-actions">
-      <button type="button" class="ds-button" hx-get="/communities/{{ community_id }}">{{ ftl_get_message("cancel") }}</button>
+      {# Asks for the header back by name (handlers/community.rs), since
+         every other htmx request for this address wants the whole page. #}
+      <button type="button" class="ds-button" hx-get="/communities/{{ community_id }}" hx-headers='{"Oeee-Part": "header"}'>{{ ftl_get_message("cancel") }}</button>
       <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("save") }}</button>
     </div>
   </form>
