@@ -803,11 +803,12 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
 
 /* Drawing together, live: a button of its own beside the sections, with a
    light the cucumber's green, the site's mark -- a lime disc in a dark
-   rim -- pulsing. Built as every other button in the bar is -- the border,
-   the corners, the one shadow -- and told apart only by its fill: plain for
-   most, this green tint here, lime for Draw. It is the sections' 30px tall -- 4px of padding, 20px
-   of line and its border, as the section group's 2px of padding and 26px
-   of button make. */
+   rim -- pulsing. Its green border is its only edge: the raise shadow the
+   bar's other buttons carry drew a second, darker line under it, in a
+   colour that was not the border's. It is the sections' 32px tall -- 5px
+   of padding, 20px of line and its 1px border, as the section group's 1px
+   border, 2px of padding and 26px of button make -- so the two share a top
+   and a foot. */
 .nav-bar .toolbar-links a.toolbar-live,
 .nav-bar .toolbar-links a.toolbar-live:visited {
   display: -webkit-box;
@@ -815,12 +816,12 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   -webkit-box-align: center;
   align-items: center;
   flex: none;
-  padding: 4px 12px 4px 10px;
+  padding: 5px 12px 5px 10px;
   border: 1px solid rgba(60, 103, 18, 0.5);
   border-radius: 6px;
   background-color: var(--ds-surface);
   background-image: linear-gradient(rgba(122, 190, 40, 0.14), rgba(122, 190, 40, 0.14));
-  box-shadow: var(--ds-shadow-raise);
+  box-shadow: none;
   color: var(--ds-ink);
   font-weight: 600;
 }
