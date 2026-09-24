@@ -632,26 +632,42 @@ pub async fn handle_end_session_message(data: &[u8], ctx: EndSessionContext<'_>)
     }
 }
 
+/// Whether a frame from a client belongs in the room's canonical history.
+///
+/// An allow-list, and only of canvas operations. History is replayed to
+/// everyone who joins later and acted on by every one of them, so a frame let
+/// in here is an instruction to the whole room for as long as the session
+/// lives. Listing what is excluded instead meant anything nobody had thought
+/// to exclude -- a WELCOME, an END_SESSION, a RESET_POINT -- could be sequenced
+/// by a client and obeyed by everyone reading the history back.
+///
+/// This gates client input only. What the server writes into history itself
+/// (a reset point, a checkpoint's snapshots) goes to the sequencer directly and
+/// never passes through here, and a snapshot from a client is only ever taken
+/// as part of a reset upload, which is captured before this is asked.
+///
+/// The codes are `MSG_TYPE` in `frontend/collaborate/binaryProtocol.ts`;
+/// POINTER_UP (0x13) and MOVE_POINTER (0x1c) sit in the same range and are
+/// left out because a cursor is not part of the drawing.
 pub fn should_store_message(msg: &Message) -> bool {
-    if let Message::Binary(data) = msg {
-        if data.is_empty() {
-            return false;
-        }
-
-        let msg_type = data[0];
-        // Store all messages except ephemeral ones:
-        // - Chat messages (ephemeral conversation)
-        // - JOIN messages (current participants sent via JOIN_RESPONSE)
-        // - LEAVE messages (current participants tracked in Redis presence)
-        // - POINTER_UP and MOVE_POINTER (live cursor signals)
-        msg_type != MessageType::Chat as u8
-            && msg_type != MessageType::Join as u8
-            && msg_type != MessageType::Leave as u8
-            && msg_type != 0x13
-            && msg_type != 0x1c
-    } else {
-        true
-    }
+    let Message::Binary(data) = msg else {
+        return false;
+    };
+    matches!(
+        data.first(),
+        Some(
+            0x12 // FILL
+            | 0x14 // UNDO_POINT
+            | 0x15 // UNDO
+            | 0x16 // STROKE
+            | 0x17 // REGION
+            | 0x18 // LINE
+            | 0x19 // BEZIER
+            | 0x1a // ERASE_ALL
+            | 0x1b // TEXT
+            | 0x1d // PUT_IMAGE
+        )
+    )
 }
 
 /// Asks about a session reset: the whole room when `target_connection` is
@@ -810,9 +826,11 @@ pub async fn send_leave_message(
         }
     };
 
-    if redis_connections.len() <= 1 {
+    // The leaving connection has already been unregistered, so anybody still
+    // in the registry is somebody to tell.
+    if redis_connections.is_empty() {
         debug!(
-            "Not sending LEAVE message for user {} in room {} - only 1 or fewer connections",
+            "Not sending LEAVE message for user {} in room {} - nobody left to tell",
             user_login_name, room_uuid
         );
         return;
@@ -852,5 +870,54 @@ pub async fn send_leave_message(
                 user_login_name, room_uuid, e
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod history_admission_tests {
+    use super::should_store_message;
+    use axum::extract::ws::Message;
+
+    fn frame(msg_type: u8) -> Message {
+        Message::Binary(vec![msg_type, 1, 1, 0].into())
+    }
+
+    /// The canvas operations, and nothing else, go into history from a
+    /// client. Every byte is checked, so a type added to the protocol later
+    /// is kept out until somebody decides it belongs in.
+    #[test]
+    fn only_canvas_operations_are_sequenced_from_a_client() {
+        let canvas = [0x12, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1d];
+        for msg_type in 0..=u8::MAX {
+            assert_eq!(
+                should_store_message(&frame(msg_type)),
+                canvas.contains(&msg_type),
+                "type 0x{msg_type:02x}"
+            );
+        }
+    }
+
+    /// The ones a client could do the most harm with, named so a regression
+    /// says which door it opened.
+    #[test]
+    fn server_frames_and_standalone_snapshots_are_refused() {
+        for (msg_type, name) in [
+            (0x02, "SNAPSHOT"),
+            (0x05, "REPLAY_START"),
+            (0x06, "LAYERS"),
+            (0x07, "END_SESSION"),
+            (0x08, "SESSION_EXPIRED"),
+            (0x0a, "SEQUENCED"),
+            (0x0b, "RESET_REQUEST"),
+            (0x0d, "RESET_POINT"),
+            (0x0e, "WELCOME"),
+            (0x0f, "CAUGHT_UP"),
+            (0x13, "POINTER_UP"),
+            (0x1c, "MOVE_POINTER"),
+        ] {
+            assert!(!should_store_message(&frame(msg_type)), "{name}");
+        }
+        assert!(!should_store_message(&Message::Binary(Vec::new().into())));
+        assert!(!should_store_message(&Message::Text("0x16".into())));
     }
 }

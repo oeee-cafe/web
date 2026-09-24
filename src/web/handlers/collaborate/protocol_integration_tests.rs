@@ -1269,11 +1269,17 @@ async fn touching_live_history_refreshes_every_canonical_key_lifetime() {
         .sequence_and_publish(room, &payload, &envelope.from_connection, &channel)
         .await
         .expect("seed live history");
+    RedisStateManager::new(pool.clone())
+        .assign_user_id(room, Uuid::new_v4())
+        .await
+        .expect("seed a session user id")
+        .expect("the room has ids to give");
 
     let keys = [
         format!("oeee:msg_history:v4:{room}"),
         format!("oeee:msg_seq:v4:{room}"),
         format!("oeee:msg_history_id:v4:{room}"),
+        format!("oeee:user_ids:{room}"),
     ];
     let mut connection = pool.get().await.expect("Redis connection");
     for key in &keys {
@@ -1344,7 +1350,7 @@ async fn one_room_subscription_feeds_every_connection_in_it() {
     }
 
     // Decoded once for the whole room: both listeners hold the same value.
-    fanout.release(room).await;
+    fanout.release(first.subscription()).await;
     assert_eq!(
         fanout.subscribed_rooms().await,
         1,
@@ -1352,10 +1358,107 @@ async fn one_room_subscription_feeds_every_connection_in_it() {
     );
     assert_eq!(fanout.listeners_in(room).await, 1);
 
-    fanout.release(room).await;
+    fanout.release(second.subscription()).await;
     assert_eq!(
         fanout.subscribed_rooms().await,
         0,
         "the last one out takes the subscription with them"
     );
+}
+
+/// A room whose Redis subscription dies must say so, not go quiet.
+///
+/// The pub/sub stream ends when Redis restarts or the network blinks, and
+/// nothing reconnects it. If the room stayed in the map its listeners would
+/// wait forever on a channel nobody feeds, and whoever joined next would be
+/// handed the same dead one. So the listeners are told `Closed` -- which is
+/// what makes their clients reconnect -- and the next join subscribes afresh.
+/// A share in the lost subscription must not count against the new one.
+#[tokio::test]
+async fn a_lost_room_subscription_closes_its_listeners_and_the_next_join_starts_over() {
+    let (_redis, redis_url) = start_redis().await;
+    let pool = redis_pool(&redis_url).await;
+    let room = Uuid::new_v4();
+    let channel = RedisStateManager::new(pool.clone()).get_room_channel(room);
+
+    // Only this room's subscriber is cut, found as the one that appeared
+    // across the join, since OEEE_TEST_REDIS_URL may be shared with tests
+    // running alongside this one.
+    let mut conn = pool.get().await.expect("Redis connection");
+    let subscriber_ids = |list: String| -> Vec<String> {
+        list.lines()
+            .filter_map(|line| line.split(' ').find_map(|field| field.strip_prefix("id=")))
+            .map(str::to_owned)
+            .collect()
+    };
+    let before = subscriber_ids(
+        redis::cmd("CLIENT")
+            .arg("LIST")
+            .arg("TYPE")
+            .arg("pubsub")
+            .query_async(&mut *conn)
+            .await
+            .expect("list subscribers"),
+    );
+
+    let fanout = RoomFanout::new(&redis_url);
+    let mut stranded = fanout
+        .subscribe(room, &channel)
+        .await
+        .expect("join the room");
+
+    let after = subscriber_ids(
+        redis::cmd("CLIENT")
+            .arg("LIST")
+            .arg("TYPE")
+            .arg("pubsub")
+            .query_async(&mut *conn)
+            .await
+            .expect("list subscribers"),
+    );
+    let ours: Vec<_> = after.iter().filter(|id| !before.contains(id)).collect();
+    assert!(!ours.is_empty(), "the join opened a subscriber connection");
+    for id in ours {
+        let _: () = redis::cmd("CLIENT")
+            .arg("KILL")
+            .arg("ID")
+            .arg(id)
+            .query_async(&mut *conn)
+            .await
+            .expect("drop the room's subscriber connection");
+    }
+
+    let ended = tokio::time::timeout(Duration::from_secs(5), stranded.receiver.recv())
+        .await
+        .expect("the listener hears that the stream is gone");
+    assert!(
+        matches!(ended, Err(tokio::sync::broadcast::error::RecvError::Closed)),
+        "expected Closed, got {ended:?}"
+    );
+    assert_eq!(fanout.subscribed_rooms().await, 0, "the dead entry is gone");
+
+    let mut fresh = fanout
+        .subscribe(room, &channel)
+        .await
+        .expect("the next join opens a new subscription");
+    fanout.release(stranded.subscription()).await;
+    assert_eq!(
+        fanout.listeners_in(room).await,
+        1,
+        "the old share is not taken out of the new subscription"
+    );
+
+    let sent = room_message(vec![0x12, 1, 0x55]);
+    let _: () = conn
+        .publish(&channel, sent.encode())
+        .await
+        .expect("publish to the room");
+    let received = tokio::time::timeout(Duration::from_secs(5), fresh.receiver.recv())
+        .await
+        .expect("the new subscription delivers")
+        .expect("the stream is live");
+    assert_eq!(received.payload, sent.payload);
+
+    fanout.release(fresh.subscription()).await;
+    assert_eq!(fanout.subscribed_rooms().await, 0);
 }

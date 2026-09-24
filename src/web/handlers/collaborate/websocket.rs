@@ -174,6 +174,21 @@ pub async fn handle_socket(
         }
     };
 
+    // From here on this user is active in Postgres and this connection is in
+    // the Redis registry, so every way out of the handler has to go through
+    // the cleanup -- a join that fails halfway would otherwise hold a seat
+    // until the session ends.
+    let leave = || {
+        cleanup_connection(
+            &connection_id,
+            &user_login_name,
+            user_id,
+            room_uuid,
+            db,
+            &state,
+        )
+    };
+
     // Tell the client its 1-byte session user id before any history arrives;
     // all its drawing messages will carry this id instead of a UUID
     let welcome = Message::Binary(Bytes::from(vec![
@@ -185,6 +200,7 @@ pub async fn handle_socket(
             "Failed to send welcome to connection {} in room {}",
             connection_id, room_uuid
         );
+        leave().await;
         return;
     }
 
@@ -201,6 +217,7 @@ pub async fn handle_socket(
                 "Failed to send the participant list to connection {} in room {}",
                 connection_id, room_uuid
             );
+            leave().await;
             return;
         }
     }
@@ -219,9 +236,11 @@ pub async fn handle_socket(
                 "Failed to join the room stream for connection {}: {}",
                 connection_id, e
             );
+            leave().await;
             return;
         }
     };
+    let room_subscription = room_listener.subscription();
 
     let (redis_tx, mut redis_rx) =
         mpsc::channel::<std::sync::Arc<super::redis_state::RoomBroadcast>>(OUTGOING_QUEUE_LIMIT);
@@ -276,8 +295,17 @@ pub async fn handle_socket(
                     send_goodbye(&overflow_close_tx, close_code::AGAIN, "too far behind");
                     break;
                 }
+                // The room's Redis subscription on this process is gone (see
+                // `RoomFanout`). Staying open would leave this client drawing
+                // into a room it can no longer hear, so it is sent away to
+                // reconnect, which subscribes afresh and resumes from its
+                // last acknowledged position.
                 Err(broadcast::error::RecvError::Closed) => {
-                    debug!("Room stream ended for connection {}", connection_id_clone);
+                    warn!(
+                        "Room stream ended for connection {} - closing so it can resume",
+                        connection_id_clone
+                    );
+                    send_goodbye(&overflow_close_tx, close_code::AGAIN, "room stream lost");
                     break;
                 }
             }
@@ -390,22 +418,14 @@ pub async fn handle_socket(
     // unregister and the abort would helpfully re-register this connection.
     heartbeat_task.abort();
 
-    cleanup_connection(
-        &connection_id,
-        &user_login_name,
-        user_id,
-        room_uuid,
-        db,
-        &state,
-    )
-    .await;
+    leave().await;
 
     redis_task.abort();
     // Gives up this connection's share of the room's subscription. The task
     // above owned the receiver, so aborting it is what makes this the last
     // reference; when it is also the room's last, the Redis subscription goes
     // with it.
-    state.room_fanout.release(room_uuid).await;
+    state.room_fanout.release(room_subscription).await;
 
     // A goodbye is only a goodbye if it reaches the wire. When one has been
     // handed over, give the outgoing task a moment to send it before the abort
@@ -1023,7 +1043,7 @@ async fn handle_incoming_messages(
                 }
             }
         } else {
-            // Ephemeral messages (chat, join, leave) bypass the sequencer
+            // Ephemeral messages (chat, join, pointers) bypass the sequencer
             if let Message::Binary(data) = &msg {
                 if data.first() == Some(&(messages::MessageType::Chat as u8)) {
                     let store =
@@ -1367,9 +1387,16 @@ async fn process_server_message(
             Some(msg.clone())
         }
         0x02 => {
-            // Snapshot (undo/redo sync): no server-side processing needed,
-            // it is sequenced and broadcast like any other history message
-            Some(msg.clone())
+            // A snapshot is a layer of a checkpoint, and a checkpoint arrives
+            // as a reset upload: RESET_BEGIN first, then its snapshots, which
+            // are captured above before anything reaches here. One on its own
+            // was not asked for, and sequenced it would overwrite a
+            // participant's layers for everyone who replays the history.
+            warn!(
+                "Dropping a snapshot from connection {} in room {} outside a reset upload",
+                ctx.connection_id, ctx.room_uuid
+            );
+            None
         }
         0x03 => messages::handle_chat_message(data, ctx.user_id, ctx.user_login_name),
         0x04 => {
@@ -1397,12 +1424,16 @@ async fn process_server_message(
             // Message is already broadcast internally, don't re-broadcast
             None
         }
+        // Everything else below 0x10 is the server's to send. `validate`
+        // already refuses the types it has no layout for, so this is the
+        // backstop: forwarded, a WELCOME or a SESSION_EXPIRED from a client
+        // would be believed by everyone in the room.
         _ => {
             debug!(
-                "Unknown server message type: 0x{:02x} in room {}",
+                "Dropping server message type 0x{:02x} sent by a client in room {}",
                 msg_type, ctx.room_uuid
             );
-            Some(msg.clone())
+            None
         }
     }
 }
@@ -1420,13 +1451,8 @@ async fn cleanup_connection(
         connection_id, user_login_name, room_uuid
     );
 
-    messages::send_leave_message(room_uuid, connection_id, user_id, user_login_name, state).await;
-
-    if let Err(e) = db::mark_participant_inactive(db, room_uuid, user_id).await {
-        error!("Failed to update participant on disconnect: {}", e);
-    }
-
-    // Unregister connection from Redis
+    // Unregistered first, so that what is left in the registry below is
+    // everybody except this connection.
     if let Err(e) = state.redis_state.unregister_connection(connection_id).await {
         error!(
             "Failed to unregister connection {} from Redis: {}",
@@ -1435,8 +1461,11 @@ async fn cleanup_connection(
     }
 
     // On a redeploy the room is emptying because the server is going away, not
-    // because everyone left: these same people are already reconnecting. Leave
-    // the room's Redis state exactly as it is for them to come back to.
+    // because everyone left: these same people are already reconnecting, to
+    // the other colour. Leave the room's Redis state exactly as it is for them
+    // to come back to, and say nothing to the room -- a LEAVE now would show
+    // everyone leaving at once, and marking them inactive could land after the
+    // new process has marked them active again.
     if state.shutdown.is_signalled() {
         debug!(
             "Shutting down - leaving room {} state intact for reconnecting clients",
@@ -1451,7 +1480,7 @@ async fn cleanup_connection(
         .get_room_connections(room_uuid)
         .await
         .unwrap_or_default();
-    let _user_has_other_connections = {
+    let user_has_other_connections = {
         let mut has_other = false;
         for conn_id in &room_connections {
             if conn_id != connection_id {
@@ -1465,6 +1494,26 @@ async fn cleanup_connection(
         }
         has_other
     };
+
+    // Leaving is something a user does, not a tab. With another connection
+    // still open they are still here: the LEAVE carries only their user id,
+    // and a client answers it by announcing in chat that they left and hiding
+    // the cursor it keeps per session user id -- the cursor the remaining tab
+    // is still drawing with. So neither the LEAVE nor the inactive mark is
+    // for this connection to send; the user's last connection sends both.
+    if user_has_other_connections {
+        debug!(
+            "User {} still has another connection in room {}",
+            user_login_name, room_uuid
+        );
+    } else {
+        messages::send_leave_message(room_uuid, connection_id, user_id, user_login_name, state)
+            .await;
+
+        if let Err(e) = db::mark_participant_inactive(db, room_uuid, user_id).await {
+            error!("Failed to update participant on disconnect: {}", e);
+        }
+    }
 
     // Note: Previously removed user from Redis room presence, but now using database
     // for canonical participant ordering. User remains in collaborative_sessions_participants
