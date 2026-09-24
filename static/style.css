@@ -4005,9 +4005,12 @@ html[data-store="steam"] .auth-steam {
 }
 
 /* The stores' official badges, as the stores serve them. Apple's is the
-   badge and nothing else; Google's PNG carries 29px of clear space above
-   and below its 192px of artwork out of 250, so it is drawn taller and the
-   clear space taken back, which puts both badges' artwork at 40px. Neither
+   badge and nothing else; Google's PNG carries clear space above and below
+   its artwork, so it is drawn taller and the clear space taken back, which
+   puts both badges' artwork at 40px. How much depends on the language:
+   Korean, Japanese and Chinese are 192px of artwork in 250 with 29px either
+   side, and English is 168px with 41px, a smaller badge in the same
+   canvas. Neither
    is recoloured for dark mode: each store makes one black badge, with its
    own border, for any background. */
 .about-stores {
@@ -4039,6 +4042,11 @@ html[data-app] .about-stores {
 .about-store-badge-google {
   height: 52px;
   margin: -6px 0;
+}
+
+.about-store-badge-google-en {
+  height: 60px;
+  margin: -10px 0;
 }
 
 /* Four banners a row at every width, each scaled to a quarter of it in
