@@ -14,6 +14,9 @@ node_modules
 # npm's lockfile. This package is managed with pnpm, and a second lockfile
 # only resolves differently and then goes stale.
 package-lock.json
+# What pnpm writes when a dependency wants to run a build script and nobody
+# has said whether it may: a placeholder asking the question, not settings.
+/pnpm-workspace.yaml
 
 dist
 dist-example
