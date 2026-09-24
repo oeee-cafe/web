@@ -914,7 +914,7 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   margin-left: auto;
 }
 
-/* A guest's drafts, shown only while this browser holds some: the square
+/* Drafts, shown only while there are some, signed in or out: the square
    is tinted and edged as 넷캔 is, and 넷캔's own light pulses on its top
    right corner -- centred on it, as the unverified-email dot is on the
    initial. */
@@ -1288,55 +1288,6 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   height: 8px;
   border-radius: 4px;
   background-color: var(--ds-danger);
-}
-
-/* Drafts left to finish: the initial's square fills with the accent and
-   empties again, a ring breathing out from its edge as it fills. Paused
-   while the menu that lists them is open; held still as a ring for anyone
-   who has asked for less motion. */
-@-webkit-keyframes toolbar-avatar-pulse {
-  0%, 100% {
-    background-color: var(--ds-surface);
-    color: var(--ds-ink);
-    box-shadow: 0 0 0 0 var(--ds-accent), var(--ds-shadow-raise);
-  }
-  50% {
-    background-color: var(--ds-accent);
-    color: var(--ds-accent-ink);
-    box-shadow: 0 0 0 4px var(--ds-accent-line), var(--ds-shadow-raise);
-  }
-}
-
-@keyframes toolbar-avatar-pulse {
-  0%, 100% {
-    background-color: var(--ds-surface);
-    color: var(--ds-ink);
-    box-shadow: 0 0 0 0 var(--ds-accent), var(--ds-shadow-raise);
-  }
-  50% {
-    background-color: var(--ds-accent);
-    color: var(--ds-accent-ink);
-    box-shadow: 0 0 0 4px var(--ds-accent-line), var(--ds-shadow-raise);
-  }
-}
-
-.toolbar-avatar-pulse {
-  border-color: var(--ds-accent-line);
-  -webkit-animation: toolbar-avatar-pulse 2s ease-in-out infinite;
-  animation: toolbar-avatar-pulse 2s ease-in-out infinite;
-}
-
-.toolbar-menu[open] .toolbar-avatar-pulse {
-  -webkit-animation: none;
-  animation: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toolbar-avatar-pulse {
-    -webkit-animation: none;
-    animation: none;
-    box-shadow: 0 0 0 2px var(--ds-accent), var(--ds-shadow-raise);
-  }
 }
 
 .toolbar-menu {

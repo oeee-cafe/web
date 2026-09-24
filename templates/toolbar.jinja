@@ -185,16 +185,18 @@
            (info-outline, login; Apache 2.0; THIRD-PARTY-NOTICES.md). #}
         <a class="toolbar-square toolbar-button toolbar-about" href="/about" aria-label="{{ ftl_get_message("nav-about-menu") }}" title="{{ ftl_get_message("nav-about-menu") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 17h2v-6h-2zm1-8q.425 0 .713-.288T13 8t-.288-.712T12 7t-.712.288T11 8t.288.713T12 9m0 13q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg></a>
         <a class="toolbar-square toolbar-button toolbar-sign-in" href="/login" aria-label="{{ ftl_get_message("sign-in") }}" title="{{ ftl_get_message("sign-in") }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21v-2h7V5h-7V3h7q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21zm-2-4l-1.375-1.45l2.55-2.55H3v-2h8.175l-2.55-2.55L10 7l5 5z"/></svg></a>
-        {# Drawings saved in this browser while signed out, which is the
-           only place they are: a square of its own, and only while there
-           are some. The script at the foot of this nav shows it when it
-           finds them, lit as 넷캔 is, with 넷캔's own pulsing light on its
-           corner and the count in its label. A guest has none on the
-           server, so it arrives hidden. Beside Draw, whose work it holds.
-           Unboosted for the reason the account menu's link is. A page with
-           a folded corner, stroked like the bell beside it. #}
-        <a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" hidden aria-label="{{ ftl_get_message("drafts") }}" title="{{ ftl_get_message("drafts") }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h9l5 5v14h-14z"/><path d="M14.5 2.5v5h5"/></svg><span class="toolbar-live-dot" aria-hidden="true"></span></a>
       {% endif %}
+      {# Drafts: a square of its own, and only while there are some -- the
+         account's on the server, and the drawings kept in this browser,
+         which is the only place a guest's are. The server's count shows
+         it from the first paint; the script at the foot of this nav shows
+         it for this browser's, and puts the sum in its label. Lit as 넷캔
+         is, with 넷캔's own pulsing light on its corner. Beside Draw, whose
+         work it holds. Unboosted for the reason the account menu's link
+         is. A page with a folded corner, stroked like the bell. #}
+      {%- set drafts_count = draft_post_count|default(0) %}
+      {%- set drafts_label = ftl_get_message("drafts") ~ (" (" ~ drafts_count ~ ")" if drafts_count > 0 else "") %}
+      <a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="{{ drafts_count }}"{% if not drafts_count > 0 %} hidden{% endif %} aria-label="{{ drafts_label }}" title="{{ drafts_label }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h9l5 5v14h-14z"/><path d="M14.5 2.5v5h5"/></svg><span class="toolbar-live-dot" aria-hidden="true"></span></a>
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
            again. Signed out too: a guest can draw, and the drawing is kept
@@ -214,12 +216,9 @@
       {% if current_user %}
         <details class="toolbar-menu">
           <summary aria-label="{{ current_user.display_name or current_user.login_name }}">
-            {# The initial pulses green while there are drafts left to
-               finish, and an unverified email puts a red dot on it. Drafts
-               used to be a button in the bar while there were any, which
-               changed the bar's width -- and so whether it fit one row on a
-               phone -- from one visit to the next. #}
-            <span class="toolbar-square toolbar-avatar{% if draft_post_count > 0 %} toolbar-avatar-pulse{% endif %}" aria-hidden="true">{{ (current_user.display_name or current_user.login_name or "?")[:1]|upper }}</span>
+            {# An unverified email puts a red dot on the initial. Drafts
+               left to finish have the square beside Draw. #}
+            <span class="toolbar-square toolbar-avatar" aria-hidden="true">{{ (current_user.display_name or current_user.login_name or "?")[:1]|upper }}</span>
             {% if not current_user.email_verified_at %}<span class="toolbar-dot" title="{{ ftl_get_message('email-not-verified') }}"></span>{% endif %}
           </summary>
           <div class="toolbar-menu-items">
@@ -830,9 +829,10 @@
      it, so the painter still gets to create it with its store. #}
   <script>
     (function () {
-      var link = document.querySelector(".nav-bar .toolbar-menu-drafts, .nav-bar .toolbar-drafts");
-      if (!link || !window.indexedDB) return;
-      var nav = link.closest ? link.closest(".nav-bar") : null;
+      var square = document.querySelector(".nav-bar .toolbar-drafts");
+      if (!square || !window.indexedDB) return;
+      var link = document.querySelector(".nav-bar .toolbar-menu-drafts");
+      var nav = square.closest ? square.closest(".nav-bar") : null;
       var userId = (nav && nav.getAttribute("data-user-id")) || "";
       var opening;
       try { opening = indexedDB.open("oeee-local-drafts", 1); } catch (e) { return; }
@@ -855,15 +855,14 @@
       };
       function show(local) {
         if (!local) return;
-        var total = (parseInt(link.getAttribute("data-server-count"), 10) || 0) + local;
-        link.hidden = false;
-        if (/(^| )toolbar-drafts( |$)/.test(link.className)) {
-          // The guest's square: counted in its words.
-          var label = link.getAttribute("aria-label") + " (" + total + ")";
-          link.setAttribute("aria-label", label);
-          link.setAttribute("title", label);
-          return;
-        }
+        var total = (parseInt(square.getAttribute("data-server-count"), 10) || 0) + local;
+        // The square: shown, and counted in its words.
+        var label = square.getAttribute("title").replace(/ \(\d+\)$/, "") + " (" + total + ")";
+        square.setAttribute("aria-label", label);
+        square.setAttribute("title", label);
+        square.hidden = false;
+        // The account menu's line, signed in: counted in its badge.
+        if (!link) return;
         var badge = link.querySelector(".toolbar-badge");
         if (!badge) {
           badge = document.createElement("span");
@@ -872,10 +871,6 @@
           link.appendChild(badge);
         }
         badge.textContent = String(total);
-        var summary = link.closest ? link.closest(".toolbar-menu") : null;
-        summary = summary && summary.querySelector("summary");
-        var avatar = summary && summary.querySelector(".toolbar-avatar");
-        if (avatar) avatar.className += " toolbar-avatar-pulse";
       }
     })();
   </script>
