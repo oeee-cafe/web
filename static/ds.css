@@ -222,6 +222,29 @@ html[data-app] {
   --ds-text-2xl: calc(26px * var(--ds-text-scale, 1));
 }
 
+/* A tablet is given the wide layout, which was drawn for a mouse and a
+   desk, and is read held further off than a phone. An iPad mini draws a
+   pixel about a fifth smaller than the larger iPads, too, so 13px there
+   read as a page zoomed out. Every step of the type scale is a size larger
+   on a touch screen too wide for the phone layout; in an app it rides on
+   the reader's own setting. Nothing but text changes. */
+@media (pointer: coarse) and (min-width: 601px) {
+  :root {
+    --ds-text-scale: 1.15;
+    --ds-text-xs: calc(11px * var(--ds-text-scale, 1));
+    --ds-text-s: calc(12px * var(--ds-text-scale, 1));
+    --ds-text-m: calc(13px * var(--ds-text-scale, 1));
+    --ds-text-base: calc(14px * var(--ds-text-scale, 1));
+    --ds-text-l: calc(16px * var(--ds-text-scale, 1));
+    --ds-text-xl: calc(20px * var(--ds-text-scale, 1));
+    --ds-text-2xl: calc(26px * var(--ds-text-scale, 1));
+  }
+
+  html[data-app] {
+    --ds-text-scale: clamp(0.8, calc(var(--oeee-text-scale, 1) * 1.15), 2);
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Behaving like an application
 
