@@ -804,6 +804,73 @@ pub async fn collaborative_session_details(
     .into_response())
 }
 
+/// GET /admin/collaborative-sessions/:uuid/reference — the image the session
+/// was saved as, for the inspector to compare its replay against.
+///
+/// Passed through from storage rather than linked: the public image host is
+/// another origin, and a canvas that draws a cross-origin image cannot have
+/// its pixels read back, which is the whole of the comparison.
+pub async fn collaborative_session_reference(
+    _admin: AdminUser,
+    Path(room_uuid): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let filename = sqlx::query_scalar!(
+        r#"
+        SELECT i.image_filename
+        FROM collaborative_sessions cs
+        JOIN posts p ON p.id = cs.saved_post_id
+        JOIN images i ON i.id = p.image_id
+        WHERE cs.id = $1
+        "#,
+        room_uuid,
+    )
+    .fetch_optional(&state.db_pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("A saved post for this session".to_string()))?;
+    // Where the image store puts a post's picture; see save_session_to_post.
+    let key = format!("image/{}/{}", filename.get(..2).unwrap_or(""), filename);
+    let object = crate::web::handlers::collaborate::archive::s3_client(&state.config)
+        .get_object()
+        .bucket(&state.config.aws_s3_bucket)
+        .key(&key)
+        .send()
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read {}: {}",
+                key,
+                crate::web::handlers::collaborate::archive::describe(&e)
+            )
+        })?;
+    let bytes = object
+        .body
+        .collect()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", key, e))?
+        .into_bytes();
+    Ok(([(header::CONTENT_TYPE, "image/png")], bytes).into_response())
+}
+
+/// POST /admin/collaborative-sessions/:uuid/check — what the inspector found
+/// when it played the recording back, kept for the session list.
+pub async fn record_collaborative_session_check(
+    admin: AdminUser,
+    Path(room_uuid): Path<Uuid>,
+    State(state): State<AppState>,
+    axum::Json(check): axum::Json<crate::models::collaborative_recording::ReplayCheck>,
+) -> Result<Response, AppError> {
+    if !["match", "differs", "incomplete", "unavailable"].contains(&check.outcome.as_str()) {
+        return Err(AppError::InvalidFormData(format!(
+            "unknown check outcome {:?}",
+            check.outcome
+        )));
+    }
+    crate::models::collaborative_recording::note_check(&state.db_pool, room_uuid, admin.0.id, &check)
+        .await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
 /// GET /admin/collaborative-sessions/:uuid — the recording, played back
 /// through the painter that drew it, with the log, the conversation and the
 /// reports read against it.
@@ -1684,6 +1751,54 @@ mod tests {
         );
         assert!(page.find("replay.css").unwrap() < page.find("/static/ds.css").unwrap());
         assert!(page.find("/static/ds.css").unwrap() < page.find("</head>").unwrap());
+    }
+
+    /// What was kept about a session reads on its row, and what wants a
+    /// look -- a report, a replay that differs -- says so there.
+    #[test]
+    fn session_rows_say_what_their_recording_holds() {
+        let rendered = render_sessions(vec![
+            sample_session(json!({ "recording": null })),
+            sample_session(json!({
+                "id": "00000000-0000-0000-0000-00000000000d",
+                "recording": {
+                    "first_seq": 1,
+                    "last_seq": 5194,
+                    "messages": 5194,
+                    "sealed": true,
+                    "chat_lines": 4,
+                    "reports": 2,
+                    "check_outcome": "differs",
+                    "check_differing_pixels": 1234,
+                    "check_total_pixels": 60000,
+                    "check_note": null,
+                    "checked_at": "2026-09-24T09:00:00Z",
+                },
+            })),
+            sample_session(json!({
+                "id": "00000000-0000-0000-0000-00000000000e",
+                "recording": {
+                    "first_seq": 3310,
+                    "last_seq": 4000,
+                    "messages": 690,
+                    "sealed": false,
+                    "chat_lines": 0,
+                    "reports": 0,
+                    "check_outcome": "match",
+                    "check_differing_pixels": 0,
+                    "check_total_pixels": 60000,
+                    "check_note": null,
+                    "checked_at": null,
+                },
+            })),
+        ]);
+        assert!(rendered.contains("5194 msgs"));
+        assert!(rendered.contains("4 chat"));
+        assert!(rendered.contains("2 reports"));
+        assert!(rendered.contains("replay ✗ 1234 px"));
+        assert!(rendered.contains("replay ✓"));
+        assert!(rendered.contains(">partial<"));
+        assert!(rendered.contains("status=flagged"));
     }
 
     /// Sorting and filtering have to survive each other: a status link that

@@ -132,6 +132,22 @@
   color: var(--ds-danger-text);
 }
 
+/* A replay check that came out as what was saved. */
+.admin-tag.ok {
+  border-color: var(--ds-accent-line);
+  background-color: var(--ds-success-surface);
+  color: var(--ds-success-text);
+}
+
+/* A session's recording, as a stack of tags in one cell. */
+.admin-recording .admin-tag {
+  margin: 0 var(--ds-space-1) 2px 0;
+}
+
+.admin-recording .admin-tag + .admin-tag {
+  margin-left: 0;
+}
+
 .admin-tag.draft {
   background-color: var(--ds-warning-surface);
   color: var(--ds-warning-text);

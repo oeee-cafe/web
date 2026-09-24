@@ -23,6 +23,7 @@
     {{- status_link("all", "All") -}}
     {{- status_link("live", "Live") -}}
     {{- status_link("ended", "Ended") -}}
+    {{- status_link("flagged", "Needs a look") -}}
   </nav>
   <div class="admin-table-scroll">
     <table>
@@ -38,6 +39,7 @@
           <th>{{ sort_link("active", "Last active") }}</th>
           <th>{{ sort_link("created", "Created") }}</th>
           <th>Status</th>
+          <th>Recording</th>
           <th></th>
         </tr>
       </thead>
@@ -101,6 +103,36 @@
                 <span class="admin-tag deleted">ended</span>
               {% else %}
                 live
+              {% endif %}
+            </td>
+            {# What is kept about it, noted as it was written -- or by the
+               inspector, for a session recorded before that. Red is what
+               wants a look: a report, a recording that starts part-way, or a
+               replay that does not come out as what was saved. #}
+            <td class="admin-recording">
+              {% set r = session.recording %}
+              {% if r %}
+                {% if r.messages %}
+                  <span class="admin-tag">{{ r.messages }} msgs</span>
+                {% endif %}
+                {% if r.first_seq and r.first_seq != 1 %}
+                  <span class="admin-tag deleted" title="Everything before sequence {{ r.first_seq }} is missing">partial</span>
+                {% endif %}
+                {% if r.chat_lines %}
+                  <span class="admin-tag">{{ r.chat_lines }} chat</span>
+                {% endif %}
+                {% if r.reports %}
+                  <span class="admin-tag deleted">{{ r.reports }} report{% if r.reports != 1 %}s{% endif %}</span>
+                {% endif %}
+                {% if r.check_outcome == "match" %}
+                  <span class="admin-tag ok" title="Played back to what was saved, pixel for pixel">replay ✓</span>
+                {% elif r.check_outcome == "differs" %}
+                  <span class="admin-tag deleted" title="{{ r.check_differing_pixels }} of {{ r.check_total_pixels }} pixels differ from the saved post">replay ✗ {{ r.check_differing_pixels }} px</span>
+                {% elif r.check_outcome == "incomplete" %}
+                  <span class="admin-tag draft" title="{{ r.check_note or '' }}">replay incomplete</span>
+                {% endif %}
+              {% else %}
+                <span class="muted">—</span>
               {% endif %}
             </td>
             <td class="admin-row-actions">

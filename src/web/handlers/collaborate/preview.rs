@@ -688,6 +688,13 @@ pub async fn report_session_diagnostics(
                 "Stored a synchronization report from {} for room {} at {}",
                 user.login_name, room_uuid, key
             );
+            // Counted where the admin list can see it, which is what makes a
+            // reported session stand out there.
+            if let Err(e) =
+                crate::models::collaborative_recording::note_report(&state.db_pool, room_uuid).await
+            {
+                warn!("Failed to count the report for room {}: {}", room_uuid, e);
+            }
             Ok(StatusCode::NO_CONTENT.into_response())
         }
         // Nowhere private to keep it. Accepted rather than refused: the client

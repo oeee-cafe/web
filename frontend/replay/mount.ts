@@ -24,6 +24,7 @@ import { logRows } from "./logRows";
 import { markers } from "./markers";
 import { peoplePanel } from "./peoplePanel";
 import { createReplay, drawableEntries, type ReplayHandle } from "./player";
+import { checkReplay } from "./replayCheck";
 import { filedAt, reportsPanel, type FiledReport } from "./reportsPanel";
 
 const SPEEDS = [1, 2, 4, 16];
@@ -481,6 +482,22 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
   describe();
   readout.textContent = `0 / ${player.length}`;
   update(-1, false);
+
+  // Whether the recording plays back to what was saved: checked by itself on
+  // every visit to a finished session, and kept for the session list.
+  if (!live && manifest && entries.length > 0) {
+    const checkHost = el("div", "inspect-check");
+    main.appendChild(checkHost);
+    void checkReplay({
+      host: checkHost,
+      base,
+      manifest,
+      entries,
+      details,
+      chatLines: chatLoaded.ok ? chatLoaded.value.length : 0,
+      reports: reportsLoaded.ok ? reportsLoaded.value.length : 0,
+    });
+  }
 
   // A link that named a moment opens on it.
   if (asked.seq !== null) {

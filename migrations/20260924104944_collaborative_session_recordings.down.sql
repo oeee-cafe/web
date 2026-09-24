@@ -1,0 +1,1 @@
+DROP TABLE collaborative_session_recordings;
