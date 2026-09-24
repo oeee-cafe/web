@@ -6,6 +6,7 @@ pub mod config;
 pub mod db;
 pub mod feed_period;
 pub mod google;
+pub mod google_play;
 pub mod handoff;
 pub mod image_store;
 pub mod jwks;

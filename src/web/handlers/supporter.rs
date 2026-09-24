@@ -3,7 +3,8 @@
 //!
 //! Only an app can sell one -- StoreKit in the iOS and macOS apps, Steam's
 //! overlay in the Steam build, the Microsoft Store in that build of the
-//! Windows app -- and only through the store it was built for. So the
+//! Windows app, Play Billing in the Android app -- and only through the
+//! store it was built for. So the
 //! buttons are chosen here, from the store the request's user agent names
 //! ([`Store::from_user_agent`]): that store's products on sale for this
 //! year, from the catalogue (`models::store_product`), and nothing of any
@@ -108,8 +109,11 @@ pub async fn supporter_page(
         this_year => year,
         store,
         offers,
-        // Restoring is the App Store's word for it; no other store has one.
-        restorable => store == Some(Store::Apple),
+        // Restoring is the App Store's word for it. Google Play has the same
+        // thing -- what the device's Google account owns, handed over again
+        // -- and Steam and the Microsoft Store say it every time they are
+        // asked.
+        restorable => matches!(store, Some(Store::Apple | Store::Google)),
         nothing_this_year,
         supporter_standings,
         worn_mark,

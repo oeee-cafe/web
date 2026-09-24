@@ -27,11 +27,11 @@
   //               page scrolls whole and the web view swipes back itself;
   //               "desktop" for the Mac and Windows windows, whose title bar
   //               is the site's toolbar
-  //   data-store  where the build sells: "apple", "microsoft" or "steam";
-  //               absent in one that does not (app_store.jinja). The server
-  //               reads the same words by the same rule to choose
-  //               /supporter's buttons (Store::from_user_agent), so the two
-  //               change together.
+  //   data-store  where the build sells: "apple", "google", "microsoft" or
+  //               "steam"; absent in one that does not (app_store.jinja).
+  //               The server reads the same words by the same rule to
+  //               choose /supporter's buttons (Store::from_user_agent), so
+  //               the two change together.
   //
   // A browser has none of them. Only ever about what to show: nothing is
   // trusted for being marked, and a purchase is checked with the store.
@@ -46,7 +46,7 @@
       });
       if (/^(ios|android|macos|windows)$/.test(words.platform || "")) {
         app = words.platform;
-        if (/^(apple|microsoft|steam)$/.test(words.store || "")) store = words.store;
+        if (/^(apple|google|microsoft|steam)$/.test(words.store || "")) store = words.store;
       }
     }
     if (!app) return;

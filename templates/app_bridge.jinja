@@ -110,10 +110,10 @@
    appContract.json gives them.
 
    A build that sells says which store it sells through in its user agent
-   -- store/apple (the App Store), store/microsoft (the Microsoft Store) or
-   store/steam -- so `data-store` is on the root before the page paints,
-   early enough that Steam's sign-in is never drawn in a build that would
-   do nothing with it. The server reads the same words to choose
+   -- store/apple (the App Store), store/google (Google Play),
+   store/microsoft (the Microsoft Store) or store/steam -- so `data-store`
+   is on the root before the page paints, early enough that Steam's
+   sign-in is never drawn in a build that would do nothing with it. The server reads the same words to choose
    /supporter's buttons (Store::from_user_agent in models/supporter.rs,
    the same rule), so those are never in the page at all. It is the build
    that says so, not the platform: the Microsoft Store build of the Windows

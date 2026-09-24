@@ -208,6 +208,14 @@ impl App {
             ));
         }
 
+        // And for the purchase tokens the Android app has handed over.
+        if let Some(google_play) = self.state.config.google_play.clone() {
+            tokio::task::spawn(crate::google_play::recheck_supporters(
+                self.state.db_pool.clone(),
+                google_play,
+            ));
+        }
+
         let session_layer = SessionManagerLayer::new(session_store)
             .with_secure(self.state.config.env == "production")
             .with_same_site(SameSite::Lax)

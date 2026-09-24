@@ -392,14 +392,14 @@ pub async fn check(config: &AppStoreConfig) -> Result<()> {
 /// harmless.
 pub async fn recheck_supporters(db: sqlx::PgPool, config: AppStoreConfig) {
     use crate::models::store_product;
-    use crate::models::supporter::{apple_purchases_due_for_check, record_recheck, Store};
+    use crate::models::supporter::{purchases_due_for_check, record_recheck, Store};
 
     let mut every = tokio::time::interval(Duration::from_secs(10 * 60));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         every.tick().await;
         let due = match db.begin().await {
-            Ok(mut tx) => apple_purchases_due_for_check(&mut tx, 100).await,
+            Ok(mut tx) => purchases_due_for_check(&mut tx, Store::Apple, 100).await,
             Err(error) => Err(error.into()),
         };
         let due = match due {

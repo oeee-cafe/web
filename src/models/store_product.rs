@@ -3,7 +3,8 @@
 //!
 //! Everything that asks "is this one of ours, and which year is it?" asks
 //! here -- the App Store lookup, Steam's ownership check, the Microsoft
-//! Store's collections query, the daily rechecks -- and /supporter asks here
+//! Store's collections query, Google Play's purchase lookup, the daily
+//! rechecks -- and /supporter asks here
 //! what to offer. Staff change it at /admin/store.
 //!
 //! **A product is never taken out.** A pack counts for whoever bought it
@@ -35,10 +36,10 @@ use super::supporter::{OwnedProduct, Store};
 /// One product in the catalogue.
 #[derive(Clone, Debug, Serialize)]
 pub struct StoreProduct {
-    /// "apple", "microsoft" or "steam".
+    /// "apple", "google", "microsoft" or "steam".
     pub store: String,
-    /// The store's own id for it: an App Store product id, a Microsoft Store
-    /// ID, or a Steam app id written out.
+    /// The store's own id for it: an App Store product id, a Google Play
+    /// product id, a Microsoft Store ID, or a Steam app id written out.
     pub product: String,
     /// The Supporter Pack year a purchase of it counts for.
     pub year: i32,

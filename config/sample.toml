@@ -93,3 +93,13 @@ smtp_password = ""
 # tenant_id = "00000000-0000-0000-0000-000000000000"
 # client_id = "00000000-0000-0000-0000-000000000000"
 # client_secret = ""
+
+# Google Play's side of the Android app. Leave the table out and the Android
+# app sells nothing. service_account_path is a JSON key of a Google Cloud
+# service account with the Google Play Android Developer API enabled in its
+# project, invited in Play Console (Users and permissions) with "View
+# financial data" and "Manage orders and subscriptions" for the app. The
+# one-time products it sells are listed at /admin/store by their product ids.
+# [google_play]
+# package_name = "cafe.oeee"
+# service_account_path = "config/google-play-service-account.json"

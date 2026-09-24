@@ -81,7 +81,7 @@ interface Page {
 interface Options {
   userAgent?: string;
   /** The store the build sells through, named in its user agent as the builds name it. */
-  store?: "apple" | "microsoft" | "steam";
+  store?: "apple" | "google" | "microsoft" | "steam";
   signedIn?: boolean;
   presence?: string;
   unread?: number;
@@ -612,6 +612,15 @@ describe("what a store gives an app", () => {
     takingOnly(page, "ab12");
     expect(await page.window.oeeeApp.store.purchased(["ab12"])).toEqual(["ab12"]);
     expect(page.asked.map((request) => request.url)).toEqual(["/store/steam/purchases"]);
+
+    // A purchase token, which is long and carries punctuation of its own.
+    const android = await open({ store: "google" });
+    const token = "kmplbhbnbjgemmhlnbkdmhmj.AO-J1Oz_8x3T-kW/f+q=";
+    takingOnly(android, token);
+    expect(await android.window.oeeeApp.store.purchased([token])).toEqual([token]);
+    expect(android.asked.map((request) => [request.url, request.body])).toEqual([
+      ["/store/google/purchases", "proof=" + encodeURIComponent(token)],
+    ]);
   });
 
   it("takes nothing in a build that sells nowhere, or from nothing", async () => {

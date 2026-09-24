@@ -59,10 +59,11 @@
               {% endfor %}
               {# Restoring is the App Store's word for it: the same purchase
                  handed over again, which gives a pack back to whoever is
-                 signed in without ever making a second one. Steam has no such
-                 thing -- it says what an account owns every time it is
-                 asked -- and the Microsoft Store build hands its key over
-                 again by itself. #}
+                 signed in without ever making a second one. Google Play
+                 has the same, from what the device's Google account owns.
+                 Steam has no such thing -- it says what an account owns
+                 every time it is asked -- and the Microsoft Store build
+                 hands its key over again by itself. #}
               {% if restorable %}
                 <button type="button" class="ds-button supporter-restore">{{ ftl_get_message("supporter-pack-restore") }}</button>
               {% endif %}
