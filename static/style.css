@@ -3093,26 +3093,11 @@ html[data-store] .supporter-elsewhere {
   color: var(--ds-danger-text);
 }
 
-/* The thanks, with this year's mark before it. */
-.supporter-thanks .supporter-mark {
-  margin-right: 4px;
-}
-
 /* A supporter: the chips on the accent, one for every platform they
    support on, each with that platform's mark before the word and the date
-   it started after it.
-
-   The mark and the word are a row centred across the chip, as the badge
-   beside a name is. An emoji's glyph box is not the text's, and sits
-   differently from one system's emoji font to the next, so nudging it onto
-   the baseline by a pixel or two left it low in some fonts and made the
-   chip taller than the chips beside it. */
+   it started after it. The mark is centred on the word by .ds-marked. */
 .profile-chip.supporter-chip,
 .profile-chip.supporter-chip:visited {
-  display: -webkit-inline-box;
-  display: inline-flex;
-  -webkit-box-align: center;
-  align-items: center;
   border-color: var(--ds-accent-line);
   background-color: var(--ds-accent);
   color: var(--ds-accent-ink);
@@ -3122,29 +3107,12 @@ html[data-store] .supporter-elsewhere {
   background-color: var(--ds-accent-hover);
 }
 
-.supporter-chip .supporter-mark {
-  display: block;
-  margin-right: 4px;
-  line-height: 1;
-}
-
-/* The same mark before a platform's name where a supporter chooses which of
-   them to wear. */
-.community-form-choice-name .supporter-mark {
-  margin-right: 4px;
-  vertical-align: -2px;
-}
-
 /* The same mark beside a supporter's name wherever a page prints it. An
    emoji is drawn in its own colours by the reader's system, so there is no
    accent disc behind it and nothing here sets a colour: a disc under a
    gamepad read as a reaction someone had left. */
 .supporter-badge,
 .supporter-badge:visited {
-  display: -webkit-inline-box;
-  display: inline-flex;
-  -webkit-box-align: center;
-  align-items: center;
   flex: none;
   margin-left: 4px;
   font-size: 12px;
@@ -3152,9 +3120,6 @@ html[data-store] .supporter-elsewhere {
   text-decoration: none;
 }
 
-.supporter-badge .supporter-mark {
-  display: block;
-}
 
 .profile-chip-out {
   margin-left: 4px;

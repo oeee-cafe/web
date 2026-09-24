@@ -2648,7 +2648,7 @@ mod template_tests {
                 })
                 .expect("post_view.jinja renders")
         };
-        let badges = |html: &str| html.matches(r#"class="supporter-badge""#).count();
+        let badges = |html: &str| html.matches(r#"class="supporter-badge ds-marked ds-marked-alone""#).count();
 
         let page = render(json!({"someone": "steam", "friend": "apple", "fan": "steam"}));
         // Author, co-drawer, the commenter and the author's reply to them.

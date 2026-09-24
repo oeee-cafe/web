@@ -35,7 +35,7 @@
          page's own size; the notes after it are muted, not smaller. #}
       <div class="ds-card settings-card ds-stack supporter-pack-card">
         {% if supports_this_year %}
-          <p class="supporter-thanks">
+          <p class="supporter-thanks ds-marked-block">
             {{ supporter_mark(worn_mark) }}{{ ftl_format_pattern("supporter-pack-have", {"year": this_year}) }}
           </p>
         {% else %}
@@ -89,7 +89,7 @@
         <div class="profile-section-label">{{ ftl_get_message("supporter-pack-years") }}</div>
         <div class="profile-chips">
           {% for standing in supporter_standings %}
-            <span class="profile-chip supporter-chip"
+            <span class="profile-chip supporter-chip ds-marked"
                   title="{{ supporter_mark_name(standing.store) }}">{{ supporter_mark(standing.store) }}{{ standing.year }}</span>
           {% endfor %}
         </div>
