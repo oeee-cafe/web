@@ -3819,23 +3819,22 @@ html[data-store="steam"] .auth-steam {
   display: block;
 }
 
-/* The providers' own sign-in buttons on /login (login.jinja): Apple's
-   from its button service and Google's from its branding kit, one picture
-   for light and one for dark. Both are drawn at 180x40; here they are
-   198x44, the same shape a tenth larger, which is Apple's 44pt touch
-   height and the narrowest column the Japanese questions between them
-   fit in on one line. The theme rules below show one of the pair. */
+/* The providers' own sign-in buttons on /login (login.jinja), across the
+   card at the 40px both draw them: Apple's from its button service at the
+   column's 330px, and Google's from its branding kit, its background
+   widened to match (static/signin/). One picture for light and one for
+   dark; the theme rules below show one of the pair. On a screen narrower
+   than the card the pictures scale down with it, keeping their shape. */
 .auth-provider {
   display: block;
-  width: 198px;
-  margin: var(--ds-space-2) auto 0;
+  margin-top: var(--ds-space-2);
   text-decoration: none;
 }
 
 .auth-provider img {
   display: block;
-  width: 198px;
-  height: 44px;
+  width: 100%;
+  height: auto;
 }
 
 .auth-provider:hover {
@@ -3864,18 +3863,13 @@ html[data-store="steam"] .auth-steam {
   display: block;
 }
 
-/* On /login the site's own buttons and fields take the providers' size,
-   and the card narrows to them: one 198px column of 44px fields and 198x44
-   buttons, inside the card's 24px padding and its 1px edge. The longest
-   question between them ("パスワードをお忘れですか？", 146px) leaves each
-   rule 14px. `display` is left to the rules above, which is what keeps
-   Steam's hidden outside its app. */
-.auth-page-login {
-  max-width: 248px;
-}
-
+/* On /login the site's own buttons and fields take the providers' 40px
+   height. `display` is left to the rules above, which is what keeps
+   Steam's hidden outside its app. The questions between them stay on one
+   line: the longest ("パスワードをお忘れですか？") is 146px of a 330px
+   column. */
 .auth-card-login .ds-input {
-  height: 44px;
+  height: 40px;
 }
 
 .auth-card-login .auth-divider span {
@@ -3884,25 +3878,20 @@ html[data-store="steam"] .auth-steam {
 
 .auth-card-login .auth-submit,
 .auth-card-login .auth-secondary {
-  width: 198px;
-  height: 44px;
-  margin-left: auto;
-  margin-right: auto;
+  height: 40px;
   padding: 0 12px;
-  line-height: 42px;
+  line-height: 38px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 /* Google draws its button in English only, so in the other languages it
-   is drawn here to Google's measurements, a tenth larger like the kit's
-   picture beside it: 44px tall (40) with a 4.4px corner (4), the kit's
-   22px G (20) 13px from the edge (12) and 11px from the words (10), in
-   Roboto Medium 15.4px (14), and the kit's own colours for each theme. Spaced with a
-   margin rather than `gap`, which Firefox 56 does not have for flexbox and
-   which this file, never seeing the legacy build pass, cannot fall back
-   from. */
+   is drawn here to Google's measurements: 40px tall with a 4px corner, the
+   kit's 20px G 10px from the words and the pair centred, in Roboto Medium
+   14px, and the kit's own colours for each theme. Spaced with a margin
+   rather than `gap`, which Firefox 56 does not have for flexbox and which
+   this file, never seeing the legacy build pass, cannot fall back from. */
 .auth-google-drawn {
   display: -webkit-box;
   display: flex;
@@ -3912,25 +3901,25 @@ html[data-store="steam"] .auth-steam {
   justify-content: center;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
-  height: 44px;
-  padding: 0 13px;
+  height: 40px;
+  padding: 0 12px;
   border: 1px solid #747775;
-  border-radius: 4.4px;
+  border-radius: 4px;
   background-color: #fff;
   color: #1f1f1f;
   font-family: Roboto, var(--ds-font);
-  font-size: 15.4px;
+  font-size: 14px;
   font-weight: 500;
-  line-height: 22px;
-  letter-spacing: 0.275px;
+  line-height: 20px;
+  letter-spacing: 0.25px;
   white-space: nowrap;
 }
 
 .auth-provider .auth-google-drawn img {
   flex: none;
-  width: 22px;
-  height: 22px;
-  margin-right: 11px;
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
 }
 
 @media (prefers-color-scheme: dark) {
