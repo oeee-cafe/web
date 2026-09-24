@@ -17,6 +17,9 @@
 //! - `microsoft`: a Microsoft Store ID key, which the collections API is
 //!   asked what its account owns (`crate::microsoft_store`). The app makes
 //!   the key from a ticket the site hands out here first.
+//! - `google`: a Google Play purchase token, which the Google Play
+//!   Developer API is asked about, and which the site then acknowledges
+//!   (`crate::google_play`).
 //!
 //! Which products count is the catalogue's to say (`models::store_product`):
 //! every product it has for that store, on sale or not, since a pack taken
@@ -43,6 +46,7 @@ use serde_json::json;
 
 use crate::app_error::AppError;
 use crate::app_store;
+use crate::google_play;
 use crate::microsoft_store::{self, KeyRejected};
 use crate::models::identity::{find_user_by_identity, refresh_standing, Provider};
 use crate::models::store_product;
@@ -56,7 +60,8 @@ use crate::web::state::AppState;
 pub struct PurchaseForm {
     /// What the store gave the app for the purchase, as the page was handed
     /// it: a transaction id for the App Store, a hex-encoded Web API ticket
-    /// for Steam, a Store ID key for the Microsoft Store.
+    /// for Steam, a Store ID key for the Microsoft Store, a purchase token
+    /// for Google Play.
     proof: String,
 }
 
@@ -76,6 +81,7 @@ pub async fn do_store_purchase(
         Some(Store::Apple) => apple_purchase(auth_session, &state, &form.proof).await,
         Some(Store::Steam) => steam_purchase(auth_session, &state, &form.proof).await,
         Some(Store::Microsoft) => microsoft_purchase(auth_session, &state, &form.proof).await,
+        Some(Store::Google) => google_play_purchase(auth_session, &state, &form.proof).await,
         None => Ok(StatusCode::NOT_FOUND.into_response()),
     }
 }
@@ -280,5 +286,67 @@ async fn microsoft_purchase(
         .await?;
     }
     tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+/// Asks Google Play what a purchase token was, records it for whoever is
+/// signed in, and acknowledges it. The app hands a token over after a sale
+/// goes through, after a Restore, and for any purchase Play lists that has
+/// not been acknowledged yet.
+///
+/// Like an App Store transaction, the token is worth nothing on its own and
+/// the pack goes to whoever is signed in here; restoring it on another
+/// account moves the one row it has rather than making another.
+///
+/// Acknowledging comes after the purchase is recorded, so a purchase Play
+/// keeps is one the site has. When it fails the answer is a 502, which
+/// leaves the token to be handed over again -- recording it a second time
+/// changes nothing, and acknowledging it is tried again -- before Play's
+/// three days are up.
+async fn google_play_purchase(
+    auth_session: AuthSession,
+    state: &AppState,
+    token: &str,
+) -> Result<Response, AppError> {
+    let Some(config) = state.config.google_play.as_ref() else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let Some(user) = auth_session.user.as_ref() else {
+        return Ok(StatusCode::UNAUTHORIZED.into_response());
+    };
+    if !google_play::may_ask(user.id) {
+        return Ok(StatusCode::TOO_MANY_REQUESTS.into_response());
+    }
+    let packs = store_product::packs_in(&state.db_pool, Store::Google).await?;
+    let purchase = match google_play::look_up(config, &packs, token).await {
+        Ok(Some(purchase)) => purchase,
+        // Not a purchase of ours, or not one Google knows.
+        Ok(None) => return Ok(StatusCode::BAD_REQUEST.into_response()),
+        Err(error) => {
+            tracing::warn!("a Google Play purchase could not be checked: {error:#}");
+            return Ok(StatusCode::BAD_GATEWAY.into_response());
+        }
+    };
+
+    let mut tx = state.db_pool.begin().await?;
+    record_purchase(
+        &mut tx,
+        user.id,
+        Store::Google,
+        &purchase.token,
+        &purchase.pack,
+        purchase.owned,
+    )
+    .await?;
+    tx.commit().await?;
+
+    // Only a purchase that went through is Play's to refund by itself; one
+    // still pending cannot be acknowledged yet.
+    if purchase.owned && !purchase.acknowledged {
+        if let Err(error) = google_play::acknowledge(config, &purchase).await {
+            tracing::warn!("a Google Play purchase could not be acknowledged: {error:#}");
+            return Ok(StatusCode::BAD_GATEWAY.into_response());
+        }
+    }
     Ok(StatusCode::NO_CONTENT.into_response())
 }

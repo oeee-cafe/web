@@ -1018,6 +1018,19 @@ fn validate_store_product(
     if product.chars().any(char::is_whitespace) || product.chars().count() > 100 {
         return Err("A product id is one word, with no spaces.".to_string());
     }
+    // Play Console takes only these for a product id, so anything else was
+    // never one of its products.
+    if store == Store::Google
+        && !(product.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+            && product
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '.'))
+    {
+        return Err(
+            "A Google Play product id is lower-case letters, digits, _ and ., starting with a letter or digit."
+                .to_string(),
+        );
+    }
     if store == Store::Steam {
         let Ok(app_id) = product.parse::<u32>() else {
             return Err("A Steam product is a DLC's app id, which is a number.".to_string());
@@ -1089,6 +1102,7 @@ async fn render_store_page(
         stores => Store::ALL,
         this_year => current_year(),
         microsoft_configured => state.config.microsoft_store.is_some(),
+        google_play_configured => state.config.google_play.is_some(),
         error,
         form,
         draft_post_count => common_ctx.draft_post_count,
@@ -1881,15 +1895,17 @@ mod tests {
                         {"store": "apple", "product": "cafe.oeee.supporter.2025", "year": 2025,
                          "label": "Last year's", "on_sale": false, "created_at": "2025-01-01T00:00:00Z"},
                     ]},
+                    {"store": "google", "products": []},
                     {"store": "microsoft", "products": []},
                     {"store": "steam", "products": [
                         {"store": "steam", "product": "481", "year": 2026,
                          "label": null, "on_sale": true, "created_at": "2026-01-01T00:00:00Z"},
                     ]},
                 ]),
-                stores => json!(["apple", "microsoft", "steam"]),
+                stores => json!(["apple", "google", "microsoft", "steam"]),
                 this_year => 2026,
                 microsoft_configured => false,
+                google_play_configured => false,
                 error,
                 form,
                 draft_post_count => 0,
@@ -1916,6 +1932,7 @@ mod tests {
         assert!(rendered.contains("Last year&#x27;s") || rendered.contains("Last year's"));
         assert!(rendered.contains(r#"href="/admin/store""#), "in the nav");
         assert!(rendered.contains("[microsoft_store]"), "says the store cannot be asked");
+        assert!(rendered.contains("[google_play]"), "and this one");
         assert!(rendered.contains(r#"name="year" value="2026""#), "this year by default");
         assert!(!rendered.contains("Not added"));
     }
@@ -1968,6 +1985,12 @@ mod tests {
             Ok((Store::Microsoft, "9NBLGGH4R315".to_string(), current_year(), None))
         );
         assert_eq!(
+            validate_store_product(&form("google", "supporter_pack_2026", &year, ""), None)
+                .unwrap()
+                .1,
+            "supporter_pack_2026"
+        );
+        assert_eq!(
             validate_store_product(&form("apple", "cafe.oeee.x", &year, " Buy "), None)
                 .unwrap()
                 .3
@@ -1975,7 +1998,9 @@ mod tests {
             Some("Buy")
         );
         for (refused, why) in [
-            (form("google", "x", &year, ""), "an unknown store"),
+            (form("google_play", "x", &year, ""), "an unknown store"),
+            (form("google", "Supporter_2026", &year, ""), "a Google Play id with capitals"),
+            (form("google", "_supporter", &year, ""), "a Google Play id starting with _"),
             (form("", "x", &year, ""), "no store"),
             (form("apple", "  ", &year, ""), "no product"),
             (form("apple", "cafe oeee", &year, ""), "whitespace"),

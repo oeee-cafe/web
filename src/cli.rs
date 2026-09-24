@@ -50,6 +50,8 @@ enum Commands {
     SetRole { login_name: String, role: RoleArg },
     /// Check that the App Store will talk to us about purchases
     CheckAppStore,
+    /// Check that Google Play will talk to us about purchases
+    CheckGooglePlay,
     /// Mark every drawing in the public bucket as image/png, where it was
     /// stored without a type (src/image_store.rs)
     SetImageContentType {
@@ -128,6 +130,27 @@ async fn run(args: impl IntoIterator<Item = String>) -> Result<()> {
         return Ok(());
     }
 
+    // The same for Google Play: the service account, and whether Play
+    // Console has let it see the app.
+    if matches!(cli.command, Commands::CheckGooglePlay) {
+        let Some(play) = cfg.google_play.as_ref() else {
+            println!("no [google_play] table in the config: the app sells nothing");
+            exit(1);
+        };
+        println!(
+            "app {}, service account key {}",
+            play.package_name, play.service_account_path
+        );
+        match oeee_cafe::google_play::check(play).await {
+            Ok(()) => println!("Google Play accepted the service account"),
+            Err(error) => {
+                println!("Google Play did not: {error:#}");
+                exit(1);
+            }
+        }
+        return Ok(());
+    }
+
     // The bucket, and no database.
     if let Commands::SetImageContentType { dry_run } = cli.command {
         let client = oeee_cafe::web::handlers::collaborate::archive::s3_client(&cfg);
@@ -161,7 +184,9 @@ async fn run(args: impl IntoIterator<Item = String>) -> Result<()> {
     // matches just as you would the top level cmd
     match &cli.command {
         // Answered above, before the database was opened.
-        Commands::CheckAppStore | Commands::SetImageContentType { .. } => unreachable!(),
+        Commands::CheckAppStore
+        | Commands::CheckGooglePlay
+        | Commands::SetImageContentType { .. } => unreachable!(),
         Commands::ListCommunities => {
             let communities = get_communities(&mut tx).await?;
             for community in communities {

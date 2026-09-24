@@ -34,6 +34,12 @@
           nothing bought here can be checked yet.
         </p>
       {% endif %}
+      {% if group.store == "google" and not google_play_configured %}
+        <p class="ds-help admin-section-help">
+          This server has no <code>[google_play]</code> in its config, so
+          nothing bought here can be checked yet.
+        </p>
+      {% endif %}
       {% if group.products|length == 0 %}
         <p class="ds-card admin-empty">Nothing yet.</p>
       {% else %}
@@ -111,8 +117,9 @@
     <fieldset>
       <legend>Add a product</legend>
       <p class="ds-help">
-        The store's own id: an App Store product id, a Microsoft Store ID, or a
-        Steam DLC's app id. Its year cannot be changed after it is added.
+        The store's own id: an App Store product id, a Google Play product id,
+        a Microsoft Store ID, or a Steam DLC's app id. Its year cannot be
+        changed after it is added.
       </p>
       <div class="admin-fields">
         <label>

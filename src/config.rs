@@ -95,6 +95,14 @@ pub struct AppConfig {
     #[serde(default)]
     pub microsoft_store: Option<MicrosoftStoreConfig>,
 
+    /// Google Play's side of the Android app, as a `[google_play]` table:
+    /// the service account the site asks the Google Play Developer API with
+    /// (`crate::google_play`). Separate from `[google]`, which signs people
+    /// in and has nothing to do with what they buy. Unset means
+    /// `/store/google/purchases` answers 404.
+    #[serde(default)]
+    pub google_play: Option<GooglePlayConfig>,
+
     /// Sign in with Google, as a `[google]` table. Unset means the site does
     /// not offer it.
     #[serde(default)]
@@ -227,6 +235,29 @@ pub struct MicrosoftStoreConfig {
     pub collections_url: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct GooglePlayConfig {
+    /// The app the purchase has to have been made in: `cafe.oeee`. It is
+    /// part of every request, so a token from any other app is one Google
+    /// answers about nothing for.
+    pub package_name: String,
+    /// Where the service account's JSON key is (Google Cloud console > IAM
+    /// & Admin > Service accounts > Keys). The account has to be invited in
+    /// Play Console (Users and permissions) with "View financial data" and
+    /// "Manage orders and subscriptions" for this app. Kept off the
+    /// repository, like the FCM key beside it.
+    pub service_account_path: String,
+    /// Where the Google Play Developer API is. Only a test changes it; where
+    /// tokens come from is the key file's own `token_uri`.
+    #[serde(default = "default_google_play_api_url")]
+    pub api_url: String,
+}
+
+fn default_google_play_api_url() -> String {
+    "https://androidpublisher.googleapis.com".to_string()
+}
+
 fn default_microsoft_collections_url() -> String {
     "https://purchase.mp.microsoft.com/v8.0/b2b/collections/query".to_string()
 }
@@ -274,6 +305,7 @@ mod tests {
             apple: Option<AppleConfig>,
             app_store: Option<AppStoreConfig>,
             microsoft_store: Option<MicrosoftStoreConfig>,
+            google_play: Option<GooglePlayConfig>,
         }
 
         let sample =
@@ -326,5 +358,9 @@ mod tests {
             microsoft.collections_url,
             "https://purchase.mp.microsoft.com/v8.0/b2b/collections/query"
         );
+
+        let play = parsed.google_play.expect("a [google_play] table");
+        assert_eq!(play.package_name, "cafe.oeee");
+        assert_eq!(play.api_url, "https://androidpublisher.googleapis.com");
     }
 }

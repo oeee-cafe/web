@@ -1,7 +1,7 @@
 //! Supporters: accounts that have bought a Supporter Pack -- on Steam as a
 //! DLC, in the App Store as a non-consumable, in the Microsoft Store as a
-//! durable add-on -- each one a product the catalogue names and gives a
-//! year (`models::store_product`).
+//! durable add-on, on Google Play as a one-time product -- each one a
+//! product the catalogue names and gives a year (`models::store_product`).
 //!
 //! **A pack is a year's.** Buying 2026's supports the site through 2026, and
 //! supporting again means buying 2027's when it comes. So the mark beside
@@ -29,13 +29,17 @@
 //! Steam account the site knows (`steam::recheck_supporters`); the App Store
 //! is asked when the app hands over a transaction (`app_store::look_up`) and
 //! once a day for every purchase it has told us about
-//! (`app_store::recheck_supporters`). Either way a purchase or a refund
-//! shows within a day whether or not anyone signs in.
+//! (`app_store::recheck_supporters`), and Google Play the same way for every
+//! purchase token it has been handed (`google_play::recheck_supporters`).
+//! Either way a purchase or a refund shows within a day whether or not
+//! anyone signs in.
 //!
 //! **A store is not a sign-in.** Where a pack was bought is a [`Store`],
-//! never an identity [`Provider`]: Google signs people in and sells nothing,
-//! the Microsoft Store will sell and signs nobody in, and the App Store's
-//! name for a purchase is a transaction rather than an Apple ID. The one
+//! never an identity [`Provider`], even where the two share a name: a
+//! Google sign-in names an account, and a purchase on Google Play is named
+//! by its token, which no sign-in names; the Microsoft Store sells and signs
+//! nobody in; and the App Store's name for a purchase is a transaction
+//! rather than an Apple ID. The one
 //! place the two meet is Steam, whose purchases are keyed by the same Steam
 //! account a Steam sign-in names ([`Store::identity`]).
 
@@ -57,6 +61,11 @@ use super::identity::Provider;
 pub enum Store {
     /// The App Store, which the iOS and macOS apps sell through.
     Apple,
+    /// Google Play, which the Android app sells through
+    /// (`crate::google_play`). Named `google`, as a Google sign-in's provider
+    /// is, and no more the same thing than an App Store purchase is a Sign
+    /// in with Apple.
+    Google,
     /// The Microsoft Store, which the Microsoft Store build of the Windows
     /// app sells through (`crate::microsoft_store`).
     Microsoft,
@@ -65,11 +74,17 @@ pub enum Store {
 }
 
 impl Store {
-    pub const ALL: [Store; 3] = [Store::Apple, Store::Microsoft, Store::Steam];
+    pub const ALL: [Store; 4] = [
+        Store::Apple,
+        Store::Google,
+        Store::Microsoft,
+        Store::Steam,
+    ];
 
     pub fn as_str(self) -> &'static str {
         match self {
             Store::Apple => "apple",
+            Store::Google => "google",
             Store::Microsoft => "microsoft",
             Store::Steam => "steam",
         }
@@ -84,12 +99,13 @@ impl Store {
     /// Steam purchase's owner is a SteamID64, which is also a Steam
     /// identity's subject, so linking Steam is enough for the site to ask
     /// about that account's packs. An App Store purchase's owner is a
-    /// transaction id, which no Apple ID names, and the Microsoft Store
-    /// signs nobody in here.
+    /// transaction id, which no Apple ID names; a Google Play purchase's is
+    /// a purchase token, which no Google sign-in names; and the Microsoft
+    /// Store signs nobody in here.
     pub fn identity(self) -> Option<Provider> {
         match self {
             Store::Steam => Some(Provider::Steam),
-            Store::Apple | Store::Microsoft => None,
+            Store::Apple | Store::Google | Store::Microsoft => None,
         }
     }
 
@@ -353,27 +369,32 @@ pub async fn steam_accounts_due_for_check(
         .collect())
 }
 
-/// An App Store purchase to ask Apple about again: the transaction, and
-/// which pack it was.
+/// A purchase to ask its store about again: what the store calls it -- an
+/// App Store transaction, a Google Play purchase token -- and which pack it
+/// was.
 pub struct DuePurchase {
     pub transaction: String,
     pub product: String,
 }
 
-/// App Store purchases Apple has not been asked about for a day, longest ago
-/// first.
-pub async fn apple_purchases_due_for_check(
+/// Purchases in `store` it has not been asked about for a day, longest ago
+/// first. For the stores that answer about one purchase at a time, the App
+/// Store and Google Play; Steam is asked by account
+/// ([`steam_accounts_due_for_check`]).
+pub async fn purchases_due_for_check(
     tx: &mut Transaction<'_, Postgres>,
+    store: Store,
     limit: i64,
 ) -> Result<Vec<DuePurchase>> {
     let rows = query!(
         r#"
         SELECT owner, product
         FROM supporter_purchases
-        WHERE store = 'apple' AND checked_at < now() - interval '1 day'
+        WHERE store = $1 AND checked_at < now() - interval '1 day'
         ORDER BY checked_at
-        LIMIT $1
+        LIMIT $2
         "#,
+        store.as_str(),
         limit,
     )
     .fetch_all(&mut **tx)
@@ -391,7 +412,8 @@ pub async fn apple_purchases_due_for_check(
 /// profile lists every one of them, whichever mark they wear now.
 #[derive(Clone, Debug, Serialize)]
 pub struct Standing {
-    /// The store that sold it: "apple", "microsoft" or "steam".
+    /// The store that sold it: "apple", "google", "microsoft" or
+    /// "steam".
     pub store: String,
     pub year: i32,
     pub since: DateTime<Utc>,
@@ -789,7 +811,7 @@ mod tests {
             .await
             .unwrap();
 
-        let due = apple_purchases_due_for_check(&mut tx, 100).await.unwrap();
+        let due = purchases_due_for_check(&mut tx, Store::Apple, 100).await.unwrap();
         assert!(
             !due.iter().any(|due| due.transaction == transaction),
             "asked about today already"
@@ -802,12 +824,19 @@ mod tests {
         .execute(&mut *tx)
         .await
         .unwrap();
-        let due = apple_purchases_due_for_check(&mut tx, 100).await.unwrap();
+        let due = purchases_due_for_check(&mut tx, Store::Apple, 100).await.unwrap();
         let mine = due
             .iter()
             .find(|due| due.transaction == transaction)
             .expect("due for a recheck");
         assert_eq!(mine.product, bought.product);
+        let elsewhere = purchases_due_for_check(&mut tx, Store::Google, 100)
+            .await
+            .unwrap();
+        assert!(
+            !elsewhere.iter().any(|due| due.transaction == transaction),
+            "Google Play is not asked about the App Store's purchases"
+        );
 
         // Refunded.
         record_recheck(&mut tx, Store::Apple, transaction, &bought.product, false)
@@ -1092,8 +1121,10 @@ mod tests {
     /// The marks someone may choose between and the stores a purchase may
     /// come from are the same list, and it is [`Store::ALL`]. A store is not
     /// a sign-in, so nothing here asks that list to match the providers an
-    /// identity can come from: Google signs people in and sells nothing, and
-    /// the Microsoft Store sells and signs nobody in.
+    /// identity can come from: Google does both, under the one name, and
+    /// even so a purchase on Google Play is not a Google sign-in; and the
+    /// Microsoft Store sells and signs
+    /// nobody in.
     #[tokio::test]
     async fn the_marks_are_what_the_database_allows() {
         let Some(mut tx) = tx().await else { return };
@@ -1132,7 +1163,7 @@ mod tests {
         for store in Store::ALL {
             assert_eq!(Store::parse(store.as_str()), Some(store));
         }
-        assert_eq!(Store::parse("google"), None);
+        assert_eq!(Store::parse("google_play"), None);
         tx.rollback().await.unwrap();
     }
 
@@ -1143,6 +1174,7 @@ mod tests {
         assert_eq!(Store::Steam.identity(), Some(Provider::Steam));
         assert_eq!(Store::Apple.identity(), None);
         assert_eq!(Store::Microsoft.identity(), None);
+        assert_eq!(Store::Google.identity(), None);
         assert_eq!(
             Store::owned_by_identity(Provider::Steam),
             Some(Store::Steam)
@@ -1152,9 +1184,8 @@ mod tests {
     }
 
     /// The stores that sell a pack, each of which needs its mark worded and
-    /// drawn: every one of them, now that the Microsoft Store records its
-    /// purchases too.
-    const SELLING: [Store; 3] = Store::ALL;
+    /// drawn: every one of them.
+    const SELLING: [Store; 4] = Store::ALL;
 
     /// The user agents the apps are tested against (appContract.json, which
     /// appContract.browser.test.ts gives theme_head.jinja): the server reads

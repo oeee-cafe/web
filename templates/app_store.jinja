@@ -1,12 +1,12 @@
 {# What a store gives an app, handed to the page, which tells the site.
 
-   A store is "apple" (the App Store: the iOS and macOS apps), "microsoft"
-   (the Microsoft Store build of the Windows app) or "steam" (the Steam
-   build). A build that sells names its store in its user agent, and the
-   root is marked data-store before the page paints (theme_head.jinja); one
-   that does not sells nothing. Each build sells
-   through one store only, so nothing the page asks says which: the app is
-   that store.
+   A store is "apple" (the App Store: the iOS and macOS apps), "google"
+   (Google Play: the Android app), "microsoft" (the Microsoft Store build of
+   the Windows app) or "steam" (the Steam build). A build that sells names
+   its store in its user agent, and the root is marked data-store before
+   the page paints (theme_head.jinja); one that does not sells nothing.
+   Each build sells through one store only, so nothing the page asks says
+   which: the app is that store.
 
    What a store sells is the site's catalogue, which staff keep at
    /admin/store (models/store_product.rs): each product by the store's own
@@ -22,13 +22,18 @@
      1. /supporter asks  prices {products}  and the app answers with
         oeeeApp.store.prices({product: price}) (supporter.jinja);
      2. a press asks  purchase {product}, or  restore {}  where the store
-        has such a thing (App Store), and the app sells;
+        has such a thing (App Store, Google Play), and the app sells;
      3. the app hands the page proof of what was bought, as strings:
 
           window.oeeeApp.store.purchased(proofs)
 
         apple      StoreKit transaction ids -- after a sale, a Restore, or
                    finding transactions StoreKit has not seen finished
+        google     Play Billing purchase tokens -- after a sale, a
+                   Restore, and whenever /supporter asks for prices and
+                   Play lists a purchase not yet acknowledged. The site
+                   acknowledges each one it takes, so the app has nothing
+                   to finish
         steam      a Web API ticket -- after Steam says a DLC was installed;
                    the site asks Steam what the ticket's account owns
         microsoft  a Microsoft Store ID key -- after a sale, and whenever
@@ -49,11 +54,11 @@
                    time a key is wanted.
 
         Each is posted to /store/<store>/purchases, which asks the store
-        itself (src/app_store.rs, src/steam.rs, src/microsoft_store.rs) --
-        nothing the page or the app says records a purchase. The promise
-        answers with the proofs the site took; the app finishes those and
-        only those where its store has finishing (StoreKit), and anything
-        else is offered again. The page reloads once, after answering, if
+        itself (src/app_store.rs, src/google_play.rs, src/steam.rs,
+        src/microsoft_store.rs) -- nothing the page or the app says
+        records a purchase. The promise answers with the proofs the site
+        took; the app finishes those and only those where its store has
+        finishing (StoreKit), and anything else is offered again. The page reloads once, after answering, if
         the site took any.
 
    What happens to a press is the page's to say, since only the page hears

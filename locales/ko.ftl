@@ -572,6 +572,7 @@ supporter-pack-years-help = 한 번 산 팩은 계속 남고, 이름 옆의 표�
 supporter-badge-steam = Steam 후원자
 supporter-badge-apple = App Store 후원자
 supporter-badge-microsoft = Microsoft Store 후원자
+supporter-badge-google = Google Play 후원자
 supporter-year = { $year }년 { $platform }
 about-supporters = 후원자
 about-supporters-thanks = 올해의 후원 팩을 구입해 모두를 위한 오이카페를 지켜 주는 분들입니다. 고맙습니다.
