@@ -1,0 +1,25 @@
+{# A replay's controls, as they stand before the viewer has arrived: all
+   there, so nothing moves when it does, and all disabled until then. The
+   viewer takes them over rather than making its own, and gives them their
+   words, which live in its catalog and not in ours.
+
+   The icons are material-symbols:play-arrow, :pause, :skip-previous and
+   :skip-next (Apache 2.0; THIRD-PARTY-NOTICES.md), inline as the toolbar's
+   are. This is neo-cucumber's controlsMarkup() written out; its
+   embed.browser.test.ts mounts over this file and fails when the two differ. #}
+<div class="neo-cucumber-replay-controls">
+  <input class="neo-cucumber-replay-seek" type="range" min="0" max="1000" value="1000" disabled>
+  <div class="neo-cucumber-replay-buttons">
+    <div class="neo-cucumber-replay-transport ds-segmented">
+      <button class="neo-cucumber-replay-button" type="button" data-replay-control="rewind" disabled><svg class="neo-cucumber-replay-icon neo-cucumber-replay-rewind-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5.5 18V6h2v12zm13 0l-9-6l9-6z"/></svg></button>
+      <button class="neo-cucumber-replay-button" type="button" data-replay-control="play" disabled><svg class="neo-cucumber-replay-icon neo-cucumber-replay-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 19V5l11 7z"/></svg><svg class="neo-cucumber-replay-icon neo-cucumber-replay-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14 19V5h4v14zm-8 0V5h4v14z"/></svg></button>
+      <button class="neo-cucumber-replay-button" type="button" data-replay-control="skip" disabled><svg class="neo-cucumber-replay-icon neo-cucumber-replay-skip-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.5 18V6h2v12zm-11 0V6l9 6z"/></svg></button>
+    </div>
+    <div class="neo-cucumber-replay-speeds ds-segmented">
+      <button class="neo-cucumber-replay-speed" type="button" aria-pressed="false" disabled>×½</button>
+      <button class="neo-cucumber-replay-speed" type="button" aria-pressed="true" disabled>×1</button>
+      <button class="neo-cucumber-replay-speed" type="button" aria-pressed="false" disabled>×2</button>
+      <button class="neo-cucumber-replay-speed" type="button" aria-pressed="false" disabled>×4</button>
+    </div>
+  </div>
+</div>

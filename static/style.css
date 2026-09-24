@@ -2694,31 +2694,30 @@ nav a:visited,
   flex-wrap: wrap;
 }
 .neo-cucumber-replay-speeds {
-  display: flex;
-  gap: 0.2em;
   margin-left: auto;
-}
-.neo-cucumber-replay-button,
-.neo-cucumber-replay-speed {
-  padding: 0.2em 0.6em;
-}
-.neo-cucumber-replay-speed[aria-pressed="true"] {
-  font-weight: bold;
-  text-decoration: underline;
 }
 .neo-cucumber-replay-status {
   margin: 0;
 }
 
-/* The play button holds both of its labels, so it keeps one width; the one
-   not in use takes room across and none down. */
-.neo-cucumber-replay-label {
+/* Play, rewind and skip are icons; the play button holds Play and Pause and
+   shows the one it would do. */
+.neo-cucumber-replay-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.neo-cucumber-replay-pause-icon,
+.neo-cucumber-replay-button[data-playing] .neo-cucumber-replay-play-icon {
+  display: none;
+}
+.neo-cucumber-replay-button[data-playing] .neo-cucumber-replay-pause-icon {
   display: block;
 }
-.neo-cucumber-replay-label[aria-hidden="true"] {
-  height: 0;
-  overflow: hidden;
-  visibility: hidden;
+/* Disabled until the viewer has arrived and taken them over. */
+.neo-cucumber-replay-controls :disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 /* The three debounced search boxes. They cannot use hx-disable — disabling an
@@ -3657,60 +3656,30 @@ html[data-store] .supporter-elsewhere {
   margin: 0 6px 6px 0;
 }
 
-/* Play, rewind and skip as the design system's buttons. */
-.ds-page .post-stage-replay .neo-cucumber-replay-button {
-  display: inline-block;
-  margin-top: 0;
-  padding: 4px 12px;
-  border: 1px solid var(--ds-line-strong);
-  border-radius: var(--ds-radius-s);
-  background-color: var(--ds-surface);
-  box-shadow: var(--ds-shadow-raise);
-  color: var(--ds-ink);
-  font: inherit;
-  font-size: var(--ds-text-m);
-  font-weight: 500;
-  line-height: calc(20px * var(--ds-text-scale, 1));
-}
-
-.ds-page .post-stage-replay .neo-cucumber-replay-button:hover {
-  background-color: var(--ds-ground);
-}
-
-/* The speeds as a segmented control, the chosen one raised. */
+/* Rewind, play and skip, and the speeds: two of the design system's
+   segmented controls (.ds-segmented), the speeds at the far end. Only the
+   speeds have a choice, so only they draw a thumb. */
 .post-stage-replay .neo-cucumber-replay-speeds {
-  display: inline-block;
   margin-left: auto;
-  padding: 2px;
-  border-radius: 7px;
-  background-color: var(--ds-hover);
-  white-space: nowrap;
 }
 
-.ds-page .post-stage-replay .neo-cucumber-replay-speed {
-  display: inline-block;
-  margin: 0;
-  padding: var(--ds-segment-padding);
-  border: 0;
-  border-radius: var(--ds-radius-s);
-  background: none;
-  box-shadow: none;
-  color: var(--ds-ink);
-  font: inherit;
-  font-size: var(--ds-text-s);
-  font-weight: 500;
-  line-height: calc(20px * var(--ds-text-scale, 1));
-  text-decoration: none;
+/* An icon stands where a segment's 20px line of words would, so both
+   pills are one height. It needs less room a side than a word does, and
+   with a word's 11px the two pills came to 309px, past the smallest
+   drawing's 300 -- every such stage broke its row in two. */
+.post-stage-replay .neo-cucumber-replay-icon {
+  width: calc(20px * var(--ds-text-scale, 1));
+  height: calc(20px * var(--ds-text-scale, 1));
 }
 
-.ds-page .post-stage-replay .neo-cucumber-replay-speed + .neo-cucumber-replay-speed {
-  margin-left: 2px;
+.ds-page .post-stage-replay .neo-cucumber-replay-transport > button {
+  padding-right: 6px;
+  padding-left: 6px;
 }
 
-.ds-page .post-stage-replay .neo-cucumber-replay-speed[aria-pressed="true"] {
-  background-color: var(--ds-surface);
-  box-shadow: 0 0 0 0.5px var(--ds-line), var(--ds-shadow-raise);
-  font-weight: 600;
+/* Before the viewer has taken them over they are there but inert. */
+.ds-page .post-stage-replay .ds-segmented > button:disabled:not([aria-pressed="true"]):hover {
+  background-color: transparent;
 }
 
 /* ---------------------------------------------------------------------------

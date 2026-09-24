@@ -11,15 +11,18 @@ type Frame = any[];
  *
  * ×1 is 800 steps/s, which plays the median archived drawing (7,575 steps) in
  * about ten seconds.
+ *
+ * Slowest first, so the faster setting is the one further along, as it is on
+ * the seek bar above them.
  */
 export const SPEEDS = [
-  { label: "×4", rate: 3200 },
-  { label: "×2", rate: 1600 },
-  { label: "×1", rate: 800 },
   { label: "×½", rate: 400 },
+  { label: "×1", rate: 800 },
+  { label: "×2", rate: 1600 },
+  { label: "×4", rate: 3200 },
 ] as const;
 
-export const DEFAULT_SPEED_INDEX = 2;
+export const DEFAULT_SPEED_INDEX = 1;
 
 /** Ignore gaps longer than this, so returning to a background tab is not a jump. */
 const MAX_FRAME_SECONDS = 0.1;

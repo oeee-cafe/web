@@ -86,12 +86,12 @@
            others. Larger than the stage, it is scaled down smoothly.
 
            A NEO drawing whose replay may be watched carries the replay's
-           controls under it from the start: the viewer mounts over this box
-           with the drawing as its poster and fetches the recording only when
-           a control is used. The image inside is what shows until it does,
-           and what shows without script. #}
+           controls under it from the start, disabled until the viewer
+           arrives, so its arrival moves nothing. The viewer mounts over this
+           box, keeps the drawing as its poster and the controls as they are,
+           and fetches the recording only when a control is used. #}
         {% set image_url = r2_public_endpoint_url ~ "/image/" ~ post.image_filename[:2] ~ "/" ~ post.image_filename %}
-        <div class="{% if inline_replay %}post-stage-replay{% else %}post-stage-frame{% endif %}" data-post-stage
+        <div class="{% if inline_replay %}post-stage-replay neo-cucumber-replay{% else %}post-stage-frame{% endif %}" data-post-stage
              data-width="{{ post.image_width }}" data-height="{{ post.image_height }}"
              style="--post-stage-shown: {{ post.image_width }}px"
              {% if inline_replay %}
@@ -100,11 +100,12 @@
                data-poster="{{ image_url }}"
                data-lang="{{ ftl_lang }}"
              {% endif %}>
-          <img class="post-stage-image" data-oeee-drawing
+          <img class="post-stage-image{% if inline_replay %} neo-cucumber-replay-poster{% endif %}" data-oeee-drawing
                width="{{ post.image_width }}"
                height="{{ post.image_height }}"
                alt="{{ post.title }}"
                src="{{ image_url }}" />
+          {% if inline_replay %}{% include "replay_controls.jinja" %}{% endif %}
         </div>
       </div>
     </div>
