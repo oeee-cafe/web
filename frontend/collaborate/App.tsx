@@ -781,7 +781,7 @@ export default function App() {
       document.title = `Oeee Cafe - ${meta.title?.trim() || t`No Title`}`;
       setCanvasMeta(meta);
       // Over without a post: the dialog, not a socket the server would
-      // refuse. The owner can still save it from there.
+      // refuse. Nothing to save from here -- the canvas went with the room.
       if (meta.ended) setSessionExpired(true);
     } catch (error) {
       setInitializationError(error instanceof Error ? error.message : String(error));
@@ -1020,6 +1020,6 @@ export default function App() {
         <SessionEndingModal isOpen={sessionEnding} />
       </div>
     </div>
-    <SessionExpiredModal isOpen={sessionExpired} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} onClose={() => {}} onSaveToGallery={saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
+    <SessionExpiredModal isOpen={sessionExpired} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} hasCanvas={!canvasMeta?.ended} onClose={() => {}} onSaveToGallery={saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
   </>;
 }

@@ -48,11 +48,11 @@ msgid "Disconnected"
 msgstr "연결 끊어짐"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:79
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:121
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Download PNG"
 msgstr "PNG 다운로드"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:48
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:57
 msgid "Failed to save session. Please try downloading as PNG instead."
 msgstr "세션 저장에 실패했습니다. 대신 PNG로 다운로드해 보세요."
 
@@ -61,8 +61,8 @@ msgstr "세션 저장에 실패했습니다. 대신 PNG로 다운로드해 보�
 msgid "Go to Lobby"
 msgstr "로비로 가기"
 
-#: ../frontend/collaborate/App.tsx:999
-#: ../frontend/collaborate/App.tsx:1003
+#: ../frontend/collaborate/App.tsx:928
+#: ../frontend/collaborate/App.tsx:932
 msgid "Help"
 msgstr "도움말"
 
@@ -83,17 +83,17 @@ msgstr "로딩 중"
 msgid "Loading..."
 msgstr "로딩 중..."
 
-#: ../frontend/collaborate/components/Chat.tsx:117
+#: ../frontend/collaborate/components/Chat.tsx:118
 msgid "Message too long (max 500 characters)"
 msgstr "메시지가 너무 깁니다 (최대 500자)"
 
-#: ../frontend/collaborate/App.tsx:894
+#: ../frontend/collaborate/App.tsx:781
 msgid "No Title"
 msgstr "제목 없음"
 
 #. placeholder {0}: participants.size
-#: ../frontend/collaborate/components/Chat.tsx:206
 #: ../frontend/collaborate/components/Chat.tsx:207
+#: ../frontend/collaborate/components/Chat.tsx:208
 msgid "Participants ({0})"
 msgstr "참가자 ({0})"
 
@@ -106,11 +106,11 @@ msgstr "재연결"
 msgid "Retry"
 msgstr "다시 시도"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:139
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:151
 msgid "Return to Lobby"
 msgstr "로비로 돌아가기"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:131
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:143
 msgid "Save as PNG"
 msgstr "PNG로 저장"
 
@@ -118,26 +118,26 @@ msgstr "PNG로 저장"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "이 그림을 갤러리에 저장할까요? 저장하면 모두의 세션이 끝나고 아무도 이어서 그릴 수 없습니다."
 
-#: ../frontend/collaborate/App.tsx:1036
-#: ../frontend/collaborate/App.tsx:1085
+#: ../frontend/collaborate/App.tsx:965
+#: ../frontend/collaborate/App.tsx:1014
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:110
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:122
 msgid "Save to Gallery"
 msgstr "갤러리에 저장"
 
-#: ../frontend/collaborate/App.tsx:1036
-#: ../frontend/collaborate/App.tsx:1085
+#: ../frontend/collaborate/App.tsx:965
+#: ../frontend/collaborate/App.tsx:1014
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:117
 msgid "Saving..."
 msgstr "저장 중..."
 
-#: ../frontend/collaborate/components/Chat.tsx:288
+#: ../frontend/collaborate/components/Chat.tsx:289
 msgid "Send"
 msgstr "전송"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:69
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:78
 msgid "Session Expired"
 msgstr "세션 만료"
 
@@ -161,19 +161,23 @@ msgstr "이 세션 공유"
 msgid "The shared drawing could not be synchronized safely. Your current canvas is still available to download."
 msgstr "공유 그림을 안전하게 동기화하지 못했습니다. 현재 캔버스는 계속 내려받을 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:84
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:95
 msgid "This collaborative session has ended due to inactivity. As the owner, you can save it to the gallery or download it as a PNG."
 msgstr "비활성으로 인해 이 협업 세션이 종료되었습니다. 소유자로서 갤러리에 저장하거나 PNG로 다운로드할 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:83
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:94
 msgid "This collaborative session has ended due to inactivity. The session has already been saved to the gallery, but you can download it as a PNG."
 msgstr "비활성으로 인해 이 협업 세션이 종료되었습니다. 세션이 이미 갤러리에 저장되었지만 PNG로 다운로드할 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:85
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:96
 msgid "This collaborative session has ended due to inactivity. You can save your work locally as a PNG before leaving."
 msgstr "비활성으로 인해 이 협업 세션이 종료되었습니다. 떠나기 전에 작업을 PNG로 로컬에 저장할 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:44
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:91
+msgid "This collaborative session has ended. Its drawing was not saved to the gallery and is no longer available."
+msgstr ""
+
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:53
 msgid "This session has already been saved. You can only download it as a PNG."
 msgstr "이 세션은 이미 저장되었습니다. PNG로만 다운로드할 수 있습니다."
 
@@ -181,7 +185,7 @@ msgstr "이 세션은 이미 저장되었습니다. PNG로만 다운로드할 �
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "이 세션이 가득 찼습니다 ({currentUserCount}/{maxUsers}명). 처음 {maxUsers}명의 사용자만 세션에 참여할 수 있습니다."
 
-#: ../frontend/collaborate/components/Chat.tsx:279
+#: ../frontend/collaborate/components/Chat.tsx:280
 msgid "Type a message..."
 msgstr "메시지 입력..."
 

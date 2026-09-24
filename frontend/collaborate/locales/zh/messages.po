@@ -48,11 +48,11 @@ msgid "Disconnected"
 msgstr "已断开"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:79
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:121
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Download PNG"
 msgstr "下载 PNG"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:48
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:57
 msgid "Failed to save session. Please try downloading as PNG instead."
 msgstr "保存会话失败。请尝试下载为 PNG。"
 
@@ -61,8 +61,8 @@ msgstr "保存会话失败。请尝试下载为 PNG。"
 msgid "Go to Lobby"
 msgstr "去大厅"
 
-#: ../frontend/collaborate/App.tsx:999
-#: ../frontend/collaborate/App.tsx:1003
+#: ../frontend/collaborate/App.tsx:928
+#: ../frontend/collaborate/App.tsx:932
 msgid "Help"
 msgstr "帮助"
 
@@ -83,17 +83,17 @@ msgstr "加载中"
 msgid "Loading..."
 msgstr "加载中..."
 
-#: ../frontend/collaborate/components/Chat.tsx:117
+#: ../frontend/collaborate/components/Chat.tsx:118
 msgid "Message too long (max 500 characters)"
 msgstr "消息过长（最多 500 个字符）"
 
-#: ../frontend/collaborate/App.tsx:894
+#: ../frontend/collaborate/App.tsx:781
 msgid "No Title"
 msgstr "无标题"
 
 #. placeholder {0}: participants.size
-#: ../frontend/collaborate/components/Chat.tsx:206
 #: ../frontend/collaborate/components/Chat.tsx:207
+#: ../frontend/collaborate/components/Chat.tsx:208
 msgid "Participants ({0})"
 msgstr "参与者（{0}）"
 
@@ -106,11 +106,11 @@ msgstr "重新连接"
 msgid "Retry"
 msgstr "重试"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:139
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:151
 msgid "Return to Lobby"
 msgstr "返回大厅"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:131
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:143
 msgid "Save as PNG"
 msgstr "保存为 PNG"
 
@@ -118,26 +118,26 @@ msgstr "保存为 PNG"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "要把这幅画保存到画廊吗？保存后所有人的协作会话都会结束，谁都无法继续绘制。"
 
-#: ../frontend/collaborate/App.tsx:1036
-#: ../frontend/collaborate/App.tsx:1085
+#: ../frontend/collaborate/App.tsx:965
+#: ../frontend/collaborate/App.tsx:1014
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:110
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:122
 msgid "Save to Gallery"
 msgstr "保存到画廊"
 
-#: ../frontend/collaborate/App.tsx:1036
-#: ../frontend/collaborate/App.tsx:1085
+#: ../frontend/collaborate/App.tsx:965
+#: ../frontend/collaborate/App.tsx:1014
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:117
 msgid "Saving..."
 msgstr "保存中..."
 
-#: ../frontend/collaborate/components/Chat.tsx:288
+#: ../frontend/collaborate/components/Chat.tsx:289
 msgid "Send"
 msgstr "发送"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:69
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:78
 msgid "Session Expired"
 msgstr "会话过期"
 
@@ -161,19 +161,23 @@ msgstr "分享此会话"
 msgid "The shared drawing could not be synchronized safely. Your current canvas is still available to download."
 msgstr "无法安全同步共享的画作。您当前的画布仍可下载。"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:84
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:95
 msgid "This collaborative session has ended due to inactivity. As the owner, you can save it to the gallery or download it as a PNG."
 msgstr "由于无活动，此协作会话已结束。作为所有者，您可以将其保存到画廊或下载为 PNG。"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:83
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:94
 msgid "This collaborative session has ended due to inactivity. The session has already been saved to the gallery, but you can download it as a PNG."
 msgstr "由于无活动，此协作会话已结束。会话已保存到画廊，但您可以将其下载为 PNG。"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:85
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:96
 msgid "This collaborative session has ended due to inactivity. You can save your work locally as a PNG before leaving."
 msgstr "由于无活动，此协作会话已结束。您可以在离开前将您的作品保存为 PNG。"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:44
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:91
+msgid "This collaborative session has ended. Its drawing was not saved to the gallery and is no longer available."
+msgstr ""
+
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:53
 msgid "This session has already been saved. You can only download it as a PNG."
 msgstr "此会话已保存。您只能将其下载为 PNG。"
 
@@ -181,7 +185,7 @@ msgstr "此会话已保存。您只能将其下载为 PNG。"
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "此会话已满（{currentUserCount}/{maxUsers} 位用户）。只有前 {maxUsers} 位用户可以加入会话。"
 
-#: ../frontend/collaborate/components/Chat.tsx:279
+#: ../frontend/collaborate/components/Chat.tsx:280
 msgid "Type a message..."
 msgstr "输入消息..."
 
