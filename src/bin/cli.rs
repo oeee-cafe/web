@@ -45,6 +45,13 @@ enum Commands {
     SetRole { login_name: String, role: RoleArg },
     /// Check that the App Store will talk to us about purchases
     CheckAppStore,
+    /// Mark every drawing in the public bucket as image/png, where it was
+    /// stored without a type (src/image_store.rs)
+    SetImageContentType {
+        /// Count what would change, and change nothing
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -112,6 +119,26 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    // The bucket, and no database.
+    if let Commands::SetImageContentType { dry_run } = cli.command {
+        let client = oeee_cafe::web::handlers::collaborate::archive::s3_client(&cfg);
+        let tally =
+            oeee_cafe::image_store::set_png_content_type(&client, &cfg.aws_s3_bucket, dry_run)
+                .await?;
+        println!(
+            "{} drawings: {} already image/png, {} {}, {} failed",
+            tally.seen,
+            tally.already,
+            tally.fixed,
+            if dry_run { "to fix" } else { "fixed" },
+            tally.failed
+        );
+        if tally.failed > 0 {
+            exit(1);
+        }
+        return Ok(());
+    }
+
     let db = match cfg.connect_database().await {
         Ok(db) => db,
         Err(e) => {
@@ -125,7 +152,7 @@ async fn main() -> Result<()> {
     // matches just as you would the top level cmd
     match &cli.command {
         // Answered above, before the database was opened.
-        Commands::CheckAppStore => unreachable!(),
+        Commands::CheckAppStore | Commands::SetImageContentType { .. } => unreachable!(),
         Commands::ListCommunities => {
             let communities = get_communities(&mut tx).await?;
             for community in communities {

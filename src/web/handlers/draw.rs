@@ -1,4 +1,5 @@
 use crate::app_error::{error_codes, AppError};
+use crate::image_store;
 use crate::models::banner::{create_banner, BannerDraft};
 use crate::models::community::{find_community_by_id, is_user_member, Community, CommunityVisibility};
 use crate::models::post::{
@@ -181,18 +182,22 @@ pub async fn start_draw(
     Ok(Html(rendered).into_response())
 }
 
+/// Writes `bytes` to the public bucket as `content_type`, which is what the
+/// image store answers with (`crate::image_store`).
 pub async fn upload_object(
     client: &Client,
     bucket_name: &str,
     bytes: Vec<u8>,
     key: &str,
     checksum_sha256: &str,
+    content_type: &str,
 ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
     let body = ByteStream::from(bytes);
     client
         .put_object()
         .bucket(bucket_name)
         .key(key)
+        .content_type(content_type)
         .checksum_sha256(checksum_sha256)
         .body(body)
         .send()
@@ -276,6 +281,7 @@ pub async fn draw_finish(
                     image_sha256
                 ),
                 &BASE64.encode(&safe_decode_hash(&image_sha256)?),
+                image_store::PNG,
             )
             .await?;
         } else if name == "animation" {
@@ -364,6 +370,7 @@ pub async fn draw_finish(
         replay_data,
         &format!("replay/{}/{}.pch", replay_prefix, replay_sha256),
         &BASE64.encode(&safe_decode_hash(&replay_sha256)?),
+        image_store::PCH,
     )
     .await?;
 
@@ -532,6 +539,7 @@ pub async fn banner_draw_finish(
                     image_sha256
                 ),
                 &BASE64.encode(&safe_decode_hash(&image_sha256)?),
+                image_store::PNG,
             )
             .await?;
         } else if name == "animation" {
@@ -548,6 +556,7 @@ pub async fn banner_draw_finish(
                 data.to_vec(),
                 &format!("replay/{}/{}.pch", replay_prefix, replay_sha256),
                 &BASE64.encode(&safe_decode_hash(&replay_sha256)?),
+                image_store::PCH,
             )
             .await?;
         } else if name == "paint_duration_ms" {
