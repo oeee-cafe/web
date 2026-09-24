@@ -173,14 +173,13 @@
       {% if current_user %}
         <details class="toolbar-menu">
           <summary aria-label="{{ current_user.display_name or current_user.login_name }}">
-            <span class="toolbar-square toolbar-avatar" aria-hidden="true">{{ (current_user.display_name or current_user.login_name or "?")[:1]|upper }}</span>
-            {# A dot on the initial when the menu holds something to see to:
-               an unverified email first, then drafts left to finish. Drafts
+            {# The initial pulses green while there are drafts left to
+               finish, and an unverified email puts a red dot on it. Drafts
                used to be a button in the bar while there were any, which
                changed the bar's width -- and so whether it fit one row on a
                phone -- from one visit to the next. #}
-            {% if not current_user.email_verified_at %}<span class="toolbar-dot" title="{{ ftl_get_message('email-not-verified') }}"></span>
-            {% elif draft_post_count > 0 %}<span class="toolbar-dot toolbar-dot-drafts" title="{{ ftl_get_message('drafts') }}"></span>{% endif %}
+            <span class="toolbar-square toolbar-avatar{% if draft_post_count > 0 %} toolbar-avatar-pulse{% endif %}" aria-hidden="true">{{ (current_user.display_name or current_user.login_name or "?")[:1]|upper }}</span>
+            {% if not current_user.email_verified_at %}<span class="toolbar-dot" title="{{ ftl_get_message('email-not-verified') }}"></span>{% endif %}
           </summary>
           <div class="toolbar-menu-items">
             <div class="toolbar-menu-who">
@@ -228,8 +227,8 @@
           </summary>
           <div class="toolbar-menu-items">
             {# Drawings saved in this browser while signed out, which is
-               the only place they are. Shown by the script below, with a
-               dot on this square, only when there are some. Unboosted for
+               the only place they are. Shown by the script below, with this
+               square pulsing, only when there are some. Unboosted for
                the reason the account menu's is. #}
             <a href="/posts/drafts" hx-boost="false" class="toolbar-menu-drafts" data-server-count="0" hidden>{{ ftl_get_message("drafts") }}</a>
             {{ theme_choices() }}
@@ -829,12 +828,8 @@
         badge.textContent = String(total);
         var summary = link.closest ? link.closest(".toolbar-menu") : null;
         summary = summary && summary.querySelector("summary");
-        if (summary && !summary.querySelector(".toolbar-dot")) {
-          var dot = document.createElement("span");
-          dot.className = "toolbar-dot toolbar-dot-drafts";
-          dot.title = link.textContent.replace(/\s+\d+\s*$/, "").trim();
-          summary.appendChild(dot);
-        }
+        var avatar = summary && summary.querySelector(".toolbar-avatar");
+        if (avatar) avatar.className += " toolbar-avatar-pulse";
       }
     })();
   </script>
