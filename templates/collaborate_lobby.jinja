@@ -39,7 +39,7 @@
     {% if current_user %}
       <div id="create-session-dialog" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="create-session-title">
         <div class="ds-modal-panel create-session-panel">
-          <h2 id="create-session-title">{{ ftl_get_message("collaborate-create-session") }}</h2>
+          <h2 id="create-session-title" tabindex="-1">{{ ftl_get_message("collaborate-create-session") }}</h2>
           {# Failure messages ride on the form rather than being interpolated
              into the script below: they are translated text, and an attribute
              is the only context minijinja escapes correctly for. A label
@@ -155,7 +155,10 @@
     function toggleSessionDialog(open) {
       var dialog = document.getElementById("create-session-dialog");
       dialog.style.display = open ? "flex" : "none";
-      if (open) document.getElementById("canvas-size").focus();
+      // Focus the heading, not the first field: on iOS a focused <select>
+      // opens its picker and a focused input raises the keyboard, so
+      // New session would arrive with the canvas-size wheel already up.
+      if (open) document.getElementById("create-session-title").focus();
     }
     (function () {
       var dialog = document.getElementById("create-session-dialog");
