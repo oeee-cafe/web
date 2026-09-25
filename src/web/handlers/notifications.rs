@@ -13,7 +13,7 @@ use crate::{
     models::{
         community::get_pending_invitations_with_details_for_user,
         notification::{
-            delete_notification, get_notification_by_id, get_unread_count,
+            delete_notification, get_badge_count, get_notification_by_id,
             list_notifications as fetch_notifications, mark_all_notifications_as_read,
             mark_notification_as_read,
         },
@@ -145,7 +145,7 @@ async fn nav_notification_badge(
 ) -> Result<String, AppError> {
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
-    let unread = get_unread_count(&mut tx, user_id).await?;
+    let unread = get_badge_count(&mut tx, user_id).await?;
     tx.commit().await?;
 
     let template = state.env.get_template("nav_notifications.jinja")?;
@@ -185,6 +185,7 @@ pub async fn mark_notification_read(
     let notification = get_notification_by_id(&mut tx, notification_id, user.id).await?;
 
     tx.commit().await?;
+    state.push_service.refresh_badge(user.id);
 
     if let Some(notification) = notification {
         // Render the notification using the notification_item template
@@ -230,6 +231,7 @@ pub async fn hx_mark_all_notifications_read(
     let has_more = notifications.len() as i64 == NOTIFICATIONS_PER_BATCH;
 
     tx.commit().await?;
+    state.push_service.refresh_badge(user.id);
 
     let rows = state
         .env
@@ -260,7 +262,8 @@ pub async fn hx_mark_all_notifications_read(
     .into_response())
 }
 
-/// Get the unread notification count for the current user
+/// The number on the bell for the current user: unread notifications and
+/// pending invitations together (`get_badge_count`).
 pub async fn get_unread_notification_count(
     auth_session: AuthSession,
     State(state): State<AppState>,
@@ -274,7 +277,7 @@ pub async fn get_unread_notification_count(
         .ok_or(AppError::Unauthorized)?
         .clone();
 
-    let count = get_unread_count(&mut tx, user.id).await?;
+    let count = get_badge_count(&mut tx, user.id).await?;
 
     tx.commit().await?;
 
@@ -302,6 +305,7 @@ pub async fn delete_notification_handler(
     tx.commit().await?;
 
     if success {
+        state.push_service.refresh_badge(user.id);
         // Empty main content removes the row; the partial alongside it fixes
         // the badge, which was counting a notification that no longer exists.
         let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;

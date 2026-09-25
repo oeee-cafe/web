@@ -1,6 +1,6 @@
 use apns_h2::{
-    Client, ClientConfig, DefaultNotificationBuilder, Endpoint, Error as A2Error, ErrorReason,
-    NotificationBuilder, NotificationOptions,
+    request::payload::Payload, Client, ClientConfig, DefaultNotificationBuilder, Endpoint,
+    Error as A2Error, ErrorReason, NotificationBuilder, NotificationOptions, PushType,
 };
 use std::fs::File;
 use std::sync::Arc;
@@ -72,6 +72,25 @@ impl ApnsClient {
             }
         }
 
+        self.send(payload).await
+    }
+
+    /// Only the number on the app's icon: no banner, no sound, nothing in
+    /// Notification Center. The system sets it whether or not the app is
+    /// running.
+    pub async fn send_badge(&self, device_token: &str, badge: u32) -> Result<(), PushError> {
+        let options = NotificationOptions {
+            apns_topic: Some(&self.topic),
+            apns_push_type: Some(PushType::Alert),
+            ..Default::default()
+        };
+        let payload = DefaultNotificationBuilder::new()
+            .badge(badge)
+            .build(device_token, options);
+        self.send(payload).await
+    }
+
+    async fn send(&self, payload: Payload<'_>) -> Result<(), PushError> {
         let response = self.client.send(payload).await.map_err(|e| {
             // Check if it's a response error with an invalid token reason
             if let A2Error::ResponseError(ref resp) = e {

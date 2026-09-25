@@ -11,7 +11,7 @@ use crate::models::community::{
 use crate::models::follow;
 use crate::models::image::find_image_by_id;
 use crate::models::notification::{
-    create_notification, get_notification_by_id, get_unread_count, send_push_for_notification,
+    create_notification, get_badge_count, get_notification_by_id, send_push_for_notification,
     CreateNotificationParams, NotificationType,
 };
 use crate::models::post::{
@@ -1210,8 +1210,8 @@ pub async fn post_publish(
                 if let Ok(Some(notification)) =
                     get_notification_by_id(&mut tx, notification_id, recipient_id).await
                 {
-                    // Get unread count for badge
-                    let badge_count = get_unread_count(&mut tx, recipient_id)
+                    // The number on the bell, for the icon's badge
+                    let badge_count = get_badge_count(&mut tx, recipient_id)
                         .await
                         .ok()
                         .and_then(|count| u32::try_from(count).ok());
@@ -1547,8 +1547,8 @@ pub async fn do_create_comment(
                 if let Ok(Some(notification)) =
                     get_notification_by_id(&mut tx, notification_id, recipient_id).await
                 {
-                    // Get unread count for badge
-                    let badge_count = get_unread_count(&mut tx, recipient_id)
+                    // The number on the bell, for the icon's badge
+                    let badge_count = get_badge_count(&mut tx, recipient_id)
                         .await
                         .ok()
                         .and_then(|count| u32::try_from(count).ok());
@@ -3090,8 +3090,8 @@ pub async fn add_reaction(
                 if let Ok(Some(notification)) =
                     get_notification_by_id(&mut tx, notification_id, recipient_id).await
                 {
-                    // Get unread count for badge
-                    let badge_count = get_unread_count(&mut tx, recipient_id)
+                    // The number on the bell, for the icon's badge
+                    let badge_count = get_badge_count(&mut tx, recipient_id)
                         .await
                         .ok()
                         .and_then(|count| u32::try_from(count).ok());

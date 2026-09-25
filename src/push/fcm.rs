@@ -118,8 +118,41 @@ impl FcmClient {
             validate_only: Some(false),
         };
 
-        // Send the message
-        let result = self.hub.projects().messages_send(req, &parent).doit().await;
+        self.send(req, &parent).await
+    }
+
+    /// Only the number on the bell, as data and nothing to show: the app
+    /// takes its notifications down when it falls to nothing, since the
+    /// launcher's badge is theirs (OeeeCafeMessagingService in
+    /// oeee-cafe/android). Normal priority, since nothing is shown: FCM holds
+    /// a high-priority message that shows nothing against the app.
+    pub async fn send_badge(&self, device_token: &str, badge: u32) -> Result<(), PushError> {
+        let message = Message {
+            token: Some(device_token.to_string()),
+            android: Some(AndroidConfig {
+                priority: Some("normal".to_string()),
+                ..Default::default()
+            }),
+            data: Some(std::collections::HashMap::from([(
+                "badge".to_string(),
+                badge.to_string(),
+            )])),
+            ..Default::default()
+        };
+        let parent = format!("projects/{}", self.project_id);
+        let req = google_fcm1::api::SendMessageRequest {
+            message: Some(message),
+            validate_only: Some(false),
+        };
+        self.send(req, &parent).await
+    }
+
+    async fn send(
+        &self,
+        req: google_fcm1::api::SendMessageRequest,
+        parent: &str,
+    ) -> Result<(), PushError> {
+        let result = self.hub.projects().messages_send(req, parent).doit().await;
 
         match result {
             Ok(_) => Ok(()),

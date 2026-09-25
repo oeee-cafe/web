@@ -93,7 +93,7 @@ use crate::models::community::{find_community_by_id, find_community_by_slug, Com
 use crate::models::follow;
 use crate::models::image::find_image_by_id;
 use crate::models::notification::{
-    create_notification, get_notification_by_id, get_unread_count, send_push_for_notification,
+    create_notification, get_badge_count, get_notification_by_id, send_push_for_notification,
     CreateNotificationParams, NotificationType,
 };
 use crate::models::post::find_post_by_id;
@@ -1471,9 +1471,9 @@ impl Activity for Create {
                                             )
                                             .await
                                             {
-                                                // Get unread count for badge
+                                                // The number on the bell, for the icon's badge
                                                 let badge_count =
-                                                    get_unread_count(&mut tx, recipient_id)
+                                                    get_badge_count(&mut tx, recipient_id)
                                                         .await
                                                         .ok()
                                                         .and_then(|count| {
@@ -2307,9 +2307,9 @@ impl Activity for Like {
                                         )
                                         .await
                                         {
-                                            // Get unread count for badge
+                                            // The number on the bell, for the icon's badge
                                             let badge_count =
-                                                get_unread_count(&mut tx, recipient_id)
+                                                get_badge_count(&mut tx, recipient_id)
                                                     .await
                                                     .ok()
                                                     .and_then(|count| u32::try_from(count).ok());
@@ -2544,9 +2544,9 @@ impl Activity for EmojiReact {
                                         )
                                         .await
                                         {
-                                            // Get unread count for badge
+                                            // The number on the bell, for the icon's badge
                                             let badge_count =
-                                                get_unread_count(&mut tx, recipient_id)
+                                                get_badge_count(&mut tx, recipient_id)
                                                     .await
                                                     .ok()
                                                     .and_then(|count| u32::try_from(count).ok());

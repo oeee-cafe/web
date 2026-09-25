@@ -418,23 +418,28 @@ pub async fn mark_all_notifications_as_read(
     Ok(result.rows_affected())
 }
 
-/// Get unread notification count for a user
-pub async fn get_unread_count(
-    tx: &mut Transaction<'_, Postgres>,
-    recipient_id: Uuid,
-) -> Result<i64> {
-    let result = sqlx::query!(
+/// The number on the bell, and on the apps' icons: unread notifications and
+/// the community invitations waiting for an answer, together.
+///
+/// One count for all of them. The bell used to add the invitations while the
+/// pushes and the bell's own refresh left them out, so an app's icon said one
+/// number and the page, when it opened, another.
+pub async fn get_badge_count(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) -> Result<i64> {
+    let count = sqlx::query_scalar!(
         r#"
-        SELECT COUNT(*) as count
-        FROM notifications
-        WHERE recipient_id = $1 AND read_at IS NULL
+        SELECT
+            (SELECT COUNT(*) FROM notifications
+             WHERE recipient_id = $1 AND read_at IS NULL)
+          + (SELECT COUNT(*) FROM community_invitations
+             WHERE invitee_id = $1 AND status = 'pending')
+            AS "count!"
         "#,
-        recipient_id
+        user_id
     )
     .fetch_one(&mut **tx)
     .await?;
 
-    Ok(result.count.unwrap_or(0))
+    Ok(count)
 }
 
 /// Delete a notification, and with it the rest of its group.
