@@ -43,6 +43,10 @@ export default defineConfig({
     target: LEGACY_BROWSER_TARGET,
     outDir: "dist-offline",
     emptyOutDir: true,
+    // A map beside each file, for Sentry. The maps never reach the image's
+    // served directories: the Dockerfile injects debug ids, sets them aside
+    // for deploy.py to upload, and deletes them from what is served.
+    sourcemap: true,
     lib: {
       // The painter, and the drafts page's list of the drawings it kept in
       // the browser (frontend/shared/localDrafts.ts), which the two share.
