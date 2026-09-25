@@ -4,7 +4,7 @@ python = "3.13"
 # What deploy.py runs, so a Mac that has never deployed can after
 # `mise install`. zstd is the one it cannot pin -- nothing mise can install it
 # from -- so it is Homebrew's (`brew install zstd`), and the server's too; only
-# deploy-local uses it. gh, which `deploy` waits for the image build with, is
+# deploy:local uses it. gh, which `deploy` waits for the image build with, is
 # Homebrew's as well (`brew install gh`).
 sentry-cli = "3.8.0"
 # The CLI that applies migrations to the build database, matched to the sqlx
@@ -16,9 +16,9 @@ ruff = "0.16.8"
 description = "Switch the server to origin/main, as GitHub Actions built it (see deploy.py)"
 run = "python deploy.py deploy"
 
-[tasks.deploy-local]
+[tasks."deploy:local"]
 description = "Build origin/main here, ship it over ssh and switch the server to it (see deploy.py)"
-run = "python deploy.py deploy-local"
+run = "python deploy.py deploy:local"
 
 [tasks.rollback]
 description = "Switch the server back to the release before the last deploy (see deploy.py)"

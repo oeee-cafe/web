@@ -3,7 +3,7 @@
 # server pull. The development Mac deploys over a cellular connection, so the
 # image and the debug info never pass through it: GitHub builds the image and
 # uploads the debug info to Sentry, and the server downloads the image itself.
-# `mise run deploy-local` still builds on the Mac and ships over ssh, for when
+# `mise run deploy:local` still builds on the Mac and ships over ssh, for when
 # this is broken or GitHub is down.
 #
 # The same Dockerfile and the same steps as deploy.py's build_and_ship, in the
