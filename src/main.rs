@@ -64,7 +64,13 @@ fn main() {
             sentry::init((
                 dsn,
                 sentry::ClientOptions {
-                    release: sentry::release_name!(),
+                    // The commit, which is the name deploy.py creates the
+                    // release under in Sentry: the crate's version is
+                    // 0.1.0 in every build, so it named every deploy the
+                    // same release.
+                    release: oeee_cafe::build_info::git_commit()
+                        .map(|sha| sha.to_string().into())
+                        .or_else(|| sentry::release_name!()),
                     environment: Some(cfg.env.clone().into()),
                     // Capture user IPs and potentially sensitive headers when using HTTP server integrations
                     // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
