@@ -326,6 +326,26 @@ describe("the offline bundle, as Firefox 56 would read it", () => {
     );
   })();
 
+  it("keeps the error reporter in an entry of its own", async () => {
+    // frontend/painter/sentry.ts: the SDK assumes an engine newer than the
+    // floor, so it is loaded by a script of its own and must not be pulled
+    // into offline.js, or into a chunk offline.js imports.
+    const chunks = (await built).filter(
+      (entry): entry is Rollup.OutputChunk => entry.type === "chunk",
+    );
+    const reporter = chunks.find((chunk) => chunk.name === "sentry");
+    expect(reporter?.isEntry).toBe(true);
+    expect(reporter?.code).toContain("ingest.us.sentry.io");
+
+    const painter = chunks.find((chunk) => chunk.name === "offline")!;
+    const reachable = [painter, ...painter.imports.map(
+      (file) => chunks.find((chunk) => chunk.fileName === file)!,
+    )];
+    for (const chunk of reachable) {
+      expect(chunk.code, chunk.fileName).not.toContain("sentry.io");
+    }
+  }, 60_000);
+
   it("parses as ES2018, the last grammar Firefox 56 accepts", async () => {
     const chunk = (await built).find(
       (entry) => entry.type === "chunk" && entry.isEntry,

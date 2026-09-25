@@ -74,6 +74,11 @@
       "ok": ftl_get_message("ok"),
       "keepDrawing": ftl_get_message("draw-keep-drawing"),
     }|tojson }}</script>
+    {# Its own script, not part of offline.js: a browser too old to run the
+       reporter fails this one and still gets the painter. See
+       frontend/painter/sentry.ts. #}
+    <script type="module"
+            src="{{ '/static/neo-cucumber/sentry.js' | cachebuster | safe }}"></script>
     <script type="module"
             src="{{ '/static/neo-cucumber/offline.js' | cachebuster | safe }}"></script>
   </body>

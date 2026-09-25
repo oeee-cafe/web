@@ -19,6 +19,7 @@ export default defineConfig({
       { find: "react-dom", replacement: resolve(__dirname, "node_modules/react-dom") },
       { find: "@lingui/core", replacement: resolve(__dirname, "node_modules/@lingui/core") },
       { find: "@lingui/react", replacement: resolve(__dirname, "node_modules/@lingui/react") },
+      { find: "@sentry/browser", replacement: resolve(__dirname, "node_modules/@sentry/browser") },
       { find: "@sentry/react", replacement: resolve(__dirname, "node_modules/@sentry/react") },
       { find: "@iconify/react", replacement: resolve(__dirname, "node_modules/@iconify/react") },
     ],

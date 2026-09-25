@@ -24,6 +24,12 @@ export default defineConfig({
         find: /^neo-cucumber\/style\.css$/,
         replacement: resolve(import.meta.dirname, "src/App.css"),
       },
+      // The host under ../frontend has no node_modules of its own to resolve
+      // through, as the other configs say of theirs.
+      {
+        find: "@sentry/browser",
+        replacement: resolve(import.meta.dirname, "node_modules/@sentry/browser"),
+      },
     ],
   },
   plugins: [
@@ -43,6 +49,10 @@ export default defineConfig({
       entry: {
         offline: resolve(import.meta.dirname, "../frontend/painter/entry.ts"),
         drafts: resolve(import.meta.dirname, "../frontend/drafts/entry.ts"),
+        // The painter page's error reporter, kept out of offline.js so that
+        // an engine the SDK does not run on loses the reporter and not the
+        // painter; see frontend/painter/sentry.ts.
+        sentry: resolve(import.meta.dirname, "../frontend/painter/sentry.ts"),
       },
       formats: ["es"],
       fileName: (_format, name) => `${name}.js`,
