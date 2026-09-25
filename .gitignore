@@ -7,7 +7,6 @@
 # Apple's public root, which app_store.rs pins; not a secret.
 !/src/certs/AppleRootCA-G3.cer
 /proxy/upstream.caddy
-/.deploy.lock/
 
 # Vitest browser failure screenshots, as neo-cucumber already ignores.
 **/__screenshots__/

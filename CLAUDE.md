@@ -33,15 +33,35 @@ Linux CI box whose locale data disagrees with the one that will run it.
 
 ### Deploys
 
-`deploy.sh` runs on the development Mac, not the server: it builds
-`oeee-cafe:<commit>` from origin/main in a clean checkout of its own, ships
-the image over ssh (host alias `oeee-cafe-deploy` in `~/.ssh/config`), and
-runs `deploy-server.sh <commit>` there. Nothing compiles on the server, and
-its compose file has no `build:` on purpose.
+`mise run deploy` (`deploy.py`, standard-library Python) runs on the
+development Mac, not the server: it builds `oeee-cafe:<commit>` from
+origin/main in a clean checkout of its own, ships the image over ssh (host
+alias `oeee-cafe-deploy` in `~/.ssh/config`), and drives the switch there one
+ssh command at a time. Nothing compiles on the server, and its compose file
+has no `build:` on purpose.
+
+The server's `~/oeee-cafe-data` is not a checkout and runs no script of its
+own. Each deploy copies in `docker-compose.yml`, `proxy/Caddyfile` and
+`cli.sh` from the commit being deployed, and the production config from
+`~/.config/oeee-cafe/production` on the Mac into the idle colour's
+`config-blue/` or `config-green/`. That Mac directory is the source of truth:
+an edit made on the server is replaced by the next deploy. Each colour keeps
+its own copy so that a rollback boots with the config its release shipped
+with.
+
+The server reads every key file its config names (`*_path`) when it loads the
+config, into a `KeyFile`, and never from disk at a request: one that is
+missing or does not parse stops it booting, which a deploy sees as a colour
+that never answers `/health`, so the colour already serving stays. A new key
+file belongs in `AppConfig::load_keys`, not in the code that uses it.
 
 The image's binary carries no debug info: the Dockerfile splits it off and
-`deploy.sh` uploads it to Sentry (`sentry-cli` must be logged in), which is
-where file and line come back. The admin CLI is a subcommand of the one
+`deploy.py` uploads it to Sentry (`sentry-cli` must be logged in), which is
+where file and line come back. Each deploy is a Sentry release named by its
+full commit, which is also what the server reports as its release
+(`build_info::git_commit`), with the deploy or rollback recorded against it.
+`mise install` provides `sentry-cli`, `sqlx-cli` and `ruff` at the versions
+`deploy.py` expects; `zstd` comes from Homebrew. The admin CLI is a subcommand of the one
 binary, `./oeee-cafe cli ...`, reached through `./cli.sh`, not a second
 binary — that one cost 200MB of every image.
 
@@ -66,13 +86,12 @@ access**. `aws_s3_bucket` is served straight to browsers from
 anyone to read — so a recording written there would be downloadable by anyone
 who loaded `/collaborate`. Unset means nothing is recorded, which is the
 intended default for a deployment that has not been given somewhere private to
-put them. `config/` is gitignored, so this lives only on the server.
+put them. It is set in the production config on the development Mac.
 
-Rolling back before the next deploy: point `proxy/upstream.caddy` at the other
-colour, `docker compose start` it, and
-`docker compose exec proxy caddy reload --config /etc/caddy/Caddyfile`. The
-previous colour's container and image are kept until the next deploy
-recreates it.
+Rolling back before the next deploy is `mise run rollback`: it starts the
+stopped colour as it was, with its own image and config, and hands the proxy
+back to it the way a deploy does. The previous colour's container, image and
+config are kept until the next deploy recreates it.
 
 ### Templates
 

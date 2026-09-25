@@ -1,3 +1,19 @@
 [tools]
 pnpm = "10.15.0"
-python = "3.13.0"
+python = "3.13"
+# What deploy.py runs, so a Mac that has never deployed can after
+# `mise install`. zstd is the one it cannot pin -- nothing mise can install it
+# from -- so it is Homebrew's (`brew install zstd`), and the server's too.
+sentry-cli = "3.8.0"
+# The CLI that applies migrations to the build database, matched to the sqlx
+# the server runs them with on boot (Cargo.toml).
+"cargo:sqlx-cli" = { version = "0.8.6", features = "postgres", default-features = false }
+ruff = "0.16.8"
+
+[tasks.deploy]
+description = "Build origin/main here and switch the server to it (see deploy.py)"
+run = "python deploy.py deploy"
+
+[tasks.rollback]
+description = "Switch the server back to the release before the last deploy (see deploy.py)"
+run = "python deploy.py rollback"

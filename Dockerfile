@@ -29,7 +29,7 @@ ENV DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5433/oeee_c
 # inside this RUN.
 #
 # The release profile builds full debug info, and it is split off here: the
-# image gets the binary without it, and deploy.sh takes oeee-cafe.debug from
+# image gets the binary without it, and deploy.py takes oeee-cafe.debug from
 # the debug-files stage below and uploads it to Sentry, which puts file, line
 # and inlined frames back into its stack traces by the GNU build id the two
 # share. The symbol table stays in, so a backtrace in `docker logs` still
