@@ -463,8 +463,8 @@ html:not([data-app="windows"]):has(> body.ds-page) {
    scrollbar runs from under it to the bottom, as in any application. So on
    `.ds-page` the body is a column that exactly fills the window -- the
    header (the toolbar, then any messages) and below it `main.ds-content`,
-   which is the only thing that scrolls. The grid is drawn on the content
-   area and scrolls with it.
+   which is the only thing that scrolls. The grid is the root's and stays
+   where it is, under the content, the scrollbar and the toolbar alike.
 
    Phones keep the page scrolling: a scrolling area inside the page stops a
    phone browser from tucking its address bar away, which costs more screen
@@ -538,13 +538,11 @@ html:not([data-app="windows"]):has(> body.ds-page) {
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* Its own ground under its own grid, covering the page's, so the two
-       never show out of step. */
-    background-color: var(--ds-ground);
-    background-image: linear-gradient(var(--ds-grid) 1px, transparent 1px),
-      linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
-    background-size: 14px 14px;
-    background-attachment: local;
+    /* No ground of its own: the root's grid shows through and stays put
+       while the content scrolls over it, like the canvas under the
+       painter's windows. A grid of its own, scrolling with the content,
+       could not reach under the scrollbar, whose transparent track then
+       showed the root's grid out of step with it. */
   }
 }
 
