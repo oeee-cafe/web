@@ -311,12 +311,6 @@ nav a:visited,
    `.posts-grid`, which the admin grid wears too, with its own column count
    (admin.css).
    --------------------------------------------------------------------------- */
-/* A drawing its artist marked sensitive, blurred in every grid until it is
-   opened. post_card.jinja puts the class on the image. */
-.sensitive {
-  filter: blur(1rem);
-}
-
 /* A feed's own header row: what it is at the start, Per row at the end.
    The distance between them is a gap, not a margin on the first, so a
    first that has wrapped onto a row of its own reaches the row's end
@@ -359,6 +353,11 @@ nav a:visited,
   padding-top: 100%;
   background-color: #ffffff;
   box-shadow: 0 0 0 1px var(--ds-frame);
+  /* A blur paints past the box it blurs, by about three times its radius;
+     unclipped, a sensitive drawing smeared its colours across the gap
+     onto its neighbours and its own caption. The frame is a shadow, which
+     this does not clip. */
+  overflow: hidden;
 }
 
 @media (hover: hover), (min--moz-device-pixel-ratio: 0) {
@@ -385,6 +384,14 @@ nav a:visited,
 
 .posts-grid .posts-grid-item img.drawing-downscaled {
   image-rendering: auto;
+}
+
+/* A drawing its artist marked sensitive, blurred in every grid until it is
+   opened. post_card.jinja puts the class on the image. Scoped to the grid's
+   images: the admin pages load this sheet too, and their "sensitive" tag
+   (admin-tag sensitive) was being blurred into an unreadable smudge. */
+.posts-grid .posts-grid-item img.sensitive {
+  filter: blur(1rem);
 }
 
 /* Attribution under the drawing, never over it: it is the artist's credit,

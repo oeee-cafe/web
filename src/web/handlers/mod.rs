@@ -1353,13 +1353,22 @@ mod template_tests {
         )
         .expect("style.css reads");
         let rule = css
-            .split(".sensitive {")
+            .split(".posts-grid .posts-grid-item img.sensitive {")
             .nth(1)
             .and_then(|rest| rest.split('}').next())
             .expect("a .sensitive rule");
         assert!(
             rule.contains("filter: blur("),
             "the .sensitive rule no longer blurs"
+        );
+        let frame = css
+            .split(".posts-grid .posts-grid-item > a:first-child {")
+            .nth(1)
+            .and_then(|rest| rest.split('}').next())
+            .expect("the drawing's frame rule");
+        assert!(
+            frame.contains("overflow: hidden;"),
+            "the frame no longer clips the blur, which spills onto the grid"
         );
         let card = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/post_card.jinja"),
