@@ -1,5 +1,5 @@
 //! `oeee-cafe cli ...`: admin and ops commands, run inside a serving
-//! container by ./cli.sh. A subcommand of the server rather than a binary of
+//! container by `mise run cli` (deploy.py). A subcommand of the server rather than a binary of
 //! its own, because a second binary links nearly all of the same code again
 //! and was 200MB of every release image.
 
