@@ -4,9 +4,10 @@ python = "3.13"
 # What deploy.py runs, so a Mac that has never deployed can after
 # `mise install`. zstd is the one it cannot pin -- nothing mise can install it
 # from -- so it is Homebrew's (`brew install zstd`), and the server's too; only
-# deploy:local uses it. gh, which `deploy` waits for the image build with, is
-# Homebrew's as well (`brew install gh`).
+# deploy:local uses it.
 sentry-cli = "3.8.0"
+# What `deploy` waits for the image build with.
+gh = "2.101.0"
 # The CLI that applies migrations to the build database, matched to the sqlx
 # the server runs them with on boot (Cargo.toml).
 "cargo:sqlx-cli" = { version = "0.8.6", features = "postgres", default-features = false }

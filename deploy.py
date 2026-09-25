@@ -24,10 +24,11 @@ over it, every release. .github/workflows/image.yml builds every commit on main
 instead, uploads its debug info to Sentry itself, and pushes the image to
 REGISTRY_IMAGE; the server pulls it from there, so what crosses this machine's
 connection is the config and a few ssh commands. Waiting for that build is
-`gh`'s job, so gh has to be logged in (`gh auth login`). The package is
-private, so the server pulls it as whoever it has done `docker login ghcr.io`
-as, with a token that can read packages. `deploy:local` is the old way, for
-when GitHub is the problem; it needs none of that, and Docker here instead.
+`gh`'s job -- `mise install` provides it -- so gh has to be logged in
+(`gh auth login`). The package is private, so the server pulls it as whoever
+it has done `docker login ghcr.io` as, with a token that can read packages.
+`deploy:local` is the old way, for when GitHub is the problem; it needs none
+of that, and Docker here instead.
 
 The server holds no checkout and runs no script of its own. REMOTE_DIR there
 has only what this copies in, plus proxy/upstream.caddy, which the switch
@@ -930,6 +931,12 @@ def deploy(build_here: bool = False) -> None:
                 "       `sentry-cli login`, or deploy without debug info in Sentry\n"
                 "       with SENTRY_UPLOAD=skip"
             )
+    elif not shutil.which("gh"):
+        raise DeployError(
+            "gh is not installed, and it is how this waits for GitHub Actions to\n"
+            "       build the image: run `mise install`, or build here with\n"
+            "       `mise run deploy:local`"
+        )
     elif not succeeds("gh", "auth", "status"):
         raise DeployError(
             "gh is not logged in, and it is how this waits for GitHub Actions to\n"
