@@ -1,13 +1,15 @@
 """Deploy what is on origin/main, blue/green, or roll back to the release
 before it.
 
-    mise run deploy      (python deploy.py deploy)
-    mise run rollback    (python deploy.py rollback)
-    mise run cli -- ...  (python deploy.py cli ..., the admin CLI on the server)
+    mise run deploy        (python deploy.py deploy)
+    mise run deploy-local  (python deploy.py deploy-local)
+    mise run rollback      (python deploy.py rollback)
+    mise run cli -- ...    (python deploy.py cli ..., the admin CLI on the server)
 
-    fetch origin/main into a clean build checkout -> build oeee-cafe:<commit>
-    against a throwaway Postgres -> ship the image over ssh -> copy the compose
-    file, proxy config and the config directory -> start the idle
+    fetch origin/main into a clean build checkout -> have the server pull the
+    image GitHub Actions built (deploy), or build oeee-cafe:<commit> here
+    against a throwaway Postgres and ship it over ssh (deploy-local) -> copy
+    the compose file, proxy config and the config directory -> start the idle
     colour -> wait for it to answer /health -> point the proxy at it -> drain
     -> stop the colour that was serving -> remove images no container can come
     back to
@@ -15,6 +17,17 @@ before it.
 The build used to run on the server, where it pegged the CPU the site and its
 neighbours share, and left a 1.4GB image and gigabytes of build cache behind
 every time. Both machines are arm64, so an image built here runs there as is.
+
+`deploy` builds nothing here. This machine is often on a cellular connection,
+and a build here means the image going up and the debug info going to Sentry
+over it, every release. .github/workflows/image.yml builds every commit on main
+instead, uploads its debug info to Sentry itself, and pushes the image to
+REGISTRY_IMAGE; the server pulls it from there, so what crosses this machine's
+connection is the config and a few ssh commands. Waiting for that build is
+`gh`'s job, so gh has to be logged in (`gh auth login`), and the server has to
+be able to pull the image: the package is public, or the server has done
+`docker login ghcr.io`. `deploy-local` is the old way, for when GitHub is the
+problem; it needs none of that, and Docker here instead.
 
 The server holds no checkout and runs no script of its own. REMOTE_DIR there
 has only what this copies in, plus proxy/upstream.caddy, which the switch
@@ -45,10 +58,12 @@ machine in DEPLOY_CONFIG_DIR, and each deploy copies it over. It is kept out of
 the repository, which is public, so edit it there, not on the server: the next
 deploy replaces whatever the server has.
 
-Docker here has to be running. OrbStack is started if it is not.
+For deploy-local, Docker here has to be running. OrbStack is started if it is
+not.
 
-The image's binary has no debug info; it is uploaded to Sentry instead, so
-sentry-cli has to be logged in (`sentry-cli login`). Each deploy is also a
+The image's binary has no debug info; it is uploaded to Sentry instead -- by
+the workflow for `deploy`, and from here for `deploy-local`, which is why that
+needs sentry-cli logged in (`sentry-cli login`). Each deploy is also a
 release there, named by its commit -- the name the server reports its errors
 under (main.rs) -- with the deploy, or rollback, recorded against it, so an
 error that started with a release says which. The organization and
@@ -59,13 +74,14 @@ deploy stops rather than find that out from the first error. SENTRY_UPLOAD=skip
 deploys anyway.
 
 The browser bundles are the same story in Sentry's neo-cucumber project: the
-image serves them without their source maps, and the maps go up here instead,
+image serves them without their source maps, and the maps go to Sentry instead,
 paired with the files by the debug ids the Dockerfile stamped into both.
 """
 
 from __future__ import annotations
 
 import io
+import json
 import os
 import shlex
 import shutil
@@ -107,8 +123,13 @@ SENTRY_ENV = {
 # Where the browser bundles report (frontend/shared/sentry.ts), which is a
 # project of its own; their source maps go there.
 SENTRY_JS_PROJECT = os.environ.get("SENTRY_JS_PROJECT", "neo-cucumber")
-# The repository as Sentry's GitHub integration names it.
-SENTRY_REPOSITORY = "oeee-cafe/web"
+# The repository as Sentry's GitHub integration names it, and as GitHub does.
+SENTRY_REPOSITORY = GITHUB_REPOSITORY = "oeee-cafe/web"
+# Where .github/workflows/image.yml pushes each commit on main, tagged with it.
+REGISTRY_IMAGE = "ghcr.io/oeee-cafe/web"
+IMAGE_WORKFLOW = "image.yml"
+# A push takes a few seconds to show up as a workflow run.
+WORKFLOW_APPEAR_SECONDS = 60
 BUILD_DB = "oeee-cafe-build-db"
 UPSTREAM_FILE = "proxy/upstream.caddy"
 # What the server needs from the repository; everything else is in the image.
@@ -310,7 +331,10 @@ def ensure_docker() -> None:
         raise DeployError("Docker is not running on this machine")
 
 
-def fetch_main() -> str:
+def fetch_main(submodules: bool) -> str:
+    """The build checkout at origin/main. Without submodules when nothing is
+    built here: all that is used then is the compose file, the proxy config
+    and this script."""
     step("Fetching origin/main...")
     if not (BUILD_DIR / ".git").is_dir():
         repo_url = output("git", "-C", REPO, "remote", "get-url", "origin")
@@ -319,9 +343,11 @@ def fetch_main() -> str:
     run(*git, "fetch", "--quiet", "origin", "main")
     commit = output(*git, "rev-parse", "FETCH_HEAD")
     run(*git, "checkout", "--quiet", "--detach", commit)
-    run(*git, "submodule", "--quiet", "update", "--init", "--recursive")
+    if submodules:
+        run(*git, "submodule", "--quiet", "update", "--init", "--recursive")
     run(*git, "clean", "-qffdx")
-    run(*git, "submodule", "--quiet", "foreach", "--recursive", "git clean -qffdx")
+    if submodules:
+        run(*git, "submodule", "--quiet", "foreach", "--recursive", "git clean -qffdx")
     step(f"Deploying {output(*git, 'log', '-1', '--format=%h %s')}")
 
     # Only what has been pushed goes out: the image, the compose file and the
@@ -483,6 +509,103 @@ def build_and_ship(server: Server, commit: str) -> None:
     compress.stdout.close()
     if save.wait() != 0 or compress.wait() != 0 or load.returncode != 0:
         raise DeployError(f"could not ship {image} to {server.host}")
+
+
+def image_run(commit: str) -> dict | None:
+    """The newest run of the image workflow for this commit, as gh reports it."""
+    runs = json.loads(
+        output(
+            "gh",
+            "run",
+            "list",
+            "--repo",
+            GITHUB_REPOSITORY,
+            "--workflow",
+            IMAGE_WORKFLOW,
+            "--commit",
+            commit,
+            "--limit",
+            "1",
+            "--json",
+            "databaseId,status,conclusion,url",
+        )
+    )
+    return runs[0] if runs else None
+
+
+def wait_for_image(commit: str) -> None:
+    """Until GitHub Actions has pushed this commit's image, which includes its
+    debug info being in Sentry: the workflow uploads that first."""
+    found = None
+
+    def appeared() -> bool:
+        nonlocal found
+        found = image_run(commit)
+        return found is not None
+
+    if poll(WORKFLOW_APPEAR_SECONDS, appeared) is None:
+        raise DeployError(
+            f"GitHub Actions has no {IMAGE_WORKFLOW} run for {commit[:12]}; start one with\n"
+            f"       `gh workflow run {IMAGE_WORKFLOW} --repo {GITHUB_REPOSITORY}`, or build here\n"
+            "       with `mise run deploy-local`"
+        )
+    if found["status"] != "completed":
+        step(f"Waiting for GitHub Actions to build {commit[:12]} ({found['url']})...")
+        # Its exit status is not what decides: the run is asked again below,
+        # which also covers a watch that was interrupted by the connection.
+        run(
+            "gh",
+            "run",
+            "watch",
+            str(found["databaseId"]),
+            "--repo",
+            GITHUB_REPOSITORY,
+            "--interval",
+            "15",
+            "--compact",
+            check=False,
+        )
+        found = image_run(commit)
+    if found["conclusion"] != "success":
+        raise DeployError(
+            f"the image build for {commit[:12]} ended {found['conclusion'] or found['status']}:\n"
+            f"       {found['url']}\n"
+            "       rerun it, or build here with `mise run deploy-local`"
+        )
+
+
+def pull_image(server: Server, commit: str) -> None:
+    """The server downloads the image GitHub Actions built; nothing of it
+    crosses this machine's connection. It is kept under the same local name
+    a deploy-local ships, oeee-cafe:<commit>, and the registry's name is
+    dropped, so everything after this -- the switch, rollback, and removing
+    old releases -- cannot tell which way it arrived."""
+    image = f"oeee-cafe:{commit}"
+    if server.succeeds("docker", "image", "inspect", image, cwd=False):
+        step(f"The server already has {image}")
+        return
+    wait_for_image(commit)
+    remote = f"{REGISTRY_IMAGE}:{commit}"
+    step(f"Pulling {remote} on {server.host}...")
+    if (
+        server.run(
+            "docker",
+            "pull",
+            "--platform",
+            "linux/arm64",
+            remote,
+            cwd=False,
+            check=False,
+        ).returncode
+        != 0
+    ):
+        raise DeployError(
+            f"{server.host} could not pull {remote}. The package has to be public, or\n"
+            f"       the server logged in to ghcr.io (`docker login ghcr.io` there, with a\n"
+            "       token that can read packages)"
+        )
+    server.run("docker", "tag", remote, image, cwd=False)
+    server.run("docker", "rmi", remote, cwd=False, quiet=True)
 
 
 def copy_files(server: Server, target: str) -> None:
@@ -793,33 +916,49 @@ def record_deploy(
     sentry(*args)
 
 
-def deploy() -> None:
+def deploy(build_here: bool = False) -> None:
     check_config()
-    ensure_docker()
-    # Checked before the build rather than after it, which is when it would fail.
-    if SENTRY_UPLOAD != "skip" and not succeeds(
-        "env", *(f"{k}={v}" for k, v in SENTRY_ENV.items()), "sentry-cli", "info"
-    ):
+    if build_here:
+        ensure_docker()
+        # Checked before the build rather than after it, which is when it
+        # would fail.
+        if SENTRY_UPLOAD != "skip" and not succeeds(
+            "env", *(f"{k}={v}" for k, v in SENTRY_ENV.items()), "sentry-cli", "info"
+        ):
+            raise DeployError(
+                f"sentry-cli cannot reach {SENTRY_ENV['SENTRY_ORG']}/{SENTRY_ENV['SENTRY_PROJECT']}: run\n"
+                "       `sentry-cli login`, or deploy without debug info in Sentry\n"
+                "       with SENTRY_UPLOAD=skip"
+            )
+    elif not succeeds("gh", "auth", "status"):
         raise DeployError(
-            f"sentry-cli cannot reach {SENTRY_ENV['SENTRY_ORG']}/{SENTRY_ENV['SENTRY_PROJECT']}: run\n"
-            "       `sentry-cli login`, or deploy without debug info in Sentry\n"
-            "       with SENTRY_UPLOAD=skip"
+            "gh is not logged in, and it is how this waits for GitHub Actions to\n"
+            "       build the image: run `gh auth login`, or build here with\n"
+            "       `mise run deploy-local`"
         )
     started = int(time.time())
-    commit = fetch_main()
+    commit = fetch_main(submodules=build_here)
     server = Server(DEPLOY_HOST)
     try:
-        build_and_ship(server, commit)
+        if build_here:
+            build_and_ship(server, commit)
+        else:
+            pull_image(server, commit)
         create_release(commit)
         switch(server, commit)
     finally:
         server.close()
     sentry("releases", "finalize", commit)
     record_deploy(commit, started=started)
-    remove_local_images(commit)
+    if build_here:
+        remove_local_images(commit)
 
 
-COMMANDS = {"deploy": deploy, "rollback": rollback}
+def deploy_local() -> None:
+    deploy(build_here=True)
+
+
+COMMANDS = {"deploy": deploy, "deploy-local": deploy_local, "rollback": rollback}
 
 
 def main() -> int:
