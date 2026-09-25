@@ -43,7 +43,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::app_store::{may_ask_of, Asked};
-use crate::config::GooglePlayConfig;
+use crate::config::{GooglePlayConfig, KeyFile};
 use crate::models::supporter::OwnedProduct;
 
 /// What the site's tokens are good for: the Google Play Developer API.
@@ -72,7 +72,7 @@ fn http() -> &'static reqwest::Client {
 
 /// The fields of a service account's JSON key this uses.
 #[derive(Deserialize)]
-struct ServiceAccountKey {
+pub struct ServiceAccountKey {
     client_email: String,
     /// PKCS#8, as Google issues it.
     private_key: String,
@@ -82,19 +82,33 @@ struct ServiceAccountKey {
     token_uri: Option<String>,
 }
 
-fn read_key(config: &GooglePlayConfig) -> Result<ServiceAccountKey> {
-    let text = std::fs::read_to_string(&config.service_account_path).map_err(|error| {
-        anyhow!(
-            "could not read the Google Play service account key at {}: {error}",
-            config.service_account_path
-        )
-    })?;
-    serde_json::from_str(&text).map_err(|error| {
-        anyhow!(
-            "the Google Play service account key at {} is not one: {error}",
-            config.service_account_path
-        )
-    })
+impl GooglePlayConfig {
+    /// Reads the service account's key from `service_account_path`, once,
+    /// when the config is loaded (`KeyFile`). The private key inside it is
+    /// parsed here too, so a key Google would never have issued stops the
+    /// server booting rather than the first token request.
+    pub fn load_key(&mut self) -> Result<()> {
+        let text = std::fs::read_to_string(&self.service_account_path).map_err(|error| {
+            anyhow!(
+                "could not read the Google Play service account key at {}: {error}",
+                self.service_account_path
+            )
+        })?;
+        let key: ServiceAccountKey = serde_json::from_str(&text).map_err(|error| {
+            anyhow!(
+                "the Google Play service account key at {} is not one: {error}",
+                self.service_account_path
+            )
+        })?;
+        EncodingKey::from_rsa_pem(key.private_key.as_bytes()).map_err(|error| {
+            anyhow!(
+                "the private key in the Google Play service account key at {} does not parse: {error}",
+                self.service_account_path
+            )
+        })?;
+        self.service_account = KeyFile::new(key);
+        Ok(())
+    }
 }
 
 /// The signed assertion a service account asks for a token with (RFC 7523):
@@ -124,11 +138,16 @@ struct TokenResponse {
 
 /// A token for the Developer API, from the cache while it lasts.
 async fn access_token(config: &GooglePlayConfig) -> Result<String> {
-    // Keyed by everything that decides the token, so a key file that is
-    // replaced is never answered with the old account's.
+    // Keyed by everything that decides the token, so one account is never
+    // answered with another's.
     type Tokens = Mutex<HashMap<[String; 3], (String, Instant)>>;
     static TOKENS: OnceLock<Tokens> = OnceLock::new();
-    let key = read_key(config)?;
+    let key = config.service_account.get().ok_or_else(|| {
+        anyhow!(
+            "the Google Play service account key at {} was never loaded",
+            config.service_account_path
+        )
+    })?;
     let token_uri = key
         .token_uri
         .clone()
@@ -152,7 +171,7 @@ async fn access_token(config: &GooglePlayConfig) -> Result<String> {
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:jwt-bearer".to_string(),
             ),
-            ("assertion", assertion(&key, &token_uri)?),
+            ("assertion", assertion(key, &token_uri)?),
         ])
         .send()
         .await?;
@@ -652,12 +671,15 @@ mod tests {
         )
         .unwrap();
 
+        let mut config = GooglePlayConfig {
+            package_name: PACKAGE.to_string(),
+            service_account_path: key_file.to_string_lossy().into_owned(),
+            service_account: KeyFile::default(),
+            api_url: format!("http://{addr}"),
+        };
+        config.load_key().expect("the test key loads");
         Fake {
-            config: GooglePlayConfig {
-                package_name: PACKAGE.to_string(),
-                service_account_path: key_file.to_string_lossy().into_owned(),
-                api_url: format!("http://{addr}"),
-            },
+            config,
             seen,
             key_file,
         }
@@ -780,9 +802,32 @@ mod tests {
             .await
             .is_err());
 
-        let mut missing = fake_google_play().await;
-        missing.config.service_account_path = "/nowhere/google-play.json".to_string();
-        assert!(look_up(&missing.config, &packs(), "bought").await.is_err());
+        let mut unloaded = fake_google_play().await;
+        unloaded.config.service_account = KeyFile::default();
+        assert!(look_up(&unloaded.config, &packs(), "bought").await.is_err());
+    }
+
+    /// A key file that is not there, is not a service account's key, or
+    /// holds a private key that does not parse, is found when the config is
+    /// loaded: the server does not boot, rather than failing the first
+    /// purchase after it passed its health check.
+    #[tokio::test]
+    async fn a_key_that_will_not_load_is_found_at_load() {
+        let mut fake = fake_google_play().await;
+        fake.config.service_account_path = "/nowhere/google-play.json".to_string();
+        let error = fake.config.load_key().unwrap_err().to_string();
+        assert!(error.contains("/nowhere/google-play.json"), "{error}");
+
+        std::fs::write(&fake.key_file, "{}").unwrap();
+        fake.config.service_account_path = fake.key_file.to_string_lossy().into_owned();
+        assert!(fake.config.load_key().is_err());
+
+        std::fs::write(
+            &fake.key_file,
+            json!({"client_email": CLIENT_EMAIL, "private_key": "not a key"}).to_string(),
+        )
+        .unwrap();
+        assert!(fake.config.load_key().is_err());
     }
 
     /// What `cli check-google-play` does: Google saying it has never heard

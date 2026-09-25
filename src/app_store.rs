@@ -53,7 +53,7 @@ use serde_json::json;
 
 use uuid::Uuid;
 
-use crate::config::AppStoreConfig;
+use crate::config::{AppStoreConfig, KeyFile};
 use crate::models::supporter::OwnedProduct;
 
 /// Who the App Store Server API tokens are for, in every request Apple
@@ -107,17 +107,37 @@ struct Transaction {
     in_app_ownership_type: Option<String>,
 }
 
+impl AppStoreConfig {
+    /// Reads the key Apple issued from `private_key_path`, once, when the
+    /// config is loaded (`KeyFile`).
+    pub fn load_key(&mut self) -> Result<()> {
+        let pem = std::fs::read(&self.private_key_path).map_err(|error| {
+            anyhow!(
+                "could not read the App Store key at {}: {error}",
+                self.private_key_path
+            )
+        })?;
+        let key = EncodingKey::from_ec_pem(&pem).map_err(|error| {
+            anyhow!(
+                "the App Store key at {} is not a P-256 private key: {error}",
+                self.private_key_path
+            )
+        })?;
+        self.private_key = KeyFile::new(key);
+        Ok(())
+    }
+}
+
 /// A JWT for the App Store Server API: ES256 over the key Apple issued
 /// (App Store Connect > Users and Access > Integrations > In-App Purchase),
 /// naming the issuer, the key and the app it is for.
 fn api_token(config: &AppStoreConfig) -> Result<String> {
-    let pem = std::fs::read(&config.private_key_path).map_err(|error| {
+    let key = config.private_key.get().ok_or_else(|| {
         anyhow!(
-            "could not read the App Store key at {}: {error}",
+            "the App Store key at {} was never loaded",
             config.private_key_path
         )
     })?;
-    let key = EncodingKey::from_ec_pem(&pem)?;
     let mut header = Header::new(Algorithm::ES256);
     header.kid = Some(config.key_id.clone());
     header.typ = Some("JWT".to_string());
@@ -129,7 +149,7 @@ fn api_token(config: &AppStoreConfig) -> Result<String> {
         "aud": TOKEN_AUDIENCE,
         "bid": config.bundle_id,
     });
-    Ok(encode(&header, &claims, &key)?)
+    Ok(encode(&header, &claims, key)?)
 }
 
 /// Apple's answer, or `None` when that environment has never heard of the
@@ -940,15 +960,18 @@ mod tests {
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
 
-        AppStoreConfig {
+        let mut config = AppStoreConfig {
             issuer_id: ISSUER_ID.to_string(),
             key_id: KEY_ID.to_string(),
             private_key_path: PRIVATE_KEY_PATH.to_string(),
+            private_key: KeyFile::default(),
             bundle_id: BUNDLE_ID.to_string(),
             api_url: format!("http://{addr}/production"),
             sandbox_api_url: format!("http://{addr}/sandbox"),
             trusted_root: TEST_ROOT,
-        }
+        };
+        config.load_key().expect("the test key loads");
+        config
     }
 
     /// The catalogue's App Store products, as `store_product::packs` gives
@@ -1054,9 +1077,30 @@ mod tests {
         config.key_id = "WRONGKEY00".to_string();
         assert!(look_up(&config, &packs(), "1000").await.is_err());
 
+        // A key that was never loaded is an error too, and not a request
+        // without one.
         let mut config = fake_app_store().await;
-        config.private_key_path = "/nowhere/app-store.p8".to_string();
+        config.private_key = KeyFile::default();
         assert!(look_up(&config, &packs(), "1000").await.is_err());
+    }
+
+    /// A key file that is not there, or is not a key, is found when the
+    /// config is loaded: the server does not boot, rather than failing the
+    /// first purchase after it passed its health check.
+    #[test]
+    fn a_key_that_will_not_load_is_found_at_load() {
+        let mut config = test_config();
+        config.private_key_path = "/nowhere/app-store.p8".to_string();
+        let error = config.load_key().unwrap_err().to_string();
+        assert!(error.contains("/nowhere/app-store.p8"), "{error}");
+
+        let mut config = test_config();
+        config.private_key_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/testdata/app_store_x5c/root.der"
+        )
+        .to_string();
+        assert!(config.load_key().is_err());
     }
 
     fn read(jws: &str) -> Result<Transaction> {
@@ -1085,15 +1129,18 @@ mod tests {
     }
 
     fn test_config() -> AppStoreConfig {
-        AppStoreConfig {
+        let mut config = AppStoreConfig {
             issuer_id: ISSUER_ID.to_string(),
             key_id: KEY_ID.to_string(),
             private_key_path: PRIVATE_KEY_PATH.to_string(),
+            private_key: KeyFile::default(),
             bundle_id: BUNDLE_ID.to_string(),
             api_url: "http://127.0.0.1:9/production".to_string(),
             sandbox_api_url: "http://127.0.0.1:9/sandbox".to_string(),
             trusted_root: TEST_ROOT,
-        }
+        };
+        config.load_key().expect("the test key loads");
+        config
     }
 
     fn notice(payload: &Value) -> Result<Notice> {
