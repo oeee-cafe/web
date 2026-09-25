@@ -131,6 +131,15 @@ REGISTRY_IMAGE = "ghcr.io/oeee-cafe/web"
 IMAGE_WORKFLOW = "image.yml"
 # A push takes a few seconds to show up as a workflow run.
 WORKFLOW_APPEAR_SECONDS = 60
+# The step of IMAGE_WORKFLOW that pushes the image, which is what a deploy
+# waits for. The steps after it only save caches for the next build, and
+# waiting for the whole run spent over a minute of every deploy on them.
+IMAGE_PUSH_STEP = "Build and push the image"
+IMAGE_POLL_SECONDS = 15
+# gh on a cellular connection: a TLS handshake that times out, or no route to
+# host for a moment. Asked again this many times, a few seconds apart, before
+# the deploy gives up.
+GH_ATTEMPTS = 5
 BUILD_DB = "oeee-cafe-build-db"
 UPSTREAM_FILE = "proxy/upstream.caddy"
 # What the server needs from the repository; everything else is in the image.
@@ -512,31 +521,45 @@ def build_and_ship(server: Server, commit: str) -> None:
         raise DeployError(f"could not ship {image} to {server.host}")
 
 
+def gh_json(*args: str):
+    """What gh prints with --json, asked again when the connection drops."""
+    for attempt in range(1, GH_ATTEMPTS + 1):
+        result = run("gh", *args, check=False, stdout=subprocess.PIPE)
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+        if attempt < GH_ATTEMPTS:
+            print(
+                f"    gh failed; asking again ({attempt}/{GH_ATTEMPTS - 1})", flush=True
+            )
+            time.sleep(5)
+    raise DeployError(
+        f"`gh {shlex.join(args)}` failed {GH_ATTEMPTS} times; is the connection up?"
+    )
+
+
 def image_run(commit: str) -> dict | None:
     """The newest run of the image workflow for this commit, as gh reports it."""
-    runs = json.loads(
-        output(
-            "gh",
-            "run",
-            "list",
-            "--repo",
-            GITHUB_REPOSITORY,
-            "--workflow",
-            IMAGE_WORKFLOW,
-            "--commit",
-            commit,
-            "--limit",
-            "1",
-            "--json",
-            "databaseId,status,conclusion,url",
-        )
+    runs = gh_json(
+        "run",
+        "list",
+        "--repo",
+        GITHUB_REPOSITORY,
+        "--workflow",
+        IMAGE_WORKFLOW,
+        "--commit",
+        commit,
+        "--limit",
+        "1",
+        "--json",
+        "databaseId,status,conclusion,url",
     )
     return runs[0] if runs else None
 
 
 def wait_for_image(commit: str) -> None:
     """Until GitHub Actions has pushed this commit's image, which includes its
-    debug info being in Sentry: the workflow uploads that first."""
+    debug info being in Sentry: the workflow uploads that first. It is the
+    push step that is waited for, not the run, which goes on to save caches."""
     found = None
 
     def appeared() -> bool:
@@ -550,29 +573,51 @@ def wait_for_image(commit: str) -> None:
             f"       `gh workflow run {IMAGE_WORKFLOW} --repo {GITHUB_REPOSITORY}`, or build here\n"
             "       with `mise run deploy:local`"
         )
-    if found["status"] != "completed":
-        step(f"Waiting for GitHub Actions to build {commit[:12]} ({found['url']})...")
-        # Its exit status is not what decides: the run is asked again below,
-        # which also covers a watch that was interrupted by the connection.
-        run(
-            "gh",
+    url = found["url"]
+
+    def ended(how: str) -> DeployError:
+        return DeployError(
+            f"the image build for {commit[:12]} ended {how}:\n"
+            f"       {url}\n"
+            "       rerun it, or build here with `mise run deploy:local`"
+        )
+
+    announced = False
+    shown = None
+    while True:
+        view = gh_json(
             "run",
-            "watch",
+            "view",
             str(found["databaseId"]),
             "--repo",
             GITHUB_REPOSITORY,
-            "--interval",
-            "15",
-            "--compact",
-            check=False,
+            "--json",
+            "status,conclusion,jobs",
         )
-        found = image_run(commit)
-    if found["conclusion"] != "success":
-        raise DeployError(
-            f"the image build for {commit[:12]} ended {found['conclusion'] or found['status']}:\n"
-            f"       {found['url']}\n"
-            "       rerun it, or build here with `mise run deploy:local`"
+        steps = [s for job in view["jobs"] for s in job["steps"]]
+        push = next((s for s in steps if s["name"] == IMAGE_PUSH_STEP), None)
+        if push is not None and push["status"] == "completed":
+            if push["conclusion"] != "success":
+                raise ended(view["conclusion"] or push["conclusion"])
+            return
+        if view["status"] == "completed":
+            if view["conclusion"] == "success":
+                # The run passed without the step: it has been renamed.
+                raise DeployError(
+                    f"{IMAGE_WORKFLOW} has no step named {IMAGE_PUSH_STEP!r}, which is\n"
+                    "       what this waits for; update IMAGE_PUSH_STEP in deploy.py"
+                )
+            raise ended(view["conclusion"])
+        if not announced:
+            step(f"Waiting for GitHub Actions to build {commit[:12]} ({url})...")
+            announced = True
+        current = next(
+            (s["name"] for s in steps if s["status"] == "in_progress"), "Queued"
         )
+        if current != shown:
+            print(f"    {current}", flush=True)
+            shown = current
+        time.sleep(IMAGE_POLL_SECONDS)
 
 
 def pull_image(server: Server, commit: str) -> None:

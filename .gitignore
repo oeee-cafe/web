@@ -10,3 +10,6 @@
 
 # Vitest browser failure screenshots, as neo-cucumber already ignores.
 **/__screenshots__/
+
+# From importing deploy.py.
+__pycache__/
