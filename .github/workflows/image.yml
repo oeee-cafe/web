@@ -132,6 +132,8 @@ jobs:
       # versions the static asset URLs the server hands out, so each deploy
       # invalidates browser and CDN caches exactly once. No provenance
       # attestation, so what the server pulls is one plain arm64 manifest.
+      # deploy.py waits for this step by name (IMAGE_PUSH_STEP), not for the
+      # run, so a deploy pulls without waiting for the caches to save.
       - name: Build and push the image
         uses: docker/build-push-action@v7
         with:
