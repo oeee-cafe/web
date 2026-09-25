@@ -183,16 +183,18 @@ export function drawBezierPreview(
 
   const overlay = new XorOverlay(ctx, backdrop);
   const scale = backdrop.scale ?? 1;
-  points = points.map((point) => point * scale);
+  // The handles are drawn on the display, so they take display coordinates;
+  // the curve is rasterised on the artwork below and keeps the artwork's.
+  const shown = points.map((point) => point * scale);
   const ring = (x: number, y: number) =>
     overlay.ellipse(x - HANDLE, y - HANDLE, HANDLE * 2, HANDLE * 2);
 
-  if (points.length === 4) {
+  if (shown.length === 4) {
     // Still setting the chord: NEO draws the plain line cursor for this step.
-    overlay.line(points[0], points[1], points[2], points[3]);
+    overlay.line(shown[0], shown[1], shown[2], shown[3]);
     overlay.commit();
   } else {
-    const [x0, y0, x1, y1, x2, y2, x3, y3] = points;
+    const [x0, y0, x1, y1, x2, y2, x3, y3] = shown;
 
     if (step <= 1) {
       // drawBezierCursor1: only the first handle is being placed.
@@ -212,13 +214,49 @@ export function drawBezierPreview(
     // Neo draws the handles into its destination first, then draws the curve
     // from tempCanvas over them. Use the verified rasterizer for that curve;
     // preview mode deliberately forces full alpha and disables masking.
-    const painter = new NeoPainter(ctx.canvas.width, ctx.canvas.height);
+    //
+    // The curve is rasterised at the artwork's own size and scaled onto the
+    // overlay afterwards, which is what drawBezierCursor1 does: it draws into
+    // tempCanvas at 1x and drawImages that through the zoom. Scaling the
+    // *width* instead -- `style.width * scale` -- handed the pen kernel a
+    // size it has no round for. Its table is indexed by whole widths from 1
+    // to 30, so a fit-to-screen zoom (every tablet opens at one) or a wide
+    // brush at 2x looked up `undefined` and threw -- out of the release
+    // handler, before it had let go of the pointer. See useBaseDrawing for
+    // what that did to the painter.
+    const [ax0, ay0, ax1, ay1, ax2, ay2, ax3, ay3] = points;
+    const curve = curveSurface(backdrop.width, backdrop.height);
+    const painter = new NeoPainter(backdrop.width, backdrop.height);
     painter._currentColor = [...style.color];
-    painter._currentWidth = style.width * scale;
+    painter._currentWidth = style.width;
     painter.drawBezier(
-      ctx, x0, y0, x1, y1,
-      step <= 1 ? x1 : x2, step <= 1 ? y1 : y2,
-      x3, y3, LINETYPE.PEN, true
+      curve, ax0, ay0, ax1, ay1,
+      step <= 1 ? ax1 : ax2, step <= 1 ? ay1 : ay2,
+      ax3, ay3, LINETYPE.PEN, true
     );
+    ctx.save();
+    // Hard pixels, as the canvas under it is shown.
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      curve.canvas,
+      0, 0, backdrop.width, backdrop.height,
+      0, 0, backdrop.width * scale, backdrop.height * scale
+    );
+    ctx.restore();
   }
+}
+
+/** NEO's tempCanvas for the curve: one, kept, cleared before each use. */
+let curveScratch: HTMLCanvasElement | null = null;
+
+function curveSurface(width: number, height: number): CanvasRenderingContext2D {
+  if (!curveScratch) curveScratch = document.createElement("canvas");
+  if (curveScratch.width !== width || curveScratch.height !== height) {
+    curveScratch.width = width;
+    curveScratch.height = height;
+  }
+  const surface = curveScratch.getContext("2d", { willReadFrequently: true });
+  if (!surface) throw new Error("2d context unavailable");
+  surface.clearRect(0, 0, width, height);
+  return surface;
 }

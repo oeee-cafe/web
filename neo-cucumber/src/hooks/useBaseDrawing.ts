@@ -1424,11 +1424,63 @@ export const useBaseDrawing = (
       callbacks?.onHoverMove?.(null);
     };
 
-    app.addEventListener("pointerdown", handlePointerDown);
-    app.addEventListener("pointerup", handlePointerUp);
+    /**
+     * Lets go of the pointer when a handler throws.
+     *
+     * A press latches `activePointerId` on its way in and the release clears
+     * it on the way out, and everything between the two -- the previews, the
+     * history, a session's callbacks -- runs on the same stack. One of them
+     * throwing left the latch set with nothing coming to clear it. Every
+     * contact of a pen or a finger is a new pointer id, so every press after
+     * that was refused as a second pointer, and the painter was dead until a
+     * reload while other people's strokes went on arriving. A bezier preview
+     * at a fit-to-screen zoom was the throw that found this (regionPreview.ts),
+     * but the shape of the failure belongs to the handlers, not the preview,
+     * so it is met here. The error still goes out, to the console and to
+     * Sentry; it just no longer takes the pointer with it.
+     */
+    const releasingOnFailure =
+      (handle: (e: PointerEvent) => void) => (e: PointerEvent) => {
+        try {
+          handle(e);
+        } catch (error) {
+          abandonPointer(e.pointerId);
+          throw error;
+        }
+      };
+
+    /**
+     * `cleanupPointerState`, with the latch cleared even if that throws too:
+     * the previews it clears are the callbacks that failed a moment ago.
+     */
+    const abandonPointer = (pointerId: number) => {
+      try {
+        cleanupPointerState(pointerId);
+      } catch (error) {
+        console.warn("Failed to clean up after a pointer handler threw:", error);
+      }
+      if (pendingTouchPressRef.current?.pointerId === pointerId) {
+        discardPendingTouchPress();
+      }
+      if (drawingStateRef.current.activePointerId === pointerId) {
+        drawingStateRef.current.activePointerId = null;
+        drawingStateRef.current.isDrawing = false;
+        drawingStateRef.current.isPanning = false;
+        isDrawingRef.current = false;
+        strokeParamsRef.current = null;
+      }
+    };
+
+    const onPointerDown = releasingOnFailure(handlePointerDown);
+    const onPointerUp = releasingOnFailure(handlePointerUp);
+    const onPointerCancel = releasingOnFailure(handlePointerCancel);
+    const onPointerLeave = releasingOnFailure(handlePointerLeave);
+
+    app.addEventListener("pointerdown", onPointerDown);
+    app.addEventListener("pointerup", onPointerUp);
     app.addEventListener("pointermove", handlePointerMove);
-    app.addEventListener("pointercancel", handlePointerCancel);
-    app.addEventListener("pointerleave", handlePointerLeave);
+    app.addEventListener("pointercancel", onPointerCancel);
+    app.addEventListener("pointerleave", onPointerLeave);
 
     const preventTouchOnCanvas = (e: TouchEvent) => {
       const target = e.target as Element;
@@ -1446,11 +1498,11 @@ export const useBaseDrawing = (
     app.addEventListener("touchend", preventTouchOnCanvas, { passive: false });
 
     return () => {
-      app.removeEventListener("pointerdown", handlePointerDown);
-      app.removeEventListener("pointerup", handlePointerUp);
+      app.removeEventListener("pointerdown", onPointerDown);
+      app.removeEventListener("pointerup", onPointerUp);
       app.removeEventListener("pointermove", handlePointerMove);
-      app.removeEventListener("pointercancel", handlePointerCancel);
-      app.removeEventListener("pointerleave", handlePointerLeave);
+      app.removeEventListener("pointercancel", onPointerCancel);
+      app.removeEventListener("pointerleave", onPointerLeave);
 
       app.removeEventListener("touchstart", preventTouchOnCanvas);
       app.removeEventListener("touchmove", preventTouchOnCanvas);
