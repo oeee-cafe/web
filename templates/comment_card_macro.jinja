@@ -5,7 +5,10 @@
 
    On a profile every row is by the same person, so `by_drawing` heads each
    row with the drawing's title instead, and names whose drawing it is where
-   the commenter's handle would be. #}
+   the commenter's handle would be.
+
+   Someone from this site is named by their login name alone (@miro); only
+   a commenter from elsewhere needs the domain to be told apart. #}
 {% macro comment_card(comment, r2_public_endpoint_url, ftl_get_message, by_drawing=false) %}
   <div class="comment-row">
     {% if comment.post_image_filename %}
@@ -26,7 +29,7 @@
         <a class="comment-row-link" href="/@{{ comment.post_author_login_name }}/{{ comment.post_id }}">
           {%- if by_drawing %}{{ comment.post_title or ftl_get_message("post-no-title") }}{% else %}{{ comment.actor_name }}{% endif -%}
         </a>
-        <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}@{{ comment.post_author_login_name }}{% else %}{{ comment.actor_handle }}{% endif %} · </span><span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>
+        <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}@{{ comment.post_author_login_name }}{% elif comment.is_local and comment.actor_login_name %}@{{ comment.actor_login_name }}{% else %}{{ comment.actor_handle }}{% endif %} · </span><span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>
       </div>
       <div class="comment-row-content ds-selectable">
         {% if comment.content_html %}

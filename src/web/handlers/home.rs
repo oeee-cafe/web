@@ -937,6 +937,32 @@ mod tests {
         assert!(without.contains(r#"<section class="feed-layout" role="region""#));
     }
 
+    /// A commenter from this site is named by their login name alone; one
+    /// from elsewhere keeps the domain that tells them apart.
+    #[test]
+    fn a_comment_names_a_local_commenter_without_the_domain() {
+        let remote = NotificationComment {
+            id: uuid::Uuid::from_u128(12),
+            actor_handle: "@visitor@elsewhere.test".to_string(),
+            actor_login_name: None,
+            is_local: false,
+            ..sample_comment()
+        };
+        let rendered = test_support::env()
+            .get_template("home.jinja")
+            .expect("template loads")
+            .render(context! {
+                comments => super::comments_context(vec![sample_comment(), remote], "/api/home/comments"),
+                ..home_context(vec![sample_post()], false)
+            })
+            .expect("renders");
+        assert!(rendered.contains(r#"<span class="comment-row-handle">@commenter · </span>"#));
+        assert!(!rendered.contains("@commenter@oeee.test"));
+        assert!(
+            rendered.contains(r#"<span class="comment-row-handle">@visitor@elsewhere.test · </span>"#)
+        );
+    }
+
     /// A full batch beside the grid loads the next from after its last
     /// comment, and a phone, which shows the first three, is sent on to the
     /// feed's comments page.
