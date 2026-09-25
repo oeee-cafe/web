@@ -18,6 +18,7 @@
       "@lingui/core": ["./node_modules/@lingui/core"],
       "@lingui/react": ["./node_modules/@lingui/react"],
       "@lingui/react/*": ["./node_modules/@lingui/react/*"],
+      "@sentry/browser": ["./node_modules/@sentry/browser"],
       "@sentry/react": ["./node_modules/@sentry/react"],
       "@iconify/react": ["./node_modules/@iconify/react"],
       "vitest": ["./node_modules/vitest"],

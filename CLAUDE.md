@@ -124,6 +124,14 @@ page's inline replay requests, so a checkout that has never been built will 404 
 session replay viewer serves `neo-cucumber/dist-replay` at `/static/replay/`;
 `pnpm run build` builds all of them, and Docker builds them itself.
 
+The drawing page's error reporter is `dist-offline/sentry.js`, a bundle of
+its own that `draw_post_cucumber.jinja` loads by a second script tag, never an
+import in `offline.js`: the Sentry SDK assumes an engine newer than the
+Firefox 56 floor below, and kept apart it can fail there without taking the
+painter with it (`frontend/painter/sentry.ts`). The collaborative page
+initialises its own client in `frontend/collaborate/main.tsx`; both read the
+project's DSN from `frontend/shared/sentry.ts`.
+
 Always run and check linting:
 
 ```bash

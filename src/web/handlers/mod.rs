@@ -3129,6 +3129,8 @@ mod template_tests {
             assert!(rendered.contains("id=\"neo-cucumber-root\""));
             assert!(rendered.contains("/static/neo-cucumber/offline.js"));
             assert!(rendered.contains("/static/neo-cucumber/offline.css"));
+            // The error reporter is a script of its own; frontend/painter/sentry.ts.
+            assert!(rendered.contains("/static/neo-cucumber/sentry.js"));
             assert!(rendered.contains("\"kind\":\"two-tone\""));
             assert!(!rendered.contains("neo.js"));
             assert!(rendered.contains("html, body { width: 100%; height: 100%; margin: 0; }"));

@@ -7,13 +7,9 @@ import * as Sentry from "@sentry/react";
 import { setupI18n, fetchPreferredLocale } from "./i18n";
 import { DefaultI18n } from "neo-cucumber";
 import { refuseSelection } from "../shared/selection";
+import { SENTRY_OPTIONS } from "../shared/sentry";
 
-Sentry.init({
-  dsn: "https://930f2aecbd98603e4dd1651924c1004a@o4504757655764992.ingest.us.sentry.io/4510046135582720",
-  // Setting this option to true will send default PII data to Sentry.
-  // For example, automatic IP address collection on events
-  sendDefaultPii: true,
-});
+Sentry.init(SENTRY_OPTIONS);
 
 // Beside app.css, which refuses selection for the page: see selection.ts.
 refuseSelection();
