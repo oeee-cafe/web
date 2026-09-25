@@ -1,3 +1,5 @@
+use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use config::{Config, ConfigError, Environment, File};
@@ -120,6 +122,9 @@ pub struct AppStoreConfig {
     /// Where the `.p8` private key file is. Kept off the repository, like
     /// the APNs key beside it.
     pub private_key_path: String,
+    /// That file's key, read when the config is loaded (`load_key`).
+    #[serde(skip)]
+    pub private_key: KeyFile<jsonwebtoken::EncodingKey>,
     /// The app the purchase has to have been made in: `cafe.oeee` for the
     /// iOS app. A transaction from any other bundle buys nothing here.
     pub bundle_id: String,
@@ -248,10 +253,59 @@ pub struct GooglePlayConfig {
     /// "Manage orders and subscriptions" for this app. Kept off the
     /// repository, like the FCM key beside it.
     pub service_account_path: String,
+    /// That file's key, read when the config is loaded (`load_key`).
+    #[serde(skip)]
+    pub service_account: KeyFile<crate::google_play::ServiceAccountKey>,
     /// Where the Google Play Developer API is. Only a test changes it; where
     /// tokens come from is the key file's own `token_uri`.
     #[serde(default = "default_google_play_api_url")]
     pub api_url: String,
+}
+
+/// A key named by one of the config's `*_path`s, read once, with the rest
+/// of the config, rather than from disk on every request that needs it.
+///
+/// A key file that is missing or is not a key then stops the server from
+/// booting, which a deploy sees as a colour that never answers `/health`, and
+/// it leaves the colour already serving in place. Read at the request, the
+/// same file passed the health check and failed the first purchase instead.
+/// It also means what a running server signs with is what it booted with,
+/// whatever later happens to the file.
+pub struct KeyFile<T>(Option<Arc<T>>);
+
+impl<T> KeyFile<T> {
+    pub fn new(key: T) -> Self {
+        Self(Some(Arc::new(key)))
+    }
+
+    /// The key, or `None` for a config built without loading it: one that
+    /// was deserialized but never went through `new_from_file_and_env`.
+    pub fn get(&self) -> Option<&T> {
+        self.0.as_deref()
+    }
+}
+
+impl<T> Default for KeyFile<T> {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+impl<T> Clone for KeyFile<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+/// Never the key itself: configs are logged.
+impl<T> fmt::Debug for KeyFile<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.0.is_some() {
+            "KeyFile(loaded)"
+        } else {
+            "KeyFile(not loaded)"
+        })
+    }
 }
 
 fn default_google_play_api_url() -> String {
@@ -272,11 +326,26 @@ fn default_log_level() -> String {
 
 impl AppConfig {
     pub fn new_from_file_and_env(path: &str) -> Result<Self, ConfigError> {
-        Config::builder()
+        let mut cfg = Config::builder()
             .add_source(File::with_name(path))
             .add_source(Environment::with_prefix("oeee"))
             .build()
-            .and_then(|cfg| cfg.try_deserialize::<Self>())
+            .and_then(|cfg| cfg.try_deserialize::<Self>())?;
+        cfg.load_keys()
+            .map_err(|error| ConfigError::Message(format!("{error:#}")))?;
+        Ok(cfg)
+    }
+
+    /// Reads every key file the config names, so none is read at a request.
+    /// See `KeyFile`.
+    fn load_keys(&mut self) -> anyhow::Result<()> {
+        if let Some(store) = self.app_store.as_mut() {
+            store.load_key()?;
+        }
+        if let Some(play) = self.google_play.as_mut() {
+            play.load_key()?;
+        }
+        Ok(())
     }
 
     /// Determines whether to use ActivityPub message queueing.
