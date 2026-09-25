@@ -2,13 +2,13 @@
 before it.
 
     mise run deploy        (python deploy.py deploy)
-    mise run deploy-local  (python deploy.py deploy-local)
+    mise run deploy:local  (python deploy.py deploy:local)
     mise run rollback      (python deploy.py rollback)
     mise run cli -- ...    (python deploy.py cli ..., the admin CLI on the server)
 
     fetch origin/main into a clean build checkout -> have the server pull the
     image GitHub Actions built (deploy), or build oeee-cafe:<commit> here
-    against a throwaway Postgres and ship it over ssh (deploy-local) -> copy
+    against a throwaway Postgres and ship it over ssh (deploy:local) -> copy
     the compose file, proxy config and the config directory -> start the idle
     colour -> wait for it to answer /health -> point the proxy at it -> drain
     -> stop the colour that was serving -> remove images no container can come
@@ -24,10 +24,10 @@ over it, every release. .github/workflows/image.yml builds every commit on main
 instead, uploads its debug info to Sentry itself, and pushes the image to
 REGISTRY_IMAGE; the server pulls it from there, so what crosses this machine's
 connection is the config and a few ssh commands. Waiting for that build is
-`gh`'s job, so gh has to be logged in (`gh auth login`), and the server has to
-be able to pull the image: the package is public, or the server has done
-`docker login ghcr.io`. `deploy-local` is the old way, for when GitHub is the
-problem; it needs none of that, and Docker here instead.
+`gh`'s job, so gh has to be logged in (`gh auth login`). The package is
+private, so the server pulls it as whoever it has done `docker login ghcr.io`
+as, with a token that can read packages. `deploy:local` is the old way, for
+when GitHub is the problem; it needs none of that, and Docker here instead.
 
 The server holds no checkout and runs no script of its own. REMOTE_DIR there
 has only what this copies in, plus proxy/upstream.caddy, which the switch
@@ -58,11 +58,11 @@ machine in DEPLOY_CONFIG_DIR, and each deploy copies it over. It is kept out of
 the repository, which is public, so edit it there, not on the server: the next
 deploy replaces whatever the server has.
 
-For deploy-local, Docker here has to be running. OrbStack is started if it is
+For deploy:local, Docker here has to be running. OrbStack is started if it is
 not.
 
 The image's binary has no debug info; it is uploaded to Sentry instead -- by
-the workflow for `deploy`, and from here for `deploy-local`, which is why that
+the workflow for `deploy`, and from here for `deploy:local`, which is why that
 needs sentry-cli logged in (`sentry-cli login`). Each deploy is also a
 release there, named by its commit -- the name the server reports its errors
 under (main.rs) -- with the deploy, or rollback, recorded against it, so an
@@ -547,7 +547,7 @@ def wait_for_image(commit: str) -> None:
         raise DeployError(
             f"GitHub Actions has no {IMAGE_WORKFLOW} run for {commit[:12]}; start one with\n"
             f"       `gh workflow run {IMAGE_WORKFLOW} --repo {GITHUB_REPOSITORY}`, or build here\n"
-            "       with `mise run deploy-local`"
+            "       with `mise run deploy:local`"
         )
     if found["status"] != "completed":
         step(f"Waiting for GitHub Actions to build {commit[:12]} ({found['url']})...")
@@ -570,14 +570,14 @@ def wait_for_image(commit: str) -> None:
         raise DeployError(
             f"the image build for {commit[:12]} ended {found['conclusion'] or found['status']}:\n"
             f"       {found['url']}\n"
-            "       rerun it, or build here with `mise run deploy-local`"
+            "       rerun it, or build here with `mise run deploy:local`"
         )
 
 
 def pull_image(server: Server, commit: str) -> None:
     """The server downloads the image GitHub Actions built; nothing of it
     crosses this machine's connection. It is kept under the same local name
-    a deploy-local ships, oeee-cafe:<commit>, and the registry's name is
+    a deploy:local ships, oeee-cafe:<commit>, and the registry's name is
     dropped, so everything after this -- the switch, rollback, and removing
     old releases -- cannot tell which way it arrived."""
     image = f"oeee-cafe:{commit}"
@@ -600,9 +600,9 @@ def pull_image(server: Server, commit: str) -> None:
         != 0
     ):
         raise DeployError(
-            f"{server.host} could not pull {remote}. The package has to be public, or\n"
-            f"       the server logged in to ghcr.io (`docker login ghcr.io` there, with a\n"
-            "       token that can read packages)"
+            f"{server.host} could not pull {remote}. The package is private, so the\n"
+            "       server has to be logged in to ghcr.io (`docker login ghcr.io` there,\n"
+            "       with a token that can read packages)"
         )
     server.run("docker", "tag", remote, image, cwd=False)
     server.run("docker", "rmi", remote, cwd=False, quiet=True)
@@ -934,7 +934,7 @@ def deploy(build_here: bool = False) -> None:
         raise DeployError(
             "gh is not logged in, and it is how this waits for GitHub Actions to\n"
             "       build the image: run `gh auth login`, or build here with\n"
-            "       `mise run deploy-local`"
+            "       `mise run deploy:local`"
         )
     started = int(time.time())
     commit = fetch_main(submodules=build_here)
@@ -958,7 +958,7 @@ def deploy_local() -> None:
     deploy(build_here=True)
 
 
-COMMANDS = {"deploy": deploy, "deploy-local": deploy_local, "rollback": rollback}
+COMMANDS = {"deploy": deploy, "deploy:local": deploy_local, "rollback": rollback}
 
 
 def main() -> int:

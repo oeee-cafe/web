@@ -41,7 +41,7 @@ on an arm64 runner, uploads its debug info to Sentry and pushes
 `ghcr.io/oeee-cafe/web:<commit>`, and the deploy waits for that run with `gh`
 and has the server pull the image itself. The Mac is often on cellular data,
 which is the whole point: no image and no debug info cross its connection.
-`mise run deploy-local` is the old way, kept for when GitHub is the problem:
+`mise run deploy:local` is the old way, kept for when GitHub is the problem:
 it builds `oeee-cafe:<commit>` on the Mac in a clean checkout of its own and
 ships it over ssh. Nothing compiles on the server, and its compose file has
 no `build:` on purpose.
@@ -62,7 +62,7 @@ that never answers `/health`, so the colour already serving stays. A new key
 file belongs in `AppConfig::load_keys`, not in the code that uses it.
 
 The image's binary carries no debug info: the Dockerfile splits it off and
-the image workflow uploads it to Sentry (`deploy-local` does it from the Mac,
+the image workflow uploads it to Sentry (`deploy:local` does it from the Mac,
 with `sentry-cli` logged in there), which is where file and line come back. The browser bundles for the two drawing pages
 get the same treatment in Sentry's `neo-cucumber` project: Vite writes a
 source map beside each file, the Dockerfile stamps debug ids into both with
