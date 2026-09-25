@@ -17,3 +17,7 @@ run = "python deploy.py deploy"
 [tasks.rollback]
 description = "Switch the server back to the release before the last deploy (see deploy.py)"
 run = "python deploy.py rollback"
+
+[tasks.cli]
+description = "The admin CLI in whichever colour is serving: mise run cli -- set-role <login_name> admin"
+run = "python deploy.py cli"

@@ -41,8 +41,8 @@ ssh command at a time. Nothing compiles on the server, and its compose file
 has no `build:` on purpose.
 
 The server's `~/oeee-cafe-data` is not a checkout and runs no script of its
-own. Each deploy copies in `docker-compose.yml`, `proxy/Caddyfile` and
-`cli.sh` from the commit being deployed, and the production config from
+own. Each deploy copies in `docker-compose.yml` and `proxy/Caddyfile` from
+the commit being deployed, and the production config from
 `~/.config/oeee-cafe/production` on the Mac into the idle colour's
 `config-blue/` or `config-green/`. That Mac directory is the source of truth:
 an edit made on the server is replaced by the next deploy. Each colour keeps
@@ -62,14 +62,15 @@ full commit, which is also what the server reports as its release
 (`build_info::git_commit`), with the deploy or rollback recorded against it.
 `mise install` provides `sentry-cli`, `sqlx-cli` and `ruff` at the versions
 `deploy.py` expects; `zstd` comes from Homebrew. The admin CLI is a subcommand of the one
-binary, `./oeee-cafe cli ...`, reached through `./cli.sh`, not a second
-binary — that one cost 200MB of every image.
+binary, `./oeee-cafe cli ...`, not a second binary — that one cost 200MB of
+every image. `mise run cli -- <command>` runs it on the server, in whichever
+colour is serving.
 
 The switch is blue/green: `oeee-cafe-blue` and `oeee-cafe-green` take turns,
 and the `proxy` container (Caddy) owns the published port so it is never
 rebound. Which colour is live is written in `proxy/upstream.caddy` — that file
-is generated and gitignored, and reading it is how anything else (`cli.sh`, a
-rollback) finds the serving container.
+is generated and gitignored, and reading it is how anything else (`mise run cli`,
+a rollback) finds the serving container.
 
 Two consequences for anything that touches the database:
 

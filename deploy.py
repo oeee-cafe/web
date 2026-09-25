@@ -3,10 +3,11 @@ before it.
 
     mise run deploy      (python deploy.py deploy)
     mise run rollback    (python deploy.py rollback)
+    mise run cli -- ...  (python deploy.py cli ..., the admin CLI on the server)
 
     fetch origin/main into a clean build checkout -> build oeee-cafe:<commit>
     against a throwaway Postgres -> ship the image over ssh -> copy the compose
-    file, proxy config, cli.sh and the config directory -> start the idle
+    file, proxy config and the config directory -> start the idle
     colour -> wait for it to answer /health -> point the proxy at it -> drain
     -> stop the colour that was serving -> remove images no container can come
     back to
@@ -104,7 +105,7 @@ SENTRY_REPOSITORY = "oeee-cafe/web"
 BUILD_DB = "oeee-cafe-build-db"
 UPSTREAM_FILE = "proxy/upstream.caddy"
 # What the server needs from the repository; everything else is in the image.
-RUNTIME_FILES = {"docker-compose.yml": 0o644, "cli.sh": 0o755, "proxy/Caddyfile": 0o644}
+RUNTIME_FILES = {"docker-compose.yml": 0o644, "proxy/Caddyfile": 0o644}
 
 
 class DeployError(Exception):
@@ -215,6 +216,14 @@ class Server:
 
     def put(self, data: bytes, script: str) -> None:
         self.shell(script, stdin=None, input=data)
+
+    def interactive(self, *args: str) -> int:
+        """A command with this terminal attached -- its input, its output, and
+        a tty on the server when there is one here -- and its exit status."""
+        command = self._command(shlex.join(args), cwd=True)
+        if sys.stdin.isatty():
+            command.insert(1, "-t")
+        return subprocess.run(command, check=False).returncode
 
 
 def poll(seconds: int, attempt) -> int | None:
@@ -462,7 +471,7 @@ def copy_files(server: Server, target: str) -> None:
     one serving keeps reading its own. The directory is replaced whole, so it
     is exactly what is here: a key file removed here is gone from the next
     release rather than lingering."""
-    step("Copying the compose file, proxy config and cli.sh...")
+    step("Copying the compose file and proxy config...")
     runtime = tar_of(
         {name: (BUILD_DIR / name, mode) for name, mode in RUNTIME_FILES.items()}
     )
@@ -649,6 +658,29 @@ def release_of(server: Server, container: str) -> str | None:
     return None
 
 
+def cli(args: list[str]) -> int:
+    """The admin CLI, `./oeee-cafe cli ...`, in whichever colour is serving,
+    found the way a deploy finds it, so nobody has to know which colour the
+    last deploy landed on."""
+    server = Server(DEPLOY_HOST)
+    try:
+        active, _ = colours(server)
+        flags = ["-it"] if sys.stdin.isatty() else ["-i"]
+        return server.interactive(
+            "docker",
+            "exec",
+            *flags,
+            active,
+            "./oeee-cafe",
+            "cli",
+            "-c",
+            "config/config.toml",
+            *args,
+        )
+    finally:
+        server.close()
+
+
 def rollback() -> None:
     server = Server(DEPLOY_HOST)
     try:
@@ -772,8 +804,16 @@ COMMANDS = {"deploy": deploy, "rollback": rollback}
 
 
 def main() -> int:
+    # Not under the lock: the CLI changes nothing a deploy does, and is often
+    # what is wanted while one runs.
+    if sys.argv[1:2] == ["cli"]:
+        try:
+            return cli(sys.argv[2:])
+        except DeployError as error:
+            print(f"ERROR: {error}", file=sys.stderr)
+            return 1
     if len(sys.argv) != 2 or sys.argv[1] not in COMMANDS:
-        print(f"usage: {sys.argv[0]} {{{'|'.join(COMMANDS)}}}", file=sys.stderr)
+        print(f"usage: {sys.argv[0]} {{{'|'.join(COMMANDS)}|cli ...}}", file=sys.stderr)
         return 2
     command = COMMANDS[sys.argv[1]]
     BUILD_DIR.parent.mkdir(parents=True, exist_ok=True)

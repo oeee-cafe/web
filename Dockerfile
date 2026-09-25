@@ -77,9 +77,9 @@ COPY tegaki/ ./tegaki/
 COPY locales/ ./locales/
 COPY static/ ./static/
 COPY templates/ ./templates/
-# Admin/ops commands are `./oeee-cafe cli ...`. ./cli.sh finds whichever
+# Admin/ops commands are `./oeee-cafe cli ...`. `mise run cli` finds whichever
 # blue/green colour is serving and runs them inside it, e.g.
-#   ./cli.sh set-role <login_name> admin
+#   mise run cli -- set-role <login_name> admin
 COPY --from=rust-builder /app/oeee-cafe ./
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist/ ./neo-cucumber/dist/
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-viewer/ ./neo-cucumber/dist-viewer/

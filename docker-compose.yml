@@ -2,8 +2,8 @@
 # holding the published port across the switch. Compose has no rolling update
 # outside Swarm, so deploy.py drives the sequence -- see the header there.
 #
-# This directory is not a checkout. deploy.py copies this file, proxy/Caddyfile
-# and cli.sh here from the commit it deploys, and nothing else from the
+# This directory is not a checkout. deploy.py copies this file and
+# proxy/Caddyfile here from the commit it deploys, and nothing else from the
 # repository is needed: everything else is in the image.
 #
 # Room state, sequencing and presence all live in Redis, and sessions live in
