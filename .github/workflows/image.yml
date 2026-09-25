@@ -88,11 +88,12 @@ jobs:
       - uses: reproducible-containers/buildkit-cache-dance@v3
         with:
           builder: ${{ steps.buildx.outputs.name }}
-          cache-dir: cache-mounts
+          # The keys are where each mount is extracted to, relative to the
+          # workspace; cache-dir is not consulted once there is a cache-map.
           cache-map: |
             {
-              "sccache": "/sccache",
-              "cargo-registry": "/usr/local/cargo/registry"
+              "cache-mounts/sccache": "/sccache",
+              "cache-mounts/cargo-registry": "/usr/local/cargo/registry"
             }
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
