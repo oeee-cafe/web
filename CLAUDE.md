@@ -72,7 +72,7 @@ them. Nothing is keyed on a release name, so a map that is already there is a
 no-op to upload again. Each deploy is a Sentry release named by its
 full commit, which is also what the server reports as its release
 (`build_info::git_commit`), with the deploy or rollback recorded against it.
-`mise install` provides `sentry-cli`, `sqlx-cli` and `ruff` at the versions
+`mise install` provides `sentry-cli`, `gh`, `sqlx-cli` and `ruff` at the versions
 `deploy.py` expects; `zstd` comes from Homebrew. The admin CLI is a subcommand of the one
 binary, `./oeee-cafe cli ...`, not a second binary — that one cost 200MB of
 every image. `mise run cli -- <command>` runs it on the server, in whichever
