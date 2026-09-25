@@ -22,7 +22,7 @@ use crate::web::handlers::admin::{
     download_collaborative_archive, download_collaborative_diagnostics,
     record_collaborative_session_check, replay_collaborative_session,
 };
-use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, signup};
+use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, require_login, signup};
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
     create_collaborative_session_form, get_auth_info, get_collaboration_meta,
@@ -99,7 +99,7 @@ use axum::http::{header, Response, StatusCode};
 use axum::response::Redirect;
 use axum::routing::{delete, get, post, put};
 use axum::Router;
-use axum_login::{login_required, AuthManagerLayerBuilder};
+use axum_login::AuthManagerLayerBuilder;
 use axum_messages::MessagesManagerLayer;
 use std::any::Any;
 use std::net::SocketAddr;
@@ -292,7 +292,6 @@ impl App {
             .route("/communities/{id}/members/{user_id}", delete(remove_member))
             .route("/invitations/{id}/accept", post(do_accept_invitation))
             .route("/invitations/{id}/reject", post(do_reject_invitation))
-            .route("/logout", post(do_logout))
             .route(
                 "/draw/finish",
                 post(draw_finish).layer(DefaultBodyLimit::max(10 * 1024 * 1024)),
@@ -409,7 +408,7 @@ impl App {
                 "/admin/store/{store}/{product}/details",
                 post(admin_set_store_product_details),
             )
-            .route_layer(login_required!(Backend, login_url = "/login"));
+            .route_layer(axum::middleware::from_fn(require_login));
 
         let state = self.state.clone();
         let domain = state.config.domain.clone();
@@ -597,6 +596,9 @@ impl App {
             .route("/signup", post(do_signup))
             .route("/login", get(login))
             .route("/login", post(do_login))
+            // Outside the protected routes: signing out when already signed
+            // out is just going home.
+            .route("/logout", post(do_logout))
             .route("/auth/steam/app", get(steam_app_only))
             .route("/auth/steam", post(do_steam_sign_in))
             .route("/auth/apple", get(apple_sign_in))
