@@ -2,8 +2,7 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::app_error::AppError;
-use crate::models::community::get_pending_invitations_for_user;
-use crate::models::notification::get_unread_count;
+use crate::models::notification::get_badge_count;
 use crate::models::post::get_draft_post_count;
 
 /// Common context data needed by most template renders
@@ -22,16 +21,11 @@ impl CommonContext {
         match user_id {
             Some(user_id) => {
                 let draft_post_count = get_draft_post_count(tx, user_id).await.unwrap_or_default();
-                let unread_notification_count = get_unread_count(tx, user_id).await.unwrap_or(0);
-                let pending_invitations = get_pending_invitations_for_user(tx, user_id)
-                    .await
-                    .unwrap_or_default();
-                let pending_invitations_count = pending_invitations.len() as i64;
+                let unread_notification_count = get_badge_count(tx, user_id).await.unwrap_or(0);
 
                 Ok(CommonContext {
                     draft_post_count,
-                    unread_notification_count: unread_notification_count
-                        + pending_invitations_count,
+                    unread_notification_count,
                 })
             }
             None => Ok(CommonContext {

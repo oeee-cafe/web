@@ -1414,10 +1414,10 @@ pub async fn invite_user(
                 body
             );
 
-            // Get unread notification count for badge
+            // The number on the bell, for the icon's badge
             let mut badge_tx = db.begin().await?;
             let unread_count =
-                crate::models::notification::get_unread_count(&mut badge_tx, invitee.id)
+                crate::models::notification::get_badge_count(&mut badge_tx, invitee.id)
                     .await
                     .ok();
             let _ = badge_tx.commit().await;
@@ -1581,6 +1581,7 @@ pub async fn do_accept_invitation(
         .flatten();
 
     tx.commit().await?;
+    state.push_service.refresh_badge(user.id);
 
     // Send push notification to inviter with localized message
     let (title, body) = format_community_invitation_message(
@@ -1611,9 +1612,9 @@ pub async fn do_accept_invitation(
         body
     );
 
-    // Get unread notification count for badge
+    // The number on the bell, for the icon's badge
     let mut badge_tx = db.begin().await?;
-    let unread_count = crate::models::notification::get_unread_count(&mut badge_tx, inviter_id)
+    let unread_count = crate::models::notification::get_badge_count(&mut badge_tx, inviter_id)
         .await
         .ok();
     let _ = badge_tx.commit().await;
@@ -1699,6 +1700,7 @@ pub async fn do_reject_invitation(
         .flatten();
 
     tx.commit().await?;
+    state.push_service.refresh_badge(user.id);
 
     // Send push notification to inviter with localized message
     let (title, body) = format_community_invitation_message(
@@ -1729,9 +1731,9 @@ pub async fn do_reject_invitation(
         body
     );
 
-    // Get unread notification count for badge
+    // The number on the bell, for the icon's badge
     let mut badge_tx = db.begin().await?;
-    let unread_count = crate::models::notification::get_unread_count(&mut badge_tx, inviter_id)
+    let unread_count = crate::models::notification::get_badge_count(&mut badge_tx, inviter_id)
         .await
         .ok();
     let _ = badge_tx.commit().await;
@@ -1802,15 +1804,18 @@ pub async fn retract_invitation(
     }
 
     // Delete the invitation
-    sqlx::query!(
-        "DELETE FROM community_invitations WHERE id = $1 AND community_id = $2 AND status = 'pending'",
+    let invitee_id = sqlx::query_scalar!(
+        "DELETE FROM community_invitations WHERE id = $1 AND community_id = $2 AND status = 'pending' RETURNING invitee_id",
         invitation_id,
         community.id
     )
-    .execute(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
 
     tx.commit().await?;
+    if let Some(invitee_id) = invitee_id {
+        state.push_service.refresh_badge(invitee_id);
+    }
 
     // Return empty HTML for HTMX to remove the row
     Ok(Html(String::new()).into_response())

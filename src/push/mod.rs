@@ -2,11 +2,13 @@ pub mod apns;
 pub mod fcm;
 
 use crate::models::device::{delete_invalid_device, get_user_devices_by_platform, PlatformType};
+use crate::models::notification::get_badge_count;
 use crate::AppConfig;
 use anyhow::Result;
 use apns::ApnsClient;
 use fcm::FcmClient;
 use sqlx::PgPool;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum PushError {
@@ -161,6 +163,77 @@ impl PushService {
                     Err(PushError::Other(e)) => {
                         tracing::warn!(
                             "Failed to send FCM notification to token {}: {}",
+                            token.device_token,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Sets the number on the user's devices to what the bell says now, in the
+    /// background. For when it falls -- a notification read or deleted, an
+    /// invitation answered or withdrawn -- which the pushes for new
+    /// notifications, the only ones that carry it, never say: the icon kept the
+    /// last push's number until the next one came.
+    ///
+    /// iPhones, iPads and Macs get the number itself, which the system puts on
+    /// the icon. Android's badge is the app's notifications on show, so it is
+    /// sent the number as data, and takes them down at nothing.
+    pub fn refresh_badge(self: &Arc<Self>, user_id: uuid::Uuid) {
+        if self.apns_client.is_none() && self.fcm_client.is_none() {
+            return;
+        }
+        let this = Arc::clone(self);
+        tokio::spawn(async move {
+            if let Err(e) = this.send_badge_to_user(user_id).await {
+                tracing::warn!("Failed to refresh the badge for user {}: {:?}", user_id, e);
+            }
+        });
+    }
+
+    async fn send_badge_to_user(&self, user_id: uuid::Uuid) -> Result<()> {
+        let mut tx = self.db_pool.begin().await?;
+        let badge = u32::try_from(get_badge_count(&mut tx, user_id).await?).unwrap_or(0);
+
+        let mut platforms = Vec::new();
+        if self.apns_client.is_some() {
+            platforms.extend([PlatformType::Ios, PlatformType::Macos]);
+        }
+        if self.fcm_client.is_some() {
+            platforms.push(PlatformType::Android);
+        }
+        for platform in platforms {
+            let devices = get_user_devices_by_platform(&mut tx, user_id, platform.clone()).await?;
+            for token in devices {
+                let sent = match platform {
+                    PlatformType::Android => match &self.fcm_client {
+                        Some(fcm) => fcm.send_badge(&token.device_token, badge).await,
+                        None => Ok(()),
+                    },
+                    PlatformType::Ios | PlatformType::Macos => match &self.apns_client {
+                        Some(apns) => apns.send_badge(&token.device_token, badge).await,
+                        None => Ok(()),
+                    },
+                };
+                match sent {
+                    Ok(_) => {}
+                    Err(PushError::InvalidToken) => {
+                        tracing::info!("Removing invalid push token: {}", token.device_token);
+                        let _ = delete_invalid_device(
+                            &mut tx,
+                            token.device_token.clone(),
+                            platform.clone(),
+                        )
+                        .await;
+                    }
+                    Err(PushError::Other(e)) => {
+                        tracing::warn!(
+                            "Failed to send the badge to token {}: {}",
                             token.device_token,
                             e
                         );
