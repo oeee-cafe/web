@@ -172,7 +172,7 @@ pub async fn do_login(
 
             let mut login_url = "/login".to_string();
             if let Some(next) = creds.next {
-                login_url = format!("{}?next={}", login_url, next);
+                login_url = format!("{}?next={}", login_url, urlencoding::encode(&next));
             };
 
             return Redirect::to(&login_url).into_response();
@@ -259,6 +259,54 @@ pub async fn do_logout(
     }
 }
 
+/// What axum-login's `login_required!` does, except that it answers with 303
+/// See Other rather than 307. A 307 keeps the method and the body, so a
+/// signed out POST — a sign out from a tab whose session had expired, a
+/// comment, a follow — was replayed at `POST /login` with a body that has no
+/// `login_name`, and the visitor got a deserialisation error instead of the
+/// sign-in page.
+///
+/// Only a GET is worth coming back to. Every other method is an action on a
+/// URL nobody can load, so `next` is the page the form was on, if the
+/// Referer names one.
+pub async fn require_login(
+    auth_session: AuthSession,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    if auth_session.user.is_some() {
+        return next.run(req).await;
+    }
+    let back =
+        if req.method() == axum::http::Method::GET || req.method() == axum::http::Method::HEAD {
+            req.uri().path_and_query().map(|pq| pq.as_str().to_string())
+        } else {
+            req.headers()
+                .get(axum::http::header::REFERER)
+                .and_then(|value| value.to_str().ok())
+                .and_then(referer_path)
+        };
+    match back {
+        Some(back) => Redirect::to(&format!("/login?next={}", urlencoding::encode(&back))),
+        None => Redirect::to("/login"),
+    }
+    .into_response()
+}
+
+/// The path and query of a Referer, as somewhere on this site to go back to.
+fn referer_path(referer: &str) -> Option<String> {
+    let url = url::Url::parse(referer).ok()?;
+    let path = url.path();
+    // `//host` would be another site to a browser.
+    if !path.starts_with('/') || path.starts_with("//") || path == "/login" {
+        return None;
+    }
+    Some(match url.query() {
+        Some(query) => format!("{path}?{query}"),
+        None => path.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,6 +320,17 @@ mod tests {
             HeaderValue::from_static("id=abc; oeee_device=tok123; theme=dark"),
         );
         assert_eq!(device_cookie(&headers).as_deref(), Some("tok123"));
+    }
+
+    #[test]
+    fn a_referer_becomes_a_path_on_this_site() {
+        assert_eq!(
+            referer_path("https://oeee.cafe/@someone?tab=posts").as_deref(),
+            Some("/@someone?tab=posts")
+        );
+        assert_eq!(referer_path("https://oeee.cafe//evil.example/"), None);
+        assert_eq!(referer_path("https://oeee.cafe/login?next=%2F"), None);
+        assert_eq!(referer_path("not a url"), None);
     }
 
     #[test]
