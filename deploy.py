@@ -99,6 +99,8 @@ SENTRY_ENV = {
     "SENTRY_ORG": os.environ.get("SENTRY_ORG", "limeburst"),
     "SENTRY_PROJECT": os.environ.get("SENTRY_PROJECT", "oeee-cafe"),
 }
+# The repository as Sentry's GitHub integration names it.
+SENTRY_REPOSITORY = "oeee-cafe/web"
 BUILD_DB = "oeee-cafe-build-db"
 UPSTREAM_FILE = "proxy/upstream.caddy"
 # What the server needs from the repository; everything else is in the image.
@@ -711,10 +713,21 @@ def environment() -> str:
 def create_release(commit: str) -> None:
     """Before the release goes out, so its first error has somewhere to go.
     set-commits needs the repository connected to Sentry; without that, the
-    release still exists and only its commit list is empty."""
+    release still exists and only its commit list is empty.
+
+    The commit is named rather than left to --auto, which reads HEAD of
+    whatever checkout this runs in: that is often ahead of origin/main, and
+    the release would claim commits that are not in it."""
     step(f"Creating release {commit[:12]} in Sentry...")
     if sentry("releases", "new", commit):
-        sentry("releases", "set-commits", commit, "--auto", "--ignore-missing")
+        sentry(
+            "releases",
+            "set-commits",
+            commit,
+            "--commit",
+            f"{SENTRY_REPOSITORY}@{commit}",
+            "--ignore-missing",
+        )
 
 
 def record_deploy(
