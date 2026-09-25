@@ -3,7 +3,7 @@
 # Nothing here terminates TLS: the tunnel does that, and only ever speaks plain
 # HTTP to the port this publishes.
 :80 {
-	# deploy.sh rewrites this file to name whichever colour it just brought up,
+	# deploy.py rewrites this file to name whichever colour it just brought up,
 	# then reloads Caddy. A reload only redirects *new* connections, so requests
 	# and drawing sockets already in flight finish on the container they
 	# started on.

@@ -1,25 +1,33 @@
 # Blue/green: two identical app services, one serving at a time, with `proxy`
 # holding the published port across the switch. Compose has no rolling update
-# outside Swarm, so deploy-server.sh drives the sequence -- see the header there.
+# outside Swarm, so deploy.py drives the sequence -- see the header there.
+#
+# This directory is not a checkout. deploy.py copies this file, proxy/Caddyfile
+# and cli.sh here from the commit it deploys, and nothing else from the
+# repository is needed: everything else is in the image.
 #
 # Room state, sequencing and presence all live in Redis, and sessions live in
 # Postgres, so it does not matter to a client which colour it lands on: a
 # drawing session survives the swap by reconnecting and resuming from its last
 # canonical sequence number.
+# Named here rather than after the directory this sits in, which is what
+# compose would use otherwise: the containers are labelled with it, so a
+# directory of another name would not recognise its own colours and would fail
+# to create a second oeee-cafe-blue beside the first.
+name: oeee-cafe
+
 x-oeee-cafe: &oeee-cafe
   # Both colours run the same image. It is built on another machine and loaded
-  # here by deploy.sh, and deploy-server.sh points this tag at it before
-  # starting whichever colour is idle. There is deliberately no `build:`: a
-  # build here is what used to peg this machine's CPU on every deploy.
+  # here by deploy.py, which points this tag at it before starting whichever
+  # colour is idle. There is deliberately no `build:`: a build here is what
+  # used to peg this machine's CPU on every deploy.
   image: oeee-cafe:current
   # Without a `build:`, a missing image would send compose to Docker Hub for
   # someone else's `oeee-cafe`. Fail instead.
   pull_policy: never
-  volumes:
-    - ./config:/app/config:ro
   networks:
     - oeee-cafe-network
-  # Not `always`: a colour that deploy.sh stopped must stay stopped, and
+  # Not `always`: a colour that deploy.py stopped must stay stopped, and
   # `always` starts manually stopped containers again when the daemon restarts,
   # which after a reboot would leave both colours running.
   restart: unless-stopped
@@ -45,7 +53,7 @@ services:
     container_name: oeee-cafe-proxy
     ports:
       - "30000:80"
-    # The whole directory, not just the file: deploy.sh replaces
+    # The whole directory, not just the file: deploy.py replaces
     # proxy/upstream.caddy, and a single-file bind mount would keep showing the
     # container the replaced inode.
     volumes:
@@ -54,13 +62,23 @@ services:
       - oeee-cafe-network
     restart: always
 
+  # Each colour has a config directory of its own, which deploy.py fills from
+  # the development Mac while that colour is stopped. The server reads its
+  # config and every key file it names once, at boot, so the serving colour
+  # would not notice its directory changing -- but a rollback starts the other
+  # colour again, and this way it boots with the config its release was
+  # deployed with rather than the next one's.
   oeee-cafe-blue:
     <<: *oeee-cafe
     container_name: oeee-cafe-blue
+    volumes:
+      - ./config-blue:/app/config:ro
 
   oeee-cafe-green:
     <<: *oeee-cafe
     container_name: oeee-cafe-green
+    volumes:
+      - ./config-green:/app/config:ro
 
 networks:
   oeee-cafe-network:
