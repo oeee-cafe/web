@@ -209,18 +209,26 @@ mod tests {
         let body = r#"<html><body>You are being <a href="https://social.cleverlibre.org/about">redirected</a>.</body></html>"#;
         let parse = serde_json::from_str::<serde_json::Value>(body).unwrap_err();
         let url = "https://social.cleverlibre.org/".parse().unwrap();
-        let AppError::Anyhow(err) =
-            AppError::from(FederationError::ParseFetchedObject(parse, url, body.to_string()))
-        else {
+        let AppError::Anyhow(err) = AppError::from(FederationError::ParseFetchedObject(
+            parse,
+            url,
+            body.to_string(),
+        )) else {
             unreachable!()
         };
         assert!(should_filter_from_sentry(&err));
-        assert!(should_filter_from_sentry(&err.context("while fetching an actor")));
+        assert!(should_filter_from_sentry(
+            &err.context("while fetching an actor")
+        ));
     }
 
     #[test]
     fn our_own_failures_are_still_reported() {
-        assert!(!should_filter_from_sentry(&anyhow::anyhow!("Failed to parse object")));
-        assert!(!should_filter_from_sentry(&FederationError::Other("x".into()).into()));
+        assert!(!should_filter_from_sentry(&anyhow::anyhow!(
+            "Failed to parse object"
+        )));
+        assert!(!should_filter_from_sentry(
+            &FederationError::Other("x".into()).into()
+        ));
     }
 }

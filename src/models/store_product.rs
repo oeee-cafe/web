@@ -332,17 +332,16 @@ pub fn any_on_sale() -> bool {
 /// Per process, so per colour. Only one serves at a time, and the one that
 /// starts next reads it on boot.
 pub async fn refresh_any_on_sale(db: &sqlx::PgPool) -> Result<bool> {
-    let windows: Vec<SaleWindow> = query!(
-        "SELECT sale_starts_at, sale_ends_at FROM store_products WHERE on_sale"
-    )
-    .fetch_all(db)
-    .await?
-    .into_iter()
-    .map(|row| SaleWindow {
-        starts_at: row.sale_starts_at,
-        ends_at: row.sale_ends_at,
-    })
-    .collect();
+    let windows: Vec<SaleWindow> =
+        query!("SELECT sale_starts_at, sale_ends_at FROM store_products WHERE on_sale")
+            .fetch_all(db)
+            .await?
+            .into_iter()
+            .map(|row| SaleWindow {
+                starts_at: row.sale_starts_at,
+                ends_at: row.sale_ends_at,
+            })
+            .collect();
     if let Ok(mut on_sale) = ON_SALE.write() {
         *on_sale = windows;
     }
@@ -483,7 +482,10 @@ mod tests {
         let hour = chrono::Duration::hours(1);
         let window = |starts_at, ends_at| SaleWindow { starts_at, ends_at };
         assert!(window(None, None).contains(now));
-        assert!(window(Some(now), None).contains(now), "a start is inclusive");
+        assert!(
+            window(Some(now), None).contains(now),
+            "a start is inclusive"
+        );
         assert!(!window(None, Some(now)).contains(now), "an end is not");
         assert!(!window(Some(now + hour), None).contains(now));
         assert!(window(Some(now - hour), Some(now + hour)).contains(now));
@@ -528,8 +530,12 @@ mod tests {
         use crate::models::supporter::record_purchase;
         let Some(mut tx) = tx().await else { return };
         let product = "cafe.oeee.test.fix";
-        add(&mut tx, Store::Apple, product, 2026, None).await.unwrap();
-        add(&mut tx, Store::Google, product, 2026, None).await.unwrap();
+        add(&mut tx, Store::Apple, product, 2026, None)
+            .await
+            .unwrap();
+        add(&mut tx, Store::Google, product, 2026, None)
+            .await
+            .unwrap();
         let buyer = query!(
             "INSERT INTO users (login_name, display_name, password_hash)
              VALUES ('store_product_fix', 'store_product_fix', 'x') RETURNING id"
@@ -556,7 +562,10 @@ mod tests {
             .unwrap();
         assert_eq!(moved, Some(2));
         let found = find(&mut tx, Store::Apple, product).await.unwrap().unwrap();
-        assert_eq!((found.year, found.label.as_deref()), (2027, Some("Buy 2027")));
+        assert_eq!(
+            (found.year, found.label.as_deref()),
+            (2027, Some("Buy 2027"))
+        );
         let years: Vec<(String, i32)> = query!(
             "SELECT store, year FROM supporter_purchases WHERE product = $1 ORDER BY store, owner",
             product
@@ -576,7 +585,10 @@ mod tests {
             ]
         );
         let counts = purchase_counts(&mut tx).await.unwrap();
-        assert_eq!(counts.get(&("apple".to_string(), product.to_string())), Some(&2));
+        assert_eq!(
+            counts.get(&("apple".to_string(), product.to_string())),
+            Some(&2)
+        );
 
         // There and back, beside another product already counting for that
         // year: each product's purchases move with it and no further, so the
@@ -622,7 +634,9 @@ mod tests {
 
         // Only the words: nothing moves, and they can be taken away again.
         assert_eq!(
-            set_details(&mut tx, Store::Apple, product, 2027, None).await.unwrap(),
+            set_details(&mut tx, Store::Apple, product, 2027, None)
+                .await
+                .unwrap(),
             Some(0)
         );
         let found = find(&mut tx, Store::Apple, product).await.unwrap().unwrap();

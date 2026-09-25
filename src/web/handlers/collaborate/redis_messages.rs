@@ -448,7 +448,9 @@ impl RedisMessageStore {
         let mut result = Vec::with_capacity(entries.len());
         for entry in &entries {
             match decode_entry(entry) {
-                Some((seq, payload)) => result.push((seq, Message::Binary(payload.to_vec().into()))),
+                Some((seq, payload)) => {
+                    result.push((seq, Message::Binary(payload.to_vec().into())))
+                }
                 None => debug!(
                     "Skipping malformed history entry in room {} ({} bytes)",
                     room_uuid,

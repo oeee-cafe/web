@@ -11,7 +11,6 @@ use crate::models::admin::{
     find_community_by_slug, find_post_by_id, set_banner_explicit, set_post_explicit,
     AdminCommunity, AdminPostFilter, AdminSessionStatus, AdminSort,
 };
-use crate::web::handlers::collaborate::preview::preview_versions;
 use crate::models::store_product::{
     self, add as add_store_product, find as find_store_product, list_all as list_store_products,
     purchase_counts as store_purchase_counts, set_details as set_store_product_details,
@@ -21,6 +20,7 @@ use crate::models::store_product::{
 use crate::models::supporter::{current_year, Store};
 use crate::models::user::find_user_by_login_name;
 use crate::web::context::CommonContext;
+use crate::web::handlers::collaborate::preview::preview_versions;
 use crate::web::handlers::identity::from_this_site;
 use crate::web::handlers::{AdminUser, ExtractFtlLang};
 use crate::web::state::AppState;
@@ -588,7 +588,9 @@ pub async fn download_collaborative_archive(
             )
         })?;
     if archive.is_empty() {
-        return Err(AppError::NotFound("No archive for this session".to_string()));
+        return Err(AppError::NotFound(
+            "No archive for this session".to_string(),
+        ));
     }
 
     // A recording is mostly its own framing and goes over the wire at about a
@@ -693,7 +695,9 @@ pub async fn collaborative_archive_manifest(
         })?;
     match manifest {
         Some(manifest) => Ok(axum::Json(manifest).into_response()),
-        None => Err(AppError::NotFound("No recording for this session".to_string())),
+        None => Err(AppError::NotFound(
+            "No recording for this session".to_string(),
+        )),
     }
 }
 
@@ -737,19 +741,16 @@ pub async fn collaborative_archive_tail(
     State(state): State<AppState>,
 ) -> Result<Response, AppError> {
     require_recording(&state)?;
-    let tail = crate::web::handlers::collaborate::archive::read_tail(&state, room_uuid, query.after)
-        .await
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to read the recording: {}",
-                crate::web::handlers::collaborate::archive::describe(&*e)
-            )
-        })?;
-    Ok((
-        [(header::CONTENT_TYPE, "application/octet-stream")],
-        tail,
-    )
-        .into_response())
+    let tail =
+        crate::web::handlers::collaborate::archive::read_tail(&state, room_uuid, query.after)
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read the recording: {}",
+                    crate::web::handlers::collaborate::archive::describe(&*e)
+                )
+            })?;
+    Ok(([(header::CONTENT_TYPE, "application/octet-stream")], tail).into_response())
 }
 
 /// Who holds which session id right now, for naming the marks of somebody
@@ -874,8 +875,13 @@ pub async fn record_collaborative_session_check(
             check.outcome
         )));
     }
-    crate::models::collaborative_recording::note_check(&state.db_pool, room_uuid, admin.0.id, &check)
-        .await?;
+    crate::models::collaborative_recording::note_check(
+        &state.db_pool,
+        room_uuid,
+        admin.0.id,
+        &check,
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
@@ -954,22 +960,23 @@ fn parse_sale_window(
     String,
 > {
     use chrono::{NaiveDateTime, TimeZone};
-    let parse = |value: &str, which: &str| -> Result<Option<chrono::DateTime<chrono::Utc>>, String> {
-        let value = value.trim();
-        if value.is_empty() {
-            return Ok(None);
-        }
-        let naive = NaiveDateTime::parse_from_str(value, LOCAL_INPUT)
-            .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S"))
-            .map_err(|_| format!("The {which} is not a date and time."))?;
-        // Seoul has no daylight saving, so every local time is exactly one
-        // moment; `single` is only there to say so.
-        STORE_TZ
-            .from_local_datetime(&naive)
-            .single()
-            .map(|at| Some(at.with_timezone(&chrono::Utc)))
-            .ok_or_else(|| format!("The {which} is not a time Seoul has."))
-    };
+    let parse =
+        |value: &str, which: &str| -> Result<Option<chrono::DateTime<chrono::Utc>>, String> {
+            let value = value.trim();
+            if value.is_empty() {
+                return Ok(None);
+            }
+            let naive = NaiveDateTime::parse_from_str(value, LOCAL_INPUT)
+                .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S"))
+                .map_err(|_| format!("The {which} is not a date and time."))?;
+            // Seoul has no daylight saving, so every local time is exactly one
+            // moment; `single` is only there to say so.
+            STORE_TZ
+                .from_local_datetime(&naive)
+                .single()
+                .map(|at| Some(at.with_timezone(&chrono::Utc)))
+                .ok_or_else(|| format!("The {which} is not a time Seoul has."))
+        };
     let starts = parse(starts, "start")?;
     let ends = parse(ends, "end")?;
     if let (Some(starts), Some(ends)) = (starts, ends) {
@@ -1134,8 +1141,14 @@ pub async fn admin_store(
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
 ) -> Result<Html<String>, AppError> {
-    let rendered =
-        render_store_page(&state, &admin, ftl_lang, None, AddStoreProductForm::default()).await?;
+    let rendered = render_store_page(
+        &state,
+        &admin,
+        ftl_lang,
+        None,
+        AddStoreProductForm::default(),
+    )
+    .await?;
     Ok(Html(rendered))
 }
 
@@ -1157,7 +1170,8 @@ pub async fn admin_add_store_product(
     }
     let steam_app_id = state.config.steam.as_ref().map(|steam| steam.app_id);
     let refused = |error: String, form: AddStoreProductForm| async {
-        let rendered = render_store_page(&state, &admin, ftl_lang.clone(), Some(error), form).await?;
+        let rendered =
+            render_store_page(&state, &admin, ftl_lang.clone(), Some(error), form).await?;
         Ok::<_, AppError>((StatusCode::BAD_REQUEST, Html(rendered)).into_response())
     };
     let (store, product, year, label) = match validate_store_product(&form, steam_app_id) {
@@ -1221,7 +1235,10 @@ pub async fn admin_set_store_product_on_sale(
         return Err(AppError::NotFound("Store".to_string()));
     };
     let mut tx = state.db_pool.begin().await?;
-    if find_store_product(&mut tx, store, &product).await?.is_none() {
+    if find_store_product(&mut tx, store, &product)
+        .await?
+        .is_none()
+    {
         return Err(AppError::NotFound("Product".to_string()));
     }
     set_store_product_on_sale(&mut tx, store, &product, form.on_sale).await?;
@@ -1421,7 +1438,9 @@ mod tests {
     #[test]
     fn renders_posts_list() {
         let env = test_env();
-        let template = env.get_template("admin/posts.jinja").expect("template loads");
+        let template = env
+            .get_template("admin/posts.jinja")
+            .expect("template loads");
         let rendered = template
             .render(context! {
                 current_user => current_user(),
@@ -1459,7 +1478,9 @@ mod tests {
     #[test]
     fn renders_posts_list_when_empty() {
         let env = test_env();
-        let template = env.get_template("admin/posts.jinja").expect("template loads");
+        let template = env
+            .get_template("admin/posts.jinja")
+            .expect("template loads");
         let rendered = template
             .render(context! {
                 current_user => current_user(),
@@ -1504,7 +1525,10 @@ mod tests {
         assert!(!rendered.contains(r#"><//" onerror="#));
         assert!(!rendered.contains("onerror=\"alert"));
         // ...and the div holding it must still close, so cards do not nest.
-        assert_eq!(rendered.matches("<div").count(), rendered.matches("</div>").count());
+        assert_eq!(
+            rendered.matches("<div").count(),
+            rendered.matches("</div>").count()
+        );
     }
 
     #[test]
@@ -1564,8 +1588,9 @@ mod tests {
         // Escaping encodes `/` and `&` as entities. Harmless in an attribute —
         // the HTML parser decodes them, so getAttribute() hands htmx back the
         // plain URL. Pinned so double-escaping would be caught.
-        assert!(rendered
-            .contains("&#x2f;admin&#x2f;posts-fragment?offset=60&amp;author=some%20one"));
+        assert!(
+            rendered.contains("&#x2f;admin&#x2f;posts-fragment?offset=60&amp;author=some%20one")
+        );
     }
 
     #[test]
@@ -1681,8 +1706,7 @@ mod tests {
             })
             .expect("banners_fragment.jinja renders standalone");
         assert!(rendered.contains("hx-trigger=\"revealed\""));
-        assert!(rendered
-            .contains("&#x2f;admin&#x2f;banners-fragment?offset=60&amp;explicit=on"));
+        assert!(rendered.contains("&#x2f;admin&#x2f;banners-fragment?offset=60&amp;explicit=on"));
         // The nested card must still render inside the fragment.
         assert!(rendered.contains("Flag as explicit"));
     }
@@ -1780,9 +1804,8 @@ mod tests {
     #[test]
     fn session_list_shows_the_live_canvas() {
         let rendered = render_sessions(vec![sample_session(json!({}))]);
-        assert!(rendered.contains(
-            "/collaborate/00000000-0000-0000-0000-000000000009/preview?v=1700000000123"
-        ));
+        assert!(rendered
+            .contains("/collaborate/00000000-0000-0000-0000-000000000009/preview?v=1700000000123"));
     }
 
     /// An ended session's Redis state is deleted with it, so there is nothing
@@ -1796,9 +1819,7 @@ mod tests {
         }))]);
         assert!(!rendered.contains("/preview?v="));
         // The canvas is a post by then, and that is where it is reachable.
-        assert!(rendered.contains(
-            "/@someone/00000000-0000-0000-0000-00000000000b"
-        ));
+        assert!(rendered.contains("/@someone/00000000-0000-0000-0000-00000000000b"));
         // Nor is there a live room left to open.
         assert!(!rendered.contains("/collaborate/00000000-0000-0000-0000-000000000009\""));
     }
@@ -1910,7 +1931,9 @@ mod tests {
     #[test]
     fn renders_users_list() {
         let env = test_env();
-        let template = env.get_template("admin/users.jinja").expect("template loads");
+        let template = env
+            .get_template("admin/users.jinja")
+            .expect("template loads");
         template
             .render(context! {
                 current_user => current_user(),
@@ -1998,27 +2021,44 @@ mod tests {
             json!({"store": "", "product": "", "year": "", "label": ""}),
         );
         // A toggle per product, saying what pressing it will do.
-        assert!(rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/on-sale""#));
+        assert!(
+            rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/on-sale""#)
+        );
         assert!(rendered.contains("Take off sale"));
         assert!(rendered.contains("Put on sale"));
         // Its window, as the inputs that change it want it.
-        assert!(rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/sale-window""#));
+        assert!(rendered
+            .contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/sale-window""#));
         assert!(rendered.contains(r#"value="2026-01-01T09:00""#));
         assert!(rendered.contains("outside its window"));
         assert!(rendered.contains("Last year&#x27;s") || rendered.contains("Last year's"));
         assert!(rendered.contains(r#"href="/admin/store""#), "in the nav");
-        assert!(rendered.contains("[microsoft_store]"), "says the store cannot be asked");
+        assert!(
+            rendered.contains("[microsoft_store]"),
+            "says the store cannot be asked"
+        );
         assert!(rendered.contains("[google_play]"), "and this one");
         // The year and the words, changed together, and what a new year moves.
-        assert!(rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/details""#));
-        assert!(rendered.contains("admin-product-this-year"), "this year stands out");
+        assert!(
+            rendered.contains(r#"action="/admin/store/apple/cafe.oeee.supporter.2026/details""#)
+        );
+        assert!(
+            rendered.contains("admin-product-this-year"),
+            "this year stands out"
+        );
         assert!(
             rendered.contains(r#"value="Last year&#x27;s""#)
                 || rendered.contains(r#"value="Last year's""#),
             "the words are there to change"
         );
-        assert!(rendered.contains("3 purchases"), "says what a new year would move");
-        assert!(rendered.contains(r#"name="year" value="2026""#), "this year by default");
+        assert!(
+            rendered.contains("3 purchases"),
+            "says what a new year would move"
+        );
+        assert!(
+            rendered.contains(r#"name="year" value="2026""#),
+            "this year by default"
+        );
         assert!(!rendered.contains("Not added"));
     }
 
@@ -2041,11 +2081,22 @@ mod tests {
         let (starts, ends) = parse_sale_window("2026-12-01T09:00", " ").unwrap();
         assert_eq!(starts.unwrap().to_rfc3339(), "2026-12-01T00:00:00+00:00");
         assert_eq!(ends, None);
-        assert_eq!(to_local_input(starts), "2026-12-01T09:00", "and written back the same");
+        assert_eq!(
+            to_local_input(starts),
+            "2026-12-01T09:00",
+            "and written back the same"
+        );
         assert_eq!(parse_sale_window("", "").unwrap(), (None, None));
-        assert!(parse_sale_window("2026-12-01T09:00:30", "").is_ok(), "seconds");
+        assert!(
+            parse_sale_window("2026-12-01T09:00:30", "").is_ok(),
+            "seconds"
+        );
         for (starts, ends, why) in [
-            ("2026-12-02T00:00", "2026-12-01T00:00", "ends before it starts"),
+            (
+                "2026-12-02T00:00",
+                "2026-12-01T00:00",
+                "ends before it starts",
+            ),
             ("2026-12-01T00:00", "2026-12-01T00:00", "ends as it starts"),
             ("tomorrow", "", "not a date"),
         ] {
@@ -2067,7 +2118,12 @@ mod tests {
         let year = current_year().to_string();
         assert_eq!(
             validate_store_product(&form("microsoft", " 9NBLGGH4R315 ", &year, "  "), Some(480)),
-            Ok((Store::Microsoft, "9NBLGGH4R315".to_string(), current_year(), None))
+            Ok((
+                Store::Microsoft,
+                "9NBLGGH4R315".to_string(),
+                current_year(),
+                None
+            ))
         );
         assert_eq!(
             validate_store_product(&form("google", "supporter_pack_2026", &year, ""), None)
@@ -2084,20 +2140,35 @@ mod tests {
         );
         for (refused, why) in [
             (form("google_play", "x", &year, ""), "an unknown store"),
-            (form("google", "Supporter_2026", &year, ""), "a Google Play id with capitals"),
-            (form("google", "_supporter", &year, ""), "a Google Play id starting with _"),
+            (
+                form("google", "Supporter_2026", &year, ""),
+                "a Google Play id with capitals",
+            ),
+            (
+                form("google", "_supporter", &year, ""),
+                "a Google Play id starting with _",
+            ),
             (form("", "x", &year, ""), "no store"),
             (form("apple", "  ", &year, ""), "no product"),
             (form("apple", "cafe oeee", &year, ""), "whitespace"),
-            (form("apple", "cafe\u{3000}oeee", &year, ""), "an ideographic space"),
-            (form("steam", "abc", &year, ""), "a Steam product that is not an app id"),
+            (
+                form("apple", "cafe\u{3000}oeee", &year, ""),
+                "an ideographic space",
+            ),
+            (
+                form("steam", "abc", &year, ""),
+                "a Steam product that is not an app id",
+            ),
             (form("steam", "480", &year, ""), "the app itself"),
             (form("apple", "x", "1999", ""), "too early"),
             (form("apple", "x", "20226", ""), "a typo"),
             (form("apple", "x", "", ""), "no year"),
             (form("apple", "x", &year, &"가".repeat(101)), "a long label"),
         ] {
-            assert!(validate_store_product(&refused, Some(480)).is_err(), "{why}");
+            assert!(
+                validate_store_product(&refused, Some(480)).is_err(),
+                "{why}"
+            );
         }
     }
 }

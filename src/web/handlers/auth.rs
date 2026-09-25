@@ -267,7 +267,10 @@ mod tests {
     #[test]
     fn the_device_cookie_is_found_among_the_others() {
         let mut headers = HeaderMap::new();
-        headers.insert(COOKIE, HeaderValue::from_static("id=abc; oeee_device=tok123; theme=dark"));
+        headers.insert(
+            COOKIE,
+            HeaderValue::from_static("id=abc; oeee_device=tok123; theme=dark"),
+        );
         assert_eq!(device_cookie(&headers).as_deref(), Some("tok123"));
     }
 
@@ -275,7 +278,10 @@ mod tests {
     fn no_device_cookie_is_none() {
         let mut headers = HeaderMap::new();
         assert_eq!(device_cookie(&headers), None);
-        headers.insert(COOKIE, HeaderValue::from_static("oeee_device=; x_oeee_device=nope"));
+        headers.insert(
+            COOKIE,
+            HeaderValue::from_static("oeee_device=; x_oeee_device=nope"),
+        );
         assert_eq!(device_cookie(&headers), None);
     }
 }

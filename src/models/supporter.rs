@@ -74,12 +74,7 @@ pub enum Store {
 }
 
 impl Store {
-    pub const ALL: [Store; 4] = [
-        Store::Apple,
-        Store::Google,
-        Store::Microsoft,
-        Store::Steam,
-    ];
+    pub const ALL: [Store; 4] = [Store::Apple, Store::Google, Store::Microsoft, Store::Steam];
 
     pub fn as_str(self) -> &'static str {
         match self {
@@ -148,7 +143,11 @@ impl Store {
                 if end == 0 {
                     break;
                 }
-                let slot = if key == "platform" { &mut platform } else { &mut store };
+                let slot = if key == "platform" {
+                    &mut platform
+                } else {
+                    &mut store
+                };
                 slot.get_or_insert(&value[..end]);
                 rest = &value[end..];
             }
@@ -811,7 +810,9 @@ mod tests {
             .await
             .unwrap();
 
-        let due = purchases_due_for_check(&mut tx, Store::Apple, 100).await.unwrap();
+        let due = purchases_due_for_check(&mut tx, Store::Apple, 100)
+            .await
+            .unwrap();
         assert!(
             !due.iter().any(|due| due.transaction == transaction),
             "asked about today already"
@@ -824,7 +825,9 @@ mod tests {
         .execute(&mut *tx)
         .await
         .unwrap();
-        let due = purchases_due_for_check(&mut tx, Store::Apple, 100).await.unwrap();
+        let due = purchases_due_for_check(&mut tx, Store::Apple, 100)
+            .await
+            .unwrap();
         let mine = due
             .iter()
             .find(|due| due.transaction == transaction)
@@ -1244,8 +1247,11 @@ mod tests {
     #[test]
     fn every_mark_is_centred_by_the_design_system() {
         let templates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
-        let macro_file = std::fs::read_to_string(templates.join("supporter_badge_macro.jinja")).unwrap();
-        let marks = macro_file.matches(r#"class="supporter-mark ds-mark""#).count();
+        let macro_file =
+            std::fs::read_to_string(templates.join("supporter_badge_macro.jinja")).unwrap();
+        let marks = macro_file
+            .matches(r#"class="supporter-mark ds-mark""#)
+            .count();
         assert_eq!(marks, SELLING.len(), "every store's mark is a .ds-mark");
 
         let mut drawn = 0;
@@ -1257,7 +1263,10 @@ mod tests {
                     stack.push(path);
                     continue;
                 }
-                if path.file_name().is_some_and(|name| name == "supporter_badge_macro.jinja") {
+                if path
+                    .file_name()
+                    .is_some_and(|name| name == "supporter_badge_macro.jinja")
+                {
                     continue;
                 }
                 let text = std::fs::read_to_string(&path).unwrap_or_default();

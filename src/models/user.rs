@@ -105,7 +105,9 @@ impl User {
     /// Whether the account can be signed into with a password. One made by
     /// signing in with Steam, say, cannot until its owner sets one.
     pub fn has_password(&self) -> bool {
-        self.password_hash.as_deref().is_some_and(|hash| !hash.is_empty())
+        self.password_hash
+            .as_deref()
+            .is_some_and(|hash| !hash.is_empty())
     }
 
     /// Site-wide staff. Gates everything under `/admin`.

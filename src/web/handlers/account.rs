@@ -3,14 +3,14 @@ use crate::models::email_verification_challenge::{
     create_email_verification_challenge, find_email_verification_challenge_by_id,
     EmailVerificationChallenge,
 };
+use crate::models::identity::list_identities_for_user;
+use crate::models::supporter::{
+    current_year, mark_for, set_mark, set_show_in_credits, shows_in_credits, standings, Store,
+};
 use crate::models::user::{
     delete_user_with_activity, find_user_by_id, update_password, update_user_email_verified_at,
     update_user_preferred_language, update_user_show_sensitive_content, update_user_with_activity,
     AuthSession, DeleteConfirmation,
-};
-use crate::models::identity::list_identities_for_user;
-use crate::models::supporter::{
-    current_year, mark_for, set_mark, set_show_in_credits, shows_in_credits, standings, Store,
 };
 use crate::web::context::CommonContext;
 use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};

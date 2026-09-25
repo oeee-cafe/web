@@ -417,7 +417,10 @@ pub async fn do_app_store_notification(
         }
         Err(error) => {
             // Apple will send it again.
-            tracing::warn!(kind, "an App Store notification could not be checked: {error:#}");
+            tracing::warn!(
+                kind,
+                "an App Store notification could not be checked: {error:#}"
+            );
             return Ok(StatusCode::SERVICE_UNAVAILABLE.into_response());
         }
     }

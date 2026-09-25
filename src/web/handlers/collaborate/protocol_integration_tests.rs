@@ -507,7 +507,11 @@ async fn a_preview_is_stored_only_against_the_token_that_claimed_it() {
     tokio::time::timeout(Duration::from_secs(10), async {
         let harness = start_harness().await;
         let store = PreviewStore::new(harness.pool.clone());
-        let token = store.claim(harness.room).await.expect("claim").expect("token");
+        let token = store
+            .claim(harness.room)
+            .await
+            .expect("claim")
+            .expect("token");
 
         assert_eq!(
             store
@@ -535,7 +539,11 @@ async fn a_preview_is_stored_only_against_the_token_that_claimed_it() {
             None
         );
 
-        let stored = store.load(harness.room).await.expect("load").expect("preview");
+        let stored = store
+            .load(harness.room)
+            .await
+            .expect("load")
+            .expect("preview");
         assert_eq!(stored.bytes, b"first");
         assert_eq!(stored.kind, ImageKind::Webp);
         assert_eq!(stored.version, version);
@@ -559,7 +567,11 @@ async fn preview_versions_come_back_per_room_in_the_order_asked() {
         let empty = Uuid::new_v4();
         let other = Uuid::new_v4();
 
-        let token = store.claim(harness.room).await.expect("claim").expect("token");
+        let token = store
+            .claim(harness.room)
+            .await
+            .expect("claim")
+            .expect("token");
         let version = store
             .store(harness.room, &token, ImageKind::Png, b"drawing")
             .await
@@ -708,7 +720,10 @@ async fn the_archive_buffer_is_drained_only_by_the_flusher_that_claimed_it() {
         assert_eq!(Some(rest[0].seq), Some(4));
 
         buffer.release(harness.room).await.expect("release");
-        assert!(buffer.claim(harness.room).await.expect("claim after release"));
+        assert!(buffer
+            .claim(harness.room)
+            .await
+            .expect("claim after release"));
     })
     .await
     .expect("archive flush claim scenario timed out");
@@ -823,13 +838,23 @@ async fn recent_chat_is_bounded_and_removed_with_the_room() {
                 .expect("append recent chat");
         }
 
-        let chat = store.get_recent_chat(harness.room).await.expect("recent chat");
+        let chat = store
+            .get_recent_chat(harness.room)
+            .await
+            .expect("recent chat");
         assert_eq!(chat.len(), 100);
         assert_eq!(chat.first(), Some(&vec![0x03, 5]));
         assert_eq!(chat.last(), Some(&vec![0x03, 104]));
 
-        store.cleanup_room(harness.room).await.expect("cleanup room");
-        assert!(store.get_recent_chat(harness.room).await.unwrap().is_empty());
+        store
+            .cleanup_room(harness.room)
+            .await
+            .expect("cleanup room");
+        assert!(store
+            .get_recent_chat(harness.room)
+            .await
+            .unwrap()
+            .is_empty());
     })
     .await
     .expect("recent chat scenario timed out");
@@ -896,9 +921,8 @@ async fn a_resume_reads_only_the_history_after_its_position() {
     let harness = start_harness().await;
     let store = RedisMessageStore::new(harness.pool.clone());
     let channel = format!("oeee:pubsub:{}", harness.room);
-    let sequences = |entries: &[(u64, AxumMessage)]| {
-        entries.iter().map(|(seq, _)| *seq).collect::<Vec<_>>()
-    };
+    let sequences =
+        |entries: &[(u64, AxumMessage)]| entries.iter().map(|(seq, _)| *seq).collect::<Vec<_>>();
 
     let (history_id, _) = store
         .get_history_snapshot(harness.room)
@@ -1423,7 +1447,11 @@ async fn one_room_subscription_feeds_every_connection_in_it() {
         .await
         .expect("second connection joins the same room");
 
-    assert_eq!(fanout.subscribed_rooms().await, 1, "one subscription, not two");
+    assert_eq!(
+        fanout.subscribed_rooms().await,
+        1,
+        "one subscription, not two"
+    );
     assert_eq!(fanout.listeners_in(room).await, 2);
 
     let sent = RoomBroadcast {

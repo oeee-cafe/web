@@ -55,11 +55,11 @@
 //! is 32 random bytes, it is never logged, and it lives for minutes. It is
 //! only ever handed from the app to the system browser.
 
+use crate::models::identity::VerifiedIdentity;
+use crate::redis::RedisPool;
 use anyhow::Result;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
-use crate::models::identity::VerifiedIdentity;
-use crate::redis::RedisPool;
 
 /// How long a handoff waits to be claimed. Long enough to sign in with a
 /// provider, including making an account; short enough that an id left
@@ -148,11 +148,7 @@ pub async fn is_pending(pool: &RedisPool, id: &str) -> Result<bool> {
 /// Answers `false` when there is no such handoff any more -- it expired
 /// while the person was signing in, or it has already been claimed -- which
 /// is not an error, only a sign-in that arrived too late to be carried.
-pub async fn verified(
-    pool: &RedisPool,
-    id: &str,
-    identity: &VerifiedIdentity,
-) -> Result<bool> {
+pub async fn verified(pool: &RedisPool, id: &str, identity: &VerifiedIdentity) -> Result<bool> {
     let mut conn = connect(pool).await?;
     // Whatever is left of the original life, so signing in does not extend
     // how long an unclaimed handoff lingers.
@@ -269,7 +265,11 @@ fn at_provider_key(state: &str) -> String {
 pub async fn send_to_provider(pool: &RedisPool, state: &str, request: &AtProvider) -> Result<()> {
     let mut conn = connect(pool).await?;
     let _: () = conn
-        .set_ex(at_provider_key(state), serde_json::to_string(request)?, HANDOFF_FOR)
+        .set_ex(
+            at_provider_key(state),
+            serde_json::to_string(request)?,
+            HANDOFF_FOR,
+        )
         .await?;
     Ok(())
 }
@@ -296,8 +296,8 @@ mod tests {
     use crate::models::identity::Provider;
 
     async fn pool() -> Option<RedisPool> {
-        let url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
         let manager = bb8_redis::RedisConnectionManager::new(url).ok()?;
         let pool = bb8_redis::bb8::Pool::builder()
             .max_size(2)
@@ -339,7 +339,9 @@ mod tests {
             Claim::Waiting
         );
 
-        assert!(verified(&pool, &started.id, &identity("g-1")).await.unwrap());
+        assert!(verified(&pool, &started.id, &identity("g-1"))
+            .await
+            .unwrap());
         assert!(!is_pending(&pool, &started.id).await.unwrap());
 
         // A peek says what it is without using it up, so the app can ask
@@ -404,7 +406,9 @@ mod tests {
     async fn the_secret_is_what_claims_it() {
         let Some(pool) = pool().await else { return };
         let started = start(&pool, None).await.unwrap();
-        verified(&pool, &started.id, &identity("g-2")).await.unwrap();
+        verified(&pool, &started.id, &identity("g-2"))
+            .await
+            .unwrap();
 
         // The id alone does not claim: knowing it is not enough, which is
         // the whole reason the secret stays in the app.
@@ -414,7 +418,10 @@ mod tests {
                 Claim::Unknown,
                 "{wrong:?}"
             );
-            assert!(!spend(&pool, &started.id, wrong).await.unwrap(), "{wrong:?}");
+            assert!(
+                !spend(&pool, &started.id, wrong).await.unwrap(),
+                "{wrong:?}"
+            );
         }
         // And none of that spent it.
         assert_eq!(
@@ -441,10 +448,14 @@ mod tests {
     async fn only_the_first_answer_counts() {
         let Some(pool) = pool().await else { return };
         let started = start(&pool, None).await.unwrap();
-        assert!(verified(&pool, &started.id, &identity("first")).await.unwrap());
+        assert!(verified(&pool, &started.id, &identity("first"))
+            .await
+            .unwrap());
         // A second browser finishing against the same handoff does not
         // replace the identity waiting to be handed over.
-        assert!(!verified(&pool, &started.id, &identity("second")).await.unwrap());
+        assert!(!verified(&pool, &started.id, &identity("second"))
+            .await
+            .unwrap());
         assert_eq!(
             subject_of(&peek(&pool, &started.id, &started.secret).await.unwrap()),
             Some("first")
@@ -473,7 +484,9 @@ mod tests {
         // Wind it down to a minute, as if it had been waiting a while.
         let _: () = conn.expire(key(&started.id), 60).await.unwrap();
         drop(conn);
-        verified(&pool, &started.id, &identity("g-4")).await.unwrap();
+        verified(&pool, &started.id, &identity("g-4"))
+            .await
+            .unwrap();
         let mut conn = pool.get().await.unwrap();
         let left: i64 = conn.ttl(key(&started.id)).await.unwrap();
         assert!(left <= 60, "{left} seconds left, expected at most 60");
@@ -485,10 +498,19 @@ mod tests {
     async fn a_state_sent_to_the_provider_answers_once() {
         let Some(pool) = pool().await else { return };
         let state = random_token();
-        let request = AtProvider { id: random_token(), nonce: random_token() };
+        let request = AtProvider {
+            id: random_token(),
+            nonce: random_token(),
+        };
         send_to_provider(&pool, &state, &request).await.unwrap();
-        assert_eq!(back_from_provider(&pool, &state).await.unwrap(), Some(request));
+        assert_eq!(
+            back_from_provider(&pool, &state).await.unwrap(),
+            Some(request)
+        );
         assert_eq!(back_from_provider(&pool, &state).await.unwrap(), None);
-        assert_eq!(back_from_provider(&pool, &random_token()).await.unwrap(), None);
+        assert_eq!(
+            back_from_provider(&pool, &random_token()).await.unwrap(),
+            None
+        );
     }
 }

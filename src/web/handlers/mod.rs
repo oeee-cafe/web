@@ -38,7 +38,6 @@ pub mod collaborate_cleanup;
 pub mod community;
 pub mod devices;
 pub mod draw;
-pub mod tag;
 pub mod home;
 pub mod identity;
 pub mod notifications;
@@ -51,6 +50,7 @@ pub mod report;
 pub mod search;
 pub mod store;
 pub mod supporter;
+pub mod tag;
 pub mod well_known;
 
 pub async fn handler_404(
@@ -714,20 +714,23 @@ mod community_page_tests {
         let rendered = env
             .get_template("community.jinja")
             .expect("community template loads")
-            .render_captured_to(context! {
-                current_user => json!(null),
-                community => json!({
-                    "id": "00000000-0000-0000-0000-000000000001",
-                    "name": "Open Studio",
-                    "description": "Draw with us",
-                    "slug": "open",
-                    "visibility": "public",
-                    "owner_id": "00000000-0000-0000-0000-000000000002",
-                }),
-                community_id => "00000000-0000-0000-0000-000000000001",
-                domain => "oeee.test",
-                ftl_lang => "en",
-            }, std::io::sink())
+            .render_captured_to(
+                context! {
+                    current_user => json!(null),
+                    community => json!({
+                        "id": "00000000-0000-0000-0000-000000000001",
+                        "name": "Open Studio",
+                        "description": "Draw with us",
+                        "slug": "open",
+                        "visibility": "public",
+                        "owner_id": "00000000-0000-0000-0000-000000000002",
+                    }),
+                    community_id => "00000000-0000-0000-0000-000000000001",
+                    domain => "oeee.test",
+                    ftl_lang => "en",
+                },
+                std::io::sink(),
+            )
             .expect("template evaluates")
             .with_state_mut(|state| state.render_block("community_edit_block"))
             .expect("the header block renders on its own");
@@ -777,9 +780,16 @@ mod community_page_tests {
             .render(base())
             .expect("community renders");
         let on_drawings = pill(&drawings);
-        assert!(on_drawings.contains(r#"<a href="/@open" aria-current="page">feed-view-drawings</a>"#));
-        assert!(on_drawings.contains(r#"<a href="/communities/@open/comments">feed-view-comments</a>"#));
-        assert!(on_drawings.contains("hx-boost:inherited"), "switched in place");
+        assert!(
+            on_drawings.contains(r#"<a href="/@open" aria-current="page">feed-view-drawings</a>"#)
+        );
+        assert!(
+            on_drawings.contains(r#"<a href="/communities/@open/comments">feed-view-comments</a>"#)
+        );
+        assert!(
+            on_drawings.contains("hx-boost:inherited"),
+            "switched in place"
+        );
 
         let comments = env
             .get_template("community_comments.jinja")
@@ -810,11 +820,16 @@ mod community_page_tests {
             .expect("comments render");
         let on_comments = pill(&comments);
         assert!(on_comments.contains(r#"<a href="/@open">feed-view-drawings</a>"#));
-        assert!(on_comments.contains(r#"<a href="/communities/@open/comments" aria-current="page">feed-view-comments</a>"#));
+        assert!(on_comments.contains(
+            r#"<a href="/communities/@open/comments" aria-current="page">feed-view-comments</a>"#
+        ));
         assert!(comments.contains("Draw with us"), "under the same card");
         assert!(comments.contains(r#"<div class="comment-grid">"#));
         assert!(comments.contains("멋져요"));
-        assert!(!comments.contains(r#"id="post-feed-grid""#), "no drawings under it");
+        assert!(
+            !comments.contains(r#"id="post-feed-grid""#),
+            "no drawings under it"
+        );
     }
 
     /// The header says who keeps the community and how much is in it, and
@@ -898,7 +913,10 @@ mod community_page_tests {
                 })
                 .expect("edit form renders");
             let rendered = rendered.trim();
-            assert!(rendered.ends_with("</section>"), "something follows the card");
+            assert!(
+                rendered.ends_with("</section>"),
+                "something follows the card"
+            );
             assert_eq!(rendered.matches("<section").count(), 1);
             assert!(rendered.contains("hx-target:inherited=\"this\""));
             assert!(rendered.contains("delete-community-btn"));
@@ -941,8 +959,10 @@ mod community_page_tests {
             .expect("drafts render");
         assert!(rendered.contains("class=\"posts-grid\" id=\"post-feed-grid\""));
         assert!(rendered.contains("data-per-row"));
-        assert!(rendered.contains("&#x2f;posts&#x2f;00000000-0000-0000-0000-000000000001&#x2f;publish")
-            || rendered.contains("/posts/00000000-0000-0000-0000-000000000001/publish"));
+        assert!(
+            rendered.contains("&#x2f;posts&#x2f;00000000-0000-0000-0000-000000000001&#x2f;publish")
+                || rendered.contains("/posts/00000000-0000-0000-0000-000000000001/publish")
+        );
         assert!(rendered.contains(">3h<"), "not a relative time");
     }
 
@@ -968,7 +988,10 @@ mod community_page_tests {
                 .expect("renders")
         };
         let empty = render(vec![]);
-        assert!(empty.contains(r#"id="guestbook-entries"></div>"#), "the list is not :empty");
+        assert!(
+            empty.contains(r#"id="guestbook-entries"></div>"#),
+            "the list is not :empty"
+        );
         assert!(empty.contains("guestbook-empty"));
         let entry = json!({
             "id": "e1", "author_id": "u2", "recipient_id": "u1",
@@ -983,7 +1006,10 @@ mod community_page_tests {
             .expect("loads")
             .render(context! { entry, user => json!({"login_name": "oeee"}), current_user => json!(null), ftl_lang => "en" })
             .expect("renders");
-        assert!(alone.starts_with("<div") && alone.ends_with("</div>"), "{alone:?}");
+        assert!(
+            alone.starts_with("<div") && alone.ends_with("</div>"),
+            "{alone:?}"
+        );
     }
 
     /// Throwing a draft away answers with what else changes, out of band:
@@ -993,13 +1019,18 @@ mod community_page_tests {
     fn a_thrown_away_draft_updates_the_count_and_empties_the_page() {
         let env = test_support::env();
         let oob = env.get_template("draft_delete_oob.jinja").expect("loads");
-        let some = oob.render(context! { remaining => 2, ftl_lang => "en" }).expect("renders");
+        let some = oob
+            .render(context! { remaining => 2, ftl_lang => "en" })
+            .expect("renders");
         assert!(some.contains(r#"<span id="drafts-count" hx-swap-oob="true">2</span>"#));
         assert!(!some.contains("drafts-body"), "drafts left, the grid stays");
-        let none = oob.render(context! { remaining => 0, ftl_lang => "en" }).expect("renders");
+        let none = oob
+            .render(context! { remaining => 0, ftl_lang => "en" })
+            .expect("renders");
         assert!(none.contains(r#"<div id="drafts-body" hx-swap-oob="true">"#));
         assert!(none.contains("draft-empty"));
-        assert!(none.contains(r#"<div id="drafts-tools" class="drafts-tools" hx-swap-oob="true"></div>"#));
+        assert!(none
+            .contains(r#"<div id="drafts-tools" class="drafts-tools" hx-swap-oob="true"></div>"#));
 
         let page = env
             .get_template("draft_posts.jinja")
@@ -1014,7 +1045,10 @@ mod community_page_tests {
             })
             .expect("renders");
         for id in ["drafts-count", "drafts-tools", "drafts-body"] {
-            assert!(page.contains(&format!(r#"id="{id}""#)), "the page has no #{id}");
+            assert!(
+                page.contains(&format!(r#"id="{id}""#)),
+                "the page has no #{id}"
+            );
         }
     }
 
@@ -1323,12 +1357,18 @@ mod template_tests {
             .nth(1)
             .and_then(|rest| rest.split('}').next())
             .expect("a .sensitive rule");
-        assert!(rule.contains("filter: blur("), "the .sensitive rule no longer blurs");
+        assert!(
+            rule.contains("filter: blur("),
+            "the .sensitive rule no longer blurs"
+        );
         let card = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/post_card.jinja"),
         )
         .expect("post_card.jinja reads");
-        assert!(card.contains("sensitive{% endif %}"), "the card no longer marks sensitive drawings");
+        assert!(
+            card.contains("sensitive{% endif %}"),
+            "the card no longer marks sensitive drawings"
+        );
     }
 
     /// The words the apps say over the page (app_bridge.jinja) come from the
@@ -1415,7 +1455,8 @@ mod template_tests {
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/post_card.jinja"),
         )
         .expect("post_card.jinja reads");
-        assert!(card.contains("{% if not post.is_sensitive and not admin %}data-oeee-drawing{% endif %}"));
+        assert!(card
+            .contains("{% if not post.is_sensitive and not admin %}data-oeee-drawing{% endif %}"));
     }
 
     /// Signing up asks for agreement to the two pages it links, and the box
@@ -1605,7 +1646,9 @@ mod template_tests {
         assert!(listed.contains(r#"value="on" checked"#));
         let hidden = squash(render(json!(false)));
         assert!(hidden.contains(r#"action="/account/credits""#));
-        assert!(!hidden.contains(r#"name="show_in_credits" id="show_in_credits" value="on" checked"#));
+        assert!(
+            !hidden.contains(r#"name="show_in_credits" id="show_in_credits" value="on" checked"#)
+        );
         assert!(!render(json!(null)).contains("/account/credits"));
     }
 
@@ -1680,13 +1723,7 @@ mod template_tests {
         let pack = |product: &str, label: Option<&str>| json!({"product": product, "label": label});
 
         // Signed out: somewhere to sign in, and nothing to buy with.
-        let out = render(
-            none.clone(),
-            json!("apple"),
-            json!([]),
-            false,
-            json!([]),
-        );
+        let out = render(none.clone(), json!("apple"), json!([]), false, json!([]));
         assert!(out.contains(r#"href="/login?next=/supporter""#));
         // The buttons themselves, not the script that listens for them.
         assert!(!out.contains(r#"data-product="#));
@@ -1699,20 +1736,33 @@ mod template_tests {
             json!("apple"),
             json!([
                 pack("cafe.oeee.supporter.2026", None),
-                pack("cafe.oeee.supporter.2026.more", Some("Support twice as much")),
+                pack(
+                    "cafe.oeee.supporter.2026.more",
+                    Some("Support twice as much")
+                ),
             ]),
             false,
             json!([]),
         );
         let squashed = apple.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert_eq!(apple.matches(r#"class="ds-button ds-button-primary supporter-buy""#).count(), 2);
-        assert!(squashed.contains(r#"data-product="cafe.oeee.supporter.2026">supporter-pack-buy(year=2026)<span"#));
-        assert!(squashed.contains(r#"data-product="cafe.oeee.supporter.2026.more">Support twice as much<span"#));
+        assert_eq!(
+            apple
+                .matches(r#"class="ds-button ds-button-primary supporter-buy""#)
+                .count(),
+            2
+        );
+        assert!(squashed.contains(
+            r#"data-product="cafe.oeee.supporter.2026">supporter-pack-buy(year=2026)<span"#
+        ));
+        assert!(squashed.contains(
+            r#"data-product="cafe.oeee.supporter.2026.more">Support twice as much<span"#
+        ));
         assert!(apple.contains(r#"class="ds-button supporter-restore""#));
         // Room for the price the app will fill in, keyed by the product it
         // belongs to, and empty until then.
-        assert!(squashed
-            .contains(r#"<span class="supporter-price" data-product="cafe.oeee.supporter.2026"></span>"#));
+        assert!(squashed.contains(
+            r#"<span class="supporter-price" data-product="cafe.oeee.supporter.2026"></span>"#
+        ));
         assert!(apple.contains("(app.store = app.store || {}).prices = "));
         assert!(!apple.contains("supporter-pack-none"));
 
@@ -1727,7 +1777,10 @@ mod template_tests {
                 json!([]),
             );
             assert!(page.contains(r#"data-product="481""#), "{store}");
-            assert!(!page.contains(r#"class="ds-button supporter-restore""#), "{store}");
+            assert!(
+                !page.contains(r#"class="ds-button supporter-restore""#),
+                "{store}"
+            );
         }
 
         // A browser: no store, no button, and the line saying where the
@@ -1738,7 +1791,13 @@ mod template_tests {
         assert!(browser.contains("supporter-pack-elsewhere"));
 
         // Nothing for this year yet: the page says so instead.
-        let nothing = render(signed_in.clone(), json!("steam"), json!([]), true, json!([]));
+        let nothing = render(
+            signed_in.clone(),
+            json!("steam"),
+            json!([]),
+            true,
+            json!([]),
+        );
         assert!(!nothing.contains(r#"data-product="#));
         assert!(nothing.contains("supporter-pack-none(year=2026)"));
 
@@ -1784,7 +1843,9 @@ mod template_tests {
         let reader = json!({"login_name": "oeee", "display_name": "오이"});
 
         let selling = render(json!(true), reader.clone());
-        assert!(selling.contains(r#"class="toolbar-square toolbar-button toolbar-supporter" href="/supporter""#));
+        assert!(selling.contains(
+            r#"class="toolbar-square toolbar-button toolbar-supporter" href="/supporter""#
+        ));
 
         // Nothing to sell: no heart for anyone.
         assert!(!render(json!(false), reader.clone()).contains("toolbar-supporter"));
@@ -1813,7 +1874,10 @@ mod template_tests {
         // swapping nothing in, so this one is not boosted -- the bar would
         // sit there looking as though the search had not been pressed.
         assert!(bar.contains(r#"role="search" hx-boost="false""#));
-        assert!(bar.contains(r#"for="toolbar-search-field""#), "the glass labels it");
+        assert!(
+            bar.contains(r#"for="toolbar-search-field""#),
+            "the glass labels it"
+        );
         assert!(
             bar.contains(r#"<span class="toolbar-search-pill">"#),
             "the glass and the field share the pill that opens"
@@ -1916,7 +1980,11 @@ mod template_tests {
 
         let both = render_account(json!(true), json!(["steam", "apple"]), json!("apple"));
         let squashed = both.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert_eq!(squashed.matches(r#"name="mark""#).count(), 2, "one for each");
+        assert_eq!(
+            squashed.matches(r#"name="mark""#).count(),
+            2,
+            "one for each"
+        );
         assert!(squashed.contains(r#"name="mark" value="apple" checked"#));
         assert!(!squashed.contains(r#"name="mark" value="steam" checked"#));
         // Saved by the same button as the credits, in the same form.
@@ -2017,7 +2085,8 @@ mod template_tests {
         // A NEO replay is not linked but played under the drawing: what a
         // stranger must not be handed is the recording's address, which the
         // stage carries for the viewer.
-        let link = "/replay/30/30ca3f590dda85e21dbc94250199a692b4fa5c7d626ea3445acef3bcf3c1338a.pch";
+        let link =
+            "/replay/30/30ca3f590dda85e21dbc94250199a692b4fa5c7d626ea3445acef3bcf3c1338a.pch";
 
         let open = render_post_page("true", author, json!(null));
         assert!(
@@ -2141,7 +2210,10 @@ mod template_tests {
         let title = |rendered: &str| {
             let start = rendered.find("<title>").expect("a title") + "<title>".len();
             let end = rendered.find("</title>").expect("a closed title");
-            rendered[start..end].split_whitespace().collect::<Vec<_>>().join(" ")
+            rendered[start..end]
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
         };
         let in_a_community = title(&render(json!("Tegaki"), json!("tegaki")));
         assert!(
@@ -2174,7 +2246,10 @@ mod template_tests {
             "ds-window",
             "ds-notice-error",
         ] {
-            assert!(rendered.contains(class), "{class} missing from the reference");
+            assert!(
+                rendered.contains(class),
+                "{class} missing from the reference"
+            );
         }
         assert!(rendered.contains("<body class=\"ds-page\">"));
     }
@@ -2211,10 +2286,19 @@ mod template_tests {
             })
             .expect("design.jinja renders");
         let header = header(&rendered);
-        assert!(header.contains("ds-notice ds-notice-success"), "got: {header}");
-        assert!(header.contains("ds-notice ds-notice-error"), "got: {header}");
+        assert!(
+            header.contains("ds-notice ds-notice-success"),
+            "got: {header}"
+        );
+        assert!(
+            header.contains("ds-notice ds-notice-error"),
+            "got: {header}"
+        );
         assert!(header.contains("Welcome, Tandemaus"));
-        assert!(header.contains("&lt;b&gt;not bold"), "a message is text, not markup");
+        assert!(
+            header.contains("&lt;b&gt;not bold"),
+            "a message is text, not markup"
+        );
         assert!(header.contains("ds-notice-close"));
     }
 
@@ -2228,7 +2312,10 @@ mod template_tests {
             .render(chrome())
             .expect("design.jinja renders");
         let header = header(&rendered);
-        assert!(!header.contains("<ul class=\"ds-notices\">"), "got: {header}");
+        assert!(
+            !header.contains("<ul class=\"ds-notices\">"),
+            "got: {header}"
+        );
         assert!(header.contains(r#"<div id="htmx-error" class="ds-notices htmx-error"></div>"#));
     }
 
@@ -2265,7 +2352,10 @@ mod template_tests {
         );
         if let Some(painter_css) = rendered.find("offline.css") {
             let ds_css = rendered.find("/static/ds.css").unwrap();
-            assert!(painter_css < ds_css, "ds.css loads after the painter's reset");
+            assert!(
+                painter_css < ds_css,
+                "ds.css loads after the painter's reset"
+            );
         }
     }
 
@@ -2413,10 +2503,17 @@ mod template_tests {
 
         assert!(rendered.contains(r#"<div class="profile-drawings" data-profile-panel="public">"#));
         assert!(rendered.contains("post-card-byline"), "the shared card");
-        assert!(rendered.contains(r#"class="sensitive""#), "blurred, as everywhere else");
+        assert!(
+            rendered.contains(r#"class="sensitive""#),
+            "blurred, as everywhere else"
+        );
         // The heading element: the toolbar's skeleton script carries the
         // class too.
-        assert_eq!(rendered.matches(r#"<h3 class="feed-period">"#).count(), 1, "headed by month");
+        assert_eq!(
+            rendered.matches(r#"<h3 class="feed-period">"#).count(),
+            1,
+            "headed by month"
+        );
         let links_in = rendered.replace("&#x2f;", "/").replace("&amp;", "&");
         assert!(links_in.contains(&format!(
             r#"hx-get="/api/profiles/@oeee/posts?offset={0}&limit={0}&period="#,
@@ -2459,42 +2556,44 @@ mod template_tests {
                 .expect("profile renders")
         };
         // As `NotificationComment` serialises.
-        let with = render(json!([{
-            "id": "0c8f0000-0000-0000-0000-000000000001",
-            "post_id": "0c8f0000-0000-0000-0000-000000000002",
-            "actor_id": "0c8f0000-0000-0000-0000-000000000003",
-            "content": "멋져요",
-            "content_html": null,
-            "iri": null,
-            "actor_name": "오이",
-            "actor_handle": "@oeee@oeee.cafe",
-            "actor_url": "https://oeee.cafe/@oeee",
-            "actor_login_name": "oeee",
-            "is_local": true,
-            "updated_at": "2026-09-22T00:00:00Z",
-            "created_at": "2026-09-22T00:00:00Z",
-            "post_title": "고양이",
-            "post_author_login_name": "cat",
-            "post_image_filename": "abcdef.png",
-            "post_image_width": 300,
-            "post_image_height": 300,
-        }]), 45, Some("/@oeee/comments?after=0c8f0000-0000-0000-0000-000000000001"));
+        let with = render(
+            json!([{
+                "id": "0c8f0000-0000-0000-0000-000000000001",
+                "post_id": "0c8f0000-0000-0000-0000-000000000002",
+                "actor_id": "0c8f0000-0000-0000-0000-000000000003",
+                "content": "멋져요",
+                "content_html": null,
+                "iri": null,
+                "actor_name": "오이",
+                "actor_handle": "@oeee@oeee.cafe",
+                "actor_url": "https://oeee.cafe/@oeee",
+                "actor_login_name": "oeee",
+                "is_local": true,
+                "updated_at": "2026-09-22T00:00:00Z",
+                "created_at": "2026-09-22T00:00:00Z",
+                "post_title": "고양이",
+                "post_author_login_name": "cat",
+                "post_image_filename": "abcdef.png",
+                "post_image_width": 300,
+                "post_image_height": 300,
+            }]),
+            45,
+            Some("/@oeee/comments?after=0c8f0000-0000-0000-0000-000000000001"),
+        );
         assert!(with.contains(r#"data-profile-tab="comments""#));
         assert!(with.contains(r#"data-profile-panel="comments""#));
         assert!(with.contains(r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002""#));
         assert!(with.contains("멋져요"));
         // Headed by the drawing, not by its owner's own name on every row.
-        assert!(with.contains(
-            r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002">고양이</a>"#
-        ));
+        assert!(with.contains(r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002">고양이</a>"#));
         assert!(with.contains("@cat · "));
         assert!(!with.contains("comment-row-post"));
         assert!(with.contains(r#"<span class="profile-tab-count">45</span>"#));
         // Minijinja escapes the slashes in an attribute; the browser reads
         // them back as the URL.
-        assert!(with.replace("&#x2f;", "/").contains(
-            r#"hx-get="/@oeee/comments?after=0c8f0000-0000-0000-0000-000000000001""#
-        ));
+        assert!(with
+            .replace("&#x2f;", "/")
+            .contains(r#"hx-get="/@oeee/comments?after=0c8f0000-0000-0000-0000-000000000001""#));
 
         // The scrolled batches come from the fragment alone, which has to
         // stand without the profile's context.
@@ -2512,7 +2611,9 @@ mod template_tests {
         // one showing: /@oeee shows the drawings, /@oeee/comments the
         // comments, with the column control that only drawings have hidden.
         let links = with.replace("&#x2f;", "/");
-        assert!(links.contains(r#"<a href="/@oeee" data-profile-tab="public" aria-current="page">"#));
+        assert!(
+            links.contains(r#"<a href="/@oeee" data-profile-tab="public" aria-current="page">"#)
+        );
         assert!(links.contains(r#"<a href="/@oeee/comments" data-profile-tab="comments">"#));
         assert!(with.contains(r#"<div data-profile-panel="comments" hidden>"#));
         let on_comments = env
@@ -2537,9 +2638,12 @@ mod template_tests {
             })
             .unwrap()
             .replace("&#x2f;", "/");
-        assert!(on_comments.contains(r#"<a href="/@oeee/comments" data-profile-tab="comments" aria-current="page">"#));
+        assert!(on_comments.contains(
+            r#"<a href="/@oeee/comments" data-profile-tab="comments" aria-current="page">"#
+        ));
         assert!(on_comments.contains(r#"<div data-profile-panel="comments">"#));
-        assert!(on_comments.contains(r#"<div class="profile-drawings" data-profile-panel="public" hidden>"#));
+        assert!(on_comments
+            .contains(r#"<div class="profile-drawings" data-profile-panel="public" hidden>"#));
         assert!(on_comments.contains("<div data-profile-per-row hidden>"));
 
         let without = render(json!([]), 0, None);
@@ -2579,10 +2683,16 @@ mod template_tests {
             })
             .expect("profile renders");
         assert!(
-            rendered.contains(r#"<time datetime="2024-03">profile-member-since(month=3,year=2024)</time>"#),
+            rendered.contains(
+                r#"<time datetime="2024-03">profile-member-since(month=3,year=2024)</time>"#
+            ),
             "{rendered}"
         );
-        let at = |needle: &str| rendered.find(needle).unwrap_or_else(|| panic!("no {needle}"));
+        let at = |needle: &str| {
+            rendered
+                .find(needle)
+                .unwrap_or_else(|| panic!("no {needle}"))
+        };
         assert!(at("profile-handle") < at("profile-joined"));
     }
 
@@ -2648,19 +2758,33 @@ mod template_tests {
                 })
                 .expect("post_view.jinja renders")
         };
-        let badges = |html: &str| html.matches(r#"class="supporter-badge ds-marked ds-marked-alone""#).count();
+        let badges = |html: &str| {
+            html.matches(r#"class="supporter-badge ds-marked ds-marked-alone""#)
+                .count()
+        };
 
         let page = render(json!({"someone": "steam", "friend": "apple", "fan": "steam"}));
         // Author, co-drawer, the commenter and the author's reply to them.
         assert_eq!(badges(&page), 4);
         let byline = page.find("post-inspector-byline").unwrap();
         let handle = page[byline..].find("post-inspector-handle").unwrap() + byline;
-        assert!(page[byline..handle].contains("supporter-badge"), "beside the author");
+        assert!(
+            page[byline..handle].contains("supporter-badge"),
+            "beside the author"
+        );
         assert!(page.contains(r#"href="/about#supporters""#));
         // The co-drawer bought elsewhere and wears the other mark: one
         // storefront on the page, the rest gamepads.
-        assert_eq!(page.matches(r#"aria-label="supporter-badge-apple""#).count(), 1);
-        assert_eq!(page.matches(r#"aria-label="supporter-badge-steam""#).count(), 3);
+        assert_eq!(
+            page.matches(r#"aria-label="supporter-badge-apple""#)
+                .count(),
+            1
+        );
+        assert_eq!(
+            page.matches(r#"aria-label="supporter-badge-steam""#)
+                .count(),
+            3
+        );
 
         assert_eq!(badges(&render(json!({}))), 0);
         // The comments fragment an HTMX post swaps in, the same way.
@@ -2703,11 +2827,22 @@ mod template_tests {
             {"store": "apple", "year": 2027, "since": "2027-01-04T00:00:00Z"},
         ]));
         let chip = supporter.find("supporter-chip").expect("a supporter chip");
-        assert!(chip < supporter.find("/@oeee/guestbook").unwrap(), "before the guestbook");
+        assert!(
+            chip < supporter.find("/@oeee/guestbook").unwrap(),
+            "before the guestbook"
+        );
         assert!(supporter.contains(r#"href="/about#supporters""#));
-        assert_eq!(supporter.matches("supporter-chip").count(), 2, "one per year");
-        let steam = supporter.find("supporter-badge-steam").expect("the Steam chip");
-        let apple = supporter.find("supporter-badge-apple").expect("the App Store chip");
+        assert_eq!(
+            supporter.matches("supporter-chip").count(),
+            2,
+            "one per year"
+        );
+        let steam = supporter
+            .find("supporter-badge-steam")
+            .expect("the Steam chip");
+        let apple = supporter
+            .find("supporter-badge-apple")
+            .expect("the App Store chip");
         assert!(steam < apple, "earliest year first");
         // The year is the chip, and the platform is what it is read as.
         assert!(supporter.contains("🎮</span>2026</a>"), "{supporter}");
@@ -2763,7 +2898,9 @@ mod template_tests {
         };
         let sha = "e6851d5a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e";
         let about = render(Some(sha));
-        assert!(about.contains(&format!(r#"href="https://github.com/oeee-cafe/web/commit/{sha}""#)));
+        assert!(about.contains(&format!(
+            r#"href="https://github.com/oeee-cafe/web/commit/{sha}""#
+        )));
         assert!(about.contains(">e6851d5a0b1c<span"), "{about}");
         assert!(!render(None).contains("about-version"));
     }
@@ -2849,8 +2986,14 @@ mod template_tests {
                 .replace("&#x2f;", "/")
         };
         let private = render("private");
-        let at = |needle: &str| private.find(needle).unwrap_or_else(|| panic!("no {needle}"));
-        assert!(private.contains(r#"<a href="/@oeee/private" data-profile-tab="private" aria-current="page">"#));
+        let at = |needle: &str| {
+            private
+                .find(needle)
+                .unwrap_or_else(|| panic!("no {needle}"))
+        };
+        assert!(private.contains(
+            r#"<a href="/@oeee/private" data-profile-tab="private" aria-current="page">"#
+        ));
         assert!(private.contains(r#"<p class="profile-panel-note" data-profile-note="private">"#));
         assert!(at("profile-tabs-bar") < at("profile-panel-note"));
         assert!(at("profile-panel-note") < at("data-profile-panel=\"public\""));
@@ -2886,10 +3029,16 @@ mod template_tests {
                 .expect("profile renders")
         };
         let visitor = render(json!({"id": "u2", "login_name": "fan", "display_name": "Fan"}));
-        let at = |needle: &str| visitor.find(needle).unwrap_or_else(|| panic!("no {needle}"));
+        let at = |needle: &str| {
+            visitor
+                .find(needle)
+                .unwrap_or_else(|| panic!("no {needle}"))
+        };
         assert!(at("/@oeee/follow") < at("/@oeee/guestbook"));
         assert!(at("/@oeee/guestbook") < at(r#"<details class="toolbar-menu profile-more">"#));
-        assert!(at(r#"<details class="toolbar-menu profile-more">"#) < at("showProfileReportModal()"));
+        assert!(
+            at(r#"<details class="toolbar-menu profile-more">"#) < at("showProfileReportModal()")
+        );
         // Their banner, not a link for someone who cannot redraw it.
         assert!(visitor.contains(r#"<span class="profile-banner">"#));
 
@@ -2918,10 +3067,7 @@ mod template_tests {
             "community": "오이카페 \"모에화\" <b>",
             "group": null,
         });
-        for template_name in [
-            "draw_post_cucumber.jinja",
-            "collaborate_chrome_head.jinja",
-        ] {
+        for template_name in ["draw_post_cucumber.jinja", "collaborate_chrome_head.jinja"] {
             let render = |presence: serde_json::Value| {
                 env.get_template(template_name)
                     .unwrap_or_else(|e| panic!("{template_name} loads: {e:#}"))
@@ -2942,7 +3088,10 @@ mod template_tests {
                 "{template_name} should carry the presence tag, escaped"
             );
             // The tag, not the name: app_bridge.jinja's script reads it.
-            assert!(!render(json!(null)).contains(r#"<meta name="oeee-presence""#), "{template_name}");
+            assert!(
+                !render(json!(null)).contains(r#"<meta name="oeee-presence""#),
+                "{template_name}"
+            );
         }
 
         let room = env
@@ -3341,9 +3490,7 @@ mod template_tests {
             .unwrap_or_else(|e| panic!("tag_view.jinja renders empty: {e:#}"));
 
         assert!(
-            rendered.contains(
-                r#"content="https://oeee.test/tags/%EA%B7%B8%EB%A6%BC""#
-            ),
+            rendered.contains(r#"content="https://oeee.test/tags/%EA%B7%B8%EB%A6%BC""#),
             "og:url should be the escaped canonical name, got: {}",
             &rendered[..rendered.find("</head>").unwrap_or(400)]
         );
@@ -3401,17 +3548,28 @@ mod template_tests {
         let links_in = drawings.replace("&#x2f;", "/");
         assert!(drawings.contains(r#"<aside class="feed-comments" aria-labelledby"#));
         assert!(drawings.contains(r#"id="post-feed-grid""#));
-        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC" aria-current="page">feed-view-drawings</a>"#));
-        assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments">feed-view-comments</a>"#));
+        assert!(links_in.contains(
+            r#"<a href="/tags/%EA%B7%B8%EB%A6%BC" aria-current="page">feed-view-drawings</a>"#
+        ));
+        assert!(links_in
+            .contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments">feed-view-comments</a>"#));
         assert!(links_in.contains(r#"hx-get="/api/tags/%EA%B7%B8%EB%A6%BC/comments?after="#));
-        assert!(links_in.contains(r#"<a class="feed-comments-more" href="/tags/%EA%B7%B8%EB%A6%BC/comments">"#));
+        assert!(links_in.contains(
+            r#"<a class="feed-comments-more" href="/tags/%EA%B7%B8%EB%A6%BC/comments">"#
+        ));
 
         let said = render("tag_comments.jinja");
         let links_in = said.replace("&#x2f;", "/");
-        assert!(said.contains("tag-post-count(count=1)"), "under the same card");
+        assert!(
+            said.contains("tag-post-count(count=1)"),
+            "under the same card"
+        );
         assert!(said.contains(r#"<div class="comment-grid">"#));
         assert!(said.contains("Lovely colours"));
-        assert!(!said.contains(r#"id="post-feed-grid""#), "no drawings under it");
+        assert!(
+            !said.contains(r#"id="post-feed-grid""#),
+            "no drawings under it"
+        );
         assert!(links_in.contains(r#"<a href="/tags/%EA%B7%B8%EB%A6%BC/comments" aria-current="page">feed-view-comments</a>"#));
         assert!(links_in.contains(r#"hx-get="/api/tags/%EA%B7%B8%EB%A6%BC/comments?after="#));
     }
@@ -3661,7 +3819,10 @@ mod template_tests {
     fn json_script(rendered: &str, id: &str) -> serde_json::Value {
         let open = format!(r#"<script id="{id}" type="application/json">"#);
         let start = rendered.find(&open).expect("page has the script") + open.len();
-        let end = start + rendered[start..].find("</script>").expect("script is closed");
+        let end = start
+            + rendered[start..]
+                .find("</script>")
+                .expect("script is closed");
         serde_json::from_str(&rendered[start..end]).expect("the script holds JSON")
     }
 
@@ -3679,7 +3840,10 @@ mod template_tests {
                 ..guest_chrome()
             })
             .expect("painter renders for a guest");
-        assert!(rendered.contains("draw-guest-notice"), "the painter does not warn a guest");
+        assert!(
+            rendered.contains("draw-guest-notice"),
+            "the painter does not warn a guest"
+        );
         let words = json_script(&rendered, "oeee-painter-words");
         assert_eq!(words["guestSaved"], "draw-guest-saved");
         assert_eq!(words["downloadPng"], "draw-download-png");

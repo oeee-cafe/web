@@ -323,7 +323,11 @@ mod tests {
             // Made for another site -- another Google client, such as
             // somebody else's app asking the same person to sign in.
             (
-                token(with(claims(), "aud", json!("999.apps.googleusercontent.com"))),
+                token(with(
+                    claims(),
+                    "aud",
+                    json!("999.apps.googleusercontent.com"),
+                )),
                 "the-nonce",
             ),
             // Not Google's.

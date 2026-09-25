@@ -612,9 +612,13 @@ mod tests {
 
         // The app itself among them is passed over rather than counted.
         assert_eq!(
-            owned_supporter_packs(&config, &packs(&[(2026, config.app_id), (2027, 482)]), STEAM_ID)
-                .await
-                .unwrap(),
+            owned_supporter_packs(
+                &config,
+                &packs(&[(2026, config.app_id), (2027, 482)]),
+                STEAM_ID
+            )
+            .await
+            .unwrap(),
             Some(Vec::new())
         );
     }
@@ -638,7 +642,9 @@ mod tests {
     #[tokio::test]
     async fn a_ticket_steam_rejects_is_invalid() {
         let config = fake_steam(false).await;
-        let result = verify_ticket(&config, &this_years(), "deadbeef").await.unwrap();
+        let result = verify_ticket(&config, &this_years(), "deadbeef")
+            .await
+            .unwrap();
         assert_eq!(result.unwrap_err(), TicketRejected::Invalid);
     }
 
@@ -703,7 +709,9 @@ mod tests {
     #[tokio::test]
     async fn a_publisher_ban_turns_the_ticket_away() {
         let config = fake_steam(true).await;
-        let result = verify_ticket(&config, &this_years(), "14000000abcdef").await.unwrap();
+        let result = verify_ticket(&config, &this_years(), "14000000abcdef")
+            .await
+            .unwrap();
         assert_eq!(result.unwrap_err(), TicketRejected::Banned);
     }
 }

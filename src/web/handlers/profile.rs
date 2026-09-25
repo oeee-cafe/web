@@ -1,11 +1,11 @@
 use crate::app_error::AppError;
 use crate::models::achievement::list_achievements;
+use crate::models::actor::Actor;
+use crate::models::banner::{activate_banner, delete_banner, find_banner_by_id, list_user_banners};
 use crate::models::comment::{
     count_public_comments_by_user, find_public_comments_by_user, NotificationComment,
 };
-use crate::models::supporter::standings;
-use crate::models::actor::Actor;
-use crate::models::banner::{activate_banner, delete_banner, find_banner_by_id, list_user_banners};
+use crate::models::community::find_community_by_slug;
 use crate::models::follow::{find_followings_by_user_id, follow_user, is_following, unfollow_user};
 use crate::models::guestbook_entry::{
     add_guestbook_entry_reply, create_guestbook_entry, delete_guestbook_entry,
@@ -22,11 +22,11 @@ use crate::models::post::{
     count_profile_posts, find_profile_posts, find_published_public_posts_by_author_id,
     ProfileDrawings,
 };
-use crate::models::community::find_community_by_slug;
-use crate::web::handlers::home::{feed_context, LoadMoreQuery, HOME_POSTS_PER_BATCH};
-use crate::web::handlers::community::render_community_page;
+use crate::models::supporter::standings;
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession, User};
 use crate::web::context::CommonContext;
+use crate::web::handlers::community::render_community_page;
+use crate::web::handlers::home::{feed_context, LoadMoreQuery, HOME_POSTS_PER_BATCH};
 use crate::web::state::AppState;
 use anyhow::Error;
 use aws_sdk_s3::config::{Credentials as AwsCredentials, Region, SharedCredentialsProvider};
@@ -240,23 +240,29 @@ async fn profile_posts_batch(
         user.id,
         which,
         viewer_id,
-        auth_session.user.as_ref().map_or(false, |u| u.show_sensitive_content),
+        auth_session
+            .user
+            .as_ref()
+            .map_or(false, |u| u.show_sensitive_content),
         query.limit.clamp(1, HOME_POSTS_PER_BATCH),
         query.offset.max(0),
     )
     .await?;
     tx.commit().await?;
 
-    let rendered = state.env.get_template("post_feed_fragment.jinja")?.render(context! {
-        feed => feed_context(
-            posts,
-            &profile_posts_path(&user.login_name, which),
-            query.offset,
-            query.period.as_deref(),
-        ),
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .env
+        .get_template("post_feed_fragment.jinja")?
+        .render(context! {
+            feed => feed_context(
+                posts,
+                &profile_posts_path(&user.login_name, which),
+                query.offset,
+                query.period.as_deref(),
+            ),
+            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+            ftl_lang,
+        })?;
     Ok(Html(rendered).into_response())
 }
 
@@ -268,7 +274,15 @@ pub async fn load_more_profile_posts(
     Path(login_name): Path<String>,
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    profile_posts_batch(ProfileDrawings::Public, auth_session, state, ftl_lang, login_name, query).await
+    profile_posts_batch(
+        ProfileDrawings::Public,
+        auth_session,
+        state,
+        ftl_lang,
+        login_name,
+        query,
+    )
+    .await
 }
 
 /// GET /api/profiles/@{login_name}/private/posts
@@ -279,7 +293,15 @@ pub async fn load_more_profile_private_posts(
     Path(login_name): Path<String>,
     Query(query): Query<LoadMoreQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    profile_posts_batch(ProfileDrawings::Private, auth_session, state, ftl_lang, login_name, query).await
+    profile_posts_batch(
+        ProfileDrawings::Private,
+        auth_session,
+        state,
+        ftl_lang,
+        login_name,
+        query,
+    )
+    .await
 }
 
 /// Which of a profile's tabs an address asks for (profile.jinja).
@@ -326,9 +348,18 @@ async fn render_profile(
     // batch a tab, each loading on from its own endpoint, headed by month,
     // counted over the same filter. Only they see the private tab.
     let viewer_id = auth_session.user.as_ref().map(|u| u.id);
-    let show_sensitive = auth_session.user.as_ref().map_or(false, |u| u.show_sensitive_content);
-    let public_count =
-        count_profile_posts(tx, user.id, ProfileDrawings::Public, viewer_id, show_sensitive).await?;
+    let show_sensitive = auth_session
+        .user
+        .as_ref()
+        .map_or(false, |u| u.show_sensitive_content);
+    let public_count = count_profile_posts(
+        tx,
+        user.id,
+        ProfileDrawings::Public,
+        viewer_id,
+        show_sensitive,
+    )
+    .await?;
     let public_posts = find_profile_posts(
         tx,
         user.id,
@@ -340,9 +371,14 @@ async fn render_profile(
     )
     .await?;
     let (private_count, private_posts) = if is_owner {
-        let count =
-            count_profile_posts(tx, user.id, ProfileDrawings::Private, viewer_id, show_sensitive)
-                .await?;
+        let count = count_profile_posts(
+            tx,
+            user.id,
+            ProfileDrawings::Private,
+            viewer_id,
+            show_sensitive,
+        )
+        .await?;
         let posts = find_profile_posts(
             tx,
             user.id,
@@ -485,7 +521,15 @@ pub async fn profile_private(
     let user = find_user_by_login_name(&mut tx, &login_name)
         .await?
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
-    render_profile(&mut tx, &state, &auth_session, ftl_lang, user, ProfileTab::Private).await
+    render_profile(
+        &mut tx,
+        &state,
+        &auth_session,
+        ftl_lang,
+        user,
+        ProfileTab::Private,
+    )
+    .await
 }
 
 pub async fn profile_or_community(
@@ -501,8 +545,15 @@ pub async fn profile_or_community(
 
     // First, try to find a user by login_name
     if let Some(user) = find_user_by_login_name(&mut tx, &slug).await? {
-        return render_profile(&mut tx, &state, &auth_session, ftl_lang, user, ProfileTab::Public)
-            .await;
+        return render_profile(
+            &mut tx,
+            &state,
+            &auth_session,
+            ftl_lang,
+            user,
+            ProfileTab::Public,
+        )
+        .await;
     }
 
     // User not found - try to find a community by slug
@@ -520,7 +571,8 @@ pub async fn profile_or_community(
     }
 
     // Neither user nor community found - render 404 page
-    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx =
+        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
     let template: minijinja::Template<'_, '_> = state.env.get_template("404.jinja")?;
     let rendered: String = template.render(context! {
         current_user => auth_session.user,
@@ -615,11 +667,14 @@ pub async fn do_move_link_down(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
     let rendered = template
-        .render_captured_to(context! {
-            user => auth_session.user,
-            links => links,
-            ftl_lang,
-        }, std::io::sink())?
+        .render_captured_to(
+            context! {
+                user => auth_session.user,
+                links => links,
+                ftl_lang,
+            },
+            std::io::sink(),
+        )?
         .with_state_mut(|state| state.render_block("links"))?;
     Ok(Html(rendered).into_response())
 }
@@ -658,11 +713,14 @@ pub async fn do_move_link_up(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
     let rendered = template
-        .render_captured_to(context! {
-            user => auth_session.user,
-            links => links,
-            ftl_lang,
-        }, std::io::sink())?
+        .render_captured_to(
+            context! {
+                user => auth_session.user,
+                links => links,
+                ftl_lang,
+            },
+            std::io::sink(),
+        )?
         .with_state_mut(|state| state.render_block("links"))?;
     Ok(Html(rendered).into_response())
 }
@@ -705,11 +763,14 @@ pub async fn do_delete_link(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
     let rendered = template
-        .render_captured_to(context! {
-            user => auth_session.user,
-            links => links,
-            ftl_lang,
-        }, std::io::sink())?
+        .render_captured_to(
+            context! {
+                user => auth_session.user,
+                links => links,
+                ftl_lang,
+            },
+            std::io::sink(),
+        )?
         .with_state_mut(|state| state.render_block("links"))?;
     Ok(Html(rendered).into_response())
 }
@@ -752,11 +813,14 @@ pub async fn do_add_link(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
     let rendered = template
-        .render_captured_to(context! {
-            user => auth_session.user,
-            links => links,
-            ftl_lang,
-        }, std::io::sink())?
+        .render_captured_to(
+            context! {
+                user => auth_session.user,
+                links => links,
+                ftl_lang,
+            },
+            std::io::sink(),
+        )?
         .with_state_mut(|state| state.render_block("links"))?;
     Ok(Html(rendered).into_response())
 }
@@ -828,7 +892,8 @@ pub async fn banner_management(
         })
         .collect();
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("banner_management.jinja")?;
+    let template: minijinja::Template<'_, '_> =
+        state.env.get_template("banner_management.jinja")?;
     let rendered = template.render(context! {
         current_user => auth_session.user,
         draft_post_count => common_ctx.draft_post_count,
@@ -1246,11 +1311,15 @@ pub async fn do_delete_banner(
             replay_filename
                 .chars()
                 .next()
-                .ok_or_else(|| AppError::InvalidFormData("Replay filename too short".to_string()))?,
+                .ok_or_else(|| AppError::InvalidFormData(
+                    "Replay filename too short".to_string()
+                ))?,
             replay_filename
                 .chars()
                 .nth(1)
-                .ok_or_else(|| AppError::InvalidFormData("Replay filename too short".to_string()))?,
+                .ok_or_else(|| AppError::InvalidFormData(
+                    "Replay filename too short".to_string()
+                ))?,
             replay_filename
         ));
     }
@@ -1275,7 +1344,9 @@ pub async fn do_delete_banner(
         .iter()
         .map(|key| ObjectIdentifier::builder().key(key).build())
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| AppError::from(anyhow::anyhow!("Failed to build object identifiers: {}", e)))?;
+        .map_err(|e| {
+            AppError::from(anyhow::anyhow!("Failed to build object identifiers: {}", e))
+        })?;
 
     client
         .delete_objects()

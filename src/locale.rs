@@ -40,7 +40,9 @@ mod tests {
         let mut bundle = FluentBundle::new_concurrent(vec![lang.parse().unwrap()]);
         bundle.set_use_isolating(false);
         bundle.add_resource(&LOCALES[lang]).unwrap();
-        let message = bundle.get_message(id).unwrap_or_else(|| panic!("{lang} lacks {id}"));
+        let message = bundle
+            .get_message(id)
+            .unwrap_or_else(|| panic!("{lang} lacks {id}"));
         let mut errors = vec![];
         let formatted = bundle
             .format_pattern(message.value().unwrap(), Some(args), &mut errors)
@@ -56,11 +58,23 @@ mod tests {
         let mut args = FluentArgs::new();
         args.set("year", 2024);
         args.set("month", 3);
-        assert_eq!(format("en", "profile-member-since", &args), "Member since March 2024");
-        assert_eq!(format("ko", "profile-member-since", &args), "2024년 3월 가입");
-        assert_eq!(format("ja", "profile-member-since", &args), "2024年3月から参加");
+        assert_eq!(
+            format("en", "profile-member-since", &args),
+            "Member since March 2024"
+        );
+        assert_eq!(
+            format("ko", "profile-member-since", &args),
+            "2024년 3월 가입"
+        );
+        assert_eq!(
+            format("ja", "profile-member-since", &args),
+            "2024年3月から参加"
+        );
         assert_eq!(format("zh", "profile-member-since", &args), "2024年3月加入");
         args.set("month", 1);
-        assert_eq!(format("en", "profile-member-since", &args), "Member since January 2024");
+        assert_eq!(
+            format("en", "profile-member-since", &args),
+            "Member since January 2024"
+        );
     }
 }

@@ -1,14 +1,17 @@
 use crate::app_error::{error_codes, AppError};
 use crate::image_store;
 use crate::models::banner::{create_banner, BannerDraft};
-use crate::models::community::{find_community_by_id, is_user_member, Community, CommunityVisibility};
+use crate::models::community::{
+    find_community_by_id, is_user_member, Community, CommunityVisibility,
+};
 use crate::models::post::{
     create_post, find_post_by_id, find_post_id_by_client_draft_id, PostDraft, Tool,
 };
 use crate::models::user::{AuthSession, User};
 use crate::web::context::CommonContext;
-use crate::web::responses::ErrorResponse;
 use crate::web::handlers::{safe_decode_hash, safe_parse_uuid, ExtractFtlLang};
+use crate::web::presence::{Activity, Presence};
+use crate::web::responses::ErrorResponse;
 use crate::web::state::AppState;
 use aws_sdk_s3::config::{Credentials as AwsCredentials, Region, SharedCredentialsProvider};
 use aws_sdk_s3::error::SdkError;
@@ -30,7 +33,6 @@ use minijinja::context;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha256::digest;
-use crate::web::presence::{Activity, Presence};
 use sqlx::postgres::types::PgInterval;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
@@ -159,7 +161,12 @@ pub async fn start_draw(
     // A guest draws on a plain canvas or for a public community, and relays
     // nothing: see `may_draw_in`.
     let user = auth_session.user.as_ref();
-    if user.is_none() && input.parent_post_id.as_deref().is_some_and(|id| !id.is_empty()) {
+    if user.is_none()
+        && input
+            .parent_post_id
+            .as_deref()
+            .is_some_and(|id| !id.is_empty())
+    {
         return Ok(sign_in_instead());
     }
     if let Some(ref community) = community {
@@ -380,7 +387,9 @@ pub async fn draw_finish(
 
     // This drawing has been here before; answer with what it made then.
     if let Some(draft_id) = client_draft_id {
-        if let Some(post_id) = find_post_id_by_client_draft_id(&mut tx, current_user.id, draft_id).await? {
+        if let Some(post_id) =
+            find_post_id_by_client_draft_id(&mut tx, current_user.id, draft_id).await?
+        {
             return existing_post_response(&mut tx, post_id).await;
         }
     }
@@ -407,7 +416,9 @@ pub async fn draw_finish(
     if community_id.is_none() {
         if let Some(parent_id) = parent_post_id {
             if let Some(parent_post) = find_post_by_id(&mut tx, parent_id).await? {
-                if let Some(parent_community_id_str) = parent_post.get("community_id").and_then(|v| v.as_ref()) {
+                if let Some(parent_community_id_str) =
+                    parent_post.get("community_id").and_then(|v| v.as_ref())
+                {
                     community_id = Uuid::parse_str(parent_community_id_str).ok();
                 }
             }

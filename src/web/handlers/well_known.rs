@@ -1,6 +1,6 @@
 use crate::app_error::AppError;
 use crate::models::sitemap::{
-    sitemap_communities, sitemap_tags, sitemap_posts, sitemap_profiles, SitemapEntry,
+    sitemap_communities, sitemap_posts, sitemap_profiles, sitemap_tags, SitemapEntry,
 };
 use crate::web::state::AppState;
 use axum::extract::State;
@@ -208,7 +208,10 @@ mod tests {
             .map(|c| c["/"].as_str().unwrap())
             .collect();
         for path in ["/api/*", "/ap/*", "/auth/*", "/logout"] {
-            assert!(excluded.contains(&path), "{path} should stay in the browser");
+            assert!(
+                excluded.contains(&path),
+                "{path} should stay in the browser"
+            );
         }
         // Apple takes the first component that matches, so the catch-all is last.
         assert_eq!(components.last().unwrap()["/"], "/*");

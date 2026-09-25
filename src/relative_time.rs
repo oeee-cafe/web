@@ -17,10 +17,34 @@ struct Units {
 
 fn units(lang: &str) -> Units {
     match lang.get(..2) {
-        Some("ko") => Units { now: "방금", minute: "분", hour: "시간", day: "일", week: "주" },
-        Some("ja") => Units { now: "たった今", minute: "分", hour: "時間", day: "日", week: "週" },
-        Some("zh") => Units { now: "刚刚", minute: "分钟", hour: "小时", day: "天", week: "周" },
-        _ => Units { now: "now", minute: "m", hour: "h", day: "d", week: "w" },
+        Some("ko") => Units {
+            now: "방금",
+            minute: "분",
+            hour: "시간",
+            day: "일",
+            week: "주",
+        },
+        Some("ja") => Units {
+            now: "たった今",
+            minute: "分",
+            hour: "時間",
+            day: "日",
+            week: "週",
+        },
+        Some("zh") => Units {
+            now: "刚刚",
+            minute: "分钟",
+            hour: "小时",
+            day: "天",
+            week: "周",
+        },
+        _ => Units {
+            now: "now",
+            minute: "m",
+            hour: "h",
+            day: "d",
+            week: "w",
+        },
     }
 }
 

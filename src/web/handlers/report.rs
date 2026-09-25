@@ -5,8 +5,8 @@ use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, 
 use crate::web::state::AppState;
 use axum::extract::{Path, State};
 use axum::response::Html;
-use axum::Form;
 use axum::response::IntoResponse;
+use axum::Form;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use lettre::{Message, SmtpTransport, Transport};
 use minijinja::context;
@@ -27,9 +27,7 @@ async fn send_post_report(
     request: ReportPostRequest,
 ) -> Result<(), AppError> {
     // Ensure user is authenticated
-    let user = auth_session
-        .user
-        .ok_or(AppError::Unauthorized)?;
+    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
 
     // Validate description
     if request.description.trim().is_empty() {
@@ -52,7 +50,9 @@ async fn send_post_report(
 
     // Check if post is deleted
     if post.get("deleted_at").and_then(|v| v.as_ref()).is_some() {
-        return Err(AppError::InvalidFormData("Cannot report deleted post".to_string()));
+        return Err(AppError::InvalidFormData(
+            "Cannot report deleted post".to_string(),
+        ));
     }
 
     // Get post author ID and check if user is trying to report their own post
@@ -60,7 +60,9 @@ async fn send_post_report(
         .get("author_id")
         .and_then(|v| v.as_ref())
         .and_then(|s| Uuid::parse_str(s).ok())
-        .ok_or(AppError::DatabaseError("Invalid post author ID".to_string()))?;
+        .ok_or(AppError::DatabaseError(
+            "Invalid post author ID".to_string(),
+        ))?;
 
     if post_author_id == user.id {
         return Err(AppError::InvalidFormData(
@@ -76,7 +78,10 @@ async fn send_post_report(
     tx.commit().await?;
 
     // Prepare email content
-    let post_url = format!("https://{}/@{}/{}", state.config.domain, post_author.login_name, post_id);
+    let post_url = format!(
+        "https://{}/@{}/{}",
+        state.config.domain, post_author.login_name, post_id
+    );
     let reporter_profile_url = format!("https://{}/@{}", state.config.domain, user.login_name);
     let post_author_profile_url = format!(
         "https://{}/@{}",
@@ -183,9 +188,7 @@ async fn send_profile_report(
     request: ReportPostRequest,
 ) -> Result<(), AppError> {
     // Ensure user is authenticated
-    let user = auth_session
-        .user
-        .ok_or(AppError::Unauthorized)?;
+    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
 
     // Validate description
     if request.description.trim().is_empty() {
@@ -216,7 +219,10 @@ async fn send_profile_report(
     tx.commit().await?;
 
     // Prepare email content
-    let profile_url = format!("https://{}/@{}", state.config.domain, reported_user.login_name);
+    let profile_url = format!(
+        "https://{}/@{}",
+        state.config.domain, reported_user.login_name
+    );
     let reporter_profile_url = format!("https://{}/@{}", state.config.domain, user.login_name);
 
     let email_body = format!(

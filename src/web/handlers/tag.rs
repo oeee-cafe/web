@@ -1,11 +1,11 @@
 use crate::app_error::AppError;
+use crate::models::comment::CommentScope;
 use crate::models::tag::{
-    browse_tags, find_tag_by_name, find_posts_by_tag, tag_covers,
-    normalize_tag, search_tags, Tag, TagCover, TagSort,
+    browse_tags, find_posts_by_tag, find_tag_by_name, normalize_tag, search_tags, tag_covers, Tag,
+    TagCover, TagSort,
 };
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
-use crate::models::comment::CommentScope;
 use crate::web::handlers::home::{
     comments_batch, comments_context, feed_context, CommentsQuery, HOME_POSTS_PER_BATCH,
 };
@@ -147,9 +147,13 @@ async fn tag_page(
         viewer_show_sensitive,
     )
     .await?;
-    let comments =
-        comments_batch(&mut tx, CommentScope::Tag(tag.id), auth_session.user.as_ref(), None)
-            .await?;
+    let comments = comments_batch(
+        &mut tx,
+        CommentScope::Tag(tag.id),
+        auth_session.user.as_ref(),
+        None,
+    )
+    .await?;
 
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
@@ -217,11 +221,14 @@ pub async fn load_more_tag_comments(
     .await?;
     tx.commit().await?;
 
-    let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
-        comments => comments_context(comments, &tag_comments_path(&name)),
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .env
+        .get_template("comments_fragment.jinja")?
+        .render(context! {
+            comments => comments_context(comments, &tag_comments_path(&name)),
+            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+            ftl_lang,
+        })?;
     Ok(Html(rendered).into_response())
 }
 
@@ -354,8 +361,7 @@ async fn requested_tags(
     let cards = tags
         .into_iter()
         .map(|tag| {
-            let (mine, rest): (Vec<_>, Vec<_>) =
-                covers.drain(..).partition(|c| c.tag_id == tag.id);
+            let (mine, rest): (Vec<_>, Vec<_>) = covers.drain(..).partition(|c| c.tag_id == tag.id);
             covers = rest;
             TagCard { tag, covers: mine }
         })

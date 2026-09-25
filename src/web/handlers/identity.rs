@@ -742,25 +742,22 @@ pub async fn google_callback(
         return invalid();
     }
 
-    let id_token = match google::exchange_code(
-        config,
-        &google_redirect_uri(&state.config.base_url),
-        code,
-    )
-    .await
-    {
-        Ok(Some(id_token)) => id_token,
-        Ok(None) => return invalid(),
-        Err(error) => {
-            // Not a refusal -- that is Ok(None), and said where it happens --
-            // but Google not answering at all.
-            tracing::error!("Google could not be reached to trade the code: {error:#}");
-            messages
-                .clone()
-                .error(say(&bundle, "identity-sign-in-failed", Provider::Google));
-            return Ok(Redirect::to(back).into_response());
-        }
-    };
+    let id_token =
+        match google::exchange_code(config, &google_redirect_uri(&state.config.base_url), code)
+            .await
+        {
+            Ok(Some(id_token)) => id_token,
+            Ok(None) => return invalid(),
+            Err(error) => {
+                // Not a refusal -- that is Ok(None), and said where it happens --
+                // but Google not answering at all.
+                tracing::error!("Google could not be reached to trade the code: {error:#}");
+                messages
+                    .clone()
+                    .error(say(&bundle, "identity-sign-in-failed", Provider::Google));
+                return Ok(Redirect::to(back).into_response());
+            }
+        };
 
     finish_google_sign_in(
         &mut auth_session,
@@ -986,7 +983,16 @@ async fn finish_google_sign_in(
     if let Some(done) = handed_off(state, handoff, &identity).await {
         return Ok(done);
     }
-    sign_in_with(auth_session, session, messages, bundle, state, identity, next).await
+    sign_in_with(
+        auth_session,
+        session,
+        messages,
+        bundle,
+        state,
+        identity,
+        next,
+    )
+    .await
 }
 
 /// A handoff's id, short enough to follow one through the log and hashed so
@@ -1198,7 +1204,10 @@ pub async fn handoff_claim(
             .or_else(|| identity.email.clone())
             .unwrap_or_default();
         let mut args = FluentArgs::new();
-        args.set("provider", FluentValue::from(identity.provider.display_name()));
+        args.set(
+            "provider",
+            FluentValue::from(identity.provider.display_name()),
+        );
         args.set("account", FluentValue::from(account.clone()));
         // Worded here, where the reader's language is known: the page asking
         // is a script in an app's assets and has no messages of its own.
@@ -1243,7 +1252,10 @@ pub async fn handoff_claim(
         Err(error) => {
             // Left unspent on purpose: whatever went wrong, the sign-in
             // waiting in it has not been used, and asking again may work.
-            tracing::error!("handoff {mark}: {} sign-in failed: {error:?}", provider.as_str());
+            tracing::error!(
+                "handoff {mark}: {} sign-in failed: {error:?}",
+                provider.as_str()
+            );
             return Ok(say("failed"));
         }
     };

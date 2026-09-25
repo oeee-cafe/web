@@ -2,35 +2,32 @@ use crate::app_error::AppError;
 use crate::models::actor::create_actor_for_community;
 use crate::models::comment::CommentScope;
 use crate::models::community::{
-    accept_invitation, add_community_member, create_community, create_invitation, find_community_by_id,
-    find_community_by_slug, get_communities_members_count, get_community_members_with_details,
-    get_community_stats, get_invitation_by_id, get_own_communities, get_participating_communities,
+    accept_invitation, add_community_member, create_community, create_invitation,
+    find_community_by_id, find_community_by_slug, get_communities_members_count,
+    get_community_members_with_details, get_community_stats, get_invitation_by_id,
+    get_own_communities, get_participating_communities,
     get_pending_invitations_with_invitee_details_for_community, get_public_communities,
-    get_public_communities_paginated, get_user_role_in_community, is_user_member,
-    leave_community, reject_invitation, remove_community_member, search_public_communities,
-    slug_conflicts_with_user, soft_delete_community_with_activity,
-    update_community_with_activity, Community, CommunityDraft, CommunityMemberRole,
-    CommunitySort, CommunityVisibility,
+    get_public_communities_paginated, get_user_role_in_community, is_user_member, leave_community,
+    reject_invitation, remove_community_member, search_public_communities,
+    slug_conflicts_with_user, soft_delete_community_with_activity, update_community_with_activity,
+    Community, CommunityDraft, CommunityMemberRole, CommunitySort, CommunityVisibility,
 };
-use crate::models::notification::{format_community_invitation_message, get_user_language_preference};
+use crate::models::notification::{
+    format_community_invitation_message, get_user_language_preference,
+};
 use crate::models::post::{find_published_posts_by_community_id, find_recent_posts_by_communities};
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession};
 use crate::web::handlers::home::{
     comments_batch, comments_context, feed_context, CommentsQuery, LoadMoreQuery,
     HOME_POSTS_PER_BATCH,
 };
-use crate::web::handlers::{parse_id_with_legacy_support, ParsedId};
 use crate::web::handlers::render_403;
+use crate::web::handlers::{parse_id_with_legacy_support, ParsedId};
 use crate::web::state::AppState;
 use axum::extract::{Path, Query};
 use axum::http::{uri::Uri, HeaderMap, HeaderValue};
 use axum::response::{IntoResponse, Redirect};
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::Html,
-    Form,
-};
+use axum::{extract::State, http::StatusCode, response::Html, Form};
 use axum_messages::Messages;
 use minijinja::context;
 use serde::Deserialize;
@@ -39,9 +36,7 @@ use uuid::Uuid;
 use crate::web::context::CommonContext;
 use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 
-pub async fn redirect_community_to_unified(
-    Path(slug): Path<String>,
-) -> Redirect {
+pub async fn redirect_community_to_unified(Path(slug): Path<String>) -> Redirect {
     Redirect::permanent(&format!("/@{}", slug))
 }
 
@@ -177,14 +172,17 @@ pub(crate) async fn render_community_page(
         && headers.get("Oeee-Part") == Some(&HeaderValue::from_static("header"));
     if wants_header_only {
         let rendered = template
-            .render_captured_to(context! {
-                current_user => auth_session.user,
-                community => Some(&community),
-                header => header,
-                community_id => community_uuid.to_string(),
-                domain => state.config.domain.clone(),
-                ftl_lang
-            }, std::io::sink())?
+            .render_captured_to(
+                context! {
+                    current_user => auth_session.user,
+                    community => Some(&community),
+                    header => header,
+                    community_id => community_uuid.to_string(),
+                    domain => state.config.domain.clone(),
+                    ftl_lang
+                },
+                std::io::sink(),
+            )?
             .with_state_mut(|state| state.render_block("community_edit_block"))?;
         return Ok(Html(rendered).into_response());
     }
@@ -269,11 +267,14 @@ pub async fn load_more_community_comments(
     .await?;
     tx.commit().await?;
 
-    let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
-        comments => comments_context(comments, &community_comments_path(&community.slug)),
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .env
+        .get_template("comments_fragment.jinja")?
+        .render(context! {
+            comments => comments_context(comments, &community_comments_path(&community.slug)),
+            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+            ftl_lang,
+        })?;
     Ok(Html(rendered).into_response())
 }
 
@@ -387,7 +388,9 @@ pub async fn community_iframe(
                     let is_member = is_user_member(&mut tx, user.id, community_uuid).await?;
                     if !is_member {
                         // Authenticated but not a member - show 403 forbidden
-                        return Ok(render_403(&auth_session, &state, ftl_lang).await?.into_response());
+                        return Ok(render_403(&auth_session, &state, ftl_lang)
+                            .await?
+                            .into_response());
                     }
                 }
                 None => {
@@ -445,7 +448,8 @@ async fn enrich_public_communities(
 
     let ids: Vec<Uuid> = communities.iter().map(|c| c.id).collect();
     let recent_posts =
-        find_recent_posts_by_communities(tx, &ids, 3, viewer_user_id, viewer_show_sensitive).await?;
+        find_recent_posts_by_communities(tx, &ids, 3, viewer_user_id, viewer_show_sensitive)
+            .await?;
     let members_stats = get_communities_members_count(tx, &ids).await?;
 
     let mut posts_by: std::collections::HashMap<Uuid, Vec<serde_json::Value>> =
@@ -780,9 +784,13 @@ pub async fn communities(
     )
     .await?;
 
-    let official_communities =
-        enrich_public_communities(&mut tx, &official_raw, viewer_user_id, viewer_show_sensitive)
-            .await?;
+    let official_communities = enrich_public_communities(
+        &mut tx,
+        &official_raw,
+        viewer_user_id,
+        viewer_show_sensitive,
+    )
+    .await?;
 
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
@@ -1078,14 +1086,17 @@ pub async fn hx_do_edit_community(
                 let header = community_header_context(&mut header_tx, &updated_community).await?;
                 header_tx.commit().await?;
                 let rendered = template
-                    .render_captured_to(context! {
-                        current_user => auth_session.user,
-                        header => header,
-                        community => updated_community,
-                        community_id => updated_community.id.to_string(),
-                        domain => state.config.domain.clone(),
-                        ftl_lang
-                    }, std::io::sink())?
+                    .render_captured_to(
+                        context! {
+                            current_user => auth_session.user,
+                            header => header,
+                            community => updated_community,
+                            community_id => updated_community.id.to_string(),
+                            domain => state.config.domain.clone(),
+                            ftl_lang
+                        },
+                        std::io::sink(),
+                    )?
                     .with_state_mut(|state| state.render_block("community_edit_block"))?;
 
                 Ok(Html(rendered).into_response())
@@ -1196,7 +1207,9 @@ pub async fn community_comments(
                     let is_member = is_user_member(&mut tx, user.id, community_uuid).await?;
                     if !is_member {
                         // Authenticated but not a member - show 403 forbidden
-                        return Ok(render_403(&auth_session, &state, ftl_lang).await?.into_response());
+                        return Ok(render_403(&auth_session, &state, ftl_lang)
+                            .await?
+                            .into_response());
                     }
                 }
                 None => {
@@ -1365,7 +1378,10 @@ pub async fn invite_user(
     match create_invitation(&mut tx, community.id, inviter.id, invitee.id).await {
         Ok(_invitation) => {
             // Get invitee's language preference before committing transaction
-            let invitee_language = get_user_language_preference(&mut tx, invitee.id).await.ok().flatten();
+            let invitee_language = get_user_language_preference(&mut tx, invitee.id)
+                .await
+                .ok()
+                .flatten();
 
             tx.commit().await?;
 
@@ -1559,7 +1575,10 @@ pub async fn do_accept_invitation(
     .await?;
 
     // Get inviter's language preference before committing transaction
-    let inviter_language = get_user_language_preference(&mut tx, inviter_id).await.ok().flatten();
+    let inviter_language = get_user_language_preference(&mut tx, inviter_id)
+        .await
+        .ok()
+        .flatten();
 
     tx.commit().await?;
 
@@ -1674,7 +1693,10 @@ pub async fn do_reject_invitation(
     reject_invitation(&mut tx, invitation_id).await?;
 
     // Get inviter's language preference before committing transaction
-    let inviter_language = get_user_language_preference(&mut tx, inviter_id).await.ok().flatten();
+    let inviter_language = get_user_language_preference(&mut tx, inviter_id)
+        .await
+        .ok()
+        .flatten();
 
     tx.commit().await?;
 
@@ -2162,9 +2184,7 @@ mod tests {
             .find("id=\"community-search\"")
             .expect("search box");
         let sort = rendered.find("name=\"sort\"").expect("sort");
-        let panel = rendered
-            .find("data-communities-panel=")
-            .expect("panels");
+        let panel = rendered.find("data-communities-panel=").expect("panels");
         assert!(filters < search && search < sort && sort < panel);
     }
 

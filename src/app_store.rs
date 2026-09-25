@@ -234,7 +234,10 @@ fn read_signed<T: serde::de::DeserializeOwned>(
 ) -> Result<T> {
     let header = jsonwebtoken::decode_header(jws)?;
     if header.alg != Algorithm::ES256 {
-        return Err(anyhow!("the payload is signed with {:?}, not ES256", header.alg));
+        return Err(anyhow!(
+            "the payload is signed with {:?}, not ES256",
+            header.alg
+        ));
     }
     let chain = header
         .x5c
@@ -295,7 +298,9 @@ fn verify_chain(leaf: &[u8], intermediate: &[u8], root: TrustedRoot, now: UnixTi
         return Err(anyhow!("the intermediate is not Apple's WWDR certificate"));
     }
     if !has_extension(leaf, RECEIPT_SIGNING_MARKER)? {
-        return Err(anyhow!("the signing certificate is not for App Store receipts"));
+        return Err(anyhow!(
+            "the signing certificate is not for App Store receipts"
+        ));
     }
     Ok(())
 }
@@ -621,7 +626,10 @@ async fn undelivered(config: &AppStoreConfig, api_url: &str) -> Result<Vec<Strin
     let mut payloads = Vec::new();
     let mut token: Option<String> = None;
     for _ in 0..SWEEP_MAX_PAGES {
-        let mut request = http().post(&url).bearer_auth(api_token(config)?).json(&body);
+        let mut request = http()
+            .post(&url)
+            .bearer_auth(api_token(config)?)
+            .json(&body);
         if let Some(token) = &token {
             request = request.query(&[("paginationToken", token)]);
         }
@@ -634,7 +642,11 @@ async fn undelivered(config: &AppStoreConfig, api_url: &str) -> Result<Vec<Strin
             ));
         }
         let page: HistoryPage = response.json().await?;
-        payloads.extend(page.notification_history.into_iter().map(|item| item.signed_payload));
+        payloads.extend(
+            page.notification_history
+                .into_iter()
+                .map(|item| item.signed_payload),
+        );
         match page.pagination_token.filter(|_| page.has_more) {
             Some(next) => token = Some(next),
             None => return Ok(payloads),
@@ -669,12 +681,19 @@ pub async fn sweep_once(
                     product,
                 }) => match heed(db, config, &transaction, &product).await {
                     Ok(heeded) => {
-                        tracing::info!(kind, ?heeded, "heeded an App Store notification that never arrived");
+                        tracing::info!(
+                            kind,
+                            ?heeded,
+                            "heeded an App Store notification that never arrived"
+                        );
                         true
                     }
                     // Left for the next sweep.
                     Err(error) => {
-                        tracing::warn!(kind, "could not heed a missed App Store notification: {error:#}");
+                        tracing::warn!(
+                            kind,
+                            "could not heed a missed App Store notification: {error:#}"
+                        );
                         false
                     }
                 },
@@ -1151,12 +1170,19 @@ mod tests {
     /// look the transaction up again, whatever it is called.
     #[test]
     fn a_notification_names_the_purchase_to_look_at_again() {
-        let refunded = signed(&transaction("1001", json!({"revocationDate": 1_790_000_000_000i64})));
+        let refunded = signed(&transaction(
+            "1001",
+            json!({"revocationDate": 1_790_000_000_000i64}),
+        ));
         for (kind, subtype, called) in [
             ("REFUND", None, "REFUND"),
             ("REFUND_REVERSED", None, "REFUND_REVERSED"),
             ("REVOKE", None, "REVOKE"),
-            ("SOMETHING_NEW", Some("AND_SO_ON"), "SOMETHING_NEW/AND_SO_ON"),
+            (
+                "SOMETHING_NEW",
+                Some("AND_SO_ON"),
+                "SOMETHING_NEW/AND_SO_ON",
+            ),
         ] {
             assert_eq!(
                 notice(&notification(kind, subtype, Some(refunded.clone()))).unwrap(),
@@ -1171,17 +1197,30 @@ mod tests {
 
     #[test]
     fn a_test_notification_is_a_test() {
-        assert_eq!(notice(&json!({"notificationType": "TEST"})).unwrap(), Notice::Test);
+        assert_eq!(
+            notice(&json!({"notificationType": "TEST"})).unwrap(),
+            Notice::Test
+        );
     }
 
     #[test]
     fn a_notification_about_another_app_or_no_purchase_is_nothing() {
-        let mut elsewhere = notification("REFUND", None, Some(signed(&transaction("1000", json!({})))));
+        let mut elsewhere = notification(
+            "REFUND",
+            None,
+            Some(signed(&transaction("1000", json!({})))),
+        );
         elsewhere["data"]["bundleId"] = json!("com.example.other");
-        assert!(matches!(notice(&elsewhere).unwrap(), Notice::Nothing { .. }));
+        assert!(matches!(
+            notice(&elsewhere).unwrap(),
+            Notice::Nothing { .. }
+        ));
 
         // The payload says ours, the transaction inside it says otherwise.
-        let other = signed(&transaction("1003", json!({"bundleId": "com.example.other"})));
+        let other = signed(&transaction(
+            "1003",
+            json!({"bundleId": "com.example.other"}),
+        ));
         assert!(matches!(
             notice(&notification("REFUND", None, Some(other))).unwrap(),
             Notice::Nothing { .. }
@@ -1189,7 +1228,9 @@ mod tests {
 
         assert_eq!(
             notice(&notification("EXTERNAL_PURCHASE_TOKEN", None, None)).unwrap(),
-            Notice::Nothing { kind: "EXTERNAL_PURCHASE_TOKEN".to_string() }
+            Notice::Nothing {
+                kind: "EXTERNAL_PURCHASE_TOKEN".to_string()
+            }
         );
     }
 
@@ -1213,13 +1254,19 @@ mod tests {
         assert!(notice(&notification("REFUND", None, Some(forged_inside))).is_err());
 
         assert!(read_notification("not a jws", &test_config(), UnixTime::now()).is_err());
-        let under_another_root =
-            read_notification(&signed(&json!({"notificationType": "TEST"})), &{
+        let under_another_root = read_notification(
+            &signed(&json!({"notificationType": "TEST"})),
+            &{
                 let mut config = test_config();
                 config.trusted_root = TrustedRoot::default();
                 config
-            }, UnixTime::now());
-        assert!(under_another_root.is_err(), "only the configured root is trusted");
+            },
+            UnixTime::now(),
+        );
+        assert!(
+            under_another_root.is_err(),
+            "only the configured root is trusted"
+        );
     }
 
     /// The whole of a refund arriving: the notification is a cue, Apple is
@@ -1235,8 +1282,12 @@ mod tests {
     async fn a_refund_notification_revokes_the_purchase_it_names() {
         use crate::models::supporter::{record_purchase, Store};
         let _turn = PURCHASE_ROWS.lock().await;
-        let Ok(url) = std::env::var("DATABASE_URL") else { return };
-        let Ok(db) = sqlx::PgPool::connect(&url).await else { return };
+        let Ok(url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(db) = sqlx::PgPool::connect(&url).await else {
+            return;
+        };
         let config = fake_app_store().await;
 
         let added_product = sqlx::query(
@@ -1261,8 +1312,13 @@ mod tests {
         // "1001" is refunded at the fake App Store; "1000" is not.
         let mut tx = db.begin().await.unwrap();
         for id in ["1001", "1000"] {
-            let pack = OwnedProduct { product: PRODUCT_ID.to_string(), year: PACK_YEAR };
-            record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true).await.unwrap();
+            let pack = OwnedProduct {
+                product: PRODUCT_ID.to_string(),
+                year: PACK_YEAR,
+            };
+            record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true)
+                .await
+                .unwrap();
         }
         tx.commit().await.unwrap();
 
@@ -1279,7 +1335,11 @@ mod tests {
         .await
         .unwrap();
 
-        sqlx::query("DELETE FROM users WHERE id = $1").bind(buyer).execute(&db).await.unwrap();
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(buyer)
+            .execute(&db)
+            .await
+            .unwrap();
         if added_product {
             sqlx::query("DELETE FROM store_products WHERE store = 'apple' AND product = $1")
                 .bind(PRODUCT_ID)
@@ -1307,8 +1367,12 @@ mod tests {
     async fn a_sweep_heeds_what_never_arrived_by_what_is_true_now() {
         use crate::models::supporter::{record_purchase, Store};
         let _turn = PURCHASE_ROWS.lock().await;
-        let Ok(url) = std::env::var("DATABASE_URL") else { return };
-        let Ok(db) = sqlx::PgPool::connect(&url).await else { return };
+        let Ok(url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(db) = sqlx::PgPool::connect(&url).await else {
+            return;
+        };
         let config = fake_app_store().await;
 
         let added_product = sqlx::query(
@@ -1332,8 +1396,13 @@ mod tests {
         .unwrap();
         let mut tx = db.begin().await.unwrap();
         for id in ["1001", "1000"] {
-            let pack = OwnedProduct { product: PRODUCT_ID.to_string(), year: PACK_YEAR };
-            record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true).await.unwrap();
+            let pack = OwnedProduct {
+                product: PRODUCT_ID.to_string(),
+                year: PACK_YEAR,
+            };
+            record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true)
+                .await
+                .unwrap();
         }
         tx.commit().await.unwrap();
 
@@ -1349,7 +1418,11 @@ mod tests {
         .await
         .unwrap();
 
-        sqlx::query("DELETE FROM users WHERE id = $1").bind(buyer).execute(&db).await.unwrap();
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(buyer)
+            .execute(&db)
+            .await
+            .unwrap();
         if added_product {
             sqlx::query("DELETE FROM store_products WHERE store = 'apple' AND product = $1")
                 .bind(PRODUCT_ID)
@@ -1370,7 +1443,10 @@ mod tests {
     #[tokio::test]
     async fn apple_is_asked_for_a_test_notification_with_our_key() {
         let config = fake_app_store().await;
-        assert_eq!(request_test_notification(&config).await.unwrap(), "test-token");
+        assert_eq!(
+            request_test_notification(&config).await.unwrap(),
+            "test-token"
+        );
 
         let mut refused = fake_app_store().await;
         refused.key_id = "WRONGKEY00".to_string();
@@ -1391,7 +1467,10 @@ mod tests {
         let error = read_transaction(&jws, TrustedRoot::default(), UnixTime::now())
             .err()
             .expect("our test root is not Apple's");
-        assert!(error.to_string().contains("does not lead to Apple"), "{error}");
+        assert!(
+            error.to_string().contains("does not lead to Apple"),
+            "{error}"
+        );
     }
 
     /// The chain is right and the signature is somebody else's.
@@ -1411,10 +1490,15 @@ mod tests {
     fn each_certificate_has_to_carry_apples_marker() {
         for (what, chain) in [
             ("leaf", [UNMARKED_LEAF, INTERMEDIATE, TEST_ROOT.0]),
-            ("intermediate", [LEAF_UNDER_UNMARKED, UNMARKED_INTERMEDIATE, TEST_ROOT.0]),
+            (
+                "intermediate",
+                [LEAF_UNDER_UNMARKED, UNMARKED_INTERMEDIATE, TEST_ROOT.0],
+            ),
         ] {
             let jws = signed_with(&transaction("1000", json!({})), PRIVATE_KEY, &chain);
-            let error = read(&jws).err().unwrap_or_else(|| panic!("an unmarked {what}"));
+            let error = read(&jws)
+                .err()
+                .unwrap_or_else(|| panic!("an unmarked {what}"));
             assert!(error.to_string().contains("is not"), "{what}: {error}");
         }
     }
@@ -1429,7 +1513,11 @@ mod tests {
         .unwrap();
         assert!(read(&unchained).is_err(), "no x5c");
 
-        let short = signed_with(&transaction("1000", json!({})), PRIVATE_KEY, &[LEAF, INTERMEDIATE]);
+        let short = signed_with(
+            &transaction("1000", json!({})),
+            PRIVATE_KEY,
+            &[LEAF, INTERMEDIATE],
+        );
         assert!(read(&short).is_err(), "two certificates");
     }
 
@@ -1447,7 +1535,13 @@ mod tests {
     fn apples_chain_is_refused_once_its_leaf_expires() {
         // The leaf is good until October 2027.
         let later = UnixTime::since_unix_epoch(Duration::from_secs(1_830_000_000));
-        assert!(verify_chain(APPLE_LEAF, APPLE_INTERMEDIATE, TrustedRoot::default(), later).is_err());
+        assert!(verify_chain(
+            APPLE_LEAF,
+            APPLE_INTERMEDIATE,
+            TrustedRoot::default(),
+            later
+        )
+        .is_err());
     }
 
     #[test]

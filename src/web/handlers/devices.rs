@@ -80,7 +80,13 @@ mod tests {
     fn the_device_cookie_names_the_token_to_the_sign_out() {
         let cookie = device_cookie("abc123");
         assert!(cookie.starts_with("oeee_device=abc123;"));
-        for part in ["Path=/", "Max-Age=34560000", "Secure", "HttpOnly", "SameSite=Lax"] {
+        for part in [
+            "Path=/",
+            "Max-Age=34560000",
+            "Secure",
+            "HttpOnly",
+            "SameSite=Lax",
+        ] {
             assert!(cookie.contains(part), "{part} in {cookie}");
         }
     }

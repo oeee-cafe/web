@@ -1,11 +1,11 @@
 use crate::app_error::AppError;
 use crate::models::user::AuthSession;
 use crate::web::state::AppState;
+use axum::body::Bytes;
 use axum::extract::{
     ws::close_code, ws::CloseFrame, ws::Message, ws::WebSocket, Path, Query, State,
     WebSocketUpgrade,
 };
-use axum::body::Bytes;
 use axum::response::Response;
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
@@ -148,7 +148,14 @@ pub async fn websocket_collaborate_handler(
         .user
         .ok_or_else(|| anyhow::anyhow!("Authentication required"))?;
     Ok(ws.on_upgrade(move |socket| {
-        handle_socket(socket, room_uuid, state, user.id, user.login_name, resume.position())
+        handle_socket(
+            socket,
+            room_uuid,
+            state,
+            user.id,
+            user.login_name,
+            resume.position(),
+        )
     }))
 }
 
@@ -353,7 +360,11 @@ pub async fn handle_socket(
     // Send history to new connection, remembering the highest sequence number
     // it contained so the live stream can skip messages history already covered
     let (history_identity, max_history_seq) = match send_history_to_new_connection(
-        &state, room_uuid, &mut sender, &connection_id, resume_position,
+        &state,
+        room_uuid,
+        &mut sender,
+        &connection_id,
+        resume_position,
     )
     .await
     {
@@ -479,8 +490,7 @@ pub async fn handle_socket(
         .expect("close channel is never held across a panic")
         .is_none();
     if goodbye_pending {
-        let _ =
-            tokio::time::timeout(std::time::Duration::from_secs(1), &mut outgoing_task).await;
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(1), &mut outgoing_task).await;
     }
     outgoing_task.abort();
 }
@@ -543,7 +553,10 @@ async fn heartbeat_loop(state: AppState, mut info: super::redis_state::Connectio
         }
         let store = redis_messages::RedisMessageStore::new(state.redis_pool.clone());
         if let Err(e) = store.touch_history(info.room_id).await {
-            error!("Failed to refresh history lifetime for room {}: {}", info.room_id, e);
+            error!(
+                "Failed to refresh history lifetime for room {}: {}",
+                info.room_id, e
+            );
         }
     }
 }
@@ -801,7 +814,13 @@ mod reset_upload_tests {
     use crate::web::handlers::collaborate::redis_messages::MAX_CHECKPOINT_BYTES;
 
     fn upload(accepted: bool) -> PendingReset {
-        PendingReset { base_seq: 7, remaining: 510, payloads: Vec::new(), bytes: 0, accepted }
+        PendingReset {
+            base_seq: 7,
+            remaining: 510,
+            payloads: Vec::new(),
+            bytes: 0,
+            accepted,
+        }
     }
 
     /// An accepted upload holding the largest checkpoint there can be, every
@@ -846,9 +865,7 @@ mod reset_upload_tests {
 
 #[cfg(test)]
 mod forwarding_tests {
-    use super::{
-        replay_batch, replay_batches, should_forward_to_connection, REPLAY_BATCH_BYTES,
-    };
+    use super::{replay_batch, replay_batches, should_forward_to_connection, REPLAY_BATCH_BYTES};
     use crate::web::handlers::collaborate::messages::MessageType;
     use crate::web::handlers::collaborate::redis_state::RoomBroadcast;
     use uuid::Uuid;
@@ -950,7 +967,9 @@ mod forwarding_tests {
         let history_id = Uuid::from_slice(&frame[1..17]).unwrap();
         let count = u32::from_le_bytes(frame[17..21].try_into().unwrap());
         let mut body = Vec::new();
-        ZlibDecoder::new(&frame[21..]).read_to_end(&mut body).unwrap();
+        ZlibDecoder::new(&frame[21..])
+            .read_to_end(&mut body)
+            .unwrap();
         let mut entries = Vec::new();
         let mut at = 0;
         while at < body.len() {
@@ -1039,7 +1058,6 @@ mod forwarding_tests {
             "batched {batched} bytes against {framed} framed"
         );
     }
-
 }
 
 // Returns the history's identity and the highest sequence number the replay
@@ -1126,8 +1144,12 @@ async fn send_history_to_new_connection(
         .await
     {
         Ok(since) => {
-            let redis_messages::HistorySince { history_id, max_seq: current_max_seq, after_seq, entries } =
-                since;
+            let redis_messages::HistorySince {
+                history_id,
+                max_seq: current_max_seq,
+                after_seq,
+                entries,
+            } = since;
             // Sent, or already on the client's canvas: what the live stream
             // may skip. Rises with what is fed below.
             let mut max_seq = after_seq;
@@ -1153,7 +1175,11 @@ async fn send_history_to_new_connection(
             replay_start.extend_from_slice(history_id.as_bytes());
             replay_start.extend_from_slice(&after_seq.to_le_bytes());
             replay_start.extend_from_slice(&current_max_seq.to_le_bytes());
-            if sender.send(Message::Binary(replay_start.into())).await.is_err() {
+            if sender
+                .send(Message::Binary(replay_start.into()))
+                .await
+                .is_err()
+            {
                 warn!("Failed to send replay boundary to {}", connection_id);
                 return Some((history_id, after_seq));
             }
@@ -1195,7 +1221,11 @@ async fn send_history_to_new_connection(
             caught_up.push(messages::MessageType::CaughtUp as u8);
             caught_up.extend_from_slice(history_id.as_bytes());
             caught_up.extend_from_slice(&max_seq.to_le_bytes());
-            if sender.send(Message::Binary(caught_up.into())).await.is_err() {
+            if sender
+                .send(Message::Binary(caught_up.into()))
+                .await
+                .is_err()
+            {
                 warn!("Failed to send caught-up marker to {}", connection_id);
             }
             Some((history_id, max_seq))
@@ -1302,9 +1332,15 @@ async fn handle_incoming_messages(
                     // make. The room is freed to ask somebody else.
                     warn!(
                         "Discarding a checkpoint over {} bytes from connection {} in room {}",
-                        redis_messages::MAX_CHECKPOINT_BYTES, ctx.connection_id, ctx.room_uuid
+                        redis_messages::MAX_CHECKPOINT_BYTES,
+                        ctx.connection_id,
+                        ctx.room_uuid
                     );
-                    let _ = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await;
+                    let _ = ctx
+                        .state
+                        .redis_state
+                        .clear_reset_pending(ctx.room_uuid)
+                        .await;
                 }
                 reset.remaining -= 1;
                 if reset.remaining == 0 {
@@ -1383,7 +1419,10 @@ async fn handle_incoming_messages(
                     let store =
                         redis_messages::RedisMessageStore::new(ctx.state.redis_pool.clone());
                     if let Err(e) = store.append_chat_message(ctx.room_uuid, data).await {
-                        error!("Failed to preserve recent chat in room {}: {}", ctx.room_uuid, e);
+                        error!(
+                            "Failed to preserve recent chat in room {}: {}",
+                            ctx.room_uuid, e
+                        );
                     }
                     // And into the recording. `data` here is the frame the
                     // server built in `process_server_message`, so the name on
@@ -1400,7 +1439,12 @@ async fn handle_incoming_messages(
     // actually ours: a connection whose unasked-for upload we were discarding
     // would otherwise take the job away from whoever really has it.
     if pending_reset.is_some_and(|reset| reset.accepted) {
-        if let Err(e) = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await {
+        if let Err(e) = ctx
+            .state
+            .redis_state
+            .clear_reset_pending(ctx.room_uuid)
+            .await
+        {
             error!(
                 "Failed to clear reset-pending flag for room {}: {}",
                 ctx.room_uuid, e
@@ -1419,12 +1463,20 @@ async fn send_recent_chat_to_new_connection(
     match store.get_recent_chat(room_uuid).await {
         Ok(messages) => {
             for payload in &messages {
-                if sender.send(Message::Binary(payload.clone().into())).await.is_err() {
+                if sender
+                    .send(Message::Binary(payload.clone().into()))
+                    .await
+                    .is_err()
+                {
                     warn!("Failed to replay recent chat to {}", connection_id);
                     break;
                 }
             }
-            debug!("Sent {} recent chat messages to {}", messages.len(), connection_id);
+            debug!(
+                "Sent {} recent chat messages to {}",
+                messages.len(),
+                connection_id
+            );
         }
         Err(e) => error!("Failed to load recent chat for room {}: {}", room_uuid, e),
     }
@@ -1513,7 +1565,11 @@ async fn finish_reset(ctx: &SessionContext<'_>, reset: PendingReset) {
             "Rejecting malformed reset snapshots from connection {} in room {}",
             ctx.connection_id, ctx.room_uuid
         );
-        let _ = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await;
+        let _ = ctx
+            .state
+            .redis_state
+            .clear_reset_pending(ctx.room_uuid)
+            .await;
         return;
     }
     let redis_store = redis_messages::RedisMessageStore::new(ctx.state.redis_pool.clone());
@@ -1562,7 +1618,12 @@ async fn finish_reset(ctx: &SessionContext<'_>, reset: PendingReset) {
         }
     }
 
-    if let Err(e) = ctx.state.redis_state.clear_reset_pending(ctx.room_uuid).await {
+    if let Err(e) = ctx
+        .state
+        .redis_state
+        .clear_reset_pending(ctx.room_uuid)
+        .await
+    {
         error!(
             "Failed to clear reset-pending flag for room {}: {}",
             ctx.room_uuid, e
@@ -1622,7 +1683,12 @@ async fn maybe_request_reset(ctx: &SessionContext<'_>, size: redis_messages::His
         return;
     }
 
-    match ctx.state.redis_state.try_open_reset_query(ctx.room_uuid).await {
+    match ctx
+        .state
+        .redis_state
+        .try_open_reset_query(ctx.room_uuid)
+        .await
+    {
         Ok(true) => {}
         Ok(false) => return, // a query or an upload is already in flight
         Err(e) => {
@@ -1646,7 +1712,12 @@ async fn maybe_request_reset(ctx: &SessionContext<'_>, size: redis_messages::His
 /// Asks again regardless of what is already outstanding, for the room that has
 /// run out of history and cannot draw until somebody checkpoints it.
 async fn force_reset_request(ctx: &SessionContext<'_>) {
-    match ctx.state.redis_state.reopen_reset_query(ctx.room_uuid).await {
+    match ctx
+        .state
+        .redis_state
+        .reopen_reset_query(ctx.room_uuid)
+        .await
+    {
         // A query is already out and unanswered; asking again would only add
         // to what the room cannot deliver.
         Ok(false) => return,

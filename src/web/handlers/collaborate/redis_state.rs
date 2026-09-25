@@ -17,10 +17,10 @@ const USER_ID_TTL: u64 = 3600; // matches (and is refreshed with) message histor
 
 // TTL constants
 pub(crate) const ACTIVITY_TTL: u64 = 3600; // 1 hour
-// How long a room waits for somebody to volunteer for a checkpoint before it
-// asks again. Answering is one message and costs a willing client nothing, so
-// a room where nobody answers is a room where nobody *can*, and asking again
-// soon is what gets a checkpoint out of the first client to finish catching up.
+                                           // How long a room waits for somebody to volunteer for a checkpoint before it
+                                           // asks again. Answering is one message and costs a willing client nothing, so
+                                           // a room where nobody answers is a room where nobody *can*, and asking again
+                                           // soon is what gets a checkpoint out of the first client to finish catching up.
 const RESET_QUERY_TTL: u64 = 20;
 // How long the volunteer then has to deliver it. Exporting every layer of
 // every participant as a PNG is not quick on a phone, and a client that gives
@@ -474,8 +474,7 @@ return 0
     pub async fn get_user_ids(
         &self,
         room_uuid: Uuid,
-    ) -> Result<std::collections::HashMap<Uuid, u8>, Box<dyn std::error::Error + Send + Sync>>
-    {
+    ) -> Result<std::collections::HashMap<Uuid, u8>, Box<dyn std::error::Error + Send + Sync>> {
         let mut conn = self.pool.get().await?;
         let key = format!("{}{}", USER_ID_PREFIX, room_uuid);
 

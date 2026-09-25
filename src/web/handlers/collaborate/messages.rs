@@ -243,8 +243,8 @@ impl ChatMessage {
         let message_len =
             u16::from_le_bytes([*data.get(username_end)?, *data.get(username_end + 1)?]) as usize;
         let message_start = username_end + 2;
-        let message = std::str::from_utf8(data.get(message_start..message_start + message_len)?)
-            .ok()?;
+        let message =
+            std::str::from_utf8(data.get(message_start..message_start + message_len)?).ok()?;
         Some(Self {
             user_id,
             timestamp,

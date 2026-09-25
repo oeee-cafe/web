@@ -39,8 +39,8 @@ impl PostgresStore {
         conn: &mut PgConnection,
         record: &Record,
     ) -> session_store::Result<()> {
-        let data = rmp_serde::to_vec(record)
-            .map_err(|e| session_store::Error::Encode(e.to_string()))?;
+        let data =
+            rmp_serde::to_vec(record).map_err(|e| session_store::Error::Encode(e.to_string()))?;
         let expiry_date =
             DateTime::<Utc>::from_timestamp_nanos(record.expiry_date.unix_timestamp_nanos() as i64);
         sqlx::query(

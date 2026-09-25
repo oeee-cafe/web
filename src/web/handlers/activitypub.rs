@@ -7,9 +7,7 @@ use activitypub_federation::kinds::actor::PersonType;
 use activitypub_federation::protocol::context::WithContext;
 use activitypub_federation::protocol::public_key::PublicKey;
 use activitypub_federation::protocol::verification::verify_domains_match;
-use activitypub_federation::traits::{
-    Activity, Actor as ActivityPubFederationActor, Object,
-};
+use activitypub_federation::traits::{Activity, Actor as ActivityPubFederationActor, Object};
 
 use activitystreams_kinds::activity::{
     AcceptType, AnnounceType, CreateType, DeleteType, FollowType, UndoType, UpdateType,
@@ -1178,13 +1176,9 @@ impl Tag {
     fn hashtag(domain: &str, tag: &crate::models::tag::PostTag) -> Option<Tag> {
         Some(Tag {
             r#type: "Hashtag".to_string(),
-            href: format!(
-                "https://{}/tags/{}",
-                domain,
-                urlencoding::encode(&tag.name)
-            )
-            .parse()
-            .ok(),
+            href: format!("https://{}/tags/{}", domain, urlencoding::encode(&tag.name))
+                .parse()
+                .ok(),
             // With the `#`, which is what every implementation expects to read
             // and what the name in the database deliberately does not carry.
             name: Some(format!("#{}", tag.display_name)),
