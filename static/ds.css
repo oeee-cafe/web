@@ -227,30 +227,9 @@
    these layouts were drawn to go. `clamp()` is newer than the Firefox 56
    floor, which is why it is only ever inside rules keyed on data-app: no
    browser carries it, and a custom property's value is not parsed until
-   it is used.
-
-   A narrow screen reads a size larger, the way Hacker News's does: one
-   breakpoint, by width alone, under which the scale is 1.15. 750px takes
-   in every phone upright and an iPad mini upright (744px), whose pixel is
-   a fifth smaller than the larger iPads' and on which the wide layout's
-   13px read as a page zoomed out. Width alone, because asking what points
-   at the screen -- `pointer: coarse` -- took in a phone on its side as
-   well, and the text grew when it was turned. The Mac and Windows apps are
-   left out: a window made narrow is still on a desk, and its first row is
-   set against the window's own controls. In the phone and tablet apps the
-   factor rides on the reader's own text size. */
+   it is used. */
 html[data-app] {
   --ds-text-scale: clamp(0.8, var(--oeee-text-scale, 1), 2);
-}
-
-@media (max-width: 750px) {
-  :root:not([data-form="desktop"]) {
-    --ds-text-scale: 1.15;
-  }
-
-  :root[data-form="handheld"] {
-    --ds-text-scale: clamp(0.8, calc(var(--oeee-text-scale, 1) * 1.15), 2);
-  }
 }
 
 /* ---------------------------------------------------------------------------
