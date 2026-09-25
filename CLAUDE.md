@@ -34,11 +34,17 @@ Linux CI box whose locale data disagrees with the one that will run it.
 ### Deploys
 
 `mise run deploy` (`deploy.py`, standard-library Python) runs on the
-development Mac, not the server: it builds `oeee-cafe:<commit>` from
-origin/main in a clean checkout of its own, ships the image over ssh (host
-alias `oeee-cafe-deploy` in `~/.ssh/config`), and drives the switch there one
-ssh command at a time. Nothing compiles on the server, and its compose file
-has no `build:` on purpose.
+development Mac, not the server, and drives the switch there one ssh command
+at a time (host alias `oeee-cafe-deploy` in `~/.ssh/config`). The image comes
+from GitHub Actions: `.github/workflows/image.yml` builds every commit on main
+on an arm64 runner, uploads its debug info to Sentry and pushes
+`ghcr.io/oeee-cafe/web:<commit>`, and the deploy waits for that run with `gh`
+and has the server pull the image itself. The Mac is often on cellular data,
+which is the whole point: no image and no debug info cross its connection.
+`mise run deploy-local` is the old way, kept for when GitHub is the problem:
+it builds `oeee-cafe:<commit>` on the Mac in a clean checkout of its own and
+ships it over ssh. Nothing compiles on the server, and its compose file has
+no `build:` on purpose.
 
 The server's `~/oeee-cafe-data` is not a checkout and runs no script of its
 own. Each deploy copies in `docker-compose.yml` and `proxy/Caddyfile` from
@@ -56,12 +62,12 @@ that never answers `/health`, so the colour already serving stays. A new key
 file belongs in `AppConfig::load_keys`, not in the code that uses it.
 
 The image's binary carries no debug info: the Dockerfile splits it off and
-`deploy.py` uploads it to Sentry (`sentry-cli` must be logged in), which is
-where file and line come back. The browser bundles for the two drawing pages
+the image workflow uploads it to Sentry (`deploy-local` does it from the Mac,
+with `sentry-cli` logged in there), which is where file and line come back. The browser bundles for the two drawing pages
 get the same treatment in Sentry's `neo-cucumber` project: Vite writes a
 source map beside each file, the Dockerfile stamps debug ids into both with
 `sentry-cli sourcemaps inject`, sets them aside in the `debug-files` stage
-and deletes the maps from what the image serves, and `deploy.py` uploads
+and deletes the maps from what the image serves, and the same step uploads
 them. Nothing is keyed on a release name, so a map that is already there is a
 no-op to upload again. Each deploy is a Sentry release named by its
 full commit, which is also what the server reports as its release

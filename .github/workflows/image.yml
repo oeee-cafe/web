@@ -1,0 +1,148 @@
+# Builds oeee-cafe for every commit on main and pushes it to GHCR as
+# ghcr.io/oeee-cafe/web:<commit>, which is what `mise run deploy` has the
+# server pull. The development Mac deploys over a cellular connection, so the
+# image and the debug info never pass through it: GitHub builds the image and
+# uploads the debug info to Sentry, and the server downloads the image itself.
+# `mise run deploy-local` still builds on the Mac and ships over ssh, for when
+# this is broken or GitHub is down.
+#
+# The same Dockerfile and the same steps as deploy.py's build_and_ship, in the
+# same order: debug info reaches Sentry before the image is pushed, so an image
+# the server can pull is always one whose stack traces Sentry can symbolicate.
+name: Image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Only main's newest commit is ever deployed, so a build that a newer push has
+# overtaken is not worth finishing.
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/oeee-cafe/web
+  SENTRY_ORG: limeburst
+  SENTRY_PROJECT: oeee-cafe
+  SENTRY_JS_PROJECT: neo-cucumber
+
+jobs:
+  build:
+    # The server is arm64 too, so this builds natively rather than under QEMU.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # sqlx checks every query against a real schema at compile time, and the
+      # Dockerfile reaches it as host.docker.internal:5433. On Linux that name
+      # means nothing, so the build is handed this container's address for it
+      # instead; the builder is a container on the same bridge. Postgres
+      # listens on 5433 itself so no published port is involved.
+      - name: Start the build database
+        id: db
+        run: |
+          docker run -d --quiet --name build-db \
+            -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=oeee_cafe \
+            postgres:18 -c port=5433
+          # Over TCP: while the image initialises the database it runs a server
+          # on the socket alone, and pg_isready there would answer too soon.
+          for _ in $(seq 60); do
+            docker exec build-db pg_isready -q -h 127.0.0.1 -p 5433 -U postgres && break
+            sleep 1
+          done
+          docker exec build-db pg_isready -h 127.0.0.1 -p 5433 -U postgres
+          echo "ip=$(docker inspect -f '{{.NetworkSettings.IPAddress}}' build-db)" >> "$GITHUB_OUTPUT"
+
+      # With psql rather than sqlx-cli, which would be a compile of its own.
+      # Each file in a transaction of its own, as sqlx runs them.
+      - name: Apply migrations
+        run: |
+          for migration in migrations/*.up.sql; do
+            docker exec -i build-db psql -q -X -v ON_ERROR_STOP=1 --single-transaction \
+              -h 127.0.0.1 -p 5433 -U postgres oeee_cafe < "$migration"
+          done
+
+      - uses: docker/setup-buildx-action@v4
+        id: buildx
+
+      # The Dockerfile's cache mounts live in the builder, which is new every
+      # run. sccache's is carried between runs here; that is what keeps a
+      # change to our own code from recompiling every dependency. Keyed by
+      # commit so each run saves what it added, restoring the newest before it.
+      - name: Restore the compiler cache
+        uses: actions/cache@v6
+        id: cache
+        with:
+          path: cache-mounts
+          key: cache-mounts-${{ github.sha }}
+          restore-keys: cache-mounts-
+      - uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-dir: cache-mounts
+          cache-map: |
+            {
+              "sccache": "/sccache",
+              "cargo-registry": "/usr/local/cargo/registry"
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+
+      - name: Build the debug info and source maps
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          target: debug-files
+          outputs: type=local,dest=debug-files
+          add-hosts: host.docker.internal:${{ steps.db.outputs.ip }}
+          cache-from: type=gha
+
+      - uses: jdx/mise-action@v4
+        with:
+          install_args: sentry-cli
+
+      - name: Upload the debug info and source maps to Sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::error::The SENTRY_AUTH_TOKEN secret is not set, so this release's stack traces would have no file or line"
+            exit 1
+          fi
+          sentry-cli debug-files upload --no-zips debug-files
+          sentry-cli sourcemaps upload --project "$SENTRY_JS_PROJECT" debug-files/sourcemaps
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Everything but the last stage comes from the build above. GIT_COMMIT
+      # versions the static asset URLs the server hands out, so each deploy
+      # invalidates browser and CDN caches exactly once. No provenance
+      # attestation, so what the server pulls is one plain arm64 manifest.
+      - name: Build and push the image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          add-hosts: host.docker.internal:${{ steps.db.outputs.ip }}
+          build-args: GIT_COMMIT=${{ github.sha }}
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          provenance: false
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
