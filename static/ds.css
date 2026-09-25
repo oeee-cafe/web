@@ -460,6 +460,23 @@ html[data-app="windows"] ::-webkit-scrollbar-track {
   background: transparent;
 }
 
+/* Everywhere else the scrollbars take the same colours through
+   `scrollbar-color`, which recolours whatever the platform draws and
+   leaves its shape alone, so macOS and the phones keep their overlay bars.
+   The Windows app is left out: in Chromium `scrollbar-color` switches
+   ::-webkit-scrollbar off, and the thin thumb above would be lost. It is
+   inherited, so it is set once on .ds-page; the page's own scrollbar,
+   where the page scrolls (phones), is the root's, hence :has() as well --
+   on its own line, since an engine without it drops the whole rule.
+   Firefox before 64 knows neither and keeps its own bars. */
+html:not([data-app="windows"]) .ds-page {
+  scrollbar-color: var(--ds-line-strong) transparent;
+}
+
+html:not([data-app="windows"]):has(> body.ds-page) {
+  scrollbar-color: var(--ds-line-strong) transparent;
+}
+
 /* ---------------------------------------------------------------------------
    The content area
 
