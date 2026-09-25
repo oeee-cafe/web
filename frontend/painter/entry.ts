@@ -8,6 +8,7 @@ import {
   type PainterHandle,
 } from "neo-cucumber";
 import { feelInApp, type Haptic, offerPainterToApp } from "../shared/appBridge";
+import { refuseSelection } from "../shared/selection";
 import { say } from "../shared/siteDialog";
 import {
   blobToArrayBuffer,
@@ -184,6 +185,9 @@ window.addEventListener("beforeunload", (event) => {
   // Chrome shows its own wording, but only when returnValue is set.
   event.returnValue = "";
 });
+
+// Beside painter.css, which refuses selection for the page: see selection.ts.
+refuseSelection();
 
 const startedAt = Date.now();
 const painter = mount(root, {
