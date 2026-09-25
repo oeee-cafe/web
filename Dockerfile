@@ -52,12 +52,25 @@ RUN npm install --global corepack@latest
 RUN corepack enable pnpm
 RUN corepack use pnpm@latest-10
 RUN pnpm install --frozen-lockfile
-RUN pnpm run build
+# The two bundles that report to Sentry (dist/ for the collaborative page,
+# dist-offline/ for the drawing page) are built with a source map beside each
+# file. sentry-cli stamps a debug id into every file and its map, which is
+# how Sentry pairs an event's frames with the map without a release to go by;
+# then the stamped files and maps are set aside for deploy.py to upload, and
+# the maps are deleted from what the runtime image serves.
+RUN pnpm run build && \
+    pnpm exec sentry-cli sourcemaps inject dist dist-offline && \
+    mkdir -p /app/sourcemaps && \
+    cp -r dist /app/sourcemaps/collaborate && \
+    cp -r dist-offline /app/sourcemaps/offline && \
+    find dist dist-offline -name '*.map' -delete
 
 # `docker build --target debug-files --output type=local,dest=DIR` writes
-# oeee-cafe.debug to DIR for uploading, from the same cached build as the image.
+# oeee-cafe.debug and sourcemaps/ to DIR for uploading, from the same cached
+# build as the image.
 FROM scratch AS debug-files
 COPY --from=rust-builder /app/oeee-cafe.debug /
+COPY --from=node-builder-neo-cucumber /app/sourcemaps/ /sourcemaps/
 
 # Build runtime image. The last stage, so it is what a plain `docker build` makes.
 #

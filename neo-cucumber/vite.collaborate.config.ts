@@ -36,6 +36,10 @@ export default defineConfig({
     target: LEGACY_BROWSER_TARGET,
     outDir: resolve(packageRoot, "dist"),
     emptyOutDir: true,
+    // A map beside each file, for Sentry. The maps never reach the image's
+    // served directories: the Dockerfile injects debug ids, sets them aside
+    // for deploy.py to upload, and deletes them from what is served.
+    sourcemap: true,
     rollupOptions: {
       input: {
         index: resolve(collaborateRoot, "index.html"),

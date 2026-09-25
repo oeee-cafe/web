@@ -57,6 +57,10 @@ belong to whichever project that machine set up last. Without the upload, a
 release goes out whose stack traces in Sentry have no file or line, so the
 deploy stops rather than find that out from the first error. SENTRY_UPLOAD=skip
 deploys anyway.
+
+The browser bundles are the same story in Sentry's neo-cucumber project: the
+image serves them without their source maps, and the maps go up here instead,
+paired with the files by the debug ids the Dockerfile stamped into both.
 """
 
 from __future__ import annotations
@@ -100,6 +104,9 @@ SENTRY_ENV = {
     "SENTRY_ORG": os.environ.get("SENTRY_ORG", "limeburst"),
     "SENTRY_PROJECT": os.environ.get("SENTRY_PROJECT", "oeee-cafe"),
 }
+# Where the browser bundles report (frontend/shared/sentry.ts), which is a
+# project of its own; their source maps go there.
+SENTRY_JS_PROJECT = os.environ.get("SENTRY_JS_PROJECT", "neo-cucumber")
 # The repository as Sentry's GitHub integration names it.
 SENTRY_REPOSITORY = "oeee-cafe/web"
 BUILD_DB = "oeee-cafe-build-db"
@@ -447,6 +454,18 @@ def build_and_ship(server: Server, commit: str) -> None:
             "upload",
             "--no-zips",
             DEBUG_DIR,
+            env={**os.environ, **SENTRY_ENV},
+        )
+        # The browser bundles' maps, to the project they report to. Paired by
+        # the debug ids stamped in the Dockerfile, so no release is named.
+        step(f"Uploading source maps to Sentry ({SENTRY_JS_PROJECT})...")
+        run(
+            "sentry-cli",
+            "sourcemaps",
+            "upload",
+            "--project",
+            SENTRY_JS_PROJECT,
+            DEBUG_DIR / "sourcemaps",
             env={**os.environ, **SENTRY_ENV},
         )
 

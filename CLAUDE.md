@@ -57,7 +57,13 @@ file belongs in `AppConfig::load_keys`, not in the code that uses it.
 
 The image's binary carries no debug info: the Dockerfile splits it off and
 `deploy.py` uploads it to Sentry (`sentry-cli` must be logged in), which is
-where file and line come back. Each deploy is a Sentry release named by its
+where file and line come back. The browser bundles for the two drawing pages
+get the same treatment in Sentry's `neo-cucumber` project: Vite writes a
+source map beside each file, the Dockerfile stamps debug ids into both with
+`sentry-cli sourcemaps inject`, sets them aside in the `debug-files` stage
+and deletes the maps from what the image serves, and `deploy.py` uploads
+them. Nothing is keyed on a release name, so a map that is already there is a
+no-op to upload again. Each deploy is a Sentry release named by its
 full commit, which is also what the server reports as its release
 (`build_info::git_commit`), with the deploy or rollback recorded against it.
 `mise install` provides `sentry-cli`, `sqlx-cli` and `ruff` at the versions
