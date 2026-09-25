@@ -815,4 +815,3 @@ pub async fn find_all_users(
     );
     Ok(rows.fetch_all(&mut **tx).await?)
 }
-

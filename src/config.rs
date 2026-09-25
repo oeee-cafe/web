@@ -422,7 +422,10 @@ mod tests {
         assert!(store.sandbox_api_url.contains("sandbox"));
 
         let microsoft = parsed.microsoft_store.expect("a [microsoft_store] table");
-        assert_eq!(microsoft.token_url, None, "the tenant's own, unless a test says");
+        assert_eq!(
+            microsoft.token_url, None,
+            "the tenant's own, unless a test says"
+        );
         assert_eq!(
             microsoft.collections_url,
             "https://purchase.mp.microsoft.com/v8.0/b2b/collections/query"

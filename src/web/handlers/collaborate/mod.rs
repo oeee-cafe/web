@@ -21,6 +21,6 @@ pub use types::*;
 pub use websocket::websocket_collaborate_handler;
 
 #[cfg(test)]
-mod protocol_integration_tests;
-#[cfg(test)]
 mod handler_integration_tests;
+#[cfg(test)]
+mod protocol_integration_tests;

@@ -36,7 +36,10 @@ pub(crate) const COMMENTS_PER_BATCH: i64 = 30;
 /// Context for comments_fragment.jinja: a batch of comments, and where the
 /// next one comes from while there may be one -- a full batch -- keyed by
 /// the last comment in this one (find_recent_comments).
-pub(crate) fn comments_context(rows: Vec<NotificationComment>, batch_path: &str) -> minijinja::Value {
+pub(crate) fn comments_context(
+    rows: Vec<NotificationComment>,
+    batch_path: &str,
+) -> minijinja::Value {
     let next_url = match rows.last() {
         Some(last) if rows.len() as i64 == COMMENTS_PER_BATCH => {
             Some(format!("{}?after={}", batch_path, last.id))
@@ -256,16 +259,19 @@ async fn feed_comments_page(
     let comments = comments_batch(&mut tx, scope, auth_session.user.as_ref(), None).await?;
     tx.commit().await?;
 
-    let rendered = state.env.get_template("home_comments.jinja")?.render(context! {
-        current_user => auth_session.user,
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        feed_switch => feed.name(),
-        feed_view => "comments",
-        comments => comments_context(comments, feed.comments_batch_path()),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .env
+        .get_template("home_comments.jinja")?
+        .render(context! {
+            current_user => auth_session.user,
+            messages => messages.into_iter().collect::<Vec<_>>(),
+            feed_switch => feed.name(),
+            feed_view => "comments",
+            comments => comments_context(comments, feed.comments_batch_path()),
+            draft_post_count => common_ctx.draft_post_count,
+            unread_notification_count => common_ctx.unread_notification_count,
+            ftl_lang
+        })?;
     Ok(Html(rendered).into_response())
 }
 
@@ -282,11 +288,14 @@ async fn feed_comments_batch(
     let comments = comments_batch(&mut tx, scope, auth_session.user.as_ref(), query.after).await?;
     tx.commit().await?;
 
-    let rendered = state.env.get_template("comments_fragment.jinja")?.render(context! {
-        comments => comments_context(comments, feed.comments_batch_path()),
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .env
+        .get_template("comments_fragment.jinja")?
+        .render(context! {
+            comments => comments_context(comments, feed.comments_batch_path()),
+            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+            ftl_lang,
+        })?;
     Ok(Html(rendered).into_response())
 }
 
@@ -520,10 +529,10 @@ pub struct AddReactionRequest {
 
 #[cfg(test)]
 mod tests {
-    use chrono::Datelike;
     use crate::models::comment::NotificationComment;
     use crate::models::post::SerializablePostForHome;
     use crate::web::handlers::test_support;
+    use chrono::Datelike;
     use minijinja::context;
     use serde_json::json;
 
@@ -599,7 +608,10 @@ mod tests {
         let signed_out = home
             .render(home_context(vec![sample_post()], false))
             .expect("home.jinja renders");
-        assert!(!signed_out.contains("feed-switch"), "one feed signed out, no switch");
+        assert!(
+            !signed_out.contains("feed-switch"),
+            "one feed signed out, no switch"
+        );
         assert!(signed_out.contains(r#"<a href="/" aria-current="page">feed-view-drawings</a>"#));
         assert!(signed_out.contains(r#"<a href="/comments">feed-view-comments</a>"#));
 
@@ -614,13 +626,12 @@ mod tests {
         let recent = signed_in("recent");
         assert!(recent.contains(r#"<a href="/following">feed-following</a>"#));
         assert!(recent.contains(r#"<a href="/joined">feed-communities</a>"#));
-        for (feed, path) in [
-            ("following", "/following"),
-            ("communities", "/joined"),
-        ] {
+        for (feed, path) in [("following", "/following"), ("communities", "/joined")] {
             let page = signed_in(feed);
             assert!(
-                page.contains(&format!(r#"<a href="{path}" aria-current="page">feed-{feed}</a>"#)),
+                page.contains(&format!(
+                    r#"<a href="{path}" aria-current="page">feed-{feed}</a>"#
+                )),
                 "{feed} is the one marked"
             );
             assert!(page.contains(r#"<a href="/">feed-recent</a>"#));
@@ -856,7 +867,10 @@ mod tests {
             60,
             Some(&month),
         ));
-        assert!(!rendered.contains("feed-period"), "the same month, no new heading");
+        assert!(
+            !rendered.contains("feed-period"),
+            "the same month, no new heading"
+        );
         assert!(
             rendered.contains(&format!("&amp;period={month}")),
             "the next batch is told"
@@ -949,9 +963,8 @@ mod tests {
         assert!(rendered.contains(&format!(
             r#"hx-get="&#x2f;api&#x2f;following&#x2f;comments?after={last}""#
         )));
-        assert!(rendered.contains(
-            r#"<a class="feed-comments-more" href="&#x2f;following&#x2f;comments">"#
-        ));
+        assert!(rendered
+            .contains(r#"<a class="feed-comments-more" href="&#x2f;following&#x2f;comments">"#));
     }
 
     /// A feed's comments are a page of their own, the other half of its
@@ -976,12 +989,17 @@ mod tests {
         let comments = page("communities", "comments", "home_comments.jinja");
         assert!(comments.contains(r#"<div class="comment-grid">"#));
         assert!(comments.contains("Lovely colours"));
-        assert!(!comments.contains(r#"id="post-feed-grid""#), "no drawings under it");
-        assert!(comments.contains(r#"<a href="/joined/comments" aria-current="page">feed-communities</a>"#));
+        assert!(
+            !comments.contains(r#"id="post-feed-grid""#),
+            "no drawings under it"
+        );
+        assert!(comments
+            .contains(r#"<a href="/joined/comments" aria-current="page">feed-communities</a>"#));
         assert!(comments.contains(r#"<a href="/following/comments">feed-following</a>"#));
         assert!(comments.contains(r#"<a href="/comments">feed-recent</a>"#));
         assert!(comments.contains(r#"<a href="/joined">feed-view-drawings</a>"#));
-        assert!(comments.contains(r#"<a href="/joined/comments" aria-current="page">feed-view-comments</a>"#));
+        assert!(comments
+            .contains(r#"<a href="/joined/comments" aria-current="page">feed-view-comments</a>"#));
         assert!(comments.contains(r#"id="feed-switch-comments""#));
         assert!(comments.contains(r#"id="feed-views-communities""#));
 

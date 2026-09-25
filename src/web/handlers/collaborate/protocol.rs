@@ -131,18 +131,18 @@ fn expected_len(data: &[u8]) -> Result<usize, Rejected> {
     match msg_type {
         // Presence and lifecycle. These carry a 16-byte account UUID, which
         // their handlers check against the authenticated user.
-        0x01 => Ok(25),                                                    // JOIN
-        0x03 => variable(27, u16_at(data, 25), MAX_PAYLOAD_BYTES),         // CHAT
-        0x04 => Ok(1),                                                     // RESET_OFFER
-        0x07 => variable(19, u16_at(data, 17), MAX_PAYLOAD_BYTES),         // END_SESSION
-        0x0c => Ok(11),                                                    // RESET_BEGIN
+        0x01 => Ok(25),                                            // JOIN
+        0x03 => variable(27, u16_at(data, 25), MAX_PAYLOAD_BYTES), // CHAT
+        0x04 => Ok(1),                                             // RESET_OFFER
+        0x07 => variable(19, u16_at(data, 17), MAX_PAYLOAD_BYTES), // END_SESSION
+        0x0c => Ok(11),                                            // RESET_BEGIN
         // A layer of somebody's canvas, as a PNG.
-        0x02 => variable(8, u32_at(data, 4), MAX_SNAPSHOT_BYTES),          // SNAPSHOT
+        0x02 => variable(8, u32_at(data, 4), MAX_SNAPSHOT_BYTES), // SNAPSHOT
         // Canvas operations.
-        0x12 => Ok(16),                                                    // FILL
-        0x13 => Ok(2),                                                     // POINTER_UP
-        0x14 => Ok(2),                                                     // UNDO_POINT
-        0x15 => Ok(3),                                                     // UNDO
+        0x12 => Ok(16), // FILL
+        0x13 => Ok(2),  // POINTER_UP
+        0x14 => Ok(2),  // UNDO_POINT
+        0x15 => Ok(3),  // UNDO
         0x16 => match u16_at(data, 10) {
             // 12 bytes of header, four per point, four of trailing mask.
             Some(points) => Ok(16 + points * 4),
@@ -152,13 +152,13 @@ fn expected_len(data: &[u8]) -> Result<usize, Rejected> {
                 actual: data.len(),
             }),
         }, // STROKE
-        0x17 => Ok(22),                                                    // REGION
-        0x18 => Ok(22),                                                    // LINE
-        0x19 => Ok(30),                                                    // BEZIER
-        0x1a => Ok(4),                                                     // ERASE_ALL
-        0x1b => variable(19, u16_at(data, 13), MAX_PAYLOAD_BYTES),         // TEXT
-        0x1c => Ok(10),                                                    // MOVE_POINTER
-        0x1d => variable(20, u32_at(data, 16), MAX_PAYLOAD_BYTES),         // PUT_IMAGE
+        0x17 => Ok(22), // REGION
+        0x18 => Ok(22), // LINE
+        0x19 => Ok(30), // BEZIER
+        0x1a => Ok(4),  // ERASE_ALL
+        0x1b => variable(19, u16_at(data, 13), MAX_PAYLOAD_BYTES), // TEXT
+        0x1c => Ok(10), // MOVE_POINTER
+        0x1d => variable(20, u32_at(data, 16), MAX_PAYLOAD_BYTES), // PUT_IMAGE
         _ => Err(Rejected::UnknownType(msg_type)),
     }
 }

@@ -784,7 +784,10 @@ pub async fn serve_session_preview(
 
     Ok((
         [
-            (header::CONTENT_TYPE, preview.kind.content_type().to_string()),
+            (
+                header::CONTENT_TYPE,
+                preview.kind.content_type().to_string(),
+            ),
             (header::ETAG, etag_for(preview.version)),
             // Private: a link-only session's canvas must not be held by a
             // shared cache that never saw the check above. no-cache, not
@@ -899,7 +902,10 @@ mod tests {
 
     #[test]
     fn reads_the_size_of_a_png() {
-        assert_eq!(inspect_image(&png(400, 300)), Some((ImageKind::Png, 400, 300)));
+        assert_eq!(
+            inspect_image(&png(400, 300)),
+            Some((ImageKind::Png, 400, 300))
+        );
     }
 
     /// The three ways a browser's WEBP encoder can describe the same canvas.
@@ -975,7 +981,10 @@ mod tests {
     #[test]
     fn rejects_bytes_that_are_not_an_image_we_serve() {
         assert_eq!(inspect_image(b""), None);
-        assert_eq!(inspect_image(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"), None);
+        assert_eq!(
+            inspect_image(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"),
+            None
+        );
         assert_eq!(inspect_image(&[0xFF, 0xD8, 0xFF, 0xE0]), None);
         // A GIF is an image, and is still not one of the two we accept.
         assert_eq!(inspect_image(b"GIF89a\x90\x01\x2c\x01"), None);
@@ -1016,7 +1025,11 @@ mod tests {
 
     #[test]
     fn meta_round_trips_through_redis_encoding() {
-        let meta = format!("{}:{}", 1_700_000_000_000u64, ImageKind::Webp.content_type());
+        let meta = format!(
+            "{}:{}",
+            1_700_000_000_000u64,
+            ImageKind::Webp.content_type()
+        );
         assert_eq!(
             parse_meta(&meta),
             Some((1_700_000_000_000, "image/webp".to_string()))

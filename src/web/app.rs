@@ -2,8 +2,6 @@ use super::state::{AppState, Shutdown};
 use crate::models::store_product;
 use crate::models::user::Backend;
 use crate::web::handlers::about::{about, design};
-use crate::web::handlers::store::{do_app_store_notification, do_store_purchase, do_store_ticket};
-use crate::web::handlers::supporter::supporter_page;
 use crate::web::handlers::account::{
     account, delete_account_htmx, edit_account, edit_password, request_email_verification_code,
     save_language, save_show_sensitive_content, save_supporter_settings,
@@ -15,23 +13,16 @@ use crate::web::handlers::activitypub::{
     activitypub_post_user_followers, activitypub_post_user_inbox, activitypub_webfinger,
 };
 use crate::web::handlers::admin::{
-    admin_banners, admin_banners_fragment, admin_collaborative_sessions, admin_communities,
-    admin_community_posts, admin_flag_banner, admin_flag_post, admin_post_detail, admin_posts,
-    admin_add_store_product, admin_posts_fragment, admin_set_store_product_on_sale,
-    admin_set_store_product_details, admin_set_store_product_sale_window, admin_store,
+    admin_add_store_product, admin_banners, admin_banners_fragment, admin_collaborative_sessions,
+    admin_communities, admin_community_posts, admin_flag_banner, admin_flag_post,
+    admin_post_detail, admin_posts, admin_posts_fragment, admin_set_store_product_details,
+    admin_set_store_product_on_sale, admin_set_store_product_sale_window, admin_store,
     admin_user_posts, admin_users, collaborative_archive_manifest, collaborative_archive_tail,
-    collaborative_session_details, collaborative_session_chat, collaborative_session_reference,
-    record_collaborative_session_check,
+    collaborative_session_chat, collaborative_session_details, collaborative_session_reference,
     download_collaborative_archive, download_collaborative_diagnostics,
-    replay_collaborative_session,
+    record_collaborative_session_check, replay_collaborative_session,
 };
 use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, signup};
-use crate::web::handlers::identity::{
-    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_sign_in,
-    do_google_sign_in, do_identity_welcome, do_steam_sign_in, do_unlink_identity, google_callback,
-    google_sign_in, google_start, handoff_claim, handoff_done, handoff_start, identity_welcome,
-    steam_app_only,
-};
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
     create_collaborative_session_form, get_auth_info, get_collaboration_meta,
@@ -43,23 +34,25 @@ use crate::web::handlers::collaborate_cleanup::cleanup_collaborative_sessions;
 use crate::web::handlers::community::{
     communities, communities_fragment, community, community_comments, community_iframe,
     create_community_form, do_accept_invitation, do_create_community, do_leave_community,
-    do_reject_invitation, get_members, hx_delete_community, hx_do_edit_community, hx_edit_community,
-    invite_user, load_more_community_comments, load_more_community_posts, members_page, redirect_community_to_unified,
-    remove_member, retract_invitation,
+    do_reject_invitation, get_members, hx_delete_community, hx_do_edit_community,
+    hx_edit_community, invite_user, load_more_community_comments, load_more_community_posts,
+    members_page, redirect_community_to_unified, remove_member, retract_invitation,
 };
 use crate::web::handlers::devices::register_device_handler;
 use crate::web::handlers::draw::{
     banner_draw_finish, draw_finish, start_banner_draw, start_draw, start_draw_get,
-};
-use crate::web::handlers::tag::{
-    load_more_tag_comments, load_more_tag_posts, tag_autocomplete, tag_cards, tag_comments,
-    tag_discovery, tag_view,
 };
 use crate::web::handlers::home::{
     do_delete_comment, following_comments_page, home, joined_comments_page,
     load_more_community_feed_posts, load_more_following_comments, load_more_joined_comments,
     load_more_public_posts, load_more_recent_comments, load_more_timeline_posts,
     my_communities_feed, my_timeline, recent_comments_page,
+};
+use crate::web::handlers::identity::{
+    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_sign_in,
+    do_google_sign_in, do_identity_welcome, do_steam_sign_in, do_unlink_identity, google_callback,
+    google_sign_in, google_start, handoff_claim, handoff_done, handoff_start, identity_welcome,
+    steam_app_only,
 };
 use crate::web::handlers::notifications::{
     delete_notification_handler, get_unread_notification_count, hx_mark_all_notifications_read,
@@ -79,18 +72,25 @@ use crate::web::handlers::post::{
 };
 use crate::web::handlers::privacy::privacy;
 use crate::web::handlers::profile::{
-    banner_management, do_activate_banner, do_add_link, do_delete_banner, do_delete_guestbook_entry,
-    do_delete_link, do_follow_profile, do_move_link_down, do_move_link_up, do_reply_guestbook_entry,
-    do_unfollow_profile, do_write_guestbook_entry, guestbook, load_more_profile_posts,
-    load_more_profile_private_posts, profile_banners_iframe,
+    banner_management, do_activate_banner, do_add_link, do_delete_banner,
+    do_delete_guestbook_entry, do_delete_link, do_follow_profile, do_move_link_down,
+    do_move_link_up, do_reply_guestbook_entry, do_unfollow_profile, do_write_guestbook_entry,
+    guestbook, load_more_profile_posts, load_more_profile_private_posts, profile_banners_iframe,
     profile_comments, profile_iframe, profile_or_community, profile_private, profile_settings,
 };
 use crate::web::handlers::report::{hx_report_post, hx_report_profile};
 use crate::web::handlers::search::search_page;
+use crate::web::handlers::store::{do_app_store_notification, do_store_purchase, do_store_ticket};
+use crate::web::handlers::supporter::supporter_page;
+use crate::web::handlers::tag::{
+    load_more_tag_comments, load_more_tag_posts, tag_autocomplete, tag_cards, tag_comments,
+    tag_discovery, tag_view,
+};
 use crate::web::handlers::well_known::{
     android_assetlinks, apple_app_site_association, robots_txt, sitemap_xml,
 };
 use crate::web::handlers::{handler_404, health};
+use crate::web::session_store::PostgresStore;
 use activitypub_federation::config::{FederationConfig, FederationMiddleware};
 use anyhow::Result;
 use axum::body::Body;
@@ -110,7 +110,6 @@ use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_sessions::cookie::SameSite;
 use tower_sessions::{session_store::ExpiredDeletion, Expiry, SessionManagerLayer};
-use crate::web::session_store::PostgresStore;
 
 /// Everything served straight off disk.
 ///
@@ -303,7 +302,10 @@ impl App {
             .route("/posts/{id}/relay", get(post_relay_view))
             .route("/posts/{id}", put(hx_do_edit_post))
             .route("/posts/{id}", delete(hx_delete_post))
-            .route("/@{login_name}/{id}/edit/community", get(post_edit_community))
+            .route(
+                "/@{login_name}/{id}/edit/community",
+                get(post_edit_community),
+            )
             .route(
                 "/@{login_name}/{id}/edit/community",
                 post(do_post_edit_community),
@@ -335,7 +337,10 @@ impl App {
             .route("/admin/users", get(admin_users))
             .route("/admin/users/{login_name}/posts", get(admin_user_posts))
             .route("/admin/communities", get(admin_communities))
-            .route("/admin/communities/{slug}/posts", get(admin_community_posts))
+            .route(
+                "/admin/communities/{slug}/posts",
+                get(admin_community_posts),
+            )
             .route(
                 "/admin/collaborative-sessions",
                 get(admin_collaborative_sessions),
@@ -388,7 +393,10 @@ impl App {
                 "/admin/banners/{banner_id}/explicit",
                 post(admin_flag_banner),
             )
-            .route("/admin/store", get(admin_store).post(admin_add_store_product))
+            .route(
+                "/admin/store",
+                get(admin_store).post(admin_add_store_product),
+            )
             .route(
                 "/admin/store/{store}/{product}/on-sale",
                 post(admin_set_store_product_on_sale),
@@ -501,7 +509,10 @@ impl App {
             .route("/@{login_name}/banners/embed", get(profile_banners_iframe))
             .route("/@{login_name}/settings/links", post(do_add_link))
             .route("/@{login_name}/settings/links/{id}", delete(do_delete_link))
-            .route("/@{login_name}/settings/links/{id}/up", post(do_move_link_up))
+            .route(
+                "/@{login_name}/settings/links/{id}/up",
+                post(do_move_link_up),
+            )
             .route(
                 "/@{login_name}/settings/links/{id}/down",
                 post(do_move_link_down),
@@ -574,7 +585,10 @@ impl App {
             // What a store sold, handed over by the page in an app that
             // sells through it. See handlers/store.rs.
             .route("/store/{store}/purchases", post(do_store_purchase))
-            .route("/store/apple/notifications", post(do_app_store_notification))
+            .route(
+                "/store/apple/notifications",
+                post(do_app_store_notification),
+            )
             .route("/store/{store}/tickets", post(do_store_ticket))
             .route("/design", get(design))
             .route("/privacy", get(privacy))
@@ -754,4 +768,3 @@ async fn shutdown_signal(
     // draining the plain HTTP connections.
     shutdown.signal();
 }
-

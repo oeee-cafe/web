@@ -593,14 +593,7 @@ pub async fn send_push_for_notification(
 
     // Send push notification (don't fail if this errors)
     if let Err(e) = push_service
-        .send_notification_to_user(
-            notification.recipient_id,
-            &title,
-            &body,
-            badge,
-            &url,
-            data,
-        )
+        .send_notification_to_user(notification.recipient_id, &title, &body, badge, &url, data)
         .await
     {
         tracing::warn!(
@@ -797,29 +790,47 @@ pub fn format_community_invitation_message(
             args.set("inviter", inviter_name.to_string());
             args.set("community", community_slug.to_string());
 
-            let title = get_localized_message(&bundle, "push-notification-community-invite-title", None);
-            let body = get_localized_message(&bundle, "push-notification-community-invite-body", Some(&args));
+            let title =
+                get_localized_message(&bundle, "push-notification-community-invite-title", None);
+            let body = get_localized_message(
+                &bundle,
+                "push-notification-community-invite-body",
+                Some(&args),
+            );
             (title, body)
         }
         "accepted" => {
             args.set("accepter", inviter_name.to_string());
             args.set("community", community_slug.to_string());
 
-            let title = get_localized_message(&bundle, "push-notification-invite-accepted-title", None);
-            let body = get_localized_message(&bundle, "push-notification-invite-accepted-body", Some(&args));
+            let title =
+                get_localized_message(&bundle, "push-notification-invite-accepted-title", None);
+            let body = get_localized_message(
+                &bundle,
+                "push-notification-invite-accepted-body",
+                Some(&args),
+            );
             (title, body)
         }
         "declined" => {
             args.set("decliner", inviter_name.to_string());
             args.set("community", community_slug.to_string());
 
-            let title = get_localized_message(&bundle, "push-notification-invite-declined-title", None);
-            let body = get_localized_message(&bundle, "push-notification-invite-declined-body", Some(&args));
+            let title =
+                get_localized_message(&bundle, "push-notification-invite-declined-title", None);
+            let body = get_localized_message(
+                &bundle,
+                "push-notification-invite-declined-body",
+                Some(&args),
+            );
             (title, body)
         }
         _ => {
             // Fallback to English for unknown types
-            ("Notification".to_string(), "You have a new notification".to_string())
+            (
+                "Notification".to_string(),
+                "You have a new notification".to_string(),
+            )
         }
     }
 }
@@ -865,7 +876,10 @@ mod tests {
         comment.post_author_login_name = Some("author".to_string());
         assert_eq!(push_url(&comment, None), format!("/@author/{post_id}"));
 
-        assert_eq!(push_url(&notification(NotificationType::Follow), None), "/@actor");
+        assert_eq!(
+            push_url(&notification(NotificationType::Follow), None),
+            "/@actor"
+        );
         assert_eq!(
             push_url(&notification(NotificationType::GuestbookEntry), Some("me")),
             "/@me"

@@ -1,6 +1,4 @@
 use crate::app_error::AppError;
-use crate::web::presence::{Activity, Presence};
-use crate::models::supporter::supporter_marks_on_post;
 use crate::models::achievement::award_achievements;
 use crate::models::actor::Actor;
 use crate::models::comment::{
@@ -11,7 +9,6 @@ use crate::models::community::{
     find_community_by_id, get_known_communities, get_user_role_in_community, is_user_member,
 };
 use crate::models::follow;
-use crate::models::tag::{get_tags_for_post, set_post_tags};
 use crate::models::image::find_image_by_id;
 use crate::models::notification::{
     create_notification, get_notification_by_id, get_unread_count, send_push_for_notification,
@@ -26,6 +23,8 @@ use crate::models::reaction::{
     create_reaction, delete_reaction, find_reactions_by_post_id, find_user_reaction,
     get_reaction_counts, normalize_emoji, ReactionDraft,
 };
+use crate::models::supporter::supporter_marks_on_post;
+use crate::models::tag::{get_tags_for_post, set_post_tags};
 use crate::models::user::{find_user_by_id, AuthSession, Language};
 use crate::web::context::CommonContext;
 use crate::web::handlers::activitypub::{
@@ -36,6 +35,7 @@ use crate::web::handlers::{
     get_bundle, handler_404, parse_id_with_legacy_support, safe_get_message, ExtractFtlLang,
     ParsedId,
 };
+use crate::web::presence::{Activity, Presence};
 use crate::web::state::AppState;
 use activitypub_federation::fetch::object_id::ObjectId;
 use activitypub_federation::traits::Actor as ActivityPubActor;
@@ -707,9 +707,7 @@ pub async fn post_view(
         .unwrap_or_default();
 
     // Get tags for this post
-    let tags = get_tags_for_post(&mut tx, uuid)
-        .await
-        .unwrap_or_default();
+    let tags = get_tags_for_post(&mut tx, uuid).await.unwrap_or_default();
 
     // Get child posts (threaded replies)
     let child_posts = build_thread_tree(&mut tx, uuid).await.unwrap_or_default();
@@ -722,14 +720,17 @@ pub async fn post_view(
 
     if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
         let rendered = template
-            .render_captured_to(context! {
-                current_user => auth_session.user,
-                post => Some(&post),
-                post_id => id,
-                tags,
-                post_community,
-                ftl_lang
-            }, std::io::sink())?
+            .render_captured_to(
+                context! {
+                    current_user => auth_session.user,
+                    post => Some(&post),
+                    post_id => id,
+                    tags,
+                    post_community,
+                    ftl_lang
+                },
+                std::io::sink(),
+            )?
             .with_state_mut(|state| state.render_block("post_edit_block"))
             .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
         Ok(Html(rendered).into_response())
@@ -2142,13 +2143,16 @@ pub async fn hx_do_edit_post(
 
     let template: minijinja::Template<'_, '_> = state.env.get_template("post_view.jinja")?;
     let rendered = template
-        .render_captured_to(context! {
-            current_user => auth_session.user,
-                post,
-            post_id => id,
-            tags,
-            ftl_lang
-        }, std::io::sink())?
+        .render_captured_to(
+            context! {
+                current_user => auth_session.user,
+                    post,
+                post_id => id,
+                tags,
+                ftl_lang
+            },
+            std::io::sink(),
+        )?
         .with_state_mut(|state| state.render_block("post_edit_block"))?;
 
     Ok(Html(rendered).into_response())
@@ -2274,26 +2278,29 @@ pub async fn hx_delete_post(
     let post_data = post.clone();
     // A draft goes back to the drafts it was one of; a published post to
     // where it lived.
-    let is_draft = post_data.get("published_at").and_then(|v| v.as_ref()).is_none();
+    let is_draft = post_data
+        .get("published_at")
+        .and_then(|v| v.as_ref())
+        .is_none();
     let redirect_url = if is_draft {
         "/posts/drafts".to_string()
     } else if let Some(community_id_str) = post_data.get("community_id").and_then(|id| id.clone()) {
-            let community_id = Uuid::parse_str(&community_id_str)?;
-            get_community_slug_url(&mut tx, community_id).await?
-        } else {
-            // For personal posts, redirect to user's profile
-            let author_id = post_data
-                .get("author_id")
-                .and_then(|v| v.as_ref())
-                .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?;
-            let author = find_user_by_id(&mut tx, Uuid::parse_str(author_id)?).await?;
-            format!(
-                "/@{}",
-                author
-                    .ok_or_else(|| AppError::NotFound("Author".to_string()))?
-                    .login_name
-            )
-        };
+        let community_id = Uuid::parse_str(&community_id_str)?;
+        get_community_slug_url(&mut tx, community_id).await?
+    } else {
+        // For personal posts, redirect to user's profile
+        let author_id = post_data
+            .get("author_id")
+            .and_then(|v| v.as_ref())
+            .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?;
+        let author = find_user_by_id(&mut tx, Uuid::parse_str(author_id)?).await?;
+        format!(
+            "/@{}",
+            author
+                .ok_or_else(|| AppError::NotFound("Author".to_string()))?
+                .login_name
+        )
+    };
 
     // The tags stay on the post. Deletion here is soft, and a tag counts and
     // lists only undeleted posts, so there is nothing to decrement and a post
@@ -2536,9 +2543,7 @@ pub async fn post_view_by_login_name(
         .unwrap_or_default();
 
     // Get tags for this post
-    let tags = get_tags_for_post(&mut tx, uuid)
-        .await
-        .unwrap_or_default();
+    let tags = get_tags_for_post(&mut tx, uuid).await.unwrap_or_default();
 
     // Get child posts (threaded replies)
     let child_posts = build_thread_tree(&mut tx, uuid).await.unwrap_or_default();
@@ -2551,14 +2556,17 @@ pub async fn post_view_by_login_name(
 
     if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
         let rendered = template
-            .render_captured_to(context! {
-                current_user => auth_session.user,
-                post => Some(&post),
-                post_id => post_id,
-                tags,
-                post_community,
-                ftl_lang
-            }, std::io::sink())?
+            .render_captured_to(
+                context! {
+                    current_user => auth_session.user,
+                    post => Some(&post),
+                    post_id => post_id,
+                    tags,
+                    post_community,
+                    ftl_lang
+                },
+                std::io::sink(),
+            )?
             .with_state_mut(|state| state.render_block("post_edit_block"))
             .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
         Ok(Html(rendered).into_response())

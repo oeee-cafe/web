@@ -31,7 +31,11 @@ pub fn build_id() -> &'static str {
 pub fn git_commit() -> Option<&'static str> {
     static GIT_COMMIT: OnceLock<Option<String>> = OnceLock::new();
     GIT_COMMIT
-        .get_or_init(|| std::env::var("GIT_COMMIT").ok().filter(|sha| !sha.is_empty()))
+        .get_or_init(|| {
+            std::env::var("GIT_COMMIT")
+                .ok()
+                .filter(|sha| !sha.is_empty())
+        })
         .as_deref()
 }
 

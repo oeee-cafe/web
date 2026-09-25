@@ -163,7 +163,11 @@ mod tests {
             "the sentence belongs in the banner, not over the control that failed"
         );
         assert_eq!(response.headers().get("HX-Reswap").unwrap(), "innerHTML");
-        assert_eq!(response.status(), StatusCode::FORBIDDEN, "the status stands");
+        assert_eq!(
+            response.status(),
+            StatusCode::FORBIDDEN,
+            "the status stands"
+        );
         assert!(body_string(response).await.contains("htmx-error-message"));
     }
 

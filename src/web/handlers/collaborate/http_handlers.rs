@@ -1,9 +1,9 @@
 use crate::app_error::AppError;
-use crate::models::user::AuthSession;
 use crate::models::community::find_community_by_id;
+use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
-use crate::web::presence::{Activity, Presence};
 use crate::web::handlers::{ExtractAcceptLanguage, ExtractFtlLang};
+use crate::web::presence::{Activity, Presence};
 use crate::web::state::AppState;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
@@ -323,7 +323,8 @@ pub async fn collaborate_sessions_fragment(
     let viewer_user_id = auth_session.user.as_ref().map(|u| u.id);
 
     let mut tx = state.db_pool.begin().await?;
-    let (mut viewer_sessions, mut active_sessions) = lobby_sessions(&mut tx, viewer_user_id).await?;
+    let (mut viewer_sessions, mut active_sessions) =
+        lobby_sessions(&mut tx, viewer_user_id).await?;
     tx.commit().await?;
     attach_lobby_previews(&state, &mut viewer_sessions, &mut active_sessions).await;
 
@@ -397,7 +398,8 @@ pub async fn collaborate_lobby(
 
     let common_ctx = CommonContext::build(&mut tx, viewer_user_id).await?;
 
-    let (mut viewer_sessions, mut active_sessions) = lobby_sessions(&mut tx, viewer_user_id).await?;
+    let (mut viewer_sessions, mut active_sessions) =
+        lobby_sessions(&mut tx, viewer_user_id).await?;
 
     // Finished collaborative drawings, rendered through the same card template
     // as the home grid and paginated through the same sentinel. Sensitive posts
@@ -536,7 +538,6 @@ async fn insert_session(
     user_id: Uuid,
     request: CreateSessionRequest,
 ) -> Result<Uuid, AppError> {
-
     // A canvas and a seat count this server did not offer are not a matter of
     // taste: both bound how large a checkpoint of this session can be, and the
     // history ceiling is sized on the assumption that they hold.
@@ -660,7 +661,9 @@ pub async fn save_collaborative_session(
             )));
         }
         None => {
-            return Err(AppError::InvalidFormData("the body is not a PNG".to_string()));
+            return Err(AppError::InvalidFormData(
+                "the body is not a PNG".to_string(),
+            ));
         }
     }
 
@@ -741,7 +744,10 @@ pub async fn serve_collaborative_app(
     // The site's alert and confirmation, which the room says its failures
     // through (frontend/shared/siteDialog.ts), with the toolbar.
     let toolbar = state.env.get_template("toolbar.jinja")?.render(&chrome)?
-        + &state.env.get_template("confirm_dialog.jinja")?.render(&chrome)?;
+        + &state
+            .env
+            .get_template("confirm_dialog.jinja")?
+            .render(&chrome)?;
 
     Ok(Html(with_site_chrome(&html, &head, &toolbar)).into_response())
 }
@@ -966,7 +972,10 @@ mod tests {
         let public = rendered
             .find("collaborate-community-group-public")
             .expect("public group rendered");
-        assert!(yours < participated && participated < public, "tiers out of order");
+        assert!(
+            yours < participated && participated < public,
+            "tiers out of order"
+        );
         // Non-public tiers say so in the option text, because a saved drawing
         // landing somewhere nobody can see it is a surprise worth preventing.
         assert!(rendered.contains("community-badge-private"));
@@ -1024,11 +1033,21 @@ mod tests {
     #[test]
     fn the_drawing_app_is_sent_with_the_site_chrome() {
         let page = "<!DOCTYPE html><html><head><title>x</title></head><body class=\"a\"><div id=\"root\"></div></body></html>";
-        let out = super::with_site_chrome(page, "<link rel=\"stylesheet\">", "<nav class=\"nav-bar\"></nav>");
+        let out = super::with_site_chrome(
+            page,
+            "<link rel=\"stylesheet\">",
+            "<nav class=\"nav-bar\"></nav>",
+        );
         assert!(out.contains("<link rel=\"stylesheet\"></head>"), "{out}");
-        assert!(out.contains("<body class=\"a\"><nav class=\"nav-bar\"></nav><div id=\"root\">"), "{out}");
+        assert!(
+            out.contains("<body class=\"a\"><nav class=\"nav-bar\"></nav><div id=\"root\">"),
+            "{out}"
+        );
         // A page without the tags is left alone rather than mangled.
-        assert_eq!(super::with_site_chrome("<div></div>", "h", "t"), "<div></div>");
+        assert_eq!(
+            super::with_site_chrome("<div></div>", "h", "t"),
+            "<div></div>"
+        );
     }
 
     #[test]
@@ -1119,13 +1138,14 @@ mod tests {
             .render(lobby_context_with_sessions(
                 true,
                 vec![],
-                vec![sample_session(json!({"preview_version": 1_700_000_000_123u64}))],
+                vec![sample_session(
+                    json!({"preview_version": 1_700_000_000_123u64}),
+                )],
                 vec![],
             ))
             .expect("render");
-        assert!(rendered.contains(
-            "/collaborate/00000000-0000-0000-0000-000000000009/preview?v=1700000000123"
-        ));
+        assert!(rendered
+            .contains("/collaborate/00000000-0000-0000-0000-000000000009/preview?v=1700000000123"));
         // The canvas's own dimensions, so the card reserves the right shape
         // before the image arrives.
         assert!(rendered.contains("width=\"300\""));

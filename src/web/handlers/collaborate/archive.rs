@@ -29,9 +29,9 @@
 
 use aws_sdk_s3::primitives::ByteStream;
 use flate2::read::GzDecoder;
-use futures_util::{StreamExt, TryStreamExt};
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use futures_util::{StreamExt, TryStreamExt};
 use redis::AsyncCommands;
 use serde::Serialize;
 use tracing::{debug, error, info, warn};
@@ -345,7 +345,10 @@ impl ArchiveBuffer {
     pub async fn peek(&self, room_uuid: Uuid, limit: isize) -> BufferResult<Vec<ArchivedMessage>> {
         let mut conn = self.pool.get().await?;
         let raw: Vec<Vec<u8>> = conn.lrange(buffer_key(room_uuid), 0, limit - 1).await?;
-        Ok(raw.iter().filter_map(|entry| decode_buffered(entry)).collect())
+        Ok(raw
+            .iter()
+            .filter_map(|entry| decode_buffered(entry))
+            .collect())
     }
 
     /// Everything waiting, for a reader that wants the recording as it
@@ -353,7 +356,10 @@ impl ArchiveBuffer {
     pub async fn peek_all(&self, room_uuid: Uuid) -> BufferResult<Vec<ArchivedMessage>> {
         let mut conn = self.pool.get().await?;
         let raw: Vec<Vec<u8>> = conn.lrange(buffer_key(room_uuid), 0, -1).await?;
-        Ok(raw.iter().filter_map(|entry| decode_buffered(entry)).collect())
+        Ok(raw
+            .iter()
+            .filter_map(|entry| decode_buffered(entry))
+            .collect())
     }
 
     /// `peek`, and also how many raw entries were read: the count to trim
@@ -440,7 +446,10 @@ pub async fn record_chat(state: &AppState, room_uuid: Uuid, frame: &[u8]) {
         return;
     }
     let Some(chat) = super::messages::ChatMessage::parse(frame) else {
-        warn!("Could not read a chat frame for room {} to record it", room_uuid);
+        warn!(
+            "Could not read a chat frame for room {} to record it",
+            room_uuid
+        );
         return;
     };
     let line = ArchivedChat {
@@ -461,7 +470,8 @@ pub async fn record_chat(state: &AppState, room_uuid: Uuid, frame: &[u8]) {
         let key = chat_buffer_key(room_uuid);
         conn.rpush::<_, _, ()>(&key, encoded).await?;
         conn.ltrim::<_, ()>(&key, -MAX_CHAT_LINES, -1).await?;
-        conn.expire::<_, ()>(&key, ARCHIVE_BUFFER_TTL as i64).await?;
+        conn.expire::<_, ()>(&key, ARCHIVE_BUFFER_TTL as i64)
+            .await?;
         Ok(())
     }
     .await;
@@ -475,10 +485,7 @@ pub async fn record_chat(state: &AppState, room_uuid: Uuid, frame: &[u8]) {
 /// Never trimmed as it is written out: the transcript is stored whole each
 /// time, so the buffer has to keep holding the whole thing. It is text, and a
 /// session's worth of it is smaller than one snapshot.
-async fn buffered_chat(
-    state: &AppState,
-    room_uuid: Uuid,
-) -> BufferResult<Vec<serde_json::Value>> {
+async fn buffered_chat(state: &AppState, room_uuid: Uuid) -> BufferResult<Vec<serde_json::Value>> {
     let mut conn = state.redis_pool.get().await?;
     let raw: Vec<String> = conn.lrange(chat_buffer_key(room_uuid), 0, -1).await?;
     Ok(raw
@@ -667,7 +674,10 @@ pub async fn flush_room(state: &AppState, room_uuid: Uuid) -> usize {
         // Somebody else is doing it.
         Ok(false) => return 0,
         Err(e) => {
-            warn!("Failed to claim an archive flush for room {}: {}", room_uuid, e);
+            warn!(
+                "Failed to claim an archive flush for room {}: {}",
+                room_uuid, e
+            );
             return 0;
         }
     }
@@ -683,7 +693,10 @@ pub async fn flush_room(state: &AppState, room_uuid: Uuid) -> usize {
         }
     }
     if let Err(e) = buffer.release(room_uuid).await {
-        warn!("Failed to release the archive claim for room {}: {}", room_uuid, e);
+        warn!(
+            "Failed to release the archive claim for room {}: {}",
+            room_uuid, e
+        );
     }
     written
 }
@@ -706,7 +719,10 @@ async fn flush_claimed(
                 )
                 .await
                 {
-                    warn!("Failed to note the transcript length for room {}: {}", room_uuid, e);
+                    warn!(
+                        "Failed to note the transcript length for room {}: {}",
+                        room_uuid, e
+                    );
                 }
             }
             lines
@@ -733,7 +749,10 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
         let (entries, raw) = match buffer.peek_batch(room_uuid, FLUSH_BATCH).await {
             Ok(batch) => batch,
             Err(e) => {
-                warn!("Failed to read the archive buffer for room {}: {}", room_uuid, e);
+                warn!(
+                    "Failed to read the archive buffer for room {}: {}",
+                    room_uuid, e
+                );
                 return written;
             }
         };
@@ -793,11 +812,17 @@ async fn write_chunks(state: &AppState, room_uuid: Uuid, buffer: &ArchiveBuffer)
         if let Err(e) = buffer.drop_front(room_uuid, raw).await {
             // The chunk is stored; failing to trim means it is written again
             // next time, over the same bytes.
-            warn!("Failed to trim the archive buffer for room {}: {}", room_uuid, e);
+            warn!(
+                "Failed to trim the archive buffer for room {}: {}",
+                room_uuid, e
+            );
             return written + count;
         }
         if let Err(e) = note_written(state, room_uuid, &entries).await {
-            warn!("Failed to record what was archived for room {}: {}", room_uuid, e);
+            warn!(
+                "Failed to record what was archived for room {}: {}",
+                room_uuid, e
+            );
         }
         written += count;
         debug!(
@@ -858,7 +883,10 @@ pub async fn seal_room(state: &AppState, room_uuid: Uuid, force: bool) {
             (Ok(0), Ok(0)) => return,
             (Ok(_), _) | (_, Ok(_)) => {}
             (Err(e), _) => {
-                warn!("Failed to read the archive buffer for room {}: {}", room_uuid, e);
+                warn!(
+                    "Failed to read the archive buffer for room {}: {}",
+                    room_uuid, e
+                );
                 return;
             }
         }
@@ -892,7 +920,10 @@ pub async fn seal_room(state: &AppState, room_uuid: Uuid, force: bool) {
     let (flushed, _) = flush_claimed(state, room_uuid, &buffer).await;
     let sealed = write_manifest(state, room_uuid, true).await;
     if let Err(e) = buffer.release(room_uuid).await {
-        warn!("Failed to release the archive claim for room {}: {}", room_uuid, e);
+        warn!(
+            "Failed to release the archive claim for room {}: {}",
+            room_uuid, e
+        );
     }
     if let Err(e) = sealed {
         warn!(
@@ -953,13 +984,16 @@ async fn note_written(
     // than double-counting anything but the message tally, which is the one
     // field a retry can inflate -- and a tally high by a chunk is a better
     // failure than a manifest that lies about the span.
-    conn.hset_nx::<_, _, _, ()>(&key, "first_seq", first.seq).await?;
-    conn.hset_nx::<_, _, _, ()>(&key, "first_at", first.at).await?;
+    conn.hset_nx::<_, _, _, ()>(&key, "first_seq", first.seq)
+        .await?;
+    conn.hset_nx::<_, _, _, ()>(&key, "first_at", first.at)
+        .await?;
     conn.hset::<_, _, _, ()>(&key, "last_seq", last.seq).await?;
     conn.hset::<_, _, _, ()>(&key, "last_at", last.at).await?;
     conn.hincr::<_, _, _, ()>(&key, "messages", entries.len() as i64)
         .await?;
-    conn.expire::<_, ()>(&key, ARCHIVE_BUFFER_TTL as i64).await?;
+    conn.expire::<_, ()>(&key, ARCHIVE_BUFFER_TTL as i64)
+        .await?;
     Ok(())
 }
 
@@ -980,7 +1014,10 @@ async fn archived_bounds(state: &AppState, room_uuid: Uuid) -> ArchivedBounds {
             messages: held.get("messages").copied().unwrap_or(0),
         },
         Err(e) => {
-            warn!("Failed to read archive bounds for room {}: {}", room_uuid, e);
+            warn!(
+                "Failed to read archive bounds for room {}: {}",
+                room_uuid, e
+            );
             ArchivedBounds::default()
         }
     }
@@ -1031,7 +1068,10 @@ pub async fn read_chat(
     match buffered_chat(state, room_uuid).await {
         Ok(held) if !held.is_empty() => return Ok(held),
         Ok(_) => {}
-        Err(e) => warn!("Failed to read the buffered transcript for room {}: {}", room_uuid, e),
+        Err(e) => warn!(
+            "Failed to read the buffered transcript for room {}: {}",
+            room_uuid, e
+        ),
     }
     let object = s3_client(&state.config)
         .get_object()
@@ -1110,9 +1150,7 @@ async fn write_manifest(
         },
         started_at: started.to_rfc3339(),
         ended_at: session.ended_at.map(|at| at.to_rfc3339()),
-        duration_ms: session
-            .ended_at
-            .map(|at| (at - started).num_milliseconds()),
+        duration_ms: session.ended_at.map(|at| (at - started).num_milliseconds()),
         recording: ArchiveSpan {
             first_seq: bounds.first_seq,
             last_seq: bounds.last_seq,
@@ -1148,7 +1186,10 @@ async fn write_manifest(
     )
     .await
     {
-        warn!("Failed to note the recording span for room {}: {}", room_uuid, e);
+        warn!(
+            "Failed to note the recording span for room {}: {}",
+            room_uuid, e
+        );
     }
     Ok(())
 }
@@ -1303,7 +1344,10 @@ pub async fn read_tail(
         .peek_all(room_uuid)
         .await?;
     out.extend(encode_runs(
-        buffered.into_iter().filter(|message| message.seq > after).collect(),
+        buffered
+            .into_iter()
+            .filter(|message| message.seq > after)
+            .collect(),
     ));
     Ok(out)
 }
@@ -1336,7 +1380,10 @@ fn encode_runs(messages: Vec<ArchivedMessage>) -> Vec<u8> {
     let mut start = 0;
     for end in 1..=messages.len() {
         if end == messages.len() || messages[end].history_id != messages[start].history_id {
-            out.extend(encode_chunk(messages[start].history_id, &messages[start..end]));
+            out.extend(encode_chunk(
+                messages[start].history_id,
+                &messages[start..end],
+            ));
             start = end;
         }
     }
@@ -1430,12 +1477,7 @@ pub async fn download_diagnostics(
 
     let mut reports = Vec::new();
     for key in keys {
-        let object = client
-            .get_object()
-            .bucket(bucket)
-            .key(&key)
-            .send()
-            .await?;
+        let object = client.get_object().bucket(bucket).key(&key).send().await?;
         let bytes = object.body.collect().await?.into_bytes();
         match serde_json::from_slice(&bytes) {
             Ok(report) => {
@@ -1481,14 +1523,19 @@ fn filed_as(key: &str) -> (Option<String>, Option<String>) {
     // Less the random tail `store_diagnostic` adds; a name from before it
     // had none.
     let name = match name.rsplit_once('-') {
-        Some((rest, tail)) if tail.len() == 6 && tail.bytes().all(|b| b.is_ascii_hexdigit()) => rest,
+        Some((rest, tail)) if tail.len() == 6 && tail.bytes().all(|b| b.is_ascii_hexdigit()) => {
+            rest
+        }
         _ => name,
     };
     match name.split_once('-') {
         Some((at, by)) => {
             let at = chrono::NaiveDateTime::parse_from_str(at, "%Y%m%dT%H%M%S%.3fZ")
                 .ok()
-                .map(|at| at.and_utc().to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+                .map(|at| {
+                    at.and_utc()
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                });
             (at, Some(by.to_string()))
         }
         None => (None, None),
@@ -1708,10 +1755,19 @@ mod tests {
 
     #[test]
     fn only_chunks_are_read_as_chunks() {
-        assert_eq!(chunk_first_seq("collaborate-archive/x/000000000513.oeeelog.gz"), Some(513));
-        assert_eq!(chunk_first_seq("collaborate-archive/x/000000000001.oeeelog"), Some(1));
+        assert_eq!(
+            chunk_first_seq("collaborate-archive/x/000000000513.oeeelog.gz"),
+            Some(513)
+        );
+        assert_eq!(
+            chunk_first_seq("collaborate-archive/x/000000000001.oeeelog"),
+            Some(1)
+        );
         assert_eq!(chunk_first_seq("collaborate-archive/x/manifest.json"), None);
-        assert_eq!(chunk_first_seq("collaborate-archive/x/diagnostics/a-b.json"), None);
+        assert_eq!(
+            chunk_first_seq("collaborate-archive/x/diagnostics/a-b.json"),
+            None
+        );
     }
 
     /// A reset replaces the history partway through what is buffered, and a
@@ -1741,7 +1797,10 @@ mod tests {
 
     #[test]
     fn a_report_key_of_another_shape_is_not_guessed_at() {
-        assert_eq!(filed_as("collaborate-archive/x/diagnostics/report.json"), (None, None));
+        assert_eq!(
+            filed_as("collaborate-archive/x/diagnostics/report.json"),
+            (None, None)
+        );
     }
 
     #[test]
@@ -1844,7 +1903,11 @@ mod tests {
         keys.sort();
         assert_eq!(
             keys,
-            vec![chunk_key(room, 1), chunk_key(room, 99), chunk_key(room, 1024)]
+            vec![
+                chunk_key(room, 1),
+                chunk_key(room, 99),
+                chunk_key(room, 1024)
+            ]
         );
     }
 }
