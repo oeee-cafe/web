@@ -3147,13 +3147,9 @@ html[data-store] .supporter-elsewhere {
   color: var(--ds-danger-text);
 }
 
-/* While a press is out every button waits, and the one pressed stays at
-   full strength so it reads as the one working rather than as one of the
-   switched off. The status under them turns the cucumber (ds.css) at the
-   size of its own words. */
-.supporter-actions .ds-button[aria-busy="true"] {
-  opacity: 1;
-}
+/* While a press is out every button is disabled and looks it, the one
+   pressed included: what is working is said by the status under them,
+   which turns the cucumber (ds.css) at the size of its own words. */
 
 .supporter-status .ds-spinner {
   margin-right: var(--ds-space-2);

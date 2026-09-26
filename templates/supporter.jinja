@@ -175,9 +175,9 @@
         status.classList.toggle("supporter-status-error", !!error);
       }
       // Every button waits while one press is out, so a second press cannot
-      // open a second sheet over the first; the one pressed says it is the
-      // one working (style.css), and goes on saying so until they all let
-      // go.
+      // open a second sheet over the first. They all look it; the one
+      // pressed is marked busy for a screen reader, and stays so until
+      // they all let go.
       function busy(on, button) {
         var controls = document.querySelectorAll(".supporter-buy, .supporter-restore");
         for (var i = 0; i < controls.length; i++) {
