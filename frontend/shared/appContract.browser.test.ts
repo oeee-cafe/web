@@ -62,6 +62,9 @@ type PageWindow = Window &
         resume(): void;
         unopened(): void;
       };
+      password: {
+        answer(told: Record<string, unknown>): void;
+      };
     };
   };
 
@@ -95,6 +98,18 @@ interface Options {
   loadingBar?: boolean;
   /** The page has the site's own confirm and alert (confirm_dialog.jinja), as base.jinja includes. */
   confirmDialog?: boolean;
+  /** A form that takes a saved password, marked as login.jinja and account.jinja mark theirs. */
+  passwordForm?: "sign-in" | "confirm";
+}
+
+/** A form that takes a saved password, shaped as login.jinja's and account.jinja's are. */
+function passwordForm(mark: "sign-in" | "confirm"): string {
+  const username =
+    mark === "sign-in" ? `<input name="login_name" autocomplete="username" autofocus>` : "";
+  return `<form method="post" action="/login" data-saved-password="${mark}">
+      ${username}<input name="password" type="password" autocomplete="current-password">
+      <input name="other" autocomplete="off"><button type="submit">Sign in</button>
+    </form>`;
 }
 
 /** /supporter's own script, which is all of it that talks to an app. */
@@ -163,7 +178,8 @@ async function open(options: Options = {}): Promise<Page> {
       .join("")}
     ${options.supporter ? `<button class="supporter-restore"></button>${supporterScript()}` : ""}
     ${options.loadingBar ? template("loading_bar.jinja") : ""}
-    ${options.confirmDialog ? template("confirm_dialog.jinja") : ""}`;
+    ${options.confirmDialog ? template("confirm_dialog.jinja") : ""}
+    ${options.passwordForm ? passwordForm(options.passwordForm) : ""}`;
   const html = `<!doctype html><html><head>${before}
     <style>:root { --ds-ground: #ccccff; --ds-grid: #bbbbff; } body { background: rgb(255, 255, 255); }</style>
     ${presence}${HEAD}</head><body>${body}</body></html>`;
@@ -884,6 +900,107 @@ describe("signing in for an app", () => {
   });
 });
 
+describe("a saved password, in the Mac app", () => {
+  const MAC = "Mozilla/5.0 OeeeCafe platform/macos store/apple";
+
+  function field(page: Page, autocomplete: string): HTMLInputElement {
+    return page.window.document.querySelector<HTMLInputElement>(`input[autocomplete="${autocomplete}"]`)!;
+  }
+
+  function press(page: Page, target: Element) {
+    target.dispatchEvent(new page.window.PointerEvent("pointerdown", { bubbles: true }));
+  }
+
+  function asks(page: Page): Message[] {
+    return page.sent.filter((message) => message.type === "password");
+  }
+
+  /** Records the form's submissions rather than leaving the test page. */
+  function submissions(page: Page): HTMLFormElement[] {
+    const sent: HTMLFormElement[] = [];
+    page.window.HTMLFormElement.prototype.requestSubmit = function (this: HTMLFormElement) {
+      sent.push(this);
+    };
+    return sent;
+  }
+
+  it("asks when the reader presses a field, fills the form with the password picked, and signs in", async () => {
+    const page = await open({ userAgent: MAC, passwordForm: "sign-in" });
+    const sent = submissions(page);
+    // The page's own autofocus is not the reader's press.
+    expect(page.window.document.activeElement).toBe(field(page, "username"));
+    expect(asks(page)).toEqual([]);
+
+    press(page, field(page, "username"));
+    expect(asks(page)).toEqual([{ v: 1, type: "password", id: "1" }]);
+
+    page.window.oeeeApp.password.answer({ id: "1", username: "artist", password: "secret" });
+    expect(field(page, "username").value).toBe("artist");
+    expect(field(page, "current-password").value).toBe("secret");
+    expect(sent.map((form) => form.getAttribute("action"))).toEqual(["/login"]);
+  });
+
+  it("asks when the reader tabs to a field, but not for other fields", async () => {
+    const page = await open({ userAgent: MAC, passwordForm: "sign-in" });
+    press(page, page.window.document.querySelector('input[name="other"]')!);
+    field(page, "current-password").focus();
+    expect(asks(page)).toEqual([]);
+
+    page.window.document.dispatchEvent(new page.window.KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    field(page, "username").focus();
+    expect(asks(page)).toHaveLength(1);
+  });
+
+  it("offers once a form, and leaves the form as it was when none is picked", async () => {
+    const page = await open({ userAgent: MAC, passwordForm: "sign-in" });
+    const sent = submissions(page);
+    press(page, field(page, "username"));
+    // Pressed again while the sheet is up, and after it is put away.
+    press(page, field(page, "current-password"));
+    page.window.oeeeApp.password.answer({ id: "1", cancelled: true });
+    press(page, field(page, "current-password"));
+    expect(asks(page)).toHaveLength(1);
+    expect(field(page, "current-password").value).toBe("");
+    expect(sent).toEqual([]);
+  });
+
+  it("takes only the answer it is waiting for, never a sign-in's", async () => {
+    const page = await open({ userAgent: MAC, passwordForm: "sign-in" });
+    const sent = submissions(page);
+    press(page, field(page, "username"));
+    page.window.oeeeApp.password.answer({ id: "2", username: "someone", password: "else" });
+    page.window.oeeeApp.signIn.answer({ id_token: "T" });
+    expect(field(page, "current-password").value).toBe("");
+    page.window.oeeeApp.password.answer({ id: "1", username: "artist", password: "secret" });
+    page.window.oeeeApp.password.answer({ id: "1", username: "again", password: "again" });
+    expect(field(page, "username").value).toBe("artist");
+    expect(sent).toHaveLength(1);
+  });
+
+  it("fills only the password where one confirms, and the reader sends it", async () => {
+    const page = await open({ userAgent: MAC, passwordForm: "confirm" });
+    const sent = submissions(page);
+    press(page, field(page, "current-password"));
+    page.window.oeeeApp.password.answer({ id: "1", username: "artist", password: "secret" });
+    expect(field(page, "current-password").value).toBe("secret");
+    expect(page.window.document.activeElement).toBe(field(page, "current-password"));
+    expect(sent).toEqual([]);
+  });
+
+  it("is the Mac app's alone", async () => {
+    for (const userAgent of [
+      "Mozilla/5.0 OeeeCafe platform/ios",
+      "Mozilla/5.0 OeeeCafe platform/android",
+      "Mozilla/5.0 OeeeCafe platform/windows",
+      "Mozilla/5.0",
+    ]) {
+      const page = await open({ userAgent, passwordForm: "sign-in" });
+      press(page, field(page, "username"));
+      expect(asks(page), userAgent).toEqual([]);
+    }
+  });
+});
+
 describe("what Android's web view cannot do", () => {
   it("shares text through the app", async () => {
     const page = await open();
@@ -1002,6 +1119,12 @@ describe("what the apps test against (appContract.json)", () => {
       new mac.window.MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, detail: 1 }),
     );
     sent.push(last(mac, "window"));
+
+    const password = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/macos store/apple", passwordForm: "sign-in" });
+    password.window.document.querySelector("input")!.dispatchEvent(
+      new password.window.PointerEvent("pointerdown", { bubbles: true }),
+    );
+    sent.push(last(password, "password"));
 
     const windows = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", caption: true });
     windows.window.document.querySelector<HTMLElement>(".oeee-caption .is-maximize")!.click();

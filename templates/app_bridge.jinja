@@ -83,6 +83,11 @@
             `nonce` with the platform's own sheet (Apple, Google), a ticket
             from Steam (provider "steam", no nonce), or open this site's
             `url` in the system's browser (app_sign_in.jinja).
+   password {id}
+            The Mac app: the reader went to the username or password of a
+            form that takes a saved one. The app offers the system's saved
+            passwords for the site in a sheet of its own
+            (app_saved_password.jinja).
    share    {title, text}
    download {name, mime, data}
             What Android's web view cannot do itself (app_polyfills.jinja).
@@ -138,6 +143,8 @@
                              The app makes no request to the site itself.
      signIn.answer(told), signIn.resume(), signIn.unopened()
                              app_sign_in.jinja
+     password.answer(told)   app_saved_password.jinja: the password picked,
+                             with the id it was asked with
      command(name)           toolbar.jinja: the site's menu commands and keys,
                              true when the page knew the name
      store.prices(prices)    supporter.jinja
