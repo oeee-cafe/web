@@ -110,7 +110,7 @@ interface Options {
 /** A form that takes a saved password, shaped as login.jinja's and account.jinja's are. */
 function passwordForm(mark: "sign-in" | "confirm"): string {
   const username =
-    mark === "sign-in" ? `<input name="login_name" autocomplete="username" autofocus>` : "";
+    mark === "sign-in" ? `<input name="login_name" autocomplete="username">` : "";
   return `<form method="post" action="/login" data-saved-password="${mark}">
       ${username}<input name="password" type="password" autocomplete="current-password">
       <input name="other" autocomplete="off"><button type="submit">Sign in</button>
@@ -951,7 +951,10 @@ describe("a saved password, in the Mac app", () => {
   it("asks when the reader presses a field, fills the form with the password picked, and signs in", async () => {
     const page = await open({ userAgent: MAC, passwordForm: "sign-in" });
     const sent = submissions(page);
-    // Focus the page gives a field itself, an autofocus, is not the reader's press.
+    // Focus the page gives a field itself is not the reader's press. Given
+    // from script: an autofocus is not honoured in a frame the test runner
+    // has not focused, so one here left the caret nowhere and proved nothing.
+    field(page, "username").focus();
     expect(page.window.document.activeElement).toBe(field(page, "username"));
     expect(asks(page)).toEqual([]);
 
