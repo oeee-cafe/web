@@ -13,13 +13,13 @@
 //!
 //! So this layer translates on the way out: when a request that came from htmx
 //! is about to be answered with an error, the body is replaced with a short
-//! localised sentence and pointed at the banner every page carries, using
+//! localised sentence and added to the stack of toasts every page carries, using
 //! htmx's own `HX-Retarget`. The JSON body stays for everyone else, since only
 //! htmx sends `HX-Request`.
 //!
 //! Handlers that render their own inline error are left alone — see
 //! `delete_account_htmx`, which answers 200 with the message it wants shown
-//! next to the password field. A banner is the fallback for the handlers that
+//! next to the password field. A toast is the fallback for the handlers that
 //! say nothing, not a replacement for saying something useful.
 
 use axum::{
@@ -33,13 +33,13 @@ use axum::{
 use crate::models::user::AuthSession;
 use crate::web::handlers::{get_bundle, safe_get_message};
 
-/// The element `base.jinja` renders for us to swap into.
-const BANNER_TARGET: &str = "#htmx-error";
+/// The stack of toasts `base.jinja` renders (`toasts.jinja`), which we add to.
+const TOASTS_TARGET: &str = "#toasts";
 
 /// Replace the body of a failed htmx response with a localised sentence, and
-/// retarget it at the page's error banner.
+/// retarget it at the page's toasts.
 pub async fn error_banner(req: Request, next: Next) -> Response {
-    let is_htmx = req.headers().get("HX-Request") == Some(&HeaderValue::from_static("true"));
+    let is_htmx = is_htmx(req.headers());
 
     // Both are needed after the response comes back, and the request is moved
     // into `next` before then.
@@ -78,21 +78,10 @@ pub async fn error_banner(req: Request, next: Next) -> Response {
     };
 
     let (mut parts, _) = response.into_parts();
-    // A notice in the design system's own markup, the flash messages' shape;
-    // templates/notice_close.jinja is the same close button as a template.
-    let close = html_escape(&safe_get_message(&bundle, "close"));
-    let body = format!(
-        concat!(
-            r#"<div class="ds-notice ds-notice-error htmx-error-message" role="alert">"#,
-            r#"<span class="ds-notice-body">{message}</span>"#,
-            r#"<button class="ds-notice-close" type="button" aria-label="{close}" title="{close}" "#,
-            r#"onclick="var n=this.parentNode,l=n.parentNode;l.removeChild(n);if(!l.querySelector('.ds-notice'))l.innerHTML=''">"#,
-            r#"<svg viewBox="0 0 12 12" aria-hidden="true">"#,
-            r#"<path d="M2.5 2.5l7 7m0-7l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />"#,
-            r#"</svg></button></div>"#,
-        ),
-        message = html_escape(&safe_get_message(&bundle, key)),
-        close = close,
+    let body = notice(
+        "error",
+        &safe_get_message(&bundle, key),
+        &safe_get_message(&bundle, "close"),
     );
 
     parts.headers.insert(
@@ -102,18 +91,64 @@ pub async fn error_banner(req: Request, next: Next) -> Response {
     parts.headers.remove(header::CONTENT_LENGTH);
     // Without both of these htmx would swap the sentence over whatever the
     // control happened to target — the row it was deleting, or the whole body.
+    // Added to the stack, not over it: a toast already up says something else.
     parts
         .headers
-        .insert("HX-Retarget", HeaderValue::from_static(BANNER_TARGET));
+        .insert("HX-Retarget", HeaderValue::from_static(TOASTS_TARGET));
     parts
         .headers
-        .insert("HX-Reswap", HeaderValue::from_static("innerHTML"));
+        .insert("HX-Reswap", HeaderValue::from_static("beforeend"));
 
     Response::from_parts(parts, Body::from(body))
 }
 
+/// A toast, in the design system's markup (ds.css, "Toasts"): a notice of
+/// `level` -- `success`, `info`, `warning` or `error`, axum-messages' levels in
+/// lower case, as the flash messages in `toasts.jinja` spell them.
+/// templates/notice_close.jinja is the same close button as a template.
+fn notice(level: &str, message: &str, close: &str) -> String {
+    let close = html_escape(close);
+    let role = if level == "error" {
+        r#" role="alert""#
+    } else {
+        ""
+    };
+    format!(
+        concat!(
+            r#"<div class="ds-notice ds-toast ds-notice-{level} htmx-{level}-message"{role}>"#,
+            r#"<span class="ds-notice-body">{message}</span>"#,
+            r#"<button class="ds-notice-close" type="button" aria-label="{close}" title="{close}" "#,
+            r#"onclick="var n=this.parentNode,l=n.parentNode;l.removeChild(n);if(!l.querySelector('.ds-notice'))l.innerHTML=''">"#,
+            r#"<svg viewBox="0 0 12 12" aria-hidden="true">"#,
+            r#"<path d="M2.5 2.5l7 7m0-7l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />"#,
+            r#"</svg></button></div>"#,
+        ),
+        level = level,
+        role = role,
+        message = html_escape(message),
+        close = close,
+    )
+}
+
+/// A toast for a handler to put up alongside whatever else its htmx response
+/// swaps: an `<hx-partial>` aimed at the stack, so the row it answers for and
+/// the sentence about it arrive in one response. What a full page load's flash
+/// message is to a redirect, this is to an in-place action.
+pub fn toast(level: &str, message: &str, close: &str) -> String {
+    format!(
+        r#"<hx-partial hx-target="{TOASTS_TARGET}" hx-swap="beforeend">{}</hx-partial>"#,
+        notice(level, message, close)
+    )
+}
+
+/// Whether a request came from htmx, and so can be answered with fragments to
+/// swap rather than a page or a redirect.
+pub fn is_htmx(headers: &axum::http::HeaderMap) -> bool {
+    headers.get("HX-Request") == Some(&HeaderValue::from_static("true"))
+}
+
 /// Fluent messages are authored by us, but they interpolate nothing here and
-/// escaping them costs nothing, so the banner cannot become an injection point
+/// escaping them costs nothing, so a toast cannot become an injection point
 /// if one ever starts carrying a value.
 fn html_escape(input: &str) -> String {
     input
@@ -145,7 +180,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_htmx_error_is_retargeted_at_the_banner() {
+    async fn an_htmx_error_is_retargeted_at_the_toasts() {
         let response = app()
             .oneshot(
                 Request::builder()
@@ -159,16 +194,32 @@ mod tests {
 
         assert_eq!(
             response.headers().get("HX-Retarget").unwrap(),
-            BANNER_TARGET,
-            "the sentence belongs in the banner, not over the control that failed"
+            TOASTS_TARGET,
+            "the sentence belongs in a toast, not over the control that failed"
         );
-        assert_eq!(response.headers().get("HX-Reswap").unwrap(), "innerHTML");
+        assert_eq!(response.headers().get("HX-Reswap").unwrap(), "beforeend");
         assert_eq!(
             response.status(),
             StatusCode::FORBIDDEN,
             "the status stands"
         );
         assert!(body_string(response).await.contains("htmx-error-message"));
+    }
+
+    #[test]
+    fn a_toast_is_a_partial_added_to_the_stack() {
+        let toast = toast("success", "Joined <b>", "Close");
+        assert!(toast.starts_with(r##"<hx-partial hx-target="#toasts" hx-swap="beforeend">"##));
+        assert!(toast.contains("ds-notice ds-toast ds-notice-success"));
+        assert!(
+            toast.contains("Joined &lt;b&gt;"),
+            "a message is text, not markup"
+        );
+        assert!(
+            !toast.contains("role=\"alert\""),
+            "only an error interrupts"
+        );
+        assert!(super::toast("error", "No", "Close").contains("role=\"alert\""));
     }
 
     #[tokio::test]

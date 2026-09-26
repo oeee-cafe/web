@@ -2973,8 +2973,11 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 /* ---------------------------------------------------------------------------
    Notices
 
-   What the site has to say about the last thing you did: signed in, the
-   password did not match, the click did not save. A row of the header, under
+   A sentence with a level, and a way to put it away. What the site has to
+   say about the last thing you did -- signed in, the password did not match,
+   the click did not save -- is one of these given a toast's shape (below);
+   as written here it is a row of a page, as the painter's guest notice is:
+   a row under
    the toolbar and built like it -- the full width of the window, its content
    at the toolbar's 12px from either edge, and one line between each row and
    the next: the toolbar's own bottom border is what separates it from the
@@ -3114,6 +3117,102 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   width: 12px;
   height: 12px;
   margin: 0 auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Toasts
+
+   What the site has to say about the last thing you did, said where an
+   application says it: a stack at the window's bottom-left corner, over the
+   page rather than in it, so a message arriving moves nothing the reader was
+   looking at. `#toasts` (base.jinja) is outside the content area, so an
+   in-place switch of that area leaves a toast where it was; the flash
+   messages of a full page load arrive already in it, and a response to htmx
+   adds to it with an `<hx-partial>` (web::htmx::toast) -- which is also where
+   a failed request's sentence goes (web::htmx::error_banner).
+
+   Each toast is a `.ds-notice` -- the same tint, dot and close button as the
+   painter's inline notices -- given the shape of something that floats: a
+   border, the medium corner and the hard offset shadow the menus have. Above
+   the modals (z-index 200), because a form in one can fail and has to say so
+   where it can be read.
+
+   A toast that says something went well goes by itself after a while
+   (toasts.jinja); one that says something went wrong stays until it is put
+   away, since the reader may have looked elsewhere while it arrived.
+   --------------------------------------------------------------------------- */
+.ds-toasts {
+  position: fixed;
+  z-index: 210;
+  bottom: var(--ds-space-3);
+  bottom: calc(var(--ds-space-3) + env(safe-area-inset-bottom, 0px));
+  left: var(--ds-space-3);
+  left: calc(var(--ds-space-3) + env(safe-area-inset-left, 0px));
+  width: 360px;
+  max-width: calc(100% - 2 * var(--ds-space-3));
+  margin: 0;
+  padding: 0;
+  /* The stack lets presses through to the page between its toasts. */
+  pointer-events: none;
+}
+
+.ds-toasts:empty {
+  display: none;
+}
+
+.ds-toast {
+  margin-top: var(--ds-space-2);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  box-shadow: var(--ds-shadow-menu);
+  pointer-events: auto;
+  -webkit-animation: ds-toast-in 0.16s ease-out;
+  animation: ds-toast-in 0.16s ease-out;
+  -webkit-transition: opacity 0.16s, -webkit-transform 0.16s;
+  transition: opacity 0.16s, transform 0.16s;
+}
+
+.ds-toast.is-leaving {
+  opacity: 0;
+  -webkit-transform: translateY(8px);
+  transform: translateY(8px);
+}
+
+@-webkit-keyframes ds-toast-in {
+  from {
+    opacity: 0;
+    -webkit-transform: translateY(8px);
+  }
+}
+
+@keyframes ds-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* On a phone the stack spans the screen, the way the system's own banners
+   do, and stays clear of the home indicator. */
+@media (max-width: 600px) {
+  .ds-toasts {
+    right: var(--ds-space-3);
+    right: calc(var(--ds-space-3) + env(safe-area-inset-right, 0px));
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-toast {
+    -webkit-animation: none;
+    animation: none;
+  }
+
+  .ds-toast.is-leaving {
+    -webkit-transform: none;
+    transform: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------

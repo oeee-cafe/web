@@ -958,9 +958,8 @@ mod tests {
             .expect("renders");
         assert!(rendered.contains(r#"<span class="comment-row-handle">@commenter · </span>"#));
         assert!(!rendered.contains("@commenter@oeee.test"));
-        assert!(
-            rendered.contains(r#"<span class="comment-row-handle">@visitor@elsewhere.test · </span>"#)
-        );
+        assert!(rendered
+            .contains(r#"<span class="comment-row-handle">@visitor@elsewhere.test · </span>"#));
     }
 
     /// A full batch beside the grid loads the next from after its last

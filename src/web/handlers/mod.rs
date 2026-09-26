@@ -2263,10 +2263,15 @@ mod template_tests {
         assert!(rendered.contains("<body class=\"ds-page\">"));
     }
 
-    /// The page's `<header>`: the toolbar and whatever notices sit under it.
-    fn header(rendered: &str) -> &str {
-        let start = rendered.find("<header>").expect("page has a header");
-        let end = rendered.find("</header>").expect("header closes");
+    /// The page's stack of toasts (`toasts.jinja`), up to its script.
+    fn toasts(rendered: &str) -> &str {
+        let start = rendered
+            .find(r#"<div id="toasts""#)
+            .expect("page has a stack of toasts");
+        let end = start
+            + rendered[start..]
+                .find("<script>")
+                .expect("the stack's script follows it");
         &rendered[start..end]
     }
 
@@ -2294,38 +2299,41 @@ mod template_tests {
                 ftl_lang => "en",
             })
             .expect("design.jinja renders");
-        let header = header(&rendered);
+        let toasts = toasts(&rendered);
         assert!(
-            header.contains("ds-notice ds-notice-success"),
-            "got: {header}"
+            toasts.contains("ds-notice ds-toast ds-notice-success"),
+            "got: {toasts}"
         );
         assert!(
-            header.contains("ds-notice ds-notice-error"),
-            "got: {header}"
+            toasts.contains("ds-notice ds-toast ds-notice-error"),
+            "got: {toasts}"
         );
-        assert!(header.contains("Welcome, Tandemaus"));
+        assert!(toasts.contains("Welcome, Tandemaus"));
         assert!(
-            header.contains("&lt;b&gt;not bold"),
+            toasts.contains("&lt;b&gt;not bold"),
             "a message is text, not markup"
         );
-        assert!(header.contains("ds-notice-close"));
+        assert!(toasts.contains("ds-notice-close"));
+        assert!(
+            !rendered.contains("<ul class=\"ds-notices\">"),
+            "a flash message is a toast, not a row of the header"
+        );
     }
 
-    /// With nothing to say the header holds no notice list at all, so there is
-    /// no empty strip under the toolbar.
+    /// With nothing to say the stack holds nothing at all, so `:empty` keeps
+    /// it out of the way -- and it is still there for htmx to add to.
     #[test]
-    fn no_flash_messages_render_no_notice_list() {
+    fn no_flash_messages_render_an_empty_stack() {
         let rendered = test_support::env()
             .get_template("design.jinja")
             .expect("design.jinja loads")
             .render(chrome())
             .expect("design.jinja renders");
-        let header = header(&rendered);
         assert!(
-            !header.contains("<ul class=\"ds-notices\">"),
-            "got: {header}"
+            rendered.contains(r#"<div id="toasts" class="ds-toasts" aria-live="polite"></div>"#),
+            "got: {}",
+            toasts(&rendered)
         );
-        assert!(header.contains(r#"<div id="htmx-error" class="ds-notices htmx-error"></div>"#));
     }
 
     /// The painter pages carry the site's toolbar, so every window has the

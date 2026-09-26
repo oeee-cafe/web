@@ -74,23 +74,6 @@
     </script>
     <header>
       {% include "toolbar.jinja" %}
-      {# Flash messages, one notice each (ds.css, "Notices"); the level --
-         Success, Error, and the rest axum-messages has -- picks the colour. #}
-      {% if messages %}
-        <ul class="ds-notices">
-          {% for message in messages %}
-            <li class="ds-notice ds-notice-{{ message.l | lower }}">
-              <span class="ds-notice-body">{{ message.m }}</span>
-              {% include "notice_close.jinja" %}
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-      {# Where a failed htmx request lands. web::htmx::error_banner retargets
-         every error response at this id, so a control that fails says so
-         instead of going quiet. Empty until something goes wrong, and
-         `.ds-notices:empty` gives it no box while it holds nothing. #}
-      <div id="htmx-error" class="ds-notices htmx-error"></div>
     </header>
     {# In the macOS app the header floats over the content (ds.css), which
        needs its height to start below it -- a height that changes when the
@@ -114,6 +97,8 @@
       {% block content %}
       {% endblock content %}
     </main>
+    {% include "toasts.jinja" %}
+    {% include "optimistic.jinja" %}
     {% include "confirm_dialog.jinja" %}
     {% include "segmented.jinja" %}
   </body>
