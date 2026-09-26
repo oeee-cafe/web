@@ -81,11 +81,13 @@ paired with the files by the debug ids the Dockerfile stamped into both.
 
 from __future__ import annotations
 
+import fcntl
 import io
 import json
 import os
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -108,7 +110,11 @@ DEPLOY_CONFIG_DIR = Path(
 BUILD_DIR = Path(
     os.environ.get("DEPLOY_BUILD_DIR", Path.home() / ".cache/oeee-cafe-deploy")
 )
-LOCK_DIR = BUILD_DIR.with_name(BUILD_DIR.name + ".lock")
+# Held with flock(2) for as long as a deploy runs. The kernel lets go of it
+# when the process ends, however it ends -- a SIGKILL, a crash, the laptop
+# lid -- so there is never a stale lock to remove by hand, as there was when
+# it was a directory that only a clean exit took away.
+LOCK_FILE = BUILD_DIR.with_name(BUILD_DIR.name + ".lock")
 DEBUG_DIR = BUILD_DIR.with_name(BUILD_DIR.name + ".debug")
 # How long the outgoing colour keeps running after the proxy stops sending it
 # new requests, so in-flight ones finish where they started.
@@ -1013,6 +1019,14 @@ def deploy_local() -> None:
 COMMANDS = {"deploy": deploy, "deploy:local": deploy_local, "rollback": rollback}
 
 
+def interrupted(signum, frame):
+    """A SIGTERM or SIGHUP taken the way Ctrl-C is, so the cleanup in main()
+    runs: the throwaway build database is removed, and a subprocess.run()
+    under way kills its child on the way out. By default either signal ends
+    Python on the spot, with no `finally` at all."""
+    raise KeyboardInterrupt
+
+
 def main() -> int:
     # Not under the lock: the CLI changes nothing a deploy does, and is often
     # what is wanted while one runs.
@@ -1030,14 +1044,20 @@ def main() -> int:
     # One at a time: two deploys would share the build checkout and the build
     # database's port, and a deploy and a rollback would fight over which
     # colour is live.
+    #
+    # Never closed: the lock goes with the process. subprocess closes every
+    # other descriptor in its children, so an ssh left running cannot keep
+    # holding it after this has gone.
+    lock = open(LOCK_FILE, "w")
     try:
-        LOCK_DIR.mkdir()
-    except FileExistsError:
-        print(
-            f"ERROR: another deploy is in progress (remove {LOCK_DIR} if it is not)",
-            file=sys.stderr,
-        )
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("ERROR: another deploy is in progress", file=sys.stderr)
         return 1
+    # A stopped task (SIGTERM) and a closed terminal (SIGHUP) are as much an
+    # interruption as Ctrl-C.
+    signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGHUP, interrupted)
     try:
         command()
         return 0
@@ -1048,6 +1068,9 @@ def main() -> int:
         print("ERROR: interrupted", file=sys.stderr)
         return 130
     finally:
+        # A second interruption is not allowed to cut the cleanup short.
+        for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(signum, signal.SIG_IGN)
         subprocess.run(
             ["docker", "rm", "-fv", BUILD_DB],
             check=False,
@@ -1055,7 +1078,6 @@ def main() -> int:
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
         )
-        LOCK_DIR.rmdir()
 
 
 if __name__ == "__main__":
