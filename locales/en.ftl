@@ -94,8 +94,6 @@ notification-action-replied-to-comment = replied to your comment on { $postTitle
 notification-action-posted-in-community = posted in your community
 notification-action-posted-in-community-with-title = posted in your community: { $postTitle }
 
-notification-mark-all-read = Mark all as read
-notification-mark-read = Mark as read
 notification-delete = Delete
 notification-delete-confirm = Are you sure you want to delete this notification?
 

@@ -7,9 +7,11 @@
    to …"), and the actor and the verb are one sentence that was being rendered
    as two paragraphs.
 
-   Rendered by the page in a loop and standalone by the mark-read handler, so it
-   must not depend on anything that handler passes beyond `notification` —
-   r2_public_endpoint_url is a global, not part of that context. #}
+   Rendered by the page and by each scrolled batch (notifications_fragment.jinja),
+   so it must not depend on anything beyond `notification` —
+   r2_public_endpoint_url is a global, not part of that context. `unread` is
+   whether it was unread when the page was opened, not `read_at`: opening the
+   page is what reads it (ShownNotification in handlers/notifications.rs). #}
 {% set title = notification.post_title if notification.post_title else ftl_get_message("post-untitled") %}
 {% set post_url = "/@" ~ notification.post_author_login_name ~ "/" ~ notification.post_id %}
 {# What kind of thing happened, as a small badge on the row's picture --
@@ -27,7 +29,7 @@
   "GuestbookReply": '<path d="M5 4.5h11.5a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z"/><path d="M5 17.5a2 2 0 0 1 2-2h11.5"/>',
 } %}
 {% set kind_path = kind_paths[notification.notification_type] %}
-<div class="notification{% if not notification.read_at %} unread{% endif %}">
+<div class="notification{% if notification.unread %} unread{% endif %}">
   {# Shown for anything carrying a post rather than for a list of six named
      types: 95% of notifications have one. Follows and guestbook entries have
      none, and show their kind's icon in the same place, so every sentence in
@@ -134,24 +136,14 @@
     {% endif %}
   </div>
 
-  {# When, as how long ago, and the row's two controls as icons. They are
-     revealed with the row on a screen that has a pointer and always there
-     on a touch screen, which has no hover to reveal them with. #}
+  {# When, as how long ago, and the row's control as an icon. It is revealed
+     with the row on a screen that has a pointer and always there on a touch
+     screen, which has no hover to reveal it with. There is no "mark read":
+     having the page open is reading every row on it. #}
   <div class="notification-meta">
     <time class="notification-time" datetime="{{ notification.created_at }}"
           title="{{ notification.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ notification.created_at|ago }}</time>
     <div class="notification-actions">
-      {% if not notification.read_at %}
-        <button class="notification-icon-button"
-                title="{{ ftl_get_message('notification-mark-read') }}"
-                aria-label="{{ ftl_get_message('notification-mark-read') }}"
-                hx-post="/notifications/{{ notification.id }}/mark-read"
-                hx-target="closest .notification"
-                hx-swap="outerHTML"
-                hx-disable="this">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-        </button>
-      {% endif %}
       {# swapEmpty:true because the response is now nothing but an
          <hx-partial> carrying the corrected badge. htmx skips the main swap
          when a response is only partials, which would leave the row it was

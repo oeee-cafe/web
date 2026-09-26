@@ -70,8 +70,6 @@ notification-action-replied-to-comment = { $postTitle }의 댓글에 답글을 �
 notification-action-posted-in-community = 님이 커뮤니티에 그림을 그렸습니다
 notification-action-posted-in-community-with-title = 님이 커뮤니티에 그림을 그렸습니다: { $postTitle }
 
-notification-mark-all-read = 모두 읽음으로 표시
-notification-mark-read = 읽음으로 표시
 notification-delete = 삭제
 notification-delete-confirm = 정말 이 알림을 삭제하시겠습니까?
 

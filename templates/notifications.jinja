@@ -4,7 +4,18 @@
 {% endblock title %}
 {% block content %}
   <div class="notifications-page">
-    {% include "notifications_header.jinja" %}
+    <div class="notifications-header">
+      <h1 class="notifications-title">{{ ftl_get_message("notifications") }}</h1>
+    </div>
+    {# Looking at the list is reading it: once the page is on screen this
+       marks every notification read, and the answer is the bell, corrected.
+       Asked for by the page, not done by the handler rendering it, because
+       htmx preloads a boosted link at the press and a page never shown has
+       not been seen (mark_notifications_seen). The answer is only an
+       <hx-partial>, so htmx leaves this element where it is. #}
+    {% if unseen %}
+      <div hidden hx-post="/notifications/seen" hx-trigger="load" hx-swap="outerHTML"></div>
+    {% endif %}
 
     {# Invitations use the notification row's proportions — one line, time and
        controls on the right — so the two lists scan as one page rather than as

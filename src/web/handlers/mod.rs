@@ -3695,8 +3695,8 @@ mod template_tests {
 
     #[test]
     fn the_notification_chrome_renders_standalone() {
-        // Both are swapped in by handlers as well as included by the page, so
-        // they have to stand up with only the keys those handlers pass.
+        // Swapped in by handlers as well as included by the page, so it has
+        // to stand up with only the keys those handlers pass.
         let env = test_support::env();
 
         let nav = env
@@ -3719,21 +3719,6 @@ mod template_tests {
         assert!(
             with_count.contains("id=\"nav-notifications\""),
             "the partial targets this id, so it has to survive its own swap"
-        );
-
-        let header = env
-            .get_template("notifications_header.jinja")
-            .unwrap_or_else(|e| panic!("notifications_header.jinja loads: {e:#}"));
-        let unread = header
-            .render(context! { unread_notification_count => 2, ftl_lang => "en" })
-            .expect("header renders with unread");
-        let all_read = header
-            .render(context! { unread_notification_count => 0, ftl_lang => "en" })
-            .expect("header renders with none unread");
-        assert!(unread.contains("mark-all-read"));
-        assert!(
-            !all_read.contains("mark-all-read"),
-            "the button has to remove itself once there is nothing left to mark"
         );
     }
 

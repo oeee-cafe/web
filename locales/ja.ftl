@@ -70,8 +70,6 @@ notification-action-replied-to-comment = { $postTitle }のコメントに返信�
 notification-action-posted-in-community = さんがコミュニティに絵を描きました
 notification-action-posted-in-community-with-title = さんがコミュニティに絵を描きました: { $postTitle }
 
-notification-mark-all-read = すべて既読にする
-notification-mark-read = 既読にする
 notification-delete = 削除
 notification-delete-confirm = 本当にこの通知を削除しますか？
 
