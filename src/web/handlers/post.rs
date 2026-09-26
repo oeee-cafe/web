@@ -2010,8 +2010,9 @@ pub async fn do_post_edit_community(
         }
     }
 
-    let _ = edit_post_community(&mut tx, post_uuid, form.community_id).await;
-    let _ = tx.commit().await;
+    // Not `let _ =`: a move that failed was redirected to as if it had worked.
+    edit_post_community(&mut tx, post_uuid, form.community_id).await?;
+    tx.commit().await?;
 
     Ok(Redirect::to(&format!("/posts/{}", id)).into_response())
 }
