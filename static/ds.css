@@ -72,12 +72,16 @@
      NEO's night blue. */
   --ds-ground: #ccccff;
   --ds-grid: #bbbbff;
-  /* The toolbar's own ground: the page's, for now, in either theme. A
-     token of its own because the apps paint what is above the toolbar --
-     the strip behind an iPhone's status bar -- in it (the bridge's
-     `theme.toolbar`, app_bridge.jinja), so a toolbar given another colour
-     takes that strip along instead of leaving it the page's. */
-  --ds-toolbar: var(--ds-ground);
+  /* The toolbar's own ground, set apart from the page's the way an
+     application's frame is from its content: lighter than the lavender
+     here, darker than the night blue in dark, and flat -- the grid is the
+     page's, and stops at the toolbar's edge. What sits on it is a step
+     lighter again (--ds-toolbar-surface), so its buttons stay buttons. The
+     apps paint what is above the toolbar -- the strip behind a phone's
+     status bar -- in it (the bridge's `theme.toolbar`, app_bridge.jinja),
+     so the two read as one bar. */
+  --ds-toolbar: #f7f7ff;
+  --ds-toolbar-surface: #ffffff;
   /* The grid line as a solid colour, for grounds drawn by the painter. */
   --ds-grid-solid: #bbbbff;
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
@@ -143,6 +147,8 @@
     --ds-grid: #22223f;
     --ds-grid-solid: #22223f;
     --ds-surface: #25254a;
+    --ds-toolbar: #0e0e1f;
+    --ds-toolbar-surface: #25254a;
     /* The card is darker than the track here, so it would sink, not rise. */
     --ds-thumb: #3d3d70;
     --ds-track: #25253c;
@@ -178,6 +184,8 @@
   --ds-grid: #22223f;
   --ds-grid-solid: #22223f;
   --ds-surface: #25254a;
+  --ds-toolbar: #0e0e1f;
+  --ds-toolbar-surface: #25254a;
   --ds-thumb: #3d3d70;
   --ds-track: #25253c;
   --ds-field: #1c1c38;
@@ -204,6 +212,19 @@
   --ds-shadow-menu: 3px 3px 0 rgba(0, 0, 0, 0.45);
   --ds-skeleton: rgba(200, 200, 255, 0.16);
   --ds-skeleton-drawing: #2a2a46;
+}
+
+/* In the iPhone and Android apps the toolbar stays on the page's ground,
+   for now: the builds people have paint the strip behind the status bar
+   in the ground (`theme.ground`), and know nothing of `theme.toolbar`, so a
+   toolbar of its own colour sat under a strip of the page's -- a seam
+   across the top of the screen. Take this away once builds that paint the
+   strip in `theme.toolbar` are what people have. After the dark blocks, so
+   it outranks them at equal specificity. */
+:root[data-app="ios"],
+:root[data-app="android"] {
+  --ds-toolbar: var(--ds-ground);
+  --ds-toolbar-surface: var(--ds-surface);
 }
 
 /* `hidden` means hidden, even on an element whose class gives it a
@@ -504,20 +525,17 @@ html:not([data-app="windows"]):has(> body.ds-page) {
    header overrides it with `position: absolute`, being the more specific
    rule.
 
-   Opaque, because the content now passes beneath: the ground and its grid,
-   the same pair the page carries. Nothing in it shows the grid today -- the
-   toolbar has its own ground and each notice row its own tint, edge to edge,
-   so the header is exactly the toolbar and its rows -- but a gap between
-   them would show the page's ground rather than the content under it. */
+   Opaque, because the content now passes beneath, and in the toolbar's
+   own ground (--ds-toolbar), the frame's and not the page's. Everything
+   drawn inside it reads its surface from the toolbar's too, so the bar's
+   buttons and menus keep their step above what they sit on. */
 .ds-page > header {
+  --ds-surface: var(--ds-toolbar-surface);
   position: -webkit-sticky;
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: var(--ds-ground);
-  background-image: linear-gradient(var(--ds-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
-  background-size: 14px 14px;
+  background-color: var(--ds-toolbar);
 }
 
 @media (min-width: 601px) {
@@ -685,17 +703,17 @@ html:not([data-app="windows"]):has(> body.ds-page) {
 
    On the website, on Windows and on phones, nothing here applies. */
 :root {
-  --ds-bar: rgba(204, 204, 255, 0.72);
+  --ds-bar: rgba(247, 247, 255, 0.72);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ds-bar: rgba(23, 23, 43, 0.72);
+    --ds-bar: rgba(14, 14, 31, 0.72);
   }
 }
 
 :root[data-theme="dark"] {
-  --ds-bar: rgba(23, 23, 43, 0.72);
+  --ds-bar: rgba(14, 14, 31, 0.72);
 }
 
 @media (min-width: 601px) {
