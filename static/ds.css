@@ -214,19 +214,6 @@
   --ds-skeleton-drawing: #2a2a46;
 }
 
-/* In the iPhone and Android apps the toolbar stays on the page's ground,
-   for now: the builds people have paint the strip behind the status bar
-   in the ground (`theme.ground`), and know nothing of `theme.toolbar`, so a
-   toolbar of its own colour sat under a strip of the page's -- a seam
-   across the top of the screen. Take this away once builds that paint the
-   strip in `theme.toolbar` are what people have. After the dark blocks, so
-   it outranks them at equal specificity. */
-:root[data-app="ios"],
-:root[data-app="android"] {
-  --ds-toolbar: var(--ds-ground);
-  --ds-toolbar-surface: var(--ds-surface);
-}
-
 /* `hidden` means hidden, even on an element whose class gives it a
    display of its own -- a button, a flex row. Without this the attribute
    loses to any class that sets `display`, and a control a script hid stays
