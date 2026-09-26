@@ -29,7 +29,7 @@ permissions:
 env:
   IMAGE: ghcr.io/oeee-cafe/web
   SENTRY_ORG: limeburst
-  SENTRY_PROJECT: oeee-cafe
+  SENTRY_PROJECT: oeee-cafe-web
   SENTRY_JS_PROJECT: neo-cucumber
 
 jobs:
