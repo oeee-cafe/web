@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% from "follow_macro.jinja" import follow_button, unfollow_button %} {% extends "base.jinja" %}
 {% from "achievement_icon_macro.jinja" import achievement_icon %}
 {% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
@@ -17,7 +18,7 @@
      site mark when the user has not drawn one. #}
   {% if banner %}
     <meta property="og:image"
-          content="{{ r2_public_endpoint_url|safe }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
+          content="{{ stored_url("image", banner.image_filename) }}" />
     <meta property="og:image:width" content="{{ banner.width }}" />
     <meta property="og:image:height" content="{{ banner.height }}" />
   {% else %}
@@ -47,7 +48,7 @@
             <img width="{{ banner.width }}"
                  height="{{ banner.height }}"
                  alt=""
-                 src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
+                 src="{{ stored_url("image", banner.image_filename) }}" />
           {% if is_owner %}</a>{% else %}</span>{% endif %}
         {% elif is_owner %}
           {# Where the banner will go, holding its place until there is one. #}

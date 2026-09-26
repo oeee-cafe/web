@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% extends "base.jinja" %}
 {% import "pill_macro.jinja" as pill %}
 {% from "comments_aside_macro.jinja" import comments_aside %}
@@ -18,7 +19,7 @@
      preview than the site mark. #}
   {% if feed.posts %}
     <meta property="og:image"
-          content="{{ r2_public_endpoint_url|safe }}/image/{{ feed.posts[0].image_filename[:2] }}/{{ feed.posts[0].image_filename }}" />
+          content="{{ stored_url("image", feed.posts[0].image_filename) }}" />
     <meta name="twitter:card" content="summary_large_image" />
   {% else %}
     <meta property="og:image" content="{{ base_url|safe }}/static/favicon.png" />

@@ -28,6 +28,12 @@ use crate::live::LiveEvent;
 use crate::markdown_utils::process_markdown_content;
 use crate::sanitized_html::SanitizedHtml;
 
+/// An http or https address with a host: the only kind of link a remote
+/// actor's profile is allowed to be.
+fn is_web_address(url: &Url) -> bool {
+    matches!(url.scheme(), "http" | "https") && url.host_str().is_some_and(|host| !host.is_empty())
+}
+
 fn extract_note_content(note: &Note) -> (String, Option<SanitizedHtml>) {
     // Try to get HTML content from contents field or content field
     let raw_html_content = note.content.clone();
@@ -350,6 +356,22 @@ impl Object for Actor {
                 group.url,
                 ActorType::Group,
             ),
+        };
+
+        // Where a reader is sent by the actor's name: printed as a link's
+        // href, so only a web address will do. A `url` is whatever the
+        // remote server says, and `javascript:` parses as a Url like any
+        // other; the actor's id has been fetched and checked against its
+        // domain, so an address that is not http(s) gives way to it
+        // (actors_url_is_web holds the table to the same).
+        let url = if is_web_address(&url) {
+            url
+        } else {
+            tracing::info!(
+                "Actor {} gave a url that is not a web address: {url}",
+                id.inner()
+            );
+            id.inner().clone()
         };
 
         // Parse instance host from the actor ID URL
@@ -2660,5 +2682,32 @@ impl Activity for UpdateNote {
         // In a full implementation, we would update our local copy of the post
         tracing::info!("Received UpdateNote activity: {:?}", self);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod web_address_tests {
+    use super::is_web_address;
+    use url::Url;
+
+    /// A remote actor's profile link is an href on our pages: only a web
+    /// address may be one.
+    #[test]
+    fn only_a_web_address_is_a_profile_link() {
+        for good in [
+            "https://example.social/@far",
+            "http://example.social/users/far",
+        ] {
+            assert!(is_web_address(&Url::parse(good).unwrap()), "{good}");
+        }
+        for bad in [
+            "javascript:alert(document.cookie)",
+            "data:text/html,<script>alert(1)</script>",
+            "vbscript:msgbox(1)",
+            "file:///etc/passwd",
+            "mailto:far@example.social",
+        ] {
+            assert!(!is_web_address(&Url::parse(bad).unwrap()), "{bad}");
+        }
     }
 }

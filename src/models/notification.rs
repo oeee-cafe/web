@@ -8,6 +8,7 @@ use sqlx::{Postgres, Transaction, Type};
 use uuid::Uuid;
 
 use crate::locale::LOCALES;
+use crate::models::handle::Handle;
 use crate::models::user::Language;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type, PartialEq)]
@@ -49,8 +50,11 @@ pub struct NotificationWithActor {
     pub recipient_id: Uuid,
     pub actor_id: Uuid,
     pub actor_name: String,
-    pub actor_handle: String,
-    pub actor_login_name: Option<String>,
+    /// Who did it: someone from here, or from another server.
+    pub handle: Handle,
+    /// Where their name leads: their profile, here or on their server. A
+    /// web address (actors_url_is_web).
+    pub actor_url: String,
     pub notification_type: NotificationType,
     pub post_id: Option<Uuid>,
     pub comment_id: Option<Uuid>,
@@ -198,6 +202,7 @@ pub async fn list_notifications(
             n.actor_id,
             a.name AS actor_name,
             a.handle AS actor_handle,
+            a.url AS actor_url,
             actor_users.login_name AS "actor_login_name?",
             n.notification_type as "notification_type: NotificationType",
             n.post_id,
@@ -242,8 +247,8 @@ pub async fn list_notifications(
             recipient_id: row.recipient_id,
             actor_id: row.actor_id,
             actor_name: row.actor_name,
-            actor_handle: row.actor_handle,
-            actor_login_name: row.actor_login_name,
+            handle: Handle::of_actor(row.actor_login_name.map(Into::into), row.actor_handle),
+            actor_url: row.actor_url,
             notification_type: row.notification_type,
             post_id: row.post_id,
             comment_id: row.comment_id,
@@ -293,6 +298,7 @@ pub async fn get_notification_by_id(
             n.actor_id,
             a.name AS actor_name,
             a.handle AS actor_handle,
+            a.url AS actor_url,
             actor_users.login_name AS "actor_login_name?",
             n.notification_type as "notification_type: NotificationType",
             n.post_id,
@@ -332,8 +338,8 @@ pub async fn get_notification_by_id(
         recipient_id: row.recipient_id,
         actor_id: row.actor_id,
         actor_name: row.actor_name,
-        actor_handle: row.actor_handle,
-        actor_login_name: row.actor_login_name,
+        handle: Handle::of_actor(row.actor_login_name.map(Into::into), row.actor_handle),
+        actor_url: row.actor_url,
         notification_type: row.notification_type,
         post_id: row.post_id,
         comment_id: row.comment_id,
@@ -497,14 +503,14 @@ pub fn notification_url(
         }
         // A follower from another server has no login name here, and no page
         // of theirs on this site to open.
-        Follow => match &notification.actor_login_name {
+        Follow => match notification.handle.login_name() {
             Some(actor) => format!("/@{actor}"),
             None => "/notifications".to_string(),
         },
         // An entry is written in the recipient's own guestbook; a reply is the
         // actor answering one the recipient wrote in theirs.
         GuestbookEntry => format!("/@{recipient_login_name}"),
-        GuestbookReply => match &notification.actor_login_name {
+        GuestbookReply => match notification.handle.login_name() {
             Some(actor) => format!("/@{actor}"),
             None => "/notifications".to_string(),
         },
@@ -578,10 +584,10 @@ pub async fn send_push_for_notification(
             serde_json::json!(comment_id.to_string()),
         );
     }
-    if let Some(actor_login_name) = &notification.actor_login_name {
+    if let Some(actor_login_name) = notification.handle.login_name() {
         data.insert(
             "actor_login_name".to_string(),
-            serde_json::json!(actor_login_name),
+            serde_json::json!(actor_login_name.as_str()),
         );
     }
 
@@ -839,8 +845,8 @@ mod tests {
             recipient_id: Uuid::nil(),
             actor_id: Uuid::nil(),
             actor_name: "Actor".to_string(),
-            actor_handle: "@actor".to_string(),
-            actor_login_name: Some("actor".to_string()),
+            handle: Handle::Local("actor".into()),
+            actor_url: "https://oeee.test/@actor".to_string(),
             notification_type: kind,
             post_id: None,
             comment_id: None,
@@ -897,7 +903,7 @@ mod tests {
             "/notifications"
         );
         let mut remote = notification(NotificationType::Follow);
-        remote.actor_login_name = None;
+        remote.handle = Handle::Remote("@far@example.social".to_string());
         assert_eq!(notification_url(&remote, "me"), "/notifications");
     }
 }

@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {# One banner card. Rendered inside the queue and returned standalone by the
    flag endpoint, which swaps it in place via hx-swap="outerHTML". #}
 <div class="ds-card admin-banner-card {% if banner.is_explicit %}flagged{% endif %}"
@@ -8,7 +9,7 @@
        alt="Banner by {{ banner.author_login_name }}"
        loading="lazy"
        decoding="async"
-       src="{{ r2_public_endpoint_url }}/image/{{ banner.image_filename[:2] }}/{{ banner.image_filename }}" />
+       src="{{ stored_url("image", banner.image_filename) }}" />
   <div class="admin-banner-card-text">
     <div>
       {% if banner.is_explicit %}

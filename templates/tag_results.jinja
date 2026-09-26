@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {# The tag list and the line above it naming the search it answers.
 
    Rendered inline by tag_discovery.jinja for the first paint and
@@ -21,7 +22,7 @@
         <span class="community-card-cover">
           {% for cover in tag.covers %}
             <span class="community-card-cell">
-              <img src="{{ r2_public_endpoint_url }}/image/{{ cover.image_filename[:2] }}/{{ cover.image_filename }}"
+              <img src="{{ stored_url("image", cover.image_filename) }}"
                    alt=""
                    class="{% if cover.width > 300 and cover.height > 300 %}drawing-downscaled{% endif %}"
                    width="{{ cover.width }}"

@@ -1,0 +1,7 @@
+{# Where a stored file is served from: the public bucket
+   (`r2_public_endpoint_url`), under its kind -- "image" or "replay" -- and
+   the first two characters of its name, as image_store.rs writes it. Written
+   out in 24 places before this; a change to the layout is now one line. #}
+{% macro stored_url(kind, filename) -%}
+  {{ r2_public_endpoint_url|safe }}/{{ kind }}/{{ filename[:2] }}/{{ filename }}
+{%- endmacro %}

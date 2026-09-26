@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {# The community card, shared by every list on /communities and by the
    infinite-scroll fragment, so a community looks the same however it arrived.
 
@@ -15,7 +16,7 @@
     <span class="community-card-cover">
       {% for post in community.recent_posts %}
         <span class="community-card-cell">
-          <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
+          <img src="{{ stored_url("image", post.image_filename) }}"
                alt=""
                class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
                width="{{ post.image_width }}"

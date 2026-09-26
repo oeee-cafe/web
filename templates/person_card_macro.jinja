@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% from "person_macro.jinja" import handle %}
 {# A person as a card: their banner framed in hard pixels, or where they
    have none, a frame of the same size with their name in it, then their
@@ -13,7 +14,7 @@
            alt=""
            loading="lazy"
            decoding="async"
-           src="{{ r2_public_endpoint_url }}/image/{{ person.banner_image_filename[:2] }}/{{ person.banner_image_filename }}" />
+           src="{{ stored_url("image", person.banner_image_filename) }}" />
     {% else %}
       <span class="profile-follow-banner profile-follow-blank" aria-hidden="true">{{ person.display_name }}</span>
     {% endif %}
