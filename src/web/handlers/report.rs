@@ -308,8 +308,12 @@ async fn render_report_result(
     ftl_lang: &str,
     key: &str,
 ) -> Result<axum::response::Response, AppError> {
-    let template = state.env.get_template("report_result.jinja")?;
-    let rendered = template.render(context! { message_key => key, ftl_lang })?;
+    let rendered = state
+        .render(
+            "report_result.jinja",
+            context! { message_key => key, ftl_lang },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 

@@ -519,11 +519,15 @@ pub async fn apple_callback(
     State(state): State<AppState>,
     Form(answer): Form<AppleAnswer>,
 ) -> Result<Html<String>, AppError> {
-    let template = state.env.get_template("identity_apple_return.jinja")?;
-    let rendered = template.render(context! {
-        answer,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "identity_apple_return.jinja",
+            context! {
+                answer,
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered))
 }
 
@@ -1285,11 +1289,15 @@ pub async fn handoff_done(
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
 ) -> Result<Html<String>, AppError> {
-    let template = state.env.get_template("identity_handoff_done.jinja")?;
-    let rendered = template.render(context! {
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "identity_handoff_done.jinja",
+            context! {
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered))
 }
 
@@ -1315,7 +1323,7 @@ fn suggested_login_name(name: Option<&str>) -> String {
         .collect()
 }
 
-fn welcome_page(
+async fn welcome_page(
     state: &AppState,
     messages: Messages,
     ftl_lang: String,
@@ -1324,17 +1332,21 @@ fn welcome_page(
     display_name: &str,
     error: Option<String>,
 ) -> Result<Html<String>, AppError> {
-    let template = state.env.get_template("identity_welcome.jinja")?;
-    let rendered = template.render(context! {
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        ftl_lang,
-        provider => pending.identity.provider.display_name(),
-        provider_name => pending.identity.name,
-        login_name,
-        display_name,
-        error,
-        next => pending.next,
-    })?;
+    let rendered = state
+        .render(
+            "identity_welcome.jinja",
+            context! {
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                ftl_lang,
+                provider => pending.identity.provider.display_name(),
+                provider_name => pending.identity.name,
+                login_name,
+                display_name,
+                error,
+                next => pending.next,
+            },
+        )
+        .await?;
     Ok(Html(rendered))
 }
 
@@ -1362,7 +1374,8 @@ pub async fn identity_welcome(
         &login_name,
         &name,
         None,
-    )?
+    )
+    .await?
     .into_response())
 }
 
@@ -1426,7 +1439,8 @@ pub async fn do_identity_welcome(
             &login_name,
             &display_name,
             Some(error),
-        )?;
+        )
+        .await?;
         return Ok(html.into_response());
     }
 

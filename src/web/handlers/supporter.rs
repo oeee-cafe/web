@@ -103,24 +103,28 @@ pub async fn supporter_page(
         }
     };
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("supporter.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        this_year => year,
-        store,
-        offers,
-        // Restoring is the App Store's word for it. Google Play has the same
-        // thing -- what the device's Google account owns, handed over again
-        // -- and Steam and the Microsoft Store say it every time they are
-        // asked.
-        restorable => matches!(store, Some(Store::Apple | Store::Google)),
-        nothing_this_year,
-        supporter_standings,
-        worn_mark,
-        supports_this_year,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "supporter.jinja",
+            context! {
+                current_user => auth_session.user,
+                this_year => year,
+                store,
+                offers,
+                // Restoring is the App Store's word for it. Google Play has the same
+                // thing -- what the device's Google account owns, handed over again
+                // -- and Steam and the Microsoft Store say it every time they are
+                // asked.
+                restorable => matches!(store, Some(Store::Apple | Store::Google)),
+                nothing_this_year,
+                supporter_standings,
+                worn_mark,
+                supports_this_year,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered))
 }

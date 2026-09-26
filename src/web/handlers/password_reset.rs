@@ -26,11 +26,15 @@ pub async fn password_reset_request_page(
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
 ) -> Result<Html<String>, AppError> {
-    let template = state.env.get_template("password_reset_request.jinja")?;
-    let rendered = template.render(context! {
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "password_reset_request.jinja",
+            context! {
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -48,7 +52,7 @@ pub async fn password_reset_request(
     let bundle = get_bundle(&accept_language, None);
 
     // Always show success message to prevent email enumeration
-    let template = state.env.get_template("password_reset_sent.jinja")?;
+    let template = "password_reset_sent.jinja";
     let ftl_lang = bundle
         .locales
         .first()
@@ -57,10 +61,15 @@ pub async fn password_reset_request(
 
     // Validate email format
     if !form.email.contains('@') || form.email.parse::<lettre::Address>().is_err() {
-        let rendered = template.render(context! {
-            email => form.email,
-            ftl_lang
-        })?;
+        let rendered = state
+            .render(
+                template,
+                context! {
+                    email => form.email,
+                    ftl_lang
+                },
+            )
+            .await?;
         return Ok(Html(rendered).into_response());
     }
 
@@ -82,10 +91,15 @@ pub async fn password_reset_request(
     tx.commit().await?;
 
     // Always show the same success message
-    let rendered = template.render(context! {
-        email => form.email,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            template,
+            context! {
+                email => form.email,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -113,11 +127,15 @@ pub async fn password_reset_verify(
     // Validate passwords match
     if form.new_password != form.new_password_confirm {
         messages.error(safe_get_message(&bundle, "password-reset-error-mismatch"));
-        let template = state.env.get_template("password_reset_verify.jinja")?;
-        let rendered = template.render(context! {
-            token => form.token,
-            ftl_lang
-        })?;
+        let rendered = state
+            .render(
+                "password_reset_verify.jinja",
+                context! {
+                    token => form.token,
+                    ftl_lang
+                },
+            )
+            .await?;
         return Ok(Html(rendered).into_response());
     }
 
@@ -127,11 +145,15 @@ pub async fn password_reset_verify(
             &bundle,
             "account-change-password-error-too-short",
         ));
-        let template = state.env.get_template("password_reset_verify.jinja")?;
-        let rendered = template.render(context! {
-            token => form.token,
-            ftl_lang
-        })?;
+        let rendered = state
+            .render(
+                "password_reset_verify.jinja",
+                context! {
+                    token => form.token,
+                    ftl_lang
+                },
+            )
+            .await?;
         return Ok(Html(rendered).into_response());
     }
 
@@ -158,11 +180,15 @@ pub async fn password_reset_verify(
             &bundle,
             "password-reset-error-invalid-token",
         ));
-        let template = state.env.get_template("password_reset_verify.jinja")?;
-        let rendered = template.render(context! {
-            token => form.token,
-            ftl_lang
-        })?;
+        let rendered = state
+            .render(
+                "password_reset_verify.jinja",
+                context! {
+                    token => form.token,
+                    ftl_lang
+                },
+            )
+            .await?;
         Ok(Html(rendered).into_response())
     }
 }
@@ -172,11 +198,15 @@ pub async fn password_reset_verify_page(
     State(state): State<AppState>,
     axum::extract::Query(query): axum::extract::Query<TokenQuery>,
 ) -> Result<Html<String>, AppError> {
-    let template = state.env.get_template("password_reset_verify.jinja")?;
-    let rendered = template.render(context! {
-        token => query.token.map(|t| t.to_string()),
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "password_reset_verify.jinja",
+            context! {
+                token => query.token.map(|t| t.to_string()),
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }

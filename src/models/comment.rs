@@ -4,6 +4,8 @@ use serde::Serialize;
 use sqlx::{Postgres, Transaction, Type};
 use uuid::Uuid;
 
+use crate::models::handle::Handle;
+
 type CommentData = (
     Uuid,                  // post_id
     Uuid,                  // actor_id
@@ -12,10 +14,8 @@ type CommentData = (
     Option<String>,        // content_html
     Option<String>,        // iri
     String,                // actor_name
-    String,                // actor_handle
+    Handle,                // handle
     String,                // actor_url
-    Option<String>,        // actor_login_name
-    bool,                  // is_local
     DateTime<Utc>,         // updated_at
     DateTime<Utc>,         // created_at
     Option<DateTime<Utc>>, // deleted_at
@@ -60,10 +60,9 @@ pub struct SerializableComment {
     pub content_html: Option<String>,
     pub iri: Option<String>,
     pub actor_name: String,
-    pub actor_handle: String,
+    /// Who wrote it: someone from here, or from another server.
+    pub handle: Handle,
     pub actor_url: String,
-    pub actor_login_name: Option<String>,
-    pub is_local: bool,
     pub updated_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
 }
@@ -78,10 +77,9 @@ pub struct SerializableThreadedComment {
     pub content_html: Option<String>,
     pub iri: Option<String>,
     pub actor_name: String,
-    pub actor_handle: String,
+    /// Who wrote it: someone from here, or from another server.
+    pub handle: Handle,
     pub actor_url: String,
-    pub actor_login_name: Option<String>,
-    pub is_local: bool,
     pub updated_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -97,10 +95,9 @@ pub struct NotificationComment {
     pub content_html: Option<String>,
     pub iri: Option<String>,
     pub actor_name: String,
-    pub actor_handle: String,
+    /// Who wrote it: someone from here, or from another server.
+    pub handle: Handle,
     pub actor_url: String,
-    pub actor_login_name: Option<String>,
-    pub is_local: bool,
     pub updated_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub post_title: Option<String>,
@@ -108,6 +105,55 @@ pub struct NotificationComment {
     pub post_image_filename: Option<String>,
     pub post_image_width: Option<i32>,
     pub post_image_height: Option<i32>,
+}
+
+/// A [`NotificationComment`] as its queries select it, before who wrote it
+/// is made a [`Handle`].
+struct NotificationCommentRow {
+    id: Uuid,
+    post_id: Uuid,
+    actor_id: Uuid,
+    content: Option<String>,
+    content_html: Option<String>,
+    iri: Option<String>,
+    actor_name: String,
+    actor_handle: String,
+    actor_url: String,
+    actor_login_name: Option<String>,
+    /// Selected by the queries alongside the login name, and the same fact:
+    /// the handle is made from the login name.
+    #[allow(dead_code)]
+    is_local: bool,
+    updated_at: DateTime<Utc>,
+    created_at: DateTime<Utc>,
+    post_title: Option<String>,
+    post_author_login_name: String,
+    post_image_filename: Option<String>,
+    post_image_width: Option<i32>,
+    post_image_height: Option<i32>,
+}
+
+impl From<NotificationCommentRow> for NotificationComment {
+    fn from(row: NotificationCommentRow) -> Self {
+        NotificationComment {
+            id: row.id,
+            post_id: row.post_id,
+            actor_id: row.actor_id,
+            content: row.content,
+            content_html: row.content_html,
+            iri: row.iri,
+            actor_name: row.actor_name,
+            handle: Handle::of_actor(row.actor_login_name.map(Into::into), row.actor_handle),
+            actor_url: row.actor_url,
+            updated_at: row.updated_at,
+            created_at: row.created_at,
+            post_title: row.post_title,
+            post_author_login_name: row.post_author_login_name,
+            post_image_filename: row.post_image_filename,
+            post_image_width: row.post_image_width,
+            post_image_height: row.post_image_height,
+        }
+    }
 }
 
 pub async fn find_comments_by_post_id(
@@ -143,23 +189,21 @@ pub async fn find_comments_by_post_id(
 
     Ok(comments
         .into_iter()
-        .map(|comment| {
-            let is_local = comment.user_login_name.is_some();
-            SerializableComment {
-                id: comment.id,
-                post_id: comment.post_id,
-                actor_id: comment.actor_id,
-                content: comment.content,
-                content_html: comment.content_html,
-                iri: comment.iri,
-                actor_name: comment.actor_name,
-                actor_handle: comment.actor_handle,
-                actor_url: comment.actor_url,
-                actor_login_name: comment.user_login_name.clone(),
-                is_local,
-                updated_at: comment.updated_at,
-                created_at: comment.created_at,
-            }
+        .map(|comment| SerializableComment {
+            id: comment.id,
+            post_id: comment.post_id,
+            actor_id: comment.actor_id,
+            content: comment.content,
+            content_html: comment.content_html,
+            iri: comment.iri,
+            actor_name: comment.actor_name,
+            handle: Handle::of_actor(
+                comment.user_login_name.map(Into::into),
+                comment.actor_handle,
+            ),
+            actor_url: comment.actor_url,
+            updated_at: comment.updated_at,
+            created_at: comment.created_at,
         })
         .collect())
 }
@@ -225,9 +269,11 @@ pub async fn build_comment_thread_tree(
 
     for row in rows {
         let comment_id = row.id;
-        // user_login_name can be NULL from LEFT JOIN
-        let user_login_name = row.user_login_name;
-        let is_local = user_login_name.is_some();
+        // user_login_name is NULL from the LEFT JOIN for a remote actor.
+        let handle = Handle::of_actor(
+            row.user_login_name.map(Into::into),
+            row.actor_handle.unwrap_or_default(),
+        );
 
         comment_data.insert(
             comment_id,
@@ -239,10 +285,8 @@ pub async fn build_comment_thread_tree(
                 row.content_html,
                 row.iri,
                 row.actor_name.unwrap_or_default(),
-                row.actor_handle.unwrap_or_default(),
+                handle,
                 row.actor_url.unwrap_or_default(),
-                user_login_name,
-                is_local,
                 row.updated_at,
                 row.created_at,
                 row.deleted_at,
@@ -269,10 +313,8 @@ pub async fn build_comment_thread_tree(
             content_html,
             iri,
             actor_name,
-            actor_handle,
+            handle,
             actor_url,
-            actor_login_name,
-            is_local,
             updated_at,
             created_at,
             deleted_at,
@@ -297,10 +339,8 @@ pub async fn build_comment_thread_tree(
             content_html: content_html.clone(),
             iri: iri.clone(),
             actor_name: actor_name.clone(),
-            actor_handle: actor_handle.clone(),
+            handle: handle.clone(),
             actor_url: actor_url.clone(),
-            actor_login_name: actor_login_name.clone(),
-            is_local: *is_local,
             updated_at: *updated_at,
             created_at: *created_at,
             deleted_at: *deleted_at,
@@ -327,7 +367,7 @@ pub async fn find_comments_to_posts_by_author(
     author_id: Uuid,
 ) -> Result<Vec<NotificationComment>> {
     let comments = sqlx::query_as!(
-        NotificationComment,
+        NotificationCommentRow,
         r#"
         SELECT
             comments.id,
@@ -365,7 +405,7 @@ pub async fn find_comments_to_posts_by_author(
     .fetch_all(&mut **tx)
     .await?;
 
-    Ok(comments)
+    Ok(comments.into_iter().map(Into::into).collect())
 }
 
 /// Whose comments a list of the latest ones is drawn from.
@@ -417,7 +457,7 @@ pub async fn find_recent_comments(
     // member's communities and a community let in are not.
     let public_only = community_id.is_none() && member_id.is_none();
     let comments = sqlx::query_as!(
-        NotificationComment,
+        NotificationCommentRow,
         r#"
         SELECT
             comments.id,
@@ -489,7 +529,7 @@ pub async fn find_recent_comments(
     .fetch_all(&mut **tx)
     .await?;
 
-    Ok(comments)
+    Ok(comments.into_iter().map(Into::into).collect())
 }
 
 /// What a user has said, newest first, for their profile. Only on drawings a
@@ -507,7 +547,7 @@ pub async fn find_public_comments_by_user(
     limit: i64,
 ) -> Result<Vec<NotificationComment>> {
     let comments = sqlx::query_as!(
-        NotificationComment,
+        NotificationCommentRow,
         r#"
         SELECT
             comments.id,
@@ -555,7 +595,7 @@ pub async fn find_public_comments_by_user(
     .fetch_all(&mut **tx)
     .await?;
 
-    Ok(comments)
+    Ok(comments.into_iter().map(Into::into).collect())
 }
 
 /// How many comments `find_public_comments_by_user` would page through.

@@ -32,13 +32,16 @@ pub async fn signup(
     Query(NextUrl { next }): Query<NextUrl>,
     State(state): State<crate::web::state::AppState>,
 ) -> Result<impl IntoResponse, AppError> {
-    let template: minijinja::Template<'_, '_> = state.env.get_template("signup.jinja")?;
-
-    let rendered: String = template.render(context! {
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        next => next,
-        ftl_lang
-    })?;
+    let rendered: String = state
+        .render(
+            "signup.jinja",
+            context! {
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                next => next,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -132,20 +135,23 @@ pub async fn login(
     Query(NextUrl { next }): Query<NextUrl>,
     State(state): State<crate::web::state::AppState>,
 ) -> Result<impl IntoResponse, AppError> {
-    let template: minijinja::Template<'_, '_> = state.env.get_template("login.jinja")?;
-
     let collected_messages: Vec<axum_messages::Message> = messages.into_iter().collect();
 
-    let rendered: String = template.render(context! {
-        messages => collected_messages,
-        next => next,
-        // A provider's account waiting for this sign-in to be linked to.
-        linking_provider => pending_provider_name(&session).await,
-        steam_enabled => state.config.steam.is_some(),
-        apple_enabled => state.config.apple.is_some(),
-        google_enabled => state.config.google.is_some(),
-        ftl_lang
-    })?;
+    let rendered: String = state
+        .render(
+            "login.jinja",
+            context! {
+                messages => collected_messages,
+                next => next,
+                // A provider's account waiting for this sign-in to be linked to.
+                linking_provider => pending_provider_name(&session).await,
+                steam_enabled => state.config.steam.is_some(),
+                apple_enabled => state.config.apple.is_some(),
+                google_enabled => state.config.google.is_some(),
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }

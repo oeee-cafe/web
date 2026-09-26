@@ -21,12 +21,12 @@
             {% for reaction in group.reactions %}
               <div class="member-row">
                 <span class="member-text">
-                  {% if reaction.is_local %}
+                  {% if reaction.handle.login_name %}
                     <a class="member-name" href="{{ reaction.actor_url }}">{{ reaction.actor_name }}</a>
                   {% else %}
                     <a class="member-name" href="{{ reaction.actor_url }}" target="_blank" rel="noopener noreferrer">{{ reaction.actor_name }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
                   {% endif %}
-                  <span class="member-meta">{{ handle(reaction.actor_login_name if reaction.is_local else none, reaction.actor_handle) }} · {{ reaction.created_at|ago }}</span>
+                  <span class="member-meta">{{ handle(reaction.handle) }} · {{ reaction.created_at|ago }}</span>
                 </span>
               </div>
             {% endfor %}

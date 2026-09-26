@@ -120,7 +120,7 @@ fn for_reader(listening: &Listening, live_event: &LiveEvent) -> Option<Event> {
 
 /// The event's name and its JSON, as `reader` hears it.
 fn heard_as(
-    env: &minijinja::Environment<'_>,
+    env: &crate::web::templates::Templates,
     reader: Option<Uuid>,
     ftl_lang: &str,
     live_event: &LiveEvent,
@@ -132,14 +132,13 @@ fn heard_as(
     }
     Some(match live_event {
         LiveEvent::Unread { count, .. } => {
-            let bell = env
-                .get_template("nav_notifications.jinja")
-                .and_then(|template| {
-                    template.render(context! {
-                        unread_notification_count => count,
-                        ftl_lang => ftl_lang,
-                    })
-                });
+            let bell = env.render_without_people(
+                "nav_notifications.jinja",
+                context! {
+                    unread_notification_count => count,
+                    ftl_lang => ftl_lang,
+                },
+            );
             match bell {
                 Ok(bell) => ("unread", json!({ "count": count, "html": bell })),
                 Err(e) => {
@@ -179,7 +178,7 @@ mod tests {
 
     #[test]
     fn a_reader_hears_their_own_bell_and_nobody_elses() {
-        let env = test_support::env();
+        let env = crate::web::templates::Templates::new(test_support::env());
         let (me, them) = (Uuid::new_v4(), Uuid::new_v4());
         let mine = LiveEvent::Unread {
             user_id: me,
@@ -199,7 +198,7 @@ mod tests {
 
     #[test]
     fn a_notification_says_whether_its_body_is_a_quote() {
-        let env = test_support::env();
+        let env = crate::web::templates::Templates::new(test_support::env());
         let me = Uuid::new_v4();
         let event = LiveEvent::Notification {
             user_id: me,
@@ -224,7 +223,7 @@ mod tests {
 
     #[test]
     fn anyone_hears_that_a_post_has_new_comments() {
-        let env = test_support::env();
+        let env = crate::web::templates::Templates::new(test_support::env());
         let post_id = Uuid::new_v4();
         let event = LiveEvent::Comments { post_id, by: None };
         let (name, data) = heard_as(&env, None, "en", &event).expect("heard");

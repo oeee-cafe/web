@@ -63,16 +63,18 @@ pub async fn jump(
     tx.commit().await?;
 
     let rendered = state
-        .env
-        .get_template("jump_results.jinja")?
-        .render(context! {
-            q,
-            current_user => auth_session.user,
-            communities,
-            people,
-            tags,
-            ftl_lang,
-        })?;
+        .render(
+            "jump_results.jinja",
+            context! {
+                q,
+                current_user => auth_session.user,
+                communities,
+                people,
+                tags,
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered))
 }
 

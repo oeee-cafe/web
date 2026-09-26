@@ -122,11 +122,11 @@
         {# Who drew it, above what it is called, as a byline sits over a
            headline; the people who drew it together follow. #}
         <div class="post-inspector-byline">
-          {{ person(post.display_name, "/@" ~ post.login_name, login_name=post.login_name, supporters=supporters) }}
+          {{ person(post.display_name, "/@" ~ post.login_name, post.login_name) }}
           {% for participant in collaborative_participants %}
             {% if participant.login_name != post.login_name %}
               <span class="post-inspector-handle">·</span>
-              {{ person(participant.display_name, "/@" ~ participant.login_name, login_name=participant.login_name, supporters=supporters) }}
+              {{ person(participant.display_name, "/@" ~ participant.login_name, participant.login_name) }}
             {% endif %}
           {% endfor %}
         </div>
@@ -231,7 +231,7 @@
         {# data-live-post: fetched again when someone else comments (live.jinja). #}
         <div id="comments" class="ds-selectable" data-live-post="{{ post_id }}">
           {% if comments %}
-            {{ comments_macro.comments(comments, current_user, supporters) }}
+            {{ comments_macro.comments(comments, current_user) }}
           {% else %}
             <p class="profile-empty">
               {{ ftl_get_message("post-no-comments") }}

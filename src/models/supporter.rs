@@ -493,14 +493,20 @@ pub async fn set_mark(
     Ok(())
 }
 
-/// The supporters a post's page names -- whoever drew it, whoever drew it
-/// with them, and whoever commented -- by login name, each with the mark
-/// they wear. The page asks this for every name it prints; one it does not
-/// find gets no mark.
-pub async fn supporter_marks_on_post(
-    tx: &mut Transaction<'_, Postgres>,
-    post_id: Uuid,
+/// The marks worn by whichever of these people are supporting this year,
+/// by login name: the one supporters query every page shares
+/// (web::templates). A name it does not find gets no mark.
+///
+/// Asked of the pool rather than inside a transaction, because a page is
+/// rendered after its handler has finished with its own, and one request
+/// holding two connections at once is how a full pool waits on itself.
+pub async fn marks_for<'e>(
+    db: impl sqlx::PgExecutor<'e>,
+    login_names: &[String],
 ) -> Result<HashMap<String, String>> {
+    if login_names.is_empty() {
+        return Ok(HashMap::new());
+    }
     let rows = query!(
         r#"
         SELECT DISTINCT ON (users.id) users.login_name, purchases.store
@@ -509,30 +515,15 @@ pub async fn supporter_marks_on_post(
         WHERE purchases.revoked_at IS NULL
           AND purchases.year = $2
           AND users.deleted_at IS NULL
-          AND (
-            users.id = (SELECT author_id FROM posts WHERE id = $1)
-            OR users.id IN (
-                SELECT participants.user_id
-                FROM collaborative_sessions sessions
-                JOIN collaborative_sessions_participants participants
-                  ON participants.session_id = sessions.id
-                WHERE sessions.saved_post_id = $1
-            )
-            OR users.id IN (
-                SELECT actors.user_id
-                FROM comments
-                JOIN actors ON actors.id = comments.actor_id
-                WHERE comments.post_id = $1 AND actors.user_id IS NOT NULL
-            )
-          )
+          AND users.login_name = ANY($1)
         ORDER BY users.id,
                  COALESCE(purchases.store = users.supporter_mark, false) DESC,
                  purchases.purchased_at
         "#,
-        post_id,
+        login_names,
         current_year(),
     )
-    .fetch_all(&mut **tx)
+    .fetch_all(db)
     .await?;
     Ok(rows
         .into_iter()
@@ -977,27 +968,24 @@ mod tests {
         tx.rollback().await.unwrap();
     }
 
-    /// The author and a commenter who support are named, each with their own
-    /// platform's mark; a commenter who does not, and a supporter who never
-    /// touched the post, are not.
+    /// Of the names asked about, the ones supporting are answered, each with
+    /// their own platform's mark; one who does not support is not, and nor
+    /// is a supporter nobody asked about.
     #[tokio::test]
-    async fn a_post_names_the_supporters_on_its_page() {
+    async fn the_names_asked_about_are_answered_with_their_marks() {
         let Some(mut tx) = tx().await else { return };
-        let author = user(&mut tx, "supporter_test_i").await;
-        let commenter = user(&mut tx, "supporter_test_j").await;
-        let bystander = user(&mut tx, "supporter_test_k").await;
-        let plain = user(&mut tx, "supporter_test_l").await;
-        for (id, steam_id) in [
-            (author, "76561190000000106"),
-            (bystander, "76561190000000107"),
-        ] {
+        let steam = user(&mut tx, "supporter_test_i").await;
+        let apple = user(&mut tx, "supporter_test_j").await;
+        let unasked = user(&mut tx, "supporter_test_k").await;
+        user(&mut tx, "supporter_test_l").await;
+        for (id, steam_id) in [(steam, "76561190000000106"), (unasked, "76561190000000107")] {
             record_owned_products(&mut tx, id, Store::Steam, steam_id, &[pack(this_year())])
                 .await
                 .unwrap();
         }
         record_purchase(
             &mut tx,
-            commenter,
+            apple,
             Store::Apple,
             "2000000000000004",
             &pack(this_year()),
@@ -1006,55 +994,14 @@ mod tests {
         .await
         .unwrap();
 
-        let image: Uuid = sqlx::query_scalar(
-            "INSERT INTO images (width, height, paint_duration, stroke_count, image_filename, tool)
-             VALUES (10, 10, '0'::interval, 0, $1, 'neo') RETURNING id",
-        )
-        .bind(format!("{}.png", Uuid::new_v4()))
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
-        let post: Uuid = sqlx::query_scalar(
-            "INSERT INTO posts (author_id, image_id, published_at) VALUES ($1, $2, now()) RETURNING id",
-        )
-        .bind(author)
-        .bind(image)
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
-        sqlx::query(
-            "INSERT INTO instances (host) VALUES ('supporter-test.example') ON CONFLICT DO NOTHING",
-        )
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-        for id in [commenter, plain] {
-            let actor: Uuid = sqlx::query_scalar(
-                "INSERT INTO actors (iri, url, type, username, instance_host, handle_host, handle, name,
-                                     inbox_url, followers_url, public_key_pem, user_id)
-                 VALUES ($1, $1, 'Person', $1, 'supporter-test.example', 'supporter-test.example',
-                         $1, $1, $1, $1, '', $2)
-                 RETURNING id",
-            )
-            .bind(id.to_string())
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
-            sqlx::query("INSERT INTO comments (post_id, actor_id, content) VALUES ($1, $2, 'hi')")
-                .bind(post)
-                .bind(actor)
-                .execute(&mut *tx)
-                .await
-                .unwrap();
-        }
-
-        let marks = supporter_marks_on_post(&mut tx, post).await.unwrap();
+        let asked = ["supporter_test_i", "supporter_test_j", "supporter_test_l"].map(String::from);
+        let marks = marks_for(&mut *tx, &asked).await.unwrap();
         let mut named = marks.keys().cloned().collect::<Vec<_>>();
         named.sort();
         assert_eq!(named, ["supporter_test_i", "supporter_test_j"]);
         assert_eq!(marks["supporter_test_i"], "steam");
         assert_eq!(marks["supporter_test_j"], "apple");
+        assert!(marks_for(&mut *tx, &[]).await.unwrap().is_empty());
         tx.rollback().await.unwrap();
     }
 

@@ -75,13 +75,17 @@ pub async fn handler_404(
         None => (0, 0),
     };
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("404.jinja")?;
-    let rendered: String = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count,
-        unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered: String = state
+        .render(
+            "404.jinja",
+            context! {
+                current_user => auth_session.user,
+                draft_post_count,
+                unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
@@ -113,13 +117,17 @@ pub async fn render_403(
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("403.jinja")?;
-    let rendered: String = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered: String = state
+        .render(
+            "403.jinja",
+            context! {
+                current_user => auth_session.user,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok((StatusCode::FORBIDDEN, Html(rendered)).into_response())
 }
@@ -333,21 +341,14 @@ pub fn parse_id_with_legacy_support(
     }
 
     // If neither UUID nor base64 decoding worked, render custom error page
-    match state.env.get_template("invalid_id_error.jinja") {
-        Ok(template) => {
-            match template.render(context! {}) {
-                Ok(rendered) => {
-                    let response = axum::response::Html(rendered).into_response();
-                    return Ok(ParsedId::InvalidId(response));
-                }
-                Err(_) => {
-                    // If template rendering fails, fall back to generic error
-                }
-            }
-        }
-        Err(_) => {
-            // If template not found, fall back to generic error
-        }
+    // A page with nobody on it, so it is drawn here without a request's
+    // database to ask about anyone.
+    if let Ok(rendered) = state
+        .env
+        .render_without_people("invalid_id_error.jinja", context! {})
+    {
+        let response = axum::response::Html(rendered).into_response();
+        return Ok(ParsedId::InvalidId(response));
     }
 
     // Fallback to generic error if template rendering fails
@@ -508,6 +509,7 @@ pub(crate) mod test_support {
                 }
             },
         );
+        crate::web::templates::add_to_environment(&mut env);
         env.add_global("r2_public_endpoint_url", "https://example.test");
         env.add_global("base_url", "https://oeee.test");
         env.set_loader(path_loader(
@@ -805,10 +807,8 @@ mod community_page_tests {
                     "content_html": null,
                     "iri": null,
                     "actor_name": "오이",
-                    "actor_handle": "@oeee@oeee.cafe",
+                    "handle": {"login_name": "oeee", "name": null, "host": null},
                     "actor_url": "https://oeee.cafe/@oeee",
-                    "actor_login_name": "oeee",
-                    "is_local": true,
                     "updated_at": "2026-09-22T00:00:00Z",
                     "created_at": "2026-09-22T00:00:00Z",
                     "post_title": "고양이",
@@ -1111,7 +1111,7 @@ mod community_page_tests {
                         "post_author_login_name": "artist",
                         "post_title": "Drawing 0",
                         "actor_name": "Commenter",
-                        "actor_handle": "@commenter@oeee.test",
+                        "handle": {"login_name": "commenter", "name": null, "host": null},
                         "content": "Lovely colours",
                         "created_at": "2026-01-02T03:04:05Z",
                     }],
@@ -2390,10 +2390,8 @@ mod template_tests {
                 comments => json!([{
                     "id": "0c8f0000-0000-0000-0000-000000000001",
                     "actor_name": "Someone",
-                    "actor_handle": "@someone@oeee.cafe",
-                    "actor_login_name": "someone",
+                    "handle": {"login_name": "someone", "name": null, "host": null},
                     "actor_url": "/@someone",
-                    "is_local": true,
                     "content": "hello",
                     "content_html": null,
                     "created_at": "2026-01-02T03:04:05Z",
@@ -2584,10 +2582,8 @@ mod template_tests {
                 "content_html": null,
                 "iri": null,
                 "actor_name": "오이",
-                "actor_handle": "@oeee@oeee.cafe",
+                "handle": {"login_name": "oeee", "name": null, "host": null},
                 "actor_url": "https://oeee.cafe/@oeee",
-                "actor_login_name": "oeee",
-                "is_local": true,
                 "updated_at": "2026-09-22T00:00:00Z",
                 "created_at": "2026-09-22T00:00:00Z",
                 "post_title": "고양이",
@@ -2726,10 +2722,11 @@ mod template_tests {
             "content_html": "<p>hi</p>",
             "iri": null,
             "actor_name": name,
-            "actor_handle": format!("@{}@oeee.example", login_name.unwrap_or(name)),
+            "handle": match login_name {
+                Some(login_name) => json!({"login_name": login_name, "name": null, "host": null}),
+                None => json!({"login_name": null, "name": name, "host": "oeee.example"}),
+            },
             "actor_url": "/@someone",
-            "actor_login_name": login_name,
-            "is_local": login_name.is_some(),
             "updated_at": "2026-09-22T00:00:00Z",
             "created_at": "2026-09-22T00:00:00Z",
             "deleted_at": null,
@@ -2743,7 +2740,8 @@ mod template_tests {
     /// included however they are named. Each wears their own platform's.
     #[test]
     fn supporters_wear_their_platforms_mark_on_a_post_page() {
-        let env = test_support::env();
+        use std::collections::HashMap;
+        let templates = crate::web::templates::Templates::new(test_support::env());
         let mut reply = comment(Some("fan"), "Fan");
         reply["children"] = json!([comment(Some("someone"), "Someone")]);
         reply["children"][0]["parent_comment_id"] = reply["id"].clone();
@@ -2753,36 +2751,48 @@ mod template_tests {
             // A remote account sharing a supporter's local name.
             comment(None, "fan"),
         ]);
-        let render = |supporters: serde_json::Value| {
-            env.get_template("post_view.jinja")
-                .expect("post_view.jinja loads")
-                .render(context! {
-                    post => post_page("true", "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d"),
-                    post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
-                    r2_public_endpoint_url => "https://images.example",
-                    base_url => "https://oeee.example",
-                    domain => "oeee.example",
-                    comments => comments.clone(),
-                    supporters,
-                    collaborative_participants => json!([
-                        {"login_name": "someone", "display_name": "Someone"},
-                        {"login_name": "friend", "display_name": "Friend"},
-                    ]),
-                    reaction_counts => Vec::<serde_json::Value>::new(),
-                    tags => Vec::<serde_json::Value>::new(),
-                    child_posts => Vec::<serde_json::Value>::new(),
-                    post_community => json!(null),
-                    parent_post_data => json!(null),
-                    ..chrome()
-                })
-                .expect("post_view.jinja renders")
+        let page_context = || {
+            context! {
+                post => post_page("true", "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d"),
+                post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                r2_public_endpoint_url => "https://images.example",
+                base_url => "https://oeee.example",
+                domain => "oeee.example",
+                comments => comments.clone(),
+                collaborative_participants => json!([
+                    {"login_name": "someone", "display_name": "Someone"},
+                    {"login_name": "friend", "display_name": "Friend"},
+                ]),
+                reaction_counts => Vec::<serde_json::Value>::new(),
+                tags => Vec::<serde_json::Value>::new(),
+                child_posts => Vec::<serde_json::Value>::new(),
+                post_community => json!(null),
+                parent_post_data => json!(null),
+                ..chrome()
+            }
+        };
+        let supporting = |names: &[String]| -> HashMap<String, String> {
+            [("someone", "steam"), ("friend", "apple"), ("fan", "steam")]
+                .into_iter()
+                .filter(|(name, _)| names.iter().any(|asked| asked == name))
+                .map(|(name, mark)| (name.to_string(), mark.to_string()))
+                .collect()
         };
         let badges = |html: &str| {
             html.matches(r#"class="ds-handle ds-handle-supporter ds-marked""#)
                 .count()
         };
 
-        let page = render(json!({"someone": "steam", "friend": "apple", "fan": "steam"}));
+        let mut asked = Vec::new();
+        let page = templates
+            .render_with("post_view.jinja", page_context(), |names| {
+                asked = names.to_vec();
+                supporting(names)
+            })
+            .expect("post_view.jinja renders");
+        // Everyone from here the page names, once each, and nobody else --
+        // not the remote "fan", who has no login name to ask about.
+        assert_eq!(asked, ["fan", "friend", "plain", "someone"]);
         // Author, co-drawer, the commenter and the author's reply to them.
         assert_eq!(badges(&page), 4);
         let byline = page.find("post-inspector-byline").unwrap();
@@ -2793,25 +2803,25 @@ mod template_tests {
         );
         // The co-drawer bought elsewhere and wears the other mark: one
         // storefront on the page, the rest gamepads.
-        assert_eq!(
-            page.matches(r#"title="supporter-badge-apple""#)
-                .count(),
-            1
-        );
-        assert_eq!(
-            page.matches(r#"title="supporter-badge-steam""#)
-                .count(),
-            3
-        );
+        assert_eq!(page.matches(r#"title="supporter-badge-apple""#).count(), 1);
+        assert_eq!(page.matches(r#"title="supporter-badge-steam""#).count(), 3);
+        // No placeholder is left behind.
+        assert!(!page.contains('\u{E000}'));
 
-        assert_eq!(badges(&render(json!({}))), 0);
-        // The comments fragment an HTMX post swaps in, the same way.
-        let fragment = env
-            .get_template("post_comments.jinja")
-            .unwrap()
-            .render(context! { comments, supporters => json!({"fan": "steam"}), ..chrome() })
+        let nobody = templates
+            .render_with("post_view.jinja", page_context(), |_| HashMap::new())
             .unwrap();
-        assert_eq!(badges(&fragment), 1);
+        assert_eq!(badges(&nobody), 0);
+        // The comments fragment an HTMX post swaps in, the same way.
+        let fragment = templates
+            .render_with(
+                "post_comments.jinja",
+                context! { comments, ..chrome() },
+                supporting,
+            )
+            .unwrap();
+        // The commenter and the reply to them; the remote "fan" is not one.
+        assert_eq!(badges(&fragment), 2);
     }
 
     /// A commenter from this site is @login_name, without the site's own
@@ -3560,7 +3570,7 @@ mod template_tests {
                 "post_author_login_name": "someone",
                 "post_title": "Tandemaus",
                 "actor_name": "Commenter",
-                "actor_handle": "@commenter@oeee.test",
+                "handle": {"login_name": "commenter", "name": null, "host": null},
                 "content": "Lovely colours",
                 "created_at": "2026-08-02T00:00:00Z",
             }],
@@ -4005,7 +4015,9 @@ mod template_tests {
         // The toolbar's draw button, signed out as well as in, and the
         // dialog it opens to ask for the canvas size.
         assert!(rendered.contains(r#"id="nav-draw-button""#));
-        let dialog = rendered.find(r#"id="draw-dialog""#).expect("the size dialog");
+        let dialog = rendered
+            .find(r#"id="draw-dialog""#)
+            .expect("the size dialog");
         let size = &rendered[dialog..];
         assert!(size.contains(r#"<form action="/draw" method="post">"#));
         assert!(size.contains(r#"<select name="width""#));

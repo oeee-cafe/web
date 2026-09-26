@@ -178,7 +178,6 @@ pub async fn start_draw(
         }
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template(template_filename)?;
     let painter_config = serde_json::to_string(&post_painter_config(
         input.width.parse::<u32>()?,
         input.height.parse::<u32>()?,
@@ -193,24 +192,29 @@ pub async fn start_draw(
         Activity::Drawing
     })
     .in_community(community.as_ref());
-    let rendered = template.render(context! {
-        presence,
-        current_user => auth_session.user,
-        community_name => community.as_ref().map(|c| c.name.clone()),
-        tool => input.tool,
-        width => input.width.parse::<u32>()?,
-        height => input.height.parse::<u32>()?,
-        background_color => community.as_ref().and_then(|c| c.background_color.clone()),
-        foreground_color => community.as_ref().and_then(|c| c.foreground_color.clone()),
-        community_id => input.community_id,
-        community_slug => community.as_ref().map(|c| c.slug.clone()),
-        parent_post => parent_post,
-        parent_post_id => input.parent_post_id,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-        painter_config
-    })?;
+    let rendered = state
+        .render(
+            template_filename,
+            context! {
+                presence,
+                current_user => auth_session.user,
+                community_name => community.as_ref().map(|c| c.name.clone()),
+                tool => input.tool,
+                width => input.width.parse::<u32>()?,
+                height => input.height.parse::<u32>()?,
+                background_color => community.as_ref().and_then(|c| c.background_color.clone()),
+                foreground_color => community.as_ref().and_then(|c| c.foreground_color.clone()),
+                community_id => input.community_id,
+                community_slug => community.as_ref().map(|c| c.slug.clone()),
+                parent_post => parent_post,
+                parent_post_id => input.parent_post_id,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+                painter_config
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -662,7 +666,6 @@ pub async fn start_banner_draw(
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
 ) -> Result<Html<String>, AppError> {
-    let template: minijinja::Template<'_, '_> = state.env.get_template("draw_banner.jinja")?;
     let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
     let painter_config = serde_json::to_string(&json!({
         "width": 200,
@@ -674,14 +677,19 @@ pub async fn start_banner_draw(
         },
         "mode": { "kind": "standard" },
     }))?;
-    let rendered = template.render(context! {
-        presence => Presence::new(Activity::DrawingBanner),
-        width => 200,
-        height => 40,
-        current_user => auth_session.user,
-        ftl_lang,
-        painter_config,
-    })?;
+    let rendered = state
+        .render(
+            "draw_banner.jinja",
+            context! {
+                presence => Presence::new(Activity::DrawingBanner),
+                width => 200,
+                height => 40,
+                current_user => auth_session.user,
+                ftl_lang,
+                painter_config,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }

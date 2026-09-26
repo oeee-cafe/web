@@ -1,16 +1,12 @@
 {% from "person_macro.jinja" import person %}
-{% macro comment_item(comment, current_user, supporters={}) %}
+{% macro comment_item(comment, current_user) %}
   {# Only show comment if it's not deleted, or if it's deleted but has children #}
   {% if not comment.deleted_at or (comment.children and comment.children|length > 0) %}
   <div class="comment-wrapper">
     <div class="comment" id="comment-{{ comment.id }}">
       <div class="comment-body">
         <div class="comment-header">
-          {{ person(comment.actor_name, comment.actor_url,
-                    login_name=comment.actor_login_name if comment.is_local else none,
-                    actor_handle=comment.actor_handle,
-                    supporters=supporters,
-                    external=not comment.is_local) }}
+          {{ person(comment.actor_name, comment.actor_url, comment.handle, external=not comment.handle.login_name) }}
           <span class="muted comment-timestamp">{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</span>
         </div>
         <div class="comment-content">
@@ -34,7 +30,7 @@
                                document.getElementById('comment-form').scrollIntoView({ behavior: 'smooth', block: 'center' });">
             Reply
           </button>
-          {% if current_user and comment.is_local and comment.actor_login_name == current_user.login_name %}
+          {% if current_user and comment.handle.login_name and comment.handle.login_name == current_user.login_name %}
           <button class="ds-button ds-button-quiet ds-button-small comment-delete-btn"
                   hx-delete="/comments/{{ comment.id }}"
                   hx-confirm="{{ ftl_get_message('comment-delete-confirm') }}"
@@ -51,7 +47,7 @@
     {% if comment.children and comment.children|length > 0 %}
       <div class="comment-replies">
         {% for child in comment.children %}
-          {{ comment_item(child, current_user, supporters) }}
+          {{ comment_item(child, current_user) }}
         {% endfor %}
       </div>
     {% endif %}
@@ -59,8 +55,8 @@
   {% endif %}
 {% endmacro %}
 
-{% macro comments(comments, current_user, supporters={}) %}
+{% macro comments(comments, current_user) %}
   {% for comment in comments %}
-    {{ comment_item(comment, current_user, supporters) }}
+    {{ comment_item(comment, current_user) }}
   {% endfor %}
 {% endmacro %}

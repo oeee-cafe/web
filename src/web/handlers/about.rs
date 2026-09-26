@@ -26,16 +26,20 @@ pub async fn about(
         .unwrap_or_default();
     let supporters = list_credits(&mut tx).await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("about.jinja")?;
-    let rendered: String = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        users_with_public_posts_and_banner,
-        supporters,
-        git_commit => git_commit(),
-        ftl_lang,
-    })?;
+    let rendered: String = state
+        .render(
+            "about.jinja",
+            context! {
+                current_user => auth_session.user,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                users_with_public_posts_and_banner,
+                supporters,
+                git_commit => git_commit(),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -50,13 +54,17 @@ pub async fn design(
     let mut tx = state.db_pool.begin().await?;
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-    let template: minijinja::Template<'_, '_> = state.env.get_template("design.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        messages => Vec::<String>::new(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "design.jinja",
+            context! {
+                current_user => auth_session.user,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                messages => Vec::<String>::new(),
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered))
 }

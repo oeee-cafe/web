@@ -328,14 +328,16 @@ pub async fn collaborate_sessions_fragment(
     tx.commit().await?;
     attach_lobby_previews(&state, &mut viewer_sessions, &mut active_sessions).await;
 
-    let template = state
-        .env
-        .get_template("collaborate_sessions_fragment.jinja")?;
-    let rendered = template.render(context! {
-        viewer_sessions,
-        active_sessions,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "collaborate_sessions_fragment.jinja",
+            context! {
+                viewer_sessions,
+                active_sessions,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -364,17 +366,21 @@ pub async fn load_more_collaborative_posts(
     .await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("post_feed_fragment.jinja")?;
-    let rendered = template.render(context! {
-        feed => crate::web::handlers::home::feed_context(
-            posts,
-            "/api/collaborate/posts",
-            query.offset,
-            query.period.as_deref(),
-        ),
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "post_feed_fragment.jinja",
+            context! {
+                feed => crate::web::handlers::home::feed_context(
+                    posts,
+                    "/api/collaborate/posts",
+                    query.offset,
+                    query.period.as_deref(),
+                ),
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -449,37 +455,42 @@ pub async fn collaborate_lobby(
     tx.commit().await?;
     attach_lobby_previews(&state, &mut viewer_sessions, &mut active_sessions).await;
 
-    let template = state.env.get_template("collaborate_lobby.jinja")?;
+    let template = "collaborate_lobby.jinja";
 
-    let rendered = template.render(context! {
-        current_user => user,
-        viewer_sessions => viewer_sessions,
-        active_sessions => active_sessions,
-        // Shared card fragment contract, sentinel included: the gallery pages
-        // through /api/collaborate/posts the way Home's feeds page through
-        // theirs.
-        feed => crate::web::handlers::home::feed_context(
-            collaborative_posts,
-            "/api/collaborate/posts",
-            0,
-            None,
-        ),
-        // Three tiers rather than one flat list; the template renders them as
-        // optgroups in that order.
-        has_postable_communities => !member_communities.is_empty()
-            || !participated_communities.is_empty()
-            || !other_communities.is_empty(),
-        member_communities => member_communities,
-        participated_communities => participated_communities,
-        other_communities => other_communities,
-        selected_community_slug => query.community,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        canvas_sizes => canvas_size_options(),
-        participant_choices => MAX_PARTICIPANTS_CHOICES,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            template,
+            context! {
+                current_user => user,
+                viewer_sessions => viewer_sessions,
+                active_sessions => active_sessions,
+                // Shared card fragment contract, sentinel included: the gallery pages
+                // through /api/collaborate/posts the way Home's feeds page through
+                // theirs.
+                feed => crate::web::handlers::home::feed_context(
+                    collaborative_posts,
+                    "/api/collaborate/posts",
+                    0,
+                    None,
+                ),
+                // Three tiers rather than one flat list; the template renders them as
+                // optgroups in that order.
+                has_postable_communities => !member_communities.is_empty()
+                    || !participated_communities.is_empty()
+                    || !other_communities.is_empty(),
+                member_communities => member_communities,
+                participated_communities => participated_communities,
+                other_communities => other_communities,
+                selected_community_slug => query.community,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                canvas_sizes => canvas_size_options(),
+                participant_choices => MAX_PARTICIPANTS_CHOICES,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -738,16 +749,12 @@ pub async fn serve_collaborative_app(
         ftl_lang,
     };
     let head = state
-        .env
-        .get_template("collaborate_chrome_head.jinja")?
-        .render(&chrome)?;
+        .render("collaborate_chrome_head.jinja", chrome.clone())
+        .await?;
     // The site's alert and confirmation, which the room says its failures
     // through (frontend/shared/siteDialog.ts), with the toolbar.
-    let toolbar = state.env.get_template("toolbar.jinja")?.render(&chrome)?
-        + &state
-            .env
-            .get_template("confirm_dialog.jinja")?
-            .render(&chrome)?;
+    let toolbar = state.render("toolbar.jinja", chrome.clone()).await?
+        + &state.render("confirm_dialog.jinja", chrome).await?;
 
     Ok(Html(with_site_chrome(&html, &head, &toolbar)).into_response())
 }
