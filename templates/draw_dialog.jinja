@@ -1,0 +1,90 @@
+{# New drawing, from the toolbar's Draw button: the canvas size, asked for
+   first, as a community's page asks (community.jinja). Outside the nav, so
+   it is not boosted -- the painter is a page load of its own -- and so no
+   ancestor of the bar's is the box `position: fixed` is measured against.
+
+   The button stays a form of its own at 300 × 300, which is what a press
+   does without script. With it, the press opens this instead
+   (`oeeeDrawDialog`), as do the `new-drawing` command and its key.
+
+   A boosted swap runs this again; the document listener is added once, and
+   finds the dialog by id each time.
+
+   Written for Firefox 56, which reads this script as written: no arrow
+   functions, no `let`. #}
+<div id="draw-dialog" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="draw-dialog-title">
+  <div class="ds-modal-panel">
+    <h2 id="draw-dialog-title" tabindex="-1">{{ ftl_get_message("community-drawing-new") }}</h2>
+    <form action="/draw" method="post">
+      <input type="hidden" name="tool" value="neo" />
+      <div class="form-field community-draw-size">
+        <label>
+          <span class="ds-label">{{ ftl_get_message('community-drawing-width') }}</span>
+          <select name="width" class="ds-select">
+            {% for w in [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1024] %}
+              <option value="{{ w }}" {% if w == 300 %}selected{% endif %}>{{ w }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <span class="community-draw-times" aria-hidden="true">×</span>
+        <label>
+          <span class="ds-label">{{ ftl_get_message('community-drawing-height') }}</span>
+          <select name="height" class="ds-select">
+            {% for h in [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 768, 800] %}
+              <option value="{{ h }}" {% if h == 300 %}selected{% endif %}>{{ h }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="form-actions community-draw-actions">
+        <button type="button" class="ds-button" data-draw-dialog-cancel>{{ ftl_get_message("cancel") }}</button>
+        <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("community-drawing-new") }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  (function () {
+    var opener = null;
+
+    function dialog() { return document.getElementById("draw-dialog"); }
+    function open() {
+      var modal = dialog();
+      if (!modal) return false;
+      opener = document.activeElement;
+      modal.style.display = "flex";
+      // The heading, not the first field: on iOS a focused <select> opens
+      // its picker, so the width wheel would come up with the dialog.
+      document.getElementById("draw-dialog-title").focus();
+      return true;
+    }
+    function close() {
+      var modal = dialog();
+      if (!modal || modal.style.display === "none") return;
+      modal.style.display = "none";
+      if (opener && document.body.contains(opener)) opener.focus();
+      opener = null;
+    }
+
+    var modal = dialog();
+    modal.querySelector("[data-draw-dialog-cancel]").addEventListener("click", close);
+    modal.addEventListener("mousedown", function (event) {
+      // Pressing the dimmed page is a Cancel.
+      if (event.target === modal) close();
+    });
+    modal.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" || event.key === "Esc") {
+        event.preventDefault();
+        close();
+      }
+    });
+
+    if (window.oeeeDrawDialog) return;
+    window.oeeeDrawDialog = { open: open, close: close };
+    document.addEventListener("click", function (event) {
+      if (event.defaultPrevented || event.button !== 0) return;
+      var button = event.target && event.target.closest ? event.target.closest("#nav-draw-button") : null;
+      if (button && open()) event.preventDefault();
+    });
+  })();
+</script>

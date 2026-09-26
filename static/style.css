@@ -3530,40 +3530,6 @@ html[data-store] .supporter-elsewhere {
   display: none;
 }
 
-.community-draw-choice {
-  display: block;
-  margin-top: var(--ds-space-2);
-}
-
-.community-draw-size {
-  display: flex;
-  align-items: flex-end;
-}
-
-.community-draw-size > label {
-  -webkit-box-flex: 1;
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.community-draw-size .ds-select {
-  width: 100%;
-}
-
-.community-draw-times {
-  padding: 0 var(--ds-space-2) 8px;
-  color: var(--ds-muted);
-}
-
-.community-draw-actions {
-  justify-content: flex-end;
-}
-
-.community-draw-choice .ds-help {
-  display: inline;
-  margin-left: 4px;
-}
-
 /* Up to four actions, so the name gets room before they share its row;
    past that they go underneath rather than squeezing it to a column. */
 .community-header .profile-identity {

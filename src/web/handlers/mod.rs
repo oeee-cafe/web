@@ -3961,6 +3961,8 @@ mod template_tests {
             .expect("painter renders");
         assert!(!rendered.contains("draw-guest-notice"));
         assert!(rendered.contains(r#"data-user-id="00000000-0000-0000-0000-000000000001""#));
+        // Draw asks for a size on the painter page too.
+        assert!(rendered.contains(r#"id="draw-dialog""#));
     }
 
     #[test]
@@ -3971,8 +3973,14 @@ mod template_tests {
             .expect("drafts template loads")
             .render(context! { posts => Vec::<serde_json::Value>::new(), ..guest_chrome() })
             .expect("drafts render for a guest");
-        // The toolbar's draw button, signed out as well as in.
+        // The toolbar's draw button, signed out as well as in, and the
+        // dialog it opens to ask for the canvas size.
         assert!(rendered.contains(r#"id="nav-draw-button""#));
+        let dialog = rendered.find(r#"id="draw-dialog""#).expect("the size dialog");
+        let size = &rendered[dialog..];
+        assert!(size.contains(r#"<form action="/draw" method="post">"#));
+        assert!(size.contains(r#"<select name="width""#));
+        assert!(size.contains(r#"<select name="height""#));
         // This browser's drafts, listed by the page's script, and the
         // guest's drafts square in the toolbar, which its script fills.
         assert!(rendered.contains(r#"id="local-drafts""#));

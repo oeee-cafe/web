@@ -3871,6 +3871,44 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   font-size: var(--ds-text-l);
 }
 
+/* A new drawing's choices: width × height, or for a two-tone community an
+   orientation. Here rather than in style.css because the toolbar's Draw
+   asks for a size on the painter page too, which loads this sheet alone
+   (draw_dialog.jinja). */
+.community-draw-choice {
+  display: block;
+  margin-top: var(--ds-space-2);
+}
+
+.community-draw-size {
+  display: flex;
+  align-items: flex-end;
+}
+
+.community-draw-size > label {
+  -webkit-box-flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.community-draw-size .ds-select {
+  width: 100%;
+}
+
+.community-draw-times {
+  padding: 0 var(--ds-space-2) 8px;
+  color: var(--ds-muted);
+}
+
+.community-draw-actions {
+  justify-content: flex-end;
+}
+
+.community-draw-choice .ds-help {
+  display: inline;
+  margin-left: 4px;
+}
+
 /* An alert: one question, Cancel, and the action named for what it does
    (confirm_dialog.jinja). Narrower than a dialog, since it holds a sentence
    and two buttons, and the buttons sit at its foot on the right, the

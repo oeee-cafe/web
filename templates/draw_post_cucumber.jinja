@@ -60,6 +60,7 @@
             data-cancel="{{ ftl_get_message("cancel") }}"
             style="position:fixed;top:61px;right:8px;z-index:80">{{ ftl_get_message("save") }}</button>
     {% include "confirm_dialog.jinja" %}
+    {% include "draw_dialog.jinja" %}
     <script id="neo-cucumber-config" type="application/json">{{ painter_config | safe }}</script>
     {# What saving says, beyond the button's own words; read by the adapter
        (frontend/painter/entry.ts). #}
