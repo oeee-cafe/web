@@ -6,6 +6,7 @@ use tokio::sync::watch;
 
 use super::handlers::collaborate::redis_state::RedisStateManager;
 use super::handlers::collaborate::room_fanout::RoomFanout;
+use crate::live::Live;
 use crate::push::PushService;
 use crate::redis::RedisPool;
 use crate::AppConfig;
@@ -20,6 +21,8 @@ pub struct AppState {
     /// One Redis subscription per room, shared by that room's connections.
     pub room_fanout: RoomFanout,
     pub push_service: Arc<PushService>,
+    /// What open pages hear without asking (crate::live).
+    pub live: Live,
     pub shutdown: Shutdown,
 }
 

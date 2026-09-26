@@ -1189,6 +1189,19 @@ pub async fn post_publish(
 
     let _ = tx.commit().await;
 
+    // A new drawing, for the pages showing where it went. Not for a reply,
+    // which no feed shows, and not in a private community, whose id is not
+    // to be told to every page on the site.
+    use crate::models::community::CommunityVisibility;
+    let visibility = community.as_ref().map(|c| c.visibility);
+    if !is_reply && visibility != Some(CommunityVisibility::Private) {
+        state.live.publish(crate::live::LiveEvent::Post {
+            community_id,
+            recent: !is_sensitive && matches!(visibility, None | Some(CommunityVisibility::Public)),
+            by: user_id,
+        });
+    }
+
     // Send push notifications for created notifications
     if !notification_info.is_empty() {
         let push_service = state.push_service.clone();
@@ -1526,6 +1539,12 @@ pub async fn do_create_comment(
     let comments = build_comment_thread_tree(&mut tx, post_id).await?;
     let supporters = supporter_marks_on_post(&mut tx, post_id).await?;
     let _ = tx.commit().await;
+    // Everyone else looking at this post fetches its comments again; this
+    // page has them in the response.
+    state.live.publish(crate::live::LiveEvent::Comments {
+        post_id,
+        by: Some(user_id),
+    });
 
     // Send push notifications for created notifications
     if !notification_info.is_empty() {

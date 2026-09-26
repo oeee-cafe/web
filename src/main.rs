@@ -1,6 +1,7 @@
 use fluent::bundle::FluentBundle;
 use fluent::{FluentArgs, FluentValue};
 use minijinja::{path_loader, AutoEscape, Environment, State};
+use oeee_cafe::live::Live;
 use oeee_cafe::locale::LOCALES;
 use oeee_cafe::push::PushService;
 use oeee_cafe::web::app::App;
@@ -277,6 +278,9 @@ fn main() {
                 }
             };
 
+            let live = Live::new(redis_pool.clone());
+            let push_service = push_service.with_live(live.clone());
+
             let state = AppState {
                 config: cfg.clone(),
                 env,
@@ -285,8 +289,12 @@ fn main() {
                 redis_state,
                 room_fanout: RoomFanout::new(&cfg.redis_url),
                 push_service: Arc::new(push_service),
+                live,
                 shutdown: Shutdown::new(),
             };
+            // This process's one subscription to what the others publish,
+            // for as long as it serves.
+            state.live.listen(&cfg.redis_url, state.shutdown.clone());
 
             App::new(state)
                 .await

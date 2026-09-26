@@ -31,7 +31,10 @@
       </div>
       {{ comments_aside(comments, comments_url) }}
       {% if feed.posts and feed.posts|length > 0 %}
-        <div class="posts-grid" id="post-feed-grid">
+        {# data-live-posts: a pill above it when a drawing it would show is
+           published (live.jinja) -- the recent feed only, the one feed whose
+           drawings every page may be told about. #}
+        <div class="posts-grid" id="post-feed-grid"{% if feed_switch == "recent" %} data-live-posts="recent"{% endif %}>
           {% include "post_feed_fragment.jinja" %}
         </div>
       {% else %}

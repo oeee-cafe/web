@@ -60,8 +60,9 @@
       }
     }
     look();
-    if (window.oeeeToastsInstalled) return;
-    window.oeeeToastsInstalled = true;
+    if (window.oeeeToasts) return;
+    // For a toast put up by script rather than by a swap (live.jinja).
+    window.oeeeToasts = { look: look };
     document.addEventListener("htmx:after:swap", look);
   })();
 </script>

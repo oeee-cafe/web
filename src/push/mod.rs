@@ -1,6 +1,7 @@
 pub mod apns;
 pub mod fcm;
 
+use crate::live::{Live, LiveEvent};
 use crate::models::device::{delete_invalid_device, get_user_devices_by_platform, PlatformType};
 use crate::models::notification::get_badge_count;
 use crate::AppConfig;
@@ -27,6 +28,9 @@ pub struct PushService {
     apns_client: Option<ApnsClient>,
     fcm_client: Option<FcmClient>,
     db_pool: PgPool,
+    /// The reader's open pages, which hear what their devices are sent: the
+    /// bell's number, and a new notification's words (crate::live).
+    live: Option<Live>,
 }
 
 impl PushService {
@@ -79,7 +83,14 @@ impl PushService {
             apns_client,
             fcm_client,
             db_pool,
+            live: None,
         })
+    }
+
+    /// Tells the reader's open pages too, whenever their devices are told.
+    pub fn with_live(mut self, live: Live) -> Self {
+        self.live = Some(live);
+        self
     }
 
     /// A push service with no transport configured. Every send becomes a no-op,
@@ -89,6 +100,7 @@ impl PushService {
             apns_client: None,
             fcm_client: None,
             db_pool,
+            live: None,
         }
     }
 
@@ -101,6 +113,22 @@ impl PushService {
         url: &str,
         mut data: serde_json::Map<String, serde_json::Value>,
     ) -> Result<()> {
+        // Pages first: they need no device and no database.
+        if let Some(live) = &self.live {
+            live.publish(LiveEvent::Notification {
+                user_id,
+                title: title.to_string(),
+                body: body.to_string(),
+                url: url.to_string(),
+            });
+            if let Some(count) = badge {
+                live.publish(LiveEvent::Unread {
+                    user_id,
+                    count: i64::from(count),
+                });
+            }
+        }
+
         // The page tapping it opens, a path on the site. Every push has one: the apps open
         // it and have nothing of their own to fall back on.
         data.insert("url".to_string(), serde_json::json!(url));
@@ -184,21 +212,32 @@ impl PushService {
     /// iPhones, iPads and Macs get the number itself, which the system puts on
     /// the icon. Android's badge is the app's notifications on show, so it is
     /// sent the number as data, and takes them down at nothing.
+    ///
+    /// The reader's open pages are told as well (crate::live), which is what
+    /// takes the bell down in another tab when one is read here.
     pub fn refresh_badge(self: &Arc<Self>, user_id: uuid::Uuid) {
-        if self.apns_client.is_none() && self.fcm_client.is_none() {
+        let devices = self.apns_client.is_some() || self.fcm_client.is_some();
+        if !devices && self.live.is_none() {
             return;
         }
         let this = Arc::clone(self);
         tokio::spawn(async move {
-            if let Err(e) = this.send_badge_to_user(user_id).await {
+            if let Err(e) = this.send_badge_to_user(user_id, devices).await {
                 tracing::warn!("Failed to refresh the badge for user {}: {:?}", user_id, e);
             }
         });
     }
 
-    async fn send_badge_to_user(&self, user_id: uuid::Uuid) -> Result<()> {
+    async fn send_badge_to_user(&self, user_id: uuid::Uuid, devices: bool) -> Result<()> {
         let mut tx = self.db_pool.begin().await?;
-        let badge = u32::try_from(get_badge_count(&mut tx, user_id).await?).unwrap_or(0);
+        let count = get_badge_count(&mut tx, user_id).await?;
+        if let Some(live) = &self.live {
+            live.publish(LiveEvent::Unread { user_id, count });
+        }
+        if !devices {
+            return Ok(());
+        }
+        let badge = u32::try_from(count).unwrap_or(0);
 
         let mut platforms = Vec::new();
         if self.apns_client.is_some() {

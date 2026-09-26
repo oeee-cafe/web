@@ -10,6 +10,7 @@ pub mod google_play;
 pub mod handoff;
 pub mod image_store;
 pub mod jwks;
+pub mod live;
 pub mod locale;
 pub mod markdown_utils;
 pub mod microsoft_store;

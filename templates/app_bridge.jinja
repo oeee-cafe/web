@@ -281,6 +281,8 @@
     }
 
     document.addEventListener("DOMContentLoaded", report);
+    // The bell put in place by a live event (live.jinja), not by a swap.
+    document.addEventListener("oeee:bell", report);
     window.addEventListener("load", report);
     window.addEventListener("pageshow", function (event) {
       if (event.persisted) boosted = false;

@@ -579,6 +579,10 @@ impl App {
             )
             .route("/api/auth", get(get_auth_info))
             .route("/collaboration/{uuid}/meta", get(get_collaboration_meta))
+            // The quick switcher's list (jump.jinja).
+            .route("/jump", get(crate::web::handlers::jump::jump))
+            // What an open page hears without asking (crate::live).
+            .route("/events", get(crate::web::handlers::events::events))
             .route("/about", get(about))
             .route("/supporter", get(supporter_page))
             // What a store sold, handed over by the page in an app that
