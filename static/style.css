@@ -3147,6 +3147,26 @@ html[data-store] .supporter-elsewhere {
   color: var(--ds-danger-text);
 }
 
+/* While a press is out every button waits, and the one pressed stays at
+   full strength so it reads as the one working rather than as one of the
+   switched off. The status under them turns the cucumber (ds.css) at the
+   size of its own words. */
+.supporter-actions .ds-button[aria-busy="true"] {
+  opacity: 1;
+}
+
+.supporter-status .ds-spinner {
+  margin-right: var(--ds-space-2);
+}
+
+.supporter-status .ds-spinner::before {
+  font-size: var(--ds-text-base);
+}
+
+.supporter-status .ds-spinner[hidden] {
+  display: none;
+}
+
 /* A supporter: the chips on the accent, one for every platform they
    support on, each with that platform's mark before the word and the date
    it started after it. The mark is centred on the word by .ds-marked. */
