@@ -76,13 +76,6 @@
   --ds-grid-solid: #bbbbff;
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
   --ds-surface: #f2f2ff;
-  /* Chrome: the toolbar's own ground, set apart from the page's the way an
-     application's frame is from its content -- lighter than the lavender
-     here, darker than the night blue in dark, and flat: the grid is the
-     page's, and stops at the toolbar's edge. What sits on it is a step
-     lighter again, so its buttons stay buttons. */
-  --ds-chrome: #f7f7ff;
-  --ds-chrome-surface: #ffffff;
   /* The chosen segment of a segmented control, raised out of its track
      (--ds-track): the card's colour where that is lighter than the track,
      as it is here. */
@@ -144,8 +137,6 @@
     --ds-grid: #22223f;
     --ds-grid-solid: #22223f;
     --ds-surface: #25254a;
-    --ds-chrome: #0e0e1f;
-    --ds-chrome-surface: #25254a;
     /* The card is darker than the track here, so it would sink, not rise. */
     --ds-thumb: #3d3d70;
     --ds-track: #25253c;
@@ -181,8 +172,6 @@
   --ds-grid: #22223f;
   --ds-grid-solid: #22223f;
   --ds-surface: #25254a;
-  --ds-chrome: #0e0e1f;
-  --ds-chrome-surface: #25254a;
   --ds-thumb: #3d3d70;
   --ds-track: #25253c;
   --ds-field: #1c1c38;
@@ -509,17 +498,20 @@ html:not([data-app="windows"]):has(> body.ds-page) {
    header overrides it with `position: absolute`, being the more specific
    rule.
 
-   Opaque, because the content now passes beneath, and in the chrome's
-   colour (--ds-chrome), the frame's and not the page's. Everything drawn
-   inside it reads its surface from the chrome's too, so the bar's buttons
-   and menus keep their step above what they sit on. */
+   Opaque, because the content now passes beneath: the ground and its grid,
+   the same pair the page carries. Nothing in it shows the grid today -- the
+   toolbar has its own ground and each notice row its own tint, edge to edge,
+   so the header is exactly the toolbar and its rows -- but a gap between
+   them would show the page's ground rather than the content under it. */
 .ds-page > header {
-  --ds-surface: var(--ds-chrome-surface);
   position: -webkit-sticky;
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: var(--ds-chrome);
+  background-color: var(--ds-ground);
+  background-image: linear-gradient(var(--ds-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
+  background-size: 14px 14px;
 }
 
 @media (min-width: 601px) {
@@ -687,17 +679,17 @@ html:not([data-app="windows"]):has(> body.ds-page) {
 
    On the website, on Windows and on phones, nothing here applies. */
 :root {
-  --ds-bar: rgba(247, 247, 255, 0.72);
+  --ds-bar: rgba(204, 204, 255, 0.72);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ds-bar: rgba(14, 14, 31, 0.72);
+    --ds-bar: rgba(23, 23, 43, 0.72);
   }
 }
 
 :root[data-theme="dark"] {
-  --ds-bar: rgba(14, 14, 31, 0.72);
+  --ds-bar: rgba(23, 23, 43, 0.72);
 }
 
 @media (min-width: 601px) {
@@ -745,7 +737,7 @@ html:not([data-app="windows"]):has(> body.ds-page) {
 
 @media (min-width: 601px) and (prefers-reduced-transparency: reduce) {
   html[data-app="macos"] .ds-page > header::before {
-    background-color: var(--ds-chrome);
+    background-color: var(--ds-ground);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -763,7 +755,7 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: var(--ds-chrome);
+  background-color: var(--ds-ground);
   border-bottom: 1px solid var(--ds-line);
   color: var(--ds-ink);
   font-family: var(--ds-font);
