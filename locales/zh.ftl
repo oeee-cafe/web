@@ -508,6 +508,7 @@ app-store-badge = 在 App Store 下载
 google-play-badge = 下载应用，请到 Google Play
 about-elsewhere = 其他平台
 about-documents = 文档
+about-design = 设计系统
 about-version = 版本
 post-no-reactions = 还没有回应。
 sign-in-with-steam = 通过 Steam 登录
