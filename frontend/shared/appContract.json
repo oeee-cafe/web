@@ -184,6 +184,7 @@
         "choice": "system",
         "ground": "#ccccff",
         "grid": "#bbbbff",
+        "toolbar": "#ccccff",
         "v": 1,
         "type": "theme"
       }

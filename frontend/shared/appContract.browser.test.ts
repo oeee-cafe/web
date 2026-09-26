@@ -196,7 +196,8 @@ async function open(options: Options = {}): Promise<Page> {
     ${options.passwordForm ? passwordForm(options.passwordForm) : ""}
     ${options.live ? `<div id="toasts"></div>${template("live.jinja")}` : ""}`;
   const html = `<!doctype html><html><head>${before}
-    <style>:root { --ds-ground: #ccccff; --ds-grid: #bbbbff; } body { background: rgb(255, 255, 255); }</style>
+    <style>:root { --ds-ground: #ccccff; --ds-grid: #bbbbff; --ds-toolbar: var(--ds-ground); }
+      body { background: rgb(255, 255, 255); }</style>
     ${presence}${HEAD}</head><body>${body}</body></html>`;
 
   (window as unknown as { __appContract: Hooks }).__appContract = hooks;
@@ -339,12 +340,20 @@ describe("what the site tells the apps", () => {
   it("gives the theme's choice and the design system's ground", async () => {
     const page = await open();
     const message = last(page, "theme");
-    expect(keys(message)).toEqual(["choice", "grid", "ground", "type", "v"]);
+    expect(keys(message)).toEqual(["choice", "grid", "ground", "toolbar", "type", "v"]);
     expect(message).toMatchObject({
       choice: "system",
       ground: "#ccccff",
       grid: "#bbbbff",
+      // ds.css spells it as the ground, and the app is given the colour.
+      toolbar: "#ccccff",
     });
+
+    // A toolbar of another colour is the one the app is told of, so what it
+    // paints over the toolbar follows the toolbar, not the page.
+    page.window.document.documentElement.style.setProperty("--ds-toolbar", "#f7f7ff");
+    page.window.oeeeApp.report();
+    expect(last(page, "theme")).toMatchObject({ ground: "#ccccff", toolbar: "#f7f7ff" });
   });
 
   it("gives every word an app says over the page, as strings", async () => {
