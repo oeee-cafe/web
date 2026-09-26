@@ -23,6 +23,25 @@ impl From<anyhow::Error> for PushError {
     }
 }
 
+/// Whether a notification's body quotes what someone wrote rather than
+/// saying what happened, by its type (`format_notification_message` in
+/// models/notification.rs): a comment's text, a guestbook entry, the title of
+/// the post drawn in reply. The rest -- a reaction, a follow, a community
+/// post, an invitation -- say it all in the body, which the title restates.
+fn quotes_in_body(data: &serde_json::Map<String, serde_json::Value>) -> bool {
+    matches!(
+        data.get("notification_type").and_then(|kind| kind.as_str()),
+        Some(
+            "Comment"
+                | "Mention"
+                | "CommentReply"
+                | "GuestbookEntry"
+                | "GuestbookReply"
+                | "PostReply"
+        )
+    )
+}
+
 #[derive(Clone)]
 pub struct PushService {
     apns_client: Option<ApnsClient>,
@@ -120,6 +139,7 @@ impl PushService {
                 title: title.to_string(),
                 body: body.to_string(),
                 url: url.to_string(),
+                quoted: quotes_in_body(&data),
             });
             if let Some(count) = badge {
                 live.publish(LiveEvent::Unread {

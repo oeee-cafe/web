@@ -55,6 +55,13 @@ pub enum LiveEvent {
         title: String,
         body: String,
         url: String,
+        /// Whether `body` quotes what someone wrote -- a comment, a guestbook
+        /// entry, a post's title -- which `title` introduces, rather than
+        /// saying what happened in a sentence of its own that `title` only
+        /// restates. A page shows the one sentence, or the title and the
+        /// quote (live.jinja). Absent from an older release's event.
+        #[serde(default)]
+        quoted: bool,
     },
     /// A post's comments changed. `by` is whoever changed them, whose own
     /// page has already been answered and need not fetch again.

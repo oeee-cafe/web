@@ -7,12 +7,12 @@
    unread        The bell, rendered for this reader: put in place of the one
                  in the toolbar, which the apps' icon badges follow
                  (app_bridge.jinja, on `oeee:bell`).
-   notification  A new notification's words, as a toast linking to it. Not in
-                 the phone apps or the Mac's, which are sent the same thing as
-                 a push. Windows is sent no push, so while its window is not
-                 the one in front the page hands the words to the app
-                 (`notify`, app_bridge.jinja), which shows them as the
-                 system's own notification; in front, it is a toast here.
+   notification  A new notification's words, as a toast linking to it --
+                 everywhere, the apps included, beside the system's own
+                 notification for it. The phone apps and the Mac's are sent
+                 that as a push; Windows is sent no push, so the page hands
+                 the words to the app (`notify`, app_bridge.jinja), which
+                 shows them as the system's notification.
    comments      A post's comments changed: a page showing them
                  (`#comments[data-live-post]`, post_view.jinja) fetches them
                  again and morphs them in, the form beside them untouched.
@@ -62,13 +62,10 @@
     });
 
     on("notification", function (event) {
-      var app = root.getAttribute("data-app");
-      if (app && app !== "windows") return;
       var data = read(event);
       if (!data) return;
-      if (app === "windows" && !document.hasFocus() && window.oeeeApp &&
-          window.oeeeApp.post("notify", { title: data.title, body: data.body, url: data.url }, true)) {
-        return;
+      if (root.getAttribute("data-app") === "windows" && window.oeeeApp) {
+        window.oeeeApp.post("notify", { title: data.title, body: data.body, url: data.url }, true);
       }
       var stack = document.getElementById("toasts");
       if (!stack) return;
@@ -77,10 +74,19 @@
       var body = document.createElement("a");
       body.className = "ds-notice-body";
       body.href = data.url;
-      var title = document.createElement("strong");
-      title.textContent = data.title;
-      body.appendChild(title);
-      body.appendChild(document.createTextNode(" " + data.body));
+      // One sentence. A push has a title and a body, and most bodies say it
+      // all -- "oeee reacted with ❤️" under "oeee reacted to your post" --
+      // so the title would be said twice. Where the body quotes what
+      // someone wrote (a comment, a guestbook entry), the title is what
+      // says who, and the quote follows it.
+      if (data.quoted && data.body) {
+        var title = document.createElement("strong");
+        title.textContent = data.title;
+        body.appendChild(title);
+        body.appendChild(document.createTextNode(" \u201c" + data.body + "\u201d"));
+      } else {
+        body.textContent = data.body || data.title;
+      }
       toast.appendChild(body);
       var close = document.createElement("button");
       close.type = "button";

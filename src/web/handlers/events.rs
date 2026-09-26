@@ -149,10 +149,14 @@ fn heard_as(
             }
         }
         LiveEvent::Notification {
-            title, body, url, ..
+            title,
+            body,
+            url,
+            quoted,
+            ..
         } => (
             "notification",
-            json!({ "title": title, "body": body, "url": url }),
+            json!({ "title": title, "body": body, "url": url, "quoted": quoted }),
         ),
         LiveEvent::Comments { post_id, by } => {
             ("comments", json!({ "post_id": post_id, "by": by }))
@@ -191,6 +195,31 @@ mod tests {
             heard_as(&env, None, "en", &mine).is_none(),
             "nor a signed-out page"
         );
+    }
+
+    #[test]
+    fn a_notification_says_whether_its_body_is_a_quote() {
+        let env = test_support::env();
+        let me = Uuid::new_v4();
+        let event = LiveEvent::Notification {
+            user_id: me,
+            title: "oeee reacted to your post".into(),
+            body: "oeee reacted with ❤️".into(),
+            url: "/@artist/1".into(),
+            quoted: false,
+        };
+        let (name, data) = heard_as(&env, Some(me), "en", &event).expect("heard");
+        assert_eq!(name, "notification");
+        assert_eq!(data["quoted"], false);
+        // An event from a release that did not say is not a quote.
+        let older: LiveEvent = serde_json::from_str(&format!(
+            r#"{{"type":"notification","user_id":"{me}","title":"t","body":"b","url":"/"}}"#
+        ))
+        .unwrap();
+        assert!(matches!(
+            older,
+            LiveEvent::Notification { quoted: false, .. }
+        ));
     }
 
     #[test]
