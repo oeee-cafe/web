@@ -3202,6 +3202,32 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 
 /* A new notification, heard live (live.jinja): the whole sentence is the
    link to it, in the notice's own colour, with who and what in bold. */
+/* Someone did something to what is yours, which is worth looking up for:
+   the toast in ink, the other way round from the page in either theme --
+   dark on the lavender, light on the night blue -- where a notice in the
+   surface's colour was lost against it. The dot is the accent's, what is
+   new. Written against .ds-toast as well, to outrank the level tints. */
+.ds-toast.ds-toast-notification {
+  border-color: var(--ds-ink);
+  background-color: var(--ds-ink);
+  color: var(--ds-surface);
+}
+
+.ds-toast.ds-toast-notification::before {
+  background-color: var(--ds-accent);
+  /* Ringed in the accent's own ink, so the lime reads on the light toast
+     of the dark theme as well as on the dark one. */
+  box-shadow: 0 0 0 1px var(--ds-accent-ink);
+}
+
+/* The close button's wash is drawn for a surface, and is lost on ink. */
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-toast-notification .ds-notice-close:hover,
+  .ds-page .ds-toast-notification .ds-notice-close:hover {
+    background-color: transparent;
+  }
+}
+
 .ds-toast-notification .ds-notice-body {
   color: inherit;
   text-decoration: none;
