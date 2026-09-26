@@ -100,6 +100,11 @@ interface Options {
   confirmDialog?: boolean;
   /** A form that takes a saved password, marked as login.jinja and account.jinja mark theirs. */
   passwordForm?: "sign-in" | "confirm";
+  /**
+   * The page hears live events (live.jinja), from a stand-in EventSource the
+   * test speaks through (`hear`), in a window that is or is not in front.
+   */
+  live?: { focused: boolean };
 }
 
 /** A form that takes a saved password, shaped as login.jinja's and account.jinja's are. */
@@ -158,6 +163,15 @@ async function open(options: Options = {}): Promise<Page> {
     // Desktop Chromium has Web Share, which Android's web view does not.
     delete Navigator.prototype.share;
     delete Navigator.prototype.canShare;
+    ${
+      options.live
+        ? `window.EventSource = function (url) { this.url = url; this.heard = {}; window.__live = this; };
+    EventSource.prototype.addEventListener = function (type, listener) {
+      (this.heard[type] = this.heard[type] || []).push(listener);
+    };
+    document.hasFocus = function () { return ${options.live.focused}; };`
+        : ""
+    }
   </script>`;
   const presence = options.presence
     ? `<meta name="oeee-presence" content="${options.presence}" data-community="오이카페 &quot;모에화&quot;" data-group="0123456789abcdef">`
@@ -179,7 +193,8 @@ async function open(options: Options = {}): Promise<Page> {
     ${options.supporter ? `<button class="supporter-restore"></button>${supporterScript()}` : ""}
     ${options.loadingBar ? template("loading_bar.jinja") : ""}
     ${options.confirmDialog ? template("confirm_dialog.jinja") : ""}
-    ${options.passwordForm ? passwordForm(options.passwordForm) : ""}`;
+    ${options.passwordForm ? passwordForm(options.passwordForm) : ""}
+    ${options.live ? `<div id="toasts"></div>${template("live.jinja")}` : ""}`;
   const html = `<!doctype html><html><head>${before}
     <style>:root { --ds-ground: #ccccff; --ds-grid: #bbbbff; } body { background: rgb(255, 255, 255); }</style>
     ${presence}${HEAD}</head><body>${body}</body></html>`;
@@ -193,6 +208,15 @@ async function open(options: Options = {}): Promise<Page> {
   await loaded;
   return { frame, window: frame.contentWindow as PageWindow, sent, asked };
 }
+
+/** An event of `type` arriving on the page's live stream (live.jinja). */
+function hear(page: Page, type: string, data: unknown) {
+  const source = (page.window as unknown as { __live: { heard: Record<string, ((event: unknown) => void)[]> } })
+    .__live;
+  for (const listener of source.heard[type] ?? []) listener({ data: JSON.stringify(data) });
+}
+
+const NOTIFICATION = { title: "tandemaus", body: "commented on 오이", url: "/@artist/9c881320" };
 
 function last(page: Page, type: string): Message {
   const found = page.sent.filter((message) => message.type === type).pop();
@@ -1131,6 +1155,10 @@ describe("what the apps test against (appContract.json)", () => {
     await new Promise((resolve) => windows.window.requestAnimationFrame(resolve));
     sent.push(last(windows, "window"), last(windows, "caption"));
 
+    const behind = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", live: { focused: false } });
+    hear(behind, "notification", NOTIFICATION);
+    sent.push(last(behind, "notify"));
+
     // One example of each distinct message, in the order first sent.
     const byType: Record<string, Message[]> = {};
     for (const message of site(sent) as Message[]) {
@@ -1163,6 +1191,30 @@ describe("what the apps test against (appContract.json)", () => {
     // Every example says it is this contract's.
     for (const messages of Object.values(examples)) {
       for (const message of messages) expect(message.v).toBe(contract.v);
+    }
+  });
+
+  it("hands Windows a notification while its window is behind, and leaves the push to the others", async () => {
+    const toasts = (page: Page) => page.window.document.querySelectorAll("#toasts .ds-toast").length;
+    const notified = (page: Page) => page.sent.filter((message) => message.type === "notify");
+
+    const behind = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", live: { focused: false } });
+    hear(behind, "notification", NOTIFICATION);
+    expect(notified(behind).map(keys)).toEqual([["body", "title", "type", "url", "v"]]);
+    expect(toasts(behind)).toBe(0);
+
+    // In front, the page says it itself, as it does on the website.
+    const inFront = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", live: { focused: true } });
+    hear(inFront, "notification", NOTIFICATION);
+    expect(notified(inFront)).toEqual([]);
+    expect(toasts(inFront)).toBe(1);
+
+    // The Mac and the phones are sent a push, so the page says nothing.
+    for (const app of ["macos store/apple", "ios", "android"]) {
+      const pushed = await open({ userAgent: `Mozilla/5.0 OeeeCafe platform/${app}`, live: { focused: false } });
+      hear(pushed, "notification", NOTIFICATION);
+      expect(notified(pushed), app).toEqual([]);
+      expect(toasts(pushed), app).toBe(0);
     }
   });
 

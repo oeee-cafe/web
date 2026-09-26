@@ -314,6 +314,15 @@
         "type": "password"
       }
     ],
+    "notify": [
+      {
+        "title": "tandemaus",
+        "body": "commented on 오이",
+        "url": "/@artist/9c881320",
+        "v": 1,
+        "type": "notify"
+      }
+    ],
     "caption": [
       {
         "place": {

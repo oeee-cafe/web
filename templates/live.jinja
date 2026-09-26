@@ -8,7 +8,11 @@
                  in the toolbar, which the apps' icon badges follow
                  (app_bridge.jinja, on `oeee:bell`).
    notification  A new notification's words, as a toast linking to it. Not in
-                 the apps, which are sent the same thing as a push.
+                 the phone apps or the Mac's, which are sent the same thing as
+                 a push. Windows is sent no push, so while its window is not
+                 the one in front the page hands the words to the app
+                 (`notify`, app_bridge.jinja), which shows them as the
+                 system's own notification; in front, it is a toast here.
    comments      A post's comments changed: a page showing them
                  (`#comments[data-live-post]`, post_view.jinja) fetches them
                  again and morphs them in, the form beside them untouched.
@@ -54,10 +58,16 @@
     });
 
     source.addEventListener("notification", function (event) {
-      if (root.hasAttribute("data-app")) return;
+      var app = root.getAttribute("data-app");
+      if (app && app !== "windows") return;
       var data = read(event);
+      if (!data) return;
+      if (app === "windows" && !document.hasFocus() && window.oeeeApp &&
+          window.oeeeApp.post("notify", { title: data.title, body: data.body, url: data.url }, true)) {
+        return;
+      }
       var stack = document.getElementById("toasts");
-      if (!data || !stack) return;
+      if (!stack) return;
       var toast = document.createElement("div");
       toast.className = "ds-notice ds-toast ds-toast-notification";
       var body = document.createElement("a");
