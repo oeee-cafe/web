@@ -3055,6 +3055,16 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   background-color: var(--ds-muted);
 }
 
+/* Info and Debug keep the plain surface, but their dot is the accent's
+   lime, as a notification's is: in --ds-muted it read as a mark greyed out,
+   as if the notice were off. Ringed in the accent's ink, so the lime holds
+   on the pale surface of the light theme. */
+.ds-notice-info::before,
+.ds-notice-debug::before {
+  background-color: var(--ds-accent);
+  box-shadow: 0 0 0 1px var(--ds-accent-ink);
+}
+
 .ds-notice-body {
   -webkit-box-flex: 1;
   flex: 1 1 auto;
