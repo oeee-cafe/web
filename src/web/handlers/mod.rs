@@ -3661,6 +3661,30 @@ mod template_tests {
     }
 
     #[test]
+    fn follow_and_unfollow_each_carry_the_others_words() {
+        // Swapped in by the follow handlers with only these keys; the press
+        // shows the other button's words before the response (optimistic.jinja).
+        let env = test_support::env();
+        let render = |name: &str| {
+            env.get_template(name)
+                .unwrap_or_else(|e| panic!("{name} loads: {e:#}"))
+                .render(context! {
+                    current_user => json!({"id": "reader"}),
+                    user => json!({"id": "artist", "login_name": "artist"}),
+                    ftl_lang => "en",
+                })
+                .unwrap_or_else(|e| panic!("{name} renders: {e:#}"))
+        };
+        let follow = render("follow_button.jinja");
+        assert!(follow.contains("data-optimistic-toggle"));
+        assert!(follow.contains(r#"data-pressed-label="unfollow""#), "got: {follow}");
+        assert!(follow.contains(r#"hx-sync="this:drop""#));
+        assert!(!follow.contains("hx-disable"), "a disabled button would dim the answer shown");
+        let unfollow = render("unfollow_button.jinja");
+        assert!(unfollow.contains(r#"data-pressed-label="follow""#), "got: {unfollow}");
+    }
+
+    #[test]
     fn the_notification_chrome_renders_standalone() {
         // Both are swapped in by handlers as well as included by the page, so
         // they have to stand up with only the keys those handlers pass.

@@ -39,7 +39,7 @@
               hx-target="#post-reactions-{{ post_id }}"
               hx-swap="outerHTML"
               title="{% if reaction.reacted_by_user %}Remove your {{ reaction.emoji }}{% else %}React with {{ reaction.emoji }}{% endif %}"
-              hx-disable="this">
+              hx-sync="closest .post-reactions:drop">
         {{ reaction.emoji }} <span class="reaction-count">{{ reaction.count }}</span>
       </button>
     {% else %}
