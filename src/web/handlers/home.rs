@@ -963,7 +963,7 @@ mod tests {
         assert!(rendered.contains(r#"<span class="comment-row-handle"><span class="ds-handle">@commenter</span> · </span>"#));
         assert!(!rendered.contains("@commenter@oeee.test"));
         assert!(rendered
-            .contains(r#"<span class="comment-row-handle"><span class="ds-handle">@visitor@elsewhere.test</span> · </span>"#));
+            .contains(r#"<span class="comment-row-handle"><span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@visitor</bdi><span class="ds-handle-host">@elsewhere.test</span></span> · </span>"#));
     }
 
     /// A full batch beside the grid loads the next from after its last

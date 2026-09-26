@@ -31,8 +31,18 @@
       {{- supporter_mark(mark) -}}
       {{- handle_text(login_name, actor_handle) -}}
     </span>
+  {%- elif login_name or not actor_handle -%}
+    <span class="ds-handle">{{ handle_text(login_name) }}</span>
   {%- else -%}
-    <span class="ds-handle">{{ handle_text(login_name, actor_handle) }}</span>
+    {#- Someone from another server: @name@host, the two parts apart so
+        that however long the line runs short, it is the name that gives
+        way and never the host -- a remote handle whose host is out of sight
+        reads as one of ours. The name is a <bdi>, so whatever direction
+        its characters run in, it cannot carry the host round with it. A
+        username cannot hold an @ (actors_username_is_plain), so the last
+        one is where the host starts. -#}
+    {%- set parts = actor_handle|split("@")|list -%}
+    <span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@{{ parts[1:-1]|join("@") }}</bdi><span class="ds-handle-host">@{{ parts[-1] }}</span></span>
   {%- endif -%}
 {%- endmacro %}
 

@@ -2815,7 +2815,8 @@ mod template_tests {
     }
 
     /// A commenter from this site is @login_name, without the site's own
-    /// domain; one from elsewhere keeps the handle their server gave them.
+    /// domain; one from elsewhere keeps the handle their server gave them,
+    /// with its host where nothing can hide it.
     /// Name and handle's pill are printed with nothing between them, so the
     /// gap is .ds-person's margin alone.
     #[test]
@@ -2833,7 +2834,11 @@ mod template_tests {
             fragment.contains(r#"<span class="ds-handle">@plain</span>"#),
             "{fragment}"
         );
-        assert!(fragment.contains(r#"<span class="ds-handle">@far@oeee.example</span>"#));
+        // The host in a part of its own, which the name gives way to, and
+        // the name in a <bdi> it cannot turn the host round from.
+        assert!(fragment.contains(
+            r#"<span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@far</bdi><span class="ds-handle-host">@oeee.example</span></span>"#
+        ));
         assert!(fragment.contains(r#"Plain</a><span class="ds-handle">"#));
         // The remote author's profile is off the site, so it opens apart.
         assert!(fragment.contains(r#"target="_blank" rel="noopener noreferrer">far</a>"#));
