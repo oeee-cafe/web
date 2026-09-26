@@ -2605,7 +2605,7 @@ mod template_tests {
         assert!(with.contains("멋져요"));
         // Headed by the drawing, not by its owner's own name on every row.
         assert!(with.contains(r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002">고양이</a>"#));
-        assert!(with.contains("@cat · "));
+        assert!(with.contains(r#"<span class="ds-handle">@cat</span> · "#));
         assert!(!with.contains("comment-row-post"));
         assert!(with.contains(r#"<span class="profile-tab-count">45</span>"#));
         // Minijinja escapes the slashes in an attribute; the browser reads
@@ -2778,7 +2778,7 @@ mod template_tests {
                 .expect("post_view.jinja renders")
         };
         let badges = |html: &str| {
-            html.matches(r#"class="supporter-badge ds-marked ds-marked-alone""#)
+            html.matches(r#"class="ds-handle ds-handle-supporter ds-marked""#)
                 .count()
         };
 
@@ -2786,21 +2786,20 @@ mod template_tests {
         // Author, co-drawer, the commenter and the author's reply to them.
         assert_eq!(badges(&page), 4);
         let byline = page.find("post-inspector-byline").unwrap();
-        let handle = page[byline..].find("ds-person-handle").unwrap() + byline;
+        let handle = page[byline..].find("ds-handle").unwrap() + byline;
         assert!(
-            page[byline..handle].contains("supporter-badge"),
-            "beside the author"
+            page[handle..].starts_with("ds-handle ds-handle-supporter"),
+            "the author's own pill"
         );
-        assert!(page.contains(r#"href="/about#supporters""#));
         // The co-drawer bought elsewhere and wears the other mark: one
         // storefront on the page, the rest gamepads.
         assert_eq!(
-            page.matches(r#"aria-label="supporter-badge-apple""#)
+            page.matches(r#"title="supporter-badge-apple""#)
                 .count(),
             1
         );
         assert_eq!(
-            page.matches(r#"aria-label="supporter-badge-steam""#)
+            page.matches(r#"title="supporter-badge-steam""#)
                 .count(),
             3
         );
@@ -2817,8 +2816,8 @@ mod template_tests {
 
     /// A commenter from this site is @login_name, without the site's own
     /// domain; one from elsewhere keeps the handle their server gave them.
-    /// Name and handle are printed with nothing between them, so the gap is
-    /// .ds-person's margin alone.
+    /// Name and handle's pill are printed with nothing between them, so the
+    /// gap is .ds-person's margin alone.
     #[test]
     fn a_comment_names_its_author_by_the_design_systems_person() {
         let env = test_support::env();
@@ -2831,11 +2830,11 @@ mod template_tests {
             })
             .unwrap();
         assert!(
-            fragment.contains(r#"<span class="ds-person-handle">@plain</span>"#),
+            fragment.contains(r#"<span class="ds-handle">@plain</span>"#),
             "{fragment}"
         );
-        assert!(fragment.contains(r#"<span class="ds-person-handle">@far@oeee.example</span>"#));
-        assert!(fragment.contains(r#"Plain</a><span class="ds-person-handle">"#));
+        assert!(fragment.contains(r#"<span class="ds-handle">@far@oeee.example</span>"#));
+        assert!(fragment.contains(r#"Plain</a><span class="ds-handle">"#));
         // The remote author's profile is off the site, so it opens apart.
         assert!(fragment.contains(r#"target="_blank" rel="noopener noreferrer">far</a>"#));
     }

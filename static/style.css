@@ -1177,12 +1177,6 @@ nav a:visited,
   margin-left: 4px;
 }
 
-.post-inspector-author,
-.post-inspector-author:visited {
-  color: var(--ds-ink);
-  font-weight: 600;
-}
-
 .post-inspector-handle {
   color: var(--ds-faint);
 }
@@ -3169,20 +3163,6 @@ html[data-store] .supporter-elsewhere {
   }
 }
 
-/* The same mark beside a supporter's name wherever a page prints it. An
-   emoji is drawn in its own colours by the reader's system, so there is no
-   accent disc behind it and nothing here sets a colour: a disc under a
-   gamepad read as a reaction someone had left. */
-.supporter-badge,
-.supporter-badge:visited {
-  flex: none;
-  margin-left: 4px;
-  font-size: 12px;
-  line-height: 1;
-  text-decoration: none;
-}
-
-
 .profile-chip-out {
   margin-left: 4px;
   color: var(--ds-muted);
@@ -4557,21 +4537,6 @@ html[data-app] .about-stores {
   .comment-row:hover {
     background-color: var(--ds-field);
   }
-}
-
-.member-initial {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  margin-right: 12px;
-  border: 1px solid var(--ds-line-strong);
-  border-radius: 6px;
-  background-color: var(--ds-field);
-  color: var(--ds-ink);
-  font-weight: 700;
 }
 
 .member-text,

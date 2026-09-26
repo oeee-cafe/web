@@ -38,8 +38,6 @@ pub struct JumpQuery {
 struct JumpCommunity {
     name: String,
     slug: String,
-    foreground_color: Option<String>,
-    background_color: Option<String>,
     is_member: bool,
 }
 
@@ -92,8 +90,6 @@ async fn communities(
         SELECT
             c.name,
             c.slug,
-            c.foreground_color,
-            c.background_color,
             (m.user_id IS NOT NULL) AS "is_member!"
         FROM communities c
         LEFT JOIN community_members m ON m.community_id = c.id AND m.user_id = $2
@@ -115,23 +111,7 @@ async fn communities(
     )
     .fetch_all(&mut **tx)
     .await?;
-    // The chip is coloured by a style attribute, so only a colour goes in.
-    Ok(rows
-        .into_iter()
-        .map(|mut row| {
-            if !(is_hex_colour(&row.foreground_color) && is_hex_colour(&row.background_color)) {
-                row.foreground_color = None;
-                row.background_color = None;
-            }
-            row
-        })
-        .collect())
-}
-
-fn is_hex_colour(colour: &Option<String>) -> bool {
-    colour.as_deref().is_some_and(|c| {
-        c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|d| d.is_ascii_hexdigit())
-    })
+    Ok(rows)
 }
 
 #[cfg(test)]
@@ -164,19 +144,17 @@ mod tests {
             .replace("&#x2f;", "/")
     }
 
-    fn club(colour: Option<&str>) -> JumpCommunity {
+    fn club() -> JumpCommunity {
         JumpCommunity {
             name: "drawing club".into(),
             slug: "club".into(),
-            foreground_color: colour.map(Into::into),
-            background_color: colour.map(Into::into),
             is_member: true,
         }
     }
 
     #[test]
     fn every_row_is_a_link_and_a_name_is_text() {
-        let rendered = render("", true, vec![club(Some("#112233"))]);
+        let rendered = render("", true, vec![club()]);
         assert!(rendered.contains(r#"href="/@club""#));
         assert!(rendered.contains(r#"href="/@neo""#));
         assert!(
@@ -188,7 +166,6 @@ mod tests {
             "a signed-in reader's pages include their profile"
         );
         assert!(rendered.contains(r#"data-command="new-drawing""#));
-        assert!(rendered.contains("background-color: #112233"));
         assert!(
             !rendered.contains("/search?q="),
             "nothing typed, nothing to search for"
@@ -212,12 +189,5 @@ mod tests {
         assert!(!rendered.contains("/notifications"));
         assert!(!rendered.contains("new-drawing"));
         assert!(rendered.contains(r#"href="/communities""#));
-    }
-
-    #[test]
-    fn only_a_colour_goes_into_a_style() {
-        assert!(is_hex_colour(&Some("#a0B1c2".into())));
-        assert!(!is_hex_colour(&Some("red;x:y".into())));
-        assert!(!is_hex_colour(&None));
     }
 }

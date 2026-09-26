@@ -414,7 +414,7 @@
 
     <section>
       <h2>People</h2>
-      <p class="ds-help"><code>person()</code> in person_macro.jinja: the name, a supporter's mark, the handle. Someone from here is <code>@login_name</code>; someone from another server keeps <code>@name@their.host</code>. <code>handle()</code> is the handle alone, for a line that says more after it.</p>
+      <p class="ds-help"><code>person()</code> in person_macro.jinja: the name, then the handle as a pill. Everyone's pill is a ring; a supporter's is the accent, with their mark inside. Someone from here is <code>@login_name</code>; someone from another server keeps <code>@name@their.host</code>. <code>handle()</code> is the pill alone, for a line that says more after it.</p>
       <div class="ds-stack">
         <div>{{ person("Tandemaus", "#", login_name="tandemaus") }}</div>
         <div>{{ person("Tandemaus", "#", login_name="tandemaus", supporters={"tandemaus": "steam"}) }}</div>

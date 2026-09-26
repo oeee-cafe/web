@@ -2928,22 +2928,14 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   line-height: 1;
 }
 
-/* A mark with no words after it -- a supporter's badge beside a name -- has
-   nothing to keep apart from. A class, because CSS cannot see that the text
-   after a mark is not there. */
-.ds-marked.ds-marked-alone > .ds-mark {
-  margin-right: 0;
-}
-
-/* A person by name (person_macro.jinja): what they are called, a
-   supporter's mark, then their handle, on one line. The macro prints the
-   parts with no space between them, so the gap here is the whole of it --
-   a space's width is the font's, and a flex gap on top of a margin once put
-   a comment's handle twice as far from its name as the byline's.
+/* A person by name (person_macro.jinja): what they are called, then their
+   handle's pill. The macro prints the parts with no space between them, so
+   the gap here is the whole of it -- a space's width is the font's, and a
+   flex gap on top of a margin once put a comment's handle twice as far from
+   its name as the byline's.
 
    Inline, not a flex row, so a line too narrow for it ends in an ellipsis
-   where its holder asks for one. The handle is the name's size in a fainter
-   ink: the same line, said more quietly. */
+   where its holder asks for one. */
 .ds-person {
   min-width: 0;
 }
@@ -2958,9 +2950,40 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   font-weight: 600;
 }
 
-.ds-person-handle {
-  color: var(--ds-faint);
+/* A handle, as a pill: a ring in the muted ink for everyone, so a handle
+   reads as a name's tag rather than more of the sentence. A supporter's is
+   filled with the accent and carries their mark (.ds-marked centres it) --
+   the one place the site's lime goes on a person, and so a thank-you rather
+   than decoration. A border in both, the supporter's the fill's own colour,
+   so the two are the same size. Inline-flex under .ds-page for the same
+   reason a mark's holder is: the line box of an inline pill sat a pixel
+   lower in one font than the next. */
+.ds-handle {
+  display: inline-block;
+  padding: 0 7px;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 9px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
   font-weight: 400;
+  line-height: calc(16px * var(--ds-text-scale, 1));
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.ds-page .ds-handle {
+  display: -webkit-inline-box;
+  display: inline-flex;
+  -webkit-box-align: center;
+  align-items: center;
+}
+
+.ds-handle-supporter {
+  border-color: var(--ds-accent);
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
 }
 
 /* A surface on the ground: settings groups, forms, anything that is a box. */
