@@ -1,3 +1,4 @@
+use crate::models::handle::LoginName;
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -74,7 +75,7 @@ pub struct Community {
 pub struct PublicCommunity {
     pub id: Uuid,
     pub owner_id: Uuid,
-    pub owner_login_name: String,
+    pub owner_login_name: LoginName,
     pub name: String,
     pub slug: String,
     pub description: String,
@@ -90,7 +91,7 @@ pub struct PublicCommunity {
 pub struct PublicCommunityWithPosts {
     pub id: Uuid,
     pub owner_id: Uuid,
-    pub owner_login_name: String,
+    pub owner_login_name: LoginName,
     pub name: String,
     pub slug: String,
     pub description: String,
@@ -383,7 +384,7 @@ pub async fn get_user_communities_with_latest_9_posts(
                 id: row.id,
                 title: row.title,
                 author_id: row.author_id,
-                user_login_name: Some(row.login_name),
+                user_login_name: Some(row.login_name.into()),
                 paint_duration: row.paint_duration.microseconds.to_string(),
                 stroke_count: row.stroke_count,
                 image_filename: row.image_filename,
@@ -435,7 +436,7 @@ pub async fn get_user_communities_with_latest_9_posts(
 pub struct KnownCommunity {
     pub id: Uuid,
     pub owner_id: Uuid,
-    pub owner_login_name: String,
+    pub owner_login_name: LoginName,
     pub name: String,
     pub slug: String,
     pub description: String,
@@ -845,7 +846,7 @@ pub async fn get_community_members(
 pub struct CommunityMemberWithDetails {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub login_name: String,
+    pub login_name: LoginName,
     pub display_name: String,
     pub role: CommunityMemberRole,
     pub joined_at: DateTime<Utc>,
@@ -886,7 +887,7 @@ pub async fn get_community_members_with_details(
         .map(|row| CommunityMemberWithDetails {
             id: row.id,
             user_id: row.user_id,
-            login_name: row.login_name,
+            login_name: row.login_name.into(),
             display_name: row.display_name,
             role: row.role,
             joined_at: row.joined_at,
@@ -1045,7 +1046,7 @@ pub struct InvitationWithDetails {
     pub id: Uuid,
     pub community_name: String,
     pub community_slug: String,
-    pub inviter_login_name: String,
+    pub inviter_login_name: LoginName,
     pub inviter_display_name: String,
     pub created_at: DateTime<Utc>,
 }
@@ -1081,7 +1082,7 @@ pub async fn get_pending_invitations_with_details_for_user(
             id: row.id,
             community_name: row.community_name,
             community_slug: row.community_slug,
-            inviter_login_name: row.inviter_login_name,
+            inviter_login_name: row.inviter_login_name.into(),
             inviter_display_name: row.inviter_display_name,
             created_at: row.created_at,
         })
@@ -1113,7 +1114,7 @@ pub async fn get_pending_invitations_for_community(
 #[derive(Debug)]
 pub struct CommunityInvitationWithInviteeDetails {
     pub id: Uuid,
-    pub invitee_login_name: String,
+    pub invitee_login_name: LoginName,
     pub invitee_display_name: String,
     pub created_at: DateTime<Utc>,
 }
@@ -1144,7 +1145,7 @@ pub async fn get_pending_invitations_with_invitee_details_for_community(
         .into_iter()
         .map(|row| CommunityInvitationWithInviteeDetails {
             id: row.id,
-            invitee_login_name: row.invitee_login_name,
+            invitee_login_name: row.invitee_login_name.into(),
             invitee_display_name: row.invitee_display_name,
             created_at: row.created_at,
         })

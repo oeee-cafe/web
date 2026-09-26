@@ -1,3 +1,4 @@
+use crate::models::handle::LoginName;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -87,7 +88,7 @@ pub async fn is_following(
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FollowingInfo {
     pub user_id: Uuid,
-    pub login_name: String,
+    pub login_name: LoginName,
     pub display_name: String,
     pub banner_image_filename: Option<String>,
     pub banner_image_width: Option<i32>,
@@ -131,7 +132,7 @@ pub async fn find_followings_by_user_id(
         .filter_map(|row| {
             row.user_id.map(|user_id| FollowingInfo {
                 user_id,
-                login_name: row.login_name,
+                login_name: row.login_name.into(),
                 display_name: row.display_name,
                 banner_image_filename: row.image_filename,
                 banner_image_width: row.width,

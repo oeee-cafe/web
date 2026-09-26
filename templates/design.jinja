@@ -414,12 +414,13 @@
 
     <section>
       <h2>People</h2>
-      <p class="ds-help"><code>person()</code> in person_macro.jinja: the name, then the handle as a pill. Everyone's pill is a ring; a supporter's is the accent, with their mark inside. Someone from here is <code>@login_name</code>; someone from another server keeps <code>@name@their.host</code>. <code>handle()</code> is the pill alone, for a line that says more after it.</p>
+      <p class="ds-help"><code>person()</code> in person_macro.jinja: the name, then the handle as a pill. Everyone's pill is a ring; a supporter's is the accent, with their mark inside. Someone from here is <code>@login_name</code>; someone from another server keeps <code>@name@their.host</code>. <code>handle()</code> is the pill alone, for a line that says more after it. Short of room, a remote pill takes the next line and its name gives way to an ellipsis; its host never does.</p>
       <div class="ds-stack">
         <div>{{ person("Tandemaus", "#", "tandemaus") }}</div>
         <div>{{ pill("steam", "@tandemaus") }} · a supporter's pill, as a page draws it once it has asked</div>
         <div>{{ person("Someone far", "#", {"login_name": none, "name": "someone", "host": "example.social"}, external=true) }}</div>
         <div>{{ handle("tandemaus") }} · 3 days ago</div>
+        <div style="width: 220px">{{ person("Someone far", "#", {"login_name": none, "name": "a_name_long_enough_to_run_out_of_room", "host": "example.social"}, external=true) }}</div>
       </div>
     </section>
 

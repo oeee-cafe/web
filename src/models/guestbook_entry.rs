@@ -1,3 +1,4 @@
+use crate::models::handle::LoginName;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 
@@ -20,9 +21,9 @@ pub struct GuestbookEntry {
 pub struct SerializableGuestbookEntry {
     pub id: Uuid,
     pub author_id: Uuid,
-    pub author_login_name: String,
+    pub author_login_name: LoginName,
     pub author_display_name: String,
-    pub recipient_login_name: String,
+    pub recipient_login_name: LoginName,
     pub recipient_display_name: String,
     pub recipient_id: Uuid,
     pub content: String,
@@ -91,10 +92,10 @@ pub async fn find_guestbook_entry_by_id(
     Ok(entry.map(|entry| SerializableGuestbookEntry {
         id: entry.id,
         author_id: entry.author_id,
-        author_login_name: entry.author_login_name,
+        author_login_name: entry.author_login_name.into(),
         author_display_name: entry.author_display_name,
         recipient_id: entry.recipient_id,
-        recipient_login_name: entry.recipient_login_name,
+        recipient_login_name: entry.recipient_login_name.into(),
         recipient_display_name: entry.recipient_display_name,
         content: entry.content,
         reply: entry.reply,
@@ -164,9 +165,9 @@ pub async fn create_guestbook_entry(
     Ok(SerializableGuestbookEntry {
         id: entry.id,
         author_id: entry.author_id,
-        author_login_name: entry.author_login_name,
+        author_login_name: entry.author_login_name.into(),
         author_display_name: entry.author_display_name,
-        recipient_login_name: entry.recipient_login_name,
+        recipient_login_name: entry.recipient_login_name.into(),
         recipient_display_name: entry.recipient_display_name,
         recipient_id: entry.recipient_id,
         content: entry.content,
@@ -210,9 +211,9 @@ pub async fn find_guestbook_entries_by_recipient_id(
         .map(|entry| SerializableGuestbookEntry {
             id: entry.id,
             author_id: entry.author_id,
-            author_login_name: entry.author_login_name,
+            author_login_name: entry.author_login_name.into(),
             author_display_name: entry.author_display_name,
-            recipient_login_name: entry.recipient_login_name,
+            recipient_login_name: entry.recipient_login_name.into(),
             recipient_display_name: entry.recipient_display_name,
             recipient_id: entry.recipient_id,
             content: entry.content,

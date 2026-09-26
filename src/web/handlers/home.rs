@@ -809,7 +809,7 @@ mod tests {
             id: uuid::Uuid::from_u128(i),
             title: Some(format!("Drawing {i}")),
             author_id: uuid::Uuid::from_u128(999),
-            user_login_name: "artist".to_string(),
+            user_login_name: "artist".into(),
             paint_duration: "0".to_string(),
             stroke_count: 1,
             viewer_count: 0,

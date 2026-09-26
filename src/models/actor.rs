@@ -392,7 +392,7 @@ pub async fn create_actor_for_user(
         "#,
         iri,
         ActorType::Person as _,
-        user.login_name,
+        user.login_name.as_str(),
         config.domain,
         config.domain,
         handle,

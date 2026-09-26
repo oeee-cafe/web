@@ -268,7 +268,7 @@ pub async fn get_active_participants(
         .into_iter()
         .map(|p| crate::models::user::User {
             id: p.user_id,
-            login_name: p.login_name,
+            login_name: p.login_name.into(),
             password_hash: None,
             display_name: String::new(),
             email: None,

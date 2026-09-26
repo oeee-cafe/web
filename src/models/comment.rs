@@ -5,6 +5,7 @@ use sqlx::{Postgres, Transaction, Type};
 use uuid::Uuid;
 
 use crate::models::handle::Handle;
+use crate::sanitized_html::SanitizedHtml;
 
 type CommentData = (
     Uuid,                  // post_id
@@ -48,7 +49,8 @@ pub struct CommentDraft {
     pub actor_id: Uuid,
     pub parent_comment_id: Option<Uuid>,
     pub content: String,
-    pub content_html: Option<String>,
+    /// Printed with `|safe`, so only ever HTML that has been cleaned.
+    pub content_html: Option<SanitizedHtml>,
 }
 
 #[derive(Serialize)]
@@ -639,7 +641,7 @@ pub async fn create_comment(
         draft.actor_id,
         draft.parent_comment_id,
         draft.content,
-        draft.content_html
+        draft.content_html.map(SanitizedHtml::into_string)
     )
     .fetch_one(&mut **tx)
     .await?;
@@ -694,9 +696,10 @@ pub async fn create_comment_from_activitypub(
     post_id: Uuid,
     actor_id: Uuid,
     content: String,
-    content_html: Option<String>,
+    content_html: Option<SanitizedHtml>,
     iri: String,
 ) -> Result<Comment> {
+    let content_html = content_html.map(SanitizedHtml::into_string);
     let comment = sqlx::query_as!(
         Comment,
         r#"

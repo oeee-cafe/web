@@ -43,6 +43,7 @@
 //! place the two meet is Steam, whose purchases are keyed by the same Steam
 //! account a Steam sign-in names ([`Store::identity`]).
 
+use crate::models::handle::LoginName;
 use std::collections::HashMap;
 
 use anyhow::Result;
@@ -536,7 +537,7 @@ pub async fn marks_for<'e>(
 /// or the platform whose mark they wear now.
 #[derive(Clone, Debug, Serialize)]
 pub struct Credit {
-    pub login_name: String,
+    pub login_name: LoginName,
     pub display_name: String,
     pub mark: String,
     pub since: DateTime<Utc>,
@@ -585,7 +586,7 @@ pub async fn list_credits(tx: &mut Transaction<'_, Postgres>) -> Result<Vec<Cred
     Ok(rows
         .into_iter()
         .map(|row| Credit {
-            login_name: row.login_name,
+            login_name: row.login_name.into(),
             display_name: row.display_name,
             mark: row.mark,
             since: row.since,

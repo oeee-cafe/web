@@ -641,7 +641,7 @@ pub async fn post_view(
                             title: row.title,
                             content: row.content,
                             author_id: row.author_id,
-                            user_login_name: row.login_name.unwrap_or_default(),
+                            user_login_name: (row.login_name.unwrap_or_default()).into(),
                             user_display_name: row.display_name.unwrap_or_default(),
                             user_actor_handle: row.actor_handle.unwrap_or_default(),
                             image_filename: row.image_filename.unwrap_or_default(),
@@ -825,7 +825,7 @@ mod replay_visibility_tests {
     fn viewer(id: Uuid, role: UserRole) -> User {
         User {
             id,
-            login_name: "someone".to_string(),
+            login_name: "someone".into(),
             password_hash: None,
             display_name: "Someone".to_string(),
             email: None,
@@ -2517,7 +2517,7 @@ pub async fn post_view_by_login_name(
                             title: row.title,
                             content: row.content,
                             author_id: row.author_id,
-                            user_login_name: row.login_name.unwrap_or_default(),
+                            user_login_name: (row.login_name.unwrap_or_default()).into(),
                             user_display_name: row.display_name.unwrap_or_default(),
                             user_actor_handle: row.actor_handle.unwrap_or_default(),
                             image_filename: row.image_filename.unwrap_or_default(),

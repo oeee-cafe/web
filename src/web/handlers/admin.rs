@@ -11,6 +11,7 @@ use crate::models::admin::{
     find_community_by_slug, find_post_by_id, set_banner_explicit, set_post_explicit,
     AdminCommunity, AdminPostFilter, AdminSessionStatus, AdminSort,
 };
+use crate::models::handle::LoginName;
 use crate::models::store_product::{
     self, add as add_store_product, find as find_store_product, list_all as list_store_products,
     purchase_counts as store_purchase_counts, set_details as set_store_product_details,
@@ -56,7 +57,7 @@ pub struct AdminPostsQuery {
 
 struct ResolvedFilter {
     filter: AdminPostFilter,
-    author_login_name: Option<String>,
+    author_login_name: Option<LoginName>,
     community_slug: Option<String>,
 }
 

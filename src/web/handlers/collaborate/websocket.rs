@@ -153,7 +153,7 @@ pub async fn websocket_collaborate_handler(
             room_uuid,
             state,
             user.id,
-            user.login_name,
+            user.login_name.to_string(),
             resume.position(),
         )
     }))

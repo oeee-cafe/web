@@ -10,6 +10,7 @@ use sqlx::types::Uuid;
 use sqlx::{query, query_as, PgPool, Postgres, Transaction, Type};
 
 use crate::models::actor::create_actor_for_user;
+use crate::models::handle::LoginName;
 use crate::AppConfig;
 
 pub struct UserDraft {
@@ -73,7 +74,7 @@ pub enum UserRole {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct User {
     pub id: Uuid,
-    pub login_name: String,
+    pub login_name: LoginName,
     #[serde(skip_serializing)]
     pub password_hash: Option<String>,
     pub display_name: String,
@@ -469,7 +470,7 @@ pub async fn create_user(
 
     let user = User {
         id: result.id,
-        login_name: user_draft.login_name,
+        login_name: user_draft.login_name.into(),
         password_hash: user_draft.password_hash,
         display_name: user_draft.display_name,
         email: None,
@@ -572,7 +573,7 @@ pub async fn find_user_by_email(
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct UserWithPublicPostAndBanner {
-    pub login_name: String,
+    pub login_name: LoginName,
     pub display_name: String,
     pub banner_image_filename: String,
 }
@@ -648,7 +649,7 @@ pub async fn delete_user(
             // Checked against the account, not just for being non-empty: an
             // account with a password never gets here, but one that answers
             // with its handle has to answer with its own.
-            if user.has_password() || login_name.trim() != user.login_name {
+            if user.has_password() || user.login_name != login_name.trim() {
                 return Err(anyhow::anyhow!("The username does not match"));
             }
         }

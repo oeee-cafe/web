@@ -1,4 +1,5 @@
 use crate::app_error::AppError;
+use crate::models::handle::LoginName;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
 use crate::web::handlers::ExtractFtlLang;
@@ -24,7 +25,7 @@ const SEARCH_PEOPLE_LIMIT: i64 = 5;
 /// (person_card_macro.jinja) draws them.
 #[derive(Serialize)]
 pub struct SearchPersonRow {
-    pub login_name: String,
+    pub login_name: LoginName,
     pub display_name: String,
     pub banner_image_filename: Option<String>,
 }
@@ -77,7 +78,7 @@ pub struct SearchPageQuery {
 pub struct SearchPostRow {
     pub id: Uuid,
     pub title: Option<String>,
-    pub user_login_name: String,
+    pub user_login_name: LoginName,
     pub image_filename: Option<String>,
     pub image_width: Option<i32>,
     pub image_height: Option<i32>,
