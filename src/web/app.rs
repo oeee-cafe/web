@@ -55,8 +55,8 @@ use crate::web::handlers::identity::{
     steam_app_only,
 };
 use crate::web::handlers::notifications::{
-    delete_notification_handler, get_unread_notification_count, hx_mark_all_notifications_read,
-    list_notifications, mark_notification_read, notifications_fragment,
+    delete_notification_handler, get_unread_notification_count, list_notifications,
+    mark_notifications_seen, notifications_fragment, open_notification,
 };
 use crate::web::handlers::password_reset::{
     password_reset_request, password_reset_request_page, password_reset_verify,
@@ -239,13 +239,10 @@ impl App {
                 "/notifications/unread-count",
                 get(get_unread_notification_count),
             )
+            .route("/notifications/seen", post(mark_notifications_seen))
             .route(
-                "/notifications/mark-all-read",
-                post(hx_mark_all_notifications_read),
-            )
-            .route(
-                "/notifications/{notification_id}/mark-read",
-                post(mark_notification_read),
+                "/notifications/{notification_id}/open",
+                get(open_notification),
             )
             .route(
                 "/notifications/{notification_id}",

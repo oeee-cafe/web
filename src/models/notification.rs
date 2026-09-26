@@ -271,10 +271,7 @@ pub async fn list_notifications(
 /// Get a single notification by ID, carrying the same group count the list
 /// gives it.
 ///
-/// The mark-read handler re-renders whatever it just changed, and for a
-/// collapsed reaction group that is the whole group — without the count here it
-/// would swap "Alice and 15 others reacted" for a bare "Alice reacted" the
-/// moment you marked it read.
+/// `/notifications/{id}/open` reads one to find where it points.
 pub async fn get_notification_by_id(
     tx: &mut Transaction<'_, Postgres>,
     notification_id: Uuid,
@@ -480,11 +477,15 @@ pub async fn delete_notification(
     Ok(result.rows_affected() > 0)
 }
 
-/// The page a push notification opens, as a path on the site: the post it is
-/// about, or for a follow the follower, or for a guestbook the guestbook it
-/// was written in. The notifications page when there is nothing better, which
-/// is where every notification can be found anyway.
-fn push_url(notification: &NotificationWithActor, recipient_login_name: Option<&str>) -> String {
+/// The page a notification is about, as a path on the site: the post, or for
+/// a follow the follower, or for a guestbook the guestbook it was written in.
+/// The notifications page when there is nothing better, which is where every
+/// notification can be found anyway. Where `/notifications/{id}/open` sends
+/// the reader once it has marked the notification read.
+pub fn notification_url(
+    notification: &NotificationWithActor,
+    recipient_login_name: &str,
+) -> String {
     use NotificationType::*;
     match notification.notification_type {
         Comment | Reaction | Mention | PostReply | CommentReply | CommunityPost => {
@@ -502,10 +503,7 @@ fn push_url(notification: &NotificationWithActor, recipient_login_name: Option<&
         },
         // An entry is written in the recipient's own guestbook; a reply is the
         // actor answering one the recipient wrote in theirs.
-        GuestbookEntry => match recipient_login_name {
-            Some(recipient) => format!("/@{recipient}"),
-            None => "/notifications".to_string(),
-        },
+        GuestbookEntry => format!("/@{recipient_login_name}"),
         GuestbookReply => match &notification.actor_login_name {
             Some(actor) => format!("/@{actor}"),
             None => "/notifications".to_string(),
@@ -561,21 +559,12 @@ pub async fn send_push_for_notification(
         serde_json::json!(format!("{:?}", notification.notification_type)),
     );
 
-    // Where tapping it goes. The apps open this rather than working it out
-    // from the type, so a new kind of notification, or a route that moves,
-    // is right in every app without a release of any of them.
-    let recipient_login_name = match notification.notification_type {
-        NotificationType::GuestbookEntry => sqlx::query_scalar!(
-            "SELECT login_name FROM users WHERE id = $1",
-            notification.recipient_id
-        )
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten(),
-        _ => None,
-    };
-    let url = push_url(notification, recipient_login_name.as_deref());
+    // Where tapping it goes: through the route that marks it read, which
+    // then sends the reader on to the page it is about (notification_url).
+    // The apps open this rather than working it out from the type, so a new
+    // kind of notification, or a route that moves, is right in every app
+    // without a release of any of them.
+    let url = format!("/notifications/{}/open", notification.id);
 
     if let Some(post_id) = notification.post_id {
         data.insert(
@@ -873,40 +862,42 @@ mod tests {
     }
 
     #[test]
-    fn a_push_opens_what_it_is_about() {
+    fn a_notification_opens_what_it_is_about() {
         let post_id = Uuid::parse_str("9c881320-2b43-4afa-b2bb-7128c8a3e985").unwrap();
         let mut comment = notification(NotificationType::Comment);
         comment.post_id = Some(post_id);
-        assert_eq!(push_url(&comment, None), format!("/posts/{post_id}"));
+        assert_eq!(
+            notification_url(&comment, "me"),
+            format!("/posts/{post_id}")
+        );
         comment.post_author_login_name = Some("author".to_string());
-        assert_eq!(push_url(&comment, None), format!("/@author/{post_id}"));
+        assert_eq!(
+            notification_url(&comment, "me"),
+            format!("/@author/{post_id}")
+        );
 
         assert_eq!(
-            push_url(&notification(NotificationType::Follow), None),
+            notification_url(&notification(NotificationType::Follow), "me"),
             "/@actor"
         );
         assert_eq!(
-            push_url(&notification(NotificationType::GuestbookEntry), Some("me")),
+            notification_url(&notification(NotificationType::GuestbookEntry), "me"),
             "/@me"
         );
         assert_eq!(
-            push_url(&notification(NotificationType::GuestbookReply), None),
+            notification_url(&notification(NotificationType::GuestbookReply), "me"),
             "/@actor"
         );
     }
 
     #[test]
-    fn a_push_with_nowhere_better_opens_the_notifications() {
+    fn a_notification_with_nowhere_better_opens_the_notifications() {
         assert_eq!(
-            push_url(&notification(NotificationType::Reaction), None),
-            "/notifications"
-        );
-        assert_eq!(
-            push_url(&notification(NotificationType::GuestbookEntry), None),
+            notification_url(&notification(NotificationType::Reaction), "me"),
             "/notifications"
         );
         let mut remote = notification(NotificationType::Follow);
         remote.actor_login_name = None;
-        assert_eq!(push_url(&remote, None), "/notifications");
+        assert_eq!(notification_url(&remote, "me"), "/notifications");
     }
 }

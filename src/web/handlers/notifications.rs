@@ -2,11 +2,12 @@ use crate::app_error::AppError;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{Html, IntoResponse, Json},
+    response::{Html, IntoResponse, Json, Redirect},
 };
 use axum_messages::Messages;
+use chrono::{DateTime, Utc};
 use minijinja::context;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
         notification::{
             delete_notification, get_badge_count, get_notification_by_id,
             list_notifications as fetch_notifications, mark_all_notifications_as_read,
-            mark_notification_as_read,
+            mark_notification_as_read, notification_url, NotificationWithActor,
         },
         user::AuthSession,
     },
@@ -49,12 +50,15 @@ pub async fn notifications_fragment(
     tx.commit().await?;
 
     let has_more = notifications.len() as i64 == NOTIFICATIONS_PER_BATCH;
+    let opened = query
+        .opened
+        .and_then(DateTime::<Utc>::from_timestamp_micros);
 
     let template = state.env.get_template("notifications_fragment.jinja")?;
     let rendered = template.render(context! {
-        notifications => notifications,
+        notifications => as_shown(notifications, opened),
         has_more => has_more,
-        next_url => notifications_fragment_url(offset + NOTIFICATIONS_PER_BATCH),
+        next_url => notifications_fragment_url(offset + NOTIFICATIONS_PER_BATCH, opened),
         ftl_lang,
     })?;
 
@@ -65,11 +69,52 @@ pub async fn notifications_fragment(
 pub struct NotificationsFragmentQuery {
     /// Row offset for the infinite-scroll sentinel. The first batch omits it.
     pub offset: Option<i64>,
+    /// When the page these rows are scrolled into was rendered, in
+    /// microseconds since the epoch. Viewing the page marks everything read
+    /// (`mark_notifications_seen`), so a row read since then was unread when
+    /// the reader arrived and is still shown as new.
+    pub opened: Option<i64>,
 }
 
 /// URL the infinite-scroll sentinel fetches next.
-fn notifications_fragment_url(next_offset: i64) -> String {
-    format!("/api/notifications/items?offset={next_offset}")
+fn notifications_fragment_url(next_offset: i64, opened: Option<DateTime<Utc>>) -> String {
+    match opened {
+        Some(opened) => format!(
+            "/api/notifications/items?offset={next_offset}&opened={}",
+            opened.timestamp_micros()
+        ),
+        None => format!("/api/notifications/items?offset={next_offset}"),
+    }
+}
+
+/// A row as the list shows it: `unread` is whether it was unread when the
+/// page was opened, which is not `read_at`, because opening the page is what
+/// reads it.
+#[derive(Serialize)]
+struct ShownNotification {
+    #[serde(flatten)]
+    notification: NotificationWithActor,
+    unread: bool,
+}
+
+fn as_shown(
+    notifications: Vec<NotificationWithActor>,
+    opened: Option<DateTime<Utc>>,
+) -> Vec<ShownNotification> {
+    notifications
+        .into_iter()
+        .map(|notification| {
+            let unread = match (notification.read_at, opened) {
+                (None, _) => true,
+                (Some(read_at), Some(opened)) => read_at >= opened,
+                (Some(_), None) => false,
+            };
+            ShownNotification {
+                notification,
+                unread,
+            }
+        })
+        .collect()
 }
 
 pub async fn list_notifications(
@@ -87,6 +132,7 @@ pub async fn list_notifications(
         .ok_or(AppError::Unauthorized)?
         .clone();
 
+    let opened = Utc::now();
     let notifications = fetch_notifications(&mut tx, user.id, NOTIFICATIONS_PER_BATCH, 0).await?;
     let has_more = notifications.len() as i64 == NOTIFICATIONS_PER_BATCH;
 
@@ -113,18 +159,23 @@ pub async fn list_notifications(
 
     tx.commit().await?;
 
+    // Unread notifications, not counting the invitations the bell adds to
+    // them: whether the page has anything for `mark_notifications_seen` to do.
+    let unseen = common_ctx.unread_notification_count > invitations_with_details.len() as i64;
+
     let template: minijinja::Template<'_, '_> = state.env.get_template("notifications.jinja")?;
     let rendered = template.render(context! {
         current_user => auth_session.user,
         messages => messages.into_iter().collect::<Vec<_>>(),
-        notifications => notifications,
+        notifications => as_shown(notifications, Some(opened)),
+        unseen => unseen,
         invitations => invitations_with_details,
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         // Same key names the fragment uses, so the first batch and every
         // scrolled batch render through one template.
         has_more => has_more,
-        next_url => notifications_fragment_url(NOTIFICATIONS_PER_BATCH),
+        next_url => notifications_fragment_url(NOTIFICATIONS_PER_BATCH, Some(opened)),
         ftl_lang
     })?;
 
@@ -158,108 +209,64 @@ pub(crate) async fn nav_notification_badge(
     ))
 }
 
-/// Mark a specific notification as read
-pub async fn mark_notification_read(
+/// GET /notifications/{id}/open — where a notification's push and toast
+/// link to: it marks the notification read, and with it the rest of its
+/// reaction group, then sends the reader on to the page it is about.
+///
+/// Opening a notification is reading it. Before this, only the notifications
+/// page's buttons marked anything read, so a push tapped and followed stayed
+/// unread and kept the apps' icons badged for something already seen.
+pub async fn open_notification(
     auth_session: AuthSession,
-    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(notification_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
+    let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
 
-    let user = auth_session
-        .user
-        .as_ref()
-        .ok_or(AppError::Unauthorized)?
-        .clone();
-
-    let success = mark_notification_as_read(&mut tx, notification_id, user.id).await?;
-
-    if !success {
+    let mut tx = state.db_pool.begin().await?;
+    let Some(notification) = get_notification_by_id(&mut tx, notification_id, user.id).await?
+    else {
+        // Deleted since, or someone else's: the list is where it would have been.
         tx.rollback().await?;
-        return Ok((StatusCode::NOT_FOUND, Html("".to_string())).into_response());
-    }
-
-    // Fetch the updated notification
-    let notification = get_notification_by_id(&mut tx, notification_id, user.id).await?;
-
+        return Ok(Redirect::to("/notifications"));
+    };
+    let marked = mark_notification_as_read(&mut tx, notification_id, user.id).await?;
     tx.commit().await?;
-    state.push_service.refresh_badge(user.id);
 
-    if let Some(notification) = notification {
-        // Render the notification using the notification_item template
-        let template = state.env.get_template("notification_item.jinja")?;
-        let rendered = template.render(context! {
-            notification,
-            ftl_lang,
-        })?;
-
-        let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
-        Ok(Html(format!("{rendered}{badge}")).into_response())
-    } else {
-        Ok((StatusCode::NOT_FOUND, Html("".to_string())).into_response())
+    if marked {
+        state.push_service.refresh_badge(user.id);
     }
+    Ok(Redirect::to(&notification_url(
+        &notification,
+        &user.login_name,
+    )))
 }
 
-/// POST /notifications/mark-all-read — the button on the notifications page.
+/// POST /notifications/seen — sent by the notifications page once it is on
+/// screen (notifications.jinja), and it marks every notification read: the
+/// list is where they are all read, so having looked at it is having read
+/// them.
 ///
-/// It answers in three pieces: the re-rendered list as the main swap, and
-/// partials for the badge in the header and for the button itself, which has
-/// to disappear now that nothing is unread. It replaces a `hx-swap="none"`
-/// that called `window.location.reload()` — a full document fetch, all its
-/// queries included, to change a number and hide a button.
-pub async fn hx_mark_all_notifications_read(
+/// From the page rather than from the handler that renders it, because htmx
+/// preloads a boosted link at the press, and a page fetched and never shown
+/// has not been seen. The rows keep their unread look for the visit
+/// (`ShownNotification`); the answer is only the bell, corrected.
+pub async fn mark_notifications_seen(
     auth_session: AuthSession,
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
 ) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
+    let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
 
-    let user = auth_session
-        .user
-        .as_ref()
-        .ok_or(AppError::Unauthorized)?
-        .clone();
-
-    mark_all_notifications_as_read(&mut tx, user.id).await?;
-
-    // Re-read the first batch inside the same work: every row's "mark read"
-    // button has to go, and the rows are what the button targets.
-    let notifications = fetch_notifications(&mut tx, user.id, NOTIFICATIONS_PER_BATCH, 0).await?;
-    let has_more = notifications.len() as i64 == NOTIFICATIONS_PER_BATCH;
-
+    let mut tx = state.db_pool.begin().await?;
+    let marked = mark_all_notifications_as_read(&mut tx, user.id).await?;
     tx.commit().await?;
-    state.push_service.refresh_badge(user.id);
 
-    let rows = state
-        .env
-        .get_template("notifications_fragment.jinja")?
-        .render(context! {
-            notifications => notifications,
-            has_more => has_more,
-            next_url => notifications_fragment_url(NOTIFICATIONS_PER_BATCH),
-            ftl_lang,
-        })?;
-
-    // Zero unread, so this renders the header without its button.
-    let header = state
-        .env
-        .get_template("notifications_header.jinja")?
-        .render(context! {
-            unread_notification_count => 0,
-            ftl_lang,
-        })?;
-
+    if marked > 0 {
+        state.push_service.refresh_badge(user.id);
+    }
     let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
-
-    Ok(Html(format!(
-        "{rows}\
-         <hx-partial hx-target=\"#notifications-header\" hx-swap=\"outerHTML\">{header}</hx-partial>\
-         {badge}"
-    ))
-    .into_response())
+    Ok(Html(badge))
 }
 
 /// The number on the bell for the current user: unread notifications and
@@ -317,7 +324,7 @@ pub async fn delete_notification_handler(
 
 #[cfg(test)]
 mod tests {
-    use super::notifications_fragment_url;
+    use super::{as_shown, notifications_fragment_url};
     use crate::web::handlers::test_support;
     use minijinja::context;
     use serde_json::json;
@@ -327,6 +334,7 @@ mod tests {
             "id": "00000000-0000-0000-0000-000000000001",
             "notification_type": "Follow",
             "read_at": null,
+            "unread": true,
             "created_at": "2026-01-02T03:04:05Z",
             "actor_login_name": "someone",
             "actor_name": "Someone",
@@ -341,6 +349,7 @@ mod tests {
             "id": "00000000-0000-0000-0000-000000000003",
             "notification_type": "Reaction",
             "read_at": "2026-01-02T04:00:00Z",
+            "unread": false,
             "created_at": "2026-01-02T03:04:05Z",
             "actor_login_name": "someone",
             "actor_name": "Someone",
@@ -361,6 +370,7 @@ mod tests {
         let mut n = sample_reaction();
         n["actor_count"] = json!(16);
         n["read_at"] = json!(null);
+        n["unread"] = json!(true);
         n
     }
 
@@ -379,6 +389,14 @@ mod tests {
         notifications: Vec<serde_json::Value>,
         invitations: Vec<serde_json::Value>,
     ) -> String {
+        render_seen(notifications, invitations, false)
+    }
+
+    fn render_seen(
+        notifications: Vec<serde_json::Value>,
+        invitations: Vec<serde_json::Value>,
+        unseen: bool,
+    ) -> String {
         let env = test_support::env();
         let template = env
             .get_template("notifications.jinja")
@@ -391,6 +409,7 @@ mod tests {
                 invitations => invitations,
                 draft_post_count => 0,
                 unread_notification_count => 1,
+                unseen => unseen,
                 has_more => false,
                 next_url => "/api/notifications/items?offset=30",
                 ftl_lang => "en",
@@ -477,18 +496,77 @@ mod tests {
         assert!(!follow.contains("notification-post-image"));
     }
 
-    /// The mark-read button is the control that disappears once used; delete
-    /// is always there. Both live in the row rather than on one of their own.
+    /// Opening the page reads every row on it, so a row has no "mark read",
+    /// and none of it is left for a "mark all read" either. What was unread
+    /// when the page opened still looks it, for the visit.
     #[test]
-    fn read_rows_drop_the_mark_read_button() {
-        let unread = render(vec![sample_notification()], Vec::new());
-        assert!(unread.contains("notification-mark-read"));
-        assert!(unread.contains("class=\"notification unread\""));
+    fn rows_show_what_was_unread_and_offer_only_delete() {
+        let rendered = render(vec![sample_notification(), sample_reaction()], Vec::new());
+        assert_eq!(rendered.matches("class=\"notification unread\"").count(), 1);
+        assert!(!rendered.contains("mark-read"));
+        assert!(!rendered.contains("mark-all-read"));
+        assert!(rendered.contains("notification-delete"));
+    }
 
-        let read = render(vec![sample_reaction()], Vec::new());
-        assert!(!read.contains("notification-mark-read"));
-        assert!(read.contains("notification-delete"));
-        assert!(!read.contains("notification unread"));
+    /// The page marks everything read once it is on screen, and only when
+    /// there is something to mark.
+    #[test]
+    fn the_page_reports_itself_seen_only_with_something_unread() {
+        let unseen = render_seen(vec![sample_notification()], Vec::new(), true);
+        assert!(unseen.contains("hx-post=\"/notifications/seen\""));
+        assert!(unseen.contains("hx-trigger=\"load\""));
+
+        let seen = render_seen(vec![sample_reaction()], Vec::new(), false);
+        assert!(!seen.contains("/notifications/seen"));
+    }
+
+    /// A row read after the page opened was read by opening it: it was new to
+    /// the reader and is shown so, in the first batch and in every one
+    /// scrolled in after it.
+    #[test]
+    fn a_row_read_by_opening_the_page_is_still_shown_as_new() {
+        use chrono::{Duration, Utc};
+        let opened = Utc::now();
+        let row = |read_at| crate::models::notification::NotificationWithActor {
+            id: uuid::Uuid::nil(),
+            recipient_id: uuid::Uuid::nil(),
+            actor_id: uuid::Uuid::nil(),
+            actor_name: "Someone".to_string(),
+            actor_handle: "@someone".to_string(),
+            actor_login_name: Some("someone".to_string()),
+            notification_type: crate::models::notification::NotificationType::Follow,
+            post_id: None,
+            comment_id: None,
+            reaction_iri: None,
+            reaction_emoji: None,
+            guestbook_entry_id: None,
+            read_at,
+            created_at: opened - Duration::days(2),
+            post_title: None,
+            post_author_login_name: None,
+            post_image_filename: None,
+            post_image_width: None,
+            post_image_height: None,
+            comment_content: None,
+            comment_content_html: None,
+            guestbook_content: None,
+            actor_count: 1,
+        };
+        let shown = as_shown(
+            vec![
+                row(None),
+                row(Some(opened + Duration::seconds(1))),
+                row(Some(opened - Duration::days(1))),
+            ],
+            Some(opened),
+        );
+        let unread: Vec<bool> = shown.iter().map(|s| s.unread).collect();
+        assert_eq!(unread, vec![true, true, false]);
+
+        // Without an opening time, only what is unread now is.
+        let shown = as_shown(vec![row(None), row(Some(opened))], None);
+        let unread: Vec<bool> = shown.iter().map(|s| s.unread).collect();
+        assert_eq!(unread, vec![true, false]);
     }
 
     /// The invitation row is built from the same pieces as a notification row,
@@ -580,8 +658,13 @@ mod tests {
     #[test]
     fn the_first_sentinel_starts_where_the_page_stopped() {
         assert_eq!(
-            notifications_fragment_url(super::NOTIFICATIONS_PER_BATCH),
+            notifications_fragment_url(super::NOTIFICATIONS_PER_BATCH, None),
             "/api/notifications/items?offset=30"
+        );
+        let opened = chrono::DateTime::from_timestamp_micros(1_790_000_000_123_456);
+        assert_eq!(
+            notifications_fragment_url(super::NOTIFICATIONS_PER_BATCH, opened),
+            "/api/notifications/items?offset=30&opened=1790000000123456"
         );
     }
 

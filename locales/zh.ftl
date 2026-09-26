@@ -70,8 +70,6 @@ notification-action-replied-to-comment = 回复了{ $postTitle }的评论
 notification-action-posted-in-community = 在您的社区发布了作品
 notification-action-posted-in-community-with-title = 在您的社区发布了作品：{ $postTitle }
 
-notification-mark-all-read = 全部标记为已读
-notification-mark-read = 标记为已读
 notification-delete = 删除
 notification-delete-confirm = 确定要删除此通知吗？
 
