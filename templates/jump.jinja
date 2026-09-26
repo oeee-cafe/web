@@ -9,9 +9,14 @@
    Fetched with fetch() rather than htmx, so it works where htmx does not
    run (Firefox 56); a newer answer always wins over an older one that
    arrives after it. Going to a row is the toolbar's own `go`, with its
-   loading bar and its skeleton. #}
+   loading bar and its skeleton.
+
+   The key that opens it sits at the field's end, so that someone who came
+   by the toolbar's search button learns the way that skips it: Ctrl K, or
+   ⌘ K where the platform says it is a Mac or an iPad. #}
 <div class="jump" id="jump" hidden>
   <div class="jump-panel" role="dialog" aria-modal="true" aria-label="{{ ftl_get_message('jump-title') }}">
+    <div class="jump-top">
     <input id="jump-field"
            class="jump-field"
            type="text"
@@ -23,6 +28,8 @@
            autocapitalize="off"
            spellcheck="false"
            placeholder="{{ ftl_get_message('jump-placeholder') }}" />
+    <span class="jump-key" aria-hidden="true"><kbd id="jump-key-mod">Ctrl</kbd> <kbd>K</kbd></span>
+    </div>
     <ul id="jump-list" class="jump-list" role="listbox" aria-label="{{ ftl_get_message('jump-title') }}"></ul>
     <p class="jump-hint">{{ ftl_get_message("jump-hint") }}</p>
   </div>
@@ -117,6 +124,14 @@
       else location.href = href;
     }
     window.oeeeJump = { open: open, close: close };
+
+    function markKey() {
+      var mod = el("jump-key-mod");
+      if (mod && /Mac|iPhone|iPad|iPod/.test(navigator.platform || "")) mod.textContent = "\u2318";
+    }
+    markKey();
+    // A boosted swap brings the markup back as the server wrote it.
+    document.addEventListener("htmx:after:swap", markKey);
 
     document.addEventListener("keydown", function (event) {
       var key = event.key && event.key.toLowerCase();

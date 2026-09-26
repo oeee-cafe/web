@@ -112,45 +112,19 @@
       <a class="toolbar-live" href="/collaborate"><span class="toolbar-live-dot" aria-hidden="true"></span>{{ ftl_get_message("collaborate") }}</a>
     </div>
     <div class="toolbar-end">
-      {# Search, signed in or out, and first: the glass's own square button at rest,
-         which widens leftward into a field when anything gives the field
-         focus -- a press on the glass, a Tab into it, or `/` -- and closes
-         again when it loses it. The glass stays at its left as it goes,
-         and the corners stay the 6px every other control in the bar has:
-         the width is the only thing that changes. A word here is the width that pushes a phone's first row
-         into its compact steps; the pill takes none of the bar's, since it
-         opens over the bar rather than in it (ds.css).
-
-         Enter goes to /search, which is still where results are read and
-         where the apps' own search fields land: this is a faster way to a
-         field than going there to find one, not a second search.
-
-         No script holds any of it up. The glass is the field's <label>, so
-         pressing it focuses the field; the pill opens on :focus-within;
-         and a form with a single field submits on Enter by itself. #}
-      {# Unboosted, like the two forms below and for a plainer reason than
-         theirs: htmx 4 takes a boosted form's submit, sends the request --
-         GET /search?q=… , 200, the right page -- and swaps nothing in. The
-         bar stays where it was and the search appears to do nothing. So
-         this goes the way a form went before htmx existed, which is also
-         the way it goes with no script at all; the skeleton is laid by
-         hand below, where a boosted link would have had one for free. #}
-      <form class="toolbar-search" method="get" action="/search" role="search" hx-boost="false">
-        <span class="toolbar-search-pill">
-          <label class="toolbar-search-glass" for="toolbar-search-field" title="{{ ftl_get_message("search") }} (/)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
-          </label>
-          <input class="toolbar-search-field"
-                 id="toolbar-search-field"
-                 type="search"
-                 name="q"
-                 placeholder="{{ ftl_get_message("search-placeholder") }}"
-                 aria-label="{{ ftl_get_message("search-placeholder") }}"
-                 autocomplete="off"
-                 autocapitalize="none"
-                 spellcheck="false" />
-        </span>
-      </form>
+      {# Search, signed in or out, and first: a square like the others, which
+         opens the quick switcher (jump.jinja) -- the same one Ctrl+K and ⌘K
+         open -- where a community, a person or a tag is one row away and
+         the last row searches drawings on /search. It is a link to /search
+         so that it still goes somewhere with no script, and on a page the
+         switcher is not on; the script below takes the click otherwise. #}
+      <a class="toolbar-square toolbar-button toolbar-search"
+         href="/search"
+         title="{{ ftl_get_message("search") }} (Ctrl+K)"
+         aria-label="{{ ftl_get_message("search") }}"
+         aria-haspopup="dialog">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+      </a>
       {# The Supporter Pack: a heart, after search, leading to /supporter.
          For someone signed in only: the pack is bought against an account,
          and the bar signed out is already asking for something else.
@@ -489,20 +463,17 @@
         "communities": function () { go("/communities"); },
         "together": function () { go("/collaborate"); },
         "tags": function () { go("/tags"); },
-        // A field is what was wanted, not a reload. The bar's own opens
-        // wherever you are -- unless it is not shown at all, and then /search
-        // is the one to go to. `offsetParent` is null for a control
-        // `display: none` hides and not for the closed field, which is
-        // merely 0 wide.
+        // The quick switcher, whose last row searches drawings -- except on
+        // /search itself, where the page's own field is the one wanted. With
+        // neither, /search is the one to go to.
         "search": function () {
-          var field = document.getElementById("toolbar-search-field");
-          if (!field || field.offsetParent === null) {
-            field = location.pathname === "/search" &&
-              document.querySelector('.search-page input[name="q"]');
-          }
+          var field = location.pathname === "/search" &&
+            document.querySelector('.search-page input[name="q"]');
           if (field) {
             field.focus();
             field.select();
+          } else if (window.oeeeJump) {
+            window.oeeeJump.open();
           } else {
             go("/search");
           }
@@ -610,18 +581,18 @@
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") closeMenus(null);
       });
-      // Escape gives up on a search: the field empties and lets go, and
-      // letting go is what closes it (ds.css). The keys above leave a field
-      // being typed in alone, so this is its own listener rather than a
-      // case there. Delegated from the document, since a boosted swap
-      // replaces the bar and this script does not run again.
-      document.addEventListener("keydown", function (event) {
-        if (event.key !== "Escape") return;
-        var field = event.target;
-        if (!field || field.id !== "toolbar-search-field") return;
-        field.value = "";
-        field.blur();
-      });
+      // The bar's search button opens the quick switcher in place of going
+      // to /search, which it links to for want of a script. Taken in the
+      // capture phase, ahead of htmx's boost and the skeleton below, both of
+      // which would otherwise treat it as the trip its href describes.
+      document.addEventListener("click", function (event) {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        var button = event.target && event.target.closest ? event.target.closest(".toolbar-search") : null;
+        if (!button || !window.oeeeJump) return;
+        event.preventDefault();
+        event.stopPropagation();
+        window.oeeeJump.open();
+      }, true);
 
       // The page that was asked for is drawn at once, before it arrives: the
       // content area swaps to a skeleton of it -- a grid of empty squares
@@ -878,15 +849,6 @@
         // place.
         if (!link.closest(".nav-bar") && !(FROM_ANYWHERE.test(link.pathname) && !link.closest(".ds-segmented"))) return;
         loading(link.pathname);
-      });
-      // A search is a trip to /search, and the bar's links to it lay a
-      // skeleton down while they go; submitting the field is the same trip
-      // and gets the same one. The form is unboosted, so this is a page
-      // load, and the page that arrives replaces the skeleton with itself.
-      document.addEventListener("submit", function (event) {
-        var form = event.target;
-        if (!form || !form.classList || !form.classList.contains("toolbar-search")) return;
-        loading("/search");
       });
       document.addEventListener("submit", function (event) {
         var form = event.target;
