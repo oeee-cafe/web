@@ -1867,12 +1867,11 @@ mod template_tests {
         assert!(!render(json!(true), json!(null)).contains("toolbar-supporter"));
     }
 
-    /// Search in the bar is a form now, not a link to the page that holds
-    /// one: a field the glass opens, because the glass is its label. One
-    /// field and no button, which is what lets Enter submit it, and no
-    /// link to /search left in the bar to go there instead.
+    /// Search in the bar is a button for the quick switcher (jump.jinja),
+    /// the one Ctrl+K opens, and no longer a field of its own. It is a link
+    /// to /search underneath, which is where it goes with no script.
     #[test]
-    fn the_bar_holds_the_search_field_rather_than_a_way_to_one() {
+    fn the_bars_search_button_opens_the_quick_switcher() {
         let env = test_support::env();
         let bar = env
             .get_template("toolbar.jinja")
@@ -1880,24 +1879,12 @@ mod template_tests {
             .render(chrome())
             .expect("toolbar renders");
 
-        assert!(bar.contains(r#"class="toolbar-search" method="get" action="/search""#));
-        // htmx 4 answers a boosted form's submit by fetching the page and
-        // swapping nothing in, so this one is not boosted -- the bar would
-        // sit there looking as though the search had not been pressed.
-        assert!(bar.contains(r#"role="search" hx-boost="false""#));
+        assert!(bar.contains(r#"class="toolbar-square toolbar-button toolbar-search""#));
+        assert!(bar.contains(r#"href="/search""#), "somewhere to go with no script");
+        assert!(bar.contains("window.oeeeJump.open()"));
         assert!(
-            bar.contains(r#"for="toolbar-search-field""#),
-            "the glass labels it"
-        );
-        assert!(
-            bar.contains(r#"<span class="toolbar-search-pill">"#),
-            "the glass and the field share the pill that opens"
-        );
-        assert!(bar.contains(r#"id="toolbar-search-field""#));
-        assert!(bar.contains(r#"type="search""#) && bar.contains(r#"name="q""#));
-        assert!(
-            !bar.contains(r#"href="/search""#),
-            "going to /search for a field is the thing this replaces"
+            !bar.contains("toolbar-search-field") && !bar.contains(r#"type="search""#),
+            "the bar holds no search field of its own"
         );
     }
 
