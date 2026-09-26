@@ -1,5 +1,33 @@
 import { useEffect, useRef } from "react";
 import { PinchGesture } from "../neo/pinchGesture";
+import { reportFromPainter } from "../painterReport";
+
+/** How many of the latest touches a report carries. */
+const TRAIL_LENGTH = 24;
+
+/** One touch press or release, or the page being hidden or shown. */
+interface TrailEntry {
+  /** Milliseconds since the page loaded. */
+  t: number;
+  type: string;
+  pointerId?: number;
+  isPrimary?: boolean;
+  /** The element the event was aimed at, as `tag#id.class`. */
+  target?: string;
+  /** Whether that element was still in the page when it was heard. */
+  connected?: boolean;
+  visibility: DocumentVisibilityState;
+}
+
+const describeTarget = (target: EventTarget | null) => {
+  if (!(target instanceof Element)) return String(target);
+  const id = target.id ? `#${target.id}` : "";
+  const className =
+    typeof target.className === "string" && target.className
+      ? `.${target.className.trim().split(/\s+/)[0]}`
+      : "";
+  return `${target.tagName.toLowerCase()}${id}${className}`;
+};
 
 interface UsePinchZoomOptions {
   /** The painter ground, which is where touches are listened for. */
@@ -93,8 +121,32 @@ export function usePinchZoom({
       return target === app || target.closest(".canvas-container") !== null;
     };
 
+    /**
+     * The latest touches, for the report below: a missing release is known
+     * only by its absence, so what went before it is all there is to go on.
+     */
+    const trail: TrailEntry[] = [];
+    const remember = (entry: Omit<TrailEntry, "t" | "visibility">) => {
+      trail.push({
+        t: Math.round(performance.now()),
+        visibility: document.visibilityState,
+        ...entry,
+      });
+      if (trail.length > TRAIL_LENGTH) trail.shift();
+    };
+    const rememberPointer = (e: PointerEvent) =>
+      remember({
+        type: e.type,
+        pointerId: e.pointerId,
+        isPrimary: e.isPrimary,
+        target: describeTarget(e.target),
+        connected: e.target instanceof Node ? e.target.isConnected : undefined,
+      });
+    const rememberVisibility = () => remember({ type: "visibilitychange" });
+
     const handlePointerDown = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
+      rememberPointer(e);
       if (!overTheCanvas(e.target)) return;
 
       // The primary touch is the first finger of a hand that was off the
@@ -103,6 +155,15 @@ export function usePinchZoom({
       // it pairs with every new finger: one finger then pinches, and the
       // painter stays suspended for the pen as well, until a reload.
       if (e.isPrimary && gesture.pointerCount > 0) {
+        // Said, because recovering hides it: nothing here knows why the
+        // release went missing, and the trail is how to find out.
+        reportFromPainter({
+          message: "Pinch forgot a touch whose release never arrived",
+          details: {
+            forgotten: gesture.pointerIds.filter((id) => id !== e.pointerId),
+            trail: [...trail],
+          },
+        });
         gesture.clear();
         suspendRef.current(false);
       }
@@ -146,6 +207,7 @@ export function usePinchZoom({
 
     const handlePointerUp = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
+      rememberPointer(e);
       const change = gesture.up(e.pointerId);
       if (change === "seeded") baseZoomRef.current = zoomNow();
       // Not when the pinch ends but when the hand leaves: a finger still down
@@ -173,6 +235,7 @@ export function usePinchZoom({
     app.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp, true);
     window.addEventListener("pointercancel", handlePointerUp, true);
+    document.addEventListener("visibilitychange", rememberVisibility);
     app.addEventListener("touchstart", preventBrowserPinch, { passive: false });
     app.addEventListener("touchmove", preventBrowserPinch, { passive: false });
 
@@ -181,6 +244,7 @@ export function usePinchZoom({
       app.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp, true);
       window.removeEventListener("pointercancel", handlePointerUp, true);
+      document.removeEventListener("visibilitychange", rememberVisibility);
       app.removeEventListener("touchstart", preventBrowserPinch);
       app.removeEventListener("touchmove", preventBrowserPinch);
       // A gesture that outlived its listeners would hold the painter

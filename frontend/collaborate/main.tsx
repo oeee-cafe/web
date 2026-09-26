@@ -7,9 +7,10 @@ import * as Sentry from "@sentry/react";
 import { setupI18n, fetchPreferredLocale } from "./i18n";
 import { DefaultI18n } from "neo-cucumber";
 import { refuseSelection } from "../shared/selection";
-import { SENTRY_OPTIONS } from "../shared/sentry";
+import { forwardPainterReports, SENTRY_OPTIONS } from "../shared/sentry";
 
 Sentry.init(SENTRY_OPTIONS);
+forwardPainterReports(Sentry.captureMessage);
 
 // Beside app.css, which refuses selection for the page: see selection.ts.
 refuseSelection();

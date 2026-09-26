@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { act, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { usePinchZoom } from "./usePinchZoom";
+import { PAINTER_REPORT_EVENT, type PainterReport } from "../painterReport";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -19,6 +20,9 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 async function mountPinch() {
   const zooms: number[] = [];
   const suspended = { now: false };
+  const reports: PainterReport[] = [];
+  const onReport = (e: Event) => reports.push((e as CustomEvent<PainterReport>).detail);
+  window.addEventListener(PAINTER_REPORT_EVENT, onReport);
 
   function Harness() {
     const appRef = useRef<HTMLDivElement>(null);
@@ -63,8 +67,13 @@ async function mountPinch() {
     canvas,
     zooms,
     suspended,
+    reports,
     touch,
-    unmount: () => act(() => { root.unmount(); container.remove(); }),
+    unmount: () => act(() => {
+      window.removeEventListener(PAINTER_REPORT_EVENT, onReport);
+      root.unmount();
+      container.remove();
+    }),
   };
 }
 
@@ -86,6 +95,13 @@ describe("a touch whose release went missing", () => {
     expect(pinch.zooms).toEqual([]);
     await pinch.touch(pinch.canvas, "pointerup", 2, 150, 150, true);
     expect(pinch.suspended.now).toBe(false);
+
+    // And it says so, with the press that never came back in the trail.
+    expect(pinch.reports).toHaveLength(1);
+    expect(pinch.reports[0].details.forgotten).toEqual([1]);
+    expect(pinch.reports[0].details.trail).toContainEqual(
+      expect.objectContaining({ type: "pointerdown", pointerId: 1, connected: true })
+    );
   });
 
   it("is heard when the finger lifts outside the painter", async () => {
@@ -111,5 +127,6 @@ describe("a touch whose release went missing", () => {
     expect(pinch.suspended.now).toBe(true);
     await pinch.touch(pinch.canvas, "pointermove", 2, 220, 20, false);
     expect(pinch.zooms.at(-1)).toBeCloseTo(2);
+    expect(pinch.reports).toEqual([]);
   });
 });

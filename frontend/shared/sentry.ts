@@ -1,3 +1,8 @@
+import {
+  PAINTER_REPORT_EVENT,
+  type PainterReport,
+} from "../../neo-cucumber/src/painterReport";
+
 /**
  * Where the drawing pages report the errors they cannot handle.
  *
@@ -13,3 +18,23 @@ export const SENTRY_OPTIONS = {
   // painter has no account of its own to name one by.
   sendDefaultPii: true,
 };
+
+/**
+ * Passes on what the painter reports about failures it recovered from
+ * (neo-cucumber/src/painterReport.ts), as warnings rather than errors: the
+ * painter went on working, and the report is how the cause gets found.
+ *
+ * The file is taken by path rather than through "neo-cucumber", which would
+ * drag the whole painter into the /draw reporter's bundle.
+ */
+export function forwardPainterReports(
+  captureMessage: (
+    message: string,
+    context: { level: "warning"; extra: Record<string, unknown> }
+  ) => unknown
+): void {
+  window.addEventListener(PAINTER_REPORT_EVENT, (event) => {
+    const { message, details } = (event as CustomEvent<PainterReport>).detail;
+    captureMessage(message, { level: "warning", extra: details });
+  });
+}

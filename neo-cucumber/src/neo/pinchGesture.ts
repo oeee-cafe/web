@@ -56,6 +56,11 @@ export class PinchGesture {
     return this.points.size;
   }
 
+  /** The fingers down, in the order they arrived. */
+  get pointerIds(): number[] {
+    return [...this.points.keys()];
+  }
+
   /** Whether two fingers are driving the view right now. */
   get active(): boolean {
     return this.pair !== null;

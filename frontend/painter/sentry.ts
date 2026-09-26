@@ -17,6 +17,7 @@
  * what offline.js throws: the two share nothing but the page.
  */
 import * as Sentry from "@sentry/browser";
-import { SENTRY_OPTIONS } from "../shared/sentry";
+import { forwardPainterReports, SENTRY_OPTIONS } from "../shared/sentry";
 
 Sentry.init(SENTRY_OPTIONS);
+forwardPainterReports(Sentry.captureMessage);
