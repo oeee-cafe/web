@@ -64,8 +64,18 @@ impl FcmClient {
         // notification's: given the unread total, three on show read 1, 2
         // and 3, and the icon said 6. Left unset, each counts as one, which
         // is what the badge is on Android -- the notifications on show.
+        //
+        // Tagged with the notification's id, which is how the app finds it
+        // again to take it down once it is read or withdrawn (send_badge).
+        // The system posts it under this tag when it shows it itself, and
+        // the app does the same when it is in front.
         let android_notification = AndroidNotification {
             sound: Some("default".to_string()),
+            tag: data
+                .as_ref()
+                .and_then(|data| data.get("notification_id"))
+                .and_then(|id| id.as_str())
+                .map(str::to_string),
             ..Default::default()
         };
 
@@ -120,22 +130,29 @@ impl FcmClient {
         self.send(req, &parent).await
     }
 
-    /// Only the number on the bell, as data and nothing to show: the app
-    /// takes its notifications down when it falls to nothing, since the
-    /// launcher's badge is theirs (OeeeCafeMessagingService in
+    /// Only the number on the bell, as data and nothing to show, with the
+    /// notifications that stopped counting: the launcher's badge is the
+    /// notifications on show, so the app takes those down by their tag, and
+    /// all of them when the number is nothing (OeeeCafeMessagingService in
     /// oeee-cafe/android). Normal priority, since nothing is shown: FCM holds
     /// a high-priority message that shows nothing against the app.
-    pub async fn send_badge(&self, device_token: &str, badge: u32) -> Result<(), PushError> {
+    pub async fn send_badge(
+        &self,
+        device_token: &str,
+        badge: u32,
+        withdrawn: &[uuid::Uuid],
+    ) -> Result<(), PushError> {
+        let mut data = std::collections::HashMap::from([("badge".to_string(), badge.to_string())]);
+        if !withdrawn.is_empty() {
+            data.insert("withdrawn".to_string(), withdrawn_ids(withdrawn));
+        }
         let message = Message {
             token: Some(device_token.to_string()),
             android: Some(AndroidConfig {
                 priority: Some("normal".to_string()),
                 ..Default::default()
             }),
-            data: Some(std::collections::HashMap::from([(
-                "badge".to_string(),
-                badge.to_string(),
-            )])),
+            data: Some(data),
             ..Default::default()
         };
         let parent = format!("projects/{}", self.project_id);
@@ -161,6 +178,22 @@ impl FcmClient {
             Err(e) => Err(PushError::Other(anyhow::anyhow!("FCM error: {:?}", e))),
         }
     }
+}
+
+/// The most withdrawn ids one message names. FCM refuses a data payload over
+/// 4096 bytes, and each id is 37 with its comma; the rest stay on show until
+/// they are read or the badge reaches nothing, which takes them all down.
+/// Past this many it is nearly always everything read at once, which is that.
+const MAX_WITHDRAWN: usize = 64;
+
+/// The ids, comma separated, as many as fit.
+fn withdrawn_ids(withdrawn: &[uuid::Uuid]) -> String {
+    withdrawn
+        .iter()
+        .take(MAX_WITHDRAWN)
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Whether FCM refused the send because of the token, and so the device can be
@@ -189,8 +222,19 @@ fn token_is_dead(body: &serde_json::Value) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::token_is_dead;
+    use super::{token_is_dead, withdrawn_ids, MAX_WITHDRAWN};
     use serde_json::json;
+
+    #[test]
+    fn withdrawn_ids_fit_in_a_message() {
+        let one = uuid::Uuid::new_v4();
+        assert_eq!(withdrawn_ids(&[one]), one.to_string());
+        let many: Vec<_> = (0..500).map(|_| uuid::Uuid::new_v4()).collect();
+        let ids = withdrawn_ids(&many);
+        assert_eq!(ids.split(',').count(), MAX_WITHDRAWN);
+        // With the badge beside them, well inside FCM's 4096 bytes.
+        assert!(ids.len() + 64 < 4096, "{}", ids.len());
+    }
 
     #[test]
     fn an_unregistered_token_is_dead() {

@@ -275,7 +275,7 @@ pub async fn delete_reaction_by_iri(
         r#"
         DELETE FROM notifications
         WHERE reaction_iri = $1
-        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        RETURNING id, recipient_id, read_at IS NULL AS "unread!"
         "#,
         iri
     )
@@ -298,7 +298,8 @@ pub async fn delete_reaction_by_iri(
     Ok(Some(
         retracted
             .into_iter()
-            .filter_map(|row| row.unread.then_some(row.recipient_id))
+            .filter(|row| row.unread)
+            .map(|row| BadgeFalls::withdrawn(row.recipient_id, row.id))
             .collect(),
     ))
 }

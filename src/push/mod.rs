@@ -252,15 +252,20 @@ impl PushService {
         }
         let this = Arc::clone(self);
         tokio::spawn(async move {
-            for user_id in falls.into_readers() {
-                if let Err(e) = this.send_badge_to_user(user_id, devices).await {
+            for (user_id, withdrawn) in falls.into_readers() {
+                if let Err(e) = this.send_badge_to_user(user_id, &withdrawn, devices).await {
                     tracing::warn!("Failed to refresh the badge for user {}: {:?}", user_id, e);
                 }
             }
         });
     }
 
-    async fn send_badge_to_user(&self, user_id: uuid::Uuid, devices: bool) -> Result<()> {
+    async fn send_badge_to_user(
+        &self,
+        user_id: uuid::Uuid,
+        withdrawn: &[uuid::Uuid],
+        devices: bool,
+    ) -> Result<()> {
         let mut tx = self.db_pool.begin().await?;
         let count = get_badge_count(&mut tx, user_id).await?;
         if let Some(live) = &self.live {
@@ -283,7 +288,7 @@ impl PushService {
             for token in devices {
                 let sent = match platform {
                     PlatformType::Android => match &self.fcm_client {
-                        Some(fcm) => fcm.send_badge(&token.device_token, badge).await,
+                        Some(fcm) => fcm.send_badge(&token.device_token, badge, withdrawn).await,
                         None => Ok(()),
                     },
                     PlatformType::Ios | PlatformType::Macos => match &self.apns_client {

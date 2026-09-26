@@ -1191,7 +1191,7 @@ pub async fn accept_invitation(
     .fetch_optional(&mut **tx)
     .await?;
 
-    Ok(invitee.into_iter().collect())
+    Ok(invitee.into_iter().map(BadgeFalls::reader).collect())
 }
 
 /// Reject an invitation
@@ -1211,7 +1211,7 @@ pub async fn reject_invitation(
     .fetch_optional(&mut **tx)
     .await?;
 
-    Ok(invitee.into_iter().collect())
+    Ok(invitee.into_iter().map(BadgeFalls::reader).collect())
 }
 
 /// Withdraw an invitation still waiting for an answer.
@@ -1232,7 +1232,7 @@ pub async fn withdraw_invitation(
     .fetch_optional(&mut **tx)
     .await?;
 
-    Ok(invitee.into_iter().collect())
+    Ok(invitee.into_iter().map(BadgeFalls::reader).collect())
 }
 
 /// Soft delete a community and all its posts, and withdraw its pending
@@ -1293,7 +1293,7 @@ pub async fn soft_delete_community(
 
     // Soft delete all posts in the community with cascade reason
     let mut falls = crate::models::post::soft_delete_community_posts(tx, community.id).await?;
-    falls.add(withdrawn.into_iter().collect());
+    falls.add(withdrawn.into_iter().map(BadgeFalls::reader).collect());
     Ok(falls)
 }
 

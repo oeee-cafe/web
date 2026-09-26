@@ -804,7 +804,7 @@ pub async fn delete_comment(
         r#"
         DELETE FROM notifications
         WHERE comment_id = $1
-        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        RETURNING id, recipient_id, read_at IS NULL AS "unread!"
         "#,
         id
     )
@@ -813,6 +813,7 @@ pub async fn delete_comment(
 
     Ok(retracted
         .into_iter()
-        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .filter(|row| row.unread)
+        .map(|row| BadgeFalls::withdrawn(row.recipient_id, row.id))
         .collect())
 }
