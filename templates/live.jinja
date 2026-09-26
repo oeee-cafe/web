@@ -25,12 +25,16 @@
    toasts, which are plain DOM. #}
 <script>
   (function () {
-    if (window.oeeeLive || !window.EventSource) return;
+    if (window.oeeeLiveStarted || !window.EventSource) return;
+    window.oeeeLiveStarted = true;
     var CLOSE = {{ ftl_get_message("close")|tojson }};
     var NEW_DRAWINGS = {{ ftl_get_message("feed-new-drawings")|tojson }};
     var root = document.documentElement;
-    var source = new EventSource("/events");
-    window.oeeeLive = source;
+    // What each event does, by name; attached to every stream opened below.
+    var heard = {};
+    function on(name, listener) {
+      heard[name] = listener;
+    }
 
     function me() {
       var bar = document.querySelector(".nav-bar[data-user-id]");
@@ -44,7 +48,7 @@
       }
     }
 
-    source.addEventListener("unread", function (event) {
+    on("unread", function (event) {
       var data = read(event);
       var bell = document.getElementById("nav-notifications");
       if (!data || !bell) return;
@@ -57,7 +61,7 @@
       document.dispatchEvent(new CustomEvent("oeee:bell"));
     });
 
-    source.addEventListener("notification", function (event) {
+    on("notification", function (event) {
       var app = root.getAttribute("data-app");
       if (app && app !== "windows") return;
       var data = read(event);
@@ -92,7 +96,7 @@
       if (window.oeeeToasts) window.oeeeToasts.look();
     });
 
-    source.addEventListener("comments", function (event) {
+    on("comments", function (event) {
       var data = read(event);
       if (!data || !window.htmx) return;
       var list = document.querySelector('#comments[data-live-post="' + data.post_id + '"]');
@@ -104,7 +108,7 @@
       }).catch(function () {});
     });
 
-    source.addEventListener("post", function (event) {
+    on("post", function (event) {
       var data = read(event);
       if (!data || !window.htmx || (data.by && data.by === me())) return;
       var feeds = document.querySelectorAll("[data-live-posts]");
@@ -162,5 +166,39 @@
       pill.setAttribute("data-count", String(count));
       pill.textContent = NEW_DRAWINGS + " \u00b7 " + count;
     }
+
+    // The stream. A network that drops is reconnected by the browser; an
+    // answer that is not 200 -- a 502 or 530 while the tunnel or a deploy
+    // blinks -- closes it for good, and the page went on deaf until it was
+    // loaded again. So a closed stream is opened again here: soon, then
+    // less often, and at once when the page is looked at again or the
+    // network comes back.
+    var source = null;
+    var wait = 2000;
+    var retry = null;
+    function open() {
+      clearTimeout(retry);
+      retry = null;
+      if (source && source.readyState !== 2) return;
+      source = new EventSource("/events");
+      window.oeeeLive = source;
+      for (var name in heard) source.addEventListener(name, heard[name]);
+      source.addEventListener("open", function () {
+        wait = 2000;
+      });
+      source.addEventListener("error", function () {
+        if (source.readyState !== 2 || retry) return;
+        retry = setTimeout(open, wait);
+        wait = Math.min(wait * 2, 60000);
+      });
+    }
+    function openIfClosed() {
+      if (!source || source.readyState === 2) open();
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) openIfClosed();
+    });
+    window.addEventListener("online", openIfClosed);
+    open();
   })();
 </script>
