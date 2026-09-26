@@ -812,9 +812,14 @@ nav a:visited,
   }
 }
 
-/* Unread: a dot in the margin, and the row a shade toward the accent. */
+/* Unread: a dot in the margin, and the row a shade darker. The shade is
+   --ds-hover, which is a wash to be laid over something: given as the
+   background colour it replaced the row's surface, and the page's ground
+   and its grid showed through every unread row. Laid over the surface as
+   an image, the row stays a card; hovering changes the colour beneath and
+   keeps the shade. */
 .notification.unread {
-  background-color: var(--ds-hover);
+  background-image: linear-gradient(var(--ds-hover), var(--ds-hover));
 }
 
 .notification.unread::before {
