@@ -1,4 +1,6 @@
-{# Controls that show their answer at the press, before the server's.
+{# Controls that show their answer at the press, before the server's: a
+   reaction chip, and follow and unfollow (follow_macro.jinja), whose button
+   takes the other one's words and fill.
 
    A reaction chip (post_reactions.jinja) fills or empties and moves its
    number, and the post's total with it, the moment it is pressed, the way a
@@ -24,31 +26,52 @@
       if (!isNaN(n)) span.textContent = String(Math.max(0, n + by));
       return { span: span, was: was };
     }
+    // Follow and unfollow (follow_macro.jinja): the button takes the other
+    // one's words and fill.
+    function toggle(ctx, form) {
+      var button = form.querySelector("button[data-pressed-label]");
+      if (!button) return;
+      var was = { text: button.textContent, className: button.className };
+      button.textContent = button.getAttribute("data-pressed-label");
+      button.classList.toggle("ds-button-primary");
+      ctx.oeeeGuess = {
+        undo: function () {
+          if (!button.isConnected) return;
+          button.textContent = was.text;
+          button.className = was.className;
+        }
+      };
+    }
     document.addEventListener("htmx:before:request", function (event) {
       var ctx = event.detail && event.detail.ctx;
-      var chip = ctx && ctx.sourceElement;
+      var source = ctx && ctx.sourceElement;
+      if (source && source.hasAttribute && source.hasAttribute("data-optimistic-toggle")) {
+        toggle(ctx, source);
+        return;
+      }
+      var chip = source;
       if (!chip || !chip.classList || !chip.classList.contains("reaction-button")) return;
       var block = chip.closest(".post-reactions");
       if (!block) return;
       var reacted = !chip.classList.contains("reacted");
       var by = reacted ? 1 : -1;
       chip.classList.toggle("reacted", reacted);
+      var counts = [nudge(chip.querySelector(".reaction-count"), by), nudge(block.querySelector(".reaction-total-count"), by)];
       ctx.oeeeGuess = {
-        chip: chip,
-        reacted: !reacted,
-        counts: [nudge(chip.querySelector(".reaction-count"), by), nudge(block.querySelector(".reaction-total-count"), by)]
+        undo: function () {
+          if (!chip.isConnected) return;
+          chip.classList.toggle("reacted", !reacted);
+          for (var i = 0; i < counts.length; i++) {
+            if (counts[i] && counts[i].span.isConnected) counts[i].span.textContent = counts[i].was;
+          }
+        }
       };
     });
     function takeBack(ctx) {
       var guess = ctx && ctx.oeeeGuess;
       if (!guess) return;
       ctx.oeeeGuess = null;
-      if (!guess.chip.isConnected) return;
-      guess.chip.classList.toggle("reacted", guess.reacted);
-      for (var i = 0; i < guess.counts.length; i++) {
-        var count = guess.counts[i];
-        if (count && count.span.isConnected) count.span.textContent = count.was;
-      }
+      guess.undo();
     }
     document.addEventListener("htmx:after:request", function (event) {
       var ctx = event.detail && event.detail.ctx;

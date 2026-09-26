@@ -1,16 +1,24 @@
+{# Follow and unfollow, each the other's answer: the handler swaps in the
+   other form. The press shows its answer at once (optimistic.jinja): the
+   button takes the other's words and fill from its data-pressed-label, and
+   the response then stands in with the truth. hx-sync drops a second press
+   while the first is on its way, rather than hx-disable, which would dim
+   the answer being shown. #}
 {% macro follow_button() %}
   {% if current_user.id != user.id %}
     <form hx-post="/@{{ user.login_name }}/follow" hx-swap="outerHTML"
-          hx-disable="find button">
-      <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("follow") }}</button>
+          hx-sync="this:drop" data-optimistic-toggle>
+      <button type="submit" class="ds-button ds-button-primary"
+              data-pressed-label="{{ ftl_get_message("unfollow") }}">{{ ftl_get_message("follow") }}</button>
     </form>
   {% endif %}
 {% endmacro %}
 {% macro unfollow_button() %}
   {% if current_user.id != user.id %}
     <form hx-post="/@{{ user.login_name }}/unfollow" hx-swap="outerHTML"
-          hx-disable="find button">
-      <button type="submit" class="ds-button" data-haptic="light">{{ ftl_get_message("unfollow") }}</button>
+          hx-sync="this:drop" data-optimistic-toggle>
+      <button type="submit" class="ds-button" data-haptic="light"
+              data-pressed-label="{{ ftl_get_message("follow") }}">{{ ftl_get_message("unfollow") }}</button>
     </form>
   {% endif %}
 {% endmacro %}
