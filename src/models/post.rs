@@ -1771,7 +1771,7 @@ pub async fn delete_post(
         r#"
         DELETE FROM notifications
         WHERE post_id = $1
-        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        RETURNING id, recipient_id, read_at IS NULL AS "unread!"
         "#,
         id
     )
@@ -1780,7 +1780,8 @@ pub async fn delete_post(
 
     Ok(retracted
         .into_iter()
-        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .filter(|row| row.unread)
+        .map(|row| BadgeFalls::withdrawn(row.recipient_id, row.id))
         .collect())
 }
 
@@ -1814,7 +1815,7 @@ pub async fn soft_delete_community_posts(
         WHERE post_id IN (
             SELECT id FROM posts WHERE community_id = $1
         )
-        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        RETURNING id, recipient_id, read_at IS NULL AS "unread!"
         "#,
         community_id
     )
@@ -1823,7 +1824,8 @@ pub async fn soft_delete_community_posts(
 
     Ok(retracted
         .into_iter()
-        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .filter(|row| row.unread)
+        .map(|row| BadgeFalls::withdrawn(row.recipient_id, row.id))
         .collect())
 }
 

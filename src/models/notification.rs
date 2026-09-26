@@ -5,7 +5,7 @@ use fluent::{FluentArgs, FluentResource};
 use intl_memoizer::concurrent::IntlLangMemoizer;
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction, Type};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
 
 use crate::locale::LOCALES;
@@ -373,7 +373,7 @@ pub async fn mark_notification_as_read(
     notification_id: Uuid,
     recipient_id: Uuid,
 ) -> Result<BadgeFalls> {
-    let result = sqlx::query!(
+    let read = sqlx::query_scalar!(
         r#"
         WITH target AS (
             SELECT id, notification_type, post_id
@@ -393,14 +393,18 @@ pub async fn mark_notification_as_read(
                   AND n.post_id = target.post_id
               )
           )
+        RETURNING n.id
         "#,
         notification_id,
         recipient_id
     )
-    .execute(&mut **tx)
+    .fetch_all(&mut **tx)
     .await?;
 
-    Ok(BadgeFalls::of_changed(recipient_id, result.rows_affected()))
+    Ok(read
+        .into_iter()
+        .map(|id| BadgeFalls::withdrawn(recipient_id, id))
+        .collect())
 }
 
 /// Mark all notifications as read for a user
@@ -408,18 +412,22 @@ pub async fn mark_all_notifications_as_read(
     tx: &mut Transaction<'_, Postgres>,
     recipient_id: Uuid,
 ) -> Result<BadgeFalls> {
-    let result = sqlx::query!(
+    let read = sqlx::query_scalar!(
         r#"
         UPDATE notifications
         SET read_at = CURRENT_TIMESTAMP
         WHERE recipient_id = $1 AND read_at IS NULL
+        RETURNING id
         "#,
         recipient_id
     )
-    .execute(&mut **tx)
+    .fetch_all(&mut **tx)
     .await?;
 
-    Ok(BadgeFalls::of_changed(recipient_id, result.rows_affected()))
+    Ok(read
+        .into_iter()
+        .map(|id| BadgeFalls::withdrawn(recipient_id, id))
+        .collect())
 }
 
 /// The number on the bell, and on the apps' icons: unread notifications and
@@ -460,37 +468,57 @@ pub async fn get_badge_count(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) 
 /// A foreign key's cascade tells no one, so what deletes a reaction or a
 /// guestbook entry deletes its notifications itself first. The cascades that
 /// remain are listed in `every_cascade_into_the_badge_is_accounted_for`.
+///
+/// Each reader comes with the notifications that stopped counting. Android's
+/// badge is the notifications on show, so the app takes those ones down; a
+/// reaction taken back would otherwise stay in the shade, and on the icon,
+/// until everything else had been read.
 #[must_use = "send it with PushService::badges_fell once the transaction commits"]
 #[derive(Debug, Default, PartialEq)]
-pub struct BadgeFalls(BTreeSet<Uuid>);
+pub struct BadgeFalls(BTreeMap<Uuid, BTreeSet<Uuid>>);
 
 impl BadgeFalls {
     pub fn none() -> Self {
         Self::default()
     }
 
-    /// `reader`'s, if anything of theirs was changed.
-    pub fn of_changed(reader: Uuid, rows: u64) -> Self {
-        (rows > 0).then_some(reader).into_iter().collect()
+    /// `reader`'s count fell by something that is not a notification: an
+    /// invitation answered or withdrawn.
+    pub fn reader(reader: Uuid) -> Self {
+        Self(BTreeMap::from([(reader, BTreeSet::new())]))
+    }
+
+    /// `notification`, unread, was read or deleted.
+    pub fn withdrawn(reader: Uuid, notification: Uuid) -> Self {
+        Self(BTreeMap::from([(reader, BTreeSet::from([notification]))]))
     }
 
     pub fn add(&mut self, other: BadgeFalls) {
-        self.0.extend(other.0);
+        for (reader, notifications) in other.0 {
+            self.0.entry(reader).or_default().extend(notifications);
+        }
     }
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    /// The readers, taking them out to be sent.
-    pub fn into_readers(self) -> impl Iterator<Item = Uuid> {
-        self.0.into_iter()
+    /// Each reader and the notifications of theirs that stopped counting,
+    /// taking them out to be sent.
+    pub fn into_readers(self) -> impl Iterator<Item = (Uuid, Vec<Uuid>)> {
+        self.0
+            .into_iter()
+            .map(|(reader, notifications)| (reader, notifications.into_iter().collect()))
     }
 }
 
-impl FromIterator<Uuid> for BadgeFalls {
-    fn from_iter<I: IntoIterator<Item = Uuid>>(readers: I) -> Self {
-        Self(readers.into_iter().collect())
+impl FromIterator<BadgeFalls> for BadgeFalls {
+    fn from_iter<I: IntoIterator<Item = BadgeFalls>>(falls: I) -> Self {
+        let mut all = Self::none();
+        for fall in falls {
+            all.add(fall);
+        }
+        all
     }
 }
 
@@ -507,7 +535,7 @@ pub async fn retract_follow_notifications(
         WHERE recipient_id = $1
           AND actor_id = $2
           AND notification_type = 'follow'
-        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        RETURNING id, recipient_id, read_at IS NULL AS "unread!"
         "#,
         recipient_id,
         follower_actor_id
@@ -517,7 +545,8 @@ pub async fn retract_follow_notifications(
 
     Ok(rows
         .into_iter()
-        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .filter(|row| row.unread)
+        .map(|row| BadgeFalls::withdrawn(row.recipient_id, row.id))
         .collect())
 }
 
@@ -551,7 +580,7 @@ pub async fn delete_notification(
                   AND n.post_id = target.post_id
               )
           )
-        RETURNING n.read_at IS NULL AS "unread!"
+        RETURNING n.id, n.read_at IS NULL AS "unread!"
         "#,
         notification_id,
         recipient_id
@@ -562,8 +591,12 @@ pub async fn delete_notification(
     if rows.is_empty() {
         return Ok(None);
     }
-    let unread = rows.iter().filter(|row| row.unread).count() as u64;
-    Ok(Some(BadgeFalls::of_changed(recipient_id, unread)))
+    Ok(Some(
+        rows.into_iter()
+            .filter(|row| row.unread)
+            .map(|row| BadgeFalls::withdrawn(recipient_id, row.id))
+            .collect(),
+    ))
 }
 
 /// The page a notification is about, as a path on the site: the post, or for
@@ -923,18 +956,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_fall_is_a_reader_once_and_nothing_is_no_one() {
-        let reader = Uuid::new_v4();
-        assert!(BadgeFalls::of_changed(reader, 0).is_empty());
-        assert_eq!(
-            BadgeFalls::of_changed(reader, 3)
-                .into_readers()
-                .collect::<Vec<_>>(),
-            [reader]
-        );
-        let mut falls: BadgeFalls = [reader, reader].into_iter().collect();
-        falls.add(BadgeFalls::of_changed(reader, 1));
-        assert_eq!(falls.into_readers().count(), 1);
+    fn falls_gather_by_reader_with_what_each_lost() {
+        let (reader, invitee) = (Uuid::new_v4(), Uuid::new_v4());
+        let (first, second) = (Uuid::new_v4(), Uuid::new_v4());
+        assert!(std::iter::empty::<BadgeFalls>()
+            .collect::<BadgeFalls>()
+            .is_empty());
+        let mut falls: BadgeFalls = [
+            BadgeFalls::withdrawn(reader, first),
+            BadgeFalls::withdrawn(reader, second),
+            BadgeFalls::withdrawn(reader, first),
+        ]
+        .into_iter()
+        .collect();
+        falls.add(BadgeFalls::reader(invitee));
+        let mut expected = BTreeMap::from([(reader, vec![first, second]), (invitee, vec![])]);
+        expected.get_mut(&reader).unwrap().sort();
+        assert_eq!(falls.into_readers().collect::<BTreeMap<_, _>>(), expected);
     }
 
     async fn tx() -> Option<Transaction<'static, Postgres>> {
@@ -1041,7 +1079,10 @@ mod tests {
         let falls = crate::models::community::soft_delete_community(&mut tx, &slug, owner)
             .await
             .unwrap();
-        assert_eq!(falls.into_readers().collect::<Vec<_>>(), [waiting]);
+        assert_eq!(
+            falls.into_readers().collect::<Vec<_>>(),
+            [(waiting, vec![])]
+        );
         assert_eq!(get_badge_count(&mut tx, waiting).await.unwrap(), 0);
 
         tx.rollback().await.unwrap();
@@ -1098,6 +1139,7 @@ mod tests {
         .await
         .unwrap();
 
+        let mut shown = Vec::new();
         for (emoji, read) in [("❤️", false), ("👍", true)] {
             let reaction = format!("{iri}/{}", emoji.len());
             sqlx::query!(
@@ -1110,27 +1152,33 @@ mod tests {
             .execute(&mut *tx)
             .await
             .unwrap();
-            sqlx::query!(
-                r#"
-                INSERT INTO notifications (recipient_id, actor_id, notification_type,
-                                           post_id, reaction_iri, read_at)
-                VALUES ($1, $2, 'reaction', $3, $4, CASE WHEN $5 THEN now() END)
-                "#,
-                author,
-                actor,
-                post,
-                reaction,
-                read
-            )
-            .execute(&mut *tx)
-            .await
-            .unwrap();
+            shown.push(
+                sqlx::query_scalar!(
+                    r#"
+                    INSERT INTO notifications (recipient_id, actor_id, notification_type,
+                                               post_id, reaction_iri, read_at)
+                    VALUES ($1, $2, 'reaction', $3, $4, CASE WHEN $5 THEN now() END)
+                    RETURNING id
+                    "#,
+                    author,
+                    actor,
+                    post,
+                    reaction,
+                    read
+                )
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap(),
+            );
         }
 
         let unread = crate::models::reaction::delete_reaction(&mut tx, post, actor, "❤️")
             .await
             .unwrap();
-        assert_eq!(unread.into_readers().collect::<Vec<_>>(), [author]);
+        assert_eq!(
+            unread.into_readers().collect::<Vec<_>>(),
+            [(author, vec![shown[0]])]
+        );
         let read = crate::models::reaction::delete_reaction(&mut tx, post, actor, "👍")
             .await
             .unwrap();
