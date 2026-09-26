@@ -97,6 +97,16 @@ export function usePinchZoom({
       if (e.pointerType !== "touch") return;
       if (!overTheCanvas(e.target)) return;
 
+      // The primary touch is the first finger of a hand that was off the
+      // glass, so any finger still counted is one whose release never reached
+      // us -- lifted over a node that had since left the page, say. Left in,
+      // it pairs with every new finger: one finger then pinches, and the
+      // painter stays suspended for the pen as well, until a reload.
+      if (e.isPrimary && gesture.pointerCount > 0) {
+        gesture.clear();
+        suspendRef.current(false);
+      }
+
       const change = gesture.down(e.pointerId, { x: e.clientX, y: e.clientY });
       if (gesture.pointerCount < 2) return;
 
@@ -156,18 +166,21 @@ export function usePinchZoom({
       if (e.touches.length >= 2 && overTheCanvas(e.target)) e.preventDefault();
     };
 
+    // Releases are heard on the window: a finger that went down on the
+    // canvas may lift over the site's own header or a panel outside the
+    // ground, and a release missed there would leave it counted.
     app.addEventListener("pointerdown", handlePointerDown);
     app.addEventListener("pointermove", handlePointerMove);
-    app.addEventListener("pointerup", handlePointerUp);
-    app.addEventListener("pointercancel", handlePointerUp);
+    window.addEventListener("pointerup", handlePointerUp, true);
+    window.addEventListener("pointercancel", handlePointerUp, true);
     app.addEventListener("touchstart", preventBrowserPinch, { passive: false });
     app.addEventListener("touchmove", preventBrowserPinch, { passive: false });
 
     return () => {
       app.removeEventListener("pointerdown", handlePointerDown);
       app.removeEventListener("pointermove", handlePointerMove);
-      app.removeEventListener("pointerup", handlePointerUp);
-      app.removeEventListener("pointercancel", handlePointerUp);
+      window.removeEventListener("pointerup", handlePointerUp, true);
+      window.removeEventListener("pointercancel", handlePointerUp, true);
       app.removeEventListener("touchstart", preventBrowserPinch);
       app.removeEventListener("touchmove", preventBrowserPinch);
       // A gesture that outlived its listeners would hold the painter
