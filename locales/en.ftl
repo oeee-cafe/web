@@ -277,6 +277,7 @@ jump-hint = ↑↓ to choose · Enter to go · Esc to close
 search-results-for = Search results for
 search-placeholder = Search drawings
 search-posts = Drawings
+search-people = People
 search-no-results = Nothing matched your search
 no-tags-found = No tags found
 sort-by = Sort by

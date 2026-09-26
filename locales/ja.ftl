@@ -249,6 +249,7 @@ jump-hint = ↑↓ で選ぶ · Enter で移動 · Esc で閉じる
 search-results-for = 検索結果
 search-placeholder = 絵を検索
 search-posts = 絵
+search-people = 人
 search-no-results = 一致する結果がありませんでした
 no-tags-found = タグが見つかりませんでした
 sort-by = 並べ替え

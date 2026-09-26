@@ -249,6 +249,7 @@ jump-hint = ↑↓ 선택 · Enter 이동 · Esc 닫기
 search-results-for = 검색 결과
 search-placeholder = 그림 검색
 search-posts = 그림
+search-people = 사람
 search-no-results = 검색 결과가 없습니다
 no-tags-found = 태그를 찾을 수 없습니다
 sort-by = 정렬

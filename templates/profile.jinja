@@ -132,6 +132,7 @@
     </section>
 
     {% if followings %}
+      {% from "person_card_macro.jinja" import person_card %}
       {# Everyone they follow, under the card and over the drawings, all
          the same shape: their banner framed in hard pixels, or where they
          have none, a frame of the same size with their name in it -- one
@@ -140,25 +141,7 @@
         <div class="profile-section-label">{{ ftl_get_message("profile-following") }}<span class="profile-tab-count">{{ followings|length }}</span></div>
       <ul class="profile-follows">
         {% for following in followings %}
-          <li>
-            <a class="profile-follow" href="/@{{ following.login_name }}">
-              {% if following.banner_image_filename %}
-                <img class="profile-follow-banner"
-                     width="200"
-                     height="40"
-                     alt=""
-                     loading="lazy"
-                     decoding="async"
-                     src="{{ r2_public_endpoint_url }}/image/{{ following.banner_image_filename[:2] }}/{{ following.banner_image_filename }}" />
-              {% else %}
-                <span class="profile-follow-banner profile-follow-blank" aria-hidden="true">{{ following.display_name }}</span>
-              {% endif %}
-              <span class="profile-follow-text">
-                <span class="profile-follow-name">{{ following.display_name }}</span>
-                <span class="profile-follow-handle">@{{ following.login_name }}</span>
-              </span>
-            </a>
-          </li>
+          <li>{{ person_card(following, r2_public_endpoint_url) }}</li>
         {% endfor %}
       </ul>
       </section>

@@ -1,8 +1,9 @@
 //! `/jump`: the quick switcher's list (jump.jinja), as a fragment.
 //!
-//! Places, not drawings: communities, people, tags and the site's own
-//! pages, each a link, in one list the reader moves through with the arrow
-//! keys. Nothing typed is the reader's own communities and the pages; with
+//! Places, not drawings: communities, tags, the site's own pages, and the
+//! person whose handle was typed exactly -- people are not found by part of
+//! a name, as on /search (search.rs) -- each a link, in one list the reader
+//! moves through with the arrow keys. Nothing typed is the reader's own communities and the pages; with
 //! something typed, what matches it, the reader's communities first, and a
 //! last row that searches drawings for it -- the one thing this is not for.
 
@@ -16,6 +17,7 @@ use uuid::Uuid;
 use crate::app_error::AppError;
 use crate::models::tag::{escape_like, search_tags};
 use crate::models::user::AuthSession;
+use crate::web::handlers::search::search_people;
 use crate::web::handlers::ExtractFtlLang;
 use crate::web::state::AppState;
 
@@ -41,12 +43,6 @@ struct JumpCommunity {
     is_member: bool,
 }
 
-#[derive(Serialize)]
-struct JumpPerson {
-    login_name: String,
-    display_name: String,
-}
-
 pub async fn jump(
     auth_session: AuthSession,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
@@ -62,7 +58,7 @@ pub async fn jump(
         (Vec::new(), Vec::new())
     } else {
         (
-            people(&mut tx, &q).await?,
+            search_people(&mut tx, &q, PER_KIND).await?,
             search_tags(&mut tx, &q, PER_KIND).await?,
         )
     };
@@ -138,27 +134,6 @@ fn is_hex_colour(colour: &Option<String>) -> bool {
     })
 }
 
-/// People by handle or by name, those whose handle starts with it first.
-async fn people(tx: &mut Transaction<'_, Postgres>, q: &str) -> Result<Vec<JumpPerson>, AppError> {
-    let escaped = escape_like(q.trim_start_matches('@'));
-    let rows = sqlx::query_as!(
-        JumpPerson,
-        r#"
-        SELECT login_name, display_name
-        FROM users
-        WHERE deleted_at IS NULL
-          AND (login_name ILIKE '%' || $1 || '%' ESCAPE '\'
-               OR display_name ILIKE '%' || $1 || '%' ESCAPE '\')
-        ORDER BY (login_name ILIKE $1 || '%' ESCAPE '\') DESC, login_name ASC
-        LIMIT $2
-        "#,
-        escaped,
-        PER_KIND,
-    )
-    .fetch_all(&mut **tx)
-    .await?;
-    Ok(rows)
-}
 
 #[cfg(test)]
 mod tests {
@@ -176,7 +151,11 @@ mod tests {
                 q,
                 current_user => if signed_in { json!({"id": "u", "login_name": "tandemaus"}) } else { json!(null) },
                 communities,
-                people => vec![JumpPerson { login_name: "neo".into(), display_name: "Neo <b>".into() }],
+                people => vec![crate::web::handlers::search::SearchPersonRow {
+                    login_name: "neo".into(),
+                    display_name: "Neo <b>".into(),
+                    banner_image_filename: None,
+                }],
                 tags,
                 ftl_lang => "en",
             })

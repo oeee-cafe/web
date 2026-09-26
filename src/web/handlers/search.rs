@@ -16,6 +16,55 @@ use uuid::Uuid;
 /// the JSON endpoint will hand out in one go.
 const SEARCH_PAGE_LIMIT: i64 = 50;
 
+/// People shown over the drawings. A handle is one person, but the match
+/// ignores case and handles are told apart by it, so there can be a few.
+const SEARCH_PEOPLE_LIMIT: i64 = 5;
+
+/// A person whose handle or name matches, as the profile's follow card
+/// (person_card_macro.jinja) draws them.
+#[derive(Serialize)]
+pub struct SearchPersonRow {
+    pub login_name: String,
+    pub display_name: String,
+    pub banner_image_filename: Option<String>,
+}
+
+/// The person whose handle this is, `@` or not, whatever its case -- and
+/// nobody else. Search does not list people by part of a name or a handle:
+/// finding someone takes knowing who they are. The quick switcher finds
+/// people the same way (jump.rs). A banner staff have flagged, or one taken
+/// down, is left off the card, as on /about.
+pub async fn search_people(
+    tx: &mut Transaction<'_, Postgres>,
+    q: &str,
+    limit: i64,
+) -> Result<Vec<SearchPersonRow>, AppError> {
+    let escaped = crate::models::tag::escape_like(q.trim_start_matches('@'));
+    let people = sqlx::query_as!(
+        SearchPersonRow,
+        r#"
+        SELECT
+            u.login_name,
+            u.display_name,
+            i.image_filename AS "banner_image_filename?"
+        FROM users u
+        LEFT JOIN banners b ON b.id = u.banner_id
+            AND b.deleted_at IS NULL
+            AND b.is_explicit = false
+        LEFT JOIN images i ON i.id = b.image_id
+        WHERE u.deleted_at IS NULL
+          AND u.login_name ILIKE $1 ESCAPE '\'
+        ORDER BY u.login_name ASC
+        LIMIT $2
+        "#,
+        escaped,
+        limit
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(people)
+}
+
 #[derive(Deserialize)]
 pub struct SearchPageQuery {
     #[serde(default)]
@@ -114,6 +163,10 @@ pub async fn search_page(
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
+    let people = match search_query {
+        Some(ref q) => search_people(&mut tx, q, SEARCH_PEOPLE_LIMIT).await?,
+        None => Vec::new(),
+    };
     let posts = match search_query {
         Some(ref q) => {
             let (viewer_user_id, viewer_show_sensitive) = viewer(&auth_session);
@@ -139,6 +192,7 @@ pub async fn search_page(
     let rendered = template.render(context! {
         current_user => auth_session.user,
         search_query,
+        people,
         posts,
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
