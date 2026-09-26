@@ -2940,6 +2940,35 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   min-width: 0;
 }
 
+/* Under .ds-page a row that wraps, never wider than what holds it. When
+   the name and the pill do not fit on one line the pill takes the next,
+   where it is as wide as the line and a remote one's name part gives way
+   to an ellipsis before its host would (.ds-handle-remote). Squeezing the
+   two onto one line instead cost the reader either the display name or the
+   host, and the host is what tells @name@elsewhere from our own @name.
+   Baseline, so the name sits on the line the text around it does. */
+.ds-page .ds-person {
+  display: -webkit-inline-box;
+  display: inline-flex;
+  -webkit-box-align: baseline;
+  align-items: baseline;
+  flex-wrap: wrap;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+.ds-page .ds-person > .ds-person-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-page .ds-person > .ds-handle {
+  min-width: 0;
+}
+
 .ds-person > * + * {
   margin-left: 6px;
 }
@@ -2978,6 +3007,29 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   display: inline-flex;
   -webkit-box-align: center;
   align-items: center;
+}
+
+/* Someone from another server. The pill is never wider than what holds it,
+   and inside it the name gives way to an ellipsis before the host does: the
+   host is what tells @name@elsewhere from our own @name, so it is the part
+   that has to stay in view. Where a line cuts itself short (a byline, a
+   member's meta line) it is the words after the pill that go. */
+.ds-handle-remote {
+  max-width: 100%;
+}
+
+.ds-handle-remote > .ds-handle-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-page .ds-handle-remote > .ds-handle-name {
+  min-width: 0;
+}
+
+.ds-handle-remote > .ds-handle-host {
+  -webkit-box-flex: 0;
+  flex: none;
 }
 
 .ds-handle-supporter {

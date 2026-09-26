@@ -358,6 +358,15 @@ impl Object for Actor {
             .ok_or_else(|| anyhow::anyhow!("Could not extract host from actor URL"))?
             .to_string();
 
+        // Printed as @name@host beside our own @login_name, so a name that
+        // could hide or move the host is refused (is_plain_remote_username).
+        if !crate::models::actor::is_plain_remote_username(&preferred_username) {
+            return Err(anyhow::anyhow!(
+                "Refusing actor {actor_url}: preferredUsername {preferred_username:?} is not a plain name"
+            )
+            .into());
+        }
+
         // Create handle components
         let handle_host = instance_host.clone();
         let handle = format!("@{}@{}", preferred_username, handle_host);

@@ -19,6 +19,24 @@ use crate::models::user::{find_user_by_id, User};
 use crate::web::state::AppState;
 use crate::AppConfig;
 
+/// Whether a remote server's name for one of its accounts is one we print.
+///
+/// A local person is shown as `@login_name`, with no host, so a remote
+/// handle has to be impossible to read as one: its host has to be there and
+/// has to be seen. The name before it is the remote server's to choose, and
+/// unchecked it could be padded out until a line's ellipsis hides the host,
+/// or carry a bidirectional override that moves it. Only the characters an
+/// `acct:` name is made of in practice pass -- RFC 3986's unreserved set,
+/// which every fediverse server's usernames fall inside -- and an actor whose
+/// name does not is not stored. The same range is `actors_username_is_plain`
+/// in the database.
+pub fn is_plain_remote_username(username: &str) -> bool {
+    (1..=128).contains(&username.len())
+        && username
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'~' | b'-'))
+}
+
 #[derive(Debug)]
 struct UserIdRow {
     id: Option<Uuid>,
@@ -620,4 +638,36 @@ pub async fn backfill_actors_for_existing_communities(
     }
 
     Ok(created_count)
+}
+
+#[cfg(test)]
+mod plain_username_tests {
+    use super::is_plain_remote_username;
+
+    #[test]
+    fn a_fediverse_username_is_plain() {
+        for name in ["gargron", "Tandem_Maus", "a.b-c~d", "x"] {
+            assert!(is_plain_remote_username(name), "{name}");
+        }
+    }
+
+    /// Each of these could make a remote handle read as a local one: by
+    /// pushing its host out of sight, turning it round, hiding in it, or
+    /// bringing a second @ of its own.
+    #[test]
+    fn a_name_that_could_pass_for_someone_here_is_not() {
+        let padded = format!("limeburst{}", " ".repeat(40));
+        let long = "a".repeat(129);
+        for name in [
+            "",
+            padded.as_str(),
+            "limeburst\u{202E}",
+            "lime\u{200B}burst",
+            "limeburst@oeee.cafe",
+            "그림",
+            long.as_str(),
+        ] {
+            assert!(!is_plain_remote_username(name), "{name:?}");
+        }
+    }
 }
