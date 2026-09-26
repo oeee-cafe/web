@@ -58,8 +58,11 @@
         src/microsoft_store.rs) -- nothing the page or the app says
         records a purchase. The promise answers with the proofs the site
         took; the app finishes those and only those where its store has
-        finishing (StoreKit), and anything else is offered again. The page reloads once, after answering, if
-        the site took any.
+        finishing (StoreKit), and anything else is offered again. /supporter
+        reloads once, after answering, if the site took any, to show the pack;
+        any other page is left as it is, since an app may hand proof over
+        wherever the reader happens to be, and a reload there could cost them
+        a drawing or a message half written.
 
    What happens to a press is the page's to say, since only the page hears
    the site's answer (supporter.jinja). So purchased() tells the page as
@@ -124,8 +127,10 @@
         });
         if (list.length) tell({ state: "checked", taken: taken.length, refused: refused });
         // After the answer has gone back, so the app hears it before the
-        // page it came from goes away.
-        if (taken.length) setTimeout(function () { location.reload(); }, 0);
+        // page it came from goes away. Only /supporter shows the pack.
+        if (taken.length && location.pathname === "/supporter") {
+          setTimeout(function () { location.reload(); }, 0);
+        }
         return taken;
       });
     };
