@@ -16,7 +16,8 @@
     </div>
   {%- endfor -%}
 </div>
-{# A toast that is not an error goes after a while, sliding down as it came;
+{# A toast that is not an error goes after a while -- counted from when the
+   page is in view -- sliding down as it came;
    the pointer resting on one holds it, so it is not taken away mid-read.
    Only the three newest are kept, so a run of clicks does not build a
    tower. Looked for on load and after every htmx swap -- partials included,
@@ -34,14 +35,25 @@
         if (toast.parentNode) toast.parentNode.removeChild(toast);
       }, 200);
     }
+    // The time starts when the page is being looked at: a toast that
+    // arrives in a tab in the background -- a live notification, most
+    // often (live.jinja) -- waits there to be read rather than going
+    // before anyone was there to see it.
     function time(toast) {
       var timer = null;
       function start() {
+        clearTimeout(timer);
         timer = setTimeout(function () { leave(toast); }, SHOWN_MS);
+      }
+      function whenSeen() {
+        if (document.hidden) return;
+        document.removeEventListener("visibilitychange", whenSeen);
+        start();
       }
       toast.addEventListener("mouseenter", function () { clearTimeout(timer); });
       toast.addEventListener("mouseleave", start);
-      start();
+      if (document.hidden) document.addEventListener("visibilitychange", whenSeen);
+      else start();
     }
     function look() {
       var stack = document.getElementById("toasts");
