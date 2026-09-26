@@ -1,0 +1,24 @@
+{# A person as a card: their banner framed in hard pixels, or where they
+   have none, a frame of the same size with their name in it, then their
+   name and handle -- the profile's list of who they follow, and the people
+   /search finds. `person` needs login_name, display_name and
+   banner_image_filename (none for no banner). #}
+{% macro person_card(person, r2_public_endpoint_url) %}
+  <a class="profile-follow" href="/@{{ person.login_name }}">
+    {% if person.banner_image_filename %}
+      <img class="profile-follow-banner"
+           width="200"
+           height="40"
+           alt=""
+           loading="lazy"
+           decoding="async"
+           src="{{ r2_public_endpoint_url }}/image/{{ person.banner_image_filename[:2] }}/{{ person.banner_image_filename }}" />
+    {% else %}
+      <span class="profile-follow-banner profile-follow-blank" aria-hidden="true">{{ person.display_name }}</span>
+    {% endif %}
+    <span class="profile-follow-text">
+      <span class="profile-follow-name">{{ person.display_name }}</span>
+      <span class="profile-follow-handle">@{{ person.login_name }}</span>
+    </span>
+  </a>
+{% endmacro %}

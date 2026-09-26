@@ -6,7 +6,7 @@
   {# The per-row choice applies to the drawings grid below, as on every other
      grid of drawings. #}
   {% include "post_feed_head.jinja" %}
-  {# Site search: the form, then the drawings it matched. #}
+  {# Site search: the form, then the people and the drawings it matched. #}
   <div class="center-wide communities-page search-page">
     <h1 class="collaborate-title">{{ ftl_get_message("search") }}</h1>
     <div class="communities-bar">
@@ -30,6 +30,19 @@
         {{ ftl_get_message("search-results-for") }} "<strong>{{ search_query }}</strong>"
       </p>
 
+      {% if people %}
+        {% from "person_card_macro.jinja" import person_card %}
+        {# Over the drawings: a name is what was more likely meant. #}
+        <section class="profile-section" aria-labelledby="search-people-heading">
+          <div id="search-people-heading" class="profile-section-label">{{ ftl_get_message("search-people") }}</div>
+          <ul class="profile-follows">
+            {% for person in people %}
+              <li>{{ person_card(person, r2_public_endpoint_url) }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endif %}
+
       {% if posts %}
         {% import "post_card.jinja" as card %}
         <section class="profile-section" aria-labelledby="search-posts-heading">
@@ -43,7 +56,7 @@
             {% endfor %}
           </div>
         </section>
-      {% else %}
+      {% elif not people %}
         <p class="communities-empty">{{ ftl_get_message("search-no-results") }}</p>
       {% endif %}
     {% endif %}

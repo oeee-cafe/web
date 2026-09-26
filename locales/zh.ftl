@@ -249,6 +249,7 @@ jump-hint = ↑↓ 选择 · Enter 前往 · Esc 关闭
 search-results-for = 搜索结果
 search-placeholder = 搜索作品
 search-posts = 作品
+search-people = 用户
 search-no-results = 没有找到匹配的结果
 no-tags-found = 未找到标签
 sort-by = 排序
