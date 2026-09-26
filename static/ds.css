@@ -1041,11 +1041,13 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   color: var(--ds-ink);
 }
 
-/* Unread fills the bell in the accent, the Draw button's lime, outlined in
-   its ink as that button's brush is: the shape changes as well as the
-   colour, and the width does not (nav_notifications.jinja). */
+/* Unread fills the bell in the accent, the Draw button's lime: the shape
+   changes as well as the colour, and the width does not
+   (nav_notifications.jinja). The outline and clapper stay in the button's
+   own ink, not the accent's: --ds-accent-ink is for marks drawn *on* lime
+   and is near-black in both themes, so on the dark bar it vanished and
+   took the bell's rim and clapper with it. */
 .toolbar-end .toolbar-bell-unread svg {
-  color: var(--ds-accent-ink);
   fill: var(--ds-accent);
 }
 
