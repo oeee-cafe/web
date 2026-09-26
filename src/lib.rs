@@ -18,6 +18,7 @@ pub mod models;
 pub mod push;
 pub mod redis;
 pub mod relative_time;
+pub mod sanitized_html;
 pub mod steam;
 pub mod web;
 

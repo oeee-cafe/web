@@ -4,7 +4,11 @@ use markdown::{mdast, to_html, to_mdast, ParseOptions};
 pub fn process_markdown_content(value: &str) -> String {
     let ast = match to_mdast(value, &ParseOptions::default()) {
         Ok(ast) => ast,
-        Err(_) => return value.to_string(), // Return original text on parse error
+        // Templates print what this returns with `|safe`, so text that could
+        // not be parsed goes back escaped, never as it came. With the default
+        // options a parse only fails where MDX is on, which it is not; this
+        // is so that turning it on cannot make every post a way in.
+        Err(_) => return escape_html(value),
     };
 
     let processed_ast = convert_headings_to_paragraphs(ast);
@@ -109,5 +113,47 @@ fn mdast_to_markdown(node: &mdast::Node) -> String {
             )
         }
         _ => String::new(), // Handle other node types as needed
+    }
+}
+
+/// `value` as text in HTML: the five characters that could start or end
+/// markup or an attribute, as entities.
+fn escape_html(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for c in value.chars() {
+        match c {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#x27;"),
+            c => escaped.push(c),
+        }
+    }
+    escaped
+}
+
+#[cfg(test)]
+mod safety_tests {
+    use super::{escape_html, process_markdown_content};
+
+    /// What someone writes cannot become markup: raw HTML is shown as
+    /// text and a javascript: link loses its target.
+    #[test]
+    fn markdown_written_by_anyone_stays_text() {
+        let html = process_markdown_content(
+            "<script>steal()</script> <img src=x onerror=steal()> [go](javascript:steal())",
+        );
+        assert!(!html.contains("<script"), "{html}");
+        assert!(!html.contains("<img"), "{html}");
+        assert!(!html.contains("javascript:"), "{html}");
+    }
+
+    #[test]
+    fn text_that_is_escaped_cannot_open_a_tag_or_close_an_attribute() {
+        assert_eq!(
+            escape_html(r#"<a href="x" title='y'>&"#),
+            "&lt;a href=&quot;x&quot; title=&#x27;y&#x27;&gt;&amp;"
+        );
     }
 }

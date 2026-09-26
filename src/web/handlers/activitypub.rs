@@ -26,22 +26,23 @@ use uuid::Uuid;
 use crate::app_error::AppError;
 use crate::live::LiveEvent;
 use crate::markdown_utils::process_markdown_content;
+use crate::sanitized_html::SanitizedHtml;
 
-fn extract_note_content(note: &Note) -> (String, Option<String>) {
+fn extract_note_content(note: &Note) -> (String, Option<SanitizedHtml>) {
     // Try to get HTML content from contents field or content field
     let raw_html_content = note.content.clone();
 
     // Sanitize HTML content if present using ammonia defaults
     let html_content = raw_html_content.map(|html| {
-        let sanitized = ammonia::clean(&html);
+        let sanitized = SanitizedHtml::clean(&html);
 
         tracing::debug!(
             "Sanitized HTML content: original length {}, sanitized length {}",
             html.len(),
-            sanitized.len()
+            sanitized.as_str().len()
         );
 
-        if html != sanitized {
+        if html != sanitized.as_str() {
             tracing::info!("HTML content was sanitized - potentially dangerous content removed");
         }
 
@@ -63,25 +64,25 @@ fn extract_note_content(note: &Note) -> (String, Option<String>) {
                     // Fallback to sanitized HTML content if available, or "No content"
                     html_content
                         .clone()
-                        .unwrap_or_else(|| "No content".to_string())
+                        .map_or_else(|| "No content".to_string(), SanitizedHtml::into_string)
                 }
             } else {
                 // Fallback to sanitized HTML content if available, or "No content"
                 html_content
                     .clone()
-                    .unwrap_or_else(|| "No content".to_string())
+                    .map_or_else(|| "No content".to_string(), SanitizedHtml::into_string)
             }
         } else {
             // Fallback to sanitized HTML content if available, or "No content"
             html_content
                 .clone()
-                .unwrap_or_else(|| "No content".to_string())
+                .map_or_else(|| "No content".to_string(), SanitizedHtml::into_string)
         }
     } else {
         // No source field, use sanitized HTML content as fallback for markdown too
         html_content
             .clone()
-            .unwrap_or_else(|| "No content".to_string())
+            .map_or_else(|| "No content".to_string(), SanitizedHtml::into_string)
     };
 
     (markdown_content, html_content)

@@ -2973,6 +2973,19 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   margin-left: 6px;
 }
 
+/* Where flex rows have a gap (Firefox 63 on), it is the gap: a gap is only
+   ever between two things on one line, so a pill that wraps to the next
+   starts flush with the name above it, where the margin indented it. */
+@supports (column-gap: 1px) {
+  .ds-page .ds-person {
+    column-gap: 6px;
+  }
+
+  .ds-page .ds-person > * + * {
+    margin-left: 0;
+  }
+}
+
 .ds-person-name,
 .ds-person-name:visited {
   color: var(--ds-ink);

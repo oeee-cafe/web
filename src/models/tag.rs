@@ -296,7 +296,7 @@ pub async fn find_posts_by_tag(
                 id: row.id,
                 title: row.title,
                 author_id: row.author_id,
-                user_login_name: row.login_name,
+                user_login_name: row.login_name.into(),
                 paint_duration: row.paint_duration.microseconds.to_string(),
                 stroke_count: row.stroke_count,
                 image_filename: row.image_filename,

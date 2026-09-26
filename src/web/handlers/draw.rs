@@ -704,7 +704,7 @@ mod painter_config_tests {
     fn user() -> User {
         User {
             id: Uuid::new_v4(),
-            login_name: "relayer".to_string(),
+            login_name: "relayer".into(),
             password_hash: None,
             display_name: "Relayer".to_string(),
             email: None,

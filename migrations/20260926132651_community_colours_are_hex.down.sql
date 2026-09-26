@@ -1,0 +1,1 @@
+ALTER TABLE communities DROP CONSTRAINT communities_colours_are_hex;

@@ -53,7 +53,7 @@ pub async fn get_auth_info(
                 StatusCode::OK,
                 Json(AuthInfo {
                     user_id: user.id.to_string(),
-                    login_name: user.login_name,
+                    login_name: user.login_name.to_string(),
                     preferred_locale,
                 }),
             )

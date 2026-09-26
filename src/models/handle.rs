@@ -40,9 +40,45 @@ impl From<String> for LoginName {
     }
 }
 
+impl From<&str> for LoginName {
+    fn from(login_name: &str) -> Self {
+        LoginName(login_name.to_string())
+    }
+}
+
 impl PartialEq<str> for LoginName {
     fn eq(&self, other: &str) -> bool {
         self.0 == other
+    }
+}
+
+impl PartialEq<&str> for LoginName {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<String> for LoginName {
+    fn eq(&self, other: &String) -> bool {
+        &self.0 == other
+    }
+}
+
+/// A login name can be read as the string it is -- in a URL, a format, a
+/// query's parameter -- but a string cannot be taken for a login name
+/// without saying so (`LoginName::from`), which is the direction the type
+/// is for.
+impl std::ops::Deref for LoginName {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for LoginName {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 
