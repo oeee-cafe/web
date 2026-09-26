@@ -88,6 +88,12 @@
             form that takes a saved one. The app offers the system's saved
             passwords for the site in a sheet of its own
             (app_saved_password.jinja).
+   notify   {title, body, url}
+            Windows, which is sent no push: a new notification for the
+            reader, heard live (live.jinja) while the window is not the one
+            in front -- in its reader's language, `url` a path on this site.
+            The app shows it as the system's notification and, pressed, opens
+            `url` in the window. In front, the page shows it itself.
    share    {title, text}
    download {name, mime, data}
             What Android's web view cannot do itself (app_polyfills.jinja).
