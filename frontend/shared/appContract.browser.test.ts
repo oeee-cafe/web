@@ -927,7 +927,7 @@ describe("a saved password, in the Mac app", () => {
   it("asks when the reader presses a field, fills the form with the password picked, and signs in", async () => {
     const page = await open({ userAgent: MAC, passwordForm: "sign-in" });
     const sent = submissions(page);
-    // The page's own autofocus is not the reader's press.
+    // Focus the page gives a field itself, an autofocus, is not the reader's press.
     expect(page.window.document.activeElement).toBe(field(page, "username"));
     expect(asks(page)).toEqual([]);
 
