@@ -7,13 +7,22 @@
 {% endblock title %}
 {% block content %}
   {# What the site is, as an application's About window says it: the name
-     and a line on what it is and where else to get it, then where else to find
-     it, the documents it keeps, and the people who draw here -- each a
-     button or a chip rather than a bulleted list of links. #}
+     and version, a line on what it is and where else to get it, then where
+     else to find it, the documents it keeps, and the people who draw here --
+     each a button or a chip rather than a bulleted list of links. #}
   <div class="profile about-page">
     <section class="profile-card ds-card about-card">
       <div class="profile-identity">
         <h1 class="profile-name">{{ ftl_get_message("brand") }}</h1>
+        {% if git_commit %}
+          {# Which commit is serving, for anyone reporting a bug, under the
+             name where an About window keeps its version; unset outside a
+             deployed image, and then there is nothing to say. #}
+          <p class="about-version">
+            {{ ftl_get_message("about-version") }}
+            <a href="https://github.com/oeee-cafe/web/commit/{{ git_commit }}" target="_blank" rel="noopener" title="{{ git_commit }}">{{ git_commit[:12] }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
+          </p>
+        {% endif %}
         <p class="about-lede">{{ ftl_get_message("about") }}</p>
         {{ app_stores(ftl_lang) }}
       </div>
@@ -77,15 +86,5 @@
       </section>
     {% endif %}
 
-    {% if git_commit %}
-      {# Which commit is serving, for anyone reporting a bug; unset outside
-         a deployed image, and then there is nothing to say. #}
-      <section class="profile-section">
-        <div class="profile-section-label">{{ ftl_get_message("about-version") }}</div>
-        <div class="profile-chips">
-          <a class="profile-chip about-version" href="https://github.com/oeee-cafe/web/commit/{{ git_commit }}" target="_blank" rel="noopener" title="{{ git_commit }}">{{ git_commit[:12] }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
-        </div>
-      </section>
-    {% endif %}
   </div>
 {% endblock content %}

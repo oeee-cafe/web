@@ -2938,8 +2938,9 @@ mod template_tests {
         assert!(!render(json!([])).contains(r#"id="supporters""#));
     }
 
-    /// The commit that is serving, linked to on GitHub, and nothing at all
-    /// outside a deployed image.
+    /// The commit that is serving, linked to on GitHub, under the name at
+    /// the top of the page rather than below every list that grows, and
+    /// nothing at all outside a deployed image.
     #[test]
     fn the_about_page_names_the_commit_it_runs() {
         let env = test_support::env();
@@ -2960,6 +2961,9 @@ mod template_tests {
             r#"href="https://github.com/oeee-cafe/web/commit/{sha}""#
         )));
         assert!(about.contains(">e6851d5a0b1c<span"), "{about}");
+        let version = about.find("about-version").expect("the version is shown");
+        let lede = about.find("about-lede").expect("the lede is shown");
+        assert!(version < lede, "the version sits under the name");
         assert!(!render(None).contains("about-version"));
     }
 
