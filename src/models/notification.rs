@@ -5,6 +5,7 @@ use fluent::{FluentArgs, FluentResource};
 use intl_memoizer::concurrent::IntlLangMemoizer;
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction, Type};
+use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::locale::LOCALES;
@@ -371,7 +372,7 @@ pub async fn mark_notification_as_read(
     tx: &mut Transaction<'_, Postgres>,
     notification_id: Uuid,
     recipient_id: Uuid,
-) -> Result<bool> {
+) -> Result<BadgeFalls> {
     let result = sqlx::query!(
         r#"
         WITH target AS (
@@ -399,14 +400,14 @@ pub async fn mark_notification_as_read(
     .execute(&mut **tx)
     .await?;
 
-    Ok(result.rows_affected() > 0)
+    Ok(BadgeFalls::of_changed(recipient_id, result.rows_affected()))
 }
 
 /// Mark all notifications as read for a user
 pub async fn mark_all_notifications_as_read(
     tx: &mut Transaction<'_, Postgres>,
     recipient_id: Uuid,
-) -> Result<u64> {
+) -> Result<BadgeFalls> {
     let result = sqlx::query!(
         r#"
         UPDATE notifications
@@ -418,7 +419,7 @@ pub async fn mark_all_notifications_as_read(
     .execute(&mut **tx)
     .await?;
 
-    Ok(result.rows_affected())
+    Ok(BadgeFalls::of_changed(recipient_id, result.rows_affected()))
 }
 
 /// The number on the bell, and on the apps' icons: unread notifications and
@@ -445,17 +446,94 @@ pub async fn get_badge_count(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) 
     Ok(count)
 }
 
+/// The readers whose badge a transaction brought down: an unread
+/// notification of theirs deleted or read, an invitation to them answered or
+/// withdrawn.
+///
+/// A new notification's push carries the number on the icon, but a fall has
+/// no push of its own, and the icon kept saying 1 over a bell at 0 when a
+/// reaction was taken back or a follower left. So whatever takes something
+/// off a badge says whose, and the handler hands it to
+/// `PushService::badges_fell` once it has committed -- the only way to send
+/// a badge on its own. Dropping one unsent is a warning.
+///
+/// A foreign key's cascade tells no one, so what deletes a reaction or a
+/// guestbook entry deletes its notifications itself first. The cascades that
+/// remain are listed in `every_cascade_into_the_badge_is_accounted_for`.
+#[must_use = "send it with PushService::badges_fell once the transaction commits"]
+#[derive(Debug, Default, PartialEq)]
+pub struct BadgeFalls(BTreeSet<Uuid>);
+
+impl BadgeFalls {
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// `reader`'s, if anything of theirs was changed.
+    pub fn of_changed(reader: Uuid, rows: u64) -> Self {
+        (rows > 0).then_some(reader).into_iter().collect()
+    }
+
+    pub fn add(&mut self, other: BadgeFalls) {
+        self.0.extend(other.0);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The readers, taking them out to be sent.
+    pub fn into_readers(self) -> impl Iterator<Item = Uuid> {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<Uuid> for BadgeFalls {
+    fn from_iter<I: IntoIterator<Item = Uuid>>(readers: I) -> Self {
+        Self(readers.into_iter().collect())
+    }
+}
+
+/// Deletes the notifications a follow gave `recipient_id` from
+/// `follower_actor_id`, when the follow is undone.
+pub async fn retract_follow_notifications(
+    tx: &mut Transaction<'_, Postgres>,
+    recipient_id: Uuid,
+    follower_actor_id: Uuid,
+) -> Result<BadgeFalls> {
+    let rows = sqlx::query!(
+        r#"
+        DELETE FROM notifications
+        WHERE recipient_id = $1
+          AND actor_id = $2
+          AND notification_type = 'follow'
+        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        "#,
+        recipient_id,
+        follower_actor_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .collect())
+}
+
 /// Delete a notification, and with it the rest of its group.
 ///
 /// Same reason as marking read: the row the reader deleted stands for every
 /// reaction on that post, so leaving the others behind would delete one line
 /// and put fifteen back in its place.
+///
+/// `None` when there was no such notification of theirs to delete.
 pub async fn delete_notification(
     tx: &mut Transaction<'_, Postgres>,
     notification_id: Uuid,
     recipient_id: Uuid,
-) -> Result<bool> {
-    let result = sqlx::query!(
+) -> Result<Option<BadgeFalls>> {
+    let rows = sqlx::query!(
         r#"
         WITH target AS (
             SELECT id, notification_type, post_id
@@ -473,14 +551,19 @@ pub async fn delete_notification(
                   AND n.post_id = target.post_id
               )
           )
+        RETURNING n.read_at IS NULL AS "unread!"
         "#,
         notification_id,
         recipient_id
     )
-    .execute(&mut **tx)
+    .fetch_all(&mut **tx)
     .await?;
 
-    Ok(result.rows_affected() > 0)
+    if rows.is_empty() {
+        return Ok(None);
+    }
+    let unread = rows.iter().filter(|row| row.unread).count() as u64;
+    Ok(Some(BadgeFalls::of_changed(recipient_id, unread)))
 }
 
 /// The page a notification is about, as a path on the site: the post, or for
@@ -838,6 +921,228 @@ pub fn format_community_invitation_message(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_fall_is_a_reader_once_and_nothing_is_no_one() {
+        let reader = Uuid::new_v4();
+        assert!(BadgeFalls::of_changed(reader, 0).is_empty());
+        assert_eq!(
+            BadgeFalls::of_changed(reader, 3)
+                .into_readers()
+                .collect::<Vec<_>>(),
+            [reader]
+        );
+        let mut falls: BadgeFalls = [reader, reader].into_iter().collect();
+        falls.add(BadgeFalls::of_changed(reader, 1));
+        assert_eq!(falls.into_readers().count(), 1);
+    }
+
+    async fn tx() -> Option<Transaction<'static, Postgres>> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        let pool = sqlx::PgPool::connect(&url).await.ok()?;
+        pool.begin().await.ok()
+    }
+
+    /// A foreign key that deletes a notification or an invitation by cascade
+    /// takes something off a badge without saying whose (BadgeFalls). Each
+    /// one here has been answered; a new one fails until it is too.
+    #[tokio::test]
+    async fn every_cascade_into_the_badge_is_accounted_for() {
+        let Some(mut tx) = tx().await else { return };
+        let cascades = sqlx::query!(
+            r#"
+            SELECT conrelid::regclass::text AS "child!",
+                   confrelid::regclass::text AS "parent!",
+                   (SELECT attname FROM pg_attribute
+                    WHERE attrelid = conrelid AND attnum = conkey[1])::text AS "column!"
+            FROM pg_constraint
+            WHERE contype = 'f'
+              AND confdeltype = 'c'
+              AND conrelid::regclass::text IN ('notifications', 'community_invitations')
+            ORDER BY 1, 2, 3
+            "#
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .unwrap();
+
+        let answered = [
+            // Nothing left to tell.
+            ("notifications", "users", "recipient_id"),
+            ("community_invitations", "users", "invitee_id"),
+            // Users, posts, comments and communities are only ever soft
+            // deleted, and actors not at all; delete_post, delete_comment and
+            // soft_delete_community_posts delete the notifications themselves.
+            ("community_invitations", "users", "inviter_id"),
+            ("community_invitations", "communities", "community_id"),
+            ("notifications", "actors", "actor_id"),
+            ("notifications", "posts", "post_id"),
+            ("notifications", "comments", "comment_id"),
+            // Deleted outright, so their notifications go first, by hand:
+            // delete_reaction_by_iri and delete_guestbook_entry.
+            ("notifications", "reactions", "reaction_iri"),
+            ("notifications", "guestbook_entries", "guestbook_entry_id"),
+        ];
+        for row in &cascades {
+            let key = (row.child.as_str(), row.parent.as_str(), row.column.as_str());
+            assert!(
+                answered.contains(&key),
+                "{key:?} cascades without saying whose badge fell"
+            );
+        }
+    }
+
+    /// Deleting a community withdraws what it had asked of people, and says
+    /// whom; an invitation already answered is no one's badge.
+    #[tokio::test]
+    async fn a_deleted_community_withdraws_its_invitations() {
+        let Some(mut tx) = tx().await else { return };
+        let tag = Uuid::new_v4().simple().to_string()[..12].to_string();
+        let mut users = Vec::new();
+        for role in ["owner", "waiting", "answered"] {
+            users.push(
+                sqlx::query_scalar!(
+                    "INSERT INTO users (login_name, display_name) VALUES ($1, $1) RETURNING id",
+                    format!("{role}_{tag}")
+                )
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap(),
+            );
+        }
+        let [owner, waiting, answered] = users[..] else {
+            unreachable!()
+        };
+        let slug = format!("withdrawn_{tag}");
+        let community = sqlx::query_scalar!(
+            "INSERT INTO communities (owner_id, name, description, visibility, slug)
+             VALUES ($1, $2, '', 'private', $2) RETURNING id",
+            owner,
+            slug
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        for (invitee, status) in [(waiting, "pending"), (answered, "rejected")] {
+            sqlx::query!(
+                "INSERT INTO community_invitations (community_id, inviter_id, invitee_id, status)
+                 VALUES ($1, $2, $3, $4::text::community_invitation_status)",
+                community,
+                owner,
+                invitee,
+                status
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+        assert_eq!(get_badge_count(&mut tx, waiting).await.unwrap(), 1);
+
+        let falls = crate::models::community::soft_delete_community(&mut tx, &slug, owner)
+            .await
+            .unwrap();
+        assert_eq!(falls.into_readers().collect::<Vec<_>>(), [waiting]);
+        assert_eq!(get_badge_count(&mut tx, waiting).await.unwrap(), 0);
+
+        tx.rollback().await.unwrap();
+    }
+
+    /// Taking a reaction back deletes its notification before the reaction,
+    /// so the reader it was unread for is known; one already read is no fall.
+    #[tokio::test]
+    async fn a_reaction_taken_back_names_the_reader_it_was_unread_for() {
+        let Some(mut tx) = tx().await else { return };
+        let tag = Uuid::new_v4().simple().to_string()[..12].to_string();
+        let author = sqlx::query_scalar!(
+            "INSERT INTO users (login_name, display_name) VALUES ($1, $1) RETURNING id",
+            format!("falls_{tag}")
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query!("INSERT INTO instances (host) VALUES ('falls.test') ON CONFLICT DO NOTHING")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let iri = format!("https://falls.test/{tag}");
+        let actor = sqlx::query_scalar!(
+            r#"
+            INSERT INTO actors (iri, url, type, username, instance_host, handle_host,
+                                handle, name, inbox_url, followers_url, public_key_pem)
+            VALUES ($1, $1, 'Person', $2, 'falls.test', 'falls.test', $2, $2, $1, $1, '')
+            RETURNING id
+            "#,
+            iri,
+            tag
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        let image = sqlx::query_scalar!(
+            r#"
+            INSERT INTO images (width, height, paint_duration, stroke_count, image_filename, tool)
+            VALUES (10, 10, '0'::interval, 0, $1, 'neo')
+            RETURNING id
+            "#,
+            format!("{tag}.png")
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        let post = sqlx::query_scalar!(
+            "INSERT INTO posts (author_id, image_id, published_at) VALUES ($1, $2, now()) RETURNING id",
+            author,
+            image
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+
+        for (emoji, read) in [("❤️", false), ("👍", true)] {
+            let reaction = format!("{iri}/{}", emoji.len());
+            sqlx::query!(
+                "INSERT INTO reactions (iri, post_id, actor_id, emoji) VALUES ($1, $2, $3, $4)",
+                reaction,
+                post,
+                actor,
+                emoji
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+            sqlx::query!(
+                r#"
+                INSERT INTO notifications (recipient_id, actor_id, notification_type,
+                                           post_id, reaction_iri, read_at)
+                VALUES ($1, $2, 'reaction', $3, $4, CASE WHEN $5 THEN now() END)
+                "#,
+                author,
+                actor,
+                post,
+                reaction,
+                read
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+
+        let unread = crate::models::reaction::delete_reaction(&mut tx, post, actor, "❤️")
+            .await
+            .unwrap();
+        assert_eq!(unread.into_readers().collect::<Vec<_>>(), [author]);
+        let read = crate::models::reaction::delete_reaction(&mut tx, post, actor, "👍")
+            .await
+            .unwrap();
+        assert!(read.is_empty(), "already read");
+        let gone = crate::models::reaction::delete_reaction(&mut tx, post, actor, "👍")
+            .await
+            .unwrap();
+        assert!(gone.is_empty(), "nothing to take back");
+        assert_eq!(get_badge_count(&mut tx, author).await.unwrap(), 0);
+
+        tx.rollback().await.unwrap();
+    }
 
     fn notification(kind: NotificationType) -> NotificationWithActor {
         NotificationWithActor {

@@ -1,4 +1,5 @@
 use crate::models::handle::LoginName;
+use crate::models::notification::BadgeFalls;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 
@@ -104,10 +105,24 @@ pub async fn find_guestbook_entry_by_id(
     }))
 }
 
+/// Deletes an entry and, first, the notifications it and its reply gave,
+/// rather than leaving them to the foreign key's cascade, which would not
+/// say whose badge they were on.
 pub async fn delete_guestbook_entry(
     tx: &mut Transaction<'_, Postgres>,
     entry_id: Uuid,
-) -> Result<()> {
+) -> Result<BadgeFalls> {
+    let retracted = query!(
+        r#"
+        DELETE FROM notifications
+        WHERE guestbook_entry_id = $1
+        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        "#,
+        entry_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
     query!(
         "
             DELETE FROM guestbook_entries
@@ -118,7 +133,10 @@ pub async fn delete_guestbook_entry(
     .execute(&mut **tx)
     .await?;
 
-    Ok(())
+    Ok(retracted
+        .into_iter()
+        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .collect())
 }
 
 pub async fn create_guestbook_entry(

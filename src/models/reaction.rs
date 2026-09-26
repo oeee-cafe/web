@@ -5,6 +5,7 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::models::handle::Handle;
+use crate::models::notification::BadgeFalls;
 
 // The reactions every post offers a button for. Any other emoji can be
 // reacted with too; it gets a button once someone has used it.
@@ -218,17 +219,19 @@ pub async fn get_reaction_counts(
     Ok(result)
 }
 
+/// Takes a reaction back. Its notification goes with it, deleted here
+/// rather than left to the foreign key's cascade, which would not say whose
+/// badge it was on.
 pub async fn delete_reaction(
     tx: &mut Transaction<'_, Postgres>,
     post_id: Uuid,
     actor_id: Uuid,
     emoji: &str,
-) -> Result<bool> {
-    let result = sqlx::query!(
+) -> Result<BadgeFalls> {
+    let iri = sqlx::query_scalar!(
         r#"
-        DELETE FROM reactions
+        SELECT iri FROM reactions
         WHERE post_id = $1 AND actor_id = $2 AND emoji = $3
-        RETURNING iri
         "#,
         post_id,
         actor_id,
@@ -237,7 +240,10 @@ pub async fn delete_reaction(
     .fetch_optional(&mut **tx)
     .await?;
 
-    Ok(result.is_some())
+    match iri {
+        Some(iri) => Ok(delete_reaction_by_iri(tx, &iri).await?.unwrap_or_default()),
+        None => Ok(BadgeFalls::none()),
+    }
 }
 
 pub async fn find_reaction_by_iri(
@@ -259,7 +265,23 @@ pub async fn find_reaction_by_iri(
     Ok(reaction)
 }
 
-pub async fn delete_reaction_by_iri(tx: &mut Transaction<'_, Postgres>, iri: &str) -> Result<bool> {
+/// `None` when there was no reaction with that iri. Its notification goes
+/// first, as in `delete_reaction`.
+pub async fn delete_reaction_by_iri(
+    tx: &mut Transaction<'_, Postgres>,
+    iri: &str,
+) -> Result<Option<BadgeFalls>> {
+    let retracted = sqlx::query!(
+        r#"
+        DELETE FROM notifications
+        WHERE reaction_iri = $1
+        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        "#,
+        iri
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
     let result = sqlx::query!(
         r#"
         DELETE FROM reactions
@@ -270,7 +292,15 @@ pub async fn delete_reaction_by_iri(tx: &mut Transaction<'_, Postgres>, iri: &st
     .execute(&mut **tx)
     .await?;
 
-    Ok(result.rows_affected() > 0)
+    if result.rows_affected() == 0 {
+        return Ok(None);
+    }
+    Ok(Some(
+        retracted
+            .into_iter()
+            .filter_map(|row| row.unread.then_some(row.recipient_id))
+            .collect(),
+    ))
 }
 
 pub async fn find_user_reaction(

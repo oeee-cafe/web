@@ -517,7 +517,7 @@ pub async fn do_delete_comment(
     }
 
     // Delete the comment
-    crate::models::comment::delete_comment(
+    let falls = crate::models::comment::delete_comment(
         &mut tx,
         comment_uuid,
         crate::models::comment::CommentDeletionReason::UserDeleted,
@@ -525,6 +525,7 @@ pub async fn do_delete_comment(
     .await?;
 
     tx.commit().await?;
+    state.push_service.badges_fell(falls);
     state.live.publish(crate::live::LiveEvent::Comments {
         post_id: comment.post_id,
         by: Some(user.id),

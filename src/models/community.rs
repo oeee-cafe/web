@@ -4,11 +4,13 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::query;
 use sqlx::query_as;
+use sqlx::query_scalar;
 use sqlx::Postgres;
 use sqlx::Transaction;
 use sqlx::Type;
 use uuid::Uuid;
 
+use super::notification::BadgeFalls;
 use super::post::SerializablePost;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Type, PartialEq, Eq)]
@@ -1176,46 +1178,70 @@ pub async fn get_invitation_by_id(
 pub async fn accept_invitation(
     tx: &mut Transaction<'_, Postgres>,
     invitation_id: Uuid,
-) -> Result<()> {
-    query!(
+) -> Result<BadgeFalls> {
+    let invitee = query_scalar!(
         r#"
         UPDATE community_invitations
         SET status = 'accepted', updated_at = now()
         WHERE id = $1 AND status = 'pending'
+        RETURNING invitee_id
         "#,
         invitation_id
     )
-    .execute(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await?;
 
-    Ok(())
+    Ok(invitee.into_iter().collect())
 }
 
 /// Reject an invitation
 pub async fn reject_invitation(
     tx: &mut Transaction<'_, Postgres>,
     invitation_id: Uuid,
-) -> Result<()> {
-    query!(
+) -> Result<BadgeFalls> {
+    let invitee = query_scalar!(
         r#"
         UPDATE community_invitations
         SET status = 'rejected', updated_at = now()
         WHERE id = $1 AND status = 'pending'
+        RETURNING invitee_id
         "#,
         invitation_id
     )
-    .execute(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await?;
 
-    Ok(())
+    Ok(invitee.into_iter().collect())
 }
 
-/// Soft delete a community and all its posts
+/// Withdraw an invitation still waiting for an answer.
+pub async fn withdraw_invitation(
+    tx: &mut Transaction<'_, Postgres>,
+    invitation_id: Uuid,
+    community_id: Uuid,
+) -> Result<BadgeFalls> {
+    let invitee = query_scalar!(
+        r#"
+        DELETE FROM community_invitations
+        WHERE id = $1 AND community_id = $2 AND status = 'pending'
+        RETURNING invitee_id
+        "#,
+        invitation_id,
+        community_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    Ok(invitee.into_iter().collect())
+}
+
+/// Soft delete a community and all its posts, and withdraw its pending
+/// invitations
 pub async fn soft_delete_community(
     tx: &mut Transaction<'_, Postgres>,
     slug: &str,
     user_id: Uuid,
-) -> Result<()> {
+) -> Result<BadgeFalls> {
     // First, verify the community exists and user is the owner
     let community = query!(
         r#"
@@ -1252,10 +1278,23 @@ pub async fn soft_delete_community(
     .execute(&mut **tx)
     .await?;
 
-    // Soft delete all posts in the community with cascade reason
-    crate::models::post::soft_delete_community_posts(tx, community.id).await?;
+    // Withdraw the invitations still waiting: there is nothing left to
+    // join, and each one was a number on its invitee's badge.
+    let withdrawn = query_scalar!(
+        r#"
+        DELETE FROM community_invitations
+        WHERE community_id = $1 AND status = 'pending'
+        RETURNING invitee_id
+        "#,
+        community.id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
 
-    Ok(())
+    // Soft delete all posts in the community with cascade reason
+    let mut falls = crate::models::post::soft_delete_community_posts(tx, community.id).await?;
+    falls.add(withdrawn.into_iter().collect());
+    Ok(falls)
 }
 
 pub async fn soft_delete_community_with_activity(
@@ -1264,7 +1303,7 @@ pub async fn soft_delete_community_with_activity(
     user_id: Uuid,
     _config: &crate::config::AppConfig,
     state: Option<&crate::web::state::AppState>,
-) -> Result<()> {
+) -> Result<BadgeFalls> {
     // First, get the community to find its ID
     let community = query!(
         r#"
@@ -1285,7 +1324,7 @@ pub async fn soft_delete_community_with_activity(
     let actor = super::actor::Actor::find_by_community_id(tx, community_id).await?;
 
     // Soft delete the community
-    soft_delete_community(tx, slug, user_id).await?;
+    let falls = soft_delete_community(tx, slug, user_id).await?;
 
     // If state is provided and actor exists, send ActivityPub Delete activity
     if let (Some(state), Some(actor)) = (state, actor) {
@@ -1305,5 +1344,5 @@ pub async fn soft_delete_community_with_activity(
         }
     }
 
-    Ok(())
+    Ok(falls)
 }

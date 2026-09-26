@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::community::CommunityVisibility;
+use super::notification::BadgeFalls;
 
 type PostData = (
     Option<String>,        // title
@@ -1734,7 +1735,7 @@ pub async fn delete_post(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
     reason: PostDeletionReason,
-) -> Result<()> {
+) -> Result<BadgeFalls> {
     let q = query!(
         "
         UPDATE posts
@@ -1766,23 +1767,27 @@ pub async fn delete_post(
     .await?;
 
     // Delete notifications referencing this post
-    query!(
-        "
+    let retracted = query!(
+        r#"
         DELETE FROM notifications
         WHERE post_id = $1
-        ",
+        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        "#,
         id
     )
-    .execute(&mut **tx)
+    .fetch_all(&mut **tx)
     .await?;
 
-    Ok(())
+    Ok(retracted
+        .into_iter()
+        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .collect())
 }
 
 pub async fn soft_delete_community_posts(
     tx: &mut Transaction<'_, Postgres>,
     community_id: Uuid,
-) -> Result<()> {
+) -> Result<BadgeFalls> {
     query!(
         "
         UPDATE posts
@@ -1803,26 +1808,30 @@ pub async fn soft_delete_community_posts(
     // This allows for potential recovery if the community is restored
 
     // Delete notifications for posts in this community
-    query!(
-        "
+    let retracted = query!(
+        r#"
         DELETE FROM notifications
         WHERE post_id IN (
             SELECT id FROM posts WHERE community_id = $1
         )
-        ",
+        RETURNING recipient_id, read_at IS NULL AS "unread!"
+        "#,
         community_id
     )
-    .execute(&mut **tx)
+    .fetch_all(&mut **tx)
     .await?;
 
-    Ok(())
+    Ok(retracted
+        .into_iter()
+        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .collect())
 }
 
 pub async fn delete_post_with_activity(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
     app_state: Option<&crate::web::state::AppState>,
-) -> Result<()> {
+) -> Result<BadgeFalls> {
     // First, get post details before deletion
     let post = find_post_by_id(tx, id).await?;
     let post = match post {
@@ -1838,7 +1847,7 @@ pub async fn delete_post_with_activity(
     let author_id = uuid::Uuid::parse_str(author_id_str)?;
 
     // Perform the deletion
-    delete_post(tx, id, PostDeletionReason::UserDeleted).await?;
+    let falls = delete_post(tx, id, PostDeletionReason::UserDeleted).await?;
 
     // If app_state is provided, send ActivityPub Delete activity
     if let Some(state) = app_state {
@@ -1863,5 +1872,5 @@ pub async fn delete_post_with_activity(
         }
     }
 
-    Ok(())
+    Ok(falls)
 }

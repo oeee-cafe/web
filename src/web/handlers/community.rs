@@ -10,7 +10,8 @@ use crate::models::community::{
     get_public_communities_paginated, get_user_role_in_community, is_user_member, leave_community,
     reject_invitation, remove_community_member, search_public_communities,
     slug_conflicts_with_user, soft_delete_community_with_activity, update_community_with_activity,
-    Community, CommunityDraft, CommunityMemberRole, CommunitySort, CommunityVisibility,
+    withdraw_invitation, Community, CommunityDraft, CommunityMemberRole, CommunitySort,
+    CommunityVisibility,
 };
 use crate::models::notification::{
     format_community_invitation_message, get_user_language_preference,
@@ -1619,7 +1620,7 @@ pub async fn do_accept_invitation(
     let inviter_id = invitation.inviter_id;
 
     // Accept the invitation
-    accept_invitation(&mut tx, invitation_id).await?;
+    let falls = accept_invitation(&mut tx, invitation_id).await?;
 
     // Add user as a member
     add_community_member(
@@ -1638,7 +1639,7 @@ pub async fn do_accept_invitation(
         .flatten();
 
     tx.commit().await?;
-    state.push_service.refresh_badge(user.id);
+    state.push_service.badges_fell(falls);
 
     // Send push notification to inviter with localized message
     let (title, body) = format_community_invitation_message(
@@ -1761,7 +1762,7 @@ pub async fn do_reject_invitation(
     let inviter_id = invitation.inviter_id;
 
     // Reject the invitation
-    reject_invitation(&mut tx, invitation_id).await?;
+    let falls = reject_invitation(&mut tx, invitation_id).await?;
 
     // Get inviter's language preference before committing transaction
     let inviter_language = get_user_language_preference(&mut tx, inviter_id)
@@ -1770,7 +1771,7 @@ pub async fn do_reject_invitation(
         .flatten();
 
     tx.commit().await?;
-    state.push_service.refresh_badge(user.id);
+    state.push_service.badges_fell(falls);
 
     // Send push notification to inviter with localized message
     let (title, body) = format_community_invitation_message(
@@ -1885,18 +1886,10 @@ pub async fn retract_invitation(
     }
 
     // Delete the invitation
-    let invitee_id = sqlx::query_scalar!(
-        "DELETE FROM community_invitations WHERE id = $1 AND community_id = $2 AND status = 'pending' RETURNING invitee_id",
-        invitation_id,
-        community.id
-    )
-    .fetch_optional(&mut *tx)
-    .await?;
+    let falls = withdraw_invitation(&mut tx, invitation_id, community.id).await?;
 
     tx.commit().await?;
-    if let Some(invitee_id) = invitee_id {
-        state.push_service.refresh_badge(invitee_id);
-    }
+    state.push_service.badges_fell(falls);
 
     // Return empty HTML for HTMX to remove the row
     Ok(Html(String::new()).into_response())
@@ -2074,10 +2067,12 @@ pub async fn hx_delete_community(
     let mut tx = db.begin().await?;
 
     // Attempt to delete the community
-    soft_delete_community_with_activity(&mut tx, &slug, user.id, &state.config, Some(&state))
-        .await?;
+    let falls =
+        soft_delete_community_with_activity(&mut tx, &slug, user.id, &state.config, Some(&state))
+            .await?;
 
     tx.commit().await?;
+    state.push_service.badges_fell(falls);
 
     // Redirect to communities list
     Ok(([("HX-Redirect", "/communities")],).into_response())

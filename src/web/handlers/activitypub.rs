@@ -101,8 +101,8 @@ use crate::models::community::{find_community_by_id, find_community_by_slug, Com
 use crate::models::follow;
 use crate::models::image::find_image_by_id;
 use crate::models::notification::{
-    create_notification, get_badge_count, get_notification_by_id, send_push_for_notification,
-    CreateNotificationParams, NotificationType,
+    create_notification, get_badge_count, get_notification_by_id, retract_follow_notifications,
+    send_push_for_notification, BadgeFalls, CreateNotificationParams, NotificationType,
 };
 use crate::models::post::find_post_by_id;
 use crate::models::user::{find_user_by_id, find_user_by_login_name};
@@ -1075,26 +1075,15 @@ impl Activity for Undo {
                 );
 
                 // Delete follow notification
+                let mut falls = BadgeFalls::none();
                 if let Some(following_user_id) = following_actor.user_id {
-                    match sqlx::query!(
-                        r#"
-                        DELETE FROM notifications
-                        WHERE recipient_id = $1
-                          AND actor_id = $2
-                          AND notification_type = 'follow'
-                        "#,
-                        following_user_id,
-                        follower_actor.id
-                    )
-                    .execute(&mut *tx)
-                    .await
-                    {
-                        Ok(_) => tracing::info!("Deleted follow notification"),
-                        Err(e) => tracing::warn!("Failed to delete follow notification: {:?}", e),
-                    }
+                    falls =
+                        retract_follow_notifications(&mut tx, following_user_id, follower_actor.id)
+                            .await?;
                 }
 
                 tx.commit().await?;
+                data.push_service.badges_fell(falls);
             }
             UndoObject::Like(like) => {
                 tracing::info!("Undo type: Like (removing ❤️ reaction)");
@@ -1102,9 +1091,10 @@ impl Activity for Undo {
 
                 // Delete reaction by IRI
                 use crate::models::reaction::delete_reaction_by_iri;
-                if delete_reaction_by_iri(&mut tx, like.id.as_str()).await? {
+                if let Some(falls) = delete_reaction_by_iri(&mut tx, like.id.as_str()).await? {
                     tracing::info!("Deleted ❤️ reaction with IRI: {}", like.id);
                     tx.commit().await?;
+                    data.push_service.badges_fell(falls);
                 } else {
                     tracing::warn!("Failed to delete reaction with IRI: {}", like.id);
                 }
@@ -1118,9 +1108,10 @@ impl Activity for Undo {
 
                 // Delete reaction by IRI
                 use crate::models::reaction::delete_reaction_by_iri;
-                if delete_reaction_by_iri(&mut tx, react.id.as_str()).await? {
+                if let Some(falls) = delete_reaction_by_iri(&mut tx, react.id.as_str()).await? {
                     tracing::info!("Deleted {} reaction with IRI: {}", react.content, react.id);
                     tx.commit().await?;
+                    data.push_service.badges_fell(falls);
                 } else {
                     tracing::warn!("Failed to delete reaction with IRI: {}", react.id);
                 }
@@ -2135,15 +2126,20 @@ impl Activity for Delete {
             if let Ok(post_id) = uuid::Uuid::parse_str(post_id_str) {
                 // Mark the post as deleted in our database
                 use crate::models::post::{delete_post, PostDeletionReason};
-                if let Err(e) = delete_post(&mut tx, post_id, PostDeletionReason::UserDeleted).await
-                {
-                    tracing::warn!(
-                        "Failed to delete post {} from Delete activity: {:?}",
-                        post_id,
-                        e
-                    );
-                }
+                let falls =
+                    match delete_post(&mut tx, post_id, PostDeletionReason::UserDeleted).await {
+                        Ok(falls) => falls,
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to delete post {} from Delete activity: {:?}",
+                                post_id,
+                                e
+                            );
+                            BadgeFalls::none()
+                        }
+                    };
                 tx.commit().await?;
+                data.push_service.badges_fell(falls);
             }
         } else {
             // Check if this is a comment deletion by IRI
@@ -2160,9 +2156,10 @@ impl Activity for Delete {
                 if let Some(deleting_actor) = deleting_actor {
                     if comment.actor_id == deleting_actor.id {
                         // Actor owns the comment, proceed with deletion
-                        if delete_comment_by_iri(&mut tx, &object_url).await? {
+                        if let Some(falls) = delete_comment_by_iri(&mut tx, &object_url).await? {
                             tracing::info!("Deleted comment with IRI: {}", object_url);
                             tx.commit().await?;
+                            data.push_service.badges_fell(falls);
                             data.live.publish(LiveEvent::Comments {
                                 post_id: comment.post_id,
                                 by: None,

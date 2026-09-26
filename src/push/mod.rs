@@ -3,7 +3,7 @@ pub mod fcm;
 
 use crate::live::{Live, LiveEvent};
 use crate::models::device::{delete_invalid_device, get_user_devices_by_platform, PlatformType};
-use crate::models::notification::get_badge_count;
+use crate::models::notification::{get_badge_count, BadgeFalls};
 use crate::AppConfig;
 use anyhow::Result;
 use apns::ApnsClient;
@@ -235,15 +235,27 @@ impl PushService {
     ///
     /// The reader's open pages are told as well (crate::live), which is what
     /// takes the bell down in another tab when one is read here.
-    pub fn refresh_badge(self: &Arc<Self>, user_id: uuid::Uuid) {
+    ///
+    /// Called with what a transaction took off, after it commits: the
+    /// readers whose count is lower now than the last number sent. One task
+    /// takes them in turn, so a post deleted with forty readers' reactions on
+    /// it holds one Postgres connection at a time, not forty. Each reader is
+    /// one PUBLISH on a pooled Redis connection (Live::publish), never a new
+    /// connection.
+    pub fn badges_fell(self: &Arc<Self>, falls: BadgeFalls) {
+        if falls.is_empty() {
+            return;
+        }
         let devices = self.apns_client.is_some() || self.fcm_client.is_some();
         if !devices && self.live.is_none() {
             return;
         }
         let this = Arc::clone(self);
         tokio::spawn(async move {
-            if let Err(e) = this.send_badge_to_user(user_id, devices).await {
-                tracing::warn!("Failed to refresh the badge for user {}: {:?}", user_id, e);
+            for user_id in falls.into_readers() {
+                if let Err(e) = this.send_badge_to_user(user_id, devices).await {
+                    tracing::warn!("Failed to refresh the badge for user {}: {:?}", user_id, e);
+                }
             }
         });
     }
