@@ -307,6 +307,13 @@
         "type": "window"
       }
     ],
+    "password": [
+      {
+        "id": "1",
+        "v": 1,
+        "type": "password"
+      }
+    ],
     "caption": [
       {
         "place": {
@@ -328,6 +335,7 @@
     "signIn.answer",
     "signIn.resume",
     "signIn.unopened",
+    "password.answer",
     "store.prices",
     "store.purchased",
     "store.ended",

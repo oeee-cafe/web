@@ -10,7 +10,7 @@
      or an account they do not have yet -- each a section of its own under a
      question, rather than a line of small print under the form. #}
   <div class="auth-page">
-    <form method="post" class="ds-card auth-card auth-card-providers">
+    <form method="post" class="ds-card auth-card auth-card-providers" data-saved-password="sign-in">
       <h1 class="auth-title">{{ ftl_get_message("sign-in") }}</h1>
       {% if linking_provider %}
         {# Arrived from signing in with Steam, say, to an account that is

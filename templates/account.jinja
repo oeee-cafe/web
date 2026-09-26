@@ -34,7 +34,7 @@
     <section class="settings-group">
       {% if has_password %}
       <div class="profile-section-label">{{ ftl_get_message("account-change-password") }}</div>
-      <form method="post" action="/account/password" class="ds-card settings-card">
+      <form method="post" action="/account/password" class="ds-card settings-card" data-saved-password="confirm">
         <div class="form-field">
           <label class="ds-label" for="current_password">{{ ftl_get_message("account-change-password-current") }}</label>
           <input class="ds-input" name="current_password" id="current_password" type="password" autocomplete="current-password" />
@@ -185,7 +185,7 @@
 
     <section class="settings-group settings-danger">
       <div class="profile-section-label">{{ ftl_get_message("account-delete") }}</div>
-      <form id="delete-account-form"
+      <form id="delete-account-form" data-saved-password="confirm"
             class="ds-card settings-card"
             hx-delete="/account/delete"
             hx-confirm="{{ ftl_get_message("account-delete-confirm") }}"
