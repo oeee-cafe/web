@@ -371,7 +371,7 @@
 
     <section>
       <h2>Notices</h2>
-      <p class="ds-help">Flash messages and the htmx error banner, as rows of the header. The level is the colour; Info and Debug are plain.</p>
+      <p class="ds-help">Flash messages and the htmx error banner, as rows of the header. The level is the colour; Info and Debug are plain, with the accent's dot.</p>
       <ul class="ds-notices" style="border-top: 1px solid var(--ds-line)">
         {% for level, text in [("info", "Your drawing is saved as a draft."), ("success", "Welcome, 날다람지!"), ("warning", "This community is about to be archived."), ("error", "The passwords did not match. 비밀번호가 일치하지 않습니다.")] %}
           <li class="ds-notice ds-notice-{{ level }}">
