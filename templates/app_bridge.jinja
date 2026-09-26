@@ -35,7 +35,7 @@
             The number on the bell (nav_notifications.jinja): unread
             notifications and invitations waiting, together. Sent whenever it
             changes, which is when a request swaps the bell.
-   theme    {choice, ground, grid}
+   theme    {choice, ground, grid, toolbar}
             `choice` is "light", "dark" or "system", as the reader picked it
             in the toolbar; what "system" comes to is the app's to know.
             `ground` and `grid` are the design system's --ds-ground and
@@ -44,8 +44,12 @@
             it every 14px. An app draws the same field wherever it draws
             against the page -- its bars, under an overscroll, behind the
             window before the page arrives -- rather than keep its own copy
-            of NEO's colours in step with this one. Null on a page without
-            the design system's stylesheet.
+            of NEO's colours in step with this one. `toolbar` is the
+            toolbar's own ground (--ds-toolbar), which is the page's today
+            but need not be: what an app draws directly above the toolbar --
+            the strip behind the status bar -- is this, so the two read as
+            one bar. Each is null on a page without the design system's
+            stylesheet.
    words    {leaveTitle, leaveBody, leave, stay, saveImage, copyImage,
              share, copyLink, savedImage, savedFile, saveFailed}
             What an app says in dialogs and menus of its own over the page
@@ -253,7 +257,8 @@
       return {
         choice: root.getAttribute("data-theme") || "system",
         ground: token("--ds-ground"),
-        grid: token("--ds-grid")
+        grid: token("--ds-grid"),
+        toolbar: token("--ds-toolbar")
       };
     }
     // A design-system colour as the root resolves it now, theme included;

@@ -72,6 +72,12 @@
      NEO's night blue. */
   --ds-ground: #ccccff;
   --ds-grid: #bbbbff;
+  /* The toolbar's own ground: the page's, for now, in either theme. A
+     token of its own because the apps paint what is above the toolbar --
+     the strip behind an iPhone's status bar -- in it (the bridge's
+     `theme.toolbar`, app_bridge.jinja), so a toolbar given another colour
+     takes that strip along instead of leaving it the page's. */
+  --ds-toolbar: var(--ds-ground);
   /* The grid line as a solid colour, for grounds drawn by the painter. */
   --ds-grid-solid: #bbbbff;
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
@@ -737,7 +743,7 @@ html:not([data-app="windows"]):has(> body.ds-page) {
 
 @media (min-width: 601px) and (prefers-reduced-transparency: reduce) {
   html[data-app="macos"] .ds-page > header::before {
-    background-color: var(--ds-ground);
+    background-color: var(--ds-toolbar);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -755,7 +761,7 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: var(--ds-ground);
+  background-color: var(--ds-toolbar);
   border-bottom: 1px solid var(--ds-line);
   color: var(--ds-ink);
   font-family: var(--ds-font);
