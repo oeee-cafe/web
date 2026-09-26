@@ -204,7 +204,10 @@
 
            Only its brush, square like the icons beside it: its words are
            its label and tooltip. It keeps the lime fill, the one filled
-           control in the bar. #}
+           control in the bar.
+
+           A press asks for the canvas size first (draw_dialog.jinja); the
+           300 × 300 here is what it sends without script. #}
         <form action="/draw" method="post" hx-boost="false">
           <input type="hidden" name="tool" value="neo" />
           <input type="hidden" name="width" value="300" />
@@ -510,6 +513,7 @@
         "about": function () { go("/about"); },
         "new-drawing": function () {
           var draw = document.getElementById("nav-draw-button");
+          if (draw && window.oeeeDrawDialog && window.oeeeDrawDialog.open()) return;
           if (draw && draw.form) {
             if (window.oeeeLoadingBar) window.oeeeLoadingBar.leave(function () { draw.form.submit(); });
             else draw.form.submit();
