@@ -134,7 +134,6 @@ fn is_hex_colour(colour: &Option<String>) -> bool {
     })
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

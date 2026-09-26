@@ -3677,11 +3677,20 @@ mod template_tests {
         };
         let follow = render("follow_button.jinja");
         assert!(follow.contains("data-optimistic-toggle"));
-        assert!(follow.contains(r#"data-pressed-label="unfollow""#), "got: {follow}");
+        assert!(
+            follow.contains(r#"data-pressed-label="unfollow""#),
+            "got: {follow}"
+        );
         assert!(follow.contains(r#"hx-sync="this:drop""#));
-        assert!(!follow.contains("hx-disable"), "a disabled button would dim the answer shown");
+        assert!(
+            !follow.contains("hx-disable"),
+            "a disabled button would dim the answer shown"
+        );
         let unfollow = render("unfollow_button.jinja");
-        assert!(unfollow.contains(r#"data-pressed-label="follow""#), "got: {unfollow}");
+        assert!(
+            unfollow.contains(r#"data-pressed-label="follow""#),
+            "got: {unfollow}"
+        );
     }
 
     #[test]
@@ -3850,7 +3859,10 @@ mod template_tests {
                 published_at: Some(chrono::Utc::now()),
             }],
         );
-        assert!(!found.contains("search-people"), "no one matched, so no heading for them");
+        assert!(
+            !found.contains("search-people"),
+            "no one matched, so no heading for them"
+        );
         assert!(found.contains(r#"href="/@someone/00000000-0000-0000-0000-000000000000""#));
         assert!(found.contains("/image/ab/abcdef0123.png"));
         assert!(!found.contains("search-no-results"));
@@ -3878,8 +3890,14 @@ mod template_tests {
         assert!(people.contains("search-people"));
         assert!(people.contains(r#"href="/@oeee""#));
         assert!(people.contains("/image/ab/abcdef.png"));
-        assert!(people.contains("profile-follow-blank"), "no banner, a frame with the name");
-        assert!(people.contains("오이 &lt;b&gt;"), "a name is text, not markup");
+        assert!(
+            people.contains("profile-follow-blank"),
+            "no banner, a frame with the name"
+        );
+        assert!(
+            people.contains("오이 &lt;b&gt;"),
+            "a name is text, not markup"
+        );
         assert!(
             !people.contains("search-no-results"),
             "people found is a result, drawings or not"
