@@ -1206,27 +1206,25 @@ describe("what the apps test against (appContract.json)", () => {
     }
   });
 
-  it("hands Windows a notification while its window is behind, and leaves the push to the others", async () => {
+  it("shows a notification as a toast in every app, and hands Windows the words for its own", async () => {
     const toasts = (page: Page) => page.window.document.querySelectorAll("#toasts .ds-toast").length;
     const notified = (page: Page) => page.sent.filter((message) => message.type === "notify");
 
-    const behind = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", live: { focused: false } });
-    hear(behind, "notification", NOTIFICATION);
-    expect(notified(behind).map(keys)).toEqual([["body", "title", "type", "url", "v"]]);
-    expect(toasts(behind)).toBe(0);
+    // Windows is sent no push, so the app is handed the words, in front or not.
+    for (const focused of [false, true]) {
+      const windows = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", live: { focused } });
+      hear(windows, "notification", NOTIFICATION);
+      expect(notified(windows).map(keys), `focused: ${focused}`).toEqual([["body", "title", "type", "url", "v"]]);
+      expect(toasts(windows), `focused: ${focused}`).toBe(1);
+    }
 
-    // In front, the page says it itself, as it does on the website.
-    const inFront = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", live: { focused: true } });
-    hear(inFront, "notification", NOTIFICATION);
-    expect(notified(inFront)).toEqual([]);
-    expect(toasts(inFront)).toBe(1);
-
-    // The Mac and the phones are sent a push, so the page says nothing.
+    // The Mac and the phones are sent a push for it; the page shows its toast
+    // beside that, and asks the app for nothing.
     for (const app of ["macos store/apple", "ios", "android"]) {
-      const pushed = await open({ userAgent: `Mozilla/5.0 OeeeCafe platform/${app}`, live: { focused: false } });
+      const pushed = await open({ userAgent: `Mozilla/5.0 OeeeCafe platform/${app}`, live: { focused: true } });
       hear(pushed, "notification", NOTIFICATION);
       expect(notified(pushed), app).toEqual([]);
-      expect(toasts(pushed), app).toBe(0);
+      expect(toasts(pushed), app).toBe(1);
     }
   });
 
