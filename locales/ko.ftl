@@ -508,6 +508,7 @@ app-store-badge = App Store에서 다운로드하기
 google-play-badge = Google Play에서 받으세요
 about-elsewhere = 다른 곳에서
 about-documents = 문서
+about-design = 디자인 시스템
 about-version = 버전
 post-no-reactions = 아직 반응이 없습니다.
 sign-in-with-steam = Steam으로 로그인

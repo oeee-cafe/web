@@ -536,6 +536,7 @@ app-store-badge = Download on the App Store
 google-play-badge = Get it on Google Play
 about-elsewhere = Elsewhere
 about-documents = Documents
+about-design = Design System
 about-version = Version
 post-no-reactions = No reactions yet.
 sign-in-with-steam = Sign in with Steam
