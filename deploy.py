@@ -119,7 +119,7 @@ HEALTH_TIMEOUT_SECONDS = int(os.environ.get("HEALTH_TIMEOUT_SECONDS", "180"))
 SENTRY_UPLOAD = os.environ.get("SENTRY_UPLOAD", "")
 SENTRY_ENV = {
     "SENTRY_ORG": os.environ.get("SENTRY_ORG", "limeburst"),
-    "SENTRY_PROJECT": os.environ.get("SENTRY_PROJECT", "oeee-cafe"),
+    "SENTRY_PROJECT": os.environ.get("SENTRY_PROJECT", "oeee-cafe-web"),
 }
 # Where the browser bundles report (frontend/shared/sentry.ts), which is a
 # project of its own; their source maps go there.
