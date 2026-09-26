@@ -1,0 +1,171 @@
+{# The quick switcher: Ctrl+K, or ⌘K on a Mac, from anywhere on the site's
+   own pages, and the `jump` command for the apps' menus (toolbar.jinja).
+   A field and one list under it -- communities, people, tags and pages,
+   from /jump (web::handlers::jump, jump_results.jinja) -- moved through
+   with the arrow keys and left with Enter, the way a chat application's
+   switcher is. The field keeps the focus throughout, and the list says
+   which row is chosen with aria-activedescendant.
+
+   Fetched with fetch() rather than htmx, so it works where htmx does not
+   run (Firefox 56); a newer answer always wins over an older one that
+   arrives after it. Going to a row is the toolbar's own `go`, with its
+   loading bar and its skeleton. #}
+<div class="jump" id="jump" hidden>
+  <div class="jump-panel" role="dialog" aria-modal="true" aria-label="{{ ftl_get_message('jump-title') }}">
+    <input id="jump-field"
+           class="jump-field"
+           type="text"
+           role="combobox"
+           aria-expanded="true"
+           aria-controls="jump-list"
+           aria-autocomplete="list"
+           autocomplete="off"
+           autocapitalize="off"
+           spellcheck="false"
+           placeholder="{{ ftl_get_message('jump-placeholder') }}" />
+    <ul id="jump-list" class="jump-list" role="listbox" aria-label="{{ ftl_get_message('jump-title') }}"></ul>
+    <p class="jump-hint">{{ ftl_get_message("jump-hint") }}</p>
+  </div>
+</div>
+<script>
+  (function () {
+    if (window.oeeeJump) return;
+    var WAIT_MS = 80;
+    var asked = 0;
+    var pending = null;
+    var returnTo = null;
+
+    function el(id) {
+      return document.getElementById(id);
+    }
+    function rows() {
+      var list = el("jump-list");
+      return list ? list.querySelectorAll(".jump-item") : [];
+    }
+    function chosen() {
+      var list = el("jump-list");
+      return list ? list.querySelector('.jump-item[aria-selected="true"]') : null;
+    }
+    function choose(index) {
+      var all = rows();
+      var field = el("jump-field");
+      if (!all.length) {
+        if (field) field.removeAttribute("aria-activedescendant");
+        return;
+      }
+      index = (index + all.length) % all.length;
+      for (var i = 0; i < all.length; i++) {
+        all[i].id = "jump-row-" + i;
+        all[i].setAttribute("aria-selected", i === index ? "true" : "false");
+      }
+      if (field) field.setAttribute("aria-activedescendant", all[index].id);
+      if (all[index].scrollIntoView) all[index].scrollIntoView({ block: "nearest" });
+    }
+    function indexOf(row) {
+      var all = rows();
+      for (var i = 0; i < all.length; i++) if (all[i] === row) return i;
+      return -1;
+    }
+    function load(q) {
+      var mine = ++asked;
+      fetch("/jump?q=" + encodeURIComponent(q), { credentials: "same-origin" })
+        .then(function (response) {
+          if (!response.ok) throw new Error(String(response.status));
+          return response.text();
+        })
+        .then(function (html) {
+          var list = el("jump-list");
+          if (mine !== asked || !list) return;
+          list.innerHTML = html;
+          choose(0);
+        })
+        .catch(function () {});
+    }
+    function open() {
+      var jump = el("jump");
+      var field = el("jump-field");
+      if (!jump || !field) return;
+      if (!jump.hidden) {
+        field.select();
+        return;
+      }
+      returnTo = document.activeElement;
+      jump.hidden = false;
+      field.value = "";
+      load("");
+      field.focus();
+    }
+    function close() {
+      var jump = el("jump");
+      if (!jump || jump.hidden) return;
+      jump.hidden = true;
+      if (returnTo && returnTo.focus && document.contains(returnTo)) returnTo.focus();
+      returnTo = null;
+    }
+    function follow(row, event) {
+      if (!row) return;
+      var inTab = event && (event.metaKey || event.ctrlKey || event.shiftKey);
+      var href = row.getAttribute("href");
+      if (inTab) {
+        window.open(href, "_blank");
+        return;
+      }
+      close();
+      var name = row.getAttribute("data-command");
+      if (name && window.oeeeCommand && window.oeeeCommand(name)) return;
+      if (window.oeeeGo) window.oeeeGo(href);
+      else location.href = href;
+    }
+    window.oeeeJump = { open: open, close: close };
+
+    document.addEventListener("keydown", function (event) {
+      var key = event.key && event.key.toLowerCase();
+      if (key === "k" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+        if (!document.body || !document.body.classList.contains("ds-page")) return;
+        event.preventDefault();
+        var jump = el("jump");
+        if (jump && !jump.hidden) close();
+        else open();
+        return;
+      }
+      if (!event.target || event.target.id !== "jump-field") return;
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        choose(indexOf(chosen()) + (event.key === "ArrowDown" ? 1 : -1));
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        follow(chosen(), event);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      } else if (event.key === "Tab") {
+        // The field is the dialog's one stop; the list is chosen from it.
+        event.preventDefault();
+        choose(indexOf(chosen()) + (event.shiftKey ? -1 : 1));
+      }
+    });
+    document.addEventListener("input", function (event) {
+      if (!event.target || event.target.id !== "jump-field") return;
+      clearTimeout(pending);
+      var q = event.target.value;
+      pending = setTimeout(function () { load(q); }, WAIT_MS);
+    });
+    document.addEventListener("mousemove", function (event) {
+      var row = event.target && event.target.closest ? event.target.closest("#jump-list .jump-item") : null;
+      if (row && row.getAttribute("aria-selected") !== "true") choose(indexOf(row));
+    });
+    document.addEventListener("click", function (event) {
+      var target = event.target;
+      if (!target || !target.closest) return;
+      if (target.id === "jump") {
+        close();
+        return;
+      }
+      var row = target.closest("#jump-list .jump-item");
+      if (!row || event.button !== 0) return;
+      event.preventDefault();
+      follow(row, event);
+    });
+  })();
+</script>

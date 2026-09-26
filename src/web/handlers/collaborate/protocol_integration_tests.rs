@@ -21,7 +21,7 @@ use crate::redis::RedisPool;
 const SEQUENCED: u8 = 0x0a;
 const CAUGHT_UP: u8 = 0x0f;
 
-pub(super) struct RedisProcess(Option<Child>);
+pub(crate) struct RedisProcess(Option<Child>);
 
 impl Drop for RedisProcess {
     fn drop(&mut self) {
@@ -61,7 +61,7 @@ fn unused_port() -> u16 {
         .port()
 }
 
-pub(super) async fn start_redis() -> (RedisProcess, String) {
+pub(crate) async fn start_redis() -> (RedisProcess, String) {
     if let Ok(url) = std::env::var("OEEE_TEST_REDIS_URL") {
         wait_for_redis(&url).await;
         return (RedisProcess(None), url);

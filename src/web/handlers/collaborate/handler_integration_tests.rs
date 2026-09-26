@@ -256,6 +256,7 @@ async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
         redis_state: RedisStateManager::new(pool),
         room_fanout: RoomFanout::new(&redis_url),
         push_service: Arc::new(PushService::disabled(db.clone())),
+        live: crate::live::Live::local(),
         shutdown: Shutdown::new(),
     };
     let app = Router::new()

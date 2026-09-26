@@ -231,7 +231,8 @@
         {# The list alone is what posting a comment replaces; the form stays.
            It used to be inside the replaced element, so after one comment
            there was nowhere to write the next without reloading. #}
-        <div id="comments" class="ds-selectable">
+        {# data-live-post: fetched again when someone else comments (live.jinja). #}
+        <div id="comments" class="ds-selectable" data-live-post="{{ post_id }}">
           {% if comments %}
             {{ comments_macro.comments(comments, current_user, supporters) }}
           {% else %}

@@ -320,7 +320,7 @@ pub async fn find_posts_by_tag(
 ///
 /// `_` is a legal character in a tag and `%` is not, so without this, typing
 /// `%` listed every tag on the site and `_` silently matched any character.
-fn escape_like(query: &str) -> String {
+pub fn escape_like(query: &str) -> String {
     query
         .replace('\\', "\\\\")
         .replace('%', "\\%")

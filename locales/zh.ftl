@@ -32,6 +32,7 @@ feed-communities-empty = 你加入的社区还没有新作品。去<a href="/com
 feed-period-month = { $month }月
 feed-period-month-year = { $year }年{ $month }月
 feed-view-drawings = 作品
+feed-new-drawings = 新作品
 feed-view-comments = 评论
 recent-comments-more = 查看更多评论
 loading-more-comments = 正在加载更多评论...
@@ -235,6 +236,16 @@ tag-no-posts = 暂无使用此标签的作品
 tag-discovery = 标签
 tag-search-placeholder = 搜索标签...
 search = 搜索
+
+jump-title = 快速跳转
+jump-placeholder = 去哪里？社区、用户、标签…
+jump-communities = 社区
+jump-people = 用户
+jump-tags = 标签
+jump-pages = 页面
+jump-search-drawings = 搜索作品：
+jump-empty = 没有这个名字
+jump-hint = ↑↓ 选择 · Enter 前往 · Esc 关闭
 search-results-for = 搜索结果
 search-placeholder = 搜索作品
 search-posts = 作品

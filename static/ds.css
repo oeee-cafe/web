@@ -76,6 +76,13 @@
   --ds-grid-solid: #bbbbff;
   /* Surfaces: what sits on the ground -- fields, menus, cards. */
   --ds-surface: #f2f2ff;
+  /* Chrome: the toolbar's own ground, set apart from the page's the way an
+     application's frame is from its content -- lighter than the lavender
+     here, darker than the night blue in dark, and flat: the grid is the
+     page's, and stops at the toolbar's edge. What sits on it is a step
+     lighter again, so its buttons stay buttons. */
+  --ds-chrome: #f7f7ff;
+  --ds-chrome-surface: #ffffff;
   /* The chosen segment of a segmented control, raised out of its track
      (--ds-track): the card's colour where that is lighter than the track,
      as it is here. */
@@ -137,6 +144,8 @@
     --ds-grid: #22223f;
     --ds-grid-solid: #22223f;
     --ds-surface: #25254a;
+    --ds-chrome: #0e0e1f;
+    --ds-chrome-surface: #25254a;
     /* The card is darker than the track here, so it would sink, not rise. */
     --ds-thumb: #3d3d70;
     --ds-track: #25253c;
@@ -172,6 +181,8 @@
   --ds-grid: #22223f;
   --ds-grid-solid: #22223f;
   --ds-surface: #25254a;
+  --ds-chrome: #0e0e1f;
+  --ds-chrome-surface: #25254a;
   --ds-thumb: #3d3d70;
   --ds-track: #25253c;
   --ds-field: #1c1c38;
@@ -498,20 +509,17 @@ html:not([data-app="windows"]):has(> body.ds-page) {
    header overrides it with `position: absolute`, being the more specific
    rule.
 
-   Opaque, because the content now passes beneath: the ground and its grid,
-   the same pair the page carries. Nothing in it shows the grid today -- the
-   toolbar has its own ground and each notice row its own tint, edge to edge,
-   so the header is exactly the toolbar and its rows -- but a gap between
-   them would show the page's ground rather than the content under it. */
+   Opaque, because the content now passes beneath, and in the chrome's
+   colour (--ds-chrome), the frame's and not the page's. Everything drawn
+   inside it reads its surface from the chrome's too, so the bar's buttons
+   and menus keep their step above what they sit on. */
 .ds-page > header {
+  --ds-surface: var(--ds-chrome-surface);
   position: -webkit-sticky;
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: var(--ds-ground);
-  background-image: linear-gradient(var(--ds-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
-  background-size: 14px 14px;
+  background-color: var(--ds-chrome);
 }
 
 @media (min-width: 601px) {
@@ -679,17 +687,17 @@ html:not([data-app="windows"]):has(> body.ds-page) {
 
    On the website, on Windows and on phones, nothing here applies. */
 :root {
-  --ds-bar: rgba(204, 204, 255, 0.72);
+  --ds-bar: rgba(247, 247, 255, 0.72);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ds-bar: rgba(23, 23, 43, 0.72);
+    --ds-bar: rgba(14, 14, 31, 0.72);
   }
 }
 
 :root[data-theme="dark"] {
-  --ds-bar: rgba(23, 23, 43, 0.72);
+  --ds-bar: rgba(14, 14, 31, 0.72);
 }
 
 @media (min-width: 601px) {
@@ -737,7 +745,7 @@ html:not([data-app="windows"]):has(> body.ds-page) {
 
 @media (min-width: 601px) and (prefers-reduced-transparency: reduce) {
   html[data-app="macos"] .ds-page > header::before {
-    background-color: var(--ds-ground);
+    background-color: var(--ds-chrome);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -755,7 +763,7 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: var(--ds-ground);
+  background-color: var(--ds-chrome);
   border-bottom: 1px solid var(--ds-line);
   color: var(--ds-ink);
   font-family: var(--ds-font);
@@ -3192,6 +3200,76 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   }
 }
 
+/* A new notification, heard live (live.jinja): the whole sentence is the
+   link to it, in the notice's own colour, with who and what in bold. */
+.ds-toast-notification .ds-notice-body {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ds-toast-notification strong {
+  font-weight: 600;
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-toast-notification .ds-notice-body:hover {
+    text-decoration: underline;
+  }
+}
+
+/* "New drawings · 3": a feed that has fallen behind (live.jinja), floating
+   centred just under the toolbar -- the script sets `top` from where the
+   header ends -- in the accent, the colour of what is new. */
+.live-pill,
+.ds-page .live-pill {
+  position: fixed;
+  z-index: 55;
+  left: 50%;
+  -webkit-transform: translateX(-50%);
+  transform: translateX(-50%);
+  min-height: 0;
+  margin: 0;
+  padding: var(--ds-space-1) var(--ds-space-3);
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 999px;
+  background-color: var(--ds-accent);
+  box-shadow: var(--ds-shadow-menu);
+  color: var(--ds-accent-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-text-base);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
+  -webkit-animation: ds-pill-in 0.16s ease-out;
+  animation: ds-pill-in 0.16s ease-out;
+}
+
+/* The toast's arrival, from above, keeping the centring. */
+@-webkit-keyframes ds-pill-in {
+  from {
+    opacity: 0;
+    -webkit-transform: translate(-50%, -8px);
+  }
+}
+
+@keyframes ds-pill-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .live-pill:hover,
+  .ds-page .live-pill:hover {
+    background-color: var(--ds-accent-hover);
+  }
+}
+
+.live-pill[disabled] {
+  opacity: 0.7;
+}
+
 /* On a phone the stack spans the screen, the way the system's own banners
    do, and stays clear of the home indicator. */
 @media (max-width: 600px) {
@@ -3204,7 +3282,8 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ds-toast {
+  .ds-toast,
+  .live-pill {
     -webkit-animation: none;
     animation: none;
   }
@@ -3371,6 +3450,176 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 
 .ds-shortcuts dd {
   margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   The quick switcher (jump.jinja)
+
+   The shortcuts panel's veil and panel, hung from the top third rather than
+   centred, so the list grows down from a field that stays where it opened.
+   The chosen row is the selected state the menus use; the field keeps the
+   focus, so there is no ring on the row.
+   --------------------------------------------------------------------------- */
+.jump {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 200;
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-pack: center;
+  justify-content: center;
+  -webkit-box-align: start;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background-color: rgba(20, 20, 50, 0.35);
+}
+
+.jump[hidden] {
+  display: none;
+}
+
+.jump-panel {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-orient: vertical;
+  flex-direction: column;
+  width: 560px;
+  max-width: calc(100% - 32px);
+  max-height: 70vh;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-menu);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  overflow: hidden;
+}
+
+/* 16px, not the page's 14: below that, Safari on iOS zooms in on a field
+   as it takes the focus. */
+.jump-field,
+.ds-page .jump-field {
+  -webkit-box-flex: 0;
+  flex: none;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border: 0;
+  border-bottom: 1px solid var(--ds-line);
+  border-radius: 0;
+  background-color: var(--ds-field);
+  color: var(--ds-ink);
+  font: inherit;
+  font-size: calc(16px * var(--ds-text-scale, 1));
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.jump-list {
+  -webkit-box-flex: 1;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: var(--ds-space-1);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.jump-list:empty {
+  display: none;
+}
+
+.jump-heading {
+  padding: var(--ds-space-2) var(--ds-space-2) var(--ds-space-1);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+  font-weight: 600;
+}
+
+.jump-heading:empty {
+  padding: 0;
+  margin: var(--ds-space-1) 0;
+  border-top: 1px solid var(--ds-line);
+}
+
+.jump-empty {
+  padding: var(--ds-space-3) var(--ds-space-2);
+  color: var(--ds-muted);
+}
+
+.jump-item,
+.jump-item:visited {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+  align-items: center;
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border-radius: var(--ds-radius-s);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-base);
+  text-decoration: none;
+  cursor: default;
+}
+
+.jump-item[aria-selected="true"] {
+  background-color: var(--ds-selected);
+}
+
+.jump-item > * + * {
+  margin-left: var(--ds-space-2);
+}
+
+.jump-chip {
+  -webkit-box-flex: 0;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--ds-radius-s);
+  background-color: var(--ds-track);
+  color: var(--ds-ink);
+  font-size: var(--ds-text-s);
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+}
+
+.jump-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jump-detail {
+  -webkit-box-flex: 0;
+  flex: none;
+  margin-left: auto;
+  padding-left: var(--ds-space-3);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.jump-hint {
+  -webkit-box-flex: 0;
+  flex: none;
+  margin: 0;
+  padding: var(--ds-space-2) var(--ds-space-4);
+  border-top: 1px solid var(--ds-line);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+/* A phone has no arrow keys to hint at, and less room. */
+@media (pointer: coarse) {
+  .jump-hint {
+    display: none;
+  }
 }
 
 .ds-page kbd,

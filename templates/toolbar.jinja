@@ -286,6 +286,7 @@
         {% if current_user %}
           <dt><kbd>N</kbd></dt><dd>{{ ftl_get_message("draw") }}</dd>
         {% endif %}
+        <dt><kbd>Ctrl</kbd> <kbd>K</kbd> · <kbd>⌘</kbd> <kbd>K</kbd></dt><dd>{{ ftl_get_message("jump-title") }}</dd>
         <dt><kbd>/</kbd></dt><dd>{{ ftl_get_message("search") }}</dd>
         <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>R</kbd></dt><dd>{{ ftl_get_message("nav-home") }}</dd>
         {% if current_user %}
@@ -520,6 +521,8 @@
         "theme-dark": function () { setTheme("dark"); },
         "theme-system": function () { setTheme("system"); },
         "shortcuts": function () { toggleShortcuts(); },
+        // The quick switcher (jump.jinja).
+        "jump": function () { if (window.oeeeJump) window.oeeeJump.open(); },
       };
       function command(name) {
         var run = commands[name];
@@ -527,6 +530,9 @@
         return !!run;
       }
       if (window.oeeeApp) window.oeeeApp.command = command;
+      // For the quick switcher, whose rows are places to go and commands to run.
+      window.oeeeCommand = command;
+      window.oeeeGo = go;
 
       // The keys. Only on the site's own pages -- the painter and the drawing
       // app have keys of their own -- and never while typing, or with a

@@ -132,7 +132,7 @@
       </div>
       {{ comments_aside(aside_comments, "/communities/@" ~ community.slug ~ "/comments") }}
       {% if feed_posts %}
-        <div class="posts-grid" id="post-feed-grid">
+        <div class="posts-grid" id="post-feed-grid" data-live-posts="community:{{ community_id }}">
           {% include "post_feed_fragment.jinja" %}
         </div>
       {% else %}

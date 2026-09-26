@@ -99,6 +99,12 @@
     </main>
     {% include "toasts.jinja" %}
     {% include "optimistic.jinja" %}
+    {% include "jump.jinja" %}
+    {# Only for a signed-in reader: the bell is most of what it carries, and
+       a signed-out one's every tab would hold a connection for the rest. #}
+    {% if current_user %}
+      {% include "live.jinja" %}
+    {% endif %}
     {% include "confirm_dialog.jinja" %}
     {% include "segmented.jinja" %}
   </body>

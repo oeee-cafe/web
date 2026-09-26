@@ -485,7 +485,7 @@ pub async fn do_delete_comment(
     // Find the comment
     let comment = sqlx::query!(
         r#"
-        SELECT id, actor_id, deleted_at
+        SELECT id, post_id, actor_id, deleted_at
         FROM comments
         WHERE id = $1
         "#,
@@ -518,6 +518,10 @@ pub async fn do_delete_comment(
     .await?;
 
     tx.commit().await?;
+    state.live.publish(crate::live::LiveEvent::Comments {
+        post_id: comment.post_id,
+        by: Some(user.id),
+    });
 
     Ok(StatusCode::NO_CONTENT.into_response())
 }

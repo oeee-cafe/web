@@ -1,0 +1,92 @@
+{# The quick switcher's list (web::handlers::jump), swapped into jump.jinja's
+   listbox. Every row is a link, so a click, a middle click and Enter all do
+   what a link does; a row that is an action rather than a place carries
+   `data-command`, a name from the toolbar's command registry, and runs that
+   instead. The script there selects the first row after each swap. #}
+{%- set pages = [
+  ("/", ftl_get_message("nav-home"), none),
+  ("/communities", ftl_get_message("community"), none),
+  ("/collaborate", ftl_get_message("collaborate"), none),
+  ("/tags", ftl_get_message("tag-discovery"), none),
+] %}
+{%- if current_user %}
+  {%- set pages = [
+    ("/posts/drafts", ftl_get_message("draw"), "new-drawing"),
+  ] + pages + [
+    ("/following", ftl_get_message("feed-following"), none),
+    ("/notifications", ftl_get_message("notifications"), none),
+    ("/posts/drafts", ftl_get_message("drafts"), none),
+    ("/@" ~ current_user.login_name, ftl_get_message("profile"), none),
+    ("/account", ftl_get_message("account"), none),
+  ] %}
+{%- endif %}
+{#- With something typed, only the pages whose name has it in. #}
+{%- set needle = q | lower %}
+{%- if needle %}
+  {%- set found = namespace(pages=[]) %}
+  {%- for page in pages %}
+    {%- if needle in page[1] | lower %}{% set found.pages = found.pages + [page] %}{% endif %}
+  {%- endfor %}
+  {%- set pages = found.pages %}
+{%- endif %}
+{%- macro chip(text, foreground, background) -%}
+  <span class="jump-chip" aria-hidden="true"{% if background %} style="background-color: {{ background }}; color: {{ foreground }}"{% endif %}>{{ text[:1] | upper }}</span>
+{%- endmacro %}
+{%- if communities %}
+  <li class="jump-heading" role="presentation">{{ ftl_get_message("jump-communities") }}</li>
+  {%- for community in communities %}
+    <li role="presentation">
+      <a class="jump-item" role="option" href="/@{{ community.slug }}">
+        {{ chip(community.name, community.foreground_color, community.background_color) }}
+        <span class="jump-name">{{ community.name }}</span>
+        <span class="jump-detail">@{{ community.slug }}</span>
+      </a>
+    </li>
+  {%- endfor %}
+{%- endif %}
+{%- if people %}
+  <li class="jump-heading" role="presentation">{{ ftl_get_message("jump-people") }}</li>
+  {%- for person in people %}
+    <li role="presentation">
+      <a class="jump-item" role="option" href="/@{{ person.login_name }}">
+        <span class="jump-chip jump-chip-person" aria-hidden="true">@</span>
+        <span class="jump-name">{{ person.display_name }}</span>
+        <span class="jump-detail">@{{ person.login_name }}</span>
+      </a>
+    </li>
+  {%- endfor %}
+{%- endif %}
+{%- if tags %}
+  <li class="jump-heading" role="presentation">{{ ftl_get_message("jump-tags") }}</li>
+  {%- for tag in tags %}
+    <li role="presentation">
+      <a class="jump-item" role="option" href="/tags/{{ tag.name | urlencode }}">
+        <span class="jump-chip jump-chip-tag" aria-hidden="true">#</span>
+        <span class="jump-name">{{ tag.display_name }}</span>
+        <span class="jump-detail">{{ tag.post_count }}</span>
+      </a>
+    </li>
+  {%- endfor %}
+{%- endif %}
+{%- if pages %}
+  <li class="jump-heading" role="presentation">{{ ftl_get_message("jump-pages") }}</li>
+  {%- for page in pages %}
+    <li role="presentation">
+      <a class="jump-item" role="option" href="{{ page[0] }}"{% if page[2] %} data-command="{{ page[2] }}"{% endif %}>
+        <span class="jump-chip jump-chip-page" aria-hidden="true">›</span>
+        <span class="jump-name">{{ page[1] }}</span>
+      </a>
+    </li>
+  {%- endfor %}
+{%- endif %}
+{%- if q %}
+  <li class="jump-heading" role="presentation"></li>
+  <li role="presentation">
+    <a class="jump-item" role="option" href="/search?q={{ q | urlencode }}">
+      <span class="jump-chip jump-chip-page" aria-hidden="true">⌕</span>
+      <span class="jump-name">{{ ftl_get_message("jump-search-drawings") }} “{{ q }}”</span>
+    </a>
+  </li>
+{%- elif not communities and not pages %}
+  <li class="jump-empty" role="presentation">{{ ftl_get_message("jump-empty") }}</li>
+{%- endif %}

@@ -32,6 +32,7 @@ feed-communities-empty = 내 커뮤에 새 그림이 없습니다. <a href="/com
 feed-period-month = { $month }월
 feed-period-month-year = { $year }년 { $month }월
 feed-view-drawings = 그림
+feed-new-drawings = 새 그림
 feed-view-comments = 댓글
 recent-comments-more = 댓글 더 보기
 loading-more-comments = 더 많은 댓글 불러오는 중...
@@ -235,6 +236,16 @@ tag-no-posts = 이 태그가 달린 게시물이 아직 없습니다
 tag-discovery = 태그
 tag-search-placeholder = 태그 검색...
 search = 검색
+
+jump-title = 바로 가기
+jump-placeholder = 어디로 갈까요? 커뮤니티, 사람, 태그…
+jump-communities = 커뮤니티
+jump-people = 사람
+jump-tags = 태그
+jump-pages = 페이지
+jump-search-drawings = 그림 검색:
+jump-empty = 그런 이름은 없어요
+jump-hint = ↑↓ 선택 · Enter 이동 · Esc 닫기
 search-results-for = 검색 결과
 search-placeholder = 그림 검색
 search-posts = 그림

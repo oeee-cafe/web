@@ -56,6 +56,7 @@ feed-period-month-year = { $month ->
    *[12] December
 } { $year }
 feed-view-drawings = Drawings
+feed-new-drawings = New drawings
 feed-view-comments = Comments
 recent-comments-more = More comments
 loading-more-comments = Loading more comments...
@@ -263,6 +264,16 @@ tag-no-posts = No posts with this tag yet
 tag-discovery = Tags
 tag-search-placeholder = Search tags...
 search = Search
+
+jump-title = Jump to
+jump-placeholder = Where to? A community, a person, a tag…
+jump-communities = Communities
+jump-people = People
+jump-tags = Tags
+jump-pages = Pages
+jump-search-drawings = Search drawings for
+jump-empty = Nothing by that name
+jump-hint = ↑↓ to choose · Enter to go · Esc to close
 search-results-for = Search results for
 search-placeholder = Search drawings
 search-posts = Drawings

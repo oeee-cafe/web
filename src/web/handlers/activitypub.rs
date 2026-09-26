@@ -24,6 +24,7 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::app_error::AppError;
+use crate::live::LiveEvent;
 use crate::markdown_utils::process_markdown_content;
 
 fn extract_note_content(note: &Note) -> (String, Option<String>) {
@@ -1449,6 +1450,7 @@ impl Activity for Create {
                                 }
 
                                 tx.commit().await?;
+                                data.live.publish(LiveEvent::Comments { post_id, by: None });
 
                                 // Send push notifications
                                 if !notification_info.is_empty() {
@@ -2129,6 +2131,10 @@ impl Activity for Delete {
                         if delete_comment_by_iri(&mut tx, &object_url).await? {
                             tracing::info!("Deleted comment with IRI: {}", object_url);
                             tx.commit().await?;
+                            data.live.publish(LiveEvent::Comments {
+                                post_id: comment.post_id,
+                                by: None,
+                            });
                         } else {
                             tracing::warn!("Failed to delete comment with IRI: {}", object_url);
                         }

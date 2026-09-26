@@ -1,0 +1,156 @@
+{# What an open page hears without asking (crate::live; web::handlers::events).
+
+   One EventSource for the life of the window: htmx's boosted switches keep
+   the window, and so keep it, and the browser reconnects it by itself --
+   across a deploy, to whichever colour serves by then.
+
+   unread        The bell, rendered for this reader: put in place of the one
+                 in the toolbar, which the apps' icon badges follow
+                 (app_bridge.jinja, on `oeee:bell`).
+   notification  A new notification's words, as a toast linking to it. Not in
+                 the apps, which are sent the same thing as a push.
+   comments      A post's comments changed: a page showing them
+                 (`#comments[data-live-post]`, post_view.jinja) fetches them
+                 again and morphs them in, the form beside them untouched.
+                 The page that made the change already has them.
+   post          A drawing was published: a page with a feed that would show
+                 it (`[data-live-posts]`, "recent" or "community:<id>") puts
+                 up a pill that brings the feed up to date.
+
+   None of it runs where htmx does not (Firefox 56) beyond the bell and the
+   toasts, which are plain DOM. #}
+<script>
+  (function () {
+    if (window.oeeeLive || !window.EventSource) return;
+    var CLOSE = {{ ftl_get_message("close")|tojson }};
+    var NEW_DRAWINGS = {{ ftl_get_message("feed-new-drawings")|tojson }};
+    var root = document.documentElement;
+    var source = new EventSource("/events");
+    window.oeeeLive = source;
+
+    function me() {
+      var bar = document.querySelector(".nav-bar[data-user-id]");
+      return bar ? bar.getAttribute("data-user-id") : null;
+    }
+    function read(event) {
+      try {
+        return JSON.parse(event.data);
+      } catch (error) {
+        return null;
+      }
+    }
+
+    source.addEventListener("unread", function (event) {
+      var data = read(event);
+      var bell = document.getElementById("nav-notifications");
+      if (!data || !bell) return;
+      var holder = document.createElement("div");
+      holder.innerHTML = data.html;
+      var next = holder.firstElementChild;
+      if (!next) return;
+      bell.parentNode.replaceChild(next, bell);
+      if (window.htmx && htmx.process) htmx.process(next);
+      document.dispatchEvent(new CustomEvent("oeee:bell"));
+    });
+
+    source.addEventListener("notification", function (event) {
+      if (root.hasAttribute("data-app")) return;
+      var data = read(event);
+      var stack = document.getElementById("toasts");
+      if (!data || !stack) return;
+      var toast = document.createElement("div");
+      toast.className = "ds-notice ds-toast ds-toast-notification";
+      var body = document.createElement("a");
+      body.className = "ds-notice-body";
+      body.href = data.url;
+      var title = document.createElement("strong");
+      title.textContent = data.title;
+      body.appendChild(title);
+      body.appendChild(document.createTextNode(" " + data.body));
+      toast.appendChild(body);
+      var close = document.createElement("button");
+      close.type = "button";
+      close.className = "ds-notice-close";
+      close.setAttribute("aria-label", CLOSE);
+      close.title = CLOSE;
+      close.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7m0-7l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
+      close.addEventListener("click", function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      });
+      toast.appendChild(close);
+      stack.appendChild(toast);
+      if (window.oeeeToasts) window.oeeeToasts.look();
+    });
+
+    source.addEventListener("comments", function (event) {
+      var data = read(event);
+      if (!data || !window.htmx) return;
+      var list = document.querySelector('#comments[data-live-post="' + data.post_id + '"]');
+      if (!list || (data.by && data.by === me())) return;
+      htmx.ajax("GET", location.pathname + location.search, {
+        target: "#comments",
+        select: "#comments",
+        swap: "outerMorph"
+      }).catch(function () {});
+    });
+
+    source.addEventListener("post", function (event) {
+      var data = read(event);
+      if (!data || !window.htmx || (data.by && data.by === me())) return;
+      var feeds = document.querySelectorAll("[data-live-posts]");
+      for (var i = 0; i < feeds.length; i++) {
+        var keys = " " + feeds[i].getAttribute("data-live-posts") + " ";
+        var wants = (data.recent && keys.indexOf(" recent ") >= 0) ||
+          (data.community_id && keys.indexOf(" community:" + data.community_id + " ") >= 0);
+        if (wants) {
+          announce();
+          return;
+        }
+      }
+    });
+
+    // One pill for the page, floating just under the toolbar so it is seen
+    // wherever the reader has scrolled to, the way a chat's "new messages"
+    // bar is. It lives outside the content area, so any switch of that area
+    // takes it down: whatever is shown then is newer than what it counted.
+    var pill = null;
+    function takeDown() {
+      if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
+      pill = null;
+    }
+    document.addEventListener("htmx:after:swap", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      var target = ctx && ctx.target;
+      if (target && (target === document.body || (target.matches && target.matches("main.ds-content")))) takeDown();
+    });
+    function announce() {
+      if (!pill) {
+        pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "live-pill";
+        pill.setAttribute("data-count", "0");
+        var header = document.querySelector(".ds-page > header");
+        pill.style.top = ((header ? header.getBoundingClientRect().bottom : 0) + 8) + "px";
+        pill.addEventListener("click", function () {
+          pill.disabled = true;
+          htmx.ajax("GET", location.pathname + location.search, {
+            target: "main.ds-content",
+            select: "main.ds-content",
+            swap: "outerMorph"
+          }).then(function () {
+            takeDown();
+            var content = document.querySelector("main.ds-content");
+            if (content && content.scrollTo) content.scrollTo(0, 0);
+            window.scrollTo(0, 0);
+          }, function () {
+            if (pill) pill.disabled = false;
+          });
+        });
+        document.body.appendChild(pill);
+      }
+      var count = (parseInt(pill.getAttribute("data-count"), 10) || 0) + 1;
+      pill.setAttribute("data-count", String(count));
+      pill.textContent = NEW_DRAWINGS + " \u00b7 " + count;
+    }
+  })();
+</script>
