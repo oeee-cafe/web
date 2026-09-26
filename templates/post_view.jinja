@@ -1,5 +1,6 @@
 {% import "comments_macro.jinja" as comments_macro %}
 {% from "supporter_badge_macro.jinja" import supporter_badge %}
+{% from "person_macro.jinja" import person %}
 
 {# A drawing in a thread -- the one this replies to, or one replying to it:
    a small framed square and what it is, as one target. Replies to replies
@@ -122,9 +123,7 @@
         {# Who drew it, above what it is called, as a byline sits over a
            headline; the people who drew it together follow. #}
         <div class="post-inspector-byline">
-          <a class="post-inspector-author" href="/@{{ post.login_name }}">{{ post.display_name }}</a>
-          {{ supporter_badge(supporters, post.login_name) }}
-          <span class="post-inspector-handle">@{{ post.login_name }}</span>
+          {{ person(post.display_name, "/@" ~ post.login_name, login_name=post.login_name, supporters=supporters) }}
           {% for participant in collaborative_participants %}
             {% if participant.login_name != post.login_name %}
               <span class="post-inspector-handle">·</span>

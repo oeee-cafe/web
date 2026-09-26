@@ -2935,6 +2935,34 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   margin-right: 0;
 }
 
+/* A person by name (person_macro.jinja): what they are called, a
+   supporter's mark, then their handle, on one line. The macro prints the
+   parts with no space between them, so the gap here is the whole of it --
+   a space's width is the font's, and a flex gap on top of a margin once put
+   a comment's handle twice as far from its name as the byline's.
+
+   Inline, not a flex row, so a line too narrow for it ends in an ellipsis
+   where its holder asks for one. The handle is the name's size in a fainter
+   ink: the same line, said more quietly. */
+.ds-person {
+  min-width: 0;
+}
+
+.ds-person > * + * {
+  margin-left: 6px;
+}
+
+.ds-person-name,
+.ds-person-name:visited {
+  color: var(--ds-ink);
+  font-weight: 600;
+}
+
+.ds-person-handle {
+  color: var(--ds-faint);
+  font-weight: 400;
+}
+
 /* A surface on the ground: settings groups, forms, anything that is a box. */
 .ds-card {
   padding: var(--ds-space-4);

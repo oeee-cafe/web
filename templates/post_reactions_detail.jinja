@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {% extends "base.jinja" %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("post-reactions") }} | {{ post_title }}
@@ -26,7 +27,7 @@
                   {% else %}
                     <a class="member-name" href="{{ reaction.actor_url }}" target="_blank" rel="noopener noreferrer">{{ reaction.actor_name }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
                   {% endif %}
-                  <span class="member-meta">{{ reaction.actor_handle }} · {{ reaction.created_at|ago }}</span>
+                  <span class="member-meta">{{ handle(reaction.actor_login_name if reaction.is_local else none, reaction.actor_handle) }} · {{ reaction.created_at|ago }}</span>
                 </span>
               </div>
             {% endfor %}

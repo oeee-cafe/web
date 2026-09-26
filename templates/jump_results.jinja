@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {# The quick switcher's list (web::handlers::jump), swapped into jump.jinja's
    listbox. Every row is a link, so a click, a middle click and Enter all do
    what a link does; a row that is an action rather than a place carries
@@ -51,7 +52,7 @@
       <a class="jump-item" role="option" href="/@{{ person.login_name }}">
         <span class="jump-chip jump-chip-person" aria-hidden="true">@</span>
         <span class="jump-name">{{ person.display_name }}</span>
-        <span class="jump-detail">@{{ person.login_name }}</span>
+        <span class="jump-detail">{{ handle(person.login_name) }}</span>
       </a>
     </li>
   {%- endfor %}

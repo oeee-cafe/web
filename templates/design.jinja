@@ -1,4 +1,5 @@
 {% extends "base.jinja" %}
+{% from "person_macro.jinja" import person, handle %}
 {# The design system, drawn by itself: every token and component in ds.css,
    rendered by the real stylesheet in whichever theme is on. It is where a
    change to the system is looked at before it reaches a page, and where
@@ -408,6 +409,17 @@
           <button type="button" class="ds-button">Cancel</button>
           <button type="button" class="ds-button ds-button-danger">Delete</button>
         </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>People</h2>
+      <p class="ds-help"><code>person()</code> in person_macro.jinja: the name, a supporter's mark, the handle. Someone from here is <code>@login_name</code>; someone from another server keeps <code>@name@their.host</code>. <code>handle()</code> is the handle alone, for a line that says more after it.</p>
+      <div class="ds-stack">
+        <div>{{ person("Tandemaus", "#", login_name="tandemaus") }}</div>
+        <div>{{ person("Tandemaus", "#", login_name="tandemaus", supporters={"tandemaus": "steam"}) }}</div>
+        <div>{{ person("Someone far", "#", actor_handle="@someone@example.social", external=true) }}</div>
+        <div>{{ handle("tandemaus") }} · 3 days ago</div>
       </div>
     </section>
 

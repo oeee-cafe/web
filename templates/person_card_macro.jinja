@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {# A person as a card: their banner framed in hard pixels, or where they
    have none, a frame of the same size with their name in it, then their
    name and handle -- the profile's list of who they follow, and the people
@@ -18,7 +19,7 @@
     {% endif %}
     <span class="profile-follow-text">
       <span class="profile-follow-name">{{ person.display_name }}</span>
-      <span class="profile-follow-handle">@{{ person.login_name }}</span>
+      <span class="profile-follow-handle">{{ handle(person.login_name) }}</span>
     </span>
   </a>
 {% endmacro %}
