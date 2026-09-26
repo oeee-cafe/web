@@ -1333,6 +1333,41 @@ pub async fn is_post_movable(tx: &mut Transaction<'_, Postgres>, post_id: Uuid) 
     Ok(true)
 }
 
+/// Whether an existing post may be moved into `community_id`.
+///
+/// The move form (`post_edit_community`) only offers communities that pass
+/// this, but the id arrives from a form field, so the handler has to ask
+/// again. A community that is gone or two-tone is out, as it is for the form:
+/// a two-tone community's drawings are made with its two colours, and one
+/// drawn with any others does not belong there. A private one is out even for
+/// a member. Publishing lets members in, but a move federates nothing, so a
+/// post that has already gone out would stay up on every server that has it
+/// while its page here disappeared behind the community's membership.
+/// Public and unlisted are open, as they are to draw for (`may_draw_in`).
+pub async fn may_move_post_into(
+    tx: &mut Transaction<'_, Postgres>,
+    community_id: Uuid,
+) -> Result<bool> {
+    let community = query!(
+        r#"
+        SELECT
+            visibility as "visibility: CommunityVisibility",
+            background_color,
+            foreground_color
+        FROM communities
+        WHERE id = $1 AND deleted_at IS NULL
+        "#,
+        community_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    Ok(community.is_some_and(|c| {
+        c.visibility != CommunityVisibility::Private
+            && !(c.background_color.is_some() && c.foreground_color.is_some())
+    }))
+}
+
 /// One community the caller may put a drawing into, carrying the two signals a
 /// picker needs to rank it: whether they are a member, and whether they have
 /// posted there before.
@@ -1875,4 +1910,83 @@ pub async fn delete_post_with_activity(
     }
 
     Ok(falls)
+}
+
+#[cfg(test)]
+mod move_destination_tests {
+    use super::may_move_post_into;
+    use sqlx::{Postgres, Transaction};
+    use uuid::Uuid;
+
+    async fn tx() -> Option<Transaction<'static, Postgres>> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        let pool = sqlx::PgPool::connect(&url).await.ok()?;
+        pool.begin().await.ok()
+    }
+
+    /// `do_post_edit_community` takes the destination from the form, so this
+    /// is all that stands between a hand-made POST and a community the form
+    /// would never have offered. The author here is a member of the private
+    /// one, which is still not enough.
+    #[tokio::test]
+    async fn only_a_public_or_unlisted_community_takes_a_moved_post() {
+        let Some(mut tx) = tx().await else { return };
+        let tag = Uuid::new_v4().simple().to_string()[..12].to_string();
+        let author = sqlx::query_scalar!(
+            "INSERT INTO users (login_name, display_name) VALUES ($1, $1) RETURNING id",
+            format!("mover_{tag}")
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+
+        let mut ids = std::collections::HashMap::new();
+        for kind in ["public", "unlisted", "private", "twotone", "deleted"] {
+            let slug = format!("{kind}_{tag}");
+            let (visibility, colours) = match kind {
+                "twotone" => ("public", Some("#000000")),
+                "deleted" => ("public", None),
+                other => (other, None),
+            };
+            let id = sqlx::query_scalar!(
+                r#"INSERT INTO communities
+                   (owner_id, name, description, visibility, slug, foreground_color, background_color, deleted_at)
+                   VALUES ($1, $2, '', $3::text::community_visibility, $2, $4, $4,
+                           CASE WHEN $5 THEN now() END)
+                   RETURNING id"#,
+                author,
+                slug,
+                visibility,
+                colours,
+                kind == "deleted"
+            )
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+            ids.insert(kind, id);
+        }
+        sqlx::query!(
+            "INSERT INTO community_members (community_id, user_id, role) VALUES ($1, $2, 'owner')",
+            ids["private"],
+            author
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+
+        for (kind, expected) in [
+            ("public", true),
+            ("unlisted", true),
+            ("private", false),
+            ("twotone", false),
+            ("deleted", false),
+        ] {
+            assert_eq!(
+                may_move_post_into(&mut tx, ids[kind]).await.unwrap(),
+                expected,
+                "{kind}"
+            );
+        }
+        assert!(!may_move_post_into(&mut tx, Uuid::new_v4()).await.unwrap());
+    }
 }

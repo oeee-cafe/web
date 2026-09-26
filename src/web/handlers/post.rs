@@ -2002,6 +2002,14 @@ pub async fn do_post_edit_community(
         return Ok(StatusCode::FORBIDDEN.into_response());
     }
 
+    // The form only lists communities a post may go to, but the id is the
+    // request's own. None is the author's own page, which is always allowed.
+    if let Some(community_id) = form.community_id {
+        if !crate::models::post::may_move_post_into(&mut tx, community_id).await? {
+            return Ok(StatusCode::FORBIDDEN.into_response());
+        }
+    }
+
     let _ = edit_post_community(&mut tx, post_uuid, form.community_id).await;
     let _ = tx.commit().await;
 
