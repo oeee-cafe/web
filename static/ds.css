@@ -1041,14 +1041,19 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   color: var(--ds-ink);
 }
 
-/* Unread fills the bell in the accent, the Draw button's lime: the shape
-   changes as well as the colour, and the width does not
-   (nav_notifications.jinja). The outline and clapper stay in the button's
-   own ink, not the accent's: --ds-accent-ink is for marks drawn *on* lime
-   and is near-black in both themes, so on the dark bar it vanished and
-   took the bell's rim and clapper with it. */
-.toolbar-end .toolbar-bell-unread svg {
-  fill: var(--ds-accent);
+/* Unread lights the button the way Draw is lit, the accent's lime with its
+   dark ink on it, and the bell stays an outline: the button changes as well
+   as its colour, and the width does not (nav_notifications.jinja). */
+.toolbar-end .toolbar-bell-unread,
+.toolbar-end .toolbar-bell-unread:visited {
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-end .toolbar-bell-unread:hover {
+    background-color: var(--ds-accent-hover);
+  }
 }
 
 /* Search is a form rather than one of those links, and its button is a

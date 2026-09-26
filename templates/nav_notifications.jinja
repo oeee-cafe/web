@@ -14,12 +14,11 @@
      and a bell among them the one control to decode; search became an icon
      for width, and this follows it for the same reason.
 
-     Unread shows as the bell itself, filled in with the accent's lime,
+     Unread shows as the button lit in the accent's lime, as Draw is,
      rather than as a count beside it or on its corner: the button is one
      width at 0 unread or 99, so the count never decides whether the bar
      fits on one row -- the thing drafts were taken out of the bar to stop.
-     Filled as well as coloured, so it is not colour alone that says so. The
-     number is still in the label and the tooltip. #}
+     The number is still in the label and the tooltip. #}
   {%- set unread = unread_notification_count is defined and unread_notification_count > 0 %}
   {%- set label = ftl_get_message("notifications") ~ (" (" ~ unread_notification_count ~ ")" if unread else "") %}
   <a href="/notifications" class="toolbar-square toolbar-button toolbar-bell{% if unread %} toolbar-bell-unread{% endif %}"
