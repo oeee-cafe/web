@@ -12,7 +12,7 @@
             <a href="{{ comment.actor_url }}" class="comment-author" target="_blank" rel="noopener noreferrer">{{ comment.actor_name }}</a>
           {% endif %}
           {% if comment.is_local %}{{ supporter_badge(supporters, comment.actor_login_name) }}{% endif %}
-          <span class="muted comment-handle">{{ comment.actor_handle }}</span>
+          <span class="muted comment-handle">{% if comment.is_local and comment.actor_login_name %}@{{ comment.actor_login_name }}{% else %}{{ comment.actor_handle }}{% endif %}</span>
           <span class="muted comment-timestamp">{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</span>
         </div>
         <div class="comment-content">
