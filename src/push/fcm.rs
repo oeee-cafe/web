@@ -59,16 +59,15 @@ impl FcmClient {
             ..Default::default()
         };
 
-        // Build Android-specific configuration
-        let mut android_notification = AndroidNotification {
+        // No notification_count. It is how many things this one notification
+        // stands for, and a launcher that shows a number adds up every
+        // notification's: given the unread total, three on show read 1, 2
+        // and 3, and the icon said 6. Left unset, each counts as one, which
+        // is what the badge is on Android -- the notifications on show.
+        let android_notification = AndroidNotification {
             sound: Some("default".to_string()),
             ..Default::default()
         };
-
-        // Add badge count if provided
-        if let Some(badge_count) = badge {
-            android_notification.notification_count = Some(badge_count as i32);
-        }
 
         let android_config = AndroidConfig {
             priority: Some("high".to_string()),
