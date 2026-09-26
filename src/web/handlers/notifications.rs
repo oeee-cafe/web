@@ -349,7 +349,8 @@ mod tests {
             "read_at": null,
             "unread": true,
             "created_at": "2026-01-02T03:04:05Z",
-            "actor_login_name": "someone",
+            "handle": {"login_name": "someone", "name": null, "host": null},
+            "actor_url": "https://oeee.test/@someone",
             "actor_name": "Someone",
             "actor_count": 1,
         })
@@ -364,7 +365,8 @@ mod tests {
             "read_at": "2026-01-02T04:00:00Z",
             "unread": false,
             "created_at": "2026-01-02T03:04:05Z",
-            "actor_login_name": "someone",
+            "handle": {"login_name": "someone", "name": null, "host": null},
+            "actor_url": "https://oeee.test/@someone",
             "actor_name": "Someone",
             "reaction_emoji": "\u{1f49c}",
             "post_id": "00000000-0000-0000-0000-000000000009",
@@ -428,6 +430,25 @@ mod tests {
                 ftl_lang => "en",
             })
             .expect("notifications.jinja renders")
+    }
+
+    /// Someone from another server leads to their profile on it, in a tab of
+    /// its own, with their handle's host beside them -- not to a relative
+    /// link made of their handle, which is what it used to be.
+    #[test]
+    fn a_remote_actor_leads_to_their_own_server() {
+        let mut remote = sample_notification();
+        remote["handle"] = json!({"login_name": null, "name": "far", "host": "example.social"});
+        remote["actor_url"] = json!("https://example.social/@far");
+        let rendered = render(vec![remote], Vec::new()).replace("&#x2f;", "/");
+        assert!(
+            rendered.contains(
+                r#"<a href="https://example.social/@far" class="notification-actor" target="_blank" rel="noopener noreferrer">Someone</a>"#
+            ),
+            "{rendered}"
+        );
+        assert!(rendered.contains(r#"<span class="ds-handle-host">@example.social</span>"#));
+        assert!(!rendered.contains(r#"href="@far"#));
     }
 
     /// The list used to carry an <h3> holding the same string as the page's
@@ -545,8 +566,8 @@ mod tests {
             recipient_id: uuid::Uuid::nil(),
             actor_id: uuid::Uuid::nil(),
             actor_name: "Someone".to_string(),
-            actor_handle: "@someone".to_string(),
-            actor_login_name: Some("someone".to_string()),
+            handle: crate::models::handle::Handle::Local("someone".into()),
+            actor_url: "https://oeee.test/@someone".to_string(),
             notification_type: crate::models::notification::NotificationType::Follow,
             post_id: None,
             comment_id: None,

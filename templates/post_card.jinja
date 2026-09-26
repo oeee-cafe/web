@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% from "person_macro.jinja" import handle as person_handle %}
 {# The post card, shared by the public feeds and the admin grid.
 
@@ -18,7 +19,7 @@
       <img width="{{ post.image_width }}"
            height="{{ post.image_height }}"
            alt="{{ post.title }}"
-           src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
+           src="{{ stored_url("image", post.image_filename) }}"
            loading="lazy"
            decoding="async"
            {# Staff reviewing content need to see it; the blur is for readers. #}

@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% extends "base.jinja" %}
 {% from "per_row_macro.jinja" import per_row %}
 {% block title %}
@@ -62,7 +63,7 @@
                      width="{{ post.image_width }}"
                      height="{{ post.image_height }}"
                      alt="{{ title }}"
-                     src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
+                     src="{{ stored_url("image", post.image_filename) }}"
                      loading="lazy"
                      decoding="async"
                      class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}" />

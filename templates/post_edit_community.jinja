@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% extends "base.jinja" %}
 {% block title %}
   {{ super() }} |
@@ -21,7 +22,7 @@
     <span class="move-row-cover" aria-hidden="true">
       {% if posts %}
         {% for p in posts[:3] %}
-          <span class="move-row-cell"><img src="{{ r2_public_endpoint_url }}/image/{{ p.image_filename[:2] }}/{{ p.image_filename }}" alt="" loading="lazy" decoding="async" /></span>
+          <span class="move-row-cell"><img src="{{ stored_url("image", p.image_filename) }}" alt="" loading="lazy" decoding="async" /></span>
         {% endfor %}
       {% elif value == "" %}
         <span class="move-row-icon">
@@ -60,7 +61,7 @@
   <div class="move-page">
     <section class="ds-card move-subject">
       <a class="move-subject-thumb" href="/@{{ post.login_name }}/{{ post_id }}">
-        <img src="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
+        <img src="{{ stored_url("image", post.image_filename) }}"
              alt="{{ post.title }}" />
       </a>
       <div class="move-subject-text">

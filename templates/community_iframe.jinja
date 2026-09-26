@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% extends "base_iframe.jinja" %}
 {% block title %}
   {{ super() }} | {{ community.name }}
@@ -13,7 +14,7 @@
                    class="{% if post.image_width > 300 and post.image_height > 300 %}drawing-downscaled{% endif %}"
                    width="{{ post.image_width }}"
                    height="{{ post.image_height }}"
-                   src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
+                   src="{{ stored_url("image", post.image_filename) }}" />
             </a>
           </div>
         {% endfor %}

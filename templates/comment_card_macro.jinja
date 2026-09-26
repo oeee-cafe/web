@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% from "person_macro.jinja" import handle %}
 {# A comment in a list of them: the drawing it is on, framed, then who said
    it and when, what they said, and the drawing's title. The whole row goes
@@ -16,7 +17,7 @@
       <span class="notification-figure">
         <span class="notification-thumbnail">
           <img class="notification-post-image"
-               src="{{ r2_public_endpoint_url }}/image/{{ comment.post_image_filename[:2] }}/{{ comment.post_image_filename }}"
+               src="{{ stored_url("image", comment.post_image_filename) }}"
                alt=""
                width="{{ comment.post_image_width }}"
                height="{{ comment.post_image_height }}"

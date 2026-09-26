@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% import "comments_macro.jinja" as comments_macro %}
 {% from "person_macro.jinja" import person %}
 
@@ -8,7 +9,7 @@
   <div class="post-thread-item" style="margin-left: {{ depth * 16 }}px">
     <a href="/@{{ post.user_login_name }}/{{ post.id }}" class="post-thread-card">
       <span class="post-thread-thumb">
-        <img src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}"
+        <img src="{{ stored_url("image", post.image_filename) }}"
              alt=""
              loading="lazy"
              decoding="async" />
@@ -50,7 +51,7 @@
     <meta property="og:url"
           content="{{ base_url|safe }}/@{{ post.login_name }}/{{ post_id }}" />
     <meta property="og:image"
-          content="{{ r2_public_endpoint_url|safe }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
+          content="{{ stored_url("image", post.image_filename) }}" />
     <meta property="og:image:width" content="{{ post.image_width }}" />
     <meta property="og:image:height" content="{{ post.image_height }}" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -90,13 +91,13 @@
            arrives, so its arrival moves nothing. The viewer mounts over this
            box, keeps the drawing as its poster and the controls as they are,
            and fetches the recording only when a control is used. #}
-        {% set image_url = r2_public_endpoint_url ~ "/image/" ~ post.image_filename[:2] ~ "/" ~ post.image_filename %}
+        {% set image_url = stored_url("image", post.image_filename) %}
         <div class="{% if inline_replay %}post-stage-replay neo-cucumber-replay{% else %}post-stage-frame{% endif %}" data-post-stage
              data-width="{{ post.image_width }}" data-height="{{ post.image_height }}"
              style="--post-stage-shown: {{ post.image_width }}px"
              {% if inline_replay %}
                id="post-stage-replay"
-               data-replay="{{ r2_public_endpoint_url|safe }}/replay/{{ post.replay_filename[:2] }}/{{ post.replay_filename }}"
+               data-replay="{{ stored_url("replay", post.replay_filename) }}"
                data-poster="{{ image_url }}"
                data-lang="{{ ftl_lang }}"
              {% endif %}>

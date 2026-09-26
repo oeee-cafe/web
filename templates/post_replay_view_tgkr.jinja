@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 <!DOCTYPE html>
 <html lang="{{ ftl_lang }}">
   <head>
@@ -50,7 +51,7 @@
       Tegaki.open({
         replayMode: true,
         replayURL:
-          "{{ r2_public_endpoint_url|safe }}/replay/{{ post.replay_filename[:2] }}/{{ post.replay_filename }}",
+          "{{ stored_url("replay", post.replay_filename) }}",
       });
     </script>
   </body>

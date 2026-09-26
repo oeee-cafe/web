@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% extends "admin/base.jinja" %}
 {% set admin_section = "posts" %}
 {% block admin_content %}
@@ -23,7 +24,7 @@
          width="{{ post.image_width }}"
          height="{{ post.image_height }}"
          alt="{{ post.title or 'Untitled' }}"
-         src="{{ r2_public_endpoint_url }}/image/{{ post.image_filename[:2] }}/{{ post.image_filename }}" />
+         src="{{ stored_url("image", post.image_filename) }}" />
 
     <div class="admin-post-side ds-stack">
       {% include "admin/post_flag_panel.jinja" %}

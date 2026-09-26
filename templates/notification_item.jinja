@@ -1,3 +1,5 @@
+{% from "storage_macro.jinja" import stored_url %}
+{% from "person_macro.jinja" import handle %}
 {# One notification as a single row: thumbnail, one sentence, time, actions.
 
    This used to be four stacked blocks to say "Someone commented on X" — a
@@ -43,7 +45,7 @@
              alt="{{ notification.post_title }}"
              loading="lazy"
              decoding="async"
-             src="{{ r2_public_endpoint_url }}/image/{{ notification.post_image_filename[:2] }}/{{ notification.post_image_filename }}" />
+             src="{{ stored_url("image", notification.post_image_filename) }}" />
       </a>
     {% elif kind_path %}
       <span class="notification-thumbnail-icon" aria-hidden="true">
@@ -65,10 +67,16 @@
          recent one; the rest are a count, because "Alice and 15 others reacted"
          is the whole of what sixteen separate rows were telling you. #}
       {% set grouped = notification.actor_count > 1 %}
-      {% if notification.actor_login_name %}
-        <a href="/@{{ notification.actor_login_name }}" class="notification-actor">{{ notification.actor_name }}</a>
+      {#- Someone from here is their name, leading to their profile. Someone
+          from another server leads to their profile there, in a tab of its
+          own as every link off the site does, and has their handle beside
+          them: a display name is anyone's to choose, and the host is what
+          says this is not one of ours. -#}
+      {% if notification.handle.login_name %}
+        <a href="/@{{ notification.handle.login_name }}" class="notification-actor">{{ notification.actor_name }}</a>
       {% else %}
-        <a href="{{ notification.actor_handle }}" class="notification-actor">{{ notification.actor_name }}</a>
+        <a href="{{ notification.actor_url }}" class="notification-actor" target="_blank" rel="noopener noreferrer">{{ notification.actor_name }}</a>
+        {{ handle(notification.handle) }}
       {% endif %}
       {# The actor is a link, so it cannot live inside the pattern; the string
          carries only the remainder ("and N others"). #}

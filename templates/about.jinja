@@ -1,3 +1,4 @@
+{% from "storage_macro.jinja" import stored_url %}
 {% extends "base.jinja" %}
 {% from "supporter_badge_macro.jinja" import supporter_mark %}
 {% from "app_stores_macro.jinja" import app_stores %}
@@ -69,7 +70,7 @@
                    alt="{{ user.display_name }} (@{{ user.login_name }})"
                    loading="lazy"
                    decoding="async"
-                   src="{{ r2_public_endpoint_url }}/image/{{ user.banner_image_filename[:2] }}/{{ user.banner_image_filename }}" />
+                   src="{{ stored_url("image", user.banner_image_filename) }}" />
             </a>
           {% endfor %}
         </div>
