@@ -3418,6 +3418,7 @@ pub async fn post_reactions_detail(
         actor_name: String,
         actor_handle: String,
         actor_url: String,
+        actor_login_name: Option<String>,
         is_local: bool,
         created_at: String,
     }
@@ -3439,6 +3440,7 @@ pub async fn post_reactions_detail(
                         actor_name: r.actor_name,
                         actor_handle: r.actor_handle,
                         actor_url: r.actor_url,
+                        actor_login_name: r.actor_login_name,
                         is_local,
                         created_at: r.created_at.to_rfc3339(),
                     }

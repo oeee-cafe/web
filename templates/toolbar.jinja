@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {# The toolbar: the window's title bar, on every page that has one.
 
    Included by base.jinja and by the painter pages, which do not extend base
@@ -234,7 +235,7 @@
           <div class="toolbar-menu-items">
             <div class="toolbar-menu-who">
               <strong>{{ current_user.display_name }}</strong>
-              <span>@{{ current_user.login_name }}</span>
+              <span>{{ handle(current_user.login_name) }}</span>
             </div>
             <a href="/@{{ current_user.login_name }}">{{ ftl_get_message("profile") }}</a>
             <a href="/account">{{ ftl_get_message("account") }}

@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {% extends "base.jinja" %}
 {% block title %}
   {{ super() }} | {{ community.name }} - {{ ftl_get_message("community-members") }}
@@ -37,7 +38,7 @@
               <span class="member-initial" aria-hidden="true">{{ (invitation.invitee_display_name or invitation.invitee_login_name)[:1]|upper }}</span>
               <span class="member-text">
                 <a class="member-name" href="/@{{ invitation.invitee_login_name }}">{{ invitation.invitee_display_name }}</a>
-                <span class="member-meta">@{{ invitation.invitee_login_name }} · <span title="{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ invitation.created_at|ago }}</span></span>
+                <span class="member-meta">{{ handle(invitation.invitee_login_name) }} · <span title="{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ invitation.created_at|ago }}</span></span>
               </span>
               <button class="ds-button ds-button-small"
                       hx-delete="/communities/@{{ community.slug }}/invitations/{{ invitation.id }}"
@@ -67,7 +68,7 @@
                     <span class="community-card-badge">{{ ftl_get_message("community-member-role-moderator") }}</span>
                   {% endif %}
                 </span>
-                <span class="member-meta">@{{ member.login_name }} · {{ ftl_get_message("community-member-joined") }} <span title="{{ member.joined_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ member.joined_at|ago }}</span></span>
+                <span class="member-meta">{{ handle(member.login_name) }} · {{ ftl_get_message("community-member-joined") }} <span title="{{ member.joined_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ member.joined_at|ago }}</span></span>
               </span>
               {% if can_remove and member.role != "Owner" %}
                 <button class="ds-button ds-button-small"

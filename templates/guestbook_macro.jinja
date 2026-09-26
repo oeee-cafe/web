@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {# A guestbook entry as a row of a conversation: who wrote it and how long
    ago, what they wrote, and the owner's reply quoted under it. The owner
    answers through a Reply button that opens its field in place, rather than
@@ -7,7 +8,7 @@
   <div class="guestbook-entry">
     <div class="guestbook-head">
       <a class="member-name" href="/@{{ entry.author_login_name }}">{{ entry.author_display_name }}</a>
-      <span class="member-meta">@{{ entry.author_login_name }} · <span title="{{ entry.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ entry.created_at|ago }}</span></span>
+      <span class="member-meta">{{ handle(entry.author_login_name) }} · <span title="{{ entry.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ entry.created_at|ago }}</span></span>
     </div>
     <div class="guestbook-content ds-selectable">{{ entry.content }}</div>
     {% if entry.reply %}
@@ -44,7 +45,7 @@
   <div class="guestbook-reply">
     <div class="guestbook-head">
       <a class="member-name" href="/@{{ entry.recipient_login_name }}">{{ entry.recipient_display_name }}</a>
-      <span class="member-meta">@{{ entry.recipient_login_name }} · <span title="{{ entry.replied_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ entry.replied_at|ago }}</span></span>
+      <span class="member-meta">{{ handle(entry.recipient_login_name) }} · <span title="{{ entry.replied_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ entry.replied_at|ago }}</span></span>
     </div>
     <div class="guestbook-content ds-selectable">{{ entry.reply }}</div>
   </div>

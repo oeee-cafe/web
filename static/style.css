@@ -663,16 +663,7 @@ nav a:visited,
 .comment-header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
   font-size: var(--text-sm);
-}
-
-.comment-author {
-  font-weight: bold;
-}
-
-.comment-handle {
-  font-size: var(--text-xs);
 }
 
 .comment-timestamp {
@@ -3702,11 +3693,6 @@ html[data-store] .supporter-elsewhere {
   margin-left: 6px;
 }
 
-.post-comments .comment-author {
-  font-weight: 600;
-}
-
-.post-comments .comment-handle,
 .post-comments .comment-timestamp {
   color: var(--ds-faint);
   font-size: var(--ds-text-s);

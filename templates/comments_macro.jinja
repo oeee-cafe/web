@@ -1,4 +1,4 @@
-{% from "supporter_badge_macro.jinja" import supporter_badge %}
+{% from "person_macro.jinja" import person %}
 {% macro comment_item(comment, current_user, supporters={}) %}
   {# Only show comment if it's not deleted, or if it's deleted but has children #}
   {% if not comment.deleted_at or (comment.children and comment.children|length > 0) %}
@@ -6,13 +6,11 @@
     <div class="comment" id="comment-{{ comment.id }}">
       <div class="comment-body">
         <div class="comment-header">
-          {% if comment.is_local %}
-            <a href="{{ comment.actor_url }}" class="comment-author">{{ comment.actor_name }}</a>
-          {% else %}
-            <a href="{{ comment.actor_url }}" class="comment-author" target="_blank" rel="noopener noreferrer">{{ comment.actor_name }}</a>
-          {% endif %}
-          {% if comment.is_local %}{{ supporter_badge(supporters, comment.actor_login_name) }}{% endif %}
-          <span class="muted comment-handle">{% if comment.is_local and comment.actor_login_name %}@{{ comment.actor_login_name }}{% else %}{{ comment.actor_handle }}{% endif %}</span>
+          {{ person(comment.actor_name, comment.actor_url,
+                    login_name=comment.actor_login_name if comment.is_local else none,
+                    actor_handle=comment.actor_handle,
+                    supporters=supporters,
+                    external=not comment.is_local) }}
           <span class="muted comment-timestamp">{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</span>
         </div>
         <div class="comment-content">

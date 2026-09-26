@@ -2786,7 +2786,7 @@ mod template_tests {
         // Author, co-drawer, the commenter and the author's reply to them.
         assert_eq!(badges(&page), 4);
         let byline = page.find("post-inspector-byline").unwrap();
-        let handle = page[byline..].find("post-inspector-handle").unwrap() + byline;
+        let handle = page[byline..].find("ds-person-handle").unwrap() + byline;
         assert!(
             page[byline..handle].contains("supporter-badge"),
             "beside the author"
@@ -2813,6 +2813,31 @@ mod template_tests {
             .render(context! { comments, supporters => json!({"fan": "steam"}), ..chrome() })
             .unwrap();
         assert_eq!(badges(&fragment), 1);
+    }
+
+    /// A commenter from this site is @login_name, without the site's own
+    /// domain; one from elsewhere keeps the handle their server gave them.
+    /// Name and handle are printed with nothing between them, so the gap is
+    /// .ds-person's margin alone.
+    #[test]
+    fn a_comment_names_its_author_by_the_design_systems_person() {
+        let env = test_support::env();
+        let fragment = env
+            .get_template("post_comments.jinja")
+            .unwrap()
+            .render(context! {
+                comments => json!([comment(Some("plain"), "Plain"), comment(None, "far")]),
+                ..chrome()
+            })
+            .unwrap();
+        assert!(
+            fragment.contains(r#"<span class="ds-person-handle">@plain</span>"#),
+            "{fragment}"
+        );
+        assert!(fragment.contains(r#"<span class="ds-person-handle">@far@oeee.example</span>"#));
+        assert!(fragment.contains(r#"Plain</a><span class="ds-person-handle">"#));
+        // The remote author's profile is off the site, so it opens apart.
+        assert!(fragment.contains(r#"target="_blank" rel="noopener noreferrer">far</a>"#));
     }
 
     /// Every year they have supported, earliest first, each on the platform

@@ -1,0 +1,30 @@
+{% from "supporter_badge_macro.jinja" import supporter_badge %}
+{# How a person is named wherever a page prints them.
+
+   `handle()` is the handle alone. Someone from this site is @login_name,
+   because the site's own domain on the end tells a reader here nothing;
+   someone from another server keeps the handle their server gave them,
+   @name@their.host, since that is how they are told apart from a namesake
+   here. Pass `login_name` only for a local person -- a remote actor has
+   none -- and `actor_handle` for the remote form.
+
+   `person()` is the name, the supporter's mark and the handle on one line,
+   a .ds-person (ds.css). The parts are printed with nothing between them,
+   so the gap is the stylesheet's to say rather than a space's width in
+   whatever font the line is in. `external` opens a remote profile in a new
+   tab, as every link off the site does. #}
+{% macro handle(login_name=none, actor_handle=none) -%}
+  {%- if login_name %}@{{ login_name }}{% else %}{{ actor_handle }}{% endif -%}
+{%- endmacro %}
+
+{% macro person(name, href, login_name=none, actor_handle=none, supporters=none, external=false) -%}
+  <span class="ds-person">
+    {%- if href -%}
+      <a class="ds-person-name" href="{{ href }}"{% if external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ name }}</a>
+    {%- else -%}
+      <span class="ds-person-name">{{ name }}</span>
+    {%- endif -%}
+    {%- if login_name %}{{ supporter_badge(supporters, login_name) }}{% endif -%}
+    <span class="ds-person-handle">{{ handle(login_name, actor_handle) }}</span>
+  </span>
+{%- endmacro %}

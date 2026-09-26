@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {# A comment in a list of them: the drawing it is on, framed, then who said
    it and when, what they said, and the drawing's title. The whole row goes
    to the drawing, through one stretched link, so links inside what was said
@@ -29,7 +30,7 @@
         <a class="comment-row-link" href="/@{{ comment.post_author_login_name }}/{{ comment.post_id }}">
           {%- if by_drawing %}{{ comment.post_title or ftl_get_message("post-no-title") }}{% else %}{{ comment.actor_name }}{% endif -%}
         </a>
-        <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}@{{ comment.post_author_login_name }}{% elif comment.is_local and comment.actor_login_name %}@{{ comment.actor_login_name }}{% else %}{{ comment.actor_handle }}{% endif %} · </span><span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>
+        <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}{{ handle(comment.post_author_login_name) }}{% else %}{{ handle(comment.actor_login_name if comment.is_local else none, comment.actor_handle) }}{% endif %} · </span><span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>
       </div>
       <div class="comment-row-content ds-selectable">
         {% if comment.content_html %}
