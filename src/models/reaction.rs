@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 // The reactions every post offers a button for. Any other emoji can be
 // reacted with too; it gets a button once someone has used it.
-pub const AVAILABLE_EMOJIS: &[&str] = &["🥒", "♥️", "😂", "😢"];
+pub const AVAILABLE_EMOJIS: &[&str] = &["🥒", "❤️", "😂", "😢"];
 
 /// The fully-qualified form of `input` if it is exactly one emoji, so that
 /// "❤" and "❤️" count as the same reaction. Anything else, including text
