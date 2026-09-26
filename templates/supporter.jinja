@@ -69,9 +69,10 @@
               {% endif %}
             </div>
           {% endif %}
-          {# What became of the last press, once the store or the site has
-             answered it (the script below). #}
-          <p class="ds-help supporter-status" role="status" aria-live="polite" hidden></p>
+          {# What the last press is waiting on, and then what became of it
+             once the store or the site has answered (the script below).
+             The spinner is for the eye; the words are what is announced. #}
+          <p class="ds-help supporter-status" role="status" aria-live="polite" hidden><span class="ds-spinner" aria-hidden="true" hidden></span><span class="supporter-status-words"></span></p>
           {% if nothing_this_year %}
             <p class="ds-help">{{ ftl_format_pattern("supporter-pack-none", {"year": this_year}) }}</p>
           {% endif %}
@@ -151,6 +152,8 @@
       // might give back nothing that page shows differently, so it leaves
       // a note for the page after it to say.
       var WORDS = {
+        opening: {{ ftl_get_message("supporter-pack-opening")|tojson }},
+        restoring: {{ ftl_get_message("supporter-pack-restoring")|tojson }},
         checking: {{ ftl_get_message("supporter-pack-checking")|tojson }},
         restored: {{ ftl_get_message("supporter-pack-restored")|tojson }},
         nothing: {{ ftl_get_message("supporter-pack-nothing-to-restore")|tojson }},
@@ -162,15 +165,26 @@
       };
       var NOTE = "oeee-supporter-note";
       var status = document.querySelector(".supporter-status");
-      function say(words, error) {
+      // Said with the spinner while something is still to come, and
+      // without it once the press has its answer.
+      function say(words, error, working) {
         if (!status) return;
-        status.textContent = words || "";
+        status.querySelector(".supporter-status-words").textContent = words || "";
+        status.querySelector(".ds-spinner").hidden = !working;
         status.hidden = !words;
         status.classList.toggle("supporter-status-error", !!error);
       }
-      function busy(on) {
+      // Every button waits while one press is out, so a second press cannot
+      // open a second sheet over the first; the one pressed says it is the
+      // one working (style.css), and goes on saying so until they all let
+      // go.
+      function busy(on, button) {
         var controls = document.querySelectorAll(".supporter-buy, .supporter-restore");
-        for (var i = 0; i < controls.length; i++) controls[i].disabled = on;
+        for (var i = 0; i < controls.length; i++) {
+          controls[i].disabled = on;
+          if (on && controls[i] === button) controls[i].setAttribute("aria-busy", "true");
+          else if (!on || button) controls[i].removeAttribute("aria-busy");
+        }
       }
       try {
         if (sessionStorage.getItem(NOTE) === "restored") say(WORDS.restored);
@@ -183,30 +197,55 @@
       // app hands over unasked -- a purchase it found unfinished as the
       // page opened -- is checked quietly, and is shown by the reload when
       // the site takes it.
+      //
+      // The apps answer every press, with proof or with ended() -- all but
+      // Steam's, whose overlay cannot tell a press given up from a purchase
+      // still on its way (oeee-cafe-desktop, steam.rs). So a press lets the
+      // buttons go again on its own: at once, in effect, on Steam, where
+      // the overlay is the whole of what happens next; and elsewhere only
+      // long after any store should have answered, so that an app that
+      // never does cannot leave the page stuck. Either way the press stays
+      // outstanding, and an answer that comes after is still said.
       var pressed = null;
+      var waiting = null;
+      function press(kind, button, words) {
+        pressed = kind;
+        busy(true, button);
+        say(words, false, true);
+        clearTimeout(waiting);
+        var steam = document.documentElement.getAttribute("data-store") === "steam";
+        waiting = setTimeout(function () {
+          busy(false);
+          say("");
+        }, steam ? 4000 : 120000);
+      }
       document.addEventListener("oeee:store", function (event) {
         var told = event.detail || {};
         if (!pressed) return;
+        clearTimeout(waiting);
         if (told.state === "checking") {
           busy(true);
-          say(WORDS.checking);
+          say(WORDS.checking, false, true);
           return;
         }
         var was = pressed;
         pressed = null;
+        if (told.state === "checked" && told.taken) {
+          if (was === "restore") {
+            try {
+              sessionStorage.setItem(NOTE, "restored");
+            } catch (error) {
+              // Nothing to leave the note in; the reload says it alone.
+            }
+          }
+          // The site reloads the page to show the pack (app_store.jinja),
+          // and until it does this is still working.
+          busy(true);
+          say(WORDS.checking, false, true);
+          return;
+        }
         busy(false);
         if (told.state === "checked") {
-          if (told.taken) {
-            if (was === "restore") {
-              try {
-                sessionStorage.setItem(NOTE, "restored");
-              } catch (error) {
-                // Nothing to leave the note in; the reload says it alone.
-              }
-            }
-            say(WORDS.checking);
-            return;
-          }
           var refused = told.refused || [];
           if (refused.indexOf(401) !== -1) say(WORDS.signIn, true);
           // Proof the store does not know, or a site not set up to ask it:
@@ -228,13 +267,13 @@
         if (buy) {
           if (buy.disabled) return;
           say("");
-          if (ask("purchase", { product: buy.getAttribute("data-product") })) pressed = "purchase";
+          if (ask("purchase", { product: buy.getAttribute("data-product") })) press("purchase", buy, WORDS.opening);
           return;
         }
         var restore = event.target.closest && event.target.closest(".supporter-restore");
         if (restore && !restore.disabled) {
           say("");
-          if (ask("restore", {})) pressed = "restore";
+          if (ask("restore", {})) press("restore", restore, WORDS.restoring);
         }
       });
     })();
