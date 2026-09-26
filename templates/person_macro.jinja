@@ -1,20 +1,39 @@
-{% from "supporter_badge_macro.jinja" import supporter_badge %}
+{% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
 {# How a person is named wherever a page prints them.
 
-   `handle()` is the handle alone. Someone from this site is @login_name,
-   because the site's own domain on the end tells a reader here nothing;
-   someone from another server keeps the handle their server gave them,
-   @name@their.host, since that is how they are told apart from a namesake
-   here. Pass `login_name` only for a local person -- a remote actor has
-   none -- and `actor_handle` for the remote form.
+   `handle_text()` is the handle as words. Someone from this site is
+   @login_name, because the site's own domain on the end tells a reader here
+   nothing; someone from another server keeps the handle their server gave
+   them, @name@their.host, since that is how they are told apart from a
+   namesake here. Pass `login_name` only for a local person -- a remote
+   actor has none -- and `actor_handle` for the remote form.
 
-   `person()` is the name, the supporter's mark and the handle on one line,
-   a .ds-person (ds.css). The parts are printed with nothing between them,
-   so the gap is the stylesheet's to say rather than a space's width in
-   whatever font the line is in. `external` opens a remote profile in a new
-   tab, as every link off the site does. #}
-{% macro handle(login_name=none, actor_handle=none) -%}
+   `handle()` is that handle as a pill, a .ds-handle (ds.css): a ring for
+   everyone, and for a supporter the accent's lime with the mark of the
+   platform they bought this year's pack on inside it, before the @. A page
+   that knows who among the people it prints are supporters passes their
+   marks by login name (supporter_badge_macro.jinja says how); one that does
+   not passes nothing, and every pill is a ring.
+
+   `person()` is the name and then the handle's pill, a .ds-person. The
+   parts are printed with nothing between them, so the gap is the
+   stylesheet's to say rather than a space's width in whatever font the line
+   is in. `external` opens a remote profile in a new tab, as every link off
+   the site does. #}
+{% macro handle_text(login_name=none, actor_handle=none) -%}
   {%- if login_name %}@{{ login_name }}{% else %}{{ actor_handle }}{% endif -%}
+{%- endmacro %}
+
+{% macro handle(login_name=none, actor_handle=none, supporters=none) -%}
+  {%- set mark = (supporters or {})[login_name] if login_name else none -%}
+  {%- if mark -%}
+    <span class="ds-handle ds-handle-supporter ds-marked" title="{{ supporter_mark_name(mark) }}">
+      {{- supporter_mark(mark) -}}
+      {{- handle_text(login_name, actor_handle) -}}
+    </span>
+  {%- else -%}
+    <span class="ds-handle">{{ handle_text(login_name, actor_handle) }}</span>
+  {%- endif -%}
 {%- endmacro %}
 
 {% macro person(name, href, login_name=none, actor_handle=none, supporters=none, external=false) -%}
@@ -24,7 +43,6 @@
     {%- else -%}
       <span class="ds-person-name">{{ name }}</span>
     {%- endif -%}
-    {%- if login_name %}{{ supporter_badge(supporters, login_name) }}{% endif -%}
-    <span class="ds-person-handle">{{ handle(login_name, actor_handle) }}</span>
+    {{- handle(login_name, actor_handle, supporters) -}}
   </span>
 {%- endmacro %}

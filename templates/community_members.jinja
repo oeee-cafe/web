@@ -35,7 +35,6 @@
         <div class="member-list">
           {% for invitation in pending_invitations %}
             <div class="member-row">
-              <span class="member-initial" aria-hidden="true">{{ (invitation.invitee_display_name or invitation.invitee_login_name)[:1]|upper }}</span>
               <span class="member-text">
                 <a class="member-name" href="/@{{ invitation.invitee_login_name }}">{{ invitation.invitee_display_name }}</a>
                 <span class="member-meta">{{ handle(invitation.invitee_login_name) }} · <span title="{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ invitation.created_at|ago }}</span></span>
@@ -58,7 +57,6 @@
         <div class="member-list">
           {% for member in members %}
             <div class="member-row">
-              <span class="member-initial" aria-hidden="true">{{ (member.display_name or member.login_name)[:1]|upper }}</span>
               <span class="member-text">
                 <span class="member-name-line">
                   <a class="member-name" href="/@{{ member.login_name }}">{{ member.display_name }}</a>

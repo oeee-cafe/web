@@ -30,15 +30,12 @@
   {%- endfor %}
   {%- set pages = found.pages %}
 {%- endif %}
-{%- macro chip(text, foreground, background) -%}
-  <span class="jump-chip" aria-hidden="true"{% if background %} style="background-color: {{ background }}; color: {{ foreground }}"{% endif %}>{{ text[:1] | upper }}</span>
-{%- endmacro %}
 {%- if communities %}
   <li class="jump-heading" role="presentation">{{ ftl_get_message("jump-communities") }}</li>
   {%- for community in communities %}
     <li role="presentation">
       <a class="jump-item" role="option" href="/@{{ community.slug }}">
-        {{ chip(community.name, community.foreground_color, community.background_color) }}
+        <span class="jump-chip jump-chip-person" aria-hidden="true">@</span>
         <span class="jump-name">{{ community.name }}</span>
         <span class="jump-detail">@{{ community.slug }}</span>
       </a>

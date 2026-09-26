@@ -15,7 +15,7 @@
    a platform without a mark below wears nothing at all.
 
    `supporter_mark()` is the mark alone, for a chip that spells the platform
-   out beside it, and `supporter_badge()` the small inline mark. The mark is
+   out beside it or a supporter's handle (person_macro.jinja). The mark is
    a .ds-mark, and whatever holds it and its words is a .ds-marked or a
    .ds-marked-block (ds.css), which is all that centres it -- every call site's element carries it,
    and `every_mark_is_centred_by_the_design_system` checks they do. A page that
@@ -44,14 +44,5 @@
     {{ ftl_get_message("supporter-badge-microsoft") }}
   {%- elif mark == "google" -%}
     {{ ftl_get_message("supporter-badge-google") }}
-  {%- endif -%}
-{%- endmacro %}
-
-{% macro supporter_badge(supporters, login_name) -%}
-  {#- A page that prints no supporter passes nothing at all, so the marks are
-      defaulted before they are asked. -#}
-  {%- set mark = (supporters or {})[login_name] -%}
-  {%- if mark -%}
-    <a class="supporter-badge ds-marked ds-marked-alone" href="/about#supporters" title="{{ supporter_mark_name(mark) }}" aria-label="{{ supporter_mark_name(mark) }}">{{ supporter_mark(mark) }}</a>
   {%- endif -%}
 {%- endmacro %}

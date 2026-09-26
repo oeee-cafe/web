@@ -960,10 +960,10 @@ mod tests {
                 ..home_context(vec![sample_post()], false)
             })
             .expect("renders");
-        assert!(rendered.contains(r#"<span class="comment-row-handle">@commenter · </span>"#));
+        assert!(rendered.contains(r#"<span class="comment-row-handle"><span class="ds-handle">@commenter</span> · </span>"#));
         assert!(!rendered.contains("@commenter@oeee.test"));
         assert!(rendered
-            .contains(r#"<span class="comment-row-handle">@visitor@elsewhere.test · </span>"#));
+            .contains(r#"<span class="comment-row-handle"><span class="ds-handle">@visitor@elsewhere.test</span> · </span>"#));
     }
 
     /// A full batch beside the grid loads the next from after its last
