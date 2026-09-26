@@ -33,11 +33,17 @@
             </div>
             <div class="notification-meta">
               <time class="notification-time" title="{{ invitation.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ invitation.created_at|ago }}</time>
-              <div class="invitation-actions">
-                <form method="post" action="/invitations/{{ invitation.id }}/accept">
+              {# Answered in place: the row goes, and the response brings the
+                 sentence a redirect would have flashed, as a toast, with the
+                 bell corrected (community.rs, answered_in_place). A browser
+                 without htmx posts the form and is redirected back here. #}
+              <div class="invitation-actions" hx-target:inherited="closest .invitation-item" hx-swap:inherited="delete">
+                <form method="post" action="/invitations/{{ invitation.id }}/accept" hx-post="/invitations/{{ invitation.id }}/accept"
+                      hx-disable="find button">
                   <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("invitation-accept") }}</button>
                 </form>
-                <form method="post" action="/invitations/{{ invitation.id }}/reject">
+                <form method="post" action="/invitations/{{ invitation.id }}/reject" hx-post="/invitations/{{ invitation.id }}/reject"
+                      hx-disable="find button">
                   <button type="submit" class="ds-button" data-haptic="light">{{ ftl_get_message("invitation-reject") }}</button>
                 </form>
               </div>

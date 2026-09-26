@@ -1,0 +1,61 @@
+{# Controls that show their answer at the press, before the server's.
+
+   A reaction chip (post_reactions.jinja) fills or empties and moves its
+   number, and the post's total with it, the moment it is pressed, the way a
+   chat application's reactions do -- the round trip is a few hundred
+   milliseconds on a phone, and a chip that sits there that long reads as a
+   press that missed. The response is the whole block re-rendered, which
+   stands in for this guess with the truth: someone else's reaction that
+   landed meanwhile included.
+
+   A request that fails is answered with a toast (web::htmx::error_banner)
+   and no block, so the guess is taken back here, from what was noted before
+   it was made; a request that never reached the server is taken back the
+   same way. Only the numbers and the class are touched, never the markup,
+   so the chip is still the element htmx knows. #}
+<script>
+  (function () {
+    if (window.oeeeOptimisticInstalled) return;
+    window.oeeeOptimisticInstalled = true;
+    function nudge(span, by) {
+      if (!span) return null;
+      var was = span.textContent;
+      var n = parseInt(was, 10);
+      if (!isNaN(n)) span.textContent = String(Math.max(0, n + by));
+      return { span: span, was: was };
+    }
+    document.addEventListener("htmx:before:request", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      var chip = ctx && ctx.sourceElement;
+      if (!chip || !chip.classList || !chip.classList.contains("reaction-button")) return;
+      var block = chip.closest(".post-reactions");
+      if (!block) return;
+      var reacted = !chip.classList.contains("reacted");
+      var by = reacted ? 1 : -1;
+      chip.classList.toggle("reacted", reacted);
+      ctx.oeeeGuess = {
+        chip: chip,
+        reacted: !reacted,
+        counts: [nudge(chip.querySelector(".reaction-count"), by), nudge(block.querySelector(".reaction-total-count"), by)]
+      };
+    });
+    function takeBack(ctx) {
+      var guess = ctx && ctx.oeeeGuess;
+      if (!guess) return;
+      ctx.oeeeGuess = null;
+      if (!guess.chip.isConnected) return;
+      guess.chip.classList.toggle("reacted", guess.reacted);
+      for (var i = 0; i < guess.counts.length; i++) {
+        var count = guess.counts[i];
+        if (count && count.span.isConnected) count.span.textContent = count.was;
+      }
+    }
+    document.addEventListener("htmx:after:request", function (event) {
+      var ctx = event.detail && event.detail.ctx;
+      if (ctx && ctx.response && ctx.response.status >= 400) takeBack(ctx);
+    });
+    document.addEventListener("htmx:error", function (event) {
+      takeBack(event.detail && event.detail.ctx);
+    });
+  })();
+</script>

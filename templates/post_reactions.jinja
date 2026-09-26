@@ -3,7 +3,7 @@
     {% set total_count = reaction_counts | map(attribute='count') | sum %}
     {% if login_name %}
       <a href="/@{{ login_name }}/{{ post_id }}/reactions">
-        {{ total_count }}
+        <span class="reaction-total-count">{{ total_count }}</span>
         {% if total_count == 1 %}
           {{ ftl_get_message("post-reaction") }}
         {% else %}
@@ -12,7 +12,7 @@
       </a>
     {% elif post %}
       <a href="/@{{ post.login_name }}/{{ post_id }}/reactions">
-        {{ total_count }}
+        <span class="reaction-total-count">{{ total_count }}</span>
         {% if total_count == 1 %}
           {{ ftl_get_message("post-reaction") }}
         {% else %}
@@ -28,6 +28,9 @@
       {% endif %}
     {% endif %}
   </span>
+  {# A signed-in press shows its answer at once -- the chip filled or
+     emptied and its number moved by one -- and the response, the whole block
+     re-rendered, then stands in with the truth (optimistic.jinja). #}
   {% for reaction in reaction_counts %}
     {% if current_user %}
       <button class="reaction-button {% if reaction.reacted_by_user %}reacted{% endif %}" data-haptic="light"
@@ -37,7 +40,7 @@
               hx-swap="outerHTML"
               title="{% if reaction.reacted_by_user %}Remove your {{ reaction.emoji }}{% else %}React with {{ reaction.emoji }}{% endif %}"
               hx-disable="this">
-        {{ reaction.emoji }} {{ reaction.count }}
+        {{ reaction.emoji }} <span class="reaction-count">{{ reaction.count }}</span>
       </button>
     {% else %}
       <span class="reaction-button-readonly" title="Sign in to react">{{ reaction.emoji }} {{ reaction.count }}</span>

@@ -1523,10 +1523,30 @@ pub async fn remove_member(
 
 // ========== Invitation Endpoints ==========
 
+/// What an invitation's buttons get back from htmx (notifications.jinja): the
+/// row goes by its own `hx-swap="delete"`, and this answers with the sentence
+/// the redirect would have flashed, as a toast, and the bell corrected, since
+/// a pending invitation counts on it.
+async fn answered_in_place(
+    state: &AppState,
+    user_id: Uuid,
+    ftl_lang: &str,
+    said: &str,
+    close: &str,
+) -> Result<axum::response::Response, AppError> {
+    let toast = crate::web::htmx::toast("success", said, close);
+    let badge =
+        crate::web::handlers::notifications::nav_notification_badge(state, user_id, ftl_lang)
+            .await?;
+    Ok(Html(format!("{toast}{badge}")).into_response())
+}
+
 /// Accept an invitation
 pub async fn do_accept_invitation(
     auth_session: AuthSession,
     ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    headers: HeaderMap,
     State(state): State<AppState>,
     Path(invitation_id): Path<Uuid>,
     messages: Messages,
@@ -1647,7 +1667,18 @@ pub async fn do_accept_invitation(
         }
     }
 
-    messages.success(safe_get_message(&bundle, "invitation-accepted"));
+    let said = safe_get_message(&bundle, "invitation-accepted");
+    if crate::web::htmx::is_htmx(&headers) {
+        return answered_in_place(
+            &state,
+            user.id,
+            &ftl_lang,
+            &said,
+            &safe_get_message(&bundle, "close"),
+        )
+        .await;
+    }
+    messages.success(said);
 
     Ok(Redirect::to("/notifications").into_response())
 }
@@ -1656,6 +1687,8 @@ pub async fn do_accept_invitation(
 pub async fn do_reject_invitation(
     auth_session: AuthSession,
     ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    headers: HeaderMap,
     State(state): State<AppState>,
     Path(invitation_id): Path<Uuid>,
     messages: Messages,
@@ -1766,7 +1799,18 @@ pub async fn do_reject_invitation(
         }
     }
 
-    messages.success(safe_get_message(&bundle, "invitation-rejected"));
+    let said = safe_get_message(&bundle, "invitation-rejected");
+    if crate::web::htmx::is_htmx(&headers) {
+        return answered_in_place(
+            &state,
+            user.id,
+            &ftl_lang,
+            &said,
+            &safe_get_message(&bundle, "close"),
+        )
+        .await;
+    }
+    messages.success(said);
 
     Ok(Redirect::to("/notifications").into_response())
 }

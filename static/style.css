@@ -770,6 +770,12 @@ nav a:visited,
   margin: 0 0 6px;
 }
 
+/* Answering the last invitation takes its row away in place
+   (notifications.jinja), which would leave the heading over nothing. */
+.invitations-section:not(:has(.invitation-item)) {
+  display: none;
+}
+
 .notification-list,
 .invitations-section {
   border-radius: var(--ds-radius-m);

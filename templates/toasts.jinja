@@ -1,0 +1,67 @@
+{# The toasts (ds.css, "Toasts"): what the site has to say about the last
+   thing you did, over the page at the window's corner.
+
+   A full page load's flash messages arrive already in the stack, one notice
+   each, their level -- Success, Error, and the rest axum-messages has --
+   picking the colour. A response to htmx adds to it itself, with an
+   `<hx-partial>` aimed at this id (web::htmx::toast), and a failed htmx
+   request's sentence lands here too (web::htmx::error_banner), so a control
+   that fails says so instead of going quiet. Outside `main.ds-content`, so
+   the in-place switches that morph only that leave a toast standing. #}
+<div id="toasts" class="ds-toasts" aria-live="polite">
+  {%- for message in messages or [] %}
+    <div class="ds-notice ds-toast ds-notice-{{ message.l | lower }}"{% if message.l | lower == "error" %} role="alert"{% endif %}>
+      <span class="ds-notice-body">{{ message.m }}</span>
+      {% include "notice_close.jinja" %}
+    </div>
+  {%- endfor -%}
+</div>
+{# A toast that is not an error goes after a while, sliding down as it came;
+   the pointer resting on one holds it, so it is not taken away mid-read.
+   Only the three newest are kept, so a run of clicks does not build a
+   tower. Looked for on load and after every htmx swap -- partials included,
+   since htmx fires the swap event once all of a response's tasks are done --
+   and a toast is timed once, however many swaps see it. Installed once: a
+   swap of the whole body runs this again, and only needs the look. #}
+<script>
+  (function () {
+    var SHOWN_MS = 5000;
+    var KEPT = 3;
+    function leave(toast) {
+      if (!toast.parentNode) return;
+      toast.className += " is-leaving";
+      setTimeout(function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 200);
+    }
+    function time(toast) {
+      var timer = null;
+      function start() {
+        timer = setTimeout(function () { leave(toast); }, SHOWN_MS);
+      }
+      toast.addEventListener("mouseenter", function () { clearTimeout(timer); });
+      toast.addEventListener("mouseleave", start);
+      start();
+    }
+    function look() {
+      var stack = document.getElementById("toasts");
+      if (!stack) return;
+      var toasts = stack.querySelectorAll(".ds-notice");
+      for (var i = 0; i < toasts.length; i++) {
+        var toast = toasts[i];
+        if (i < toasts.length - KEPT) {
+          leave(toast);
+          continue;
+        }
+        if (toast.getAttribute("data-timed")) continue;
+        toast.setAttribute("data-timed", "1");
+        if (toast.className.indexOf("ds-toast") < 0) toast.className += " ds-toast";
+        if (toast.className.indexOf("ds-notice-error") < 0) time(toast);
+      }
+    }
+    look();
+    if (window.oeeeToastsInstalled) return;
+    window.oeeeToastsInstalled = true;
+    document.addEventListener("htmx:after:swap", look);
+  })();
+</script>

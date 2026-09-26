@@ -138,7 +138,7 @@ pub async fn list_notifications(
 /// `<hx-partial>` carries its own target, so a handler can hand back the row
 /// it was asked for *and* the corrected badge in one response, and the number
 /// stops drifting from the list it counts.
-async fn nav_notification_badge(
+pub(crate) async fn nav_notification_badge(
     state: &AppState,
     user_id: Uuid,
     ftl_lang: &str,
