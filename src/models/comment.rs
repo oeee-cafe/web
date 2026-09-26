@@ -5,6 +5,7 @@ use sqlx::{Postgres, Transaction, Type};
 use uuid::Uuid;
 
 use crate::models::handle::Handle;
+use crate::models::notification::BadgeFalls;
 use crate::sanitized_html::SanitizedHtml;
 
 type CommentData = (
@@ -669,7 +670,11 @@ pub async fn find_comment_by_iri(
     Ok(comment)
 }
 
-pub async fn delete_comment_by_iri(tx: &mut Transaction<'_, Postgres>, iri: &str) -> Result<bool> {
+/// `None` when no comment has that iri.
+pub async fn delete_comment_by_iri(
+    tx: &mut Transaction<'_, Postgres>,
+    iri: &str,
+) -> Result<Option<BadgeFalls>> {
     // First find the comment to get its ID
     let comment = sqlx::query!(
         r#"
@@ -684,10 +689,10 @@ pub async fn delete_comment_by_iri(tx: &mut Transaction<'_, Postgres>, iri: &str
     match comment {
         Some(c) => {
             // Soft delete using the delete_comment function
-            delete_comment(tx, c.id, CommentDeletionReason::Moderation).await?;
-            Ok(true)
+            let falls = delete_comment(tx, c.id, CommentDeletionReason::Moderation).await?;
+            Ok(Some(falls))
         }
-        None => Ok(false),
+        None => Ok(None),
     }
 }
 
@@ -776,7 +781,7 @@ pub async fn delete_comment(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
     reason: CommentDeletionReason,
-) -> Result<()> {
+) -> Result<BadgeFalls> {
     // Soft delete the comment
     sqlx::query!(
         r#"
@@ -795,15 +800,19 @@ pub async fn delete_comment(
     .await?;
 
     // Delete notifications referencing this comment
-    sqlx::query!(
+    let retracted = sqlx::query!(
         r#"
         DELETE FROM notifications
         WHERE comment_id = $1
+        RETURNING recipient_id, read_at IS NULL AS "unread!"
         "#,
         id
     )
-    .execute(&mut **tx)
+    .fetch_all(&mut **tx)
     .await?;
 
-    Ok(())
+    Ok(retracted
+        .into_iter()
+        .filter_map(|row| row.unread.then_some(row.recipient_id))
+        .collect())
 }

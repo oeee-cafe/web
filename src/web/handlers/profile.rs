@@ -15,8 +15,8 @@ use crate::models::link::{
     create_link, delete_link, find_links_by_user_id, update_link_order, LinkDraft,
 };
 use crate::models::notification::{
-    create_notification, get_badge_count, get_notification_by_id, send_push_for_notification,
-    CreateNotificationParams, NotificationType,
+    create_notification, get_badge_count, get_notification_by_id, retract_follow_notifications,
+    send_push_for_notification, BadgeFalls, CreateNotificationParams, NotificationType,
 };
 use crate::models::post::{
     count_profile_posts, find_profile_posts, find_published_public_posts_by_author_id,
@@ -156,26 +156,13 @@ pub async fn do_unfollow_profile(
 
     // Delete follow notification
     let follower_actor = Actor::find_by_user_id(&mut tx, current_user.id).await?;
+    let mut falls = BadgeFalls::none();
     if let Some(follower_actor) = follower_actor {
-        match sqlx::query!(
-            r#"
-            DELETE FROM notifications
-            WHERE recipient_id = $1
-              AND actor_id = $2
-              AND notification_type = 'follow'
-            "#,
-            user.id,
-            follower_actor.id
-        )
-        .execute(&mut *tx)
-        .await
-        {
-            Ok(_) => tracing::info!("Deleted follow notification"),
-            Err(e) => tracing::warn!("Failed to delete follow notification: {:?}", e),
-        }
+        falls = retract_follow_notifications(&mut tx, user.id, follower_actor.id).await?;
     }
 
-    let _ = tx.commit().await;
+    tx.commit().await?;
+    state.push_service.badges_fell(falls);
 
     let rendered = state
         .render(
@@ -1097,8 +1084,9 @@ pub async fn do_delete_guestbook_entry(
         return Ok(StatusCode::FORBIDDEN.into_response());
     }
 
-    let _ = delete_guestbook_entry(&mut tx, entry_id).await;
-    let _ = tx.commit().await;
+    let falls = delete_guestbook_entry(&mut tx, entry_id).await?;
+    tx.commit().await?;
+    state.push_service.badges_fell(falls);
 
     Ok(StatusCode::OK.into_response())
 }

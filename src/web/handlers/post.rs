@@ -2352,12 +2352,14 @@ pub async fn hx_delete_post(
     // A draft was never announced, so there is nothing for followers to
     // take back: a Delete for it would only tell them it had existed.
     let was_published = post.get("published_at").and_then(|v| v.as_ref()).is_some();
-    delete_post_with_activity(&mut tx, post_uuid, was_published.then_some(&state)).await?;
+    let falls =
+        delete_post_with_activity(&mut tx, post_uuid, was_published.then_some(&state)).await?;
     let remaining = match (&query.in_place, &auth_session.user) {
         (Some(_), Some(user)) => Some(get_draft_post_count(&mut tx, user.id).await?),
         _ => None,
     };
     tx.commit().await?;
+    state.push_service.badges_fell(falls);
 
     if let Some(remaining) = remaining {
         let rendered = state
@@ -3279,7 +3281,7 @@ pub async fn remove_reaction(
     // Find the reaction before deleting (need IRI for Undo activity)
     let existing_reaction = find_user_reaction(&mut tx, post_id, actor.id, &form.emoji).await?;
 
-    let _ = delete_reaction(&mut tx, post_id, actor.id, &form.emoji).await;
+    let falls = delete_reaction(&mut tx, post_id, actor.id, &form.emoji).await?;
     let login_name = post
         .as_ref()
         .and_then(|p| p.get("login_name"))
@@ -3297,6 +3299,7 @@ pub async fn remove_reaction(
     let user_actor_id = Some(actor.id);
     let reaction_counts = get_reaction_counts(&mut tx, post_id, user_actor_id).await?;
     tx.commit().await?;
+    state.push_service.badges_fell(falls);
 
     // Send Undo(EmojiReact) activity to post author
     if let Some(reaction) = existing_reaction {

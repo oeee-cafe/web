@@ -243,12 +243,10 @@ pub async fn open_notification(
         tx.rollback().await?;
         return Ok(Redirect::to("/notifications"));
     };
-    let marked = mark_notification_as_read(&mut tx, notification_id, user.id).await?;
+    let falls = mark_notification_as_read(&mut tx, notification_id, user.id).await?;
     tx.commit().await?;
 
-    if marked {
-        state.push_service.refresh_badge(user.id);
-    }
+    state.push_service.badges_fell(falls);
     Ok(Redirect::to(&notification_url(
         &notification,
         &user.login_name,
@@ -272,12 +270,10 @@ pub async fn mark_notifications_seen(
     let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
 
     let mut tx = state.db_pool.begin().await?;
-    let marked = mark_all_notifications_as_read(&mut tx, user.id).await?;
+    let falls = mark_all_notifications_as_read(&mut tx, user.id).await?;
     tx.commit().await?;
 
-    if marked > 0 {
-        state.push_service.refresh_badge(user.id);
-    }
+    state.push_service.badges_fell(falls);
     let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
     Ok(Html(badge))
 }
@@ -320,12 +316,12 @@ pub async fn delete_notification_handler(
         .ok_or(AppError::Unauthorized)?
         .clone();
 
-    let success = delete_notification(&mut tx, notification_id, user.id).await?;
+    let deleted = delete_notification(&mut tx, notification_id, user.id).await?;
 
     tx.commit().await?;
 
-    if success {
-        state.push_service.refresh_badge(user.id);
+    if let Some(falls) = deleted {
+        state.push_service.badges_fell(falls);
         // Empty main content removes the row; the partial alongside it fixes
         // the badge, which was counting a notification that no longer exists.
         let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
