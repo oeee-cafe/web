@@ -225,19 +225,23 @@ async fn feed_page(
     let comments = comments_batch(&mut tx, scope, auth_session.user.as_ref(), None).await?;
     tx.commit().await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("home.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        feed_switch => feed.name(),
-        feed_view => "drawings",
-        feed => feed_context(posts, feed.batch_path(), 0, None),
-        comments => comments_context(comments, feed.comments_batch_path()),
-        comments_url => feed.comments_path(),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "home.jinja",
+            context! {
+                current_user => auth_session.user,
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                feed_switch => feed.name(),
+                feed_view => "drawings",
+                feed => feed_context(posts, feed.batch_path(), 0, None),
+                comments => comments_context(comments, feed.comments_batch_path()),
+                comments_url => feed.comments_path(),
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -260,18 +264,20 @@ async fn feed_comments_page(
     tx.commit().await?;
 
     let rendered = state
-        .env
-        .get_template("home_comments.jinja")?
-        .render(context! {
-            current_user => auth_session.user,
-            messages => messages.into_iter().collect::<Vec<_>>(),
-            feed_switch => feed.name(),
-            feed_view => "comments",
-            comments => comments_context(comments, feed.comments_batch_path()),
-            draft_post_count => common_ctx.draft_post_count,
-            unread_notification_count => common_ctx.unread_notification_count,
-            ftl_lang
-        })?;
+        .render(
+            "home_comments.jinja",
+            context! {
+                current_user => auth_session.user,
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                feed_switch => feed.name(),
+                feed_view => "comments",
+                comments => comments_context(comments, feed.comments_batch_path()),
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -289,13 +295,15 @@ async fn feed_comments_batch(
     tx.commit().await?;
 
     let rendered = state
-        .env
-        .get_template("comments_fragment.jinja")?
-        .render(context! {
-            comments => comments_context(comments, feed.comments_batch_path()),
-            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-            ftl_lang,
-        })?;
+        .render(
+            "comments_fragment.jinja",
+            context! {
+                comments => comments_context(comments, feed.comments_batch_path()),
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -378,13 +386,12 @@ async fn feed_batch(
         .await?;
     tx.commit().await?;
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("post_feed_fragment.jinja")?;
-    let rendered = template.render(context! {
+    let template = "post_feed_fragment.jinja";
+    let rendered = state.render(template, context! {
         feed => feed_context(posts, feed.batch_path(), query.offset, query.period.as_deref()),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
         ftl_lang,
-    })?;
+    }).await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -534,6 +541,7 @@ pub struct AddReactionRequest {
 #[cfg(test)]
 mod tests {
     use crate::models::comment::NotificationComment;
+    use crate::models::handle::Handle;
     use crate::models::post::SerializablePostForHome;
     use crate::web::handlers::test_support;
     use chrono::Datelike;
@@ -891,10 +899,8 @@ mod tests {
             content_html: None,
             iri: None,
             actor_name: "Commenter".to_string(),
-            actor_handle: "@commenter@oeee.test".to_string(),
+            handle: Handle::Local("commenter".to_string().into()),
             actor_url: "https://oeee.test/@commenter".to_string(),
-            actor_login_name: Some("commenter".to_string()),
-            is_local: true,
             updated_at: at,
             created_at: at,
             post_title: Some("A drawing".to_string()),
@@ -947,9 +953,7 @@ mod tests {
     fn a_comment_names_a_local_commenter_without_the_domain() {
         let remote = NotificationComment {
             id: uuid::Uuid::from_u128(12),
-            actor_handle: "@visitor@elsewhere.test".to_string(),
-            actor_login_name: None,
-            is_local: false,
+            handle: Handle::Remote("@visitor@elsewhere.test".to_string()),
             ..sample_comment()
         };
         let rendered = test_support::env()

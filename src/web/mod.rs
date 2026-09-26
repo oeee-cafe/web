@@ -7,3 +7,4 @@ pub mod presence;
 pub mod responses;
 pub mod session_store;
 pub mod state;
+pub mod templates;

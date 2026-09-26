@@ -188,16 +188,20 @@ pub async fn search_page(
     };
     tx.commit().await?;
 
-    let template = state.env.get_template("search.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        search_query,
-        people,
-        posts,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "search.jinja",
+            context! {
+                current_user => auth_session.user,
+                search_query,
+                people,
+                posts,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }

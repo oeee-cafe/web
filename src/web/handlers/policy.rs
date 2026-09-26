@@ -19,13 +19,17 @@ pub async fn policy(
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
-    let template = state.env.get_template("policy.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "policy.jinja",
+            context! {
+                current_user => auth_session.user,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }

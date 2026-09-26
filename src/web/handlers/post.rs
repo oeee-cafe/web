@@ -9,6 +9,7 @@ use crate::models::community::{
     find_community_by_id, get_known_communities, get_user_role_in_community, is_user_member,
 };
 use crate::models::follow;
+use crate::models::handle::Handle;
 use crate::models::image::find_image_by_id;
 use crate::models::notification::{
     create_notification, get_badge_count, get_notification_by_id, send_push_for_notification,
@@ -23,7 +24,6 @@ use crate::models::reaction::{
     create_reaction, delete_reaction, find_reactions_by_post_id, find_user_reaction,
     get_reaction_counts, normalize_emoji, ReactionDraft,
 };
-use crate::models::supporter::supporter_marks_on_post;
 use crate::models::tag::{get_tags_for_post, set_post_tags};
 use crate::models::user::{find_user_by_id, AuthSession, Language};
 use crate::web::context::CommonContext;
@@ -367,8 +367,7 @@ async fn render_relay_page(
     post: &std::collections::HashMap<String, Option<String>>,
     community: Option<crate::models::community::Community>,
 ) -> Result<axum::response::Response, AppError> {
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("draw_post_cucumber.jinja")?;
+    let template = "draw_post_cucumber.jinja";
     let common_ctx = CommonContext::build(tx, current_user.as_ref().map(|user| user.id)).await?;
 
     let width = post
@@ -404,27 +403,31 @@ async fn render_relay_page(
     painter_config["submission"] = json!({ "kind": "post" });
     let painter_config = serde_json::to_string(&painter_config)?;
 
-    let rendered = template
-        .render(context! {
-            parent_post => post,
-            current_user => current_user,
-            community_name => community.as_ref().map(|community| community.name.clone()),
-            width => width,
-            height => height,
-            background_color => community
-                .as_ref()
-                .and_then(|community| community.background_color.clone()),
-            foreground_color => community
-                .as_ref()
-                .and_then(|community| community.foreground_color.clone()),
-            community_id => community.as_ref().map(|community| community.id.to_string()),
-            community_slug => community.as_ref().map(|community| community.slug.clone()),
-            is_relay => true,
-            draft_post_count => common_ctx.draft_post_count,
-            unread_notification_count => common_ctx.unread_notification_count,
-            ftl_lang,
-            painter_config
-        })
+    let rendered = state
+        .render(
+            template,
+            context! {
+                parent_post => post,
+                current_user => current_user,
+                community_name => community.as_ref().map(|community| community.name.clone()),
+                width => width,
+                height => height,
+                background_color => community
+                    .as_ref()
+                    .and_then(|community| community.background_color.clone()),
+                foreground_color => community
+                    .as_ref()
+                    .and_then(|community| community.foreground_color.clone()),
+                community_id => community.as_ref().map(|community| community.id.to_string()),
+                community_slug => community.as_ref().map(|community| community.slug.clone()),
+                is_relay => true,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+                painter_config
+            },
+        )
+        .await
         .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
 
     Ok(Html(rendered).into_response())
@@ -586,7 +589,6 @@ pub async fn post_view(
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
     let comments = build_comment_thread_tree(&mut tx, uuid).await?;
-    let supporters = supporter_marks_on_post(&mut tx, uuid).await?;
 
     // Get parent post data if it exists
     let (parent_post_author_login_name, parent_post_data) =
@@ -716,11 +718,13 @@ pub async fn post_view(
 
     let community_id = community_id.map(|id| id.to_string());
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("post_view.jinja")?;
+    let template = "post_view.jinja";
 
     if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
-        let rendered = template
-            .render_captured_to(
+        let rendered = state
+            .render_block(
+                template,
+                "post_edit_block",
                 context! {
                     current_user => auth_session.user,
                     post => Some(&post),
@@ -729,41 +733,43 @@ pub async fn post_view(
                     post_community,
                     ftl_lang
                 },
-                std::io::sink(),
-            )?
-            .with_state_mut(|state| state.render_block("post_edit_block"))
+            )
+            .await
             .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
         Ok(Html(rendered).into_response())
     } else {
-        let rendered = template
-            .render(context! {
-                current_user => auth_session.user,
-                        post => Some(&post),
-                parent_post_id => post.get("parent_post_id")
-                    .and_then(|id| id.as_ref())
-                    .and_then(|id| Uuid::parse_str(id).ok())
-                    .map(|uuid| uuid.to_string())
-                    .unwrap_or_default(),
-                parent_post_author_login_name => parent_post_author_login_name.clone(),
-                parent_post_data,
-                post_id => post.get("id")
-                    .and_then(|v| v.as_ref())
-                    .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
-                    .clone(),
-                community_id,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                base_url => state.config.base_url.clone(),
-                domain => state.config.domain.clone(),
-                comments,
-                supporters,
-                collaborative_participants,
-                reaction_counts,
-                tags,
-                child_posts,
-                post_community,
-                ftl_lang
-            })
+        let rendered = state
+            .render(
+                template,
+                context! {
+                    current_user => auth_session.user,
+                            post => Some(&post),
+                    parent_post_id => post.get("parent_post_id")
+                        .and_then(|id| id.as_ref())
+                        .and_then(|id| Uuid::parse_str(id).ok())
+                        .map(|uuid| uuid.to_string())
+                        .unwrap_or_default(),
+                    parent_post_author_login_name => parent_post_author_login_name.clone(),
+                    parent_post_data,
+                    post_id => post.get("id")
+                        .and_then(|v| v.as_ref())
+                        .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
+                        .clone(),
+                    community_id,
+                    draft_post_count => common_ctx.draft_post_count,
+                    unread_notification_count => common_ctx.unread_notification_count,
+                    base_url => state.config.base_url.clone(),
+                    domain => state.config.domain.clone(),
+                    comments,
+                    collaborative_participants,
+                    reaction_counts,
+                    tags,
+                    child_posts,
+                    post_community,
+                    ftl_lang
+                },
+            )
+            .await
             .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
         Ok(Html(rendered).into_response())
     }
@@ -938,18 +944,22 @@ pub async fn post_publish_form(
         None
     };
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("post_form.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        post_id => id,
-        link,
-        post => {
-            post
-        },
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "post_form.jinja",
+            context! {
+                current_user => auth_session.user,
+                post_id => id,
+                link,
+                post => {
+                    post
+                },
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -1309,15 +1319,19 @@ pub async fn draft_posts(
 
     tx.commit().await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("draft_posts.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        posts => posts,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "draft_posts.jinja",
+            context! {
+                current_user => auth_session.user,
+                posts => posts,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -1537,7 +1551,6 @@ pub async fn do_create_comment(
     // post is not used after this point, no need to unwrap
 
     let comments = build_comment_thread_tree(&mut tx, post_id).await?;
-    let supporters = supporter_marks_on_post(&mut tx, post_id).await?;
     let _ = tx.commit().await;
     // Everyone else looking at this post fetches its comments again; this
     // page has them in the response.
@@ -1580,13 +1593,16 @@ pub async fn do_create_comment(
         });
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("post_comments.jinja")?;
-    let rendered = template.render(context! {
-        comments => comments,
-        supporters,
-        current_user => auth_session.user,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "post_comments.jinja",
+            context! {
+                comments => comments,
+                current_user => auth_session.user,
+                ftl_lang
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -1904,22 +1920,26 @@ pub async fn post_edit_community(
 
     tx.commit().await?;
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("post_edit_community.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        post,
-        post_id => id,
-        current_community,
-        unlisted_communities,
-        public_participated_communities,
-        public_other_communities,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        base_url => state.config.base_url.clone(),
-        ftl_lang
-    })?;
+    let template = "post_edit_community.jinja";
+    let rendered = state
+        .render(
+            template,
+            context! {
+                current_user => auth_session.user,
+                post,
+                post_id => id,
+                current_community,
+                unlisted_communities,
+                public_participated_communities,
+                public_other_communities,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                base_url => state.config.base_url.clone(),
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -2031,14 +2051,18 @@ pub async fn hx_edit_post(
 
     tx.commit().await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("post_edit.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        post,
-        post_id => id,
-        tags => tags_string,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "post_edit.jinja",
+            context! {
+                current_user => auth_session.user,
+                post,
+                post_id => id,
+                tags => tags_string,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -2160,9 +2184,11 @@ pub async fn hx_do_edit_post(
         }
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("post_view.jinja")?;
-    let rendered = template
-        .render_captured_to(
+    let template = "post_view.jinja";
+    let rendered = state
+        .render_block(
+            template,
+            "post_edit_block",
             context! {
                 current_user => auth_session.user,
                     post,
@@ -2170,9 +2196,8 @@ pub async fn hx_do_edit_post(
                 tags,
                 ftl_lang
             },
-            std::io::sink(),
-        )?
-        .with_state_mut(|state| state.render_block("post_edit_block"))?;
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -2336,9 +2361,8 @@ pub async fn hx_delete_post(
 
     if let Some(remaining) = remaining {
         let rendered = state
-            .env
-            .get_template("draft_delete_oob.jinja")?
-            .render(context! { remaining, ftl_lang })?;
+            .render("draft_delete_oob.jinja", context! { remaining, ftl_lang })
+            .await?;
         return Ok(Html(rendered).into_response());
     }
     Ok(([("HX-Redirect", &redirect_url)],).into_response())
@@ -2438,7 +2462,6 @@ pub async fn post_view_by_login_name(
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
     let comments = build_comment_thread_tree(&mut tx, uuid).await?;
-    let supporters = supporter_marks_on_post(&mut tx, uuid).await?;
 
     // Get parent post data if it exists
     let (parent_post_author_login_name, parent_post_data) =
@@ -2571,11 +2594,13 @@ pub async fn post_view_by_login_name(
 
     let community_id = community_id.map(|id| id.to_string());
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("post_view.jinja")?;
+    let template = "post_view.jinja";
 
     if headers.get("HX-Request") == Some(&HeaderValue::from_static("true")) {
-        let rendered = template
-            .render_captured_to(
+        let rendered = state
+            .render_block(
+                template,
+                "post_edit_block",
                 context! {
                     current_user => auth_session.user,
                     post => Some(&post),
@@ -2584,41 +2609,43 @@ pub async fn post_view_by_login_name(
                     post_community,
                     ftl_lang
                 },
-                std::io::sink(),
-            )?
-            .with_state_mut(|state| state.render_block("post_edit_block"))
+            )
+            .await
             .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
         Ok(Html(rendered).into_response())
     } else {
-        let rendered = template
-            .render(context! {
-                current_user => auth_session.user,
-                        post => Some(&post),
-                parent_post_id => post.get("parent_post_id")
-                    .and_then(|id| id.as_ref())
-                    .and_then(|id| Uuid::parse_str(id).ok())
-                    .map(|uuid| uuid.to_string())
-                    .unwrap_or_default(),
-                parent_post_author_login_name => parent_post_author_login_name.clone(),
-                parent_post_data,
-                post_id => post.get("id")
-                    .and_then(|v| v.as_ref())
-                    .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
-                    .clone(),
-                community_id,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                base_url => state.config.base_url.clone(),
-                domain => state.config.domain.clone(),
-                comments,
-                supporters,
-                collaborative_participants,
-                reaction_counts,
-                tags,
-                child_posts,
-                post_community,
-                ftl_lang
-            })
+        let rendered = state
+            .render(
+                template,
+                context! {
+                    current_user => auth_session.user,
+                            post => Some(&post),
+                    parent_post_id => post.get("parent_post_id")
+                        .and_then(|id| id.as_ref())
+                        .and_then(|id| Uuid::parse_str(id).ok())
+                        .map(|uuid| uuid.to_string())
+                        .unwrap_or_default(),
+                    parent_post_author_login_name => parent_post_author_login_name.clone(),
+                    parent_post_data,
+                    post_id => post.get("id")
+                        .and_then(|v| v.as_ref())
+                        .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
+                        .clone(),
+                    community_id,
+                    draft_post_count => common_ctx.draft_post_count,
+                    unread_notification_count => common_ctx.unread_notification_count,
+                    base_url => state.config.base_url.clone(),
+                    domain => state.config.domain.clone(),
+                    comments,
+                    collaborative_participants,
+                    reaction_counts,
+                    tags,
+                    child_posts,
+                    post_community,
+                    ftl_lang
+                },
+            )
+            .await
             .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
         Ok(Html(rendered).into_response())
     }
@@ -2942,19 +2969,22 @@ pub async fn post_replay_view_by_login_name(
 
     let community_id = community_id.map(|id| id.to_string());
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("post_replay_view_tgkr.jinja")?;
-    let rendered = template
-        .render(context! {
-            presence => Presence::new(Activity::WatchingReplay),
-            current_user => auth_session.user,
-            post => Some(&post),
-            post_id => post_id,
-            community_id,
-            draft_post_count => common_ctx.draft_post_count,
-            unread_notification_count => common_ctx.unread_notification_count,
-            ftl_lang
-        })
+    let template = "post_replay_view_tgkr.jinja";
+    let rendered = state
+        .render(
+            template,
+            context! {
+                presence => Presence::new(Activity::WatchingReplay),
+                current_user => auth_session.user,
+                post => Some(&post),
+                post_id => post_id,
+                community_id,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await
         .map_err(|e| AppError::from(anyhow::anyhow!("Template render error: {}", e)))?;
     Ok(Html(rendered).into_response())
 }
@@ -3031,13 +3061,17 @@ pub async fn add_reaction(
         _ => {
             let reaction_counts = get_reaction_counts(&mut tx, post_id, Some(actor.id)).await?;
             tx.commit().await?;
-            let template = state.env.get_template("post_reactions.jinja")?;
-            let rendered = template.render(context! {
-                current_user => auth_session.user,
-                reaction_counts => reaction_counts,
-                post_id => post_id.to_string(),
-                login_name => login_name,
-            })?;
+            let rendered = state
+                .render(
+                    "post_reactions.jinja",
+                    context! {
+                        current_user => auth_session.user,
+                        reaction_counts => reaction_counts,
+                        post_id => post_id.to_string(),
+                        login_name => login_name,
+                    },
+                )
+                .await?;
             return Ok(Html(rendered).into_response());
         }
     };
@@ -3178,13 +3212,17 @@ pub async fn add_reaction(
         }
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("post_reactions.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        reaction_counts => reaction_counts,
-        post_id => post_id.to_string(),
-        login_name => login_name,
-    })?;
+    let rendered = state
+        .render(
+            "post_reactions.jinja",
+            context! {
+                current_user => auth_session.user,
+                reaction_counts => reaction_counts,
+                post_id => post_id.to_string(),
+                login_name => login_name,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -3331,13 +3369,17 @@ pub async fn remove_reaction(
         }
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("post_reactions.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        reaction_counts => reaction_counts,
-        post_id => post_id.to_string(),
-        login_name => login_name,
-    })?;
+    let rendered = state
+        .render(
+            "post_reactions.jinja",
+            context! {
+                current_user => auth_session.user,
+                reaction_counts => reaction_counts,
+                post_id => post_id.to_string(),
+                login_name => login_name,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -3416,10 +3458,8 @@ pub async fn post_reactions_detail(
     #[derive(Serialize)]
     struct ReactionForTemplate {
         actor_name: String,
-        actor_handle: String,
+        handle: Handle,
         actor_url: String,
-        actor_login_name: Option<String>,
-        is_local: bool,
         created_at: String,
     }
 
@@ -3434,16 +3474,11 @@ pub async fn post_reactions_detail(
         .map(|(emoji, reactions)| {
             let reactions_for_template = reactions
                 .into_iter()
-                .map(|r| {
-                    let is_local = r.actor_login_name.is_some();
-                    ReactionForTemplate {
-                        actor_name: r.actor_name,
-                        actor_handle: r.actor_handle,
-                        actor_url: r.actor_url,
-                        actor_login_name: r.actor_login_name,
-                        is_local,
-                        created_at: r.created_at.to_rfc3339(),
-                    }
+                .map(|r| ReactionForTemplate {
+                    actor_name: r.actor_name,
+                    handle: r.handle,
+                    actor_url: r.actor_url,
+                    created_at: r.created_at.to_rfc3339(),
                 })
                 .collect();
             EmojiGroup {
@@ -3453,8 +3488,7 @@ pub async fn post_reactions_detail(
         })
         .collect();
 
-    let template = state.env.get_template("post_reactions_detail.jinja")?;
-    let rendered = template.render(context! {
+    let rendered = state.render("post_reactions_detail.jinja", context! {
         current_user => auth_session.user,
         post_title => post_data.get("title").and_then(|t| t.as_ref()).unwrap_or(&"Untitled".to_string()),
         post_id => post_id,
@@ -3463,7 +3497,7 @@ pub async fn post_reactions_detail(
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang
-    })?;
+    }).await?;
 
     Ok(Html(rendered).into_response())
 }

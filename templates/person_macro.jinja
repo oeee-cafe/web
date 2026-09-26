@@ -1,58 +1,83 @@
 {% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
 {# How a person is named wherever a page prints them.
 
-   `handle_text()` is the handle as words. Someone from this site is
-   @login_name, because the site's own domain on the end tells a reader here
-   nothing; someone from another server keeps the handle their server gave
-   them, @name@their.host, since that is how they are told apart from a
-   namesake here. Pass `login_name` only for a local person -- a remote
-   actor has none -- and `actor_handle` for the remote form.
+   What these take as `h` is either a Handle (models/handle.rs), which says
+   whether its person is from here or from another server, or a login name
+   alone, for a row that can only be someone from here: a member, a
+   guestbook's writer, the author of a drawing.
 
-   `handle()` is that handle as a pill, a .ds-handle (ds.css): a ring for
+   Someone from here is @login_name, because the site's own domain on the
+   end tells a reader here nothing. Someone from another server keeps
+   @name@their.host, and the host is kept in view, since it is what tells
+   them apart from a namesake here.
+
+   `handle()` is the handle as a pill, a .ds-handle (ds.css): a ring for
    everyone, and for a supporter the accent's lime with the mark of the
-   platform they bought this year's pack on inside it, before the @. A page
-   that knows who among the people it prints are supporters passes their
-   marks by login name (supporter_badge_macro.jinja says how); one that does
-   not passes nothing, and every pill is a ring.
+   platform they bought this year's pack on. Who is a supporter is not the
+   page's to say. A local handle is handed to `supporter_slot()`, which
+   notes the name and leaves a placeholder; once the page is drawn, the
+   names it printed are asked about in one query and each placeholder
+   becomes `pill()` (web::templates). Rendered on its own, as a test does,
+   there is nobody to ask and the pill is drawn plain.
 
-   `person()` is the name and then the handle's pill, a .ds-person. The
-   parts are printed with nothing between them, so the gap is the
-   stylesheet's to say rather than a space's width in whatever font the line
-   is in. `external` opens a remote profile in a new tab, as every link off
-   the site does. #}
-{% macro handle_text(login_name=none, actor_handle=none) -%}
-  {%- if login_name %}@{{ login_name }}{% else %}{{ actor_handle }}{% endif -%}
-{%- endmacro %}
+   `handle_text()` is the handle as words, for an attribute: a pill cannot
+   go in one, and the render refuses a placeholder that lands there.
 
-{% macro handle(login_name=none, actor_handle=none, supporters=none) -%}
-  {%- set mark = (supporters or {})[login_name] if login_name else none -%}
-  {%- if mark -%}
-    <span class="ds-handle ds-handle-supporter ds-marked" title="{{ supporter_mark_name(mark) }}">
-      {{- supporter_mark(mark) -}}
-      {{- handle_text(login_name, actor_handle) -}}
-    </span>
-  {%- elif login_name or not actor_handle -%}
-    <span class="ds-handle">{{ handle_text(login_name) }}</span>
+   `person()` is the name and then the handle's pill, a .ds-person, printed
+   with nothing between them so the gap is the stylesheet's to say.
+   `external` opens a remote profile in a new tab, as every link off the
+   site does. #}
+
+{% macro handle_text(h) -%}
+  {%- if h is string -%}
+    @{{ h }}
+  {%- elif h.login_name -%}
+    @{{ h.login_name }}
   {%- else -%}
-    {#- Someone from another server: @name@host, the two parts apart so
-        that however long the line runs short, it is the name that gives
-        way and never the host -- a remote handle whose host is out of sight
-        reads as one of ours. The name is a <bdi>, so whatever direction
-        its characters run in, it cannot carry the host round with it. A
-        username cannot hold an @ (actors_username_is_plain), so the last
-        one is where the host starts. -#}
-    {%- set parts = actor_handle|split("@")|list -%}
-    <span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@{{ parts[1:-1]|join("@") }}</bdi><span class="ds-handle-host">@{{ parts[-1] }}</span></span>
+    @{{ h.name }}@{{ h.host }}
   {%- endif -%}
 {%- endmacro %}
 
-{% macro person(name, href, login_name=none, actor_handle=none, supporters=none, external=false) -%}
+{% macro handle(h) -%}
+  {%- set login_name = h if h is string else (h.login_name if h is mapping else none) -%}
+  {%- if not h -%}
+  {%- elif login_name -%}
+    {%- set slot = supporter_slot(login_name, "@" ~ login_name) -%}
+    {%- if slot is none -%}
+      {{ pill(none, "@" ~ login_name) }}
+    {%- else -%}
+      {{ slot }}
+    {%- endif -%}
+  {%- else -%}
+    {#- The two parts apart, so that however short the line runs it is the
+        name that gives way and never the host. The name is a <bdi>, so
+        whatever direction its characters run in, it cannot carry the host
+        round with it. -#}
+    <span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@{{ h.name }}</bdi><span class="ds-handle-host">@{{ h.host }}</span></span>
+  {%- endif -%}
+{%- endmacro %}
+
+{# A local person's pill, with the mark the render found for them, if any.
+   Called back by web::templates, and by handle() when there is nobody to
+   ask. #}
+{% macro pill(mark, text) -%}
+  {%- if mark -%}
+    <span class="ds-handle ds-handle-supporter ds-marked" title="{{ supporter_mark_name(mark) }}">
+      {{- supporter_mark(mark) -}}
+      {{- text -}}
+    </span>
+  {%- else -%}
+    <span class="ds-handle">{{ text }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro person(name, href, h, external=false) -%}
   <span class="ds-person">
     {%- if href -%}
       <a class="ds-person-name" href="{{ href }}"{% if external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ name }}</a>
     {%- else -%}
       <span class="ds-person-name">{{ name }}</span>
     {%- endif -%}
-    {{- handle(login_name, actor_handle, supporters) -}}
+    {{- handle(h) -}}
   </span>
 {%- endmacro %}

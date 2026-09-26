@@ -250,7 +250,7 @@ async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
 
     let state = AppState {
         config: test_config(&db_url, &redis_url),
-        env: minijinja::Environment::new(),
+        env: crate::web::templates::Templates::new(minijinja::Environment::new()),
         db_pool: db.clone(),
         redis_pool: pool.clone(),
         redis_state: RedisStateManager::new(pool),

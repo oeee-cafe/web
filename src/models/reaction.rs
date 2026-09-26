@@ -4,6 +4,8 @@ use serde::Serialize;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
+use crate::models::handle::Handle;
+
 // The reactions every post offers a button for. Any other emoji can be
 // reacted with too; it gets a button once someone has used it.
 pub const AVAILABLE_EMOJIS: &[&str] = &["🥒", "❤️", "😂", "😢"];
@@ -44,9 +46,9 @@ pub struct SerializableReaction {
     pub emoji: String,
     pub created_at: DateTime<Utc>,
     pub actor_name: String,
-    pub actor_handle: String,
+    /// Who reacted: someone from here, or from another server.
+    pub handle: Handle,
     pub actor_url: String,
-    pub actor_login_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -149,9 +151,11 @@ pub async fn find_reactions_by_post_id(
             emoji: reaction.emoji,
             created_at: reaction.created_at,
             actor_name: reaction.actor_name,
-            actor_handle: reaction.actor_handle,
+            handle: Handle::of_actor(
+                reaction.actor_login_name.map(Into::into),
+                reaction.actor_handle,
+            ),
             actor_url: reaction.actor_url,
-            actor_login_name: reaction.actor_login_name,
         })
         .collect())
 }

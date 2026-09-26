@@ -250,6 +250,8 @@ fn main() {
                 minijinja::Value::from_object(PacksOnSale),
             );
 
+            oeee_cafe::web::templates::add_to_environment(&mut env);
+
             env.set_loader(path_loader(&template_path));
 
             let db_pool = cfg.connect_database().await.unwrap_or_else(|e| {
@@ -283,7 +285,7 @@ fn main() {
 
             let state = AppState {
                 config: cfg.clone(),
-                env,
+                env: oeee_cafe::web::templates::Templates::new(env),
                 db_pool,
                 redis_pool,
                 redis_state,

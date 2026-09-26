@@ -1,4 +1,3 @@
-use minijinja::Environment;
 use sqlx::PgPool;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -6,6 +5,7 @@ use tokio::sync::watch;
 
 use super::handlers::collaborate::redis_state::RedisStateManager;
 use super::handlers::collaborate::room_fanout::RoomFanout;
+use super::templates::Templates;
 use crate::live::Live;
 use crate::push::PushService;
 use crate::redis::RedisPool;
@@ -14,7 +14,9 @@ use crate::AppConfig;
 #[derive(Clone)]
 pub struct AppState {
     pub config: AppConfig,
-    pub env: Environment<'static>,
+    /// The templates, which render only through a supporter lookup
+    /// (web::templates).
+    pub env: Templates,
     pub db_pool: PgPool,
     pub redis_pool: RedisPool,
     pub redis_state: RedisStateManager,
@@ -24,6 +26,27 @@ pub struct AppState {
     /// What open pages hear without asking (crate::live).
     pub live: Live,
     pub shutdown: Shutdown,
+}
+
+impl AppState {
+    /// Renders a page (web::templates::Templates::render).
+    pub async fn render(
+        &self,
+        name: &str,
+        ctx: minijinja::Value,
+    ) -> Result<String, minijinja::Error> {
+        self.env.render(&self.db_pool, name, ctx).await
+    }
+
+    /// Renders one block of a page, for an htmx request that replaces it.
+    pub async fn render_block(
+        &self,
+        name: &str,
+        block: &str,
+        ctx: minijinja::Value,
+    ) -> Result<String, minijinja::Error> {
+        self.env.render_block(&self.db_pool, name, block, ctx).await
+    }
 }
 
 /// Lets in-flight WebSocket sessions notice a redeploy and close cleanly.

@@ -30,7 +30,7 @@
         <a class="comment-row-link" href="/@{{ comment.post_author_login_name }}/{{ comment.post_id }}">
           {%- if by_drawing %}{{ comment.post_title or ftl_get_message("post-no-title") }}{% else %}{{ comment.actor_name }}{% endif -%}
         </a>
-        <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}{{ handle(comment.post_author_login_name) }}{% else %}{{ handle(comment.actor_login_name if comment.is_local else none, comment.actor_handle) }}{% endif %} · </span><span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>
+        <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}{{ handle(comment.post_author_login_name) }}{% else %}{{ handle(comment.handle) }}{% endif %} · </span><span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>
       </div>
       <div class="comment-row-content ds-selectable">
         {% if comment.content_html %}

@@ -124,12 +124,16 @@ pub async fn do_follow_profile(
         });
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("unfollow_button.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        user,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "unfollow_button.jinja",
+            context! {
+                current_user => auth_session.user,
+                user,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -173,12 +177,16 @@ pub async fn do_unfollow_profile(
 
     let _ = tx.commit().await;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("follow_button.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        user => Some(user),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "follow_button.jinja",
+            context! {
+                current_user => auth_session.user,
+                user => Some(user),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -251,18 +259,20 @@ async fn profile_posts_batch(
     tx.commit().await?;
 
     let rendered = state
-        .env
-        .get_template("post_feed_fragment.jinja")?
-        .render(context! {
-            feed => feed_context(
-                posts,
-                &profile_posts_path(&user.login_name, which),
-                query.offset,
-                query.period.as_deref(),
-            ),
-            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-            ftl_lang,
-        })?;
+        .render(
+            "post_feed_fragment.jinja",
+            context! {
+                feed => feed_context(
+                    posts,
+                    &profile_posts_path(&user.login_name, which),
+                    query.offset,
+                    query.period.as_deref(),
+                ),
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -437,28 +447,32 @@ async fn render_profile(
         None,
     );
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("profile.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        links,
-        banner,
-        is_following => is_current_user_following,
-        followings,
-        comments,
-        comment_count,
-        tab => tab.name(),
-        achievements,
-        supporter_standings,
-        user => Some(user),
-        domain => state.config.domain.clone(),
-        public_count,
-        public_feed,
-        private_count,
-        private_feed,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "profile.jinja",
+            context! {
+                current_user => auth_session.user,
+                links,
+                banner,
+                is_following => is_current_user_following,
+                followings,
+                comments,
+                comment_count,
+                tab => tab.name(),
+                achievements,
+                supporter_standings,
+                user => Some(user),
+                domain => state.config.domain.clone(),
+                public_count,
+                public_feed,
+                private_count,
+                private_feed,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -499,12 +513,14 @@ pub async fn profile_comments(
     tx.commit().await?;
 
     let rendered = state
-        .env
-        .get_template("comments_fragment.jinja")?
-        .render(context! {
-            comments,
-            ftl_lang,
-        })?;
+        .render(
+            "comments_fragment.jinja",
+            context! {
+                comments,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -573,13 +589,17 @@ pub async fn profile_or_community(
     // Neither user nor community found - render 404 page
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-    let template: minijinja::Template<'_, '_> = state.env.get_template("404.jinja")?;
-    let rendered: String = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
+    let rendered: String = state
+        .render(
+            "404.jinja",
+            context! {
+                current_user => auth_session.user,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
 
@@ -597,13 +617,17 @@ pub async fn profile_iframe(
 
     let posts = find_published_public_posts_by_author_id(&mut tx, user.id, 1000, 0).await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("profile_iframe.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        user => Some(user),
-        posts,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "profile_iframe.jinja",
+            context! {
+                current_user => auth_session.user,
+                user => Some(user),
+                posts,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -622,14 +646,18 @@ pub async fn profile_banners_iframe(
 
     let followings = find_followings_by_user_id(&mut tx, user.id, 9999, 0, false).await?;
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("profile_banners_iframe.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        followings,
-        user => Some(user),
-        ftl_lang,
-    })?;
+    let template = "profile_banners_iframe.jinja";
+    let rendered = state
+        .render(
+            template,
+            context! {
+                current_user => auth_session.user,
+                followings,
+                user => Some(user),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -665,17 +693,18 @@ pub async fn do_move_link_down(
     let links = find_links_by_user_id(&mut tx, current_user.id).await?;
     let _ = tx.commit().await;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
-    let rendered = template
-        .render_captured_to(
+    let template = "profile_settings.jinja";
+    let rendered = state
+        .render_block(
+            template,
+            "links",
             context! {
                 user => auth_session.user,
                 links => links,
                 ftl_lang,
             },
-            std::io::sink(),
-        )?
-        .with_state_mut(|state| state.render_block("links"))?;
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -711,17 +740,18 @@ pub async fn do_move_link_up(
     let links = find_links_by_user_id(&mut tx, current_user.id).await?;
     let _ = tx.commit().await;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
-    let rendered = template
-        .render_captured_to(
+    let template = "profile_settings.jinja";
+    let rendered = state
+        .render_block(
+            template,
+            "links",
             context! {
                 user => auth_session.user,
                 links => links,
                 ftl_lang,
             },
-            std::io::sink(),
-        )?
-        .with_state_mut(|state| state.render_block("links"))?;
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -761,17 +791,18 @@ pub async fn do_delete_link(
     let links = find_links_by_user_id(&mut tx, current_user.id).await?;
     let _ = tx.commit().await;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
-    let rendered = template
-        .render_captured_to(
+    let template = "profile_settings.jinja";
+    let rendered = state
+        .render_block(
+            template,
+            "links",
             context! {
                 user => auth_session.user,
                 links => links,
                 ftl_lang,
             },
-            std::io::sink(),
-        )?
-        .with_state_mut(|state| state.render_block("links"))?;
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -811,17 +842,18 @@ pub async fn do_add_link(
     let links = find_links_by_user_id(&mut tx, current_user.id).await?;
     let _ = tx.commit().await;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
-    let rendered = template
-        .render_captured_to(
+    let template = "profile_settings.jinja";
+    let rendered = state
+        .render_block(
+            template,
+            "links",
             context! {
                 user => auth_session.user,
                 links => links,
                 ftl_lang,
             },
-            std::io::sink(),
-        )?
-        .with_state_mut(|state| state.render_block("links"))?;
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -845,15 +877,19 @@ pub async fn profile_settings(
 
     let links = find_links_by_user_id(&mut tx, user.id).await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("profile_settings.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        links,
-        user => Some(user),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "profile_settings.jinja",
+            context! {
+                current_user => auth_session.user,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                links,
+                user => Some(user),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -892,16 +928,20 @@ pub async fn banner_management(
         })
         .collect();
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("banner_management.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        user => Some(user),
-        banners => banners_with_urls,
-        ftl_lang,
-    })?;
+    let template = "banner_management.jinja";
+    let rendered = state
+        .render(
+            template,
+            context! {
+                current_user => auth_session.user,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                user => Some(user),
+                banners => banners_with_urls,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -1011,14 +1051,18 @@ pub async fn do_reply_guestbook_entry(
         });
     }
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("guestbook_entry_reply.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        user => author,
-        entry => guestbook_entry,
-        ftl_lang,
-    })?;
+    let template = "guestbook_entry_reply.jinja";
+    let rendered = state
+        .render(
+            template,
+            context! {
+                current_user => auth_session.user,
+                user => author,
+                entry => guestbook_entry,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -1156,13 +1200,17 @@ pub async fn do_write_guestbook_entry(
         });
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("guestbook_entry.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        user => Some(recipient_user),
-        entry => guestbook_entry?,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "guestbook_entry.jinja",
+            context! {
+                current_user => auth_session.user,
+                user => Some(recipient_user),
+                entry => guestbook_entry?,
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -1193,17 +1241,21 @@ pub async fn guestbook(
         is_current_user_following = is_following(&mut tx, current_user.id, user.id).await?;
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("guestbook.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        banner,
-        user => Some(user),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        is_following => is_current_user_following,
-        guestbook_entries,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "guestbook.jinja",
+            context! {
+                current_user => auth_session.user,
+                banner,
+                user => Some(user),
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                is_following => is_current_user_following,
+                guestbook_entries,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -1237,12 +1289,14 @@ async fn render_banner_grid(
         .collect();
 
     Ok(state
-        .env
-        .get_template("banner_grid.jinja")?
-        .render(context! {
-            banners => banners_with_urls,
-            ftl_lang,
-        })?)
+        .render(
+            "banner_grid.jinja",
+            context! {
+                banners => banners_with_urls,
+                ftl_lang,
+            },
+        )
+        .await?)
 }
 
 pub async fn do_activate_banner(

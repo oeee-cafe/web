@@ -153,7 +153,7 @@ pub(crate) async fn render_community_page(
         }
     }
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("community.jinja")?;
+    let template = "community.jinja";
 
     // Cancelling the edit form swaps the header back in on its own; the feed
     // below it is untouched, so it is not worth a query. The template renders
@@ -171,8 +171,10 @@ pub(crate) async fn render_community_page(
     let wants_header_only = headers.get("HX-Request") == Some(&HeaderValue::from_static("true"))
         && headers.get("Oeee-Part") == Some(&HeaderValue::from_static("header"));
     if wants_header_only {
-        let rendered = template
-            .render_captured_to(
+        let rendered = state
+            .render_block(
+                template,
+                "community_edit_block",
                 context! {
                     current_user => auth_session.user,
                     community => Some(&community),
@@ -181,9 +183,8 @@ pub(crate) async fn render_community_page(
                     domain => state.config.domain.clone(),
                     ftl_lang
                 },
-                std::io::sink(),
-            )?
-            .with_state_mut(|state| state.render_block("community_edit_block"))?;
+            )
+            .await?;
         return Ok(Html(rendered).into_response());
     }
 
@@ -211,18 +212,23 @@ pub(crate) async fn render_community_page(
     .await?;
     let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        community => Some(&community),
-        header => header,
-        community_id => community_uuid.to_string(),
-        domain => state.config.domain.clone(),
-        unread_notification_count => common_ctx.unread_notification_count,
-        feed => feed_context(posts, &community_posts_path(&community.slug), 0, None),
-        comments => comments_context(comments, &community_comments_path(&community.slug)),
-        draft_post_count => common_ctx.draft_post_count,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            template,
+            context! {
+                current_user => auth_session.user,
+                community => Some(&community),
+                header => header,
+                community_id => community_uuid.to_string(),
+                domain => state.config.domain.clone(),
+                unread_notification_count => common_ctx.unread_notification_count,
+                feed => feed_context(posts, &community_posts_path(&community.slug), 0, None),
+                comments => comments_context(comments, &community_comments_path(&community.slug)),
+                draft_post_count => common_ctx.draft_post_count,
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -268,13 +274,15 @@ pub async fn load_more_community_comments(
     tx.commit().await?;
 
     let rendered = state
-        .env
-        .get_template("comments_fragment.jinja")?
-        .render(context! {
-            comments => comments_context(comments, &community_comments_path(&community.slug)),
-            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-            ftl_lang,
-        })?;
+        .render(
+            "comments_fragment.jinja",
+            context! {
+                comments => comments_context(comments, &community_comments_path(&community.slug)),
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -320,18 +328,22 @@ pub async fn load_more_community_posts(
     .await?;
     tx.commit().await?;
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("post_feed_fragment.jinja")?;
-    let rendered = template.render(context! {
-        feed => feed_context(
-            posts,
-            &community_posts_path(&community.slug),
-            query.offset,
-            query.period.as_deref(),
-        ),
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let template = "post_feed_fragment.jinja";
+    let rendered = state
+        .render(
+            template,
+            context! {
+                feed => feed_context(
+                    posts,
+                    &community_posts_path(&community.slug),
+                    query.offset,
+                    query.period.as_deref(),
+                ),
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -422,13 +434,17 @@ pub async fn community_iframe(
     )
     .await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("community_iframe.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        community => community,
-        posts,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "community_iframe.jinja",
+            context! {
+                current_user => auth_session.user,
+                community => community,
+                posts,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -536,13 +552,12 @@ pub async fn communities_fragment(
         enrich_public_communities(&mut tx, &rows, viewer_user_id, viewer_show_sensitive).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("community_cards_fragment.jinja")?;
-    let rendered = template.render(context! {
+    let rendered = state.render("community_cards_fragment.jinja", context! {
         communities => communities,
         has_more => has_more,
         next_url => communities_fragment_url(query.sort, term, offset + COMMUNITIES_PER_BATCH),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-    })?;
+    }).await?;
 
     Ok(Html(rendered))
 }
@@ -797,25 +812,30 @@ pub async fn communities(
 
     tx.commit().await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("communities.jinja")?;
-    let rendered = template.clone().render(context! {
-        current_user => auth_session.user,
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        sort => sort.as_param(),
-        // Same key names the fragment uses, so the first batch and every
-        // scrolled batch render through one template.
-        has_more => public_has_more,
-        next_url => communities_fragment_url(sort, None, COMMUNITIES_PER_BATCH),
-        official_communities,
-        // Key name must match community_cards_fragment.jinja's loop variable;
-        // the page includes that template with this context.
-        communities => public_communities,
-        your_communities,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang
-    })?;
+    let template = "communities.jinja";
+    let rendered = state
+        .render(
+            template,
+            context! {
+                current_user => auth_session.user,
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                sort => sort.as_param(),
+                // Same key names the fragment uses, so the first batch and every
+                // scrolled batch render through one template.
+                has_more => public_has_more,
+                next_url => communities_fragment_url(sort, None, COMMUNITIES_PER_BATCH),
+                official_communities,
+                // Key name must match community_cards_fragment.jinja's loop variable;
+                // the page includes that template with this context.
+                communities => public_communities,
+                your_communities,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -921,14 +941,18 @@ pub async fn create_community_form(
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("create_community.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "create_community.jinja",
+            context! {
+                current_user => auth_session.user,
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -979,15 +1003,19 @@ pub async fn hx_edit_community(
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("community_edit.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        community,
-        community_id => id,
-        domain => state.config.domain.clone(),
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "community_edit.jinja",
+            context! {
+                current_user => auth_session.user,
+                community,
+                community_id => id,
+                domain => state.config.domain.clone(),
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -1069,7 +1097,7 @@ pub async fn hx_do_edit_community(
                     .into_response())
             } else {
                 // Slug didn't change - return updated content block
-                let template = state.env.get_template("community.jinja")?;
+                let template = "community.jinja";
                 let user_preferred_language = auth_session
                     .user
                     .clone()
@@ -1085,8 +1113,10 @@ pub async fn hx_do_edit_community(
                 let mut header_tx = state.db_pool.begin().await?;
                 let header = community_header_context(&mut header_tx, &updated_community).await?;
                 header_tx.commit().await?;
-                let rendered = template
-                    .render_captured_to(
+                let rendered = state
+                    .render_block(
+                        template,
+                        "community_edit_block",
                         context! {
                             current_user => auth_session.user,
                             header => header,
@@ -1095,9 +1125,8 @@ pub async fn hx_do_edit_community(
                             domain => state.config.domain.clone(),
                             ftl_lang
                         },
-                        std::io::sink(),
-                    )?
-                    .with_state_mut(|state| state.render_block("community_edit_block"))?;
+                    )
+                    .await?;
 
                 Ok(Html(rendered).into_response())
             }
@@ -1128,7 +1157,6 @@ pub async fn hx_do_edit_community(
             let mut tx = db.begin().await?;
             let current_community = find_community_by_id(&mut tx, community_uuid).await?;
 
-            let template = state.env.get_template("community_edit.jinja")?;
             let user_preferred_language = auth_session
                 .user
                 .clone()
@@ -1141,14 +1169,19 @@ pub async fn hx_do_edit_community(
                 .map(|l| l.to_string())
                 .unwrap_or_else(|| "en".to_string())
                 .to_string();
-            let rendered = template.render(context! {
-                current_user => auth_session.user,
-                community => current_community,
-                community_id => id,
-                domain => state.config.domain.clone(),
-                error_message => error_message,
-                ftl_lang
-            })?;
+            let rendered = state
+                .render(
+                    "community_edit.jinja",
+                    context! {
+                        current_user => auth_session.user,
+                        community => current_community,
+                        community_id => id,
+                        domain => state.config.domain.clone(),
+                        error_message => error_message,
+                        ftl_lang
+                    },
+                )
+                .await?;
 
             Ok(Html(rendered).into_response())
         }
@@ -1238,19 +1271,23 @@ pub async fn community_comments(
     let common_ctx =
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("community_comments.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        community => community,
-        header => header,
-        community_id => community_uuid.to_string(),
-        comments => comments_context(comments, &community_comments_path(&community.slug)),
-        domain => state.config.domain.clone(),
-        unread_notification_count => common_ctx.unread_notification_count,
-        draft_post_count => common_ctx.draft_post_count,
-        ftl_lang,
-    })?;
+    let template = "community_comments.jinja";
+    let rendered = state
+        .render(
+            template,
+            context! {
+                current_user => auth_session.user,
+                community => community,
+                header => header,
+                community_id => community_uuid.to_string(),
+                comments => comments_context(comments, &community_comments_path(&community.slug)),
+                domain => state.config.domain.clone(),
+                unread_notification_count => common_ctx.unread_notification_count,
+                draft_post_count => common_ctx.draft_post_count,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -1954,9 +1991,8 @@ pub async fn members_page(
 
     tx.commit().await?;
 
-    let template: minijinja::Template<'_, '_> =
-        state.env.get_template("community_members.jinja")?;
-    let rendered = template.render(context! {
+    let template = "community_members.jinja";
+    let rendered = state.render(template, context! {
         current_user => auth_session.user,
         community,
         members => members_with_details,
@@ -1968,7 +2004,7 @@ pub async fn members_page(
         draft_post_count => common_ctx.draft_post_count,
         unread_notification_count => common_ctx.unread_notification_count,
         ftl_lang,
-    })?;
+    }).await?;
 
     Ok(Html(rendered).into_response())
 }

@@ -86,28 +86,32 @@ pub async fn account(
         ("en", "English"),
         ("zh", "中文"),
     ];
-    let template: minijinja::Template<'_, '_> = state.env.get_template("account.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        languages,
-        steam_linked => identities.iter().any(|i| i.provider == "steam"),
-        apple_linked => identities.iter().any(|i| i.provider == "apple"),
-        google_linked => identities.iter().any(|i| i.provider == "google"),
-        identities,
-        has_password,
-        show_in_credits,
-        supporter_platforms,
-        // Not `supporter_mark`: account.jinja imports a macro by that name,
-        // and an imported name wins over a context one.
-        worn_mark,
-        steam_enabled => state.config.steam.is_some(),
-        apple_enabled => state.config.apple.is_some(),
-        google_enabled => state.config.google.is_some(),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        messages => messages.into_iter().collect::<Vec<_>>(),
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "account.jinja",
+            context! {
+                current_user => auth_session.user,
+                languages,
+                steam_linked => identities.iter().any(|i| i.provider == "steam"),
+                apple_linked => identities.iter().any(|i| i.provider == "apple"),
+                google_linked => identities.iter().any(|i| i.provider == "google"),
+                identities,
+                has_password,
+                show_in_credits,
+                supporter_platforms,
+                // Not `supporter_mark`: account.jinja imports a macro by that name,
+                // and an imported name wins over a context one.
+                worn_mark,
+                steam_enabled => state.config.steam.is_some(),
+                apple_enabled => state.config.apple.is_some(),
+                google_enabled => state.config.google.is_some(),
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                messages => messages.into_iter().collect::<Vec<_>>(),
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -281,7 +285,7 @@ pub async fn verify_email_verification_code(
         .ok_or_else(|| AppError::NotFound("Email verification challenge".to_string()))?;
     let now = Utc::now();
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("email_verify.jinja")?;
+    let template = "email_verify.jinja";
     let user_preferred_language = auth_session
         .user
         .clone()
@@ -295,13 +299,13 @@ pub async fn verify_email_verification_code(
             .first()
             .map(|l| l.to_string())
             .unwrap_or_else(|| "en".to_string());
-        let rendered = template.render(context! {
+        let rendered = state.render(template, context! {
             challenge_id => challenge.id,
             email => challenge.email,
             message => safe_get_message(&bundle, "account-change-email-error-token-mismatch"),
             success => false,
             ftl_lang
-        })?;
+        }).await?;
 
         return Ok(Html(rendered).into_response());
     }
@@ -312,13 +316,13 @@ pub async fn verify_email_verification_code(
             .first()
             .map(|l| l.to_string())
             .unwrap_or_else(|| "en".to_string());
-        let rendered = template.render(context! {
+        let rendered = state.render(template, context! {
             challenge_id => challenge.id,
             email => challenge.email,
             message => safe_get_message(&bundle, "account-change-email-error-token-expired"),
             success => false,
             ftl_lang
-        })?;
+        }).await?;
 
         return Ok(Html(rendered).into_response());
     }
@@ -337,13 +341,18 @@ pub async fn verify_email_verification_code(
         .first()
         .map(|l| l.to_string())
         .unwrap_or_else(|| "en".to_string());
-    let rendered = template.render(context! {
-        challenge_id => challenge.id,
-        email => challenge.email,
-        message => safe_get_message(&bundle, "account-change-email-success"),
-        success => true,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            template,
+            context! {
+                challenge_id => challenge.id,
+                email => challenge.email,
+                message => safe_get_message(&bundle, "account-change-email-success"),
+                success => true,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -365,7 +374,6 @@ pub async fn request_email_verification_code(
         .map(|u| u.preferred_language)
         .unwrap_or_else(|| None);
     let bundle = get_bundle(&accept_language, user_preferred_language);
-    let edit_email_template = state.env.get_template("email_edit.jinja")?;
 
     let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
     if current_user
@@ -379,11 +387,11 @@ pub async fn request_email_verification_code(
             .first()
             .map(|l| l.to_string())
             .unwrap_or_else(|| "en".to_string());
-        return Ok(Html(edit_email_template.render(context! {
+        return Ok(Html(state.render("email_edit.jinja", context! {
             current_user => auth_session.user,
             message => safe_get_message(&bundle, "account-change-email-error-already-verified"),
             ftl_lang,
-        })?)
+        }).await?)
         .into_response());
     }
 
@@ -397,18 +405,22 @@ pub async fn request_email_verification_code(
     .await
     .map_err(|e| anyhow::anyhow!(e))?;
 
-    let template: minijinja::Template<'_, '_> = state.env.get_template("email_verify.jinja")?;
     let ftl_lang = bundle
         .locales
         .first()
         .map(|l| l.to_string())
         .unwrap_or_else(|| "en".to_string());
 
-    let rendered = template.render(context! {
-        challenge_id => email_verification_challenge.id,
-        email => form.email,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "email_verify.jinja",
+            context! {
+                challenge_id => email_verification_challenge.id,
+                email => form.email,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }

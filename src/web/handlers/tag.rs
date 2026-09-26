@@ -62,13 +62,17 @@ async fn tag_not_found(
     ftl_lang: &str,
 ) -> Result<axum::response::Response, AppError> {
     let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
-    let template = state.env.get_template("404.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "404.jinja",
+            context! {
+                current_user => auth_session.user,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
 
@@ -160,20 +164,24 @@ async fn tag_page(
 
     tx.commit().await?;
 
-    let template = state.env.get_template(match view {
-        TagView::Drawings => "tag_view.jinja",
-        TagView::Comments => "tag_comments.jinja",
-    })?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        tag => tag,
-        post_count,
-        feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), 0, None),
-        comments => comments_context(comments, &tag_comments_path(&name)),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            match view {
+                TagView::Drawings => "tag_view.jinja",
+                TagView::Comments => "tag_comments.jinja",
+            },
+            context! {
+                current_user => auth_session.user,
+                tag => tag,
+                post_count,
+                feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), 0, None),
+                comments => comments_context(comments, &tag_comments_path(&name)),
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -222,13 +230,15 @@ pub async fn load_more_tag_comments(
     tx.commit().await?;
 
     let rendered = state
-        .env
-        .get_template("comments_fragment.jinja")?
-        .render(context! {
-            comments => comments_context(comments, &tag_comments_path(&name)),
-            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-            ftl_lang,
-        })?;
+        .render(
+            "comments_fragment.jinja",
+            context! {
+                comments => comments_context(comments, &tag_comments_path(&name)),
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 
@@ -269,18 +279,20 @@ pub async fn load_more_tag_posts(
     tx.commit().await?;
 
     let rendered = state
-        .env
-        .get_template("post_feed_fragment.jinja")?
-        .render(context! {
-            feed => feed_context(
-                posts,
-                &format!("{}/posts", tag_url(&name)),
-                query.offset,
-                query.period.as_deref(),
-            ),
-            r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-            ftl_lang,
-        })?;
+        .render(
+            "post_feed_fragment.jinja",
+            context! {
+                feed => feed_context(
+                    posts,
+                    &format!("{}/posts", tag_url(&name)),
+                    query.offset,
+                    query.period.as_deref(),
+                ),
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -310,9 +322,8 @@ pub async fn tag_autocomplete(
     };
 
     let rendered = state
-        .env
-        .get_template("tag_autocomplete.jinja")?
-        .render(context! { tags, ftl_lang })?;
+        .render("tag_autocomplete.jinja", context! { tags, ftl_lang })
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -384,13 +395,15 @@ pub async fn tag_cards(
     let (tags, search_query, _) = requested_tags(&state, &params).await?;
 
     let rendered = state
-        .env
-        .get_template("tag_results.jinja")?
-        .render(context! {
-            tags,
-            search_query,
-            ftl_lang,
-        })?;
+        .render(
+            "tag_results.jinja",
+            context! {
+                tags,
+                search_query,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }
@@ -409,16 +422,20 @@ pub async fn tag_discovery(
         CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("tag_discovery.jinja")?;
-    let rendered = template.render(context! {
-        current_user => auth_session.user,
-        tags,
-        search_query,
-        sort_by => sort.as_param(),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
-    })?;
+    let rendered = state
+        .render(
+            "tag_discovery.jinja",
+            context! {
+                current_user => auth_session.user,
+                tags,
+                search_query,
+                sort_by => sort.as_param(),
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang
+            },
+        )
+        .await?;
 
     Ok(Html(rendered).into_response())
 }

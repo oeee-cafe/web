@@ -149,23 +149,27 @@ async fn render_posts(
     let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("admin/posts.jinja")?;
-    let rendered = template.render(context! {
-        current_user => admin.0,
-        posts => posts,
-        communities => communities,
-        total => total,
-        has_more => has_more,
-        next_url => next_url,
-        filter_author => resolved.author_login_name,
-        filter_community => resolved.community_slug,
-        include_drafts => resolved.filter.include_drafts,
-        include_deleted => resolved.filter.include_deleted,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "admin/posts.jinja",
+            context! {
+                current_user => admin.0,
+                posts => posts,
+                communities => communities,
+                total => total,
+                has_more => has_more,
+                next_url => next_url,
+                filter_author => resolved.author_login_name,
+                filter_community => resolved.community_slug,
+                include_drafts => resolved.filter.include_drafts,
+                include_deleted => resolved.filter.include_deleted,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -183,13 +187,17 @@ pub async fn admin_posts_fragment(
     let (posts, has_more, next_url) = load_batch(&mut tx, &query, &resolved).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("admin/posts_fragment.jinja")?;
-    let rendered = template.render(context! {
-        posts => posts,
-        has_more => has_more,
-        next_url => next_url,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-    })?;
+    let rendered = state
+        .render(
+            "admin/posts_fragment.jinja",
+            context! {
+                posts => posts,
+                has_more => has_more,
+                next_url => next_url,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -270,15 +278,19 @@ pub async fn admin_post_detail(
     let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("admin/post_detail.jinja")?;
-    let rendered = template.render(context! {
-        current_user => admin.0,
-        post => post,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "admin/post_detail.jinja",
+            context! {
+                current_user => admin.0,
+                post => post,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -307,8 +319,9 @@ pub async fn admin_flag_post(
         .ok_or_else(|| AppError::NotFound("Post".to_string()))?;
     tx.commit().await?;
 
-    let template = state.env.get_template("admin/post_flag_panel.jinja")?;
-    let rendered = template.render(context! { post => post })?;
+    let rendered = state
+        .render("admin/post_flag_panel.jinja", context! { post => post })
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -358,18 +371,22 @@ pub async fn admin_banners(
     let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("admin/banners.jinja")?;
-    let rendered = template.render(context! {
-        current_user => admin.0,
-        banners => banners,
-        only_explicit => query.explicit.is_some(),
-        has_more => has_more,
-        next_url => next_url,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "admin/banners.jinja",
+            context! {
+                current_user => admin.0,
+                banners => banners,
+                only_explicit => query.explicit.is_some(),
+                has_more => has_more,
+                next_url => next_url,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -385,13 +402,17 @@ pub async fn admin_banners_fragment(
     let (banners, has_more, next_url) = load_banner_batch(&mut tx, &query).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("admin/banners_fragment.jinja")?;
-    let rendered = template.render(context! {
-        banners => banners,
-        has_more => has_more,
-        next_url => next_url,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-    })?;
+    let rendered = state
+        .render(
+            "admin/banners_fragment.jinja",
+            context! {
+                banners => banners,
+                has_more => has_more,
+                next_url => next_url,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -419,11 +440,15 @@ pub async fn admin_flag_banner(
         .ok_or_else(|| AppError::NotFound("Banner".to_string()))?;
     tx.commit().await?;
 
-    let template = state.env.get_template("admin/banner_card.jinja")?;
-    let rendered = template.render(context! {
-        banner => banner,
-        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-    })?;
+    let rendered = state
+        .render(
+            "admin/banner_card.jinja",
+            context! {
+                banner => banner,
+                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -453,17 +478,21 @@ pub async fn admin_users(
     tx.commit().await?;
 
     let has_next = users.len() as i64 == USERS_PER_PAGE;
-    let template = state.env.get_template("admin/users.jinja")?;
-    let rendered = template.render(context! {
-        current_user => admin.0,
-        users => users,
-        page => page,
-        sort => query.sort,
-        has_next => has_next,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "admin/users.jinja",
+            context! {
+                current_user => admin.0,
+                users => users,
+                page => page,
+                sort => query.sort,
+                has_next => has_next,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -481,15 +510,19 @@ pub async fn admin_communities(
     let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
     tx.commit().await?;
 
-    let template = state.env.get_template("admin/communities.jinja")?;
-    let rendered = template.render(context! {
-        current_user => admin.0,
-        communities => communities,
-        sort => query.sort,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "admin/communities.jinja",
+            context! {
+                current_user => admin.0,
+                communities => communities,
+                sort => query.sort,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -548,20 +581,22 @@ pub async fn admin_collaborative_sessions(
     }
 
     let has_next = sessions.len() as i64 == SESSIONS_PER_PAGE;
-    let template = state
-        .env
-        .get_template("admin/collaborative_sessions.jinja")?;
-    let rendered = template.render(context! {
-        current_user => admin.0,
-        sessions => sessions,
-        page => page,
-        sort => query.sort,
-        status => query.status,
-        has_next => has_next,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?;
+    let rendered = state
+        .render(
+            "admin/collaborative_sessions.jinja",
+            context! {
+                current_user => admin.0,
+                sessions => sessions,
+                page => page,
+                sort => query.sort,
+                status => query.status,
+                has_next => has_next,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?;
 
     Ok(Html(rendered))
 }
@@ -899,10 +934,7 @@ pub async fn replay_collaborative_session(
 ) -> Result<Response, AppError> {
     let html = std::fs::read_to_string("neo-cucumber/dist-replay/index.html")
         .map_err(|_| anyhow::anyhow!("The replay viewer has not been built"))?;
-    let head = state
-        .env
-        .get_template("admin/replay_head.jinja")?
-        .render(context! {})?;
+    let head = state.render("admin/replay_head.jinja", context! {}).await?;
     Ok(Html(with_head(&html, &head)).into_response())
 }
 
@@ -1117,20 +1149,24 @@ async fn render_store_page(
         })
         .collect();
 
-    let template = state.env.get_template("admin/store.jinja")?;
-    Ok(template.render(context! {
-        current_user => admin.0.clone(),
-        groups,
-        stores => Store::ALL,
-        this_year => current_year(),
-        microsoft_configured => state.config.microsoft_store.is_some(),
-        google_play_configured => state.config.google_play.is_some(),
-        error,
-        form,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    })?)
+    Ok(state
+        .render(
+            "admin/store.jinja",
+            context! {
+                current_user => admin.0.clone(),
+                groups,
+                stores => Store::ALL,
+                this_year => current_year(),
+                microsoft_configured => state.config.microsoft_store.is_some(),
+                google_play_configured => state.config.google_play.is_some(),
+                error,
+                form,
+                draft_post_count => common_ctx.draft_post_count,
+                unread_notification_count => common_ctx.unread_notification_count,
+                ftl_lang,
+            },
+        )
+        .await?)
 }
 
 /// GET /admin/store -- the Supporter Pack catalogue: every product each
