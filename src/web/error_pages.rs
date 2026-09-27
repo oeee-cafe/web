@@ -8,6 +8,9 @@
 //! and nothing else) becomes the page for its status when the request came
 //! from a browser navigating, and stays JSON for everyone else.
 //!
+//! An `Unauthorized` for somebody signed out is a redirect to the sign-in
+//! page instead, coming back afterwards to where they were.
+//!
 //! htmx requests are `web::htmx::error_banner`'s, which turns them into a
 //! toast; this layer leaves them alone.
 
@@ -21,6 +24,7 @@ use axum::{
 use crate::app_error::{AppError, ErrorPage};
 use crate::models::user::{AuthSession, User};
 use crate::web::context::CommonContext;
+use crate::web::handlers::auth::login_redirect;
 use crate::web::htmx::is_htmx;
 use crate::web::i18n::ftl_lang;
 use crate::web::state::AppState;
@@ -38,6 +42,9 @@ pub async fn error_pages(State(state): State<AppState>, req: Request, next: Next
         .get(header::ACCEPT_LANGUAGE)
         .cloned()
         .unwrap_or_else(|| HeaderValue::from_static(""));
+    // For a sign-in redirect, which comes back to the page the request was on.
+    let (method, uri) = (req.method().clone(), req.uri().clone());
+    let referer = req.headers().get(header::REFERER).cloned();
 
     let response = next.run(req).await;
 
@@ -45,6 +52,15 @@ pub async fn error_pages(State(state): State<AppState>, req: Request, next: Next
         return response;
     }
     let status = response.status();
+    // Somebody signed out is asked to sign in, as `require_login` asks them,
+    // rather than told they may not.
+    if status == StatusCode::UNAUTHORIZED && user.is_none() {
+        let mut headers = HeaderMap::new();
+        if let Some(referer) = referer {
+            headers.insert(header::REFERER, referer);
+        }
+        return login_redirect(&method, &uri, &headers);
+    }
     let Some(template) = template_for(status) else {
         return response;
     };
