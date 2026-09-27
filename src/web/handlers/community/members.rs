@@ -41,7 +41,7 @@ pub async fn get_members(
             .await?;
 
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
 
     let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
@@ -49,12 +49,12 @@ pub async fn get_members(
     // Only members can view member list
     let user = match auth_session.user {
         Some(user) => user,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     let is_member = is_user_member(&mut tx, user.id, community.id).await?;
     if !is_member {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // Fetch members with user details in a single query (no N+1)
@@ -107,7 +107,7 @@ pub async fn invite_user(
             .await?;
 
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
 
     let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
@@ -115,14 +115,14 @@ pub async fn invite_user(
     // Must be logged in
     let inviter = match auth_session.user {
         Some(user) => user,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     // Check if user is owner or moderator
     let role = get_user_role_in_community(&mut tx, inviter.id, community.id).await?;
     match role {
         Some(CommunityMemberRole::Owner) | Some(CommunityMemberRole::Moderator) => {}
-        _ => return Ok(StatusCode::FORBIDDEN.into_response()),
+        _ => return Err(AppError::Forbidden),
     }
 
     // Find the invitee by login_name
@@ -258,7 +258,7 @@ pub async fn remove_member(
             .await?;
 
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
 
     let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
@@ -266,14 +266,14 @@ pub async fn remove_member(
     // Must be logged in
     let current_user = match auth_session.user {
         Some(user) => user,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     // Check if current user is owner or moderator
     let current_role = get_user_role_in_community(&mut tx, current_user.id, community.id).await?;
     match current_role {
         Some(CommunityMemberRole::Owner) | Some(CommunityMemberRole::Moderator) => {}
-        _ => return Ok(StatusCode::FORBIDDEN.into_response()),
+        _ => return Err(AppError::Forbidden),
     }
 
     // Cannot remove the owner
@@ -323,7 +323,7 @@ pub async fn do_accept_invitation(
 ) -> Result<impl IntoResponse, AppError> {
     let user = match &auth_session.user {
         Some(user) => user,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     let user_preferred_language = user.preferred_language.clone();
@@ -335,13 +335,13 @@ pub async fn do_accept_invitation(
     // Get the invitation
     let invitation = get_invitation_by_id(&mut tx, invitation_id).await?;
     if invitation.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Invitation".to_string()));
     }
     let invitation = invitation.ok_or_else(|| AppError::NotFound("Invitation".to_string()))?;
 
     // Verify the invitation is for the current user
     if invitation.invitee_id != user.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // Get community info for validation and push notification
@@ -465,7 +465,7 @@ pub async fn do_reject_invitation(
 ) -> Result<impl IntoResponse, AppError> {
     let user = match &auth_session.user {
         Some(user) => user,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     let user_preferred_language = user.preferred_language.clone();
@@ -477,13 +477,13 @@ pub async fn do_reject_invitation(
     // Get the invitation
     let invitation = get_invitation_by_id(&mut tx, invitation_id).await?;
     if invitation.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Invitation".to_string()));
     }
     let invitation = invitation.ok_or_else(|| AppError::NotFound("Invitation".to_string()))?;
 
     // Verify the invitation is for the current user
     if invitation.invitee_id != user.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // Get community info for push notification
@@ -599,7 +599,7 @@ pub async fn retract_invitation(
             .await?;
 
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
 
     let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
@@ -607,14 +607,14 @@ pub async fn retract_invitation(
     // Must be logged in
     let user = match &auth_session.user {
         Some(user) => user,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     // Check if user is owner or moderator
     let user_role = get_user_role_in_community(&mut tx, user.id, community.id).await?;
     match user_role {
         Some(CommunityMemberRole::Owner) | Some(CommunityMemberRole::Moderator) => {}
-        _ => return Ok(StatusCode::FORBIDDEN.into_response()),
+        _ => return Err(AppError::Forbidden),
     }
 
     // Delete the invitation
@@ -643,7 +643,7 @@ pub async fn members_page(
             .await?;
 
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
 
     let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
@@ -655,12 +655,12 @@ pub async fn members_page(
         // Private or unlisted community - require membership
         let user = match &auth_session.user {
             Some(user) => user,
-            None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+            None => return Err(AppError::Unauthorized),
         };
 
         let is_member = is_user_member(&mut tx, user.id, community.id).await?;
         if !is_member {
-            return Ok(StatusCode::FORBIDDEN.into_response());
+            return Err(AppError::Forbidden);
         }
 
         // Get user's role to determine permissions
@@ -739,7 +739,7 @@ pub async fn do_leave_community(
 ) -> Result<impl IntoResponse, AppError> {
     let user = match &auth_session.user {
         Some(u) => u,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     let user_preferred_language = user.preferred_language.clone();
@@ -753,7 +753,7 @@ pub async fn do_leave_community(
         find_community_by_slug(&mut tx, slug.strip_prefix('@').unwrap_or(&slug).to_string())
             .await?;
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
     let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
 
@@ -769,7 +769,7 @@ pub async fn do_leave_community(
             if error_msg.contains("Owners cannot leave") {
                 messages.error(safe_get_message(&bundle, "community-owner-cannot-leave"));
             } else if error_msg.contains("not a member") {
-                return Ok(StatusCode::NOT_FOUND.into_response());
+                return Err(AppError::NotFound("Membership".to_string()));
             } else {
                 messages.error(format!("Error: {}", error_msg));
             }

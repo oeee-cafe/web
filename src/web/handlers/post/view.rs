@@ -18,7 +18,7 @@ use crate::web::state::AppState;
 use axum::extract::Path;
 use axum::http::{HeaderMap, HeaderValue};
 use axum::response::{IntoResponse, Redirect};
-use axum::{extract::State, http::StatusCode, response::Html};
+use axum::{extract::State, response::Html};
 use axum_messages::Messages;
 use minijinja::context;
 use serde_json::json;
@@ -914,7 +914,7 @@ pub async fn redirect_post_to_login_name(
             ))
             .into_response())
         }
-        None => Ok(StatusCode::NOT_FOUND.into_response()),
+        None => Err(AppError::NotFound("Post".to_string())),
     }
 }
 
@@ -1087,7 +1087,7 @@ pub async fn post_replay_view_by_login_name(
             }
         }
         None => {
-            return Ok(StatusCode::NOT_FOUND.into_response());
+            return Err(AppError::NotFound("Post".to_string()));
         }
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
@@ -1099,7 +1099,7 @@ pub async fn post_replay_view_by_login_name(
                 login_name, post_id
             )));
         }
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
 
     let community_id = post
@@ -1116,7 +1116,7 @@ pub async fn post_replay_view_by_login_name(
         .and_then(|name| name.as_deref())
         .is_some_and(|name| name.ends_with(".tgkr"));
     if !is_tegaki {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
 
     let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;

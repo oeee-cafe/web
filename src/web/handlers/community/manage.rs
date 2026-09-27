@@ -166,7 +166,7 @@ pub async fn hx_edit_community(
     };
 
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
 
     if community
@@ -175,7 +175,7 @@ pub async fn hx_edit_community(
         .owner_id
         != auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id
     {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
@@ -221,7 +221,7 @@ pub async fn hx_do_edit_community(
         if let Some(community) = community {
             (community.id, community.slug)
         } else {
-            return Ok(StatusCode::NOT_FOUND.into_response());
+            return Err(AppError::NotFound("Community".to_string()));
         }
     } else {
         // Handle UUID format - redirect to @slug
@@ -231,7 +231,7 @@ pub async fn hx_do_edit_community(
             // Redirect UUID to @slug format for PUT request
             return Ok(StatusCode::PERMANENT_REDIRECT.into_response());
         } else {
-            return Ok(StatusCode::NOT_FOUND.into_response());
+            return Err(AppError::NotFound("Community".to_string()));
         }
     };
 
@@ -374,7 +374,7 @@ pub async fn hx_delete_community(
     // Verify user is authenticated
     let user = match &auth_session.user {
         Some(u) => u,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     let db = &state.db_pool;

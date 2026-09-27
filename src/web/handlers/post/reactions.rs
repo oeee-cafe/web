@@ -21,7 +21,7 @@ use crate::web::state::AppState;
 use activitypub_federation::traits::Actor as ActivityPubActor;
 use axum::extract::Path;
 use axum::response::IntoResponse;
-use axum::{extract::State, http::StatusCode, response::Html, Form};
+use axum::{extract::State, response::Html, Form};
 use minijinja::context;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -69,14 +69,14 @@ pub async fn add_reaction(
                         get_user_role_in_community(&mut tx, user_id, community.id).await?;
                     if user_role.is_none() {
                         // User is not a member of this private community
-                        return Ok(StatusCode::FORBIDDEN.into_response());
+                        return Err(AppError::Forbidden);
                     }
                 }
             }
         }
         // Personal posts (community_id is None) are always accessible for reactions
     } else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
 
     // The handle the post's page lives under (`post_page_path`), which the
@@ -309,14 +309,14 @@ pub async fn remove_reaction(
                         get_user_role_in_community(&mut tx, user_id, community.id).await?;
                     if user_role.is_none() {
                         // User is not a member of this private community
-                        return Ok(StatusCode::FORBIDDEN.into_response());
+                        return Err(AppError::Forbidden);
                     }
                 }
             }
         }
         // Personal posts (community_id is None) are always accessible for reactions
     } else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
 
     // Find the reaction before deleting (need IRI for Undo activity)

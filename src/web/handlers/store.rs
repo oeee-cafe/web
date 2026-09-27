@@ -79,14 +79,14 @@ pub async fn do_store_purchase(
     // An Origin from somewhere else is turned away before anything is asked
     // of a store, whichever store it names.
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     match Store::parse(&store) {
         Some(Store::Apple) => apple_purchase(auth_session, &state, &form.proof).await,
         Some(Store::Steam) => steam_purchase(auth_session, &state, &form.proof).await,
         Some(Store::Microsoft) => microsoft_purchase(auth_session, &state, &form.proof).await,
         Some(Store::Google) => google_play_purchase(auth_session, &state, &form.proof).await,
-        None => Ok(StatusCode::NOT_FOUND.into_response()),
+        None => Err(AppError::NotFound("Store".to_string())),
     }
 }
 
@@ -107,15 +107,15 @@ pub async fn do_store_ticket(
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let (Some(Store::Microsoft), Some(config)) =
         (Store::parse(&store), state.config.microsoft_store.as_ref())
     else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Store".to_string()));
     };
     let Some(user) = auth_session.user.as_ref() else {
-        return Ok(StatusCode::UNAUTHORIZED.into_response());
+        return Err(AppError::Unauthorized);
     };
     if !microsoft_store::may_ask(user.id) {
         return Ok(StatusCode::TOO_MANY_REQUESTS.into_response());
@@ -151,10 +151,10 @@ async fn apple_purchase(
     transaction_id: &str,
 ) -> Result<Response, AppError> {
     let Some(config) = state.config.app_store.as_ref() else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Store".to_string()));
     };
     let Some(user) = auth_session.user.as_ref() else {
-        return Ok(StatusCode::UNAUTHORIZED.into_response());
+        return Err(AppError::Unauthorized);
     };
     // Every post here is a request to Apple, against a rate limit the whole
     // site shares (app_store::may_ask).
@@ -206,13 +206,13 @@ async fn steam_purchase(
     ticket: &str,
 ) -> Result<Response, AppError> {
     let Some(config) = state.config.steam.as_ref() else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Store".to_string()));
     };
     let packs = store_product::packs_in(&state.db_pool, Store::Steam).await?;
     let identity = match steam::verify_ticket(config, &packs, ticket).await {
         Ok(Ok(identity)) => identity,
         Ok(Err(TicketRejected::Invalid)) => return Ok(StatusCode::BAD_REQUEST.into_response()),
-        Ok(Err(TicketRejected::Banned)) => return Ok(StatusCode::FORBIDDEN.into_response()),
+        Ok(Err(TicketRejected::Banned)) => return Err(AppError::Forbidden),
         Err(error) => {
             tracing::warn!("Steam standing could not be refreshed: {error:#}");
             return Ok(StatusCode::BAD_GATEWAY.into_response());
@@ -226,7 +226,7 @@ async fn steam_purchase(
             .map(|user| user.id),
     };
     let Some(holder) = holder else {
-        return Ok(StatusCode::UNAUTHORIZED.into_response());
+        return Err(AppError::Unauthorized);
     };
     refresh_standing(&mut tx, holder, &identity).await?;
     tx.commit().await?;
@@ -249,10 +249,10 @@ async fn microsoft_purchase(
     key: &str,
 ) -> Result<Response, AppError> {
     let Some(config) = state.config.microsoft_store.as_ref() else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Store".to_string()));
     };
     let Some(user) = auth_session.user.as_ref() else {
-        return Ok(StatusCode::UNAUTHORIZED.into_response());
+        return Err(AppError::Unauthorized);
     };
     if !microsoft_store::may_ask(user.id) {
         return Ok(StatusCode::TOO_MANY_REQUESTS.into_response());
@@ -313,10 +313,10 @@ async fn google_play_purchase(
     token: &str,
 ) -> Result<Response, AppError> {
     let Some(config) = state.config.google_play.as_ref() else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Store".to_string()));
     };
     let Some(user) = auth_session.user.as_ref() else {
-        return Ok(StatusCode::UNAUTHORIZED.into_response());
+        return Err(AppError::Unauthorized);
     };
     if !google_play::may_ask(user.id) {
         return Ok(StatusCode::TOO_MANY_REQUESTS.into_response());
@@ -380,7 +380,7 @@ pub async fn do_app_store_notification(
     Json(body): Json<AppStoreNotification>,
 ) -> Result<Response, AppError> {
     let Some(config) = state.config.app_store.as_ref() else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Store".to_string()));
     };
     let notice = match app_store::read_notification(
         &body.signed_payload,
