@@ -8,8 +8,7 @@ use crate::web::handlers::account::{
     verify_email_verification_code,
 };
 use crate::web::handlers::activitypub::{
-    activitypub_community_page, activitypub_post_community_inbox, activitypub_post_page,
-    activitypub_post_shared_inbox, activitypub_post_user_inbox, activitypub_user_page,
+    activitypub_community_page, activitypub_post_page, activitypub_user_page,
 };
 use crate::web::handlers::admin::{
     admin_add_store_product, admin_banners, admin_banners_fragment, admin_collaborative_sessions,
@@ -90,7 +89,6 @@ use crate::web::handlers::well_known::{
 };
 use crate::web::handlers::{handler_404, health};
 use crate::web::session_store::PostgresStore;
-use activitypub_federation::config::{FederationConfig, FederationMiddleware};
 use anyhow::Result;
 use axum::body::Body;
 use axum::extract::DefaultBodyLimit;
@@ -143,15 +141,19 @@ fn static_router() -> Router {
 
 pub struct App {
     state: AppState,
+    federation: feder::federation::Federation<AppState>,
 }
 
 impl App {
-    pub async fn new(state: AppState) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(
+        state: AppState,
+        federation: feder::federation::Federation<AppState>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         sqlx::migrate!().run(&state.db_pool).await?;
 
         store_product::refresh_any_on_sale(&state.db_pool).await?;
 
-        Ok(Self { state })
+        Ok(Self { state, federation })
     }
 
     pub async fn serve(self) -> Result<(), Box<dyn std::error::Error>> {
@@ -406,15 +408,8 @@ impl App {
             )
             .route_layer(axum::middleware::from_fn(require_login));
 
-        let state = self.state.clone();
-        let domain = state.config.domain.clone();
-        let activitypub_data = FederationConfig::builder()
-            .domain(domain)
-            .app_data(state)
-            .build()
-            .await?;
-
-        let activitypub_router = Router::new()
+        let app = Router::new()
+            .route("/", get(home))
             // Feder answers these when ActivityPub is asked for; what is left
             // is a browser, sent to the page.
             .route("/ap/users/{user_id}", get(activitypub_user_page))
@@ -423,25 +418,6 @@ impl App {
                 "/ap/communities/{community_id}",
                 get(activitypub_community_page),
             )
-            .route(
-                "/ap/users/{user_id}/inbox",
-                post(activitypub_post_user_inbox),
-            )
-            .route(
-                "/ap/communities/{community_id}/inbox",
-                post(activitypub_post_community_inbox),
-            )
-            .route("/ap/inbox", post(activitypub_post_shared_inbox))
-            // Bounded, and signed over what it carries, before the library
-            // reads it (src/federation/inbox.rs).
-            .route_layer(axum::middleware::from_fn_with_state(
-                self.state.config.domain.clone(),
-                crate::federation::inbox::check,
-            ))
-            .layer(FederationMiddleware::new(activitypub_data));
-
-        let app = Router::new()
-            .route("/", get(home))
             // Open to guests. A guest's drawing is kept on the device, and the
             // drafts page is where it waits for them to have an account;
             // uploading it (/draw/finish) is still for someone signed in.
@@ -644,18 +620,19 @@ impl App {
             .layer(MessagesManagerLayer)
             .layer(auth_layer)
             .with_state(self.state.clone())
-            .merge(static_router)
-            .merge(activitypub_router);
-        // What other servers fetch, answered before any of the site's own
-        // layers: actors, posts, their collections, WebFinger and NodeInfo.
-        let federation = crate::federation::serving::federation(&self.state.config.domain)?;
+            .merge(static_router);
+        // What other servers fetch and send, answered before any of the
+        // site's own layers: actors, posts, their collections, WebFinger,
+        // NodeInfo, and the inboxes.
         let serving_state = self.state.clone();
-        let app = feder_axum::wrap(app, federation, move |_| Some(serving_state.clone()))
-            // Outermost, so it also covers panics raised inside the layers
-            // above. Without this axum drops the connection on a panic: the
-            // client sees a reset with no status, and Sentry never hears about
-            // it.
-            .layer(CatchPanicLayer::custom(handle_panic));
+        let app = feder_axum::wrap(app, self.federation.clone(), move |_| {
+            Some(serving_state.clone())
+        })
+        // Outermost, so it also covers panics raised inside the layers
+        // above. Without this axum drops the connection on a panic: the
+        // client sees a reset with no status, and Sentry never hears about
+        // it.
+        .layer(CatchPanicLayer::custom(handle_panic));
 
         // run our app with hyper, listening globally
         let addr = SocketAddr::from(([0, 0, 0, 0], self.state.config.port));

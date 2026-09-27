@@ -18,7 +18,6 @@ use crate::web::context::CommonContext;
 use crate::web::handlers::{parse_id_with_legacy_support, ParsedId};
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
-use activitypub_federation::traits::Actor as ActivityPubActor;
 use axum::extract::Path;
 use axum::response::IntoResponse;
 use axum::{extract::State, response::Html, Form};
@@ -217,9 +216,7 @@ pub async fn add_reaction(
             let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
 
             let emoji_react = EmojiReact {
-                actor: Some(activitypub_federation::fetch::object_id::ObjectId::parse(
-                    &actor.iri,
-                )?),
+                actor: Some(actor.iri.url().clone()),
                 object: post_url.parse()?,
                 content: emoji.to_string(),
                 r#type: "EmojiReact".to_string(),
@@ -229,20 +226,12 @@ pub async fn add_reaction(
                 signature: None,
             };
 
-            // Create federation config
-            let federation_config = activitypub_federation::config::FederationConfig::builder()
-                .domain(&state.config.domain)
-                .app_data(state.clone())
-                .build()
-                .await?;
-            let federation_data = federation_config.to_request_data();
-
             // Send to post author's inbox
             if let Err(e) = actor
                 .send(
                     emoji_react,
-                    vec![post_author_actor.shared_inbox_or_inbox()],
-                    &federation_data,
+                    vec![post_author_actor.shared_inbox_or_inbox()?],
+                    &state,
                 )
                 .await
             {
@@ -365,9 +354,7 @@ pub async fn remove_reaction(
             let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
 
             let emoji_react = EmojiReact {
-                actor: Some(activitypub_federation::fetch::object_id::ObjectId::parse(
-                    &actor.iri,
-                )?),
+                actor: Some(actor.iri.url().clone()),
                 object: post_url.parse()?,
                 content: form.emoji.clone(),
                 r#type: "EmojiReact".to_string(),
@@ -380,26 +367,18 @@ pub async fn remove_reaction(
             // Build Undo activity
             let undo_id = generate_object_id(&state.config.domain)?;
             let undo = Undo {
-                actor: activitypub_federation::fetch::object_id::ObjectId::parse(&actor.iri)?,
+                actor: actor.iri.url().clone(),
                 object: UndoObject::EmojiReact(Box::new(emoji_react)),
                 r#type: activitystreams_kinds::activity::UndoType::Undo,
                 id: undo_id,
             };
 
-            // Create federation config
-            let federation_config = activitypub_federation::config::FederationConfig::builder()
-                .domain(&state.config.domain)
-                .app_data(state.clone())
-                .build()
-                .await?;
-            let federation_data = federation_config.to_request_data();
-
             // Send to post author's inbox
             if let Err(e) = actor
                 .send(
                     undo,
-                    vec![post_author_actor.shared_inbox_or_inbox()],
-                    &federation_data,
+                    vec![post_author_actor.shared_inbox_or_inbox()?],
+                    &state,
                 )
                 .await
             {

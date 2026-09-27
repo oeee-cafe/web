@@ -1,5 +1,3 @@
-use activitypub_federation::config::Data;
-use activitypub_federation::protocol::context::WithContext;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -313,30 +311,26 @@ impl Actor {
         &self,
         activity: A,
         recipients: Vec<Url>,
-        data: &Data<AppState>,
+        state: &AppState,
     ) -> Result<(), AppError>
     where
         A: Serialize + std::fmt::Debug,
     {
         tracing::info!("Activity: {:?}", activity);
-
-        let context = [
-            "https://www.w3.org/ns/activitystreams",
-            "https://w3id.org/security/v1",
-        ];
-
-        let activity = WithContext::new(
-            activity,
-            Value::Array(
-                context
-                    .into_iter()
-                    .map(|s| Value::String(s.to_string()))
-                    .collect(),
-            ),
-        );
-        let activity = serde_json::to_value(&activity)
+        let mut activity = serde_json::to_value(&activity)
             .map_err(|error| AppError::from(anyhow::anyhow!("serialize activity: {error}")))?;
-        let state = data.app_data();
+        if let Value::Object(members) = &mut activity {
+            let mut with_context = serde_json::Map::new();
+            with_context.insert(
+                "@context".into(),
+                serde_json::json!([
+                    "https://www.w3.org/ns/activitystreams",
+                    "https://w3id.org/security/v1"
+                ]),
+            );
+            with_context.append(members);
+            *members = with_context;
+        }
         crate::federation::send(
             &state.deliverer,
             &state.config.domain,
@@ -347,6 +341,16 @@ impl Actor {
         .await
         .map_err(|error| AppError::from(anyhow::anyhow!("queue delivery: {error}")))
     }
+
+    /// Where to deliver to this actor: its server's shared inbox, if it has
+    /// one, or its own.
+    pub fn shared_inbox_or_inbox(&self) -> Result<Url, url::ParseError> {
+        if self.shared_inbox_url.is_empty() {
+            self.inbox_url.parse()
+        } else {
+            self.shared_inbox_url.parse()
+        }
+    }
 }
 
 pub async fn create_actor_for_user(
@@ -354,15 +358,11 @@ pub async fn create_actor_for_user(
     user: &User,
     config: &AppConfig,
 ) -> Result<Actor> {
-    use activitypub_federation::http_signatures::generate_actor_keypair;
-
     // Ensure local instance exists
     find_or_create_local_instance(tx, &config.domain, None, None).await?;
 
     // Generate RSA keypair for ActivityPub
-    let keypair = generate_actor_keypair()?;
-    let private_key_pem = keypair.private_key;
-    let public_key_pem = keypair.public_key;
+    let (private_key_pem, public_key_pem) = feder_runtime::signature::generate_rsa_keypair()?;
 
     let now = Utc::now();
 
@@ -533,15 +533,11 @@ pub async fn create_actor_for_community(
     community: &Community,
     config: &AppConfig,
 ) -> Result<Actor> {
-    use activitypub_federation::http_signatures::generate_actor_keypair;
-
     // Ensure local instance exists
     find_or_create_local_instance(tx, &config.domain, None, None).await?;
 
     // Generate RSA keypair for ActivityPub
-    let keypair = generate_actor_keypair()?;
-    let private_key_pem = keypair.private_key;
-    let public_key_pem = keypair.public_key;
+    let (private_key_pem, public_key_pem) = feder_runtime::signature::generate_rsa_keypair()?;
 
     let now = Utc::now();
 

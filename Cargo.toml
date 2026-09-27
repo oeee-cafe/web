@@ -17,7 +17,6 @@ debug = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-activitypub_federation = { version = "=0.7.0-beta.11", features = ["axum"] }
 activitystreams-kinds = "0.3.0"
 anyhow = "1.0.99"
 argon2 = { version = "0.5.3", features = ["password-hash", "std"] }
@@ -33,7 +32,6 @@ clap = { version = "4.5.4", features = ["derive"] }
 config = "0.15.16"
 data-encoding = "2.9.0"
 data-url = "0.3.2"
-enum_delegate = "0.2.0"
 fluent = "0.17.0"
 fluent-langneg = "0.14.0"
 futures-util = "0.3.31"
@@ -72,7 +70,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 unic-langid = "0.9.4"
 url = "2.5.7"
 urlencoding = "2.1"
-uuid = { version = "1.18.1", features = ["serde"] }
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
 redis = { version = "0.32.5", features = ["aio", "tokio-comp"] }
 bb8-redis = "0.24.0"
 ammonia = "4.1"
@@ -95,22 +93,31 @@ x509-parser = "0.18.1"
 # main moves; bump the rev to take a newer one.
 [dependencies.feder]
 git = "https://github.com/limeburst/feder.git"
-rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
+rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
 
 [dependencies.feder-postgres]
 git = "https://github.com/limeburst/feder.git"
-rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
+rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
 
-# Checking inbox requests' signatures before activitypub_federation reads
-# them (src/federation/inbox.rs).
+# Actors' key pairs (src/models/actor.rs).
 [dependencies.feder-runtime]
 git = "https://github.com/limeburst/feder.git"
-rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
+rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
+
+# The vocabulary incoming activities are read into, and what they mean
+# (src/federation/listeners.rs).
+[dependencies.feder-vocab]
+git = "https://github.com/limeburst/feder.git"
+rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
+
+[dependencies.feder-core]
+git = "https://github.com/limeburst/feder.git"
+rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
 
 # Serving what other servers fetch (src/federation/serving.rs).
 [dependencies.feder-axum]
 git = "https://github.com/limeburst/feder.git"
-rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
+rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
 
 [dependencies.sqlx]
 version = "0.8.6"

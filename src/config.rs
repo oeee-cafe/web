@@ -55,6 +55,13 @@ pub struct AppConfig {
     #[serde(default)]
     pub archive_s3_bucket: Option<String>,
 
+    /// Networks the site may reach although they are not public, as CIDRs:
+    /// for a development server federating with another on the same
+    /// machine. Empty, as it is in production, every request to another
+    /// server has to go to a public address.
+    #[serde(default)]
+    pub federation_allow_private_networks: Vec<String>,
+
     pub smtp_host: String,
     pub smtp_user: String,
     pub smtp_password: String,

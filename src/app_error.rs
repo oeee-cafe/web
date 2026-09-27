@@ -29,28 +29,13 @@ pub mod error_codes {
 /// HTML words the serde error differently, and one such wording was 13k
 /// events a month (OEEE-CAFE-4B).
 fn should_filter_from_sentry(err: &anyhow::Error) -> bool {
-    use activitypub_federation::error::Error as FederationError;
+    err.chain().any(is_remote)
+}
 
-    err.chain().any(|cause| {
-        matches!(
-            cause.downcast_ref::<FederationError>(),
-            Some(
-                FederationError::ParseFetchedObject(..)
-                    | FederationError::ParseReceivedActivity { .. }
-                    | FederationError::ObjectDeleted(..)
-                    | FederationError::FetchInvalidContentType(..)
-                    | FederationError::FetchWrongId(..)
-                    | FederationError::UrlVerificationError(..)
-                    | FederationError::ActivitySignatureInvalid
-                    | FederationError::ActivityBodyDigestInvalid
-                    | FederationError::WebfingerResolveFailed(..)
-                    | FederationError::RequestLimit
-                    | FederationError::ResponseBodyLimit
-                    | FederationError::Reqwest(..)
-                    | FederationError::ReqwestMiddleware(..)
-            )
-        )
-    })
+/// Whether `cause` is another server's doing: a fetch refused, gone, not
+/// ActivityPub, or not the object it claims to be.
+pub fn is_remote(cause: &(dyn std::error::Error + 'static)) -> bool {
+    cause.downcast_ref::<feder::fetch::FetchError>().is_some()
 }
 
 /// Why a request failed, and so what it is answered with.
@@ -157,20 +142,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use activitypub_federation::error::Error as FederationError;
 
     #[test]
     fn a_remote_answering_with_html_is_not_reported() {
-        let body = r#"<html><body>You are being <a href="https://social.cleverlibre.org/about">redirected</a>.</body></html>"#;
-        let parse = serde_json::from_str::<serde_json::Value>(body).unwrap_err();
-        let url = "https://social.cleverlibre.org/".parse().unwrap();
-        let AppError::Anyhow(err) = AppError::from(FederationError::ParseFetchedObject(
-            parse,
-            url,
-            body.to_string(),
-        )) else {
-            unreachable!()
-        };
+        let err = anyhow::Error::new(feder::fetch::FetchError::NotActivityPub("text/html".into()));
         assert!(should_filter_from_sentry(&err));
         assert!(should_filter_from_sentry(
             &err.context("while fetching an actor")
@@ -182,8 +157,5 @@ mod tests {
         assert!(!should_filter_from_sentry(&anyhow::anyhow!(
             "Failed to parse object"
         )));
-        assert!(!should_filter_from_sentry(
-            &FederationError::Other("x".into()).into()
-        ));
     }
 }

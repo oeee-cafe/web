@@ -1,91 +1,18 @@
 //! Posts as notes, both ways: ours going out and theirs coming in.
 
-use activitypub_federation::config::Data;
-use activitypub_federation::fetch::object_id::ObjectId;
-use activitypub_federation::traits::{Activity, Object};
-
 use activitystreams_kinds::activity::{CreateType, UpdateType};
 use activitystreams_kinds::object::NoteType;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use url::Url;
 use uuid::Uuid;
 
 use crate::app_error::AppError;
-use crate::live::LiveEvent;
 use crate::markdown_utils::process_markdown_content;
 use crate::models::actor::Actor;
-use crate::models::comment::create_comment_from_activitypub;
 use crate::models::image::find_image_by_id;
-use crate::models::notification::{
-    create_notification, get_badge_count, get_notification_by_id, send_push_for_notification,
-    CreateNotificationParams, NotificationType,
-};
 use crate::models::post::find_post_by_id;
-use crate::sanitized_html::SanitizedHtml;
-use crate::web::state::AppState;
 
 use super::{content_or_contents_deser, string_or_vec_deser, tag_or_vec_deser};
-
-fn extract_note_content(note: &Note) -> (String, Option<SanitizedHtml>) {
-    // Try to get HTML content from contents field or content field
-    let raw_html_content = note.content.clone();
-
-    // Sanitize HTML content if present using ammonia defaults
-    let html_content = raw_html_content.map(|html| {
-        let sanitized = SanitizedHtml::clean(&html);
-
-        tracing::debug!(
-            "Sanitized HTML content: original length {}, sanitized length {}",
-            html.len(),
-            sanitized.as_str().len()
-        );
-
-        if html != sanitized.as_str() {
-            tracing::info!("HTML content was sanitized - potentially dangerous content removed");
-        }
-
-        sanitized
-    });
-
-    // Try to get markdown content from source field
-    let markdown_content = if let Some(source) = &note.source {
-        // Parse source as object with content and mediaType
-        if let Ok(source_obj) =
-            serde_json::from_value::<serde_json::Map<String, Value>>(source.clone())
-        {
-            if let (Some(Value::String(content)), Some(Value::String(media_type))) =
-                (source_obj.get("content"), source_obj.get("mediaType"))
-            {
-                if media_type == "text/markdown" || media_type == "text/plain" {
-                    content.clone()
-                } else {
-                    // Fallback to sanitized HTML content if available, or "No content"
-                    html_content
-                        .clone()
-                        .map_or_else(|| "No content".to_string(), SanitizedHtml::into_string)
-                }
-            } else {
-                // Fallback to sanitized HTML content if available, or "No content"
-                html_content
-                    .clone()
-                    .map_or_else(|| "No content".to_string(), SanitizedHtml::into_string)
-            }
-        } else {
-            // Fallback to sanitized HTML content if available, or "No content"
-            html_content
-                .clone()
-                .map_or_else(|| "No content".to_string(), SanitizedHtml::into_string)
-        }
-    } else {
-        // No source field, use sanitized HTML content as fallback for markdown too
-        html_content
-            .clone()
-            .map_or_else(|| "No content".to_string(), SanitizedHtml::into_string)
-    };
-
-    (markdown_content, html_content)
-}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -109,7 +36,7 @@ pub struct Note {
         alias = "attribution",
         skip_serializing_if = "Option::is_none"
     )]
-    attributed_to: Option<ObjectId<Actor>>,
+    attributed_to: Option<Url>,
     #[serde(
         alias = "contents",
         skip_serializing_if = "Option::is_none",
@@ -210,7 +137,7 @@ async fn hashtag_tags(
 
 pub struct NoteParams {
     pub id: Url,
-    pub attributed_to: ObjectId<Actor>,
+    pub attributed_to: Url,
     pub content: String,
     pub to: Vec<String>,
     pub cc: Vec<String>,
@@ -248,7 +175,7 @@ impl Note {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Create {
-    actor: ObjectId<Actor>,
+    actor: Url,
     object: Note,
     r#type: CreateType,
     id: Url,
@@ -264,7 +191,7 @@ pub struct Create {
 
 impl Create {
     pub fn new(
-        actor: ObjectId<Actor>,
+        actor: Url,
         object: Note,
         id: Url,
         to: Vec<String>,
@@ -281,243 +208,6 @@ impl Create {
             published: Some(published),
             extra: std::collections::HashMap::new(),
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl Activity for Create {
-    type DataType = AppState;
-    type Error = AppError;
-
-    fn id(&self) -> &Url {
-        &self.id
-    }
-
-    fn actor(&self) -> &Url {
-        self.actor.inner()
-    }
-
-    async fn verify(&self, _data: &Data<Self::DataType>) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn receive(self, data: &Data<Self::DataType>) -> Result<(), Self::Error> {
-        tracing::info!("=== RECEIVED CREATE ACTIVITY ===");
-        tracing::info!("Actor: {}", self.actor.inner());
-        tracing::info!("Object ID: {}", self.object.id);
-        tracing::info!(
-            "Object content preview: {}",
-            self.object
-                .content
-                .as_ref()
-                .map(|c| {
-                    if c.len() > 100 {
-                        format!("{}...", &c[..100])
-                    } else {
-                        c.clone()
-                    }
-                })
-                .unwrap_or_else(|| "No content".to_string())
-        );
-        tracing::info!("in_reply_to: {:?}", self.object.in_reply_to);
-        tracing::info!("reply_target: {:?}", self.object.reply_target);
-        tracing::info!("================================");
-
-        let db = &data.app_data().db_pool;
-        let mut tx = db.begin().await?;
-
-        // Check if this is a reply to a local post
-        // Support both in_reply_to and reply_target (different ActivityPub implementations use different names)
-        let reply_target_url = self
-            .object
-            .in_reply_to
-            .as_ref()
-            .or(self.object.reply_target.as_ref());
-
-        if let Some(reply_url) = reply_target_url {
-            let reply_url_str = reply_url.to_string();
-
-            // Check if this is replying to a local post URL pattern
-            // Support both user post URLs (https://domain/@username/post-id) and AP post URLs (https://domain/ap/posts/post-id)
-            let user_post_prefix = format!("https://{}/@", data.app_data().config.domain);
-            let ap_post_prefix = format!("https://{}/ap/posts/", data.app_data().config.domain);
-
-            let post_id = if reply_url_str.starts_with(&user_post_prefix) {
-                // Extract from URLs like https://domain/@username/post-id
-                let path_part = &reply_url_str[user_post_prefix.len()..];
-                path_part
-                    .find('/')
-                    .map(|slash_pos| &path_part[slash_pos + 1..])
-            } else if reply_url_str.starts_with(&ap_post_prefix) {
-                // Extract from URLs like https://domain/ap/posts/post-id
-                Some(&reply_url_str[ap_post_prefix.len()..])
-            } else {
-                None
-            };
-
-            if let Some(post_id_str) = post_id
-                && let Ok(post_id) = Uuid::parse_str(post_id_str)
-            {
-                // Verify the post exists and get post author
-                if let Some(post) = find_post_by_id(&mut tx, post_id).await? {
-                    // Get post author's user_id
-                    let post_author_user_id = post
-                        .get("author_id")
-                        .and_then(|id| id.as_ref())
-                        .and_then(|id_str| Uuid::parse_str(id_str).ok());
-
-                    // Get the actor who sent this comment, fetching from remote if needed
-                    let actor = Actor::read_from_id(self.actor.inner().clone(), data).await?;
-
-                    let actor = if let Some(actor) = actor {
-                        actor
-                    } else {
-                        // Actor not found locally, fetch from remote and persist
-                        tracing::info!(
-                            "Actor not found locally, fetching from remote: {}",
-                            self.actor.inner()
-                        );
-
-                        match self.actor.dereference(data).await {
-                            Ok(remote_actor) => {
-                                tracing::info!(
-                                    "Successfully fetched remote actor: {}",
-                                    self.actor.inner()
-                                );
-
-                                // Persist the remote actor
-                                let persisted_actor =
-                                    Actor::create_or_update_actor(&mut tx, &remote_actor).await?;
-                                tracing::info!(
-                                    "Persisted new actor: {} ({})",
-                                    persisted_actor.handle,
-                                    persisted_actor.iri
-                                );
-                                persisted_actor
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    "Failed to fetch remote actor {}: {:?}",
-                                    self.actor.inner(),
-                                    e
-                                );
-                                tx.rollback().await?;
-                                return Ok(());
-                            }
-                        }
-                    };
-
-                    // Create the comment from the ActivityPub note
-                    // Extract both markdown and HTML content from the ActivityPub note
-                    let (markdown_content, html_content) = extract_note_content(&self.object);
-                    let comment = create_comment_from_activitypub(
-                        &mut tx,
-                        post_id,
-                        actor.id,
-                        markdown_content,
-                        html_content,
-                        self.object.id.to_string(),
-                    )
-                    .await;
-
-                    match comment {
-                        Ok(comment) => {
-                            tracing::info!(
-                                "Created comment from ActivityPub mention for post {}",
-                                post_id
-                            );
-
-                            // Collect notification info to send push after commit
-                            let mut notification_info: Vec<(Uuid, Uuid)> = Vec::new();
-
-                            // Create notification for post author
-                            if let Some(post_author_id) = post_author_user_id {
-                                match create_notification(
-                                    &mut tx,
-                                    CreateNotificationParams {
-                                        recipient_id: post_author_id,
-                                        actor_id: actor.id,
-                                        notification_type: NotificationType::Comment,
-                                        post_id: Some(post_id),
-                                        comment_id: Some(comment.id),
-                                        reaction_iri: None,
-                                        guestbook_entry_id: None,
-                                    },
-                                )
-                                .await
-                                {
-                                    Ok(notification) => {
-                                        tracing::info!(
-                                            "Created notification for comment from federated actor"
-                                        );
-                                        notification_info.push((notification.id, post_author_id));
-                                    }
-                                    Err(e) => tracing::warn!(
-                                        "Failed to create notification for comment: {:?}",
-                                        e
-                                    ),
-                                }
-                            }
-
-                            tx.commit().await?;
-                            data.live.publish(LiveEvent::Comments { post_id, by: None });
-
-                            // Send push notifications
-                            if !notification_info.is_empty() {
-                                let push_service = data.push_service.clone();
-                                let db_pool = data.db_pool.clone();
-                                tokio::spawn(async move {
-                                    for (notification_id, recipient_id) in notification_info {
-                                        let mut tx = match db_pool.begin().await {
-                                            Ok(tx) => tx,
-                                            Err(e) => {
-                                                tracing::warn!("Failed to begin transaction for push notification: {:?}", e);
-                                                continue;
-                                            }
-                                        };
-
-                                        if let Ok(Some(notification)) = get_notification_by_id(
-                                            &mut tx,
-                                            notification_id,
-                                            recipient_id,
-                                        )
-                                        .await
-                                        {
-                                            // The number on the bell, for the icon's badge
-                                            let badge_count =
-                                                get_badge_count(&mut tx, recipient_id)
-                                                    .await
-                                                    .ok()
-                                                    .and_then(|count| u32::try_from(count).ok());
-
-                                            send_push_for_notification(
-                                                &push_service,
-                                                &db_pool,
-                                                &notification,
-                                                badge_count,
-                                            )
-                                            .await;
-                                        }
-                                        let _ = tx.commit().await;
-                                    }
-                                });
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!(
-                                "Failed to create comment from ActivityPub mention: {:?}",
-                                e
-                            );
-                            // Don't return error, just log it
-                        }
-                    }
-                } else {
-                    tracing::debug!("Post {} not found for ActivityPub mention", post_id);
-                }
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -624,7 +314,7 @@ pub async fn create_note_from_post(
 
     let note = Note::from_params(NoteParams {
         id: note_id,
-        attributed_to: ObjectId::<Actor>::parse(&author_actor.iri)?,
+        attributed_to: author_actor.iri.url().clone(),
         content: formatted_content,
         to,
         cc,
@@ -711,7 +401,7 @@ pub async fn create_updated_note_from_post(
     // Create the Note object with updated timestamp
     let note = Note::from_params(NoteParams {
         id: note_id,
-        attributed_to: ObjectId::<Actor>::parse(&author_actor.iri)?,
+        attributed_to: author_actor.iri.url().clone(),
         content: formatted_content,
         to,
         cc,
@@ -729,7 +419,7 @@ pub async fn create_updated_note_from_post(
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateNote {
-    actor: ObjectId<Actor>,
+    actor: Url,
     object: Note,
     r#type: UpdateType,
     id: Url,
@@ -740,7 +430,7 @@ pub struct UpdateNote {
 
 impl UpdateNote {
     pub fn new(
-        actor: ObjectId<Actor>,
+        actor: Url,
         object: Note,
         id: Url,
         to: Vec<String>,
@@ -756,30 +446,5 @@ impl UpdateNote {
             cc,
             published,
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl Activity for UpdateNote {
-    type DataType = AppState;
-    type Error = AppError;
-
-    fn id(&self) -> &Url {
-        &self.id
-    }
-
-    fn actor(&self) -> &Url {
-        self.actor.inner()
-    }
-
-    async fn verify(&self, _data: &Data<Self::DataType>) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn receive(self, _data: &Data<Self::DataType>) -> Result<(), Self::Error> {
-        // UpdateNote activities notify followers about post content changes
-        // In a full implementation, we would update our local copy of the post
-        tracing::info!("Received UpdateNote activity: {:?}", self);
-        Ok(())
     }
 }

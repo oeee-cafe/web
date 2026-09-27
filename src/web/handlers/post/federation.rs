@@ -9,7 +9,6 @@ use crate::web::handlers::activitypub::{
     Note, UpdateNote,
 };
 use crate::web::state::AppState;
-use activitypub_federation::fetch::object_id::ObjectId;
 use uuid::Uuid;
 
 /// Whether a post in `community` goes out over ActivityPub. A personal post
@@ -43,7 +42,7 @@ pub(super) async fn send_post_to_followers(
     )
     .await?;
 
-    let actor_object_id = ObjectId::parse(&actor.iri)?;
+    let actor_object_id = actor.iri.url().clone();
     let to = vec!["https://www.w3.org/ns/activitystreams#Public".to_string()];
     let cc = vec![format!("{}/followers", actor.iri)];
     let published = chrono::Utc::now().to_rfc3339();
@@ -71,18 +70,9 @@ pub(super) async fn send_post_to_followers(
 
         if !follower_inboxes.is_empty() {
             // For now, we'll create a minimal federation config to send activities
-            // In a production setup, this would be properly integrated with the federation middleware
-            let federation_config = activitypub_federation::config::FederationConfig::builder()
-                .domain(&state.config.domain)
-                .app_data(state.clone())
-                .build()
-                .await?;
-            let federation_data = federation_config.to_request_data();
 
             // Send to all followers
-            actor
-                .send(create, follower_inboxes, &federation_data)
-                .await?;
+            actor.send(create, follower_inboxes, state).await?;
             tracing::info!(
                 "Sent Create activity for post {} to {} followers",
                 post_id,
@@ -160,7 +150,7 @@ pub(super) async fn send_post_to_community_followers(
 
         // Create the Announce activity referencing the user's original note
         let note_id = note.id.clone();
-        let community_actor_object_id = ObjectId::<Actor>::parse(&community_actor.iri)?;
+        let community_actor_object_id = community_actor.iri.url().clone();
 
         let published = chrono::Utc::now().to_rfc3339();
 
@@ -188,17 +178,9 @@ pub(super) async fn send_post_to_community_followers(
             .collect::<Result<Vec<_>, _>>()?;
 
         if !follower_inboxes.is_empty() {
-            // Create federation config to send activities
-            let federation_config = activitypub_federation::config::FederationConfig::builder()
-                .domain(&state.config.domain)
-                .app_data(state.clone())
-                .build()
-                .await?;
-            let federation_data = federation_config.to_request_data();
-
             // Send to all community followers using the community actor (announcing the user's post)
             community_actor
-                .send(announce, follower_inboxes, &federation_data)
+                .send(announce, follower_inboxes, state)
                 .await?;
             tracing::info!(
                 "Sent Announce activity for note {} to {} community followers",
@@ -238,7 +220,7 @@ pub(super) async fn send_post_update_to_followers(
     )
     .await?;
 
-    let actor_object_id = ObjectId::parse(&actor.iri)?;
+    let actor_object_id = actor.iri.url().clone();
     let to = vec!["https://www.w3.org/ns/activitystreams#Public".to_string()];
     let cc = vec![format!("{}/followers", actor.iri)];
     let published = chrono::Utc::now().to_rfc3339();
@@ -258,18 +240,8 @@ pub(super) async fn send_post_update_to_followers(
             .collect::<Result<Vec<_>, _>>()?;
 
         if !follower_inboxes.is_empty() {
-            // Create federation config to send activities
-            let federation_config = activitypub_federation::config::FederationConfig::builder()
-                .domain(&state.config.domain)
-                .app_data(state.clone())
-                .build()
-                .await?;
-            let federation_data = federation_config.to_request_data();
-
             // Send to all followers
-            actor
-                .send(update, follower_inboxes, &federation_data)
-                .await?;
+            actor.send(update, follower_inboxes, state).await?;
             tracing::info!(
                 "Sent Update activity for post {} to {} followers",
                 post_id,

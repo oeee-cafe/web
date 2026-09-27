@@ -29,6 +29,11 @@ pub struct AppState {
     pub shutdown: Shutdown,
     /// Outgoing ActivityPub deliveries (crate::federation).
     pub deliverer: Arc<crate::federation::Deliverer>,
+    /// Fetches other servers' actors and objects.
+    pub fetcher: Arc<feder::fetch::Fetcher>,
+    /// Where received activities wait for the inbox worker: the deliverer's
+    /// table, in a queue of their own.
+    pub inbox_queue: feder::queue::SharedQueue,
 }
 
 impl AppState {
