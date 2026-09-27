@@ -229,10 +229,7 @@ pub async fn handle_socket(
 
     // Tell the client its 1-byte session user id before any history arrives;
     // all its drawing messages will carry this id instead of a UUID
-    let welcome = Message::Binary(Bytes::from(vec![
-        messages::MessageType::Welcome as u8,
-        session_user_id,
-    ]));
+    let welcome = Message::Binary(messages::welcome_frame(session_user_id).into());
     if sender.send(welcome).await.is_err() {
         error!(
             "Failed to send welcome to connection {} in room {}",
@@ -1170,11 +1167,7 @@ async fn send_history_to_new_connection(
                 }
                 None => {}
             }
-            let mut replay_start = Vec::with_capacity(33);
-            replay_start.push(messages::MessageType::ReplayStart as u8);
-            replay_start.extend_from_slice(history_id.as_bytes());
-            replay_start.extend_from_slice(&after_seq.to_le_bytes());
-            replay_start.extend_from_slice(&current_max_seq.to_le_bytes());
+            let replay_start = messages::replay_start_frame(history_id, after_seq, current_max_seq);
             if sender
                 .send(Message::Binary(replay_start.into()))
                 .await
@@ -1217,10 +1210,7 @@ async fn send_history_to_new_connection(
                 connection_id,
                 max_seq
             );
-            let mut caught_up = Vec::with_capacity(25);
-            caught_up.push(messages::MessageType::CaughtUp as u8);
-            caught_up.extend_from_slice(history_id.as_bytes());
-            caught_up.extend_from_slice(&max_seq.to_le_bytes());
+            let caught_up = messages::caught_up_frame(history_id, max_seq);
             if sender
                 .send(Message::Binary(caught_up.into()))
                 .await
@@ -1587,15 +1577,9 @@ async fn finish_reset(ctx: &SessionContext<'_>, reset: PendingReset) {
 
             // Tell all clients (and future late joiners, via history) that
             // everything at or below base_seq is squashed into the reset
-            // snapshots, so they can freeze undo state and reclaim memory
-            // The count travels with the point because every snapshot of a
-            // reset is stored at the same sequence: without it a client has no
-            // way to tell a half-arrived checkpoint from a whole one, and with
-            // a pair per participant there is no longer a fixed number to
-            // assume.
-            let mut reset_point = vec![messages::MessageType::ResetPoint as u8];
-            reset_point.extend_from_slice(&reset.base_seq.to_le_bytes());
-            reset_point.extend_from_slice(&(reset.payloads.len() as u16).to_le_bytes());
+            // snapshots, so they can freeze undo state and reclaim memory.
+            let reset_point =
+                messages::reset_point_frame(reset.base_seq, reset.payloads.len() as u16);
             if let Err(e) = messages::sequence_and_broadcast(
                 &Message::Binary(reset_point.into()),
                 ctx.room_uuid,

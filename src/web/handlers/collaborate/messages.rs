@@ -306,6 +306,48 @@ impl LeaveMessage {
     }
 }
 
+/// WELCOME: the 1-byte session user id this connection's drawing carries.
+/// [0x0E][id:1]
+pub fn welcome_frame(session_user_id: u8) -> Vec<u8> {
+    vec![MessageType::Welcome as u8, session_user_id]
+}
+
+/// REPLAY_START: what a joining client is about to be sent.
+/// [0x05][history uuid:16][after seq:8 LE][last seq:8 LE]
+pub fn replay_start_frame(history_id: Uuid, after_seq: u64, last_seq: u64) -> Vec<u8> {
+    let mut buffer = Vec::with_capacity(33);
+    buffer.push(MessageType::ReplayStart as u8);
+    buffer.extend_from_slice(history_id.as_bytes());
+    buffer.extend_from_slice(&after_seq.to_le_bytes());
+    buffer.extend_from_slice(&last_seq.to_le_bytes());
+    buffer
+}
+
+/// CAUGHT_UP: the exact position the initial replay reached.
+/// [0x0F][history uuid:16][last seq:8 LE]
+pub fn caught_up_frame(history_id: Uuid, last_seq: u64) -> Vec<u8> {
+    let mut buffer = Vec::with_capacity(25);
+    buffer.push(MessageType::CaughtUp as u8);
+    buffer.extend_from_slice(history_id.as_bytes());
+    buffer.extend_from_slice(&last_seq.to_le_bytes());
+    buffer
+}
+
+/// RESET_POINT: history at or below `base_seq` was squashed into
+/// `snapshot_count` snapshots. [0x0D][base seq:8 LE][count:2 LE]
+///
+/// The count travels with the point because every snapshot of a reset is
+/// stored at the same sequence: without it a client has no way to tell a
+/// half-arrived checkpoint from a whole one, and with a pair per participant
+/// there is no longer a fixed number to assume.
+pub fn reset_point_frame(base_seq: u64, snapshot_count: u16) -> Vec<u8> {
+    let mut buffer = Vec::with_capacity(11);
+    buffer.push(MessageType::ResetPoint as u8);
+    buffer.extend_from_slice(&base_seq.to_le_bytes());
+    buffer.extend_from_slice(&snapshot_count.to_le_bytes());
+    buffer
+}
+
 // Message parsing utilities
 pub fn parse_message_type(data: &[u8]) -> Option<MessageType> {
     if data.is_empty() {
@@ -542,7 +584,7 @@ pub fn handle_chat_message(data: &[u8], user_id: Uuid, user_login_name: &str) ->
 }
 
 /// The END_SESSION frame the room hears: [0x07][owner uuid:16][len:2][path].
-fn end_session_frame(owner: Uuid, post_url: &str) -> Vec<u8> {
+pub(super) fn end_session_frame(owner: Uuid, post_url: &str) -> Vec<u8> {
     let mut buffer = Vec::with_capacity(19 + post_url.len());
     buffer.push(MessageType::EndSession as u8);
     buffer.extend_from_slice(owner.as_bytes());
