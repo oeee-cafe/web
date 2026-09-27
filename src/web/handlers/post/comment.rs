@@ -137,40 +137,15 @@ pub async fn do_create_comment(
             .await?;
 
             // Only notify if the parent comment author is a local user and not the same as current user
-            if let Some(parent_actor_data) = parent_actor {
-                if let Some(parent_user_id) = parent_actor_data.user_id {
-                    if parent_user_id != user_id {
-                        if let Ok(notification) = create_notification(
-                            &mut tx,
-                            CreateNotificationParams {
-                                recipient_id: parent_user_id,
-                                actor_id: actor.id,
-                                notification_type: NotificationType::CommentReply,
-                                post_id: Some(post_id),
-                                comment_id: Some(comment.id),
-                                reaction_iri: None,
-                                guestbook_entry_id: None,
-                            },
-                        )
-                        .await
-                        {
-                            notification_info.push((notification.id, parent_user_id));
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        // Create notification for the post author (don't notify if commenting on own post)
-        // Only send this if it's a top-level comment (no parent)
-        if let Some(post_author_id) = post_author_id {
-            if post_author_id != user_id {
-                if let Ok(notification) = create_notification(
+            if let Some(parent_actor_data) = parent_actor
+                && let Some(parent_user_id) = parent_actor_data.user_id
+                && parent_user_id != user_id
+                && let Ok(notification) = create_notification(
                     &mut tx,
                     CreateNotificationParams {
-                        recipient_id: post_author_id,
+                        recipient_id: parent_user_id,
                         actor_id: actor.id,
-                        notification_type: NotificationType::Comment,
+                        notification_type: NotificationType::CommentReply,
                         post_id: Some(post_id),
                         comment_id: Some(comment.id),
                         reaction_iri: None,
@@ -178,10 +153,30 @@ pub async fn do_create_comment(
                     },
                 )
                 .await
-                {
-                    notification_info.push((notification.id, post_author_id));
-                }
+            {
+                notification_info.push((notification.id, parent_user_id));
             }
+        }
+    } else {
+        // Create notification for the post author (don't notify if commenting on own post)
+        // Only send this if it's a top-level comment (no parent)
+        if let Some(post_author_id) = post_author_id
+            && post_author_id != user_id
+            && let Ok(notification) = create_notification(
+                &mut tx,
+                CreateNotificationParams {
+                    recipient_id: post_author_id,
+                    actor_id: actor.id,
+                    notification_type: NotificationType::Comment,
+                    post_id: Some(post_id),
+                    comment_id: Some(comment.id),
+                    reaction_iri: None,
+                    guestbook_entry_id: None,
+                },
+            )
+            .await
+        {
+            notification_info.push((notification.id, post_author_id));
         }
     }
 
@@ -210,8 +205,8 @@ pub async fn do_create_comment(
                     true
                 };
 
-                if should_notify {
-                    if let Ok(notification) = create_notification(
+                if should_notify
+                    && let Ok(notification) = create_notification(
                         &mut tx,
                         CreateNotificationParams {
                             recipient_id: mentioned_user_id,
@@ -224,9 +219,8 @@ pub async fn do_create_comment(
                         },
                     )
                     .await
-                    {
-                        notification_info.push((notification.id, mentioned_user_id));
-                    }
+                {
+                    notification_info.push((notification.id, mentioned_user_id));
                 }
             }
         }

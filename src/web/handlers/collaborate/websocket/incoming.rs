@@ -98,32 +98,32 @@ pub(super) async fn handle_incoming_messages(
         // late joiners replay the reset). Before the frame is built, so the
         // bytes are moved into the upload rather than copied a second time:
         // a checkpoint is up to 64 MiB of them.
-        if let Some(reset) = pending_reset.as_mut() {
-            if data.first() == Some(&(messages::MessageType::Snapshot as u8)) {
-                if reset.take_snapshot(data) {
-                    // Heavier than any checkpoint a room this size can
-                    // make. The room is freed to ask somebody else.
-                    warn!(
-                        "Discarding a checkpoint over {} bytes from connection {} in room {}",
-                        redis_messages::MAX_CHECKPOINT_BYTES,
-                        ctx.connection_id,
-                        ctx.room_uuid
-                    );
-                    let _ = ctx
-                        .state
-                        .redis_state
-                        .clear_reset_pending(ctx.room_uuid)
-                        .await;
-                }
-                reset.remaining -= 1;
-                if reset.remaining == 0 {
-                    let reset = pending_reset.take().expect("pending reset exists");
-                    if reset.accepted {
-                        finish_reset(&ctx, reset).await;
-                    }
-                }
-                continue;
+        if let Some(reset) = pending_reset.as_mut()
+            && data.first() == Some(&(messages::MessageType::Snapshot as u8))
+        {
+            if reset.take_snapshot(data) {
+                // Heavier than any checkpoint a room this size can
+                // make. The room is freed to ask somebody else.
+                warn!(
+                    "Discarding a checkpoint over {} bytes from connection {} in room {}",
+                    redis_messages::MAX_CHECKPOINT_BYTES,
+                    ctx.connection_id,
+                    ctx.room_uuid
+                );
+                let _ = ctx
+                    .state
+                    .redis_state
+                    .clear_reset_pending(ctx.room_uuid)
+                    .await;
             }
+            reset.remaining -= 1;
+            if reset.remaining == 0 {
+                let reset = pending_reset.take().expect("pending reset exists");
+                if reset.accepted {
+                    finish_reset(&ctx, reset).await;
+                }
+            }
+            continue;
         }
         if data.first() == Some(&(messages::MessageType::ResetBegin as u8)) {
             pending_reset = parse_reset_begin(&data, &ctx).await;
@@ -191,26 +191,25 @@ pub(super) async fn handle_incoming_messages(
             }
         } else {
             // Ephemeral messages (chat, join, pointers) bypass the sequencer
-            if let Message::Binary(data) = &msg {
-                if data.first() == Some(&(messages::MessageType::Chat as u8)) {
-                    let store =
-                        redis_messages::RedisMessageStore::new(ctx.state.redis_pool.clone());
-                    if let Err(e) = store.append_chat_message(ctx.room_uuid, data).await {
-                        error!(
-                            "Failed to preserve recent chat in room {}: {}",
-                            ctx.room_uuid, e
-                        );
-                    }
-                    // And into the recording. `data` here is the frame the
-                    // server built in `process_server_message`, so the name on
-                    // it is the one it authenticated.
-                    crate::web::handlers::collaborate::archive::record_chat(
-                        ctx.state,
-                        ctx.room_uuid,
-                        data,
-                    )
-                    .await;
+            if let Message::Binary(data) = &msg
+                && data.first() == Some(&(messages::MessageType::Chat as u8))
+            {
+                let store = redis_messages::RedisMessageStore::new(ctx.state.redis_pool.clone());
+                if let Err(e) = store.append_chat_message(ctx.room_uuid, data).await {
+                    error!(
+                        "Failed to preserve recent chat in room {}: {}",
+                        ctx.room_uuid, e
+                    );
                 }
+                // And into the recording. `data` here is the frame the
+                // server built in `process_server_message`, so the name on
+                // it is the one it authenticated.
+                crate::web::handlers::collaborate::archive::record_chat(
+                    ctx.state,
+                    ctx.room_uuid,
+                    data,
+                )
+                .await;
             }
             messages::broadcast_message(&msg, ctx.room_uuid, ctx.connection_id, ctx.state).await;
         }
@@ -220,18 +219,17 @@ pub(super) async fn handle_incoming_messages(
     // can be asked without waiting for the TTL. Only if the checkpoint was
     // actually ours: a connection whose unasked-for upload we were discarding
     // would otherwise take the job away from whoever really has it.
-    if pending_reset.is_some_and(|reset| reset.accepted) {
-        if let Err(e) = ctx
+    if pending_reset.is_some_and(|reset| reset.accepted)
+        && let Err(e) = ctx
             .state
             .redis_state
             .clear_reset_pending(ctx.room_uuid)
             .await
-        {
-            error!(
-                "Failed to clear reset-pending flag for room {}: {}",
-                ctx.room_uuid, e
-            );
-        }
+    {
+        error!(
+            "Failed to clear reset-pending flag for room {}: {}",
+            ctx.room_uuid, e
+        );
     }
 }
 

@@ -62,13 +62,13 @@ impl ApnsClient {
         let mut payload = builder.build(device_token, options);
 
         // Add custom data if provided
-        if let Some(ref custom_data) = data {
-            if let Some(data_obj) = custom_data.as_object() {
-                for (key, value) in data_obj {
-                    payload.add_custom_data(key, value).map_err(|e| {
-                        PushError::Other(anyhow::anyhow!("Failed to add custom data: {:?}", e))
-                    })?;
-                }
+        if let Some(ref custom_data) = data
+            && let Some(data_obj) = custom_data.as_object()
+        {
+            for (key, value) in data_obj {
+                payload.add_custom_data(key, value).map_err(|e| {
+                    PushError::Other(anyhow::anyhow!("Failed to add custom data: {:?}", e))
+                })?;
             }
         }
 
@@ -93,16 +93,16 @@ impl ApnsClient {
     async fn send(&self, payload: Payload<'_>) -> Result<(), PushError> {
         let response = self.client.send(payload).await.map_err(|e| {
             // Check if it's a response error with an invalid token reason
-            if let A2Error::ResponseError(ref resp) = e {
-                if let Some(ref error_body) = resp.error {
-                    match error_body.reason {
-                        ErrorReason::Unregistered
-                        | ErrorReason::BadDeviceToken
-                        | ErrorReason::DeviceTokenNotForTopic => {
-                            return PushError::InvalidToken;
-                        }
-                        _ => {}
+            if let A2Error::ResponseError(ref resp) = e
+                && let Some(ref error_body) = resp.error
+            {
+                match error_body.reason {
+                    ErrorReason::Unregistered
+                    | ErrorReason::BadDeviceToken
+                    | ErrorReason::DeviceTokenNotForTopic => {
+                        return PushError::InvalidToken;
                     }
+                    _ => {}
                 }
             }
             // For all other errors, don't capture backtrace

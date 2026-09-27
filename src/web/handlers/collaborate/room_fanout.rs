@@ -270,11 +270,11 @@ impl RoomFanout {
             return;
         }
         entry.listeners = entry.listeners.saturating_sub(1);
-        if entry.listeners == 0 {
-            if let Some(entry) = rooms.remove(&room_uuid) {
-                entry.task.abort();
-                debug!("Unsubscribed from room {}: nobody left here", room_uuid);
-            }
+        if entry.listeners == 0
+            && let Some(entry) = rooms.remove(&room_uuid)
+        {
+            entry.task.abort();
+            debug!("Unsubscribed from room {}: nobody left here", room_uuid);
         }
     }
 

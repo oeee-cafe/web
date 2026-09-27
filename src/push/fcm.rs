@@ -87,20 +87,20 @@ impl FcmClient {
 
         // Convert custom data to HashMap<String, String>
         let mut data_map = None;
-        if let Some(custom_data) = data {
-            if let Some(obj) = custom_data.as_object() {
-                let mut map = std::collections::HashMap::new();
-                for (key, value) in obj {
-                    // FCM V1 API requires all data values to be strings
-                    if let Some(str_value) = value.as_str() {
-                        map.insert(key.clone(), str_value.to_string());
-                    } else {
-                        map.insert(key.clone(), value.to_string());
-                    }
+        if let Some(custom_data) = data
+            && let Some(obj) = custom_data.as_object()
+        {
+            let mut map = std::collections::HashMap::new();
+            for (key, value) in obj {
+                // FCM V1 API requires all data values to be strings
+                if let Some(str_value) = value.as_str() {
+                    map.insert(key.clone(), str_value.to_string());
+                } else {
+                    map.insert(key.clone(), value.to_string());
                 }
-                if !map.is_empty() {
-                    data_map = Some(map);
-                }
+            }
+            if !map.is_empty() {
+                data_map = Some(map);
             }
         }
 

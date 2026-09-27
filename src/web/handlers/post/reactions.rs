@@ -142,25 +142,23 @@ pub async fn add_reaction(
     let mut notification_info: Vec<(Uuid, Uuid)> = Vec::new();
 
     // Create notification for the post author (don't notify if reacting to own post)
-    if let Some(post_author_id) = post_author_id {
-        if post_author_id != user_id {
-            if let Ok(notification) = create_notification(
-                &mut tx,
-                CreateNotificationParams {
-                    recipient_id: post_author_id,
-                    actor_id: actor.id,
-                    notification_type: NotificationType::Reaction,
-                    post_id: Some(post_id),
-                    comment_id: None,
-                    reaction_iri: Some(reaction.iri.clone()),
-                    guestbook_entry_id: None,
-                },
-            )
-            .await
-            {
-                notification_info.push((notification.id, post_author_id));
-            }
-        }
+    if let Some(post_author_id) = post_author_id
+        && post_author_id != user_id
+        && let Ok(notification) = create_notification(
+            &mut tx,
+            CreateNotificationParams {
+                recipient_id: post_author_id,
+                actor_id: actor.id,
+                notification_type: NotificationType::Reaction,
+                post_id: Some(post_id),
+                comment_id: None,
+                reaction_iri: Some(reaction.iri.clone()),
+                guestbook_entry_id: None,
+            },
+        )
+        .await
+    {
+        notification_info.push((notification.id, post_author_id));
     }
 
     let user_actor_id = Some(actor.id);
@@ -202,55 +200,55 @@ pub async fn add_reaction(
     }
 
     // Send EmojiReact activity to post author if they're remote or local with followers
-    if let Some(author_id) = post_author_id {
-        if author_id != user_id {
-            // Only send if reacting to someone else's post
-            let mut tx = db.begin().await?;
-            let post_author_actor = Actor::find_by_user_id(&mut tx, author_id).await?;
-            tx.commit().await?;
+    if let Some(author_id) = post_author_id
+        && author_id != user_id
+    {
+        // Only send if reacting to someone else's post
+        let mut tx = db.begin().await?;
+        let post_author_actor = Actor::find_by_user_id(&mut tx, author_id).await?;
+        tx.commit().await?;
 
-            if let Some(post_author_actor) = post_author_actor {
-                // Build EmojiReact activity
-                use crate::web::handlers::activitypub::EmojiReact;
+        if let Some(post_author_actor) = post_author_actor {
+            // Build EmojiReact activity
+            use crate::web::handlers::activitypub::EmojiReact;
 
-                // The Note by its id, which is what a server that holds it knows it
-                // by; the page's address moves with the post's community.
-                let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
+            // The Note by its id, which is what a server that holds it knows it
+            // by; the page's address moves with the post's community.
+            let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
 
-                let emoji_react = EmojiReact {
-                    actor: Some(activitypub_federation::fetch::object_id::ObjectId::parse(
-                        &actor.iri,
-                    )?),
-                    object: post_url.parse()?,
-                    content: emoji.to_string(),
-                    r#type: "EmojiReact".to_string(),
-                    id: reaction.iri.parse()?,
-                    to: vec![post_author_actor.iri.to_string()],
-                    cc: vec![],
-                    signature: None,
-                };
+            let emoji_react = EmojiReact {
+                actor: Some(activitypub_federation::fetch::object_id::ObjectId::parse(
+                    &actor.iri,
+                )?),
+                object: post_url.parse()?,
+                content: emoji.to_string(),
+                r#type: "EmojiReact".to_string(),
+                id: reaction.iri.parse()?,
+                to: vec![post_author_actor.iri.to_string()],
+                cc: vec![],
+                signature: None,
+            };
 
-                // Create federation config
-                let federation_config = activitypub_federation::config::FederationConfig::builder()
-                    .domain(&state.config.domain)
-                    .app_data(state.clone())
-                    .build()
-                    .await?;
-                let federation_data = federation_config.to_request_data();
+            // Create federation config
+            let federation_config = activitypub_federation::config::FederationConfig::builder()
+                .domain(&state.config.domain)
+                .app_data(state.clone())
+                .build()
+                .await?;
+            let federation_data = federation_config.to_request_data();
 
-                // Send to post author's inbox
-                if let Err(e) = actor
-                    .send(
-                        emoji_react,
-                        vec![post_author_actor.shared_inbox_or_inbox()],
-                        state.config.use_activitypub_queue(),
-                        &federation_data,
-                    )
-                    .await
-                {
-                    tracing::error!("Failed to send EmojiReact activity: {:?}", e);
-                    // Don't fail the request if ActivityPub sending fails
-                }
+            // Send to post author's inbox
+            if let Err(e) = actor
+                .send(
+                    emoji_react,
+                    vec![post_author_actor.shared_inbox_or_inbox()],
+                    state.config.use_activitypub_queue(),
+                    &federation_data,
+                )
+                .await
+            {
+                tracing::error!("Failed to send EmojiReact activity: {:?}", e);
+                // Don't fail the request if ActivityPub sending fails
             }
         }
     }
@@ -348,71 +346,67 @@ pub async fn remove_reaction(
     state.push_service.badges_fell(falls);
 
     // Send Undo(EmojiReact) activity to post author
-    if let Some(reaction) = existing_reaction {
-        if let Some(author_id) = post_author_id {
-            if author_id != user_id {
-                // Only send if unreacting to someone else's post
-                let mut tx = db.begin().await?;
-                let post_author_actor = Actor::find_by_user_id(&mut tx, author_id).await?;
-                tx.commit().await?;
+    if let Some(reaction) = existing_reaction
+        && let Some(author_id) = post_author_id
+        && author_id != user_id
+    {
+        // Only send if unreacting to someone else's post
+        let mut tx = db.begin().await?;
+        let post_author_actor = Actor::find_by_user_id(&mut tx, author_id).await?;
+        tx.commit().await?;
 
-                if let Some(post_author_actor) = post_author_actor {
-                    // Build EmojiReact activity (the object being undone)
-                    use crate::web::handlers::activitypub::{
-                        generate_object_id, EmojiReact, Undo, UndoObject,
-                    };
+        if let Some(post_author_actor) = post_author_actor {
+            // Build EmojiReact activity (the object being undone)
+            use crate::web::handlers::activitypub::{
+                generate_object_id, EmojiReact, Undo, UndoObject,
+            };
 
-                    // The Note by its id, which is what a server that holds it knows it
-                    // by; the page's address moves with the post's community.
-                    let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
+            // The Note by its id, which is what a server that holds it knows it
+            // by; the page's address moves with the post's community.
+            let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
 
-                    let emoji_react = EmojiReact {
-                        actor: Some(activitypub_federation::fetch::object_id::ObjectId::parse(
-                            &actor.iri,
-                        )?),
-                        object: post_url.parse()?,
-                        content: form.emoji.clone(),
-                        r#type: "EmojiReact".to_string(),
-                        id: reaction.iri.parse()?,
-                        to: vec![post_author_actor.iri.to_string()],
-                        cc: vec![],
-                        signature: None,
-                    };
+            let emoji_react = EmojiReact {
+                actor: Some(activitypub_federation::fetch::object_id::ObjectId::parse(
+                    &actor.iri,
+                )?),
+                object: post_url.parse()?,
+                content: form.emoji.clone(),
+                r#type: "EmojiReact".to_string(),
+                id: reaction.iri.parse()?,
+                to: vec![post_author_actor.iri.to_string()],
+                cc: vec![],
+                signature: None,
+            };
 
-                    // Build Undo activity
-                    let undo_id = generate_object_id(&state.config.domain)?;
-                    let undo = Undo {
-                        actor: activitypub_federation::fetch::object_id::ObjectId::parse(
-                            &actor.iri,
-                        )?,
-                        object: UndoObject::EmojiReact(Box::new(emoji_react)),
-                        r#type: activitystreams_kinds::activity::UndoType::Undo,
-                        id: undo_id,
-                    };
+            // Build Undo activity
+            let undo_id = generate_object_id(&state.config.domain)?;
+            let undo = Undo {
+                actor: activitypub_federation::fetch::object_id::ObjectId::parse(&actor.iri)?,
+                object: UndoObject::EmojiReact(Box::new(emoji_react)),
+                r#type: activitystreams_kinds::activity::UndoType::Undo,
+                id: undo_id,
+            };
 
-                    // Create federation config
-                    let federation_config =
-                        activitypub_federation::config::FederationConfig::builder()
-                            .domain(&state.config.domain)
-                            .app_data(state.clone())
-                            .build()
-                            .await?;
-                    let federation_data = federation_config.to_request_data();
+            // Create federation config
+            let federation_config = activitypub_federation::config::FederationConfig::builder()
+                .domain(&state.config.domain)
+                .app_data(state.clone())
+                .build()
+                .await?;
+            let federation_data = federation_config.to_request_data();
 
-                    // Send to post author's inbox
-                    if let Err(e) = actor
-                        .send(
-                            undo,
-                            vec![post_author_actor.shared_inbox_or_inbox()],
-                            state.config.use_activitypub_queue(),
-                            &federation_data,
-                        )
-                        .await
-                    {
-                        tracing::error!("Failed to send Undo(EmojiReact) activity: {:?}", e);
-                        // Don't fail the request if ActivityPub sending fails
-                    }
-                }
+            // Send to post author's inbox
+            if let Err(e) = actor
+                .send(
+                    undo,
+                    vec![post_author_actor.shared_inbox_or_inbox()],
+                    state.config.use_activitypub_queue(),
+                    &federation_data,
+                )
+                .await
+            {
+                tracing::error!("Failed to send Undo(EmojiReact) activity: {:?}", e);
+                // Don't fail the request if ActivityPub sending fails
             }
         }
     }

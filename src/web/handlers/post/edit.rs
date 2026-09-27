@@ -235,10 +235,10 @@ pub async fn post_edit_community(
 
     // Add known communities
     for c in known_communities {
-        if let Some(curr_id) = current_community_id {
-            if c.id == curr_id {
-                continue;
-            }
+        if let Some(curr_id) = current_community_id
+            && c.id == curr_id
+        {
+            continue;
         }
         // Filter out two-tone communities
         if c.background_color.is_some() && c.foreground_color.is_some() {
@@ -269,10 +269,10 @@ pub async fn post_edit_community(
 
     // Add public communities (that aren't already in known)
     for c in public_communities {
-        if let Some(curr_id) = current_community_id {
-            if c.id == curr_id {
-                continue;
-            }
+        if let Some(curr_id) = current_community_id
+            && c.id == curr_id
+        {
+            continue;
         }
         if known_ids.contains(&c.id) {
             continue;
@@ -419,10 +419,10 @@ pub async fn do_post_edit_community(
 
     // The form only lists communities a post may go to, but the id is the
     // request's own. None is the author's own page, which is always allowed.
-    if let Some(community_id) = form.community_id {
-        if !crate::models::post::may_move_post_into(&mut tx, community_id).await? {
-            return Err(AppError::Forbidden);
-        }
+    if let Some(community_id) = form.community_id
+        && !crate::models::post::may_move_post_into(&mut tx, community_id).await?
+    {
+        return Err(AppError::Forbidden);
     }
 
     // Not `let _ =`: a move that failed was redirected to as if it had worked.
@@ -448,12 +448,12 @@ pub async fn do_post_edit_community(
     // original" link follows it; one that misses this still lands on the page
     // through the redirect from the old address.
     let published = post.get("published_at").and_then(|p| p.as_ref()).is_some();
-    if let Some(actor) = author_actor {
-        if published && community_federates(destination.as_ref()) {
-            if let Err(e) = send_post_update_to_followers(&actor, post_uuid, &state).await {
-                tracing::error!("Failed to federate a post's move: {:?}", e);
-            }
-        }
+    if let Some(actor) = author_actor
+        && published
+        && community_federates(destination.as_ref())
+        && let Err(e) = send_post_update_to_followers(&actor, post_uuid, &state).await
+    {
+        tracing::error!("Failed to federate a post's move: {:?}", e);
     }
 
     Ok(Redirect::to(&crate::models::post::post_page_path(
@@ -611,28 +611,26 @@ pub async fn hx_do_edit_post(
 
     // Send ActivityPub Update activity to followers if actor exists and post is published
     // For public and unlisted communities (not private)
-    if let Some(actor) = actor {
-        if let Some(ref post_data) = post {
-            // Only send ActivityPub activities for published posts
-            if post_data
-                .get("published_at")
-                .and_then(|p| p.as_ref())
-                .is_some()
-            {
-                if should_federate {
-                    // Send update to user's followers
-                    if let Err(e) = send_post_update_to_followers(&actor, post_uuid, &state).await {
-                        tracing::error!(
-                            "Failed to send post update to user's ActivityPub followers: {:?}",
-                            e
-                        );
-                        // Don't fail the entire operation if ActivityPub sending fails
-                    }
-                } else {
-                    tracing::info!(
-                        "Skipping ActivityPub federation for private community post update"
+    if let Some(actor) = actor
+        && let Some(ref post_data) = post
+    {
+        // Only send ActivityPub activities for published posts
+        if post_data
+            .get("published_at")
+            .and_then(|p| p.as_ref())
+            .is_some()
+        {
+            if should_federate {
+                // Send update to user's followers
+                if let Err(e) = send_post_update_to_followers(&actor, post_uuid, &state).await {
+                    tracing::error!(
+                        "Failed to send post update to user's ActivityPub followers: {:?}",
+                        e
                     );
+                    // Don't fail the entire operation if ActivityPub sending fails
                 }
+            } else {
+                tracing::info!("Skipping ActivityPub federation for private community post update");
             }
         }
     }

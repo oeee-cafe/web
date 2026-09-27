@@ -216,10 +216,10 @@ pub(super) async fn user_has_other_connection(
         if conn_id == connection_id {
             continue;
         }
-        if let Ok(Some(conn_info)) = state.redis_state.get_connection_info(conn_id).await {
-            if conn_info.user_id == user_id {
-                return true;
-            }
+        if let Ok(Some(conn_info)) = state.redis_state.get_connection_info(conn_id).await
+            && conn_info.user_id == user_id
+        {
+            return true;
         }
     }
     false

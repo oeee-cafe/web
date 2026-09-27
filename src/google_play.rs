@@ -158,10 +158,10 @@ async fn access_token(config: &GooglePlayConfig) -> Result<String> {
         token_uri.clone(),
     ];
     let tokens = TOKENS.get_or_init(Default::default);
-    if let Some((token, until)) = tokens.lock().unwrap().get(&cache_key) {
-        if Instant::now() < *until {
-            return Ok(token.clone());
-        }
+    if let Some((token, until)) = tokens.lock().unwrap().get(&cache_key)
+        && Instant::now() < *until
+    {
+        return Ok(token.clone());
     }
 
     let response = http()

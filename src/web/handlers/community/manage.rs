@@ -87,19 +87,18 @@ pub async fn do_create_community(
             Err(e) => {
                 let _ = tx.rollback().await;
                 // Check if it's a unique constraint violation (handle conflict)
-                if let Some(sqlx::Error::Database(db_err)) = e.downcast_ref::<sqlx::Error>() {
-                    if db_err.constraint().is_some() {
-                        let user_preferred_language = auth_session
-                            .user
-                            .clone()
-                            .map(|u| u.preferred_language)
-                            .unwrap_or_else(|| None);
-                        let bundle = get_bundle(&accept_language, user_preferred_language);
-                        let error_message =
-                            safe_get_message(&bundle, "community-slug-conflict-error");
-                        messages.error(error_message);
-                        return Ok(Redirect::to("/communities/new").into_response());
-                    }
+                if let Some(sqlx::Error::Database(db_err)) = e.downcast_ref::<sqlx::Error>()
+                    && db_err.constraint().is_some()
+                {
+                    let user_preferred_language = auth_session
+                        .user
+                        .clone()
+                        .map(|u| u.preferred_language)
+                        .unwrap_or_else(|| None);
+                    let bundle = get_bundle(&accept_language, user_preferred_language);
+                    let error_message = safe_get_message(&bundle, "community-slug-conflict-error");
+                    messages.error(error_message);
+                    return Ok(Redirect::to("/communities/new").into_response());
                 }
                 // For other errors, re-throw
                 Err(e.into())

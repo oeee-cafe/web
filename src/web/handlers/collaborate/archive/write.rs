@@ -131,14 +131,14 @@ pub async fn flush_room(state: &AppState, room_uuid: Uuid) -> usize {
     }
 
     let (written, chatted) = flush_claimed(state, room_uuid, &buffer).await;
-    if written > 0 || chatted > 0 {
-        if let Err(e) = write_manifest(state, room_uuid, false).await {
-            warn!(
-                "Failed to write the archive manifest for room {}: {}",
-                room_uuid,
-                describe(&*e)
-            );
-        }
+    if (written > 0 || chatted > 0)
+        && let Err(e) = write_manifest(state, room_uuid, false).await
+    {
+        warn!(
+            "Failed to write the archive manifest for room {}: {}",
+            room_uuid,
+            describe(&*e)
+        );
     }
     if let Err(e) = buffer.release(room_uuid).await {
         warn!(
@@ -159,19 +159,18 @@ async fn flush_claimed(
     let written = write_chunks(state, room_uuid, buffer).await;
     let chatted = match write_chat(state, room_uuid).await {
         Ok(lines) => {
-            if lines > 0 {
-                if let Err(e) = crate::models::collaborative_recording::note_chat_lines(
+            if lines > 0
+                && let Err(e) = crate::models::collaborative_recording::note_chat_lines(
                     &state.db_pool,
                     room_uuid,
                     lines,
                 )
                 .await
-                {
-                    warn!(
-                        "Failed to note the transcript length for room {}: {}",
-                        room_uuid, e
-                    );
-                }
+            {
+                warn!(
+                    "Failed to note the transcript length for room {}: {}",
+                    room_uuid, e
+                );
             }
             lines
         }

@@ -437,11 +437,11 @@ pub async fn backfill_actors_for_existing_users(
 
     let mut created_count = 0;
     for row in user_ids {
-        if let Some(user_id) = row.id {
-            if let Some(user) = find_user_by_id(tx, user_id).await? {
-                create_actor_for_user(tx, &user, config).await?;
-                created_count += 1;
-            }
+        if let Some(user_id) = row.id
+            && let Some(user) = find_user_by_id(tx, user_id).await?
+        {
+            create_actor_for_user(tx, &user, config).await?;
+            created_count += 1;
         }
     }
 

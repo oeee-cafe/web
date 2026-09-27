@@ -80,12 +80,12 @@ pub async fn password_reset_request(
     let user = find_user_by_email(&mut tx, &form.email).await?;
 
     // If user exists and email is verified, send reset email
-    if let Some(user) = user {
-        if user.email_verified_at.is_some() && user.deleted_at.is_none() {
-            // Create challenge and send email
-            let _ =
-                create_and_send_password_reset_email(&state, user.id, &form.email, &bundle).await;
-        }
+    if let Some(user) = user
+        && user.email_verified_at.is_some()
+        && user.deleted_at.is_none()
+    {
+        // Create challenge and send email
+        let _ = create_and_send_password_reset_email(&state, user.id, &form.email, &bundle).await;
     }
 
     tx.commit().await?;

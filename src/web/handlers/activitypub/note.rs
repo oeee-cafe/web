@@ -355,166 +355,164 @@ impl Activity for Create {
                 None
             };
 
-            if let Some(post_id_str) = post_id {
-                if let Ok(post_id) = Uuid::parse_str(post_id_str) {
-                    // Verify the post exists and get post author
-                    if let Some(post) = find_post_by_id(&mut tx, post_id).await? {
-                        // Get post author's user_id
-                        let post_author_user_id = post
-                            .get("author_id")
-                            .and_then(|id| id.as_ref())
-                            .and_then(|id_str| Uuid::parse_str(id_str).ok());
+            if let Some(post_id_str) = post_id
+                && let Ok(post_id) = Uuid::parse_str(post_id_str)
+            {
+                // Verify the post exists and get post author
+                if let Some(post) = find_post_by_id(&mut tx, post_id).await? {
+                    // Get post author's user_id
+                    let post_author_user_id = post
+                        .get("author_id")
+                        .and_then(|id| id.as_ref())
+                        .and_then(|id_str| Uuid::parse_str(id_str).ok());
 
-                        // Get the actor who sent this comment, fetching from remote if needed
-                        let actor = Actor::read_from_id(self.actor.inner().clone(), data).await?;
+                    // Get the actor who sent this comment, fetching from remote if needed
+                    let actor = Actor::read_from_id(self.actor.inner().clone(), data).await?;
 
-                        let actor = if let Some(actor) = actor {
-                            actor
-                        } else {
-                            // Actor not found locally, fetch from remote and persist
-                            tracing::info!(
-                                "Actor not found locally, fetching from remote: {}",
-                                self.actor.inner()
-                            );
+                    let actor = if let Some(actor) = actor {
+                        actor
+                    } else {
+                        // Actor not found locally, fetch from remote and persist
+                        tracing::info!(
+                            "Actor not found locally, fetching from remote: {}",
+                            self.actor.inner()
+                        );
 
-                            match self.actor.dereference(data).await {
-                                Ok(remote_actor) => {
-                                    tracing::info!(
-                                        "Successfully fetched remote actor: {}",
-                                        self.actor.inner()
-                                    );
-
-                                    // Persist the remote actor
-                                    let persisted_actor =
-                                        Actor::create_or_update_actor(&mut tx, &remote_actor)
-                                            .await?;
-                                    tracing::info!(
-                                        "Persisted new actor: {} ({})",
-                                        persisted_actor.handle,
-                                        persisted_actor.iri
-                                    );
-                                    persisted_actor
-                                }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "Failed to fetch remote actor {}: {:?}",
-                                        self.actor.inner(),
-                                        e
-                                    );
-                                    tx.rollback().await?;
-                                    return Ok(());
-                                }
-                            }
-                        };
-
-                        // Create the comment from the ActivityPub note
-                        // Extract both markdown and HTML content from the ActivityPub note
-                        let (markdown_content, html_content) = extract_note_content(&self.object);
-                        let comment = create_comment_from_activitypub(
-                            &mut tx,
-                            post_id,
-                            actor.id,
-                            markdown_content,
-                            html_content,
-                            self.object.id.to_string(),
-                        )
-                        .await;
-
-                        match comment {
-                            Ok(comment) => {
+                        match self.actor.dereference(data).await {
+                            Ok(remote_actor) => {
                                 tracing::info!(
-                                    "Created comment from ActivityPub mention for post {}",
-                                    post_id
+                                    "Successfully fetched remote actor: {}",
+                                    self.actor.inner()
                                 );
 
-                                // Collect notification info to send push after commit
-                                let mut notification_info: Vec<(Uuid, Uuid)> = Vec::new();
-
-                                // Create notification for post author
-                                if let Some(post_author_id) = post_author_user_id {
-                                    match create_notification(
-                                        &mut tx,
-                                        CreateNotificationParams {
-                                            recipient_id: post_author_id,
-                                            actor_id: actor.id,
-                                            notification_type: NotificationType::Comment,
-                                            post_id: Some(post_id),
-                                            comment_id: Some(comment.id),
-                                            reaction_iri: None,
-                                            guestbook_entry_id: None,
-                                        },
-                                    )
-                                    .await
-                                    {
-                                        Ok(notification) => {
-                                            tracing::info!("Created notification for comment from federated actor");
-                                            notification_info
-                                                .push((notification.id, post_author_id));
-                                        }
-                                        Err(e) => tracing::warn!(
-                                            "Failed to create notification for comment: {:?}",
-                                            e
-                                        ),
-                                    }
-                                }
-
-                                tx.commit().await?;
-                                data.live.publish(LiveEvent::Comments { post_id, by: None });
-
-                                // Send push notifications
-                                if !notification_info.is_empty() {
-                                    let push_service = data.push_service.clone();
-                                    let db_pool = data.db_pool.clone();
-                                    tokio::spawn(async move {
-                                        for (notification_id, recipient_id) in notification_info {
-                                            let mut tx = match db_pool.begin().await {
-                                                Ok(tx) => tx,
-                                                Err(e) => {
-                                                    tracing::warn!("Failed to begin transaction for push notification: {:?}", e);
-                                                    continue;
-                                                }
-                                            };
-
-                                            if let Ok(Some(notification)) = get_notification_by_id(
-                                                &mut tx,
-                                                notification_id,
-                                                recipient_id,
-                                            )
-                                            .await
-                                            {
-                                                // The number on the bell, for the icon's badge
-                                                let badge_count =
-                                                    get_badge_count(&mut tx, recipient_id)
-                                                        .await
-                                                        .ok()
-                                                        .and_then(|count| {
-                                                            u32::try_from(count).ok()
-                                                        });
-
-                                                send_push_for_notification(
-                                                    &push_service,
-                                                    &db_pool,
-                                                    &notification,
-                                                    badge_count,
-                                                )
-                                                .await;
-                                            }
-                                            let _ = tx.commit().await;
-                                        }
-                                    });
-                                }
+                                // Persist the remote actor
+                                let persisted_actor =
+                                    Actor::create_or_update_actor(&mut tx, &remote_actor).await?;
+                                tracing::info!(
+                                    "Persisted new actor: {} ({})",
+                                    persisted_actor.handle,
+                                    persisted_actor.iri
+                                );
+                                persisted_actor
                             }
                             Err(e) => {
-                                tracing::error!(
-                                    "Failed to create comment from ActivityPub mention: {:?}",
+                                tracing::warn!(
+                                    "Failed to fetch remote actor {}: {:?}",
+                                    self.actor.inner(),
                                     e
                                 );
-                                // Don't return error, just log it
+                                tx.rollback().await?;
+                                return Ok(());
                             }
                         }
-                    } else {
-                        tracing::debug!("Post {} not found for ActivityPub mention", post_id);
+                    };
+
+                    // Create the comment from the ActivityPub note
+                    // Extract both markdown and HTML content from the ActivityPub note
+                    let (markdown_content, html_content) = extract_note_content(&self.object);
+                    let comment = create_comment_from_activitypub(
+                        &mut tx,
+                        post_id,
+                        actor.id,
+                        markdown_content,
+                        html_content,
+                        self.object.id.to_string(),
+                    )
+                    .await;
+
+                    match comment {
+                        Ok(comment) => {
+                            tracing::info!(
+                                "Created comment from ActivityPub mention for post {}",
+                                post_id
+                            );
+
+                            // Collect notification info to send push after commit
+                            let mut notification_info: Vec<(Uuid, Uuid)> = Vec::new();
+
+                            // Create notification for post author
+                            if let Some(post_author_id) = post_author_user_id {
+                                match create_notification(
+                                    &mut tx,
+                                    CreateNotificationParams {
+                                        recipient_id: post_author_id,
+                                        actor_id: actor.id,
+                                        notification_type: NotificationType::Comment,
+                                        post_id: Some(post_id),
+                                        comment_id: Some(comment.id),
+                                        reaction_iri: None,
+                                        guestbook_entry_id: None,
+                                    },
+                                )
+                                .await
+                                {
+                                    Ok(notification) => {
+                                        tracing::info!(
+                                            "Created notification for comment from federated actor"
+                                        );
+                                        notification_info.push((notification.id, post_author_id));
+                                    }
+                                    Err(e) => tracing::warn!(
+                                        "Failed to create notification for comment: {:?}",
+                                        e
+                                    ),
+                                }
+                            }
+
+                            tx.commit().await?;
+                            data.live.publish(LiveEvent::Comments { post_id, by: None });
+
+                            // Send push notifications
+                            if !notification_info.is_empty() {
+                                let push_service = data.push_service.clone();
+                                let db_pool = data.db_pool.clone();
+                                tokio::spawn(async move {
+                                    for (notification_id, recipient_id) in notification_info {
+                                        let mut tx = match db_pool.begin().await {
+                                            Ok(tx) => tx,
+                                            Err(e) => {
+                                                tracing::warn!("Failed to begin transaction for push notification: {:?}", e);
+                                                continue;
+                                            }
+                                        };
+
+                                        if let Ok(Some(notification)) = get_notification_by_id(
+                                            &mut tx,
+                                            notification_id,
+                                            recipient_id,
+                                        )
+                                        .await
+                                        {
+                                            // The number on the bell, for the icon's badge
+                                            let badge_count =
+                                                get_badge_count(&mut tx, recipient_id)
+                                                    .await
+                                                    .ok()
+                                                    .and_then(|count| u32::try_from(count).ok());
+
+                                            send_push_for_notification(
+                                                &push_service,
+                                                &db_pool,
+                                                &notification,
+                                                badge_count,
+                                            )
+                                            .await;
+                                        }
+                                        let _ = tx.commit().await;
+                                    }
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to create comment from ActivityPub mention: {:?}",
+                                e
+                            );
+                            // Don't return error, just log it
+                        }
                     }
+                } else {
+                    tracing::debug!("Post {} not found for ActivityPub mention", post_id);
                 }
             }
         }
@@ -586,28 +584,27 @@ pub async fn create_note_from_post(
 
     // Get attachments if image exists
     let mut attachments = Vec::new();
-    if let Some(Some(image_id_str)) = post.get("image_id") {
-        if let Ok(image_id) = Uuid::parse_str(image_id_str) {
-            if let Ok(image) = find_image_by_id(tx, image_id).await {
-                let image_url = format!(
-                    "{}/image/{}{}/{}",
-                    r2_public_endpoint_url,
-                    image.image_filename.chars().next().unwrap_or('0'),
-                    image.image_filename.chars().nth(1).unwrap_or('0'),
-                    image.image_filename
-                );
+    if let Some(Some(image_id_str)) = post.get("image_id")
+        && let Ok(image_id) = Uuid::parse_str(image_id_str)
+        && let Ok(image) = find_image_by_id(tx, image_id).await
+    {
+        let image_url = format!(
+            "{}/image/{}{}/{}",
+            r2_public_endpoint_url,
+            image.image_filename.chars().next().unwrap_or('0'),
+            image.image_filename.chars().nth(1).unwrap_or('0'),
+            image.image_filename
+        );
 
-                let attachment = Attachment {
-                    r#type: "Image".to_string(),
-                    url: image_url,
-                    media_type: "image/png".to_string(),
-                    name: Some(title.to_string()),
-                    width: Some(image.width),
-                    height: Some(image.height),
-                };
-                attachments.push(attachment);
-            }
-        }
+        let attachment = Attachment {
+            r#type: "Image".to_string(),
+            url: image_url,
+            media_type: "image/png".to_string(),
+            name: Some(title.to_string()),
+            width: Some(image.width),
+            height: Some(image.height),
+        };
+        attachments.push(attachment);
     }
 
     // Create URLs and IDs
@@ -670,28 +667,27 @@ pub async fn create_updated_note_from_post(
 
     // Get attachments if image exists
     let mut attachments = Vec::new();
-    if let Some(Some(image_id_str)) = post.get("image_id") {
-        if let Ok(image_id) = Uuid::parse_str(image_id_str) {
-            if let Ok(image) = find_image_by_id(tx, image_id).await {
-                let image_url = format!(
-                    "{}/image/{}{}/{}",
-                    r2_public_endpoint_url,
-                    image.image_filename.chars().next().unwrap_or('0'),
-                    image.image_filename.chars().nth(1).unwrap_or('0'),
-                    image.image_filename
-                );
+    if let Some(Some(image_id_str)) = post.get("image_id")
+        && let Ok(image_id) = Uuid::parse_str(image_id_str)
+        && let Ok(image) = find_image_by_id(tx, image_id).await
+    {
+        let image_url = format!(
+            "{}/image/{}{}/{}",
+            r2_public_endpoint_url,
+            image.image_filename.chars().next().unwrap_or('0'),
+            image.image_filename.chars().nth(1).unwrap_or('0'),
+            image.image_filename
+        );
 
-                let attachment = Attachment {
-                    r#type: "Image".to_string(),
-                    url: image_url,
-                    media_type: "image/png".to_string(),
-                    name: Some(title.to_string()),
-                    width: Some(image.width),
-                    height: Some(image.height),
-                };
-                attachments.push(attachment);
-            }
-        }
+        let attachment = Attachment {
+            r#type: "Image".to_string(),
+            url: image_url,
+            media_type: "image/png".to_string(),
+            name: Some(title.to_string()),
+            width: Some(image.width),
+            height: Some(image.height),
+        };
+        attachments.push(attachment);
     }
 
     // Create URLs and IDs
