@@ -483,6 +483,13 @@ pub async fn update_actor_for_user(
     Ok(actor)
 }
 
+/// A community's page, which its Group actor gives as its `url`: the same
+/// `/@{slug}` a person's profile is at, and the one the site links to. Kept in
+/// the `actors` row, so a rename rewrites it (`update_actor_for_community`).
+fn community_page_url(domain: &str, slug: &str) -> String {
+    format!("https://{}/@{}", domain, slug)
+}
+
 pub async fn update_actor_for_community(
     tx: &mut Transaction<'_, Postgres>,
     community_id: Uuid,
@@ -492,7 +499,7 @@ pub async fn update_actor_for_community(
     config: &AppConfig,
 ) -> Result<Option<Actor>> {
     let handle = format!("@{}@{}", username, config.domain);
-    let url = format!("https://{}/communities/@{}", config.domain, username);
+    let url = community_page_url(&config.domain, &username);
 
     let actor = query_as!(
         Actor,
@@ -548,7 +555,7 @@ pub async fn create_actor_for_community(
         "https://{}/ap/communities/{}/followers",
         config.domain, community.id
     );
-    let url = format!("https://{}/communities/{}", config.domain, community.id);
+    let url = community_page_url(&config.domain, &community.slug);
 
     let actor = query_as!(Actor,
         r#"

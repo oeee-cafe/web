@@ -105,7 +105,7 @@ pub struct PublicCommunityWithPosts {
 
 impl Community {
     pub fn get_url(&self) -> String {
-        format!("/communities/@{}", self.slug)
+        format!("/@{}", self.slug)
     }
 }
 
