@@ -267,7 +267,33 @@ pub async fn find_reaction_by_iri(
 
 /// `None` when there was no reaction with that iri. Its notification goes
 /// first, as in `delete_reaction`.
-pub async fn delete_reaction_by_iri(
+/// Take back the reaction `iri`, if `sender` made it: what a remote actor's
+/// Undo may do, and all it may do. A reaction made by anyone else, a local
+/// user included, is left as it is and `None` returned.
+pub async fn delete_remote_reaction(
+    tx: &mut Transaction<'_, Postgres>,
+    iri: &str,
+    sender: &str,
+) -> Result<Option<BadgeFalls>> {
+    let owned = sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM reactions r JOIN actors a ON a.id = r.actor_id
+            WHERE r.iri = $1 AND a.iri = $2
+        ) AS "owned!"
+        "#,
+        iri,
+        sender
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if !owned {
+        return Ok(None);
+    }
+    delete_reaction_by_iri(tx, iri).await
+}
+
+async fn delete_reaction_by_iri(
     tx: &mut Transaction<'_, Postgres>,
     iri: &str,
 ) -> Result<Option<BadgeFalls>> {
@@ -330,6 +356,102 @@ pub async fn find_user_reaction(
 #[cfg(test)]
 mod tests {
     use super::normalize_emoji;
+    use sqlx::{Postgres, Transaction};
+    use uuid::Uuid;
+
+    async fn tx() -> Option<Transaction<'static, Postgres>> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        let pool = sqlx::PgPool::connect(&url).await.ok()?;
+        pool.begin().await.ok()
+    }
+
+    async fn remote_actor(tx: &mut Transaction<'_, Postgres>, iri: &str, name: &str) -> Uuid {
+        sqlx::query_scalar!(
+            r#"
+            INSERT INTO actors (iri, url, type, username, instance_host, handle_host,
+                                handle, name, inbox_url, followers_url, public_key_pem)
+            VALUES ($1, $1, 'Person', $2, 'undo.test', 'undo.test', $2, $2, $1, $1, '')
+            RETURNING id
+            "#,
+            iri,
+            name
+        )
+        .fetch_one(&mut **tx)
+        .await
+        .unwrap()
+    }
+
+    /// A remote Undo takes back only a reaction its sender made. The inbox
+    /// used to delete whatever reaction the Undo named, so any server could
+    /// take back anyone's, a local user's included.
+    #[tokio::test]
+    async fn only_the_sender_can_take_back_a_reaction() {
+        let Some(mut tx) = tx().await else { return };
+        let tag = Uuid::new_v4().simple().to_string()[..12].to_string();
+        let author = sqlx::query_scalar!(
+            "INSERT INTO users (login_name, display_name) VALUES ($1, $1) RETURNING id",
+            format!("undo_{tag}")
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query!("INSERT INTO instances (host) VALUES ('undo.test') ON CONFLICT DO NOTHING")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let owner_iri = format!("https://undo.test/{tag}/owner");
+        let owner = remote_actor(&mut tx, &owner_iri, &format!("o{tag}")).await;
+        let other_iri = format!("https://undo.test/{tag}/other");
+        remote_actor(&mut tx, &other_iri, &format!("x{tag}")).await;
+        let image = sqlx::query_scalar!(
+            r#"
+            INSERT INTO images (width, height, paint_duration, stroke_count, image_filename, tool)
+            VALUES (10, 10, '0'::interval, 0, $1, 'neo')
+            RETURNING id
+            "#,
+            format!("{tag}.png")
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        let post = sqlx::query_scalar!(
+            "INSERT INTO posts (author_id, image_id, published_at) VALUES ($1, $2, now()) RETURNING id",
+            author,
+            image
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        let reaction = format!("{owner_iri}/likes/1");
+        sqlx::query!(
+            "INSERT INTO reactions (iri, post_id, actor_id, emoji) VALUES ($1, $2, $3, '❤️')",
+            reaction,
+            post,
+            owner
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+
+        let refused = super::delete_remote_reaction(&mut tx, &reaction, &other_iri)
+            .await
+            .unwrap();
+        assert!(refused.is_none(), "another actor's Undo takes nothing back");
+        let kept: i64 = sqlx::query_scalar!(
+            r#"SELECT count(*) AS "n!" FROM reactions WHERE iri = $1"#,
+            reaction
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        assert_eq!(kept, 1);
+
+        let taken = super::delete_remote_reaction(&mut tx, &reaction, &owner_iri)
+            .await
+            .unwrap();
+        assert!(taken.is_some(), "the owner's Undo takes it back");
+        tx.rollback().await.unwrap();
+    }
 
     #[test]
     fn a_single_emoji_is_accepted_in_its_qualified_form() {

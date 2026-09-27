@@ -101,6 +101,12 @@ rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
 git = "https://github.com/limeburst/feder.git"
 rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
 
+# Checking inbox requests' signatures before activitypub_federation reads
+# them (src/federation/inbox.rs).
+[dependencies.feder-runtime]
+git = "https://github.com/limeburst/feder.git"
+rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
+
 # Serving what other servers fetch (src/federation/serving.rs).
 [dependencies.feder-axum]
 git = "https://github.com/limeburst/feder.git"

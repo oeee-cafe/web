@@ -57,6 +57,16 @@ pub enum ActorObject {
     Group(Group),
 }
 
+impl ActorObject {
+    /// The actor's IRI.
+    pub fn id(&self) -> &Url {
+        match self {
+            Self::Person(person) => person.id.inner(),
+            Self::Group(group) => group.id.inner(),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl Object for Actor {
     type DataType = AppState;

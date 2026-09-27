@@ -206,6 +206,18 @@ impl Activity for Undo {
             UndoObject::Follow(follow) => {
                 tracing::info!("Undo type: Follow");
 
+                // Only the follower can take a follow back. The signature
+                // vouches for the Undo's actor, not for whoever the Follow
+                // inside it names.
+                if follow.actor.inner() != self.actor.inner() {
+                    tracing::warn!(
+                        sender = %self.actor.inner(),
+                        follower = %follow.actor.inner(),
+                        "refused an Undo of someone else's Follow"
+                    );
+                    return Ok(());
+                }
+
                 // Find the target actor being unfollowed
                 let following_actor =
                     Actor::find_by_iri(&mut tx, follow.object.to_string()).await?;
@@ -242,8 +254,13 @@ impl Activity for Undo {
                 tracing::info!("Reaction IRI: {}", like.id);
 
                 // Delete reaction by IRI
-                use crate::models::reaction::delete_reaction_by_iri;
-                if let Some(falls) = delete_reaction_by_iri(&mut tx, like.id.as_str()).await? {
+                // Only a reaction the sender made: the Undo names it by IRI,
+                // and an IRI can name anyone's, a local user's included.
+                use crate::models::reaction::delete_remote_reaction;
+                if let Some(falls) =
+                    delete_remote_reaction(&mut tx, like.id.as_str(), self.actor.inner().as_str())
+                        .await?
+                {
                     tracing::info!("Deleted ❤️ reaction with IRI: {}", like.id);
                     tx.commit().await?;
                     data.push_service.badges_fell(falls);
@@ -259,8 +276,13 @@ impl Activity for Undo {
                 tracing::info!("Reaction IRI: {}", react.id);
 
                 // Delete reaction by IRI
-                use crate::models::reaction::delete_reaction_by_iri;
-                if let Some(falls) = delete_reaction_by_iri(&mut tx, react.id.as_str()).await? {
+                // Only a reaction the sender made: the Undo names it by IRI,
+                // and an IRI can name anyone's, a local user's included.
+                use crate::models::reaction::delete_remote_reaction;
+                if let Some(falls) =
+                    delete_remote_reaction(&mut tx, react.id.as_str(), self.actor.inner().as_str())
+                        .await?
+                {
                     tracing::info!("Deleted {} reaction with IRI: {}", react.content, react.id);
                     tx.commit().await?;
                     data.push_service.badges_fell(falls);

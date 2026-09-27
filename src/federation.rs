@@ -11,6 +11,7 @@
 //! activitypub_federation still handles everything that comes in and every
 //! fetch.
 
+pub mod inbox;
 pub mod serving;
 
 use crate::models::actor::Actor;
