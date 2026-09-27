@@ -283,15 +283,26 @@ pub async fn require_login(
     if auth_session.user.is_some() {
         return next.run(req).await;
     }
-    let back =
-        if req.method() == axum::http::Method::GET || req.method() == axum::http::Method::HEAD {
-            req.uri().path_and_query().map(|pq| pq.as_str().to_string())
-        } else {
-            req.headers()
-                .get(axum::http::header::REFERER)
-                .and_then(|value| value.to_str().ok())
-                .and_then(referer_path)
-        };
+    login_redirect(req.method(), req.uri(), req.headers())
+}
+
+/// The sign-in page, told to come back to where the request was from: the
+/// URL itself for a GET, and for anything else the page its form was on.
+/// `web::error_pages` sends a browser here for an `AppError::Unauthorized`
+/// too, so a handler that finds nobody signed in says so and nothing more.
+pub fn login_redirect(
+    method: &axum::http::Method,
+    uri: &axum::http::Uri,
+    headers: &axum::http::HeaderMap,
+) -> axum::response::Response {
+    let back = if method == axum::http::Method::GET || method == axum::http::Method::HEAD {
+        uri.path_and_query().map(|pq| pq.as_str().to_string())
+    } else {
+        headers
+            .get(axum::http::header::REFERER)
+            .and_then(|value| value.to_str().ok())
+            .and_then(referer_path)
+    };
     match back {
         Some(back) => Redirect::to(&format!("/login?next={}", urlencoding::encode(&back))),
         None => Redirect::to("/login"),
@@ -317,6 +328,43 @@ fn referer_path(referer: &str) -> Option<String> {
 mod tests {
     use super::*;
     use axum::http::{header::COOKIE, HeaderMap, HeaderValue};
+
+    fn location(response: &axum::response::Response) -> &str {
+        response.headers()[axum::http::header::LOCATION]
+            .to_str()
+            .unwrap()
+    }
+
+    /// A GET comes back to itself; a form comes back to the page it was on,
+    /// since the URL it posted to is nowhere anybody can load.
+    #[test]
+    fn sign_in_comes_back_to_where_the_request_was_from() {
+        let get = login_redirect(
+            &axum::http::Method::GET,
+            &"/notifications?page=2".parse().unwrap(),
+            &HeaderMap::new(),
+        );
+        assert_eq!(location(&get), "/login?next=%2Fnotifications%3Fpage%3D2");
+
+        let mut from_a_post = HeaderMap::new();
+        from_a_post.insert(
+            axum::http::header::REFERER,
+            HeaderValue::from_static("https://oeee.cafe/@someone/abc"),
+        );
+        let post = login_redirect(
+            &axum::http::Method::POST,
+            &"/comments".parse().unwrap(),
+            &from_a_post,
+        );
+        assert_eq!(location(&post), "/login?next=%2F%40someone%2Fabc");
+
+        let nowhere = login_redirect(
+            &axum::http::Method::POST,
+            &"/comments".parse().unwrap(),
+            &HeaderMap::new(),
+        );
+        assert_eq!(location(&nowhere), "/login");
+    }
 
     #[test]
     fn the_device_cookie_is_found_among_the_others() {
