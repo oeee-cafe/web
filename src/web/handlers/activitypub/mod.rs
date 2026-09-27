@@ -2,12 +2,8 @@
 //! hears from them. The deserialisers here are shared by the activities, which
 //! accept either shape other implementations send.
 
-use activitypub_federation::fetch::object_id::ObjectId;
-
 use serde::Deserialize;
 use url::Url;
-
-use crate::models::actor::Actor;
 
 mod actor;
 pub use actor::*;
@@ -50,12 +46,12 @@ where
     }
 }
 
-fn actor_from_signature_deser<'de, D>(deserializer: D) -> Result<Option<ObjectId<Actor>>, D::Error>
+fn actor_from_signature_deser<'de, D>(deserializer: D) -> Result<Option<Url>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     // First try to deserialize as a direct actor field
-    match ObjectId::<Actor>::deserialize(deserializer) {
+    match Url::deserialize(deserializer) {
         Ok(actor_id) => Ok(Some(actor_id)),
         Err(_) => {
             // If that fails, return None and we'll try to extract from signature elsewhere

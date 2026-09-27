@@ -280,12 +280,30 @@ fn main() {
                 }
             };
 
-            let deliverer = oeee_cafe::federation::deliverer(db_pool.clone(), &cfg.domain)
+            let client =
+                oeee_cafe::federation::client(&cfg.domain, &cfg.federation_allow_private_networks)
+                    .unwrap_or_else(|e| {
+                        eprintln!("error setting up the ActivityPub client: {}", e);
+                        exit(1);
+                    });
+            let deliverer = oeee_cafe::federation::deliverer(db_pool.clone(), client.clone())
                 .await
                 .unwrap_or_else(|e| {
                     eprintln!("error setting up ActivityPub delivery: {}", e);
                     exit(1);
                 });
+            let fetcher = Arc::new(feder::fetch::Fetcher::new(
+                client,
+                feder::delivery::Scheme::DraftCavage,
+            ));
+            let kv = oeee_cafe::federation::kv(db_pool.clone())
+                .await
+                .unwrap_or_else(|e| {
+                    eprintln!("error setting up ActivityPub's store: {}", e);
+                    exit(1);
+                });
+            let inbox_queue =
+                feder::queue::shared(feder_postgres::PostgresQueue::new(db_pool.clone()));
 
             let live = Live::new(redis_pool.clone());
             let push_service = push_service.with_live(live.clone());
@@ -301,7 +319,14 @@ fn main() {
                 live,
                 shutdown: Shutdown::new(),
                 deliverer: Arc::new(deliverer),
+                fetcher: fetcher.clone(),
+                inbox_queue: inbox_queue.clone(),
             };
+            let federation = oeee_cafe::federation::serving::federation(&cfg.domain, fetcher, kv)
+                .unwrap_or_else(|e| {
+                    eprintln!("error setting up ActivityPub: {}", e);
+                    exit(1);
+                });
             // Sends what is queued until shutdown is signalled. What it holds
             // then is leased, and the other colour takes it when the lease
             // lapses.
@@ -315,11 +340,25 @@ fn main() {
                     }
                 });
             }
+            // Acts on what the inboxes queued until shutdown is signalled,
+            // the way the deliverer sends: what it holds then is leased, and
+            // the other colour takes it when the lease lapses.
+            {
+                let worker = feder::federation::InboxWorker::new(
+                    federation.clone(),
+                    state.clone(),
+                    inbox_queue,
+                );
+                let shutdown = state.shutdown.clone();
+                tokio::spawn(async move {
+                    worker.run_until(shutdown.signalled()).await;
+                });
+            }
             // This process's one subscription to what the others publish,
             // for as long as it serves.
             state.live.listen(&cfg.redis_url, state.shutdown.clone());
 
-            App::new(state)
+            App::new(state, federation)
                 .await
                 .expect("Failed to create app")
                 .serve()

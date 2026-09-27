@@ -29,10 +29,26 @@ type Ctx = Context<AppState>;
 /// # Errors
 ///
 /// When the configured domain is not a host, or a template is wrong.
-pub fn federation(domain: &str) -> anyhow::Result<Federation<AppState>> {
+pub fn federation(
+    domain: &str,
+    fetcher: std::sync::Arc<feder::fetch::Fetcher>,
+    kv: feder_postgres::PostgresKvStore,
+) -> anyhow::Result<Federation<AppState>> {
     let origin = Url::parse(&format!("https://{domain}")).context("the configured domain")?;
-    Federation::builder()
+    let builder = Federation::builder()
         .origin(origin)
+        .inbox("person", "/ap/users/{user_id}/inbox")
+        .inbox("group", "/ap/communities/{community_id}/inbox")
+        .shared_inbox("/ap/inbox")
+        // Keys, and the ids of activities already received, are kept a day.
+        // This site fetches unsigned: it has no instance actor to sign as.
+        .signed_fetch(
+            fetcher,
+            kv,
+            std::time::Duration::from_secs(24 * 60 * 60),
+            |_| async { Ok::<_, std::convert::Infallible>(None) },
+        )
+        .inbox_queue(|state: &AppState| Some(state.inbox_queue.clone()))
         .actor("person", "/ap/users/{user_id}", person)
         .actor("group", "/ap/communities/{community_id}", group)
         .object("note", "/ap/posts/{post_id}", note)
@@ -61,7 +77,21 @@ pub fn federation(domain: &str) -> anyhow::Result<Federation<AppState>> {
             }
         })
         .nodeinfo(nodeinfo)
-        .on_error(|error| tracing::error!(error = %error, "serving ActivityPub"))
+        // Another server being down, gone or wrong is not a bug here, and
+        // arrives at whatever rate the fediverse sends it.
+        .on_error(|error| {
+            let remote = std::iter::successors(
+                Some(&**error as &(dyn std::error::Error + 'static)),
+                |cause| cause.source(),
+            )
+            .any(crate::app_error::is_remote);
+            if remote {
+                tracing::warn!(error = %error, "ActivityPub, from another server");
+            } else {
+                tracing::error!(error = %error, "ActivityPub");
+            }
+        });
+    super::listeners::register(builder)
         .build()
         .map_err(|error| anyhow::anyhow!("{error}"))
 }
@@ -299,8 +329,17 @@ async fn nodeinfo(ctx: Ctx) -> anyhow::Result<NodeInfo> {
 mod tests {
     /// Templates that overlap, or claim a path feder serves, stop the build;
     /// this is where that would be found rather than at start-up.
-    #[test]
-    fn the_federation_builds() {
-        super::federation("oeee.cafe").expect("the federation builds");
+    #[tokio::test]
+    async fn the_federation_builds() {
+        let client = crate::federation::client("oeee.cafe", &[]).unwrap();
+        let fetcher = std::sync::Arc::new(feder::fetch::Fetcher::new(
+            client,
+            feder::delivery::Scheme::DraftCavage,
+        ));
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres:///x")
+            .unwrap();
+        let kv = feder_postgres::PostgresKvStore::new(pool);
+        super::federation("oeee.cafe", fetcher, kv).expect("the federation builds");
     }
 }

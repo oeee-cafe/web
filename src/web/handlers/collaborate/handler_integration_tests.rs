@@ -266,6 +266,11 @@ async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
             feder::client::Client::new(feder::client::ClientConfig::default()).expect("client"),
             feder::deliverer::DelivererConfig::default(),
         )),
+        fetcher: Arc::new(feder::fetch::Fetcher::new(
+            feder::client::Client::new(feder::client::ClientConfig::default()).expect("client"),
+            feder::delivery::Scheme::DraftCavage,
+        )),
+        inbox_queue: feder::queue::shared(feder_postgres::PostgresQueue::new(db.clone())),
     };
     let app = Router::new()
         .route("/ws/{room}/{user}", get(upgrade))

@@ -19,6 +19,9 @@ gitignored apart from `sample.toml`, so `dev.toml` stays local. Uploading a
 drawing needs real S3 credentials; to test pages or federation, sign up
 through the site and insert posts with `psql oeee_cafe_dev`. The
 ActivityPub routes answer `curl -H 'Accept: application/activity+json'`.
+To federate with a server on the same machine, which the client otherwise
+refuses to reach, add `federation_allow_private_networks = ["127.0.0.0/8",
+"::1/128"]` to `dev.toml`; production leaves it out.
 
 Don't run `cargo sqlx prepare`.
 

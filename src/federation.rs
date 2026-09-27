@@ -7,11 +7,11 @@
 //! while both are up; a claim is a lease, so what a stopped colour was holding
 //! is taken again when the lease lapses.
 //!
-//! What other servers fetch is served by feder too, from [`serving`].
-//! activitypub_federation still handles everything that comes in and every
-//! fetch.
+//! Everything else is feder's too: what other servers fetch is served from
+//! [`serving`], what they send is received there and acted on in
+//! [`listeners`], and remote actors are fetched with its fetcher.
 
-pub mod inbox;
+pub mod listeners;
 pub mod serving;
 
 use crate::models::actor::Actor;
@@ -27,21 +27,48 @@ use std::sync::{Arc, Mutex};
 /// The deliverer every part of the site sends through.
 pub type Deliverer = feder::deliverer::Deliverer<PostgresQueue, ActorKeys>;
 
-/// Build the deliverer, creating its table if it is not there.
+/// The guarded client every request to another server goes through.
+/// `allow_private` names networks it may reach although they are not public,
+/// which only a development server has any business with.
 ///
 /// # Errors
 ///
-/// When the table cannot be created or the HTTP client cannot be built.
-pub async fn deliverer(pool: PgPool, domain: &str) -> anyhow::Result<Deliverer> {
-    let queue = PostgresQueue::new(pool.clone());
-    queue.initialize().await?;
-    let client = Client::new(ClientConfig {
+/// When a network does not parse or the TLS backend cannot start.
+pub fn client(domain: &str, allow_private: &[String]) -> anyhow::Result<Client> {
+    let allow_private = allow_private
+        .iter()
+        .map(|network| network.parse())
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Client::new(ClientConfig {
         user_agent: format!(
             "oeee.cafe/{} (+https://{domain}/)",
             env!("CARGO_PKG_VERSION")
         ),
+        allow_private,
         ..ClientConfig::default()
-    })?;
+    })?)
+}
+
+/// The store feder keeps remote keys and received activities' ids in, in
+/// the `feder_kv` table, created if it is not there.
+///
+/// # Errors
+///
+/// When the table cannot be created.
+pub async fn kv(pool: PgPool) -> anyhow::Result<feder_postgres::PostgresKvStore> {
+    let kv = feder_postgres::PostgresKvStore::new(pool);
+    kv.initialize().await?;
+    Ok(kv)
+}
+
+/// Build the deliverer, creating its table if it is not there.
+///
+/// # Errors
+///
+/// When the table cannot be created.
+pub async fn deliverer(pool: PgPool, client: Client) -> anyhow::Result<Deliverer> {
+    let queue = PostgresQueue::new(pool.clone());
+    queue.initialize().await?;
     Ok(feder::deliverer::Deliverer::new(
         queue,
         ActorKeys::new(pool),
