@@ -392,7 +392,7 @@ async fn render_relay_page(
     community: Option<crate::models::community::Community>,
 ) -> Result<axum::response::Response, AppError> {
     let template = "draw_post_cucumber.jinja";
-    let common_ctx = CommonContext::build(tx, current_user.as_ref().map(|user| user.id)).await?;
+    let common_ctx = CommonContext::build(tx, current_user.as_ref(), &ftl_lang).await?;
 
     let width = post
         .get("image_width")
@@ -428,11 +428,11 @@ async fn render_relay_page(
     let painter_config = serde_json::to_string(&painter_config)?;
 
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
                 parent_post => post,
-                current_user => current_user,
                 community_name => community.as_ref().map(|community| community.name.clone()),
                 width => width,
                 height => height,
@@ -445,9 +445,6 @@ async fn render_relay_page(
                 community_id => community.as_ref().map(|community| community.id.to_string()),
                 community_slug => community.as_ref().map(|community| community.slug.clone()),
                 is_relay => true,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
                 painter_config
             },
         )
@@ -696,8 +693,7 @@ pub async fn post_view(
         .and_then(|id| id.as_ref())
         .and_then(|id_str| Uuid::parse_str(id_str).ok());
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     // Get collaborative session participants if this post is from a collaborative session
     let collaborative_participants: Vec<CollaborativeParticipant> = sqlx::query!(
@@ -766,10 +762,10 @@ pub async fn post_view(
         Ok(Html(rendered).into_response())
     } else {
         let rendered = state
-            .render(
+            .render_page(
                 template,
+                common_ctx,
                 context! {
-                    current_user => auth_session.user,
                             post => Some(&post),
                     parent_post_id => post.get("parent_post_id")
                         .and_then(|id| id.as_ref())
@@ -783,8 +779,6 @@ pub async fn post_view(
                         .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
                         .clone(),
                     community_id,
-                    draft_post_count => common_ctx.draft_post_count,
-                    unread_notification_count => common_ctx.unread_notification_count,
                     base_url => state.config.base_url.clone(),
                     domain => state.config.domain.clone(),
                     comments,
@@ -793,7 +787,6 @@ pub async fn post_view(
                     tags,
                     child_posts,
                     post_community,
-                    ftl_lang
                 },
             )
             .await
@@ -957,8 +950,7 @@ pub async fn post_publish_form(
         return Ok(Redirect::to(&format!("/posts/{}", id)).into_response());
     }
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let community_id = post
         .get("community_id")
@@ -972,18 +964,15 @@ pub async fn post_publish_form(
     };
 
     let rendered = state
-        .render(
+        .render_page(
             "post_form.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 post_id => id,
                 link,
                 post => {
                     post
                 },
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await?;
@@ -1334,8 +1323,7 @@ pub async fn draft_posts(
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     // A guest has no drafts here, only the ones kept on their device, which
     // the page lists itself.
@@ -1347,15 +1335,12 @@ pub async fn draft_posts(
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "draft_posts.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 posts => posts,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-                ftl_lang,
             },
         )
         .await?;
@@ -1942,28 +1927,24 @@ pub async fn post_edit_community(
     public_participated_communities.sort_by(sort_by_name);
     public_other_communities.sort_by(sort_by_name);
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     tx.commit().await?;
 
     let template = "post_edit_community.jinja";
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 post,
                 post_id => id,
                 current_community,
                 unlisted_communities,
                 public_participated_communities,
                 public_other_communities,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
                 base_url => state.config.base_url.clone(),
-                ftl_lang
             },
         )
         .await?;
@@ -2616,8 +2597,7 @@ pub async fn post_view_by_login_name(
         .and_then(|id| id.as_ref())
         .and_then(|id_str| Uuid::parse_str(id_str).ok());
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     // Get collaborative session participants if this post is from a collaborative session
     let collaborative_participants: Vec<CollaborativeParticipant> = sqlx::query!(
@@ -2686,10 +2666,10 @@ pub async fn post_view_by_login_name(
         Ok(Html(rendered).into_response())
     } else {
         let rendered = state
-            .render(
+            .render_page(
                 template,
+                common_ctx,
                 context! {
-                    current_user => auth_session.user,
                             post => Some(&post),
                     parent_post_id => post.get("parent_post_id")
                         .and_then(|id| id.as_ref())
@@ -2703,8 +2683,6 @@ pub async fn post_view_by_login_name(
                         .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
                         .clone(),
                     community_id,
-                    draft_post_count => common_ctx.draft_post_count,
-                    unread_notification_count => common_ctx.unread_notification_count,
                     base_url => state.config.base_url.clone(),
                     domain => state.config.domain.clone(),
                     comments,
@@ -2713,7 +2691,6 @@ pub async fn post_view_by_login_name(
                     tags,
                     child_posts,
                     post_community,
-                    ftl_lang
                 },
             )
             .await
@@ -3037,24 +3014,20 @@ pub async fn post_replay_view_by_login_name(
         return Ok(StatusCode::NOT_FOUND.into_response());
     }
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let community_id = community_id.map(|id| id.to_string());
 
     let template = "post_replay_view_tgkr.jinja";
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
                 presence => Presence::new(Activity::WatchingReplay),
-                current_user => auth_session.user,
                 post => Some(&post),
                 post_id => post_id,
                 community_id,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await
@@ -3517,8 +3490,7 @@ pub async fn post_reactions_detail(
     // Get all reactions for this post
     let reactions = find_reactions_by_post_id(&mut tx, uuid).await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     tx.commit().await?;
 
@@ -3566,15 +3538,11 @@ pub async fn post_reactions_detail(
         })
         .collect();
 
-    let rendered = state.render("post_reactions_detail.jinja", context! {
-        current_user => auth_session.user,
+    let rendered = state.render_page("post_reactions_detail.jinja", common_ctx, context! {
         post_title => post_data.get("title").and_then(|t| t.as_ref()).unwrap_or(&"Untitled".to_string()),
         post_id => post_id,
         login_name => login_name,
         grouped_reactions => grouped_reactions,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang
     }).await?;
 
     Ok(Html(rendered).into_response())

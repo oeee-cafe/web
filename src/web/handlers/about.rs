@@ -18,8 +18,7 @@ pub async fn about(
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let users_with_public_posts_and_banner = find_users_with_public_posts_and_banner(&mut tx)
         .await
@@ -27,16 +26,13 @@ pub async fn about(
     let supporters = list_credits(&mut tx).await?;
 
     let rendered: String = state
-        .render(
+        .render_page(
             "about.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 users_with_public_posts_and_banner,
                 supporters,
                 git_commit => git_commit(),
-                ftl_lang,
             },
         )
         .await?;
@@ -52,17 +48,13 @@ pub async fn design(
     auth_session: AuthSession,
 ) -> Result<Html<String>, AppError> {
     let mut tx = state.db_pool.begin().await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
     let rendered = state
-        .render(
+        .render_page(
             "design.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 messages => Vec::<String>::new(),
-                ftl_lang,
             },
         )
         .await?;

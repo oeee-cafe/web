@@ -148,14 +148,14 @@ async fn render_posts(
     let (posts, has_more, next_url) = load_batch(&mut tx, &query, &resolved).await?;
     let total = count_all_posts(&mut tx, resolved.filter).await?;
 
-    let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "admin/posts.jinja",
+            common_ctx,
             context! {
-                current_user => admin.0,
                 posts => posts,
                 communities => communities,
                 total => total,
@@ -165,10 +165,7 @@ async fn render_posts(
                 filter_community => resolved.community_slug,
                 include_drafts => resolved.filter.include_drafts,
                 include_deleted => resolved.filter.include_deleted,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-                ftl_lang,
             },
         )
         .await?;
@@ -277,19 +274,16 @@ pub async fn admin_post_detail(
         .await?
         .ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
-    let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "admin/post_detail.jinja",
+            common_ctx,
             context! {
-                current_user => admin.0,
                 post => post,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-                ftl_lang,
             },
         )
         .await?;
@@ -370,22 +364,19 @@ pub async fn admin_banners(
 ) -> Result<Html<String>, AppError> {
     let mut tx = state.db_pool.begin().await?;
     let (banners, has_more, next_url) = load_banner_batch(&mut tx, &query).await?;
-    let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "admin/banners.jinja",
+            common_ctx,
             context! {
-                current_user => admin.0,
                 banners => banners,
                 only_explicit => query.explicit.is_some(),
                 has_more => has_more,
                 next_url => next_url,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-                ftl_lang,
             },
         )
         .await?;
@@ -476,22 +467,19 @@ pub async fn admin_users(
 
     let mut tx = state.db_pool.begin().await?;
     let users = find_all_users(&mut tx, query.sort, USERS_PER_PAGE, offset).await?;
-    let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
     tx.commit().await?;
 
     let has_next = users.len() as i64 == USERS_PER_PAGE;
     let rendered = state
-        .render(
+        .render_page(
             "admin/users.jinja",
+            common_ctx,
             context! {
-                current_user => admin.0,
                 users => users,
                 page => page,
                 sort => query.sort,
                 has_next => has_next,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
             },
         )
         .await?;
@@ -509,19 +497,16 @@ pub async fn admin_communities(
 ) -> Result<Html<String>, AppError> {
     let mut tx = state.db_pool.begin().await?;
     let communities = find_all_communities_with_activity(&mut tx, query.sort).await?;
-    let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "admin/communities.jinja",
+            common_ctx,
             context! {
-                current_user => admin.0,
                 communities => communities,
                 sort => query.sort,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
             },
         )
         .await?;
@@ -568,7 +553,7 @@ pub async fn admin_collaborative_sessions(
         offset,
     )
     .await?;
-    let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
     tx.commit().await?;
 
     // After the transaction, never inside it: this is a round trip to Redis,
@@ -584,18 +569,15 @@ pub async fn admin_collaborative_sessions(
 
     let has_next = sessions.len() as i64 == SESSIONS_PER_PAGE;
     let rendered = state
-        .render(
+        .render_page(
             "admin/collaborative_sessions.jinja",
+            common_ctx,
             context! {
-                current_user => admin.0,
                 sessions => sessions,
                 page => page,
                 sort => query.sort,
                 status => query.status,
                 has_next => has_next,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
             },
         )
         .await?;
@@ -1124,7 +1106,7 @@ async fn render_store_page(
     let mut tx = state.db_pool.begin().await?;
     let mut products = list_store_products(&mut tx).await?;
     let counts = store_purchase_counts(&mut tx).await?;
-    let common_ctx = CommonContext::build(&mut tx, Some(admin.0.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
     tx.commit().await?;
 
     let groups: Vec<StoreGroup> = Store::ALL
@@ -1152,10 +1134,10 @@ async fn render_store_page(
         .collect();
 
     Ok(state
-        .render(
+        .render_page(
             "admin/store.jinja",
+            common_ctx,
             context! {
-                current_user => admin.0.clone(),
                 groups,
                 stores => Store::ALL,
                 this_year => current_year(),
@@ -1163,9 +1145,6 @@ async fn render_store_page(
                 google_play_configured => state.config.google_play.is_some(),
                 error,
                 form,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
             },
         )
         .await?)

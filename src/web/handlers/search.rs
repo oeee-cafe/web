@@ -161,8 +161,7 @@ pub async fn search_page(
         .map(str::to_owned);
 
     let mut tx = state.db_pool.begin().await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let people = match search_query {
         Some(ref q) => search_people(&mut tx, q, SEARCH_PEOPLE_LIMIT).await?,
@@ -190,16 +189,13 @@ pub async fn search_page(
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "search.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 search_query,
                 people,
                 posts,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await?;

@@ -49,8 +49,7 @@ pub async fn account(
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
     let identities = match auth_session.user.as_ref() {
         Some(user) => list_identities_for_user(&mut tx, user.id).await?,
         None => Vec::new(),
@@ -87,10 +86,10 @@ pub async fn account(
         ("zh", "中文"),
     ];
     let rendered = state
-        .render(
+        .render_page(
             "account.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 languages,
                 steam_linked => identities.iter().any(|i| i.provider == "steam"),
                 apple_linked => identities.iter().any(|i| i.provider == "apple"),
@@ -105,10 +104,7 @@ pub async fn account(
                 steam_enabled => state.config.steam.is_some(),
                 apple_enabled => state.config.apple.is_some(),
                 google_enabled => state.config.google.is_some(),
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 messages => messages.into_iter().collect::<Vec<_>>(),
-                ftl_lang
             },
         )
         .await?;

@@ -134,8 +134,7 @@ pub async fn start_draw(
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let community_id = input
         .community_id
@@ -194,11 +193,11 @@ pub async fn start_draw(
     })
     .in_community(community.as_ref());
     let rendered = state
-        .render(
+        .render_page(
             template_filename,
+            common_ctx,
             context! {
                 presence,
-                current_user => auth_session.user,
                 community_name => community.as_ref().map(|c| c.name.clone()),
                 tool => input.tool,
                 width => input.width.parse::<u32>()?,
@@ -209,9 +208,6 @@ pub async fn start_draw(
                 community_slug => community.as_ref().map(|c| c.slug.clone()),
                 parent_post => parent_post,
                 parent_post_id => input.parent_post_id,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
                 painter_config
             },
         )

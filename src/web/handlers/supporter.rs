@@ -42,8 +42,7 @@ pub async fn supporter_page(
     headers: HeaderMap,
 ) -> Result<Html<String>, AppError> {
     let mut tx = state.db_pool.begin().await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let year = current_year();
     let store = headers
@@ -104,10 +103,10 @@ pub async fn supporter_page(
     };
 
     let rendered = state
-        .render(
+        .render_page(
             "supporter.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 this_year => year,
                 store,
                 offers,
@@ -120,9 +119,6 @@ pub async fn supporter_page(
                 supporter_standings,
                 worn_mark,
                 supports_this_year,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
             },
         )
         .await?;

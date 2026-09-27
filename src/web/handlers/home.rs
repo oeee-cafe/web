@@ -216,8 +216,7 @@ async fn feed_page(
     messages: Messages,
 ) -> Result<axum::response::Response, AppError> {
     let mut tx = state.db_pool.begin().await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
     let posts = feed
         .posts(&mut tx, auth_session.user.as_ref(), HOME_POSTS_PER_BATCH, 0)
         .await?;
@@ -226,19 +225,16 @@ async fn feed_page(
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "home.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 messages => messages.into_iter().collect::<Vec<_>>(),
                 feed_switch => feed.name(),
                 feed_view => "drawings",
                 feed => feed_context(posts, feed.batch_path(), 0, None),
                 comments => comments_context(comments, feed.comments_batch_path()),
                 comments_url => feed.comments_path(),
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await?;
@@ -258,23 +254,19 @@ async fn feed_comments_page(
 ) -> Result<axum::response::Response, AppError> {
     let scope = feed.comment_scope(auth_session.user.as_ref())?;
     let mut tx = state.db_pool.begin().await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
     let comments = comments_batch(&mut tx, scope, auth_session.user.as_ref(), None).await?;
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "home_comments.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 messages => messages.into_iter().collect::<Vec<_>>(),
                 feed_switch => feed.name(),
                 feed_view => "comments",
                 comments => comments_context(comments, feed.comments_batch_path()),
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await?;

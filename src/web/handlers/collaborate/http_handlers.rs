@@ -405,7 +405,7 @@ pub async fn collaborate_lobby(
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
 
-    let common_ctx = CommonContext::build(&mut tx, viewer_user_id).await?;
+    let common_ctx = CommonContext::build(&mut tx, user.as_ref(), &ftl_lang).await?;
 
     let (mut viewer_sessions, mut active_sessions) =
         lobby_sessions(&mut tx, viewer_user_id).await?;
@@ -461,10 +461,10 @@ pub async fn collaborate_lobby(
     let template = "collaborate_lobby.jinja";
 
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
-                current_user => user,
                 viewer_sessions => viewer_sessions,
                 active_sessions => active_sessions,
                 // Shared card fragment contract, sentinel included: the gallery pages
@@ -488,9 +488,6 @@ pub async fn collaborate_lobby(
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
                 canvas_sizes => canvas_size_options(),
                 participant_choices => MAX_PARTICIPANTS_CHOICES,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await?;
@@ -724,8 +721,7 @@ pub async fn serve_collaborative_app(
         .map_err(|_| anyhow::anyhow!("Failed to load collaborative app"))?;
 
     let mut tx = state.db_pool.begin().await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|user| user.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
     // In a room: drawing together, grouped with friends in the same room,
     // and the community named if it is public. The lobby is browsing.
     let presence = match session_id {
@@ -750,13 +746,7 @@ pub async fn serve_collaborative_app(
         None => None,
     };
     tx.commit().await?;
-    let chrome = context! {
-        presence,
-        current_user => auth_session.user,
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
-    };
+    let chrome = common_ctx.merge(context! { presence });
     let head = state
         .render("collaborate_chrome_head.jinja", chrome.clone())
         .await?;

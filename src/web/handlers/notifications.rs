@@ -158,8 +158,7 @@ pub async fn list_notifications(
         .collect();
 
     // Get common context (includes unread_notification_count and draft_post_count)
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     tx.commit().await?;
 
@@ -169,21 +168,18 @@ pub async fn list_notifications(
 
     let template = "notifications.jinja";
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 messages => messages.into_iter().collect::<Vec<_>>(),
                 notifications => as_shown(notifications, Some(opened)),
                 unseen => unseen,
                 invitations => invitations_with_details,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 // Same key names the fragment uses, so the first batch and every
                 // scrolled batch render through one template.
                 has_more => has_more,
                 next_url => notifications_fragment_url(NOTIFICATIONS_PER_BATCH, Some(opened)),
-                ftl_lang
             },
         )
         .await?;
