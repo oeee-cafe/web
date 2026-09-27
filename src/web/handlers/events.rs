@@ -26,7 +26,7 @@ use uuid::Uuid;
 
 use crate::live::LiveEvent;
 use crate::models::user::AuthSession;
-use crate::web::handlers::ExtractFtlLang;
+use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 
 /// Often enough that nothing between here and the browser -- Caddy, the

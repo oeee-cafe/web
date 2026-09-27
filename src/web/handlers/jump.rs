@@ -18,7 +18,7 @@ use crate::app_error::AppError;
 use crate::models::tag::{escape_like, search_tags};
 use crate::models::user::AuthSession;
 use crate::web::handlers::search::search_people;
-use crate::web::handlers::ExtractFtlLang;
+use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 
 /// Rows of each kind: enough to find a place by a few letters of its name,

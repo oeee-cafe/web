@@ -31,7 +31,7 @@ use axum::{
 };
 
 use crate::models::user::AuthSession;
-use crate::web::handlers::{get_bundle, safe_get_message};
+use crate::web::i18n::{get_bundle, safe_get_message};
 
 /// The stack of toasts `base.jinja` renders (`toasts.jinja`), which we add to.
 const TOASTS_TARGET: &str = "#toasts";

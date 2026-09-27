@@ -41,7 +41,7 @@ use minijinja::context;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use super::ExtractFtlLang;
+use crate::web::i18n::ExtractFtlLang;
 
 pub async fn do_follow_profile(
     auth_session: AuthSession,

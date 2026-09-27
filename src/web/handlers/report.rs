@@ -1,7 +1,7 @@
 use crate::app_error::AppError;
 use crate::models::post::find_post_by_id;
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession};
-use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
+use crate::web::i18n::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::state::AppState;
 use axum::extract::{Path, State};
 use axum::response::Html;

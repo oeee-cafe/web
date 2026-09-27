@@ -62,7 +62,7 @@ use crate::models::user::{
     update_user_email_verified_at, update_user_preferred_language, AuthSession, User, UserDraft,
 };
 use crate::steam::{self, TicketRejected};
-use crate::web::handlers::{
+use crate::web::i18n::{
     detect_preferred_language, get_bundle, safe_format_message, safe_get_message,
     ExtractAcceptLanguage, ExtractFtlLang,
 };

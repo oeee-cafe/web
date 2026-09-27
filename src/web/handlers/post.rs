@@ -31,10 +31,8 @@ use crate::web::handlers::activitypub::{
     create_note_from_post, create_updated_note_from_post, generate_object_id, Announce, Create,
     Note, UpdateNote,
 };
-use crate::web::handlers::{
-    get_bundle, handler_404, parse_id_with_legacy_support, safe_get_message, ExtractFtlLang,
-    ParsedId,
-};
+use crate::web::handlers::{handler_404, parse_id_with_legacy_support, ParsedId};
+use crate::web::i18n::{get_bundle, safe_get_message, ExtractFtlLang};
 use crate::web::presence::{Activity, Presence};
 use crate::web::state::AppState;
 use activitypub_federation::fetch::object_id::ObjectId;
