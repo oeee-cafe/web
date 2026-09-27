@@ -238,7 +238,7 @@ async fn profile_posts_batch(
         auth_session
             .user
             .as_ref()
-            .map_or(false, |u| u.show_sensitive_content),
+            .is_some_and(|u| u.show_sensitive_content),
         query.limit.clamp(1, HOME_POSTS_PER_BATCH),
         query.offset.max(0),
     )
@@ -348,7 +348,7 @@ async fn render_profile(
     let show_sensitive = auth_session
         .user
         .as_ref()
-        .map_or(false, |u| u.show_sensitive_content);
+        .is_some_and(|u| u.show_sensitive_content);
     let public_count = count_profile_posts(
         tx,
         user.id,

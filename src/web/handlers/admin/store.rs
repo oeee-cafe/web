@@ -51,19 +51,16 @@ pub(super) fn to_local_input(at: Option<chrono::DateTime<chrono::Utc>>) -> Strin
         .unwrap_or_default()
 }
 
+/// When a product goes on sale and comes off it; `None` is an end left open.
+type SaleWindow = (
+    Option<chrono::DateTime<chrono::Utc>>,
+    Option<chrono::DateTime<chrono::Utc>>,
+);
+
 /// A sale window as two `datetime-local` values in Seoul time, either empty
 /// for an end left open. A browser that was given a step adds seconds, so
 /// those are read too.
-pub(super) fn parse_sale_window(
-    starts: &str,
-    ends: &str,
-) -> Result<
-    (
-        Option<chrono::DateTime<chrono::Utc>>,
-        Option<chrono::DateTime<chrono::Utc>>,
-    ),
-    String,
-> {
+pub(super) fn parse_sale_window(starts: &str, ends: &str) -> Result<SaleWindow, String> {
     use chrono::{NaiveDateTime, TimeZone};
     let parse =
         |value: &str, which: &str| -> Result<Option<chrono::DateTime<chrono::Utc>>, String> {

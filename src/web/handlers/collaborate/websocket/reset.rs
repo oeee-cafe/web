@@ -62,7 +62,7 @@ pub(in crate::web::handlers::collaborate) fn reset_snapshot_count(
     }
     let base_seq = utils::read_u64_le(data, 1);
     let count = u16::from_le_bytes([data[9], data[10]]);
-    if count == 0 || count % 2 != 0 || count > 2 * u16::from(u8::MAX) {
+    if count == 0 || !count.is_multiple_of(2) || count > 2 * u16::from(u8::MAX) {
         return None;
     }
     Some((base_seq, count))
@@ -194,7 +194,7 @@ pub(super) async fn finish_reset(ctx: &SessionContext<'_>, reset: PendingReset) 
 /// one background and one foreground per participant who has drawn -- not the
 /// two of a shared canvas. Each snapshot names its owner in the user byte.
 pub(in crate::web::handlers::collaborate) fn valid_reset_payloads(payloads: &[Vec<u8>]) -> bool {
-    if payloads.is_empty() || payloads.len() % 2 != 0 {
+    if payloads.is_empty() || !payloads.len().is_multiple_of(2) {
         return false;
     }
     let mut seen: std::collections::HashMap<u8, u8> = std::collections::HashMap::new();

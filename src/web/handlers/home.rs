@@ -60,7 +60,7 @@ pub(crate) async fn comments_batch(
         tx,
         scope,
         viewer.map(|user| user.id),
-        viewer.map_or(false, |user| user.show_sensitive_content),
+        viewer.is_some_and(|user| user.show_sensitive_content),
         after,
         COMMENTS_PER_BATCH,
     )
@@ -192,7 +192,7 @@ impl Feed {
         offset: i64,
     ) -> Result<Vec<crate::models::post::SerializablePostForHome>, AppError> {
         let viewer_id = viewer.map(|user| user.id);
-        let show_sensitive = viewer.map_or(false, |user| user.show_sensitive_content);
+        let show_sensitive = viewer.is_some_and(|user| user.show_sensitive_content);
         Ok(match self {
             Feed::Recent => find_public_posts(tx, limit, offset, viewer_id, show_sensitive).await?,
             Feed::Following => {
