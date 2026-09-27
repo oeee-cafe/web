@@ -348,38 +348,15 @@ pub fn reset_point_frame(base_seq: u64, snapshot_count: u16) -> Vec<u8> {
     buffer
 }
 
-// Message parsing utilities
-pub fn parse_message_type(data: &[u8]) -> Option<MessageType> {
-    if data.is_empty() {
-        return None;
-    }
-
-    match data[0] {
-        0x01 => Some(MessageType::Join),
-        0x02 => Some(MessageType::Snapshot),
-        0x03 => Some(MessageType::Chat),
-        0x04 => Some(MessageType::ResetOffer),
-        0x05 => Some(MessageType::ReplayStart),
-        0x06 => Some(MessageType::Layers),
-        0x07 => Some(MessageType::EndSession),
-        0x08 => Some(MessageType::SessionExpired),
-        0x09 => Some(MessageType::Leave),
-        0x0A => Some(MessageType::Sequenced),
-        0x0B => Some(MessageType::ResetRequest),
-        0x0C => Some(MessageType::ResetBegin),
-        0x0D => Some(MessageType::ResetPoint),
-        0x0E => Some(MessageType::Welcome),
-        0x0F => Some(MessageType::CaughtUp),
-        _ => None,
-    }
-}
-
-pub fn is_server_message(msg_type: u8) -> bool {
-    msg_type < 0x10
-}
-
+/// Whether a type byte is the client's to send, and so is forwarded as it
+/// is rather than handled here.
+///
+/// Everything up to and including REPLAY_BATCH is the server's. The client's
+/// range starts above it (`MSG_TYPE` in binaryProtocol.ts says the same):
+/// REPLAY_BATCH took 0x10 when the range below it was full, and a split at
+/// `>= 0x10` would read a batch of history as a client's canvas operation.
 pub fn is_client_message(msg_type: u8) -> bool {
-    msg_type >= 0x10
+    msg_type > MessageType::ReplayBatch as u8
 }
 
 // bytes_to_uuid is already available from utils module via import
@@ -965,6 +942,20 @@ pub async fn send_leave_message(
                 user_login_name, room_uuid, e
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod client_range_tests {
+    use super::{is_client_message, MessageType};
+
+    #[test]
+    fn a_replay_batch_is_the_servers() {
+        assert!(!is_client_message(MessageType::ReplayBatch as u8));
+        assert!(!is_client_message(MessageType::CaughtUp as u8));
+        // FILL, the lowest canvas operation, and MOVE_POINTER, the highest.
+        assert!(is_client_message(0x12));
+        assert!(is_client_message(0x1c));
     }
 }
 

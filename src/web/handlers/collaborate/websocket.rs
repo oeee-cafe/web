@@ -1351,7 +1351,7 @@ async fn handle_incoming_messages(
         // whatever its handler builds from it; a client message is forwarded
         // as it is.
         let msg_type = data[0];
-        let msg = if msg_type < 0x10 {
+        let msg = if !messages::is_client_message(msg_type) {
             match process_server_message(msg_type, &data, &ctx).await {
                 Some(processed_msg) => processed_msg,
                 None => continue,
@@ -1810,7 +1810,7 @@ async fn process_server_message(
             // Message is already broadcast internally, don't re-broadcast
             None
         }
-        // Everything else below 0x10 is the server's to send. `validate`
+        // Everything else up to 0x10 is the server's to send. `validate`
         // already refuses the types it has no layout for, so this is the
         // backstop: forwarded, a WELCOME or a SESSION_EXPIRED from a client
         // would be believed by everyone in the room.
