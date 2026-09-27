@@ -5,7 +5,8 @@
 //! its URIs, so an actor cannot name a collection that is not served. A
 //! request to one of these paths that asks for a page rather than
 //! ActivityPub goes on to the site's own routes, which send a browser to the
-//! page. Incoming activities are still activitypub_federation's.
+//! page. Incoming activities are received by the listeners in
+//! `listeners.rs`.
 
 use crate::models::actor::{create_actor_for_user, Actor};
 use crate::models::community::{find_community_by_id, find_community_by_slug, CommunityVisibility};
@@ -77,6 +78,11 @@ pub fn federation(
             }
         })
         .nodeinfo(nodeinfo)
+        // A reply to a post here, addressed to its author's followers, is
+        // passed on to them (ActivityPub §7.1.2), signed by the author.
+        .forward(|ctx: Ctx, forward: feder::federation::Forward| async move {
+            forward_to_followers(&ctx, forward).await
+        })
         // Another server being down, gone or wrong is not a bug here, and
         // arrives at whatever rate the fediverse sends it.
         .on_error(|error| {
@@ -94,6 +100,49 @@ pub fn federation(
     super::listeners::register(builder)
         .build()
         .map_err(|error| anyhow::anyhow!("{error}"))
+}
+
+/// Forward `forward`'s activity to the followers of the people and
+/// communities here whose followers collections it names, as it arrived.
+/// This site is no portable actor's gateway, so there is nothing to forward
+/// to gateways.
+async fn forward_to_followers(ctx: &Ctx, forward: feder::federation::Forward) -> anyhow::Result<()> {
+    let feder::federation::ForwardTo::Collections(collections) = forward.to else {
+        return Ok(());
+    };
+    let state = ctx.data();
+    for collection in collections {
+        let Some(id) = uuid(&collection.identifier) else {
+            continue;
+        };
+        let mut tx = state.db_pool.begin().await?;
+        let actor = match collection.kind.as_str() {
+            "followers" => Actor::find_by_user_id(&mut tx, id).await?,
+            "community_followers" => Actor::find_by_community_id(&mut tx, id).await?,
+            _ => None,
+        };
+        let Some(actor) = actor else {
+            continue;
+        };
+        let inboxes =
+            crate::models::follow::get_follower_shared_inboxes_for_actor(&mut tx, actor.id)
+                .await?;
+        tx.commit().await?;
+        let inboxes: Vec<Url> = inboxes
+            .iter()
+            .filter_map(|inbox| Url::parse(inbox).ok())
+            .collect();
+        crate::federation::send(
+            &state.deliverer,
+            &state.config.domain,
+            &actor,
+            &forward.activity,
+            inboxes,
+        )
+        .await
+        .map_err(|error| anyhow::anyhow!("queueing a forward: {error}"))?;
+    }
+    Ok(())
 }
 
 /// The site's error, for feder's log.
