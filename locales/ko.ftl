@@ -2,6 +2,7 @@ brand = 오이카페
 email-from-address = 오이카페 <noreply@oeee.cafe>
 error-404 = 페이지를 찾을 수 없습니다.
 error-403 = 이 페이지에 접근할 권한이 없습니다.
+error-500 = 서버에 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.
 htmx-error-forbidden = 그 작업을 수행할 권한이 없습니다.
 htmx-error-request = 요청이 처리되지 않았습니다. 페이지를 새로 고친 뒤 다시 시도해 주세요.
 htmx-error-server = 서버에 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.

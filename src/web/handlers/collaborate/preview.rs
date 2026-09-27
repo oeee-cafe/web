@@ -587,9 +587,7 @@ pub async fn upload_session_preview(
         .and_then(|value| value.to_str().ok())
         .filter(|token| !token.is_empty())
     else {
-        return Err(AppError::InvalidFormData(
-            "missing preview token".to_string(),
-        ));
+        return Err(AppError::BadRequest("missing preview token".to_string()));
     };
 
     if body.len() > MAX_PREVIEW_BYTES {
@@ -597,7 +595,7 @@ pub async fn upload_session_preview(
     }
 
     let Some((kind, image_width, image_height)) = inspect_image(&body) else {
-        return Err(AppError::InvalidFormData(
+        return Err(AppError::BadRequest(
             "preview is not a PNG or WEBP image".to_string(),
         ));
     };
@@ -611,7 +609,7 @@ pub async fn upload_session_preview(
         .and_then(ImageKind::from_content_type)
         != Some(kind)
     {
-        return Err(AppError::InvalidFormData(
+        return Err(AppError::BadRequest(
             "preview content type does not match its contents".to_string(),
         ));
     }
@@ -622,7 +620,7 @@ pub async fn upload_session_preview(
             "Rejected a {}x{} preview for room {} ({}x{} expected)",
             image_width, image_height, room_uuid, expected.0, expected.1
         );
-        return Err(AppError::InvalidFormData(format!(
+        return Err(AppError::BadRequest(format!(
             "preview must be {}x{}",
             expected.0, expected.1
         )));
@@ -709,7 +707,7 @@ pub async fn report_session_diagnostics(
     // this is written to object storage under an admin-readable prefix, and
     // "whatever the client posted" is not a thing to keep there.
     if serde_json::from_slice::<serde_json::Value>(&body).is_err() {
-        return Err(AppError::InvalidFormData(
+        return Err(AppError::BadRequest(
             "diagnostic report is not JSON".to_string(),
         ));
     }

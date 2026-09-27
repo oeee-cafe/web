@@ -627,6 +627,12 @@ impl App {
             // extensions and a failed request can be explained in the
             // language the reader chose rather than the one they asked for.
             .layer(axum::middleware::from_fn(crate::web::htmx::error_banner))
+            // Beside the banner, for the requests it does not take: a browser
+            // navigating gets a page for an `AppError`, not its JSON.
+            .layer(axum::middleware::from_fn_with_state(
+                self.state.clone(),
+                crate::web::error_pages::error_pages,
+            ))
             // Outside the banner, which reads the header this rewrites: a
             // signed out reader's chosen language, standing in for their
             // browser's (web/language.rs).

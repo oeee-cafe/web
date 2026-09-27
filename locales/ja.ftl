@@ -2,6 +2,7 @@ brand = OEEEカフェ
 email-from-address = OEEEカフェ <noreply@oeee.cafe>
 error-404 = ページが見つかりません.
 error-403 = このページにアクセスする権限がありません。
+error-500 = サーバー側で問題が発生しました。しばらくしてからもう一度お試しください。
 htmx-error-forbidden = その操作を行う権限がありません。
 htmx-error-request = 処理できませんでした。ページを再読み込みしてからもう一度お試しください。
 htmx-error-server = サーバー側で問題が発生しました。しばらくしてからもう一度お試しください。

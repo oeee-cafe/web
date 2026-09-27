@@ -1,5 +1,6 @@
 pub mod app;
 pub mod context;
+pub mod error_pages;
 pub mod handlers;
 pub mod htmx;
 pub mod i18n;

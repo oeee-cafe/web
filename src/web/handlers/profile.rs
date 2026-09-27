@@ -570,12 +570,8 @@ pub async fn profile_or_community(
         .await;
     }
 
-    // Neither user nor community found - render 404 page
-    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
-    let rendered: String = state
-        .render_page("404.jinja", common_ctx, context! {})
-        .await?;
-    Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
+    // Neither user nor community found
+    Err(AppError::NotFound("Profile".to_string()))
 }
 
 pub async fn profile_iframe(
@@ -1313,12 +1309,12 @@ pub async fn do_delete_banner(
             .image_filename
             .chars()
             .next()
-            .ok_or_else(|| AppError::InvalidFormData("Image filename too short".to_string()))?,
+            .ok_or_else(|| AppError::BadRequest("Image filename too short".to_string()))?,
         banner
             .image_filename
             .chars()
             .nth(1)
-            .ok_or_else(|| AppError::InvalidFormData("Image filename too short".to_string()))?,
+            .ok_or_else(|| AppError::BadRequest("Image filename too short".to_string()))?,
         banner.image_filename
     )];
 
@@ -1329,15 +1325,11 @@ pub async fn do_delete_banner(
             replay_filename
                 .chars()
                 .next()
-                .ok_or_else(|| AppError::InvalidFormData(
-                    "Replay filename too short".to_string()
-                ))?,
+                .ok_or_else(|| AppError::BadRequest("Replay filename too short".to_string()))?,
             replay_filename
                 .chars()
                 .nth(1)
-                .ok_or_else(|| AppError::InvalidFormData(
-                    "Replay filename too short".to_string()
-                ))?,
+                .ok_or_else(|| AppError::BadRequest("Replay filename too short".to_string()))?,
             replay_filename
         ));
     }

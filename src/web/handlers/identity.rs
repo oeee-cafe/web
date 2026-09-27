@@ -247,7 +247,7 @@ async fn sign_in_with(
                     },
                 )
                 .await
-                .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
             Ok(Redirect::to("/auth/welcome").into_response())
         }
     }
@@ -451,7 +451,7 @@ pub async fn apple_sign_in(
     session
         .insert(APPLE_REQUEST_KEY, request)
         .await
-        .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
     Ok(Redirect::to(&url).into_response())
 }
 
@@ -488,7 +488,7 @@ pub async fn apple_start(
     session
         .insert(APPLE_REQUEST_KEY, request)
         .await
-        .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
     Ok(axum::Json(answer).into_response())
 }
 
@@ -685,7 +685,7 @@ pub async fn google_sign_in(
     session
         .insert(GOOGLE_REQUEST_KEY, request)
         .await
-        .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
     Ok(Redirect::to(&url).into_response())
 }
 
@@ -819,7 +819,7 @@ pub async fn google_start(
     session
         .insert(GOOGLE_REQUEST_KEY, request)
         .await
-        .map_err(|e| AppError::InvalidFormData(e.to_string()))?;
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
     Ok(axum::Json(answer).into_response())
 }
 

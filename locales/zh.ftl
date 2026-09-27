@@ -2,6 +2,7 @@ brand = 黄瓜咖啡馆
 email-from-address = 黄瓜咖啡馆 <noreply@oeee.cafe>
 error-404 = 页面未找到
 error-403 = 您无权访问此页面。
+error-500 = 我们这边出了点问题。请稍后再试。
 htmx-error-forbidden = 您没有执行此操作的权限。
 htmx-error-request = 操作未能完成。请刷新页面后重试。
 htmx-error-server = 我们这边出了点问题。请稍后再试。

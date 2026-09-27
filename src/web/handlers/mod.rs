@@ -1,12 +1,10 @@
 use crate::app_error::AppError;
 use crate::models::user::{AuthSession, User};
-use crate::web::context::CommonContext;
-use crate::web::i18n::ExtractFtlLang;
 use anyhow;
 use anyhow::Result;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse};
+use axum::response::IntoResponse;
 use axum::{extract::FromRequestParts, http::request::Parts};
 use data_encoding::BASE64URL_NOPAD;
 use uuid::Uuid;
@@ -51,25 +49,10 @@ mod template_tests;
 #[cfg(test)]
 pub(crate) mod test_support;
 
-pub async fn handler_404(
-    auth_session: AuthSession,
-    ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    // The header counts only exist for signed-in users, and this handler
-    // absorbs every bot scan for /wp-admin and friends — so don't open a
-    // transaction we have nothing to ask.
-    let common = match auth_session.user.as_ref() {
-        Some(user) => {
-            let mut tx = state.db_pool.begin().await?;
-            CommonContext::build(&mut tx, Some(user), &ftl_lang).await?
-        }
-        None => CommonContext::anonymous(&ftl_lang),
-    };
-
-    let rendered: String = state.render_page("404.jinja", common, context! {}).await?;
-
-    Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
+/// Anything no route matched. `web::error_pages` draws the page for a
+/// browser; everybody else gets the JSON.
+pub async fn handler_404() -> AppError {
+    AppError::NotFound("Page".to_string())
 }
 
 /// Liveness/readiness probe. Checks that a connection can actually be taken
@@ -86,23 +69,6 @@ pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
             (StatusCode::SERVICE_UNAVAILABLE, "database unavailable").into_response()
         }
     }
-}
-
-pub async fn render_403(
-    auth_session: &AuthSession,
-    state: &AppState,
-    ftl_lang: String,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
-
-    let rendered: String = state
-        .render_page("403.jinja", common_ctx, context! {})
-        .await?;
-
-    Ok((StatusCode::FORBIDDEN, Html(rendered)).into_response())
 }
 
 /// Extractor that admits only site-wide admins.
@@ -187,18 +153,18 @@ pub fn parse_id_with_legacy_support(
 
 /// Helper function to safely parse a UUID string
 pub fn safe_parse_uuid(s: &str) -> Result<Uuid, AppError> {
-    Uuid::parse_str(s).map_err(|e| AppError::InvalidUuid(format!("{}: {}", s, e)))
+    Uuid::parse_str(s).map_err(|e| AppError::BadRequest(format!("Invalid UUID {}: {}", s, e)))
 }
 
 /// Helper function to safely decode a hex hash string
 pub fn safe_decode_hash(s: &str) -> Result<Vec<u8>, AppError> {
     data_encoding::HEXLOWER
         .decode(s.as_bytes())
-        .map_err(|e| AppError::InvalidHash(format!("{}: {}", s, e)))
+        .map_err(|e| AppError::BadRequest(format!("Invalid hash {}: {}", s, e)))
 }
 
 /// Helper function to safely parse an email address
 pub fn safe_parse_email(s: &str) -> Result<lettre::Address, AppError> {
     s.parse()
-        .map_err(|e| AppError::InvalidEmail(format!("{}: {}", s, e)))
+        .map_err(|e| AppError::BadRequest(format!("Invalid email {}: {}", s, e)))
 }
