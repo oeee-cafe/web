@@ -771,7 +771,7 @@ export default function App() {
       if (!response.ok) throw new Error(`Failed to fetch collaboration meta: ${response.status}`);
       const meta: CollaborationMeta = await response.json();
       if (meta.savedPostId) {
-        window.location.href = `/@${meta.ownerLoginName}/${meta.savedPostId}`;
+        window.location.href = meta.savedPostUrl ?? `/@${meta.ownerLoginName}/${meta.savedPostId}`;
         return;
       }
       if (meta.currentUserCount >= meta.maxUsers && meta.ownerId !== auth.user_id) {

@@ -94,7 +94,7 @@ export function header(sessionId: string): Header {
         parts.push(link("open room →", `/collaborate/${session.id}`));
       }
       if (session.saved_post_id) {
-        parts.push(link("saved post →", `/@${session.owner_login_name}/${session.saved_post_id}`));
+        parts.push(link("saved post →", `/@${session.community_slug ?? session.owner_login_name}/${session.saved_post_id}`));
       }
       parts.forEach((part, index) => {
         if (index > 0) meta.appendChild(document.createTextNode("  ·  "));

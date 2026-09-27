@@ -98,7 +98,7 @@
             <td>{{ session.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
             <td>
               {% if session.saved_post_id %}
-                <a href="/@{{ session.owner_login_name }}/{{ session.saved_post_id }}">saved</a>
+                <a href="/@{{ session.community_slug or session.owner_login_name }}/{{ session.saved_post_id }}">saved</a>
               {% elif session.ended_at %}
                 <span class="admin-tag deleted">ended</span>
               {% else %}

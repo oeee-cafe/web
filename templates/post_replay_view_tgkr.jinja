@@ -1,3 +1,4 @@
+{% from "post_url_macro.jinja" import post_url %}
 {% from "storage_macro.jinja" import stored_url %}
 <!DOCTYPE html>
 <html lang="{{ ftl_lang }}">
@@ -45,7 +46,7 @@
   <body>
     <script type="text/javascript">
       Tegaki.onCloseViewerClick = function () {
-        window.location.href = "/@{{ post.login_name }}/{{ post_id }}";
+        window.location.href = "{{ post_url(post, post_id) }}";
       };
 
       Tegaki.open({

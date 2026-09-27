@@ -293,9 +293,11 @@ pub async fn saved_post_path(
 ) -> Result<Option<String>, sqlx::Error> {
     let row = sqlx::query!(
         r#"
-        SELECT cs.saved_post_id, u.login_name
+        SELECT cs.saved_post_id, u.login_name, c.slug AS "community_slug?"
         FROM collaborative_sessions cs
         JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN posts p ON p.id = cs.saved_post_id
+        LEFT JOIN communities c ON c.id = p.community_id
         WHERE cs.id = $1
         "#,
         room_uuid
@@ -304,8 +306,13 @@ pub async fn saved_post_path(
     .await?;
 
     Ok(row.and_then(|row| {
-        row.saved_post_id
-            .map(|post_id| crate::models::post::post_page_path(&row.login_name, post_id))
+        row.saved_post_id.map(|post_id| {
+            crate::models::post::post_page_path(
+                &row.login_name,
+                row.community_slug.as_deref(),
+                post_id,
+            )
+        })
     }))
 }
 

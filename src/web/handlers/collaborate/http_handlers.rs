@@ -111,6 +111,8 @@ pub async fn get_collaboration_meta(
     .fetch_one(db)
     .await?;
 
+    let saved_post_url = db::saved_post_path(db, session_uuid).await?;
+
     Ok(Json(CollaborationMeta {
         title: session
             .title
@@ -119,6 +121,7 @@ pub async fn get_collaboration_meta(
         height: session.height,
         owner_id: session.owner_id.to_string(),
         saved_post_id: session.saved_post_id.map(|id| id.to_string()),
+        saved_post_url,
         owner_login_name: session.owner_login_name,
         max_users: session.max_participants,
         current_user_count: user_count,
@@ -649,11 +652,14 @@ pub async fn save_collaborative_session(
     // retried after a lost response used to come back as a failure, with the
     // owner left to reload.
     if let Some(post_id) = session.saved_post_id {
+        let post_url = db::saved_post_path(db, session_uuid)
+            .await?
+            .unwrap_or_else(|| format!("/@{}/{}", session.owner_login_name, post_id));
         return Ok((
             StatusCode::CONFLICT,
             Json(SaveSessionResponse {
                 post_id: post_id.to_string(),
-                post_url: format!("/@{}/{}", session.owner_login_name, post_id),
+                post_url,
                 owner_login_name: session.owner_login_name,
             }),
         )
@@ -688,7 +694,10 @@ pub async fn save_collaborative_session(
     .await
     .map_err(|e| anyhow::anyhow!("Save failed: {}", e))?;
 
-    let post_url = format!("/@{}/{}", owner_login_name, post_id);
+    // Where the post lives now that it exists, community and all.
+    let post_url = db::saved_post_path(db, session_uuid)
+        .await?
+        .unwrap_or_else(|| format!("/@{}/{}", owner_login_name, post_id));
 
     // The session is over the moment the post exists, whether or not the
     // owner's socket is still there to say so.

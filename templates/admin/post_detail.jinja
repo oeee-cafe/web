@@ -1,3 +1,4 @@
+{% from "post_url_macro.jinja" import post_url %}
 {% from "storage_macro.jinja" import stored_url %}
 {% extends "admin/base.jinja" %}
 {% set admin_section = "posts" %}
@@ -85,7 +86,7 @@
 
       {% if post.published_at and not post.deleted_at %}
         <div>
-          <a class="ds-button" href="/@{{ post.author_login_name }}/{{ post.id }}">View on site →</a>
+          <a class="ds-button" href="{{ post_url(post) }}">View on site →</a>
         </div>
       {% endif %}
     </div>

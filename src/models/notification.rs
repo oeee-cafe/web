@@ -67,6 +67,8 @@ pub struct NotificationWithActor {
     // Additional context data
     pub post_title: Option<String>,
     pub post_author_login_name: Option<String>,
+    /// The community the post is in, which names its page (`post_page_path`).
+    pub post_community_slug: Option<String>,
     pub post_image_filename: Option<String>,
     pub post_image_width: Option<i32>,
     pub post_image_height: Option<i32>,
@@ -215,6 +217,7 @@ pub async fn list_notifications(
             n.created_at,
             p.title AS post_title,
             post_authors.login_name AS "post_author_login_name?",
+            post_communities.slug AS "post_community_slug?",
             images.image_filename AS "post_image_filename?",
             images.width AS "post_image_width?",
             images.height AS "post_image_height?",
@@ -227,6 +230,7 @@ pub async fn list_notifications(
         LEFT JOIN users actor_users ON a.user_id = actor_users.id
         LEFT JOIN posts p ON n.post_id = p.id
         LEFT JOIN users post_authors ON p.author_id = post_authors.id
+        LEFT JOIN communities post_communities ON p.community_id = post_communities.id
         LEFT JOIN images ON p.image_id = images.id
         LEFT JOIN comments c ON n.comment_id = c.id
         LEFT JOIN reactions r ON n.reaction_iri = r.iri
@@ -263,6 +267,7 @@ pub async fn list_notifications(
             created_at: row.created_at,
             post_title: row.post_title,
             post_author_login_name: row.post_author_login_name,
+            post_community_slug: row.post_community_slug,
             post_image_filename: row.post_image_filename,
             post_image_width: row.post_image_width,
             post_image_height: row.post_image_height,
@@ -311,6 +316,7 @@ pub async fn get_notification_by_id(
             n.created_at,
             p.title AS post_title,
             post_authors.login_name AS "post_author_login_name?",
+            post_communities.slug AS "post_community_slug?",
             images.image_filename AS "post_image_filename?",
             images.width AS "post_image_width?",
             images.height AS "post_image_height?",
@@ -322,6 +328,7 @@ pub async fn get_notification_by_id(
         LEFT JOIN users actor_users ON a.user_id = actor_users.id
         LEFT JOIN posts p ON n.post_id = p.id
         LEFT JOIN users post_authors ON p.author_id = post_authors.id
+        LEFT JOIN communities post_communities ON p.community_id = post_communities.id
         LEFT JOIN images ON p.image_id = images.id
         LEFT JOIN comments c ON n.comment_id = c.id
         LEFT JOIN reactions r ON n.reaction_iri = r.iri
@@ -351,6 +358,7 @@ pub async fn get_notification_by_id(
         created_at: row.created_at,
         post_title: row.post_title,
         post_author_login_name: row.post_author_login_name,
+        post_community_slug: row.post_community_slug,
         post_image_filename: row.post_image_filename,
         post_image_width: row.post_image_width,
         post_image_height: row.post_image_height,
@@ -612,7 +620,11 @@ pub fn notification_url(
     match notification.notification_type {
         Comment | Reaction | Mention | PostReply | CommentReply | CommunityPost => {
             match (notification.post_id, &notification.post_author_login_name) {
-                (Some(post_id), Some(author)) => format!("/@{author}/{post_id}"),
+                (Some(post_id), Some(author)) => crate::models::post::post_page_path(
+                    author,
+                    notification.post_community_slug.as_deref(),
+                    post_id,
+                ),
                 (Some(post_id), None) => format!("/posts/{post_id}"),
                 _ => "/notifications".to_string(),
             }
@@ -1210,6 +1222,7 @@ mod tests {
             created_at: Utc::now(),
             post_title: None,
             post_author_login_name: None,
+            post_community_slug: None,
             post_image_filename: None,
             post_image_width: None,
             post_image_height: None,
@@ -1233,6 +1246,11 @@ mod tests {
         assert_eq!(
             notification_url(&comment, "me"),
             format!("/@author/{post_id}")
+        );
+        comment.post_community_slug = Some("club".to_string());
+        assert_eq!(
+            notification_url(&comment, "me"),
+            format!("/@club/{post_id}")
         );
 
         assert_eq!(

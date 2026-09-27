@@ -67,6 +67,32 @@ async fn get_community_slug_url(
     }
 }
 
+/// The redirect to a post's canonical page, or to `suffix` beneath it, for a
+/// request that named the post under any other handle. `None` when `handle`
+/// is already the one `post_page_path` gives.
+fn redirect_to_canonical_post(
+    handle: &str,
+    author_login_name: &str,
+    community: Option<&crate::models::community::Community>,
+    post_id: Uuid,
+    suffix: &str,
+) -> Option<axum::response::Response> {
+    let community_slug = community.map(|community| community.slug.as_str());
+    if handle == community_slug.unwrap_or(author_login_name) {
+        return None;
+    }
+    let path = crate::models::post::post_page_path(author_login_name, community_slug, post_id);
+    Some(Redirect::to(&format!("{path}{suffix}")).into_response())
+}
+
+/// Whether a post in `community` goes out over ActivityPub. A personal post
+/// does, to its author's followers; a post in a private community does not.
+fn community_federates(community: Option<&crate::models::community::Community>) -> bool {
+    community.is_none_or(|community| {
+        community.visibility != crate::models::community::CommunityVisibility::Private
+    })
+}
+
 /// Helper function to show a flash error message and redirect
 fn flash_error_and_redirect(
     headers: &HeaderMap,
@@ -608,11 +634,13 @@ pub async fn post_view(
                     images.width AS "width?",
                     images.height AS "height?",
                     posts.published_at,
-                    COALESCE(comment_counts.count, 0) as comments_count
+                    COALESCE(comment_counts.count, 0) as comments_count,
+                    communities.slug AS "community_slug?"
                 FROM posts
                 LEFT JOIN images ON posts.image_id = images.id
                 LEFT JOIN users ON posts.author_id = users.id
                 LEFT JOIN actors ON actors.user_id = users.id
+                LEFT JOIN communities ON posts.community_id = communities.id
                 LEFT JOIN (
                     SELECT post_id, COUNT(*) as count
                     FROM comments
@@ -650,6 +678,7 @@ pub async fn post_view(
                             published_at: row.published_at,
                             published_at_formatted,
                             comments_count: row.comments_count.unwrap_or(0),
+                            community_slug: row.community_slug,
                             children: Vec::new(),
                         };
 
@@ -2012,9 +2041,43 @@ pub async fn do_post_edit_community(
 
     // Not `let _ =`: a move that failed was redirected to as if it had worked.
     edit_post_community(&mut tx, post_uuid, form.community_id).await?;
+
+    let destination = match form.community_id {
+        Some(community_id) => find_community_by_id(&mut tx, community_id).await?,
+        None => None,
+    };
+    let author_actor = Actor::find_by_user_id(
+        &mut tx,
+        auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id,
+    )
+    .await?;
+    let author_login_name = post
+        .get("login_name")
+        .and_then(|v| v.clone())
+        .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
     tx.commit().await?;
 
-    Ok(Redirect::to(&format!("/posts/{}", id)).into_response())
+    // The move changes the post's page, which is the Note's `url`, and its
+    // `audience`. Servers that hold the Note are told, so their "open
+    // original" link follows it; one that misses this still lands on the page
+    // through the redirect from the old address.
+    let published = post.get("published_at").and_then(|p| p.as_ref()).is_some();
+    if let Some(actor) = author_actor {
+        if published && community_federates(destination.as_ref()) {
+            if let Err(e) = send_post_update_to_followers(&actor, post_uuid, &state).await {
+                tracing::error!("Failed to federate a post's move: {:?}", e);
+            }
+        }
+    }
+
+    Ok(Redirect::to(&crate::models::post::post_page_path(
+        &author_login_name,
+        destination
+            .as_ref()
+            .map(|community| community.slug.as_str()),
+        post_uuid,
+    ))
+    .into_response())
 }
 
 pub async fn hx_edit_post(
@@ -2144,23 +2207,18 @@ pub async fn hx_do_edit_post(
     )
     .await?;
 
-    // Check community visibility before federating updates
-    let should_federate = if let Some(ref post_data) = post {
-        if let Some(community_id_str) = post_data.get("community_id").and_then(|v| v.as_ref()) {
-            if let Ok(community_id) = Uuid::parse_str(community_id_str) {
-                let community = find_community_by_id(&mut tx, community_id).await?;
-                community
-                    .as_ref()
-                    .map(|c| c.visibility != crate::models::community::CommunityVisibility::Private)
-                    .unwrap_or(false)
-            } else {
-                false
-            }
-        } else {
-            false
+    // Check community visibility before federating updates. A personal post
+    // federates as it did when it was published.
+    let should_federate = match post
+        .as_ref()
+        .and_then(|post_data| post_data.get("community_id"))
+        .and_then(|v| v.as_ref())
+        .and_then(|id| Uuid::parse_str(id).ok())
+    {
+        Some(community_id) => {
+            community_federates(find_community_by_id(&mut tx, community_id).await?.as_ref())
         }
-    } else {
-        false
+        None => post.is_some(),
     };
 
     let _ = tx.commit().await;
@@ -2419,15 +2477,16 @@ pub async fn post_view_by_login_name(
                 None
             };
 
-            // A post's page is its author's, whatever community it was posted
-            // to: `post_page_path` is where that is decided, and every other
-            // handle redirects here.
-            if &login_name != post_login_name {
-                return Ok(Redirect::to(&crate::models::post::post_page_path(
-                    post_login_name,
-                    uuid,
-                ))
-                .into_response());
+            // `post_page_path` decides where a post's page is, and every other
+            // handle redirects there.
+            if let Some(redirect) = redirect_to_canonical_post(
+                &login_name,
+                post_login_name,
+                community.as_ref(),
+                uuid,
+                "",
+            ) {
+                return Ok(redirect);
             }
             if let Some(community) = community {
                 // If community is private, check if user is a member
@@ -2493,11 +2552,13 @@ pub async fn post_view_by_login_name(
                     images.width AS "width?",
                     images.height AS "height?",
                     posts.published_at,
-                    COALESCE(comment_counts.count, 0) as comments_count
+                    COALESCE(comment_counts.count, 0) as comments_count,
+                    communities.slug AS "community_slug?"
                 FROM posts
                 LEFT JOIN images ON posts.image_id = images.id
                 LEFT JOIN users ON posts.author_id = users.id
                 LEFT JOIN actors ON actors.user_id = users.id
+                LEFT JOIN communities ON posts.community_id = communities.id
                 LEFT JOIN (
                     SELECT post_id, COUNT(*) as count
                     FROM comments
@@ -2537,6 +2598,7 @@ pub async fn post_view_by_login_name(
                             published_at: row.published_at,
                             published_at_formatted,
                             comments_count: row.comments_count.unwrap_or(0),
+                            community_slug: row.community_slug,
                             children: Vec::new(),
                         };
 
@@ -2683,11 +2745,15 @@ pub async fn redirect_post_to_login_name(
                 .get("login_name")
                 .and_then(|v| v.as_ref())
                 .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
-            let post_uuid_str = post_data
-                .get("id")
-                .and_then(|v| v.as_ref())
-                .ok_or_else(|| AppError::InvalidFormData("Missing id".to_string()))?;
-            Ok(Redirect::permanent(&format!("/@{}/{}", login_name, post_uuid_str)).into_response())
+            let community_slug = post_data.get("community_slug").and_then(|v| v.as_deref());
+            // Temporary, not permanent: the page moves when the post moves
+            // between communities, and a cached 308 would outlive that.
+            Ok(Redirect::to(&crate::models::post::post_page_path(
+                login_name,
+                community_slug,
+                uuid,
+            ))
+            .into_response())
         }
         None => Ok(StatusCode::NOT_FOUND.into_response()),
     }
@@ -2811,15 +2877,14 @@ pub async fn post_relay_view_by_login_name(
         None => None,
     };
 
-    // Verify correct slug and redirect if needed
-    if let Some(ref comm) = community {
-        if login_name != comm.slug {
-            let correct_url = format!("/@{}/{}/relay", comm.slug, post_id);
-            return Ok(Redirect::to(&correct_url).into_response());
-        }
-    } else if &login_name != post_login_name {
-        let correct_url = format!("/@{}/{}/relay", post_login_name, post_id);
-        return Ok(Redirect::to(&correct_url).into_response());
+    if let Some(redirect) = redirect_to_canonical_post(
+        &login_name,
+        post_login_name,
+        community.as_ref(),
+        uuid,
+        "/relay",
+    ) {
+        return Ok(redirect);
     }
 
     // Relaying is drawing, and drawing needs an account. This route is outside
@@ -2902,15 +2967,14 @@ pub async fn post_replay_view_by_login_name(
                 None
             };
 
-            // Verify correct slug and redirect if needed
-            if let Some(ref comm) = community {
-                if login_name != comm.slug {
-                    let correct_url = format!("/@{}/{}/replay", comm.slug, post_id);
-                    return Ok(Redirect::to(&correct_url).into_response());
-                }
-            } else if &login_name != post_login_name {
-                let correct_url = format!("/@{}/{}/replay", post_login_name, post_id);
-                return Ok(Redirect::to(&correct_url).into_response());
+            if let Some(redirect) = redirect_to_canonical_post(
+                &login_name,
+                post_login_name,
+                community.as_ref(),
+                uuid,
+                "/replay",
+            ) {
+                return Ok(redirect);
             }
 
             if let Some(ref comm) = community {
@@ -3051,12 +3115,17 @@ pub async fn add_reaction(
         return Ok(StatusCode::NOT_FOUND.into_response());
     }
 
+    // The handle the post's page lives under (`post_page_path`), which the
+    // reactions link is beneath: the community's slug if it has one.
     let login_name = post
         .as_ref()
-        .and_then(|p| p.get("login_name"))
-        .and_then(|l| l.as_ref())
-        .unwrap_or(&String::new())
-        .clone();
+        .and_then(|p| {
+            p.get("community_slug")
+                .and_then(|slug| slug.as_ref())
+                .or_else(|| p.get("login_name").and_then(|l| l.as_ref()))
+        })
+        .cloned()
+        .unwrap_or_default();
 
     // Something that is not one emoji, or one you have already reacted
     // with, leaves the reactions as they are. htmx swaps an error response
@@ -3180,10 +3249,9 @@ pub async fn add_reaction(
                 // Build EmojiReact activity
                 use crate::web::handlers::activitypub::EmojiReact;
 
-                let post_url = format!(
-                    "https://{}/@{}/{}",
-                    state.config.domain, login_name, post_id
-                );
+                // The Note by its id, which is what a server that holds it knows it
+                // by; the page's address moves with the post's community.
+                let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
 
                 let emoji_react = EmojiReact {
                     actor: Some(activitypub_federation::fetch::object_id::ObjectId::parse(
@@ -3291,12 +3359,17 @@ pub async fn remove_reaction(
     let existing_reaction = find_user_reaction(&mut tx, post_id, actor.id, &form.emoji).await?;
 
     let falls = delete_reaction(&mut tx, post_id, actor.id, &form.emoji).await?;
+    // The handle the post's page lives under (`post_page_path`), which the
+    // reactions link is beneath: the community's slug if it has one.
     let login_name = post
         .as_ref()
-        .and_then(|p| p.get("login_name"))
-        .and_then(|l| l.as_ref())
-        .unwrap_or(&String::new())
-        .clone();
+        .and_then(|p| {
+            p.get("community_slug")
+                .and_then(|slug| slug.as_ref())
+                .or_else(|| p.get("login_name").and_then(|l| l.as_ref()))
+        })
+        .cloned()
+        .unwrap_or_default();
 
     // Get post author's actor for sending ActivityPub activity
     let post_author_id = post
@@ -3325,10 +3398,9 @@ pub async fn remove_reaction(
                         generate_object_id, EmojiReact, Undo, UndoObject,
                     };
 
-                    let post_url = format!(
-                        "https://{}/@{}/{}",
-                        state.config.domain, login_name, post_id
-                    );
+                    // The Note by its id, which is what a server that holds it knows it
+                    // by; the page's address moves with the post's community.
+                    let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
 
                     let emoji_react = EmojiReact {
                         actor: Some(activitypub_federation::fetch::object_id::ObjectId::parse(
@@ -3426,26 +3498,22 @@ pub async fn post_reactions_detail(
         .and_then(|v| v.as_ref())
         .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
 
-    // Check if post has community and verify correct slug
-    let community_id = post_data
+    let community = match post_data
         .get("community_id")
         .and_then(|v| v.as_ref())
-        .and_then(|s| Uuid::parse_str(s).ok());
-
-    if let Some(cid) = community_id {
-        let community = find_community_by_id(&mut tx, cid).await?;
-        if let Some(comm) = community {
-            if login_name != comm.slug {
-                let correct_url = format!("/@{}/{}/reactions", comm.slug, post_id);
-                return Ok(Redirect::to(&correct_url).into_response());
-            }
-        }
-    } else {
-        // No community - verify slug is author login_name
-        if &login_name != post_login_name {
-            let correct_url = format!("/@{}/{}/reactions", post_login_name, post_id);
-            return Ok(Redirect::to(&correct_url).into_response());
-        }
+        .and_then(|s| Uuid::parse_str(s).ok())
+    {
+        Some(cid) => find_community_by_id(&mut tx, cid).await?,
+        None => None,
+    };
+    if let Some(redirect) = redirect_to_canonical_post(
+        &login_name,
+        post_login_name,
+        community.as_ref(),
+        uuid,
+        "/reactions",
+    ) {
+        return Ok(redirect);
     }
 
     // Get all reactions for this post

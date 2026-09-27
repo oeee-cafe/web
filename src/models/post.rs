@@ -24,6 +24,7 @@ type PostData = (
     i32,                   // like_count
     Option<DateTime<Utc>>, // published_at
     i64,                   // paint_duration_ms
+    Option<String>,        // community_slug
 );
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Type, Serialize, Deserialize)]
@@ -83,6 +84,7 @@ pub struct SerializableProfilePost {
     pub updated_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub community_visibility: Option<CommunityVisibility>,
+    pub community_slug: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -154,6 +156,8 @@ pub struct SerializableThreadedPost {
     pub published_at: Option<DateTime<Utc>>,
     pub published_at_formatted: Option<String>,
     pub comments_count: i64,
+    /// The community the post is in, which names its page (`post_page_path`).
+    pub community_slug: Option<String>,
     pub children: Vec<SerializableThreadedPost>,
 }
 
@@ -300,7 +304,8 @@ pub async fn find_published_public_posts_by_author_id(
                 posts.published_at,
                 posts.created_at,
                 posts.updated_at,
-                communities.visibility as "visibility?: CommunityVisibility"
+                communities.visibility as "visibility?: CommunityVisibility",
+                communities.slug as "community_slug?"
             FROM posts
             LEFT JOIN images ON posts.image_id = images.id
             LEFT JOIN communities ON posts.community_id = communities.id
@@ -333,6 +338,7 @@ pub async fn find_published_public_posts_by_author_id(
             created_at: row.created_at,
             updated_at: row.updated_at,
             community_visibility: row.visibility,
+            community_slug: row.community_slug,
         })
         .collect())
 }
@@ -585,29 +591,46 @@ pub async fn find_published_posts_by_community_id(
 
 /// The path of a post's canonical page.
 ///
-/// A post is its author's. The author's actor is what `Create`s the Note and
-/// what `attributedTo` names; a community only `Announce`s that Note to the
-/// community's followers, the way a boost does, and a booster no more owns the
-/// page than it owns the post. `/@{community}/{id}` therefore redirects here,
-/// rather than the other way round — which also keeps a post's address still
-/// when it moves between communities, something `do_post_edit_community` does
-/// without federating anything at all, and which would otherwise leave every
-/// server that had federated the post holding a link to somewhere else.
+/// A post in a community lives under the community's slug, and any other post
+/// under its author's name. The page is where people meet a drawing, and in a
+/// community that is the community's feed, so the address says so.
+///
+/// None of this is the post's identity on the fediverse. The Note's `id` is
+/// `/ap/posts/{id}`, which names neither, and the inbox handlers find a local
+/// post from either shape of URL by its uuid alone. The address only travels
+/// as the Note's `url`, the "open original" link. A post moved by
+/// `do_post_edit_community` changes address, so that handler sends an `Update`
+/// carrying the new one; a server that misses it still holds a working link,
+/// because `post_view_by_login_name` redirects every other handle here.
 ///
 /// This is the only place that rule is written down: `post_view_by_login_name`
-/// redirects anything else to it, and `create_note_from_post` publishes it as
-/// the Note's `url`, so the address people hold and the address we federate
-/// cannot drift apart.
-pub fn post_page_path(author_login_name: &str, post_id: Uuid) -> String {
-    format!("/@{}/{}", author_login_name, post_id)
+/// and the pages under a post redirect anything else to it, and
+/// `create_note_from_post` publishes it as the Note's `url`, so the address
+/// people hold and the address we federate cannot drift apart. Templates spell
+/// it through `post_url_macro.jinja`.
+pub fn post_page_path(
+    author_login_name: &str,
+    community_slug: Option<&str>,
+    post_id: Uuid,
+) -> String {
+    format!(
+        "/@{}/{}",
+        community_slug.unwrap_or(author_login_name),
+        post_id
+    )
 }
 
 /// [`post_page_path`] as the absolute URL ActivityPub publishes.
-pub fn post_page_url(domain: &str, author_login_name: &str, post_id: Uuid) -> String {
+pub fn post_page_url(
+    domain: &str,
+    author_login_name: &str,
+    community_slug: Option<&str>,
+    post_id: Uuid,
+) -> String {
     format!(
         "https://{}{}",
         domain,
-        post_page_path(author_login_name, post_id)
+        post_page_path(author_login_name, community_slug, post_id)
     )
 }
 
@@ -616,15 +639,28 @@ mod post_page_tests {
     use super::{post_page_path, post_page_url};
     use uuid::Uuid;
 
-    /// The author names the page whether or not the post is in a community —
-    /// the community slug is not an input, which is the rule.
+    /// A post outside any community lives under its author's name.
     #[test]
-    fn the_author_names_the_page() {
+    fn a_post_without_a_community_uses_its_author() {
         let id = Uuid::nil();
-        assert_eq!(post_page_path("miro", id), format!("/@miro/{id}"));
+        assert_eq!(post_page_path("miro", None, id), format!("/@miro/{id}"));
         assert_eq!(
-            post_page_url("oeee.cafe", "miro", id),
+            post_page_url("oeee.cafe", "miro", None, id),
             format!("https://oeee.cafe/@miro/{id}")
+        );
+    }
+
+    /// A post in a community lives under the community's slug.
+    #[test]
+    fn a_post_in_a_community_uses_the_community() {
+        let id = Uuid::nil();
+        assert_eq!(
+            post_page_path("miro", Some("pokemon"), id),
+            format!("/@pokemon/{id}")
+        );
+        assert_eq!(
+            post_page_url("oeee.cafe", "miro", Some("pokemon"), id),
+            format!("https://oeee.cafe/@pokemon/{id}")
         );
     }
 }
@@ -941,11 +977,13 @@ pub async fn find_child_posts_by_parent_id(
                 images.image_filename,
                 images.width,
                 images.height,
-                posts.published_at
+                posts.published_at,
+                communities.slug AS \"community_slug?\"
             FROM posts
             LEFT JOIN images ON posts.image_id = images.id
             LEFT JOIN users ON posts.author_id = users.id
             LEFT JOIN actors ON actors.user_id = users.id
+            LEFT JOIN communities ON posts.community_id = communities.id
             WHERE posts.parent_post_id = $1
             AND posts.published_at IS NOT NULL
             AND posts.deleted_at IS NULL
@@ -979,7 +1017,8 @@ pub async fn find_child_posts_by_parent_id(
                 image_height: row.height,
                 published_at: row.published_at,
                 published_at_formatted,
-                comments_count: 0,    // Will be populated by build_thread_tree
+                comments_count: 0, // Will be populated by build_thread_tree
+                community_slug: row.community_slug,
                 children: Vec::new(), // Will be populated by build_thread_tree
             }
         })
@@ -1010,11 +1049,13 @@ pub async fn build_thread_tree(
                     images.width,
                     images.height,
                     posts.published_at,
-                    COALESCE(comment_counts.count, 0) as comments_count
+                    COALESCE(comment_counts.count, 0) as comments_count,
+                    communities.slug as community_slug
                 FROM posts
                 LEFT JOIN images ON posts.image_id = images.id
                 LEFT JOIN users ON posts.author_id = users.id
                 LEFT JOIN actors ON actors.user_id = users.id
+                LEFT JOIN communities ON posts.community_id = communities.id
                 LEFT JOIN (
                     SELECT post_id, COUNT(*) as count
                     FROM comments
@@ -1040,11 +1081,13 @@ pub async fn build_thread_tree(
                     i.width,
                     i.height,
                     p.published_at,
-                    COALESCE(cc.count, 0) as comments_count
+                    COALESCE(cc.count, 0) as comments_count,
+                    c.slug as community_slug
                 FROM posts p
                 LEFT JOIN images i ON p.image_id = i.id
                 LEFT JOIN users u ON p.author_id = u.id
                 LEFT JOIN actors a ON a.user_id = u.id
+                LEFT JOIN communities c ON p.community_id = c.id
                 LEFT JOIN (
                     SELECT post_id, COUNT(*) as count
                     FROM comments
@@ -1108,6 +1151,7 @@ pub async fn build_thread_tree(
                 height,
                 row.published_at,
                 comments_count,
+                row.community_slug.clone(),
             ),
         );
 
@@ -1134,6 +1178,7 @@ pub async fn build_thread_tree(
             height,
             published_at,
             comments_count,
+            community_slug,
         ) = post_data.get(&post_id)?;
 
         // Format the published_at date
@@ -1168,6 +1213,7 @@ pub async fn build_thread_tree(
             published_at: *published_at,
             published_at_formatted,
             comments_count: *comments_count,
+            community_slug: community_slug.clone(),
             children,
         })
     }

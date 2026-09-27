@@ -1343,6 +1343,67 @@ mod template_tests {
         );
     }
 
+    /// A post in a community is linked under the community's slug from its
+    /// own page -- its address, its share link and the pages beneath it --
+    /// and so is a drawing in its thread, from inside the thread-card macro,
+    /// while a reply outside any community keeps its author's name.
+    #[test]
+    fn a_post_in_a_community_is_linked_under_the_community() {
+        let id = "9c881320-2b43-4afa-b2bb-7128c8a3e985";
+        let mut post = post_page("true", "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d");
+        post["community_slug"] = json!("club");
+        post["community_name"] = json!("Club");
+        let reply = |reply_id: &str, community_slug: serde_json::Value| {
+            json!({
+                "id": reply_id,
+                "title": "A reply",
+                "user_login_name": "replier",
+                "user_display_name": "Replier",
+                "image_filename": "abcdef0123.png",
+                "comments_count": 0,
+                "community_slug": community_slug,
+                "children": [],
+            })
+        };
+        let env = test_support::env();
+        let rendered = env
+            .get_template("post_view.jinja")
+            .unwrap_or_else(|e| panic!("post_view.jinja loads: {e:#}"))
+            .render(context! {
+                post => post,
+                post_id => id,
+                current_user => json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "user", "login_name": "viewer"}),
+                r2_public_endpoint_url => "https://images.example",
+                base_url => "https://oeee.example",
+                domain => "oeee.example",
+                comments => Vec::<serde_json::Value>::new(),
+                collaborative_participants => Vec::<serde_json::Value>::new(),
+                reaction_counts => Vec::<serde_json::Value>::new(),
+                tags => Vec::<serde_json::Value>::new(),
+                child_posts => vec![
+                    reply("00000000-0000-0000-0000-00000000000a", json!("club")),
+                    reply("00000000-0000-0000-0000-00000000000b", json!(null)),
+                ],
+                post_community => json!(null),
+                parent_post_data => json!(null),
+                ..chrome()
+            })
+            .unwrap_or_else(|e| panic!("post_view.jinja renders: {e:#}"));
+
+        assert!(rendered.contains(&format!(r#"content="https://oeee.example/@club/{id}""#)));
+        assert!(rendered.contains(&format!(
+            r#"data-share-url="https://oeee.example/@club/{id}""#
+        )));
+        assert!(rendered.contains(&format!(r#"href="/@club/{id}/relay""#)));
+        assert!(rendered.contains(&format!(r#"href="/@club/{id}/reactions""#)));
+        assert!(rendered.contains(r#"href="/@club/00000000-0000-0000-0000-00000000000a""#));
+        assert!(rendered.contains(r#"href="/@replier/00000000-0000-0000-0000-00000000000b""#));
+        assert!(
+            !rendered.contains(&format!("/@someone/{id}")),
+            "the post is linked under its author's name"
+        );
+    }
+
     /// The blur on sensitive drawings is one CSS rule, and a stylesheet
     /// edit elsewhere once took it out with the rules around it: for a
     /// day every sensitive drawing showed in the grids unblurred, and
@@ -1880,7 +1941,10 @@ mod template_tests {
             .expect("toolbar renders");
 
         assert!(bar.contains(r#"class="toolbar-square toolbar-button toolbar-search""#));
-        assert!(bar.contains(r#"href="/search""#), "somewhere to go with no script");
+        assert!(
+            bar.contains(r#"href="/search""#),
+            "somewhere to go with no script"
+        );
         assert!(bar.contains("window.oeeeJump.open()"));
         assert!(
             !bar.contains("toolbar-search-field") && !bar.contains(r#"type="search""#),

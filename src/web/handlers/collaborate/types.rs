@@ -68,6 +68,10 @@ pub struct CollaborationMeta {
     pub owner_id: String,
     #[serde(rename = "savedPostId")]
     pub saved_post_id: Option<String>,
+    /// The saved post's page, from `db::saved_post_path` — under its
+    /// community's slug when it has one, which the client cannot know.
+    #[serde(rename = "savedPostUrl")]
+    pub saved_post_url: Option<String>,
     #[serde(rename = "ownerLoginName")]
     pub owner_login_name: String,
     #[serde(rename = "maxUsers")]
