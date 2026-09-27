@@ -499,7 +499,7 @@ pub async fn activitypub_webfinger(
 
 pub async fn activitypub_get_user(
     _header_map: HeaderMap,
-    Path(actor_id): Path<String>,
+    Path(user_id): Path<String>,
     data: Data<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = &data.app_data().db_pool;
@@ -507,8 +507,8 @@ pub async fn activitypub_get_user(
 
     if let Some(actor) = Actor::find_by_user_id(
         &mut tx,
-        Uuid::parse_str(&actor_id)
-            .map_err(|e| anyhow::anyhow!("Invalid actor UUID: {}: {}", actor_id, e))?,
+        Uuid::parse_str(&user_id)
+            .map_err(|e| anyhow::anyhow!("Invalid user UUID: {}: {}", user_id, e))?,
     )
     .await?
     {
@@ -707,16 +707,16 @@ pub async fn activitypub_post_community_inbox(
 }
 
 pub async fn activitypub_post_user_followers(
-    Path(login_name): Path<String>,
+    Path(user_id): Path<String>,
     data: Data<AppState>,
 ) -> impl IntoResponse {
     tracing::warn!(
         "🔔 USER FOLLOWERS: Request received at /ap/users/{}/followers",
-        login_name
+        user_id
     );
 
     let domain = &data.app_data().config.domain;
-    let followers_url = format!("https://{}/ap/users/{}/followers", domain, login_name);
+    let followers_url = format!("https://{}/ap/users/{}/followers", domain, user_id);
 
     // Return empty OrderedCollection following ActivityPub spec
     let collection = serde_json::json!({

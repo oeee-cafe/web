@@ -417,18 +417,18 @@ impl App {
 
         let activitypub_router = Router::new()
             .route("/.well-known/webfinger", get(activitypub_webfinger))
-            .route("/ap/users/{login_name}", get(activitypub_get_user))
+            .route("/ap/users/{user_id}", get(activitypub_get_user))
             .route("/ap/posts/{post_id}", get(activitypub_get_post))
             .route(
                 "/ap/communities/{community_id}",
                 get(activitypub_get_community),
             )
             .route(
-                "/ap/users/{login_name}/inbox",
+                "/ap/users/{user_id}/inbox",
                 post(activitypub_post_user_inbox),
             )
             .route(
-                "/ap/users/{login_name}/followers",
+                "/ap/users/{user_id}/followers",
                 get(activitypub_post_user_followers),
             )
             .route(
