@@ -215,12 +215,7 @@ pub async fn send_update_activity(
 
     // Send the activity to followers
     actor
-        .send(
-            update_activity,
-            inbox_urls,
-            app_state.config.use_activitypub_queue(),
-            &federation_data,
-        )
+        .send(update_activity, inbox_urls, &federation_data)
         .await?;
 
     Ok(())
@@ -285,12 +280,7 @@ pub async fn send_delete_activity(
 
     // Send the activity to followers
     actor
-        .send(
-            delete_activity,
-            inbox_urls,
-            app_state.config.use_activitypub_queue(),
-            &federation_data,
-        )
+        .send(delete_activity, inbox_urls, &federation_data)
         .await?;
 
     Ok(())

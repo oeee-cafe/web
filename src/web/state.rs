@@ -27,6 +27,8 @@ pub struct AppState {
     /// What open pages hear without asking (crate::live).
     pub live: Live,
     pub shutdown: Shutdown,
+    /// Outgoing ActivityPub deliveries (crate::federation).
+    pub deliverer: Arc<crate::federation::Deliverer>,
 }
 
 impl AppState {

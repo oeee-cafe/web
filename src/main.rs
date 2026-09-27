@@ -280,6 +280,13 @@ fn main() {
                 }
             };
 
+            let deliverer = oeee_cafe::federation::deliverer(db_pool.clone(), &cfg.domain)
+                .await
+                .unwrap_or_else(|e| {
+                    eprintln!("error setting up ActivityPub delivery: {}", e);
+                    exit(1);
+                });
+
             let live = Live::new(redis_pool.clone());
             let push_service = push_service.with_live(live.clone());
 
@@ -293,7 +300,21 @@ fn main() {
                 push_service: Arc::new(push_service),
                 live,
                 shutdown: Shutdown::new(),
+                deliverer: Arc::new(deliverer),
             };
+            // Sends what is queued until shutdown is signalled. What it holds
+            // then is leased, and the other colour takes it when the lease
+            // lapses.
+            {
+                let deliverer = state.deliverer.clone();
+                let shutdown = state.shutdown.clone();
+                tokio::spawn(async move {
+                    tokio::select! {
+                        () = deliverer.run() => {}
+                        () = shutdown.signalled() => {}
+                    }
+                });
+            }
             // This process's one subscription to what the others publish,
             // for as long as it serves.
             state.live.listen(&cfg.redis_url, state.shutdown.clone());

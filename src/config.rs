@@ -347,13 +347,6 @@ impl AppConfig {
         }
         Ok(())
     }
-
-    /// Determines whether to use ActivityPub message queueing.
-    /// Returns true in production for reliability (automatic retries on failure),
-    /// false in development for easier debugging (immediate sending).
-    pub fn use_activitypub_queue(&self) -> bool {
-        self.env == "production"
-    }
 }
 
 #[cfg(test)]

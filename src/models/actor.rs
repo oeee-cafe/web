@@ -1,8 +1,5 @@
-use activitypub_federation::activity_queue::queue_activity;
-use activitypub_federation::activity_sending::SendActivityTask;
 use activitypub_federation::config::Data;
 use activitypub_federation::protocol::context::WithContext;
-use activitypub_federation::traits::Activity;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -307,18 +304,20 @@ impl Actor {
         Ok(created_actor)
     }
 
+    /// Queue `activity` for `recipients`, signed by this actor.
+    ///
+    /// It is sent by the deliverer's loop (crate::federation), not here: a
+    /// peer that is down is retried from the queue rather than failing the
+    /// request that federated to it.
     pub(crate) async fn send<A>(
         &self,
         activity: A,
         recipients: Vec<Url>,
-        use_queue: bool,
         data: &Data<AppState>,
     ) -> Result<(), AppError>
     where
-        A: Activity + Serialize + std::fmt::Debug + Send + Sync,
-        <A as Activity>::Error: From<anyhow::Error> + From<serde_json::Error>,
+        A: Serialize + std::fmt::Debug,
     {
-        // Print activity
         tracing::info!("Activity: {:?}", activity);
 
         let context = [
@@ -335,16 +334,18 @@ impl Actor {
                     .collect(),
             ),
         );
-        // Send through queue in some cases and bypass it in others to test both code paths
-        if use_queue {
-            queue_activity(&activity, self, recipients, data).await?;
-        } else {
-            let sends = SendActivityTask::prepare(&activity, self, recipients, data).await?;
-            for send in sends {
-                send.sign_and_send(data).await?;
-            }
-        }
-        Ok(())
+        let activity = serde_json::to_value(&activity)
+            .map_err(|error| AppError::from(anyhow::anyhow!("serialize activity: {error}")))?;
+        let state = data.app_data();
+        crate::federation::send(
+            &state.deliverer,
+            &state.config.domain,
+            self,
+            &activity,
+            recipients,
+        )
+        .await
+        .map_err(|error| AppError::from(anyhow::anyhow!("queue delivery: {error}")))
     }
 }
 

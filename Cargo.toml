@@ -91,6 +91,16 @@ rustls-pki-types = "1.15.1"
 rustls-webpki = { version = "0.103.15", features = ["ring"] }
 x509-parser = "0.18.1"
 
+# Outgoing ActivityPub deliveries (src/federation.rs). Pinned, since feder's
+# main moves; bump the rev to take a newer one.
+[dependencies.feder]
+git = "https://github.com/limeburst/feder.git"
+rev = "41c3f4f4350582151ce8d469aad5e022a10b94f1"
+
+[dependencies.feder-postgres]
+git = "https://github.com/limeburst/feder.git"
+rev = "41c3f4f4350582151ce8d469aad5e022a10b94f1"
+
 [dependencies.sqlx]
 version = "0.8.6"
 features = [
