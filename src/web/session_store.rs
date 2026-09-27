@@ -27,11 +27,13 @@ impl PostgresStore {
     }
 
     async fn id_exists(&self, conn: &mut PgConnection, id: &Id) -> session_store::Result<bool> {
-        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM sessions WHERE id = $1)")
-            .bind(id.to_string())
-            .fetch_one(conn)
-            .await
-            .map_err(backend)
+        sqlx::query_scalar!(
+            r#"SELECT EXISTS(SELECT 1 FROM sessions WHERE id = $1) AS "exists!""#,
+            id.to_string()
+        )
+        .fetch_one(conn)
+        .await
+        .map_err(backend)
     }
 
     async fn save_with_conn(
@@ -43,17 +45,17 @@ impl PostgresStore {
             rmp_serde::to_vec(record).map_err(|e| session_store::Error::Encode(e.to_string()))?;
         let expiry_date =
             DateTime::<Utc>::from_timestamp_nanos(record.expiry_date.unix_timestamp_nanos() as i64);
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO sessions (id, data, expiry_date)
             VALUES ($1, $2, $3)
             ON CONFLICT (id) DO UPDATE
             SET data = excluded.data, expiry_date = excluded.expiry_date
             "#,
+            record.id.to_string(),
+            data,
+            expiry_date
         )
-        .bind(record.id.to_string())
-        .bind(data)
-        .bind(expiry_date)
         .execute(conn)
         .await
         .map_err(backend)?;
@@ -68,7 +70,7 @@ fn backend(e: sqlx::Error) -> session_store::Error {
 #[async_trait]
 impl ExpiredDeletion for PostgresStore {
     async fn delete_expired(&self) -> session_store::Result<()> {
-        sqlx::query("DELETE FROM sessions WHERE expiry_date < now()")
+        sqlx::query!("DELETE FROM sessions WHERE expiry_date < now()")
             .execute(&self.pool)
             .await
             .map_err(backend)?;
@@ -94,12 +96,13 @@ impl SessionStore for PostgresStore {
     }
 
     async fn load(&self, session_id: &Id) -> session_store::Result<Option<Record>> {
-        let data: Option<Vec<u8>> =
-            sqlx::query_scalar("SELECT data FROM sessions WHERE id = $1 AND expiry_date > now()")
-                .bind(session_id.to_string())
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(backend)?;
+        let data = sqlx::query_scalar!(
+            "SELECT data FROM sessions WHERE id = $1 AND expiry_date > now()",
+            session_id.to_string()
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(backend)?;
         data.map(|data| {
             rmp_serde::from_slice(&data).map_err(|e| session_store::Error::Decode(e.to_string()))
         })
@@ -107,8 +110,7 @@ impl SessionStore for PostgresStore {
     }
 
     async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
-        sqlx::query("DELETE FROM sessions WHERE id = $1")
-            .bind(session_id.to_string())
+        sqlx::query!("DELETE FROM sessions WHERE id = $1", session_id.to_string())
             .execute(&self.pool)
             .await
             .map_err(backend)?;

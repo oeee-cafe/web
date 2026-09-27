@@ -1278,9 +1278,92 @@ mod tests {
     /// take turns.
     static PURCHASE_ROWS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+    /// A new account holding purchases "1000" and "1001" of the test pack,
+    /// the fake App Store's two transactions, and the pack itself if the
+    /// database did not have it already: all of it taken away again by
+    /// `clean_up`.
+    struct Purchases {
+        buyer: Uuid,
+        added_product: bool,
+    }
+
+    impl Purchases {
+        async fn record(db: &sqlx::PgPool, login_prefix: &str) -> Self {
+            use crate::models::supporter::{record_purchase, Store};
+
+            let added_product = sqlx::query!(
+                "INSERT INTO store_products (store, product, year) VALUES ('apple', $1, $2)
+                 ON CONFLICT DO NOTHING",
+                PRODUCT_ID,
+                PACK_YEAR
+            )
+            .execute(db)
+            .await
+            .unwrap()
+            .rows_affected()
+                == 1;
+            let login = format!(
+                "{login_prefix}_{}",
+                &Uuid::new_v4().simple().to_string()[..12]
+            );
+            let buyer = sqlx::query_scalar!(
+                "INSERT INTO users (login_name, display_name, password_hash) VALUES ($1, $1, 'x') RETURNING id",
+                login
+            )
+            .fetch_one(db)
+            .await
+            .unwrap();
+            let mut tx = db.begin().await.unwrap();
+            for id in ["1001", "1000"] {
+                let pack = OwnedProduct {
+                    product: PRODUCT_ID.to_string(),
+                    year: PACK_YEAR,
+                };
+                record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true)
+                    .await
+                    .unwrap();
+            }
+            tx.commit().await.unwrap();
+            Purchases {
+                buyer,
+                added_product,
+            }
+        }
+
+        /// Each purchase's owner, and whether it has been revoked.
+        async fn revoked(&self, db: &sqlx::PgPool) -> Vec<(String, bool)> {
+            sqlx::query!(
+                r#"SELECT owner, revoked_at IS NOT NULL AS "revoked!" FROM supporter_purchases
+                   WHERE user_id = $1 ORDER BY owner"#,
+                self.buyer
+            )
+            .fetch_all(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.owner, row.revoked))
+            .collect()
+        }
+
+        async fn clean_up(self, db: &sqlx::PgPool) {
+            sqlx::query!("DELETE FROM users WHERE id = $1", self.buyer)
+                .execute(db)
+                .await
+                .unwrap();
+            if self.added_product {
+                sqlx::query!(
+                    "DELETE FROM store_products WHERE store = 'apple' AND product = $1",
+                    PRODUCT_ID
+                )
+                .execute(db)
+                .await
+                .unwrap();
+            }
+        }
+    }
+
     #[tokio::test]
     async fn a_refund_notification_revokes_the_purchase_it_names() {
-        use crate::models::supporter::{record_purchase, Store};
         let _turn = PURCHASE_ROWS.lock().await;
         let Ok(url) = std::env::var("DATABASE_URL") else {
             return;
@@ -1290,63 +1373,15 @@ mod tests {
         };
         let config = fake_app_store().await;
 
-        let added_product = sqlx::query(
-            "INSERT INTO store_products (store, product, year) VALUES ('apple', $1, $2)
-             ON CONFLICT DO NOTHING",
-        )
-        .bind(PRODUCT_ID)
-        .bind(PACK_YEAR)
-        .execute(&db)
-        .await
-        .unwrap()
-        .rows_affected()
-            == 1;
-        let login = format!("notify_{}", &Uuid::new_v4().simple().to_string()[..12]);
-        let buyer: Uuid = sqlx::query_scalar(
-            "INSERT INTO users (login_name, display_name, password_hash) VALUES ($1, $1, 'x') RETURNING id",
-        )
-        .bind(&login)
-        .fetch_one(&db)
-        .await
-        .unwrap();
         // "1001" is refunded at the fake App Store; "1000" is not.
-        let mut tx = db.begin().await.unwrap();
-        for id in ["1001", "1000"] {
-            let pack = OwnedProduct {
-                product: PRODUCT_ID.to_string(),
-                year: PACK_YEAR,
-            };
-            record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true)
-                .await
-                .unwrap();
-        }
-        tx.commit().await.unwrap();
+        let purchases = Purchases::record(&db, "notify").await;
 
         let refunded = heed(&db, &config, "1001", PRODUCT_ID).await;
         let standing = heed(&db, &config, "1000", PRODUCT_ID).await;
         let unknown = heed(&db, &config, "9999", PRODUCT_ID).await;
         let elsewhere = heed(&db, &config, "1000", "cafe.oeee.not.in.the.catalogue").await;
-        let revoked: Vec<(String, bool)> = sqlx::query_as(
-            "SELECT owner, revoked_at IS NOT NULL FROM supporter_purchases
-             WHERE user_id = $1 ORDER BY owner",
-        )
-        .bind(buyer)
-        .fetch_all(&db)
-        .await
-        .unwrap();
-
-        sqlx::query("DELETE FROM users WHERE id = $1")
-            .bind(buyer)
-            .execute(&db)
-            .await
-            .unwrap();
-        if added_product {
-            sqlx::query("DELETE FROM store_products WHERE store = 'apple' AND product = $1")
-                .bind(PRODUCT_ID)
-                .execute(&db)
-                .await
-                .unwrap();
-        }
+        let revoked = purchases.revoked(&db).await;
+        purchases.clean_up(&db).await;
 
         assert_eq!(refunded.unwrap(), Heeded::Recorded { owned: false });
         assert_eq!(standing.unwrap(), Heeded::Recorded { owned: true });
@@ -1365,7 +1400,6 @@ mod tests {
     /// Each is dealt with once, however many sweeps see it.
     #[tokio::test]
     async fn a_sweep_heeds_what_never_arrived_by_what_is_true_now() {
-        use crate::models::supporter::{record_purchase, Store};
         let _turn = PURCHASE_ROWS.lock().await;
         let Ok(url) = std::env::var("DATABASE_URL") else {
             return;
@@ -1375,61 +1409,13 @@ mod tests {
         };
         let config = fake_app_store().await;
 
-        let added_product = sqlx::query(
-            "INSERT INTO store_products (store, product, year) VALUES ('apple', $1, $2)
-             ON CONFLICT DO NOTHING",
-        )
-        .bind(PRODUCT_ID)
-        .bind(PACK_YEAR)
-        .execute(&db)
-        .await
-        .unwrap()
-        .rows_affected()
-            == 1;
-        let login = format!("sweep_{}", &Uuid::new_v4().simple().to_string()[..12]);
-        let buyer: Uuid = sqlx::query_scalar(
-            "INSERT INTO users (login_name, display_name, password_hash) VALUES ($1, $1, 'x') RETURNING id",
-        )
-        .bind(&login)
-        .fetch_one(&db)
-        .await
-        .unwrap();
-        let mut tx = db.begin().await.unwrap();
-        for id in ["1001", "1000"] {
-            let pack = OwnedProduct {
-                product: PRODUCT_ID.to_string(),
-                year: PACK_YEAR,
-            };
-            record_purchase(&mut tx, buyer, Store::Apple, id, &pack, true)
-                .await
-                .unwrap();
-        }
-        tx.commit().await.unwrap();
+        let purchases = Purchases::record(&db, "sweep").await;
 
         let mut heeded = std::collections::HashSet::new();
         let first = sweep_once(&db, &config, &mut heeded).await;
         let second = sweep_once(&db, &config, &mut heeded).await;
-        let revoked: Vec<(String, bool)> = sqlx::query_as(
-            "SELECT owner, revoked_at IS NOT NULL FROM supporter_purchases
-             WHERE user_id = $1 ORDER BY owner",
-        )
-        .bind(buyer)
-        .fetch_all(&db)
-        .await
-        .unwrap();
-
-        sqlx::query("DELETE FROM users WHERE id = $1")
-            .bind(buyer)
-            .execute(&db)
-            .await
-            .unwrap();
-        if added_product {
-            sqlx::query("DELETE FROM store_products WHERE store = 'apple' AND product = $1")
-                .bind(PRODUCT_ID)
-                .execute(&db)
-                .await
-                .unwrap();
-        }
+        let revoked = purchases.revoked(&db).await;
+        purchases.clean_up(&db).await;
 
         assert_eq!(first.unwrap(), 3, "two refunds and a test, over two pages");
         assert_eq!(second.unwrap(), 0, "each once");
