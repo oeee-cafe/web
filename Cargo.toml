@@ -93,31 +93,31 @@ x509-parser = "0.18.1"
 # main moves; bump the rev to take a newer one.
 [dependencies.feder]
 git = "https://github.com/limeburst/feder.git"
-rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
+rev = "3b0c095644465fc2b7dd6d8dea4401f14fa65583"
 
 [dependencies.feder-postgres]
 git = "https://github.com/limeburst/feder.git"
-rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
+rev = "3b0c095644465fc2b7dd6d8dea4401f14fa65583"
 
 # Actors' key pairs (src/models/actor.rs).
 [dependencies.feder-runtime]
 git = "https://github.com/limeburst/feder.git"
-rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
+rev = "3b0c095644465fc2b7dd6d8dea4401f14fa65583"
 
 # The vocabulary incoming activities are read into, and what they mean
 # (src/federation/listeners.rs).
 [dependencies.feder-vocab]
 git = "https://github.com/limeburst/feder.git"
-rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
+rev = "3b0c095644465fc2b7dd6d8dea4401f14fa65583"
 
 [dependencies.feder-core]
 git = "https://github.com/limeburst/feder.git"
-rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
+rev = "3b0c095644465fc2b7dd6d8dea4401f14fa65583"
 
 # Serving what other servers fetch (src/federation/serving.rs).
 [dependencies.feder-axum]
 git = "https://github.com/limeburst/feder.git"
-rev = "c3ec27ebb32236f71bd8374b4456260be236e80c"
+rev = "3b0c095644465fc2b7dd6d8dea4401f14fa65583"
 
 [dependencies.sqlx]
 version = "0.8.6"
