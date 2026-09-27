@@ -8,9 +8,8 @@ use crate::web::handlers::account::{
     verify_email_verification_code,
 };
 use crate::web::handlers::activitypub::{
-    activitypub_get_community, activitypub_get_post, activitypub_get_user,
-    activitypub_post_community_inbox, activitypub_post_shared_inbox,
-    activitypub_post_user_followers, activitypub_post_user_inbox, activitypub_webfinger,
+    activitypub_community_page, activitypub_post_community_inbox, activitypub_post_page,
+    activitypub_post_shared_inbox, activitypub_post_user_inbox, activitypub_user_page,
 };
 use crate::web::handlers::admin::{
     admin_add_store_product, admin_banners, admin_banners_fragment, admin_collaborative_sessions,
@@ -416,20 +415,17 @@ impl App {
             .await?;
 
         let activitypub_router = Router::new()
-            .route("/.well-known/webfinger", get(activitypub_webfinger))
-            .route("/ap/users/{user_id}", get(activitypub_get_user))
-            .route("/ap/posts/{post_id}", get(activitypub_get_post))
+            // Feder answers these when ActivityPub is asked for; what is left
+            // is a browser, sent to the page.
+            .route("/ap/users/{user_id}", get(activitypub_user_page))
+            .route("/ap/posts/{post_id}", get(activitypub_post_page))
             .route(
                 "/ap/communities/{community_id}",
-                get(activitypub_get_community),
+                get(activitypub_community_page),
             )
             .route(
                 "/ap/users/{user_id}/inbox",
                 post(activitypub_post_user_inbox),
-            )
-            .route(
-                "/ap/users/{user_id}/followers",
-                get(activitypub_post_user_followers),
             )
             .route(
                 "/ap/communities/{community_id}/inbox",
@@ -643,7 +639,12 @@ impl App {
             .layer(auth_layer)
             .with_state(self.state.clone())
             .merge(static_router)
-            .merge(activitypub_router)
+            .merge(activitypub_router);
+        // What other servers fetch, answered before any of the site's own
+        // layers: actors, posts, their collections, WebFinger and NodeInfo.
+        let federation = crate::federation::serving::federation(&self.state.config.domain)?;
+        let serving_state = self.state.clone();
+        let app = feder_axum::wrap(app, federation, move |_| Some(serving_state.clone()))
             // Outermost, so it also covers panics raised inside the layers
             // above. Without this axum drops the connection on a panic: the
             // client sees a reset with no status, and Sentry never hears about

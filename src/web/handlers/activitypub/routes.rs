@@ -1,241 +1,84 @@
 //! What other servers fetch and post: webfinger, actors, posts and the inboxes.
 
 use activitypub_federation::axum::inbox::{receive_activity, ActivityData};
-use activitypub_federation::axum::json::FederationJson;
 use activitypub_federation::config::Data;
 use activitypub_federation::fetch::object_id::ObjectId;
-use activitypub_federation::fetch::webfinger::{build_webfinger_response, extract_webfinger_name};
 use activitypub_federation::protocol::context::WithContext;
-use activitypub_federation::traits::{Activity, Object};
+use activitypub_federation::traits::Activity;
 
-use axum::extract::{Path, Query};
-use axum::http::{HeaderMap, StatusCode};
-use axum::response::IntoResponse;
-use axum::Json;
+use axum::extract::Path;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Redirect, Response};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use url::Url;
 use uuid::Uuid;
 
 use crate::app_error::AppError;
-use crate::models::actor::{create_actor_for_user, Actor};
-use crate::models::community::{find_community_by_id, find_community_by_slug, CommunityVisibility};
+use crate::models::actor::Actor;
 use crate::models::post::find_post_by_id;
-use crate::models::user::{find_user_by_id, find_user_by_login_name};
 use crate::web::state::AppState;
 
-use super::{create_note_from_post, Create, Delete, EmojiReact, Follow, Like, Undo, Update};
+use super::{Create, Delete, EmojiReact, Follow, Like, Undo, Update};
 
-#[derive(Deserialize)]
-pub struct WebfingerQuery {
-    resource: String,
-}
+// Serving to other servers is feder's (src/federation/serving.rs). What
+// reaches these is a person following an ActivityPub ID in a browser, who
+// is sent to the page it is the ID of.
 
-pub async fn activitypub_webfinger(
-    Query(query): Query<WebfingerQuery>,
-    data: Data<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let name = extract_webfinger_name(&query.resource, &data)?;
-    let db = &data.app_data().db_pool;
-    let mut tx = db.begin().await?;
-
-    // First, try to find a user with this login name
-    let user = find_user_by_login_name(&mut tx, name).await?;
-    if let Some(user) = user {
-        let actor = Actor::find_by_user_id(&mut tx, user.id).await?;
-        if let Some(actor) = actor {
-            return Ok(Json(build_webfinger_response(
-                query.resource,
-                actor
-                    .iri
-                    .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid actor IRI: {}", e))?,
-            ))
-            .into_response());
-        }
-    }
-
-    // If no user found, try to find a community with this slug
-    let community = find_community_by_slug(&mut tx, name.to_string()).await?;
-    if let Some(community) = community {
-        // Only allow webfinger discovery for public and unlisted communities
-        // Private communities should not be discoverable via webfinger
-        if community.visibility == CommunityVisibility::Private {
-            return Ok((StatusCode::NOT_FOUND, "Community not found").into_response());
-        }
-
-        let actor = Actor::find_by_community_id(&mut tx, community.id).await?;
-        if let Some(actor) = actor {
-            return Ok(Json(build_webfinger_response(
-                query.resource,
-                actor
-                    .iri
-                    .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid actor IRI: {}", e))?,
-            ))
-            .into_response());
-        }
-    }
-
-    // Neither user nor community found
-    Ok((StatusCode::NOT_FOUND, "User or community not found").into_response())
-}
-
-pub async fn activitypub_get_user(
-    _header_map: HeaderMap,
+/// `/ap/users/{user_id}`, asked for as a page: the profile.
+pub async fn activitypub_user_page(
     Path(user_id): Path<String>,
     data: Data<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &data.app_data().db_pool;
-    let mut tx = db.begin().await?;
-
-    if let Some(actor) = Actor::find_by_user_id(
-        &mut tx,
-        Uuid::parse_str(&user_id)
-            .map_err(|e| anyhow::anyhow!("Invalid user UUID: {}: {}", user_id, e))?,
-    )
-    .await?
-    {
-        let json_actor = actor.into_json(&data).await?;
-        let context = [
-            "https://www.w3.org/ns/activitystreams",
-            "https://w3id.org/security/v1",
-        ];
-
-        let activity = WithContext::new(
-            json_actor,
-            serde_json::Value::Array(
-                context
-                    .into_iter()
-                    .map(|s| serde_json::Value::String(s.to_string()))
-                    .collect(),
-            ),
-        );
-        Ok(FederationJson(activity).into_response())
-    } else {
-        Ok((StatusCode::NOT_FOUND, "Actor not found").into_response())
-    }
+) -> Result<Response, AppError> {
+    let Ok(user_id) = Uuid::parse_str(&user_id) else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let mut tx = data.app_data().db_pool.begin().await?;
+    Ok(match Actor::find_by_user_id(&mut tx, user_id).await? {
+        Some(actor) => Redirect::to(&actor.url).into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    })
 }
 
-pub async fn activitypub_get_community(
-    _header_map: HeaderMap,
+/// `/ap/communities/{community_id}`, asked for as a page: the community.
+pub async fn activitypub_community_page(
     Path(community_id): Path<String>,
     data: Data<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &data.app_data().db_pool;
-    let mut tx = db.begin().await?;
-
-    if let Some(actor) = Actor::find_by_community_id(
-        &mut tx,
-        Uuid::parse_str(&community_id)
-            .map_err(|e| anyhow::anyhow!("Invalid community UUID: {}: {}", community_id, e))?,
+) -> Result<Response, AppError> {
+    let Ok(community_id) = Uuid::parse_str(&community_id) else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let mut tx = data.app_data().db_pool.begin().await?;
+    Ok(
+        match Actor::find_by_community_id(&mut tx, community_id).await? {
+            Some(actor) => Redirect::to(&actor.url).into_response(),
+            None => StatusCode::NOT_FOUND.into_response(),
+        },
     )
-    .await?
-    {
-        let json_actor = actor.into_json(&data).await?;
-        let context = [
-            "https://www.w3.org/ns/activitystreams",
-            "https://w3id.org/security/v1",
-        ];
-
-        let activity = WithContext::new(
-            json_actor,
-            serde_json::Value::Array(
-                context
-                    .into_iter()
-                    .map(|s| serde_json::Value::String(s.to_string()))
-                    .collect(),
-            ),
-        );
-        Ok(FederationJson(activity).into_response())
-    } else {
-        Ok((StatusCode::NOT_FOUND, "Actor not found").into_response())
-    }
 }
 
-pub async fn activitypub_get_post(
-    _header_map: HeaderMap,
+/// `/ap/posts/{post_id}`, asked for as a page: the post.
+pub async fn activitypub_post_page(
     Path(post_id): Path<String>,
     data: Data<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &data.app_data().db_pool;
-    let mut tx = db.begin().await?;
-
-    let post_uuid = Uuid::parse_str(&post_id)?;
-
-    if let Some(post) = find_post_by_id(&mut tx, post_uuid).await? {
-        // Check community visibility - only expose posts from public and unlisted communities via ActivityPub
-        // Private community posts should not be accessible
-        // Personal posts (no community) are always accessible
-        let community_id = post
-            .get("community_id")
-            .and_then(|v| v.as_ref())
-            .and_then(|s| Uuid::parse_str(s).ok());
-
-        if let Some(cid) = community_id {
-            let community = find_community_by_id(&mut tx, cid).await?;
-            if let Some(community) = community
-                && community.visibility == CommunityVisibility::Private
-            {
-                return Ok((StatusCode::NOT_FOUND, "Post not found").into_response());
-            }
-        }
-
-        let author_id = Uuid::parse_str(
-            post.get("author_id")
-                .and_then(|v| v.as_ref())
-                .ok_or_else(|| anyhow::anyhow!("Missing author_id in post"))?,
-        )?;
-
-        // Find the author's actor, create if it doesn't exist
-        let author_actor = Actor::find_by_user_id(&mut tx, author_id).await?;
-        let author_actor = if let Some(actor) = author_actor {
-            actor
-        } else {
-            // Actor doesn't exist, try to find the user and create the actor
-            if let Some(user) = find_user_by_id(&mut tx, author_id).await? {
-                tracing::info!(
-                    "Creating missing actor for user {} (id: {})",
-                    user.login_name,
-                    user.id
-                );
-                create_actor_for_user(&mut tx, &user, &data.app_data().config).await?
-            } else {
-                return Ok((StatusCode::NOT_FOUND, "User not found").into_response());
-            }
-        };
-
-        // Use the shared function to create the Note
-        let note = create_note_from_post(
-            &mut tx,
-            post_uuid,
-            &author_actor,
-            &data.app_data().config.domain,
-            &data.app_data().config.r2_public_endpoint_url,
-        )
-        .await?;
-
-        // Commit the transaction to persist any actor creations
-        tx.commit().await?;
-
-        let context = [
-            "https://www.w3.org/ns/activitystreams",
-            "https://w3id.org/security/v1",
-        ];
-
-        Ok(FederationJson(WithContext::new(
-            note,
-            Value::Array(
-                context
-                    .into_iter()
-                    .map(|s| Value::String(s.to_string()))
-                    .collect(),
-            ),
-        ))
-        .into_response())
-    } else {
-        Ok((StatusCode::NOT_FOUND, "Post not found").into_response())
-    }
+) -> Result<Response, AppError> {
+    let Ok(post_id) = Uuid::parse_str(&post_id) else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let mut tx = data.app_data().db_pool.begin().await?;
+    let Some(post) = find_post_by_id(&mut tx, post_id).await? else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let Some(login_name) = post.get("login_name").and_then(|v| v.as_deref()) else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+    let community_slug = post.get("community_slug").and_then(|v| v.as_deref());
+    let url = crate::models::post::post_page_url(
+        &data.app_data().config.domain,
+        login_name,
+        community_slug,
+        post_id,
+    );
+    Ok(Redirect::to(&url).into_response())
 }
 
 pub async fn activitypub_post_user_inbox(
@@ -288,29 +131,6 @@ pub async fn activitypub_post_community_inbox(
     tracing::warn!("🔔 COMMUNITY INBOX: Request received at /ap/communities/*/inbox");
     receive_activity::<WithContext<GroupAcceptedActivities>, Actor, AppState>(activity_data, &data)
         .await
-}
-
-pub async fn activitypub_post_user_followers(
-    Path(user_id): Path<String>,
-    data: Data<AppState>,
-) -> impl IntoResponse {
-    tracing::warn!(
-        "🔔 USER FOLLOWERS: Request received at /ap/users/{}/followers",
-        user_id
-    );
-
-    let domain = &data.app_data().config.domain;
-    let followers_url = format!("https://{}/ap/users/{}/followers", domain, user_id);
-
-    // Return empty OrderedCollection following ActivityPub spec
-    let collection = serde_json::json!({
-        "type": "OrderedCollection",
-        "id": followers_url,
-        "@context": "https://www.w3.org/ns/activitystreams",
-        "totalItems": 0,
-    });
-
-    Json(collection)
 }
 
 pub async fn activitypub_post_shared_inbox(

@@ -95,11 +95,16 @@ x509-parser = "0.18.1"
 # main moves; bump the rev to take a newer one.
 [dependencies.feder]
 git = "https://github.com/limeburst/feder.git"
-rev = "41c3f4f4350582151ce8d469aad5e022a10b94f1"
+rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
 
 [dependencies.feder-postgres]
 git = "https://github.com/limeburst/feder.git"
-rev = "41c3f4f4350582151ce8d469aad5e022a10b94f1"
+rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
+
+# Serving what other servers fetch (src/federation/serving.rs).
+[dependencies.feder-axum]
+git = "https://github.com/limeburst/feder.git"
+rev = "20bf456012423b26575c4addd322a3a1d0c47c10"
 
 [dependencies.sqlx]
 version = "0.8.6"
