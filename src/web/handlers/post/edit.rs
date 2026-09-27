@@ -166,14 +166,12 @@ pub async fn post_edit_community(
     // Get all community IDs for fetching recent posts
     let mut all_community_ids: Vec<Uuid> = Vec::new();
     for c in &known_communities {
-        if current_community_id.map_or(true, |curr_id| c.id != curr_id) {
+        if current_community_id != Some(c.id) {
             all_community_ids.push(c.id);
         }
     }
     for c in &public_communities {
-        if current_community_id.map_or(true, |curr_id| c.id != curr_id)
-            && !known_ids.contains(&c.id)
-        {
+        if current_community_id != Some(c.id) && !known_ids.contains(&c.id) {
             all_community_ids.push(c.id);
         }
     }

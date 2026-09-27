@@ -1386,6 +1386,7 @@ pub struct WelcomeForm {
     agree: Option<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn do_identity_welcome(
     mut auth_session: AuthSession,
     session: Session,

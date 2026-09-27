@@ -172,6 +172,7 @@ pub struct PostableCommunity {
 /// - All public communities
 /// - Unlisted communities where the user has posted before
 /// - Private communities where the user is a member
+///
 /// Excludes two-tone communities (both colors set)
 pub async fn get_movable_communities(
     tx: &mut Transaction<'_, Postgres>,

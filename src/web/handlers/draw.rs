@@ -218,6 +218,9 @@ pub async fn start_draw(
 
 /// Writes `bytes` to the public bucket as `content_type`, which is what the
 /// image store answers with (`crate::image_store`).
+///
+/// The SDK's error is boxed: it is 360 bytes, and every `Result` carrying it
+/// would be that size on the success path too.
 pub async fn upload_object(
     client: &Client,
     bucket_name: &str,
@@ -225,7 +228,7 @@ pub async fn upload_object(
     key: &str,
     checksum_sha256: &str,
     content_type: &str,
-) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+) -> Result<PutObjectOutput, Box<SdkError<PutObjectError>>> {
     let body = ByteStream::from(bytes);
     client
         .put_object()
@@ -236,6 +239,7 @@ pub async fn upload_object(
         .body(body)
         .send()
         .await
+        .map_err(Box::new)
 }
 
 /// What the painter reads back after a save: the post to go and publish.
