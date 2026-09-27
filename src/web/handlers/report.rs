@@ -31,7 +31,7 @@ async fn send_post_report(
 
     // Validate description
     if request.description.trim().is_empty() {
-        return Err(AppError::InvalidFormData(
+        return Err(AppError::BadRequest(
             "Report description is required".to_string(),
         ));
     }
@@ -50,7 +50,7 @@ async fn send_post_report(
 
     // Check if post is deleted
     if post.get("deleted_at").and_then(|v| v.as_ref()).is_some() {
-        return Err(AppError::InvalidFormData(
+        return Err(AppError::BadRequest(
             "Cannot report deleted post".to_string(),
         ));
     }
@@ -60,12 +60,10 @@ async fn send_post_report(
         .get("author_id")
         .and_then(|v| v.as_ref())
         .and_then(|s| Uuid::parse_str(s).ok())
-        .ok_or(AppError::DatabaseError(
-            "Invalid post author ID".to_string(),
-        ))?;
+        .ok_or_else(|| AppError::Anyhow(anyhow::anyhow!("Invalid post author ID")))?;
 
     if post_author_id == user.id {
-        return Err(AppError::InvalidFormData(
+        return Err(AppError::BadRequest(
             "You cannot report your own post".to_string(),
         ));
     }
@@ -73,7 +71,7 @@ async fn send_post_report(
     // Fetch post author details
     let post_author = find_user_by_id(&mut tx, post_author_id)
         .await?
-        .ok_or(AppError::DatabaseError("Post author not found".to_string()))?;
+        .ok_or_else(|| AppError::Anyhow(anyhow::anyhow!("Post author not found")))?;
 
     tx.commit().await?;
 
@@ -151,23 +149,23 @@ This is an automated report notification from oeee.cafe",
             from_address
                 .parse()
                 .map_err(|e: lettre::address::AddressError| {
-                    AppError::DatabaseError(format!("Invalid from address: {}", e))
+                    AppError::Anyhow(anyhow::anyhow!("Invalid from address: {}", e))
                 })?,
         )
         .to("abuse@oeee.cafe"
             .parse()
             .map_err(|e: lettre::address::AddressError| {
-                AppError::DatabaseError(format!("Invalid to address: {}", e))
+                AppError::Anyhow(anyhow::anyhow!("Invalid to address: {}", e))
             })?)
         .subject(format!(
             "Post Report: {} (Post ID: {})",
             post_title, post_id
         ))
         .body(email_body)
-        .map_err(|e| AppError::DatabaseError(format!("Failed to build email: {}", e)))?;
+        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to build email: {}", e)))?;
 
     let mailer = SmtpTransport::relay(&state.config.smtp_host)
-        .map_err(|e| AppError::DatabaseError(format!("Failed to create SMTP transport: {}", e)))?
+        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to create SMTP transport: {}", e)))?
         .credentials(SmtpCredentials::new(
             state.config.smtp_user.clone(),
             state.config.smtp_password.clone(),
@@ -176,7 +174,7 @@ This is an automated report notification from oeee.cafe",
 
     mailer
         .send(&email_message)
-        .map_err(|e| AppError::DatabaseError(format!("Failed to send email: {}", e)))?;
+        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to send email: {}", e)))?;
 
     Ok(())
 }
@@ -194,7 +192,7 @@ async fn send_profile_report(
 
     // Validate description
     if request.description.trim().is_empty() {
-        return Err(AppError::InvalidFormData(
+        return Err(AppError::BadRequest(
             "Report description is required".to_string(),
         ));
     }
@@ -213,7 +211,7 @@ async fn send_profile_report(
 
     // Check if user is trying to report their own profile
     if reported_user.id == user.id {
-        return Err(AppError::InvalidFormData(
+        return Err(AppError::BadRequest(
             "You cannot report your own profile".to_string(),
         ));
     }
@@ -268,23 +266,23 @@ This is an automated report notification from oeee.cafe",
             from_address
                 .parse()
                 .map_err(|e: lettre::address::AddressError| {
-                    AppError::DatabaseError(format!("Invalid from address: {}", e))
+                    AppError::Anyhow(anyhow::anyhow!("Invalid from address: {}", e))
                 })?,
         )
         .to("abuse@oeee.cafe"
             .parse()
             .map_err(|e: lettre::address::AddressError| {
-                AppError::DatabaseError(format!("Invalid to address: {}", e))
+                AppError::Anyhow(anyhow::anyhow!("Invalid to address: {}", e))
             })?)
         .subject(format!(
             "Profile Report: {} (@{})",
             reported_user.display_name, reported_user.login_name
         ))
         .body(email_body)
-        .map_err(|e| AppError::DatabaseError(format!("Failed to build email: {}", e)))?;
+        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to build email: {}", e)))?;
 
     let mailer = SmtpTransport::relay(&state.config.smtp_host)
-        .map_err(|e| AppError::DatabaseError(format!("Failed to create SMTP transport: {}", e)))?
+        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to create SMTP transport: {}", e)))?
         .credentials(SmtpCredentials::new(
             state.config.smtp_user.clone(),
             state.config.smtp_password.clone(),
@@ -293,7 +291,7 @@ This is an automated report notification from oeee.cafe",
 
     mailer
         .send(&email_message)
-        .map_err(|e| AppError::DatabaseError(format!("Failed to send email: {}", e)))?;
+        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to send email: {}", e)))?;
 
     Ok(())
 }

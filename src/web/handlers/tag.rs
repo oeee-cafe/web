@@ -12,11 +12,9 @@ use crate::web::handlers::home::{
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use minijinja::context;
 use serde::{Deserialize, Serialize};
-use sqlx::{Postgres, Transaction};
 
 /// Tags listed on the directory, and matches returned by a search.
 const TAG_LIST_LIMIT: i64 = 100;
@@ -51,21 +49,6 @@ fn canonicalize(requested: &str) -> Requested {
 /// browser guessing.
 fn tag_url(name: &str) -> String {
     format!("/tags/{}", urlencoding::encode(name))
-}
-
-/// The 404 page, rather than the bare `<h1>Tag not found</h1>` string this
-/// used to answer with: unstyled, untranslated, and outside the site chrome.
-async fn tag_not_found(
-    tx: &mut Transaction<'_, Postgres>,
-    state: &AppState,
-    auth_session: &AuthSession,
-    ftl_lang: &str,
-) -> Result<axum::response::Response, AppError> {
-    let common_ctx = CommonContext::build(tx, auth_session.user.as_ref(), &ftl_lang).await?;
-    let rendered = state
-        .render_page("404.jinja", common_ctx, context! {})
-        .await?;
-    Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
 
 /// Which half of a tag's page is showing: its drawings, or what has been
@@ -103,10 +86,7 @@ async fn tag_page(
     let name = match canonicalize(&requested) {
         Requested::Canonical(name) => name,
         Requested::Elsewhere(name) if name.is_empty() => {
-            let mut tx = state.db_pool.begin().await?;
-            let response = tag_not_found(&mut tx, &state, &auth_session, &ftl_lang).await?;
-            tx.commit().await?;
-            return Ok(response);
+            return Err(AppError::NotFound("Tag".to_string()))
         }
         Requested::Elsewhere(name) => {
             return Ok(Redirect::permanent(&view.url(&name)).into_response())
@@ -116,9 +96,7 @@ async fn tag_page(
     let mut tx = state.db_pool.begin().await?;
 
     let Some(tag) = find_tag_by_name(&mut tx, &name).await? else {
-        let response = tag_not_found(&mut tx, &state, &auth_session, &ftl_lang).await?;
-        tx.commit().await?;
-        return Ok(response);
+        return Err(AppError::NotFound("Tag".to_string()));
     };
 
     let (viewer_user_id, viewer_show_sensitive) = match auth_session.user.as_ref() {

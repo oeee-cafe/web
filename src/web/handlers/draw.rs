@@ -280,19 +280,18 @@ pub async fn draw_finish(
     while let Some(field) = multipart.next_field().await? {
         let name = field
             .name()
-            .ok_or_else(|| AppError::InvalidFormData("Field has no name".to_string()))?
+            .ok_or_else(|| AppError::BadRequest("Field has no name".to_string()))?
             .to_string();
         let data = field.bytes().await?;
 
         if name == "image" {
-            let data_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in image data: {}", e))
-            })?;
+            let data_str = std::str::from_utf8(data.as_ref())
+                .map_err(|e| AppError::BadRequest(format!("Invalid UTF-8 in image data: {}", e)))?;
             let url = DataUrl::process(data_str)
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid data URL: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid data URL: {}", e)))?;
             let (body, _fragment) = url
                 .decode_to_vec()
-                .map_err(|e| AppError::InvalidFormData(format!("Failed to decode image: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Failed to decode image: {}", e)))?;
             image_sha256 = digest(&body);
 
             assert_eq!(url.mime_type().type_, "image");
@@ -307,11 +306,11 @@ pub async fn draw_finish(
                     image_sha256
                         .chars()
                         .next()
-                        .ok_or_else(|| AppError::InvalidHash("Hash is empty".to_string()))?,
+                        .ok_or_else(|| AppError::BadRequest("Hash is empty".to_string()))?,
                     image_sha256
                         .chars()
                         .nth(1)
-                        .ok_or_else(|| AppError::InvalidHash("Hash too short".to_string()))?,
+                        .ok_or_else(|| AppError::BadRequest("Hash too short".to_string()))?,
                     image_sha256
                 ),
                 &BASE64.encode(&safe_decode_hash(&image_sha256)?),
@@ -323,7 +322,7 @@ pub async fn draw_finish(
             replay_data = data.to_vec();
         } else if name == "community_id" {
             let id_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in community_id: {}", e))
+                AppError::BadRequest(format!("Invalid UTF-8 in community_id: {}", e))
             })?;
             if !id_str.is_empty() {
                 community_id = Uuid::parse_str(id_str).ok();
@@ -332,49 +331,49 @@ pub async fn draw_finish(
             // Measured by the painter when it saved, not from when the page
             // opened: a drawing kept on the device can be sent days later.
             let duration_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in paint_duration_ms: {}", e))
+                AppError::BadRequest(format!("Invalid UTF-8 in paint_duration_ms: {}", e))
             })?;
-            paint_duration_ms = Some(duration_str.parse::<u32>().map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid paint_duration_ms: {}", e))
-            })?);
+            paint_duration_ms =
+                Some(duration_str.parse::<u32>().map_err(|e| {
+                    AppError::BadRequest(format!("Invalid paint_duration_ms: {}", e))
+                })?);
         } else if name == "security_count" {
             let count_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in security_count: {}", e))
+                AppError::BadRequest(format!("Invalid UTF-8 in security_count: {}", e))
             })?;
             security_count = count_str
                 .parse::<i32>()
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid security_count: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid security_count: {}", e)))?;
         } else if name == "width" {
             let width_str = std::str::from_utf8(data.as_ref())
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid UTF-8 in width: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid UTF-8 in width: {}", e)))?;
             width = width_str
                 .parse::<i32>()
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid width: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid width: {}", e)))?;
         } else if name == "height" {
-            let height_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in height: {}", e))
-            })?;
+            let height_str = std::str::from_utf8(data.as_ref())
+                .map_err(|e| AppError::BadRequest(format!("Invalid UTF-8 in height: {}", e)))?;
             height = height_str
                 .parse::<i32>()
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid height: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid height: {}", e)))?;
         } else if name == "tool" {
             tool = std::str::from_utf8(data.as_ref())
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid UTF-8 in tool: {}", e)))?
+                .map_err(|e| AppError::BadRequest(format!("Invalid UTF-8 in tool: {}", e)))?
                 .to_string();
         } else if name == "parent_post_id" && !data.is_empty() {
             let parent_id_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in parent_post_id: {}", e))
+                AppError::BadRequest(format!("Invalid UTF-8 in parent_post_id: {}", e))
             })?;
             parent_post_id = Some(safe_parse_uuid(parent_id_str)?);
         } else if name == "client_draft_id" && !data.is_empty() {
             let draft_id_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in client_draft_id: {}", e))
+                AppError::BadRequest(format!("Invalid UTF-8 in client_draft_id: {}", e))
             })?;
             client_draft_id = Some(safe_parse_uuid(draft_id_str)?);
         }
     }
     let paint_duration_ms = paint_duration_ms
-        .ok_or_else(|| AppError::InvalidFormData("paint_duration_ms is required".to_string()))?;
+        .ok_or_else(|| AppError::BadRequest("paint_duration_ms is required".to_string()))?;
 
     // Every painter left records a NEO replay. Tegaki's .tgkr is still
     // played for the posts that have one, but nothing can make a new one.
@@ -398,7 +397,7 @@ pub async fn draw_finish(
     // Get first 2 characters for directory prefix
     let replay_prefix = replay_sha256.chars().take(2).collect::<String>();
     if replay_prefix.len() < 2 {
-        return Err(AppError::InvalidHash("Replay hash too short".to_string()));
+        return Err(AppError::BadRequest("Replay hash too short".to_string()));
     }
     upload_object(
         &client,
@@ -542,19 +541,18 @@ pub async fn banner_draw_finish(
     while let Some(field) = multipart.next_field().await? {
         let name = field
             .name()
-            .ok_or_else(|| AppError::InvalidFormData("Field has no name".to_string()))?
+            .ok_or_else(|| AppError::BadRequest("Field has no name".to_string()))?
             .to_string();
         let data = field.bytes().await?;
 
         if name == "image" {
-            let data_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in image data: {}", e))
-            })?;
+            let data_str = std::str::from_utf8(data.as_ref())
+                .map_err(|e| AppError::BadRequest(format!("Invalid UTF-8 in image data: {}", e)))?;
             let url = DataUrl::process(data_str)
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid data URL: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid data URL: {}", e)))?;
             let (body, _fragment) = url
                 .decode_to_vec()
-                .map_err(|e| AppError::InvalidFormData(format!("Failed to decode image: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Failed to decode image: {}", e)))?;
             image_sha256 = digest(&body);
 
             assert_eq!(url.mime_type().type_, "image");
@@ -569,11 +567,11 @@ pub async fn banner_draw_finish(
                     image_sha256
                         .chars()
                         .next()
-                        .ok_or_else(|| AppError::InvalidHash("Hash is empty".to_string()))?,
+                        .ok_or_else(|| AppError::BadRequest("Hash is empty".to_string()))?,
                     image_sha256
                         .chars()
                         .nth(1)
-                        .ok_or_else(|| AppError::InvalidHash("Hash too short".to_string()))?,
+                        .ok_or_else(|| AppError::BadRequest("Hash too short".to_string()))?,
                     image_sha256
                 ),
                 &BASE64.encode(&safe_decode_hash(&image_sha256)?),
@@ -586,7 +584,7 @@ pub async fn banner_draw_finish(
             // Get first 2 characters for directory prefix
             let replay_prefix = replay_sha256.chars().take(2).collect::<String>();
             if replay_prefix.len() < 2 {
-                return Err(AppError::InvalidHash("Replay hash too short".to_string()));
+                return Err(AppError::BadRequest("Replay hash too short".to_string()));
             }
             upload_object(
                 &client,
@@ -599,36 +597,36 @@ pub async fn banner_draw_finish(
             .await?;
         } else if name == "paint_duration_ms" {
             let data_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in paint_duration_ms: {}", e))
+                AppError::BadRequest(format!("Invalid UTF-8 in paint_duration_ms: {}", e))
             })?;
-            paint_duration_ms = Some(data_str.parse::<u32>().map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid paint_duration_ms: {}", e))
-            })?);
+            paint_duration_ms =
+                Some(data_str.parse::<u32>().map_err(|e| {
+                    AppError::BadRequest(format!("Invalid paint_duration_ms: {}", e))
+                })?);
         } else if name == "security_count" {
             let data_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in security_count: {}", e))
+                AppError::BadRequest(format!("Invalid UTF-8 in security_count: {}", e))
             })?;
             security_count = data_str
                 .parse::<i32>()
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid security_count: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid security_count: {}", e)))?;
         } else if name == "width" {
             let data_str = std::str::from_utf8(data.as_ref())
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid UTF-8 in width: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid UTF-8 in width: {}", e)))?;
             width = data_str
                 .parse::<i32>()
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid width: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid width: {}", e)))?;
         } else if name == "height" {
-            let data_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
-                AppError::InvalidFormData(format!("Invalid UTF-8 in height: {}", e))
-            })?;
+            let data_str = std::str::from_utf8(data.as_ref())
+                .map_err(|e| AppError::BadRequest(format!("Invalid UTF-8 in height: {}", e)))?;
             height = data_str
                 .parse::<i32>()
-                .map_err(|e| AppError::InvalidFormData(format!("Invalid height: {}", e)))?;
+                .map_err(|e| AppError::BadRequest(format!("Invalid height: {}", e)))?;
         }
     }
     let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
     let paint_duration_ms = paint_duration_ms
-        .ok_or_else(|| AppError::InvalidFormData("paint_duration_ms is required".to_string()))?;
+        .ok_or_else(|| AppError::BadRequest("paint_duration_ms is required".to_string()))?;
 
     let banner_draft = BannerDraft {
         author_id: current_user.id,

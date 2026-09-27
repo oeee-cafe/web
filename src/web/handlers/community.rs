@@ -22,7 +22,6 @@ use crate::web::handlers::home::{
     comments_batch, comments_context, feed_context, CommentsQuery, LoadMoreQuery,
     HOME_POSTS_PER_BATCH,
 };
-use crate::web::handlers::render_403;
 use crate::web::handlers::{parse_id_with_legacy_support, ParsedId};
 use crate::web::state::AppState;
 use axum::extract::{Path, Query};
@@ -56,7 +55,7 @@ pub async fn community(
         // Handle @slug format
         let slug = id
             .strip_prefix('@')
-            .ok_or_else(|| AppError::InvalidFormData("Invalid slug format".to_string()))?
+            .ok_or_else(|| AppError::BadRequest("Invalid slug format".to_string()))?
             .to_string();
         find_community_by_slug(&mut tx, slug).await?
     } else {
@@ -135,9 +134,7 @@ pub(crate) async fn render_community_page(
                     let is_member = is_user_member(tx, user.id, community_uuid).await?;
                     if !is_member {
                         // Authenticated but not a member - show 403 forbidden
-                        return Ok(render_403(auth_session, state, ftl_lang)
-                            .await?
-                            .into_response());
+                        return Err(AppError::Forbidden);
                     }
                 }
                 None => {
@@ -360,7 +357,7 @@ pub async fn community_iframe(
         // Handle @slug format
         let slug = id
             .strip_prefix('@')
-            .ok_or_else(|| AppError::InvalidFormData("Invalid slug format".to_string()))?
+            .ok_or_else(|| AppError::BadRequest("Invalid slug format".to_string()))?
             .to_string();
         find_community_by_slug(&mut tx, slug).await?
     } else {
@@ -398,9 +395,7 @@ pub async fn community_iframe(
                     let is_member = is_user_member(&mut tx, user.id, community_uuid).await?;
                     if !is_member {
                         // Authenticated but not a member - show 403 forbidden
-                        return Ok(render_403(&auth_session, &state, ftl_lang)
-                            .await?
-                            .into_response());
+                        return Err(AppError::Forbidden);
                     }
                 }
                 None => {
@@ -960,7 +955,7 @@ pub async fn hx_edit_community(
         // Handle @slug format
         let slug = id
             .strip_prefix('@')
-            .ok_or_else(|| AppError::InvalidFormData("Invalid slug format".to_string()))?
+            .ok_or_else(|| AppError::BadRequest("Invalid slug format".to_string()))?
             .to_string();
         find_community_by_slug(&mut tx, slug).await?
     } else {
@@ -1027,7 +1022,7 @@ pub async fn hx_do_edit_community(
         // Handle @slug format
         let slug = id
             .strip_prefix('@')
-            .ok_or_else(|| AppError::InvalidFormData("Invalid slug format".to_string()))?
+            .ok_or_else(|| AppError::BadRequest("Invalid slug format".to_string()))?
             .to_string();
         let community = find_community_by_slug(&mut tx, slug.clone()).await?;
         if let Some(community) = community {
@@ -1191,7 +1186,7 @@ pub async fn community_comments(
         // Handle @slug format
         let slug = id
             .strip_prefix('@')
-            .ok_or_else(|| AppError::InvalidFormData("Invalid slug format".to_string()))?
+            .ok_or_else(|| AppError::BadRequest("Invalid slug format".to_string()))?
             .to_string();
         find_community_by_slug(&mut tx, slug).await?
     } else {
@@ -1229,9 +1224,7 @@ pub async fn community_comments(
                     let is_member = is_user_member(&mut tx, user.id, community_uuid).await?;
                     if !is_member {
                         // Authenticated but not a member - show 403 forbidden
-                        return Ok(render_403(&auth_session, &state, ftl_lang)
-                            .await?
-                            .into_response());
+                        return Err(AppError::Forbidden);
                     }
                 }
                 None => {

@@ -31,7 +31,7 @@ use crate::web::handlers::activitypub::{
     create_note_from_post, create_updated_note_from_post, generate_object_id, Announce, Create,
     Note, UpdateNote,
 };
-use crate::web::handlers::{handler_404, parse_id_with_legacy_support, ParsedId};
+use crate::web::handlers::{parse_id_with_legacy_support, ParsedId};
 use crate::web::i18n::{get_bundle, safe_get_message, ExtractFtlLang};
 use crate::web::presence::{Activity, Presence};
 use crate::web::state::AppState;
@@ -397,17 +397,17 @@ async fn render_relay_page(
     let width = post
         .get("image_width")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_width".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing image_width".to_string()))?
         .parse::<u32>()?;
     let height = post
         .get("image_height")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_height".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing image_height".to_string()))?
         .parse::<u32>()?;
     let image_filename = post
         .get("image_filename")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_filename".to_string()))?;
+        .ok_or_else(|| AppError::BadRequest("Missing image_filename".to_string()))?;
 
     let mut painter_config = crate::web::handlers::draw::post_painter_config(
         width,
@@ -472,11 +472,7 @@ pub async fn post_relay_view(
     let post = find_post_by_id(&mut tx, uuid).await?;
 
     if post.is_none() {
-        return Ok((
-            StatusCode::NOT_FOUND,
-            handler_404(auth_session, ExtractFtlLang(ftl_lang), State(state)).await?,
-        )
-            .into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
@@ -598,11 +594,7 @@ pub async fn post_view(
             increment_post_viewer_count(&mut tx, uuid).await?;
         }
         None => {
-            return Ok((
-                StatusCode::NOT_FOUND,
-                handler_404(auth_session, ExtractFtlLang(ftl_lang), State(state)).await?,
-            )
-                .into_response());
+            return Err(AppError::NotFound("Post".to_string()));
         }
     }
 
@@ -776,7 +768,7 @@ pub async fn post_view(
                     parent_post_data,
                     post_id => post.get("id")
                         .and_then(|v| v.as_ref())
-                        .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
+                        .ok_or_else(|| AppError::BadRequest("Missing post id".to_string()))?
                         .clone(),
                     community_id,
                     base_url => state.config.base_url.clone(),
@@ -920,18 +912,14 @@ pub async fn post_publish_form(
     let post = find_post_by_id(&mut tx, post_uuid).await?;
 
     if post.is_none() {
-        return Ok((
-            StatusCode::NOT_FOUND,
-            handler_404(auth_session, ExtractFtlLang(ftl_lang), State(state)).await?,
-        )
-            .into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
     if *post
         .get("author_id")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?
         != auth_session
             .user
             .as_ref()
@@ -944,7 +932,7 @@ pub async fn post_publish_form(
 
     let published_at = post
         .get("published_at")
-        .ok_or_else(|| AppError::InvalidFormData("Missing published_at".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing published_at".to_string()))?
         .clone();
     if published_at.is_some() {
         return Ok(Redirect::to(&format!("/posts/{}", id)).into_response());
@@ -1009,7 +997,7 @@ pub async fn post_publish(
     let author_id = Uuid::parse_str(
         post.get("author_id")
             .and_then(|v| v.as_ref())
-            .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?,
+            .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?,
     )?;
     let user_id = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id;
     if author_id != user_id {
@@ -1370,8 +1358,8 @@ pub async fn do_create_comment(
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
     let user_id = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id;
-    let post_id =
-        Uuid::parse_str(&form.post_id).map_err(|e| AppError::InvalidUuid(format!("{}", e)))?;
+    let post_id = Uuid::parse_str(&form.post_id)
+        .map_err(|e| AppError::BadRequest(format!("Invalid UUID: {}", e)))?;
 
     // Get the actor for this user
     let actor = Actor::find_by_user_id(&mut tx, user_id)
@@ -1637,7 +1625,7 @@ pub async fn post_edit_community(
     if *post
         .get("author_id")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?
         != auth_session
             .user
             .as_ref()
@@ -1992,7 +1980,7 @@ pub async fn do_post_edit_community(
     if *post
         .get("author_id")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?
         != auth_session
             .user
             .as_ref()
@@ -2033,7 +2021,7 @@ pub async fn do_post_edit_community(
     let author_login_name = post
         .get("login_name")
         .and_then(|v| v.clone())
-        .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
+        .ok_or_else(|| AppError::BadRequest("Missing login_name".to_string()))?;
     tx.commit().await?;
 
     // The move changes the post's page, which is the Note's `url`, and its
@@ -2079,7 +2067,7 @@ pub async fn hx_edit_post(
     if *post
         .get("author_id")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?
         != auth_session
             .user
             .as_ref()
@@ -2148,7 +2136,7 @@ pub async fn hx_do_edit_post(
     if *post
         .get("author_id")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?
         != auth_session
             .user
             .as_ref()
@@ -2276,7 +2264,7 @@ pub async fn hx_delete_post(
     if *post
         .get("author_id")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?
+        .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?
         != auth_session
             .user
             .as_ref()
@@ -2290,9 +2278,10 @@ pub async fn hx_delete_post(
     let image_id = post
         .get("image_id")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing image_id".to_string()))
+        .ok_or_else(|| AppError::BadRequest("Missing image_id".to_string()))
         .and_then(|id_str| {
-            Uuid::parse_str(id_str).map_err(|e| AppError::InvalidUuid(format!("{}: {}", id_str, e)))
+            Uuid::parse_str(id_str)
+                .map_err(|e| AppError::BadRequest(format!("Invalid UUID {}: {}", id_str, e)))
         })?;
     let image = find_image_by_id(&mut tx, image_id).await?;
 
@@ -2302,12 +2291,12 @@ pub async fn hx_delete_post(
             .image_filename
             .chars()
             .next()
-            .ok_or_else(|| AppError::InvalidFormData("Image filename too short".to_string()))?,
+            .ok_or_else(|| AppError::BadRequest("Image filename too short".to_string()))?,
         image
             .image_filename
             .chars()
             .nth(1)
-            .ok_or_else(|| AppError::InvalidFormData("Image filename too short".to_string()))?,
+            .ok_or_else(|| AppError::BadRequest("Image filename too short".to_string()))?,
         image.image_filename
     )];
 
@@ -2318,15 +2307,11 @@ pub async fn hx_delete_post(
             replay_filename
                 .chars()
                 .next()
-                .ok_or_else(|| AppError::InvalidFormData(
-                    "Replay filename too short".to_string()
-                ))?,
+                .ok_or_else(|| AppError::BadRequest("Replay filename too short".to_string()))?,
             replay_filename
                 .chars()
                 .nth(1)
-                .ok_or_else(|| AppError::InvalidFormData(
-                    "Replay filename too short".to_string()
-                ))?,
+                .ok_or_else(|| AppError::BadRequest("Replay filename too short".to_string()))?,
             replay_filename
         ));
     }
@@ -2382,7 +2367,7 @@ pub async fn hx_delete_post(
         let author_id = post_data
             .get("author_id")
             .and_then(|v| v.as_ref())
-            .ok_or_else(|| AppError::InvalidFormData("Missing author_id".to_string()))?;
+            .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?;
         let author = find_user_by_id(&mut tx, Uuid::parse_str(author_id)?).await?;
         format!(
             "/@{}",
@@ -2442,7 +2427,7 @@ pub async fn post_view_by_login_name(
             let post_login_name = post_data
                 .get("login_name")
                 .and_then(|v| v.as_ref())
-                .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
+                .ok_or_else(|| AppError::BadRequest("Missing login_name".to_string()))?;
 
             // Check if post is in a private community and if user has access
             let community_id = post_data
@@ -2499,11 +2484,7 @@ pub async fn post_view_by_login_name(
             increment_post_viewer_count(&mut tx, uuid).await?;
         }
         None => {
-            return Ok((
-                StatusCode::NOT_FOUND,
-                handler_404(auth_session, ExtractFtlLang(ftl_lang), State(state)).await?,
-            )
-                .into_response());
+            return Err(AppError::NotFound("Post".to_string()));
         }
     }
 
@@ -2680,7 +2661,7 @@ pub async fn post_view_by_login_name(
                     parent_post_data,
                     post_id => post.get("id")
                         .and_then(|v| v.as_ref())
-                        .ok_or_else(|| AppError::InvalidFormData("Missing post id".to_string()))?
+                        .ok_or_else(|| AppError::BadRequest("Missing post id".to_string()))?
                         .clone(),
                     community_id,
                     base_url => state.config.base_url.clone(),
@@ -2719,7 +2700,7 @@ pub async fn redirect_post_to_login_name(
             let login_name = post_data
                 .get("login_name")
                 .and_then(|v| v.as_ref())
-                .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
+                .ok_or_else(|| AppError::BadRequest("Missing login_name".to_string()))?;
             let community_slug = post_data.get("community_slug").and_then(|v| v.as_deref());
             // Temporary, not permanent: the page moves when the post moves
             // between communities, and a cached 308 would outlive that.
@@ -2828,18 +2809,14 @@ pub async fn post_relay_view_by_login_name(
     let post = match find_post_by_id(&mut tx, uuid).await? {
         Some(post) => post,
         None => {
-            return Ok((
-                StatusCode::NOT_FOUND,
-                handler_404(auth_session, ExtractFtlLang(ftl_lang), State(state)).await?,
-            )
-                .into_response());
+            return Err(AppError::NotFound("Post".to_string()));
         }
     };
 
     let post_login_name = post
         .get("login_name")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
+        .ok_or_else(|| AppError::BadRequest("Missing login_name".to_string()))?;
 
     // Check if post is in a private community and if user has access
     let community_id = post
@@ -2928,7 +2905,7 @@ pub async fn post_replay_view_by_login_name(
             let post_login_name = post_data
                 .get("login_name")
                 .and_then(|v| v.as_ref())
-                .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
+                .ok_or_else(|| AppError::BadRequest("Missing login_name".to_string()))?;
 
             // Check if post is in a private community and if user has access
             let community_id = post_data
@@ -3455,11 +3432,7 @@ pub async fn post_reactions_detail(
     let post = find_post_by_id(&mut tx, uuid).await?;
 
     if post.is_none() {
-        return Ok((
-            StatusCode::NOT_FOUND,
-            handler_404(auth_session, ExtractFtlLang(ftl_lang), State(state)).await?,
-        )
-            .into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
@@ -3467,7 +3440,7 @@ pub async fn post_reactions_detail(
     let post_login_name = post_data
         .get("login_name")
         .and_then(|v| v.as_ref())
-        .ok_or_else(|| AppError::InvalidFormData("Missing login_name".to_string()))?;
+        .ok_or_else(|| AppError::BadRequest("Missing login_name".to_string()))?;
 
     let community = match post_data
         .get("community_id")

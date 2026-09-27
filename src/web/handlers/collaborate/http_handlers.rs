@@ -523,7 +523,7 @@ pub async fn create_collaborative_session_form(
         .split_once('x')
         .and_then(|(w, h)| Some((w.trim().parse().ok()?, h.trim().parse().ok()?)))
         .ok_or_else(|| {
-            AppError::InvalidFormData(format!("unsupported canvas size {}", form.canvas_size))
+            AppError::BadRequest(format!("unsupported canvas size {}", form.canvas_size))
         })?;
     let request = CreateSessionRequest {
         title: form.title.filter(|title| !title.trim().is_empty()),
@@ -553,13 +553,13 @@ async fn insert_session(
     // taste: both bound how large a checkpoint of this session can be, and the
     // history ceiling is sized on the assumption that they hold.
     if !CANVAS_SIZES.contains(&(request.width.max(0) as u32, request.height.max(0) as u32)) {
-        return Err(AppError::InvalidFormData(format!(
+        return Err(AppError::BadRequest(format!(
             "unsupported canvas size {}x{}",
             request.width, request.height
         )));
     }
     if !MAX_PARTICIPANTS_CHOICES.contains(&request.max_participants) {
-        return Err(AppError::InvalidFormData(format!(
+        return Err(AppError::BadRequest(format!(
             "unsupported participant limit {}",
             request.max_participants
         )));
@@ -669,15 +669,13 @@ pub async fn save_collaborative_session(
         Some((super::preview::ImageKind::Png, width, height))
             if (width, height) == (session.width as u32, session.height as u32) => {}
         Some((_, width, height)) => {
-            return Err(AppError::InvalidFormData(format!(
+            return Err(AppError::BadRequest(format!(
                 "expected a {}x{} PNG, got {}x{}",
                 session.width, session.height, width, height
             )));
         }
         None => {
-            return Err(AppError::InvalidFormData(
-                "the body is not a PNG".to_string(),
-            ));
+            return Err(AppError::BadRequest("the body is not a PNG".to_string()));
         }
     }
 

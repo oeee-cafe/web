@@ -2,6 +2,7 @@ brand = Oeee Cafe
 email-from-address = Oeee Cafe <noreply@oeee.cafe>
 error-404 = Page not found.
 error-403 = You do not have permission to access this page.
+error-500 = Something went wrong on our side. Please try again in a moment.
 htmx-error-forbidden = You do not have permission to do that.
 htmx-error-request = That did not go through. Reload the page and try again.
 htmx-error-server = Something went wrong on our side. Please try again in a moment.

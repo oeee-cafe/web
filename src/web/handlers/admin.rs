@@ -889,7 +889,7 @@ pub async fn record_collaborative_session_check(
     axum::Json(check): axum::Json<crate::models::collaborative_recording::ReplayCheck>,
 ) -> Result<Response, AppError> {
     if !["match", "differs", "incomplete", "unavailable"].contains(&check.outcome.as_str()) {
-        return Err(AppError::InvalidFormData(format!(
+        return Err(AppError::BadRequest(format!(
             "unknown check outcome {:?}",
             check.outcome
         )));

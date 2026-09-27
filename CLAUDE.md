@@ -122,6 +122,14 @@ parses fine and fails at render. Catching that needs a fixture whose types
 match the real context, as in `a_replay_is_on_the_stage_and_the_drawing_is_not_a_link`. Add
 one when a template starts doing more than interpolate.
 
+A page inside the site's chrome renders through `state.render_page(name,
+common, context! {...})`, with `common` from `CommonContext::build` in the
+handler's transaction: that is what supplies `current_user`, the toolbar's
+counts and `ftl_lang`, so the page's own context never lists them. A page that
+is not there, or not theirs, is `Err(AppError::NotFound(..))` or
+`Err(AppError::Forbidden)`, not a hand-drawn 404 — `web/error_pages.rs` draws
+the page for a browser and leaves the JSON for everyone else.
+
 When connecting to PostgreSQL via command line, use `psql oeee_cafe`.
 
 ## neo-cucumber (`./neo-cucumber`)

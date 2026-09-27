@@ -53,90 +53,67 @@ fn should_filter_from_sentry(err: &anyhow::Error) -> bool {
     })
 }
 
-// Application-specific errors with better context
+/// Why a request failed, and so what it is answered with.
+///
+/// The body is JSON, which is what the painter, the apps and every `/api/`
+/// caller read; a browser loading a page gets that page's error page instead,
+/// drawn by `web::error_pages` for any response carrying [`ErrorPage`].
 #[derive(Debug)]
 pub enum AppError {
-    // Wrap anyhow errors for backward compatibility
+    /// Something that is a bug or an outage here. The detail goes to the log
+    /// and Sentry; the caller is told only that it went wrong, since the
+    /// detail can be a SQL error or another server's address.
     Anyhow(anyhow::Error),
-
-    // Specific error types for better handling
-    LocalizationError(String),
-    InvalidFormData(String),
-    InvalidHash(String),
-    InvalidEmail(String),
-    InvalidUuid(String),
-    InvalidCommunityId(String),
+    /// What was sent does not make sense, and says why.
+    BadRequest(String),
     Unauthorized,
     Forbidden,
     NotFound(String),
-    DatabaseError(String),
 }
+
+/// Marks a response as an [`AppError`]'s, so `web::error_pages` may replace
+/// its JSON with a page. A handler that answers an error status with a body of
+/// its own does not carry it, and is left alone.
+#[derive(Clone, Copy, Debug)]
+pub struct ErrorPage;
 
 // Tell axum how to convert `AppError` into a response.
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, code, message, should_capture) = match &self {
+        let (status, code, message) = match &self {
             AppError::Anyhow(err) => {
-                let message = format!("Something went wrong: {}", err);
-                // Capture anyhow errors with full backtrace to Sentry
-                if !should_filter_from_sentry(err) {
+                if should_filter_from_sentry(err) {
+                    tracing::warn!("{:#}", err);
+                } else {
+                    tracing::error!("{:#}", err);
+                    // Capture anyhow errors with full backtrace to Sentry
                     sentry::integrations::anyhow::capture_anyhow(err);
                 }
-
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     error_codes::INTERNAL_ERROR,
-                    message,
-                    false,
+                    "Something went wrong".to_string(),
                 )
             }
-            AppError::LocalizationError(key) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                error_codes::INTERNAL_ERROR,
-                format!("Missing translation key: {}", key),
-                true,
-            ),
-            AppError::InvalidFormData(msg) => (
-                StatusCode::BAD_REQUEST,
-                error_codes::VALIDATION_ERROR,
-                format!("Invalid form data: {}", msg),
-                true,
-            ),
-            AppError::InvalidHash(msg) => (
-                StatusCode::BAD_REQUEST,
-                error_codes::VALIDATION_ERROR,
-                format!("Invalid hash: {}", msg),
-                true,
-            ),
-            AppError::InvalidEmail(msg) => (
-                StatusCode::BAD_REQUEST,
-                error_codes::VALIDATION_ERROR,
-                format!("Invalid email: {}", msg),
-                true,
-            ),
-            AppError::InvalidUuid(msg) => (
-                StatusCode::BAD_REQUEST,
-                error_codes::VALIDATION_ERROR,
-                format!("Invalid UUID: {}", msg),
-                true,
-            ),
-            AppError::InvalidCommunityId(msg) => (
-                StatusCode::BAD_REQUEST,
-                error_codes::VALIDATION_ERROR,
-                format!("Invalid community ID: {}", msg),
-                true,
-            ),
+            AppError::BadRequest(msg) => {
+                sentry::capture_message(msg, sentry::Level::Info);
+                (
+                    StatusCode::BAD_REQUEST,
+                    error_codes::VALIDATION_ERROR,
+                    msg.clone(),
+                )
+            }
+            // Somebody signed out, or looking where they may not: the
+            // caller's business, as a 404 is.
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
                 error_codes::UNAUTHORIZED,
                 "Unauthorized".to_string(),
-                true,
             ),
             AppError::Forbidden => (
                 StatusCode::FORBIDDEN,
                 error_codes::FORBIDDEN,
                 "Forbidden".to_string(),
-                true,
             ),
             // A link to something deleted, or a crawler guessing URLs: the
             // caller's business, and not worth a Sentry event apiece.
@@ -144,28 +121,12 @@ impl IntoResponse for AppError {
                 StatusCode::NOT_FOUND,
                 error_codes::NOT_FOUND,
                 format!("{} not found", resource),
-                false,
-            ),
-            AppError::DatabaseError(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                error_codes::INTERNAL_ERROR,
-                format!("Database error: {}", msg),
-                true,
             ),
         };
 
-        // Capture non-anyhow errors as messages (no backtrace available since they're just strings)
-        if should_capture {
-            let sentry_level = match status {
-                StatusCode::INTERNAL_SERVER_ERROR => sentry::Level::Error,
-                StatusCode::BAD_REQUEST => sentry::Level::Info,
-                StatusCode::UNAUTHORIZED => sentry::Level::Info,
-                _ => sentry::Level::Warning,
-            };
-            sentry::capture_message(&message, sentry_level);
-        }
-
-        (status, Json(ErrorResponse::new(code, message))).into_response()
+        let mut response = (status, Json(ErrorResponse::new(code, message))).into_response();
+        response.extensions_mut().insert(ErrorPage);
+        response
     }
 }
 
@@ -174,16 +135,10 @@ impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AppError::Anyhow(err) => write!(f, "{}", err),
-            AppError::LocalizationError(key) => write!(f, "Missing translation key: {}", key),
-            AppError::InvalidFormData(msg) => write!(f, "Invalid form data: {}", msg),
-            AppError::InvalidHash(msg) => write!(f, "Invalid hash: {}", msg),
-            AppError::InvalidEmail(msg) => write!(f, "Invalid email: {}", msg),
-            AppError::InvalidUuid(msg) => write!(f, "Invalid UUID: {}", msg),
-            AppError::InvalidCommunityId(msg) => write!(f, "Invalid community ID: {}", msg),
+            AppError::BadRequest(msg) => write!(f, "{}", msg),
             AppError::Unauthorized => write!(f, "Unauthorized"),
             AppError::Forbidden => write!(f, "Forbidden"),
             AppError::NotFound(resource) => write!(f, "{} not found", resource),
-            AppError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
         }
     }
 }
