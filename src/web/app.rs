@@ -432,6 +432,12 @@ impl App {
                 post(activitypub_post_community_inbox),
             )
             .route("/ap/inbox", post(activitypub_post_shared_inbox))
+            // Bounded, and signed over what it carries, before the library
+            // reads it (src/federation/inbox.rs).
+            .route_layer(axum::middleware::from_fn_with_state(
+                self.state.config.domain.clone(),
+                crate::federation::inbox::check,
+            ))
             .layer(FederationMiddleware::new(activitypub_data));
 
         let app = Router::new()

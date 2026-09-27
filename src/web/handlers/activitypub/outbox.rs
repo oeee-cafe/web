@@ -12,7 +12,6 @@ use crate::app_error::AppError;
 use crate::live::LiveEvent;
 use crate::models::actor::Actor;
 use crate::models::comment::{delete_comment_by_iri, find_comment_by_iri};
-use crate::models::notification::BadgeFalls;
 use crate::web::state::AppState;
 
 use super::{actor_from_signature_deser, generate_object_id, string_or_vec_deser, ActorObject};
@@ -133,6 +132,16 @@ impl Activity for Update {
 
         let db = &data.app_data().db_pool;
         let mut tx = db.begin().await?;
+
+        // An actor updates itself and nothing else.
+        if self.object.id() != self.actor.inner() {
+            tracing::warn!(
+                sender = %self.actor.inner(),
+                object = %self.object.id(),
+                "refused an Update of an actor other than its sender"
+            );
+            return Ok(());
+        }
 
         // Find the actor being updated
         let actor = Actor::find_by_iri(&mut tx, self.actor.to_string()).await?;
@@ -410,29 +419,15 @@ impl Activity for Delete {
 
         let object_url = self.object.id.to_string();
 
-        // Check if this is a post deletion by trying to parse the object URL
-        if let Some(post_id_str) = object_url.strip_prefix(&format!(
-            "https://{}/ap/posts/",
-            data.app_data().config.domain
-        )) {
-            if let Ok(post_id) = uuid::Uuid::parse_str(post_id_str) {
-                // Mark the post as deleted in our database
-                use crate::models::post::{delete_post, PostDeletionReason};
-                let falls =
-                    match delete_post(&mut tx, post_id, PostDeletionReason::UserDeleted).await {
-                        Ok(falls) => falls,
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to delete post {} from Delete activity: {:?}",
-                                post_id,
-                                e
-                            );
-                            BadgeFalls::none()
-                        }
-                    };
-                tx.commit().await?;
-                data.push_service.badges_fell(falls);
-            }
+        // A post of this site's is its author's, and no remote actor's: a
+        // Delete naming one is refused whoever signed it. This used to
+        // delete the post, so any server could delete any post here.
+        if object_url.starts_with(&format!("https://{}/", data.app_data().config.domain)) {
+            tracing::warn!(
+                sender = ?actor_url.as_ref().map(Url::as_str),
+                object = %object_url,
+                "refused a remote Delete of a local object"
+            );
         } else {
             // Check if this is a comment deletion by IRI
             // Try to find a comment with this IRI

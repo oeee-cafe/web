@@ -3961,6 +3961,7 @@ dependencies = [
  "feder",
  "feder-axum",
  "feder-postgres",
+ "feder-runtime",
  "flate2",
  "fluent",
  "fluent-langneg 0.14.2",
