@@ -28,7 +28,7 @@
     {% endif %}
     <div class="comment-row-body">
       <div class="comment-row-head">
-        <a class="comment-row-link" href="/@{{ comment.post_author_login_name }}/{{ comment.post_id }}">
+        <a class="comment-row-link" href="/@{{ comment.post_community_slug or comment.post_author_login_name }}/{{ comment.post_id }}">
           {%- if by_drawing %}{{ comment.post_title or ftl_get_message("post-no-title") }}{% else %}{{ comment.actor_name }}{% endif -%}
         </a>
         <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}{{ handle(comment.post_author_login_name) }}{% else %}{{ handle(comment.handle) }}{% endif %} · </span><span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>

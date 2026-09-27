@@ -4,6 +4,8 @@ export interface CollaborationMeta {
   height: number;
   ownerId: string;
   savedPostId?: string;
+  /** The saved post's page; under its community's slug when it has one. */
+  savedPostUrl?: string;
   ownerLoginName: string;
   maxUsers: number;
   currentUserCount: number;

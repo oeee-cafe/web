@@ -1,3 +1,4 @@
+{% from "post_url_macro.jinja" import post_url %}
 {% from "storage_macro.jinja" import stored_url %}
 {% extends "base.jinja" %}
 {% block title %}
@@ -60,7 +61,7 @@
      that found its section headings by looking for English words in them. #}
   <div class="move-page">
     <section class="ds-card move-subject">
-      <a class="move-subject-thumb" href="/@{{ post.login_name }}/{{ post_id }}">
+      <a class="move-subject-thumb" href="{{ post_url(post, post_id) }}">
         <img src="{{ stored_url("image", post.image_filename) }}"
              alt="{{ post.title }}" />
       </a>
@@ -78,7 +79,7 @@
       </div>
     </section>
 
-    <form method="post" action="/@{{ post.login_name }}/{{ post_id }}/edit/community" class="move-form" id="move-form">
+    <form method="post" action="{{ post_url(post, post_id) }}/edit/community" class="move-form" id="move-form">
       <input type="search"
              id="community-search"
              class="ds-input move-search"
@@ -121,7 +122,7 @@
 
       {# The one decision, at the foot of the window while the list scrolls. #}
       <div class="move-bar">
-        <a href="/@{{ post.login_name }}/{{ post_id }}" class="ds-button">{{ ftl_get_message("cancel") }}</a>
+        <a href="{{ post_url(post, post_id) }}" class="ds-button">{{ ftl_get_message("cancel") }}</a>
         <button type="submit" class="ds-button ds-button-primary" id="move-submit" disabled
                 data-choose="{{ ftl_get_message('post-move-choose') }}">{{ ftl_get_message("post-move-choose") }}</button>
       </div>

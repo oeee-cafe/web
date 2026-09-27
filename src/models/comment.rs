@@ -105,6 +105,8 @@ pub struct NotificationComment {
     pub created_at: DateTime<Utc>,
     pub post_title: Option<String>,
     pub post_author_login_name: String,
+    /// The community the post is in, which names its page (`post_page_path`).
+    pub post_community_slug: Option<String>,
     pub post_image_filename: Option<String>,
     pub post_image_width: Option<i32>,
     pub post_image_height: Option<i32>,
@@ -131,6 +133,7 @@ struct NotificationCommentRow {
     created_at: DateTime<Utc>,
     post_title: Option<String>,
     post_author_login_name: String,
+    post_community_slug: Option<String>,
     post_image_filename: Option<String>,
     post_image_width: Option<i32>,
     post_image_height: Option<i32>,
@@ -152,6 +155,7 @@ impl From<NotificationCommentRow> for NotificationComment {
             created_at: row.created_at,
             post_title: row.post_title,
             post_author_login_name: row.post_author_login_name,
+            post_community_slug: row.post_community_slug,
             post_image_filename: row.post_image_filename,
             post_image_width: row.post_image_width,
             post_image_height: row.post_image_height,
@@ -388,6 +392,7 @@ pub async fn find_comments_to_posts_by_author(
             CASE WHEN comment_authors.id IS NOT NULL THEN true ELSE false END AS "is_local!",
             posts.title AS post_title,
             post_authors.login_name AS post_author_login_name,
+            communities.slug AS "post_community_slug?",
             images.image_filename AS post_image_filename,
             images.width AS post_image_width,
             images.height AS post_image_height
@@ -396,6 +401,7 @@ pub async fn find_comments_to_posts_by_author(
         LEFT JOIN users AS comment_authors ON actors.user_id = comment_authors.id
         LEFT JOIN posts ON comments.post_id = posts.id
         LEFT JOIN users AS post_authors ON posts.author_id = post_authors.id
+        LEFT JOIN communities ON posts.community_id = communities.id
         LEFT JOIN images ON posts.image_id = images.id
         WHERE posts.author_id = $1
         AND actors.user_id != $1
@@ -478,6 +484,7 @@ pub async fn find_recent_comments(
             (comment_authors.id IS NOT NULL) AS "is_local!",
             posts.title AS post_title,
             post_authors.login_name AS post_author_login_name,
+            communities.slug AS "post_community_slug?",
             images.image_filename AS "post_image_filename?",
             images.width AS "post_image_width?",
             images.height AS "post_image_height?"
@@ -568,6 +575,7 @@ pub async fn find_public_comments_by_user(
             true AS "is_local!",
             posts.title AS post_title,
             post_authors.login_name AS post_author_login_name,
+            communities.slug AS "post_community_slug?",
             images.image_filename AS "post_image_filename?",
             images.width AS "post_image_width?",
             images.height AS "post_image_height?"

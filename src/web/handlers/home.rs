@@ -906,6 +906,7 @@ mod tests {
             created_at: at,
             post_title: Some("A drawing".to_string()),
             post_author_login_name: "someone".to_string(),
+            post_community_slug: None,
             post_image_filename: Some("abcdef.png".to_string()),
             post_image_width: Some(300),
             post_image_height: Some(300),

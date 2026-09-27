@@ -1,3 +1,4 @@
+{% from "post_url_macro.jinja" import post_url %}
 <div id="post-reactions-{{ post_id }}" class="post-reactions">
   <span class="reaction-total">
     {% set total_count = reaction_counts | map(attribute='count') | sum %}
@@ -11,7 +12,7 @@
         {% endif %}
       </a>
     {% elif post %}
-      <a href="/@{{ post.login_name }}/{{ post_id }}/reactions">
+      <a href="{{ post_url(post, post_id) }}/reactions">
         <span class="reaction-total-count">{{ total_count }}</span>
         {% if total_count == 1 %}
           {{ ftl_get_message("post-reaction") }}

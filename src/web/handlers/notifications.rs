@@ -574,6 +574,7 @@ mod tests {
             created_at: opened - Duration::days(2),
             post_title: None,
             post_author_login_name: None,
+            post_community_slug: None,
             post_image_filename: None,
             post_image_width: None,
             post_image_height: None,

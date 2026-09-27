@@ -1,3 +1,4 @@
+{% from "post_url_macro.jinja" import post_url %}
 {% from "storage_macro.jinja" import stored_url %}
 {% import "comments_macro.jinja" as comments_macro %}
 {% from "person_macro.jinja" import person %}
@@ -7,7 +8,7 @@
    step in under their parent. #}
 {% macro render_post_card(post, depth) %}
   <div class="post-thread-item" style="margin-left: {{ depth * 16 }}px">
-    <a href="/@{{ post.user_login_name }}/{{ post.id }}" class="post-thread-card">
+    <a href="{{ post_url(post) }}" class="post-thread-card">
       <span class="post-thread-thumb">
         <img src="{{ stored_url("image", post.image_filename) }}"
              alt=""
@@ -46,10 +47,10 @@
     <meta property="og:type" content="article" />
     <meta property="og:title" content="{{ post.title }}" />
     <meta property="og:description" content="{{ post.content }}" />
-    {# Canonical post URL is /@slug-or-login-name/id, the same form the page
-       links to itself by; /posts/id only redirects there. #}
+    {# The canonical post URL, the same form the page links to itself by;
+       /posts/id and any other handle only redirect there. #}
     <meta property="og:url"
-          content="{{ base_url|safe }}/@{{ post.login_name }}/{{ post_id }}" />
+          content="{{ base_url|safe }}{{ post_url(post, post_id) }}" />
     <meta property="og:image"
           content="{{ stored_url("image", post.image_filename) }}" />
     <meta property="og:image:width" content="{{ post.image_width }}" />
@@ -164,7 +165,7 @@
               {# A NEO replay's controls are under the drawing; only Tegaki's,
                  which takes the whole window, is a link to its own page. #}
               {% if not inline_replay %}
-                <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/replay">{{ ftl_get_message("post-replay") }}</a>
+                <a class="post-inspector-inline" href="{{ post_url(post, post_id) }}/replay">{{ ftl_get_message("post-replay") }}</a>
               {% endif %}
               {% if post.allow_replay != "true" %}
                 <span class="muted">({{ ftl_get_message("replay-private" if current_user.id == post.author_id else "replay-private-staff") }})</span>
@@ -177,10 +178,10 @@
               {% if post.community_slug %}
                 <a href="/@{{ post.community_slug }}">{{ post.community_name }}</a>
                 {% if current_user.id == post.author_id and (not post_community or post_community.visibility != "private") and not post.parent_post_id and not two_tone %}
-                  <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit") }}</a>
+                  <a class="post-inspector-inline" href="{{ post_url(post, post_id) }}/edit/community">{{ ftl_get_message("edit") }}</a>
                 {% endif %}
               {% else %}
-                <a class="post-inspector-inline" href="/@{{ post.login_name }}/{{ post_id }}/edit/community">{{ ftl_get_message("edit-community-button") }}</a>
+                <a class="post-inspector-inline" href="{{ post_url(post, post_id) }}/edit/community">{{ ftl_get_message("edit-community-button") }}</a>
               {% endif %}
             </dd>
           {% endif %}
@@ -194,10 +195,10 @@
           {% if current_user %}
             <button type="button" class="ds-button ds-button-primary" onclick="showPostDrawModal()">{{ ftl_get_message("post-reply-with-drawing") }}</button>
             {% if can_relay %}
-              <a class="ds-button" href="/@{{ post.login_name }}/{{ post_id }}/relay">{{ ftl_get_message("post-relay") }}</a>
+              <a class="ds-button" href="{{ post_url(post, post_id) }}/relay">{{ ftl_get_message("post-relay") }}</a>
             {% endif %}
           {% endif %}
-          <button type="button" class="ds-button" data-share-url="{{ base_url|safe }}/@{{ post.login_name }}/{{ post_id }}"
+          <button type="button" class="ds-button" data-share-url="{{ base_url|safe }}{{ post_url(post, post_id) }}"
                   data-share-title="{{ post.title or ftl_get_message('post-no-title') }}"
                   data-share-copied="{{ ftl_get_message('post-share-copied') }}"
                   onclick="sharePost(this)">{{ ftl_get_message("post-share") }}</button>

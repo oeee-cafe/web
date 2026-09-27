@@ -1,7 +1,10 @@
-{# A post's permalink. Its author names the page whatever community the post
-   was posted to — see `post_page_path` in src/models/post.rs, which is where
-   that is decided and which every other handle redirects to. #}
+{# A post's permalink: under its community's slug when it is in one, and its
+   author's name otherwise — see `post_page_path` in src/models/post.rs, which
+   is where that is decided and which every other handle redirects to.
+
+   The row shapes differ in what they call the author, so any of the three
+   names will do; `community_slug` is the same everywhere. #}
 {% macro post_url(post, post_id="") %}
-{%- set author = post.login_name or post.user_login_name or post.author_login_name -%}
-/@{{ author }}/{{ post_id or post.id }}
+{%- set handle = post.community_slug or post.login_name or post.user_login_name or post.author_login_name -%}
+/@{{ handle }}/{{ post_id or post.id }}
 {%- endmacro %}

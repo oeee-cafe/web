@@ -1177,8 +1177,28 @@ pub struct Note {
     tag: Vec<Tag>,
     #[serde(skip_serializing_if = "Option::is_none")]
     source: Option<serde_json::Value>,
+    /// The Group a post belongs to (FEP-1b12), which is how Lemmy, Mbin and
+    /// the like tell a community's post from its author's own. Read leniently:
+    /// a Note whose `audience` is not a single IRI is still a Note.
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "lenient_url_deser"
+    )]
+    audience: Option<Url>,
     #[serde(flatten)]
     extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+fn lenient_url_deser<'de, D>(deserializer: D) -> Result<Option<Url>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    Ok(value
+        .as_ref()
+        .and_then(|value| value.as_str())
+        .and_then(|iri| Url::parse(iri).ok()))
 }
 
 /// A `Hashtag` on a Note.
@@ -1235,6 +1255,7 @@ pub struct NoteParams {
     pub url: Url,
     pub attachment: Vec<Attachment>,
     pub tag: Vec<Tag>,
+    pub audience: Option<Url>,
 }
 
 impl Note {
@@ -1254,6 +1275,7 @@ impl Note {
             reply_target: None,
             tag: params.tag,
             source: None,
+            audience: params.audience,
             extra: std::collections::HashMap::new(),
         }
     }
@@ -1688,6 +1710,33 @@ pub fn generate_object_id(domain: &str) -> Result<Url, AppError> {
     ))?)
 }
 
+/// A post's Note `url` and `audience`: the page `post_page_path` gives it,
+/// and the Group of the community it is in, if any. Both change when the post
+/// moves, which is why a move sends an `Update`.
+async fn note_page_and_audience(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    post: &std::collections::HashMap<String, Option<String>>,
+    post_id: Uuid,
+    author_actor: &Actor,
+    domain: &str,
+) -> Result<(Url, Option<Url>), AppError> {
+    let community_slug = post.get("community_slug").and_then(|v| v.as_deref());
+    let post_url =
+        crate::models::post::post_page_url(domain, &author_actor.username, community_slug, post_id)
+            .parse()?;
+    let audience = match post
+        .get("community_id")
+        .and_then(|v| v.as_ref())
+        .and_then(|id| Uuid::parse_str(id).ok())
+    {
+        Some(community_id) => Actor::find_by_community_id(tx, community_id)
+            .await?
+            .map(|group| group.iri.url().clone()),
+        None => None,
+    };
+    Ok((post_url, audience))
+}
+
 pub async fn create_note_from_post(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     post_id: Uuid,
@@ -1741,8 +1790,8 @@ pub async fn create_note_from_post(
     }
 
     // Create URLs and IDs
-    let post_url: Url =
-        crate::models::post::post_page_url(domain, &author_actor.username, post_id).parse()?;
+    let (post_url, audience) =
+        note_page_and_audience(tx, &post, post_id, author_actor, domain).await?;
 
     let note_id: Url = format!("https://{}/ap/posts/{}", domain, post_id).parse()?;
 
@@ -1766,6 +1815,7 @@ pub async fn create_note_from_post(
         url: post_url,
         attachment: attachments,
         tag: hashtag_tags(tx, post_id, domain).await?,
+        audience,
     });
 
     Ok(note)
@@ -1824,8 +1874,8 @@ pub async fn create_updated_note_from_post(
     }
 
     // Create URLs and IDs
-    let post_url: Url =
-        crate::models::post::post_page_url(domain, &author_actor.username, post_id).parse()?;
+    let (post_url, audience) =
+        note_page_and_audience(tx, &post, post_id, author_actor, domain).await?;
 
     let note_id: Url = format!("https://{}/ap/posts/{}", domain, post_id).parse()?;
 
@@ -1853,6 +1903,7 @@ pub async fn create_updated_note_from_post(
         url: post_url,
         attachment: attachments,
         tag: hashtag_tags(tx, post_id, domain).await?,
+        audience,
     });
 
     Ok(note)

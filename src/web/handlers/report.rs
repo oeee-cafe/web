@@ -78,9 +78,11 @@ async fn send_post_report(
     tx.commit().await?;
 
     // Prepare email content
-    let post_url = format!(
-        "https://{}/@{}/{}",
-        state.config.domain, post_author.login_name, post_id
+    let post_url = crate::models::post::post_page_url(
+        &state.config.domain,
+        &post_author.login_name,
+        post.get("community_slug").and_then(|v| v.as_deref()),
+        post_id,
     );
     let reporter_profile_url = format!("https://{}/@{}", state.config.domain, user.login_name);
     let post_author_profile_url = format!(

@@ -15,7 +15,7 @@
    whether it was unread when the page was opened, not `read_at`: opening the
    page is what reads it (ShownNotification in handlers/notifications.rs). #}
 {% set title = notification.post_title if notification.post_title else ftl_get_message("post-untitled") %}
-{% set post_url = "/@" ~ notification.post_author_login_name ~ "/" ~ notification.post_id %}
+{% set post_url = "/@" ~ (notification.post_community_slug or notification.post_author_login_name) ~ "/" ~ notification.post_id %}
 {# What kind of thing happened, as a small badge on the row's picture --
    the way an application's notification carries its source's icon -- so a
    list can be scanned by kind before it is read. #}
