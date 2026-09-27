@@ -61,17 +61,9 @@ async fn tag_not_found(
     auth_session: &AuthSession,
     ftl_lang: &str,
 ) -> Result<axum::response::Response, AppError> {
-    let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(tx, auth_session.user.as_ref(), &ftl_lang).await?;
     let rendered = state
-        .render(
-            "404.jinja",
-            context! {
-                current_user => auth_session.user,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
-            },
-        )
+        .render_page("404.jinja", common_ctx, context! {})
         .await?;
     Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
@@ -159,26 +151,22 @@ async fn tag_page(
     )
     .await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             match view {
                 TagView::Drawings => "tag_view.jinja",
                 TagView::Comments => "tag_comments.jinja",
             },
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 tag => tag,
                 post_count,
                 feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), 0, None),
                 comments => comments_context(comments, &tag_comments_path(&name)),
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await?;
@@ -418,21 +406,17 @@ pub async fn tag_discovery(
     let (tags, search_query, sort) = requested_tags(&state, &params).await?;
 
     let mut tx = state.db_pool.begin().await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
     tx.commit().await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "tag_discovery.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 tags,
                 search_query,
                 sort_by => sort.as_param(),
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await?;

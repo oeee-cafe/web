@@ -211,22 +211,19 @@ pub(crate) async fn render_community_page(
         None,
     )
     .await?;
-    let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 community => Some(&community),
                 header => header,
                 community_id => community_uuid.to_string(),
                 domain => state.config.domain.clone(),
-                unread_notification_count => common_ctx.unread_notification_count,
                 feed => feed_context(posts, &community_posts_path(&community.slug), 0, None),
                 comments => comments_context(comments, &community_comments_path(&community.slug)),
-                draft_post_count => common_ctx.draft_post_count,
-                ftl_lang,
             },
         )
         .await?;
@@ -808,20 +805,17 @@ pub async fn communities(
     )
     .await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     tx.commit().await?;
 
     let template = "communities.jinja";
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 messages => messages.into_iter().collect::<Vec<_>>(),
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 sort => sort.as_param(),
                 // Same key names the fragment uses, so the first batch and every
                 // scrolled batch render through one template.
@@ -833,7 +827,6 @@ pub async fn communities(
                 communities => public_communities,
                 your_communities,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-                ftl_lang
             },
         )
         .await?;
@@ -939,18 +932,14 @@ pub async fn create_community_form(
 ) -> Result<Html<String>, AppError> {
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "create_community.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 messages => messages.into_iter().collect::<Vec<_>>(),
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
             },
         )
         .await?;
@@ -1001,8 +990,7 @@ pub async fn hx_edit_community(
         return Ok(StatusCode::FORBIDDEN.into_response());
     }
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let rendered = state
         .render(
@@ -1269,23 +1257,19 @@ pub async fn community_comments(
     )
     .await?;
     let header = community_header_context(&mut tx, &community).await?;
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let template = "community_comments.jinja";
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 community => community,
                 header => header,
                 community_id => community_uuid.to_string(),
                 comments => comments_context(comments, &community_comments_path(&community.slug)),
                 domain => state.config.domain.clone(),
-                unread_notification_count => common_ctx.unread_notification_count,
-                draft_post_count => common_ctx.draft_post_count,
-                ftl_lang,
             },
         )
         .await?;
@@ -1979,14 +1963,12 @@ pub async fn members_page(
         _ => Vec::new(),
     };
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     tx.commit().await?;
 
     let template = "community_members.jinja";
-    let rendered = state.render(template, context! {
-        current_user => auth_session.user,
+    let rendered = state.render_page(template, common_ctx, context! {
         community,
         members => members_with_details,
         pending_invitations,
@@ -1994,9 +1976,6 @@ pub async fn members_page(
         can_invite => matches!(user_role, Some(CommunityMemberRole::Owner) | Some(CommunityMemberRole::Moderator)),
         can_remove => matches!(user_role, Some(CommunityMemberRole::Owner) | Some(CommunityMemberRole::Moderator)),
         messages => messages.into_iter().collect::<Vec<_>>(),
-        draft_post_count => common_ctx.draft_post_count,
-        unread_notification_count => common_ctx.unread_notification_count,
-        ftl_lang,
     }).await?;
 
     Ok(Html(rendered).into_response())

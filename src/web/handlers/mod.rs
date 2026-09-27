@@ -59,29 +59,15 @@ pub async fn handler_404(
     // The header counts only exist for signed-in users, and this handler
     // absorbs every bot scan for /wp-admin and friends — so don't open a
     // transaction we have nothing to ask.
-    let (draft_post_count, unread_notification_count) = match auth_session.user.as_ref() {
+    let common = match auth_session.user.as_ref() {
         Some(user) => {
             let mut tx = state.db_pool.begin().await?;
-            let common_ctx = CommonContext::build(&mut tx, Some(user.id)).await?;
-            (
-                common_ctx.draft_post_count,
-                common_ctx.unread_notification_count,
-            )
+            CommonContext::build(&mut tx, Some(user), &ftl_lang).await?
         }
-        None => (0, 0),
+        None => CommonContext::anonymous(&ftl_lang),
     };
 
-    let rendered: String = state
-        .render(
-            "404.jinja",
-            context! {
-                current_user => auth_session.user,
-                draft_post_count,
-                unread_notification_count,
-                ftl_lang
-            },
-        )
-        .await?;
+    let rendered: String = state.render_page("404.jinja", common, context! {}).await?;
 
     Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
@@ -110,19 +96,10 @@ pub async fn render_403(
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let rendered: String = state
-        .render(
-            "403.jinja",
-            context! {
-                current_user => auth_session.user,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang
-            },
-        )
+        .render_page("403.jinja", common_ctx, context! {})
         .await?;
 
     Ok((StatusCode::FORBIDDEN, Html(rendered)).into_response())

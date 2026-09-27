@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::watch;
 
+use super::context::CommonContext;
 use super::handlers::collaborate::redis_state::RedisStateManager;
 use super::handlers::collaborate::room_fanout::RoomFanout;
 use super::templates::Templates;
@@ -36,6 +37,29 @@ impl AppState {
         ctx: minijinja::Value,
     ) -> Result<String, minijinja::Error> {
         self.env.render(&self.db_pool, name, ctx).await
+    }
+
+    /// Renders a page inside the site's chrome: `ctx` is the page's own
+    /// context, and `common` fills in what `base.jinja` reads. A key in
+    /// both is the page's.
+    pub async fn render_page(
+        &self,
+        name: &str,
+        common: CommonContext,
+        ctx: minijinja::Value,
+    ) -> Result<String, minijinja::Error> {
+        self.render(name, common.merge(ctx)).await
+    }
+
+    /// `render_page` for one block of a page.
+    pub async fn render_page_block(
+        &self,
+        name: &str,
+        block: &str,
+        common: CommonContext,
+        ctx: minijinja::Value,
+    ) -> Result<String, minijinja::Error> {
+        self.render_block(name, block, common.merge(ctx)).await
     }
 
     /// Renders one block of a page, for an htmx request that replaces it.

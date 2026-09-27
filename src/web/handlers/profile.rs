@@ -391,7 +391,7 @@ async fn render_profile(
         (0, Vec::new())
     };
 
-    let common_ctx = CommonContext::build(tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let mut is_current_user_following = false;
     if let Some(current_user) = auth_session.user.as_ref() {
@@ -435,10 +435,10 @@ async fn render_profile(
     );
 
     let rendered = state
-        .render(
+        .render_page(
             "profile.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 links,
                 banner,
                 is_following => is_current_user_following,
@@ -454,9 +454,6 @@ async fn render_profile(
                 public_feed,
                 private_count,
                 private_feed,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
             },
         )
         .await?;
@@ -574,18 +571,9 @@ pub async fn profile_or_community(
     }
 
     // Neither user nor community found - render 404 page
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
     let rendered: String = state
-        .render(
-            "404.jinja",
-            context! {
-                current_user => auth_session.user,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
-                ftl_lang,
-            },
-        )
+        .render_page("404.jinja", common_ctx, context! {})
         .await?;
     Ok((StatusCode::NOT_FOUND, Html(rendered)).into_response())
 }
@@ -859,21 +847,17 @@ pub async fn profile_settings(
 
     // User is already the current user from auth, no need for ownership check
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let links = find_links_by_user_id(&mut tx, user.id).await?;
 
     let rendered = state
-        .render(
+        .render_page(
             "profile_settings.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 links,
                 user => Some(user),
-                ftl_lang,
             },
         )
         .await?;
@@ -895,8 +879,7 @@ pub async fn banner_management(
         .await?
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let banners = list_user_banners(&mut tx, user.id).await?;
 
@@ -917,15 +900,12 @@ pub async fn banner_management(
 
     let template = "banner_management.jinja";
     let rendered = state
-        .render(
+        .render_page(
             template,
+            common_ctx,
             context! {
-                current_user => auth_session.user,
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 user => Some(user),
                 banners => banners_with_urls,
-                ftl_lang,
             },
         )
         .await?;
@@ -1216,8 +1196,7 @@ pub async fn guestbook(
 
     let guestbook_entries = find_guestbook_entries_by_recipient_id(&mut tx, user.id).await?;
 
-    let common_ctx =
-        CommonContext::build(&mut tx, auth_session.user.as_ref().map(|u| u.id)).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let banner = match user.banner_id {
         Some(banner_id) => Some(find_banner_by_id(&mut tx, banner_id).await?),
@@ -1230,17 +1209,14 @@ pub async fn guestbook(
     }
 
     let rendered = state
-        .render(
+        .render_page(
             "guestbook.jinja",
+            common_ctx,
             context! {
-                current_user => auth_session.user,
                 banner,
                 user => Some(user),
-                draft_post_count => common_ctx.draft_post_count,
-                unread_notification_count => common_ctx.unread_notification_count,
                 is_following => is_current_user_following,
                 guestbook_entries,
-                ftl_lang,
             },
         )
         .await?;
