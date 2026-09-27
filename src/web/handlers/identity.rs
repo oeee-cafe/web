@@ -36,7 +36,7 @@
 
 use axum::extract::{Path, Query, State};
 use axum::http::header::ORIGIN;
-use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::http::{HeaderMap, HeaderValue};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::Form;
 use axum_messages::Messages;
@@ -335,7 +335,7 @@ pub async fn do_steam_sign_in(
     Form(form): Form<SteamSignInForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
     let next = local_next(form.next.as_deref());
@@ -472,10 +472,10 @@ pub async fn apple_start(
     Form(form): Form<AppleStartForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     if state.config.apple.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Sign-in provider".to_string()));
     }
     let request = AppleRequest {
         state: random_token(),
@@ -565,7 +565,7 @@ async fn apple_sign_in_going(
     answer: AppleAnswer,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
     let back = back_for(&auth_session);
@@ -800,10 +800,10 @@ pub async fn google_start(
     Form(form): Form<GoogleStartForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     if state.config.google.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Sign-in provider".to_string()));
     }
     let request = GoogleRequest {
         state: random_token(),
@@ -871,7 +871,7 @@ async fn google_sign_in_going(
     answer: GoogleNativeAnswer,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
     let back = back_for(&auth_session);
@@ -1107,7 +1107,7 @@ pub async fn handoff_start(
     Form(form): Form<HandoffStartForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     // Only a provider this site actually offers, so an app is never sent to
     // a sign-in that would turn it away on arrival.
@@ -1118,7 +1118,7 @@ pub async fn handoff_start(
         Some(Provider::Steam) | None => false,
     };
     if !configured {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Sign-in provider".to_string()));
     }
 
     let next = local_next(form.next.as_deref());
@@ -1182,7 +1182,7 @@ pub async fn handoff_claim(
     Form(form): Form<HandoffClaimForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let say = |status: &str| axum::Json(serde_json::json!({ "status": status })).into_response();
 
@@ -1397,7 +1397,7 @@ pub async fn do_identity_welcome(
     Form(form): Form<WelcomeForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     if auth_session.user.is_some() {
         return Ok(Redirect::to("/").into_response());

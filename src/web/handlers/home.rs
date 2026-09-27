@@ -468,7 +468,7 @@ pub async fn do_delete_comment(
     // Require authentication
     let user = match auth_session.user {
         Some(u) => u,
-        None => return Ok(StatusCode::UNAUTHORIZED.into_response()),
+        None => return Err(AppError::Unauthorized),
     };
 
     let comment_uuid = Uuid::parse_str(&comment_id)?;
@@ -495,7 +495,7 @@ pub async fn do_delete_comment(
 
     let comment = match comment {
         Some(c) => c,
-        None => return Ok(StatusCode::NOT_FOUND.into_response()),
+        None => return Err(AppError::NotFound("Comment".to_string())),
     };
 
     // Check if comment is already deleted
@@ -505,7 +505,7 @@ pub async fn do_delete_comment(
 
     // Check if the user is the comment author
     if comment.actor_id != actor.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // Delete the comment

@@ -16,7 +16,7 @@ use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::Path;
 use axum::response::{IntoResponse, Redirect};
-use axum::{extract::State, http::StatusCode, response::Html, Form};
+use axum::{extract::State, response::Html, Form};
 use minijinja::context;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -52,7 +52,7 @@ pub async fn post_publish_form(
             .id
             .to_string()
     {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let published_at = post
@@ -115,7 +115,7 @@ pub async fn post_publish(
     let mut tx = db.begin().await?;
     let post = find_post_by_id(&mut tx, post_id).await?;
     if post.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
@@ -126,7 +126,7 @@ pub async fn post_publish(
     )?;
     let user_id = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id;
     if author_id != user_id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let is_sensitive = form.is_sensitive == Some("on".to_string());

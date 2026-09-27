@@ -19,7 +19,7 @@ use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
 use axum::extract::Path;
 use axum::response::{IntoResponse, Redirect};
-use axum::{extract::State, http::StatusCode, response::Html, Form};
+use axum::{extract::State, response::Html, Form};
 use minijinja::context;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -39,7 +39,7 @@ pub async fn post_edit_community(
     let mut tx = db.begin().await?;
     let post = find_post_by_id(&mut tx, post_uuid).await?;
     if post.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
@@ -54,14 +54,14 @@ pub async fn post_edit_community(
             .id
             .to_string()
     {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // Check if post is movable using the helper function
     use crate::models::post::is_post_movable;
     if !is_post_movable(&mut tx, post_uuid).await? {
         // Post cannot be moved (part of thread, in private/two-tone community)
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let post_data = post.clone();
@@ -394,7 +394,7 @@ pub async fn do_post_edit_community(
     let mut tx = db.begin().await?;
     let post = find_post_by_id(&mut tx, post_uuid).await?;
     if post.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
@@ -409,21 +409,21 @@ pub async fn do_post_edit_community(
             .id
             .to_string()
     {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // Check if post is movable using the helper function
     use crate::models::post::is_post_movable;
     if !is_post_movable(&mut tx, post_uuid).await? {
         // Post cannot be moved (part of thread, in private/two-tone community)
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // The form only lists communities a post may go to, but the id is the
     // request's own. None is the author's own page, which is always allowed.
     if let Some(community_id) = form.community_id {
         if !crate::models::post::may_move_post_into(&mut tx, community_id).await? {
-            return Ok(StatusCode::FORBIDDEN.into_response());
+            return Err(AppError::Forbidden);
         }
     }
 
@@ -481,7 +481,7 @@ pub async fn hx_edit_post(
     let post = find_post_by_id(&mut tx, post_uuid).await?;
 
     if post.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
@@ -496,7 +496,7 @@ pub async fn hx_edit_post(
             .id
             .to_string()
     {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // Get existing tags for this post
@@ -550,7 +550,7 @@ pub async fn hx_do_edit_post(
     let mut tx = db.begin().await?;
     let post = find_post_by_id(&mut tx, post_uuid).await?;
     if post.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
@@ -565,7 +565,7 @@ pub async fn hx_do_edit_post(
             .id
             .to_string()
     {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let _ = edit_post(
@@ -678,7 +678,7 @@ pub async fn hx_delete_post(
     let mut tx = db.begin().await?;
     let post = find_post_by_id(&mut tx, post_uuid).await?;
     if post.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     }
     let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
@@ -693,7 +693,7 @@ pub async fn hx_delete_post(
             .id
             .to_string()
     {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let image_id = post

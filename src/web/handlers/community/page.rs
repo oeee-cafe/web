@@ -17,7 +17,7 @@ use crate::web::state::AppState;
 use axum::extract::{Path, Query};
 use axum::http::{uri::Uri, HeaderMap, HeaderValue};
 use axum::response::{IntoResponse, Redirect};
-use axum::{extract::State, http::StatusCode, response::Html};
+use axum::{extract::State, response::Html};
 use minijinja::context;
 
 use crate::web::context::CommonContext;
@@ -366,7 +366,7 @@ pub async fn community_iframe(
     };
 
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
 
     let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
@@ -465,7 +465,7 @@ pub async fn community_comments(
     };
 
     if community.is_none() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Community".to_string()));
     }
 
     let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;

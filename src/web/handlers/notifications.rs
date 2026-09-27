@@ -1,7 +1,6 @@
 use crate::app_error::AppError;
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
     response::{Html, IntoResponse, Json, Redirect},
 };
 use axum_messages::Messages;
@@ -323,7 +322,7 @@ pub async fn delete_notification_handler(
         let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
         Ok(Html(badge).into_response())
     } else {
-        Ok((StatusCode::NOT_FOUND, Html("".to_string())).into_response())
+        Err(AppError::NotFound("Notification".to_string()))
     }
 }
 

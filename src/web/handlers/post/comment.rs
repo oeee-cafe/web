@@ -16,7 +16,7 @@ use crate::models::user::AuthSession;
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::response::IntoResponse;
-use axum::{extract::State, http::StatusCode, response::Html, Form};
+use axum::{extract::State, response::Html, Form};
 use minijinja::context;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -69,7 +69,7 @@ pub async fn do_create_comment(
                     let user_role = get_user_role_in_community(&mut tx, user_id, comm.id).await?;
                     if user_role.is_none() {
                         // User is not a member of this private community
-                        return Ok(StatusCode::FORBIDDEN.into_response());
+                        return Err(AppError::Forbidden);
                     }
                 }
             }
@@ -79,7 +79,7 @@ pub async fn do_create_comment(
             None
         }
     } else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Err(AppError::NotFound("Post".to_string()));
     };
 
     let post_author_id = post

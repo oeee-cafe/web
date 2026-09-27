@@ -649,7 +649,7 @@ pub async fn do_move_link_down(
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
     if user.id != current_user.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let links = find_links_by_user_id(&mut tx, current_user.id).await?;
@@ -695,7 +695,7 @@ pub async fn do_move_link_up(
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
     if user.id != current_user.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let links = find_links_by_user_id(&mut tx, current_user.id).await?;
@@ -748,7 +748,7 @@ pub async fn do_delete_link(
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
     if user.id != current_user.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let links = find_links_by_user_id(&mut tx, current_user.id).await?;
@@ -794,11 +794,11 @@ pub async fn do_add_link(
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
     if user.id != current_user.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     if user.email_verified_at.is_none() {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let _ = create_link(
@@ -930,7 +930,7 @@ pub async fn do_reply_guestbook_entry(
         .ok_or_else(|| AppError::NotFound("Guestbook entry".to_string()))?;
 
     if entry.recipient_id != current_user.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let author = find_user_by_login_name(&mut tx, &login_name)
@@ -938,7 +938,7 @@ pub async fn do_reply_guestbook_entry(
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
     if author.id != entry.recipient_id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let mut guestbook_entry = find_guestbook_entry_by_id(&mut tx, entry_id)
@@ -1049,7 +1049,7 @@ pub async fn do_delete_guestbook_entry(
         .ok_or_else(|| AppError::NotFound("Guestbook entry".to_string()))?;
 
     if entry.author_id != current_user.id && entry.recipient_id != current_user.id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     // Check if login_name matches recipient_id
@@ -1057,7 +1057,7 @@ pub async fn do_delete_guestbook_entry(
         .await?
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
     if recipient.id != entry.recipient_id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let falls = delete_guestbook_entry(&mut tx, entry_id).await?;
@@ -1085,7 +1085,7 @@ pub async fn do_write_guestbook_entry(
     let recipient_id = recipient_user.id;
 
     if current_user_id == recipient_id {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
 
     let guestbook_entry = create_guestbook_entry(

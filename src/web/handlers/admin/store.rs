@@ -272,7 +272,7 @@ pub async fn admin_add_store_product(
     Form(form): Form<AddStoreProductForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let steam_app_id = state.config.steam.as_ref().map(|steam| steam.app_id);
     let refused = |error: String, form: AddStoreProductForm| async {
@@ -335,7 +335,7 @@ pub async fn admin_set_store_product_on_sale(
     Form(form): Form<StoreProductOnSaleForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let Some(store) = Store::parse(&store) else {
         return Err(AppError::NotFound("Store".to_string()));
@@ -381,7 +381,7 @@ pub async fn admin_set_store_product_sale_window(
     Form(form): Form<StoreProductSaleWindowForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let Some(store) = Store::parse(&store) else {
         return Err(AppError::NotFound("Store".to_string()));
@@ -438,7 +438,7 @@ pub async fn admin_set_store_product_details(
     Form(form): Form<StoreProductDetailsForm>,
 ) -> Result<Response, AppError> {
     if !from_this_site(&headers, &state.config.base_url) {
-        return Ok(StatusCode::FORBIDDEN.into_response());
+        return Err(AppError::Forbidden);
     }
     let Some(store) = Store::parse(&store) else {
         return Err(AppError::NotFound("Store".to_string()));
