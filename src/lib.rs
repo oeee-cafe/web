@@ -4,6 +4,7 @@ pub mod apple;
 pub mod build_info;
 pub mod config;
 pub mod db;
+pub mod federation;
 pub mod feed_period;
 pub mod google;
 pub mod google_play;

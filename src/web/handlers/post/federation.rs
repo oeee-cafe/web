@@ -81,12 +81,7 @@ pub(super) async fn send_post_to_followers(
 
             // Send to all followers
             actor
-                .send(
-                    create,
-                    follower_inboxes,
-                    state.config.use_activitypub_queue(),
-                    &federation_data,
-                )
+                .send(create, follower_inboxes, &federation_data)
                 .await?;
             tracing::info!(
                 "Sent Create activity for post {} to {} followers",
@@ -203,12 +198,7 @@ pub(super) async fn send_post_to_community_followers(
 
             // Send to all community followers using the community actor (announcing the user's post)
             community_actor
-                .send(
-                    announce,
-                    follower_inboxes,
-                    state.config.use_activitypub_queue(),
-                    &federation_data,
-                )
+                .send(announce, follower_inboxes, &federation_data)
                 .await?;
             tracing::info!(
                 "Sent Announce activity for note {} to {} community followers",
@@ -278,12 +268,7 @@ pub(super) async fn send_post_update_to_followers(
 
             // Send to all followers
             actor
-                .send(
-                    update,
-                    follower_inboxes,
-                    state.config.use_activitypub_queue(),
-                    &federation_data,
-                )
+                .send(update, follower_inboxes, &federation_data)
                 .await?;
             tracing::info!(
                 "Sent Update activity for post {} to {} followers",

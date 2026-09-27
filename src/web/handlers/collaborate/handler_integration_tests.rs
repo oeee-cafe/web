@@ -258,6 +258,14 @@ async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
         push_service: Arc::new(PushService::disabled(db.clone())),
         live: crate::live::Live::local(),
         shutdown: Shutdown::new(),
+        // Nothing here federates; the deliverer is never run, and its table is
+        // only created if something queues.
+        deliverer: Arc::new(crate::federation::Deliverer::new(
+            feder_postgres::PostgresQueue::new(db.clone()),
+            crate::federation::ActorKeys::new(db.clone()),
+            feder::client::Client::new(feder::client::ClientConfig::default()).expect("client"),
+            feder::deliverer::DelivererConfig::default(),
+        )),
     };
     let app = Router::new()
         .route("/ws/{room}/{user}", get(upgrade))

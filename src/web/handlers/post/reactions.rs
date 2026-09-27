@@ -242,7 +242,6 @@ pub async fn add_reaction(
                 .send(
                     emoji_react,
                     vec![post_author_actor.shared_inbox_or_inbox()],
-                    state.config.use_activitypub_queue(),
                     &federation_data,
                 )
                 .await
@@ -400,7 +399,6 @@ pub async fn remove_reaction(
                 .send(
                     undo,
                     vec![post_author_actor.shared_inbox_or_inbox()],
-                    state.config.use_activitypub_queue(),
                     &federation_data,
                 )
                 .await

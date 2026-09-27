@@ -99,12 +99,7 @@ impl Activity for Follow {
         let following_actor_object_id = ObjectId::parse(&following_actor.iri)?;
         let accept = Box::new(Accept::new(following_actor_object_id, self, id.clone()));
         following_actor
-            .send(
-                accept,
-                vec![follower_actor.shared_inbox_or_inbox()],
-                data.app_data().config.use_activitypub_queue(),
-                data,
-            )
+            .send(accept, vec![follower_actor.shared_inbox_or_inbox()], data)
             .await?;
 
         Ok(())
