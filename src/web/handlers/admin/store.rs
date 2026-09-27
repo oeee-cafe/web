@@ -81,10 +81,10 @@ pub(super) fn parse_sale_window(starts: &str, ends: &str) -> Result<SaleWindow, 
         };
     let starts = parse(starts, "start")?;
     let ends = parse(ends, "end")?;
-    if let (Some(starts), Some(ends)) = (starts, ends) {
-        if ends <= starts {
-            return Err("A sale has to end after it starts.".to_string());
-        }
+    if let (Some(starts), Some(ends)) = (starts, ends)
+        && ends <= starts
+    {
+        return Err("A sale has to end after it starts.".to_string());
     }
     Ok((starts, ends))
 }

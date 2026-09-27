@@ -176,61 +176,60 @@ pub async fn post_publish(
     let mut notification_info: Vec<(Uuid, Uuid)> = Vec::new();
 
     // Check if this is a reply post and notify the parent post author
-    if let Some(parent_post_id_str) = post.get("parent_post_id").and_then(|id| id.as_ref()) {
-        if let Ok(parent_post_id) = Uuid::parse_str(parent_post_id_str) {
-            let parent_post = find_post_by_id(&mut tx, parent_post_id).await?;
-            let parent_author_id = parent_post
-                .as_ref()
-                .and_then(|p| p.get("author_id"))
-                .and_then(|id| id.as_ref())
-                .and_then(|id| Uuid::parse_str(id).ok());
+    if let Some(parent_post_id_str) = post.get("parent_post_id").and_then(|id| id.as_ref())
+        && let Ok(parent_post_id) = Uuid::parse_str(parent_post_id_str)
+    {
+        let parent_post = find_post_by_id(&mut tx, parent_post_id).await?;
+        let parent_author_id = parent_post
+            .as_ref()
+            .and_then(|p| p.get("author_id"))
+            .and_then(|id| id.as_ref())
+            .and_then(|id| Uuid::parse_str(id).ok());
 
-            if let (Some(actor), Some(parent_author_id)) = (&actor, parent_author_id) {
-                // Don't notify if replying to own post
-                if parent_author_id != user_id {
-                    // For private communities, only notify if parent author is still a member
-                    // For personal posts (no community), always notify
-                    let should_notify = if let Some(cid) = community_id {
-                        let community = find_community_by_id(&mut tx, cid).await?;
-                        if let Some(community) = community {
-                            if community.visibility
-                                == crate::models::community::CommunityVisibility::Private
-                            {
-                                // Check if parent author is still a member
-                                is_user_member(&mut tx, parent_author_id, community.id)
-                                    .await
-                                    .unwrap_or(false)
-                            } else {
-                                // Public or unlisted community - always notify
-                                true
-                            }
+        if let (Some(actor), Some(parent_author_id)) = (&actor, parent_author_id) {
+            // Don't notify if replying to own post
+            if parent_author_id != user_id {
+                // For private communities, only notify if parent author is still a member
+                // For personal posts (no community), always notify
+                let should_notify = if let Some(cid) = community_id {
+                    let community = find_community_by_id(&mut tx, cid).await?;
+                    if let Some(community) = community {
+                        if community.visibility
+                            == crate::models::community::CommunityVisibility::Private
+                        {
+                            // Check if parent author is still a member
+                            is_user_member(&mut tx, parent_author_id, community.id)
+                                .await
+                                .unwrap_or(false)
                         } else {
-                            // No community info - notify anyway
+                            // Public or unlisted community - always notify
                             true
                         }
                     } else {
-                        // Personal post - always notify
+                        // No community info - notify anyway
                         true
-                    };
-
-                    if should_notify {
-                        if let Ok(notification) = create_notification(
-                            &mut tx,
-                            CreateNotificationParams {
-                                recipient_id: parent_author_id,
-                                actor_id: actor.id,
-                                notification_type: NotificationType::PostReply,
-                                post_id: Some(post_id),
-                                comment_id: None,
-                                reaction_iri: None,
-                                guestbook_entry_id: None,
-                            },
-                        )
-                        .await
-                        {
-                            notification_info.push((notification.id, parent_author_id));
-                        }
                     }
+                } else {
+                    // Personal post - always notify
+                    true
+                };
+
+                if should_notify
+                    && let Ok(notification) = create_notification(
+                        &mut tx,
+                        CreateNotificationParams {
+                            recipient_id: parent_author_id,
+                            actor_id: actor.id,
+                            notification_type: NotificationType::PostReply,
+                            post_id: Some(post_id),
+                            comment_id: None,
+                            reaction_iri: None,
+                            guestbook_entry_id: None,
+                        },
+                    )
+                    .await
+                {
+                    notification_info.push((notification.id, parent_author_id));
                 }
             }
         }
@@ -243,32 +242,33 @@ pub async fn post_publish(
         .and_then(|id| id.as_ref())
         .is_some();
 
-    if let Some(cid) = community_id {
-        if !is_reply {
-            if let Some(ref actor) = actor {
-                let community = find_community_by_id(&mut tx, cid).await?;
+    if let Some(cid) = community_id
+        && !is_reply
+        && let Some(ref actor) = actor
+    {
+        let community = find_community_by_id(&mut tx, cid).await?;
 
-                if let Some(ref community) = community {
-                    // Only notify for unlisted or private communities
-                    let should_notify_community = matches!(
-                        community.visibility,
-                        crate::models::community::CommunityVisibility::Unlisted
-                            | crate::models::community::CommunityVisibility::Private
-                    );
+        if let Some(ref community) = community {
+            // Only notify for unlisted or private communities
+            let should_notify_community = matches!(
+                community.visibility,
+                crate::models::community::CommunityVisibility::Unlisted
+                    | crate::models::community::CommunityVisibility::Private
+            );
 
-                    if should_notify_community {
-                        // Get community participants based on visibility
-                        let participant_ids: Vec<Uuid> = if community.visibility
-                            == crate::models::community::CommunityVisibility::Private
-                        {
-                            // For private communities, get all members
-                            use crate::models::community::get_community_members;
-                            let members = get_community_members(&mut tx, cid).await?;
-                            members.into_iter().map(|m| m.user_id).collect()
-                        } else {
-                            // For unlisted communities, get all users who have posted
-                            let participants = sqlx::query!(
-                                r#"
+            if should_notify_community {
+                // Get community participants based on visibility
+                let participant_ids: Vec<Uuid> = if community.visibility
+                    == crate::models::community::CommunityVisibility::Private
+                {
+                    // For private communities, get all members
+                    use crate::models::community::get_community_members;
+                    let members = get_community_members(&mut tx, cid).await?;
+                    members.into_iter().map(|m| m.user_id).collect()
+                } else {
+                    // For unlisted communities, get all users who have posted
+                    let participants = sqlx::query!(
+                        r#"
                                 SELECT DISTINCT author_id
                                 FROM posts
                                 WHERE community_id = $1
@@ -276,35 +276,32 @@ pub async fn post_publish(
                                     AND deleted_at IS NULL
                                     AND author_id != $2
                                 "#,
-                                cid,
-                                user_id
-                            )
-                            .fetch_all(&mut *tx)
-                            .await?;
-                            participants.into_iter().map(|p| p.author_id).collect()
-                        };
+                        cid,
+                        user_id
+                    )
+                    .fetch_all(&mut *tx)
+                    .await?;
+                    participants.into_iter().map(|p| p.author_id).collect()
+                };
 
-                        // Create notifications for each participant (excluding the post author)
-                        for participant_id in participant_ids {
-                            if participant_id != user_id {
-                                if let Ok(notification) = create_notification(
-                                    &mut tx,
-                                    CreateNotificationParams {
-                                        recipient_id: participant_id,
-                                        actor_id: actor.id,
-                                        notification_type: NotificationType::CommunityPost,
-                                        post_id: Some(post_id),
-                                        comment_id: None,
-                                        reaction_iri: None,
-                                        guestbook_entry_id: None,
-                                    },
-                                )
-                                .await
-                                {
-                                    notification_info.push((notification.id, participant_id));
-                                }
-                            }
-                        }
+                // Create notifications for each participant (excluding the post author)
+                for participant_id in participant_ids {
+                    if participant_id != user_id
+                        && let Ok(notification) = create_notification(
+                            &mut tx,
+                            CreateNotificationParams {
+                                recipient_id: participant_id,
+                                actor_id: actor.id,
+                                notification_type: NotificationType::CommunityPost,
+                                post_id: Some(post_id),
+                                comment_id: None,
+                                reaction_iri: None,
+                                guestbook_entry_id: None,
+                            },
+                        )
+                        .await
+                    {
+                        notification_info.push((notification.id, participant_id));
                     }
                 }
             }

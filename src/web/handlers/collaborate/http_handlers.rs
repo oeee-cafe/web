@@ -764,10 +764,10 @@ fn with_site_chrome(html: &str, head: &str, toolbar: &str) -> String {
     if let Some(at) = out.find("</head>") {
         out.insert_str(at, head);
     }
-    if let Some(body) = out.find("<body") {
-        if let Some(close) = out[body..].find('>') {
-            out.insert_str(body + close + 1, toolbar);
-        }
+    if let Some(body) = out.find("<body")
+        && let Some(close) = out[body..].find('>')
+    {
+        out.insert_str(body + close + 1, toolbar);
     }
     out
 }

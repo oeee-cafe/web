@@ -226,17 +226,17 @@ pub async fn invite_user(
         }
         Err(e) => {
             // Check if this is a duplicate key constraint error
-            if let Some(sqlx::Error::Database(ref err)) = e.downcast_ref::<sqlx::Error>() {
-                if err.is_unique_violation() {
-                    messages.error(safe_get_message(
-                        &bundle,
-                        "community-invite-already-invited",
-                    ));
-                    return Ok(
-                        Redirect::to(&format!("/communities/@{}/members", community.slug))
-                            .into_response(),
-                    );
-                }
+            if let Some(sqlx::Error::Database(err)) = e.downcast_ref::<sqlx::Error>()
+                && err.is_unique_violation()
+            {
+                messages.error(safe_get_message(
+                    &bundle,
+                    "community-invite-already-invited",
+                ));
+                return Ok(
+                    Redirect::to(&format!("/communities/@{}/members", community.slug))
+                        .into_response(),
+                );
             }
             // For other errors, propagate them
             Err(e.into())

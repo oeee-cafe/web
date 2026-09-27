@@ -125,10 +125,10 @@ fn heard_as(
     ftl_lang: &str,
     live_event: &LiveEvent,
 ) -> Option<(&'static str, serde_json::Value)> {
-    if let Some(recipient) = live_event.recipient() {
-        if reader != Some(recipient) {
-            return None;
-        }
+    if let Some(recipient) = live_event.recipient()
+        && reader != Some(recipient)
+    {
+        return None;
     }
     Some(match live_event {
         LiveEvent::Unread { count, .. } => {

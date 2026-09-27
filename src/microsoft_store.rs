@@ -137,10 +137,10 @@ async fn access_token(config: &MicrosoftStoreConfig, resource: &str) -> Result<S
         resource.to_string(),
     ];
     let tokens = TOKENS.get_or_init(Default::default);
-    if let Some((token, until)) = tokens.lock().unwrap().get(&key) {
-        if Instant::now() < *until {
-            return Ok(token.clone());
-        }
+    if let Some((token, until)) = tokens.lock().unwrap().get(&key)
+        && Instant::now() < *until
+    {
+        return Ok(token.clone());
     }
 
     let response = http()

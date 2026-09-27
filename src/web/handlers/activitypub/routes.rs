@@ -174,10 +174,10 @@ pub async fn activitypub_get_post(
 
         if let Some(cid) = community_id {
             let community = find_community_by_id(&mut tx, cid).await?;
-            if let Some(community) = community {
-                if community.visibility == CommunityVisibility::Private {
-                    return Ok((StatusCode::NOT_FOUND, "Post not found").into_response());
-                }
+            if let Some(community) = community
+                && community.visibility == CommunityVisibility::Private
+            {
+                return Ok((StatusCode::NOT_FOUND, "Post not found").into_response());
             }
         }
 

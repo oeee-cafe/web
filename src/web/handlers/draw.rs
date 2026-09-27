@@ -169,13 +169,13 @@ pub async fn start_draw(
     {
         return Ok(sign_in_instead());
     }
-    if let Some(ref community) = community {
-        if !may_draw_in(&mut tx, user, community).await? {
-            return Ok(match user {
-                None => sign_in_instead(),
-                Some(_) => AppError::Forbidden.into_response(),
-            });
-        }
+    if let Some(ref community) = community
+        && !may_draw_in(&mut tx, user, community).await?
+    {
+        return Ok(match user {
+            None => sign_in_instead(),
+            Some(_) => AppError::Forbidden.into_response(),
+        });
     }
 
     let painter_config = serde_json::to_string(&post_painter_config(
@@ -390,12 +390,11 @@ pub async fn draw_finish(
     let mut tx = db.begin().await?;
 
     // This drawing has been here before; answer with what it made then.
-    if let Some(draft_id) = client_draft_id {
-        if let Some(post_id) =
+    if let Some(draft_id) = client_draft_id
+        && let Some(post_id) =
             find_post_id_by_client_draft_id(&mut tx, current_user.id, draft_id).await?
-        {
-            return existing_post_response(&mut tx, post_id).await;
-        }
+    {
+        return existing_post_response(&mut tx, post_id).await;
     }
 
     // Get first 2 characters for directory prefix
@@ -417,16 +416,13 @@ pub async fn draw_finish(
 
     // If creating a reply but community_id is not provided, inherit from parent post
 
-    if community_id.is_none() {
-        if let Some(parent_id) = parent_post_id {
-            if let Some(parent_post) = find_post_by_id(&mut tx, parent_id).await? {
-                if let Some(parent_community_id_str) =
-                    parent_post.get("community_id").and_then(|v| v.as_ref())
-                {
-                    community_id = Uuid::parse_str(parent_community_id_str).ok();
-                }
-            }
-        }
+    if community_id.is_none()
+        && let Some(parent_id) = parent_post_id
+        && let Some(parent_post) = find_post_by_id(&mut tx, parent_id).await?
+        && let Some(parent_community_id_str) =
+            parent_post.get("community_id").and_then(|v| v.as_ref())
+    {
+        community_id = Uuid::parse_str(parent_community_id_str).ok();
     }
 
     let tool_enum: Tool = match tool.as_str() {

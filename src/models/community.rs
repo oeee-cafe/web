@@ -625,18 +625,18 @@ pub async fn update_community(
 
     // If config is provided, also update the corresponding community actor
     // Only do this for non-member_only communities
-    if let Some(config) = config {
-        if community_draft.visibility != CommunityVisibility::Private {
-            let _ = super::actor::update_actor_for_community(
-                tx,
-                id,
-                community_draft.slug.clone(), // Use slug as username
-                community_draft.name.clone(),
-                community_draft.description.clone(),
-                config,
-            )
-            .await;
-        }
+    if let Some(config) = config
+        && community_draft.visibility != CommunityVisibility::Private
+    {
+        let _ = super::actor::update_actor_for_community(
+            tx,
+            id,
+            community_draft.slug.clone(), // Use slug as username
+            community_draft.name.clone(),
+            community_draft.description.clone(),
+            config,
+        )
+        .await;
     }
 
     Ok(Community {

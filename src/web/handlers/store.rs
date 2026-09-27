@@ -346,11 +346,12 @@ async fn google_play_purchase(
 
     // Only a purchase that went through is Play's to refund by itself; one
     // still pending cannot be acknowledged yet.
-    if purchase.owned && !purchase.acknowledged {
-        if let Err(error) = google_play::acknowledge(config, &purchase).await {
-            tracing::warn!("a Google Play purchase could not be acknowledged: {error:#}");
-            return Ok(StatusCode::BAD_GATEWAY.into_response());
-        }
+    if purchase.owned
+        && !purchase.acknowledged
+        && let Err(error) = google_play::acknowledge(config, &purchase).await
+    {
+        tracing::warn!("a Google Play purchase could not be acknowledged: {error:#}");
+        return Ok(StatusCode::BAD_GATEWAY.into_response());
     }
     Ok(StatusCode::NO_CONTENT.into_response())
 }

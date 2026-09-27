@@ -219,21 +219,20 @@ async fn sign_in_with(
         (None, None) => {
             // The provider vouches for the address, and the account proved it
             // owns it: the same person.
-            if let Some(email) = identity.email.as_deref() {
-                if let Some(user) = find_user_by_verified_email(&mut tx, email).await? {
-                    if link_identity(&mut tx, user.id, &identity).await?.is_ok() {
-                        tx.commit().await?;
-                        auth_session
-                            .login(&user)
-                            .await
-                            .map_err(|_| AppError::Unauthorized)?;
-                        messages
-                            .clone()
-                            .success(say(bundle, "identity-linked", provider));
-                        welcome(messages, bundle, &user);
-                        return Ok(Redirect::to(next.as_deref().unwrap_or("/")).into_response());
-                    }
-                }
+            if let Some(email) = identity.email.as_deref()
+                && let Some(user) = find_user_by_verified_email(&mut tx, email).await?
+                && link_identity(&mut tx, user.id, &identity).await?.is_ok()
+            {
+                tx.commit().await?;
+                auth_session
+                    .login(&user)
+                    .await
+                    .map_err(|_| AppError::Unauthorized)?;
+                messages
+                    .clone()
+                    .success(say(bundle, "identity-linked", provider));
+                welcome(messages, bundle, &user);
+                return Ok(Redirect::to(next.as_deref().unwrap_or("/")).into_response());
             }
             drop(tx);
 
@@ -718,10 +717,10 @@ pub async fn google_callback(
     let mut request = take_google_request(&session)
         .await
         .filter(|request| answer.state.as_deref() == Some(request.state.as_str()));
-    if request.is_none() {
-        if let Some(oauth_state) = answer.state.as_deref() {
-            request = sent_to_google(&state, oauth_state).await;
-        }
+    if request.is_none()
+        && let Some(oauth_state) = answer.state.as_deref()
+    {
+        request = sent_to_google(&state, oauth_state).await;
     }
     let Some(config) = state.config.google.as_ref() else {
         messages

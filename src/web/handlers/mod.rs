@@ -121,14 +121,14 @@ pub fn parse_id_with_legacy_support(
     match BASE64URL_NOPAD.decode(id_str.as_bytes()) {
         Ok(decoded_bytes) => {
             // Try to parse bytes directly as UUID (16 bytes expected)
-            if decoded_bytes.len() == 16 {
-                if let Ok(uuid) = Uuid::from_slice(&decoded_bytes) {
-                    // Create redirect to UUID version
-                    let redirect_url = format!("{}/{}", base_path, uuid);
-                    return Ok(ParsedId::Redirect(axum::response::Redirect::permanent(
-                        &redirect_url,
-                    )));
-                }
+            if decoded_bytes.len() == 16
+                && let Ok(uuid) = Uuid::from_slice(&decoded_bytes)
+            {
+                // Create redirect to UUID version
+                let redirect_url = format!("{}/{}", base_path, uuid);
+                return Ok(ParsedId::Redirect(axum::response::Redirect::permanent(
+                    &redirect_url,
+                )));
             }
         }
         Err(_) => {

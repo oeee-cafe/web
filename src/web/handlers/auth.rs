@@ -187,17 +187,16 @@ pub async fn do_login(
     };
 
     // Auto-set language preference from browser if not already set
-    if user.preferred_language.is_none() {
-        if let Some(lang) = detect_preferred_language(&accept_language) {
-            let db = &state.db_pool;
-            if let Ok(mut tx) = db.begin().await {
-                if update_user_preferred_language(&mut tx, user.id, Some(lang))
-                    .await
-                    .is_ok()
-                {
-                    let _ = tx.commit().await;
-                }
-            }
+    if user.preferred_language.is_none()
+        && let Some(lang) = detect_preferred_language(&accept_language)
+    {
+        let db = &state.db_pool;
+        if let Ok(mut tx) = db.begin().await
+            && update_user_preferred_language(&mut tx, user.id, Some(lang))
+                .await
+                .is_ok()
+        {
+            let _ = tx.commit().await;
         }
     }
 
@@ -253,11 +252,11 @@ pub async fn do_logout(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
 ) -> impl IntoResponse {
-    if let (Some(user), Some(token)) = (auth_session.user.as_ref(), device_cookie(&headers)) {
-        if let Ok(mut tx) = state.db_pool.begin().await {
-            let _ = delete_user_device_by_token(&mut tx, user.id, &token).await;
-            let _ = tx.commit().await;
-        }
+    if let (Some(user), Some(token)) = (auth_session.user.as_ref(), device_cookie(&headers))
+        && let Ok(mut tx) = state.db_pool.begin().await
+    {
+        let _ = delete_user_device_by_token(&mut tx, user.id, &token).await;
+        let _ = tx.commit().await;
     }
     match auth_session.logout().await {
         Ok(_) => Redirect::to("/").into_response(),

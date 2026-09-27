@@ -229,15 +229,15 @@ pub async fn handle_socket(
     // triggered by this client's own JOIN, which it cannot send until it has
     // this socket and has begun replay. Without this a joiner spends the whole
     // of its catch-up watching marks made by session ids it has no names for.
-    if let Some(layers) = messages::current_layers_message(room_uuid, &state).await {
-        if sender.send(Message::Binary(layers.into())).await.is_err() {
-            error!(
-                "Failed to send the participant list to connection {} in room {}",
-                connection_id, room_uuid
-            );
-            leave().await;
-            return;
-        }
+    if let Some(layers) = messages::current_layers_message(room_uuid, &state).await
+        && sender.send(Message::Binary(layers.into())).await.is_err()
+    {
+        error!(
+            "Failed to send the participant list to connection {} in room {}",
+            connection_id, room_uuid
+        );
+        leave().await;
+        return;
     }
 
     // Join the room's stream BEFORE replaying history so no message can fall

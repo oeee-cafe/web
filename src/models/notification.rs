@@ -97,10 +97,10 @@ pub async fn create_notification(
 ) -> Result<Notification> {
     // Don't create notification if actor is notifying themselves
     // For federated actors (user_id is None), they can't be self-notifications
-    if let Ok(actor_user_id) = get_user_id_from_actor(tx, params.actor_id).await {
-        if params.recipient_id == actor_user_id {
-            return Err(anyhow::anyhow!("Cannot notify self"));
-        }
+    if let Ok(actor_user_id) = get_user_id_from_actor(tx, params.actor_id).await
+        && params.recipient_id == actor_user_id
+    {
+        return Err(anyhow::anyhow!("Cannot notify self"));
     }
 
     let notification = sqlx::query_as!(
