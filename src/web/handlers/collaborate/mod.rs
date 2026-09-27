@@ -24,3 +24,5 @@ pub use websocket::websocket_collaborate_handler;
 mod handler_integration_tests;
 #[cfg(test)]
 pub(crate) mod protocol_integration_tests;
+#[cfg(test)]
+mod protocol_vectors;
