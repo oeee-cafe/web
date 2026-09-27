@@ -1887,7 +1887,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 [[package]]
 name = "feder"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=3b0c095644465fc2b7dd6d8dea4401f14fa65583#3b0c095644465fc2b7dd6d8dea4401f14fa65583"
+source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
 dependencies = [
  "chrono",
  "feder-core",
@@ -1907,7 +1907,7 @@ dependencies = [
 [[package]]
 name = "feder-axum"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=3b0c095644465fc2b7dd6d8dea4401f14fa65583#3b0c095644465fc2b7dd6d8dea4401f14fa65583"
+source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
 dependencies = [
  "axum",
  "feder",
@@ -1916,7 +1916,7 @@ dependencies = [
 [[package]]
 name = "feder-core"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=3b0c095644465fc2b7dd6d8dea4401f14fa65583#3b0c095644465fc2b7dd6d8dea4401f14fa65583"
+source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
 dependencies = [
  "feder-vocab",
 ]
@@ -1924,7 +1924,7 @@ dependencies = [
 [[package]]
 name = "feder-jsonld"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=3b0c095644465fc2b7dd6d8dea4401f14fa65583#3b0c095644465fc2b7dd6d8dea4401f14fa65583"
+source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
 dependencies = [
  "iri-string",
  "serde_json",
@@ -1933,7 +1933,7 @@ dependencies = [
 [[package]]
 name = "feder-postgres"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=3b0c095644465fc2b7dd6d8dea4401f14fa65583#3b0c095644465fc2b7dd6d8dea4401f14fa65583"
+source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
 dependencies = [
  "feder",
  "serde_json",
@@ -1943,7 +1943,7 @@ dependencies = [
 [[package]]
 name = "feder-runtime"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=3b0c095644465fc2b7dd6d8dea4401f14fa65583#3b0c095644465fc2b7dd6d8dea4401f14fa65583"
+source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1963,7 +1963,7 @@ dependencies = [
 [[package]]
 name = "feder-vocab"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=3b0c095644465fc2b7dd6d8dea4401f14fa65583#3b0c095644465fc2b7dd6d8dea4401f14fa65583"
+source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
 dependencies = [
  "feder-jsonld",
  "iri-string",
