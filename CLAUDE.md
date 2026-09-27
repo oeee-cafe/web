@@ -2,7 +2,23 @@
 
 ## Main Rust server (`./src`)
 
-Don't try to run the development server. Just run `cargo check` if you need to check if the code compiles.
+Run `cargo check` to see whether the code compiles. To see what it does, run
+the development server against a database of its own:
+
+```bash
+createdb oeee_cafe_dev
+sed 's|^db_url = .*|db_url = "postgres:///oeee_cafe_dev"|' config/sample.toml > config/dev.toml
+DATABASE_URL=postgresql:///oeee_cafe cargo run -- config/dev.toml
+```
+
+It listens on `localhost:3000` and needs Redis there too. Not `oeee_cafe`:
+that database has the current schema but an empty migration history, so the
+`sqlx::migrate!()` the server runs on boot would try to replay every
+migration into it. A fresh database migrates itself on boot. `config/` is
+gitignored apart from `sample.toml`, so `dev.toml` stays local. Uploading a
+drawing needs real S3 credentials; to test pages or federation, sign up
+through the site and insert posts with `psql oeee_cafe_dev`. The
+ActivityPub routes answer `curl -H 'Accept: application/activity+json'`.
 
 Don't run `cargo sqlx prepare`.
 

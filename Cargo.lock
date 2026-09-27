@@ -2058,11 +2058,15 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 [[package]]
 name = "feder"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=41c3f4f4350582151ce8d469aad5e022a10b94f1#41c3f4f4350582151ce8d469aad5e022a10b94f1"
+source = "git+https://github.com/limeburst/feder.git?rev=20bf456012423b26575c4addd322a3a1d0c47c10#20bf456012423b26575c4addd322a3a1d0c47c10"
 dependencies = [
+ "chrono",
+ "feder-core",
  "feder-runtime",
  "futures-util",
+ "http 1.5.0",
  "ipnet",
+ "percent-encoding",
  "reqwest 0.12.28",
  "serde_json",
  "tokio",
@@ -2070,9 +2074,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "feder-axum"
+version = "0.1.0"
+source = "git+https://github.com/limeburst/feder.git?rev=20bf456012423b26575c4addd322a3a1d0c47c10#20bf456012423b26575c4addd322a3a1d0c47c10"
+dependencies = [
+ "axum",
+ "feder",
+]
+
+[[package]]
+name = "feder-core"
+version = "0.1.0"
+source = "git+https://github.com/limeburst/feder.git?rev=20bf456012423b26575c4addd322a3a1d0c47c10#20bf456012423b26575c4addd322a3a1d0c47c10"
+dependencies = [
+ "feder-vocab",
+]
+
+[[package]]
+name = "feder-jsonld"
+version = "0.1.0"
+source = "git+https://github.com/limeburst/feder.git?rev=20bf456012423b26575c4addd322a3a1d0c47c10#20bf456012423b26575c4addd322a3a1d0c47c10"
+dependencies = [
+ "iri-string",
+ "serde_json",
+]
+
+[[package]]
 name = "feder-postgres"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=41c3f4f4350582151ce8d469aad5e022a10b94f1#41c3f4f4350582151ce8d469aad5e022a10b94f1"
+source = "git+https://github.com/limeburst/feder.git?rev=20bf456012423b26575c4addd322a3a1d0c47c10#20bf456012423b26575c4addd322a3a1d0c47c10"
 dependencies = [
  "feder",
  "serde_json",
@@ -2082,7 +2112,7 @@ dependencies = [
 [[package]]
 name = "feder-runtime"
 version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=41c3f4f4350582151ce8d469aad5e022a10b94f1#41c3f4f4350582151ce8d469aad5e022a10b94f1"
+source = "git+https://github.com/limeburst/feder.git?rev=20bf456012423b26575c4addd322a3a1d0c47c10#20bf456012423b26575c4addd322a3a1d0c47c10"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2097,6 +2127,17 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "url",
+]
+
+[[package]]
+name = "feder-vocab"
+version = "0.1.0"
+source = "git+https://github.com/limeburst/feder.git?rev=20bf456012423b26575c4addd322a3a1d0c47c10#20bf456012423b26575c4addd322a3a1d0c47c10"
+dependencies = [
+ "feder-jsonld",
+ "iri-string",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3016,6 +3057,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
+name = "iri-string"
+version = "0.7.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1663ee7d8cf2900cc1414b1e1eec9f348d6eaa3bcab07579f4726a4b8499f447"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3909,6 +3959,7 @@ dependencies = [
  "emojis",
  "enum_delegate",
  "feder",
+ "feder-axum",
  "feder-postgres",
  "flate2",
  "fluent",
@@ -6057,7 +6108,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

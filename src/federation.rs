@@ -7,9 +7,11 @@
 //! while both are up; a claim is a lease, so what a stopped colour was holding
 //! is taken again when the lease lapses.
 //!
+//! What other servers fetch is served by feder too, from [`serving`].
 //! activitypub_federation still handles everything that comes in and every
-//! fetch. This module is only the sending half, which is where the network
-//! was losing work.
+//! fetch.
+
+pub mod serving;
 
 use crate::models::actor::Actor;
 use feder::client::{Client, ClientConfig};

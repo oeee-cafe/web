@@ -36,6 +36,16 @@ smtp_host = ""
 smtp_user = ""
 smtp_password = ""
 
+# Push notifications. Leave the paths empty to send none: APNs for the iOS
+# app, FCM's V1 API for Android.
+apns_key_id = ""
+apns_team_id = ""
+apns_key_path = ""
+apns_environment = "sandbox"
+apns_topic = "cafe.oeee"
+fcm_service_account_path = ""
+fcm_project_id = ""
+
 # Sign in with Steam, from the Oeee Cafe app on Steam, and its achievements.
 # Leave the table out to turn both off. web_api_key is a publisher key, not a
 # user's. The achievements' API names in Steamworks are FIRST_DRAWING,

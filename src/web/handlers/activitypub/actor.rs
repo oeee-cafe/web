@@ -80,54 +80,7 @@ impl Object for Actor {
     }
 
     async fn into_json(self, _data: &Data<Self::DataType>) -> Result<Self::Kind, Self::Error> {
-        let public_key = PublicKey {
-            id: format!("{}#main-key", self.iri)
-                .parse()
-                .map_err(|e| anyhow::anyhow!("Invalid IRI URL: {}", e))?,
-            owner: self
-                .iri
-                .parse()
-                .map_err(|e| anyhow::anyhow!("Invalid IRI URL: {}", e))?,
-            public_key_pem: self.public_key_pem,
-        };
-
-        let endpoints = serde_json::json!({
-            "type": "as:Endpoints",
-            "sharedInbox": format!("https://{}/ap/inbox", self.instance_host)
-        });
-
-        match self.r#type {
-            ActorType::Group => Ok(ActorObject::Group(Group {
-                id: ObjectId::parse(&self.iri)?,
-                r#type: GroupType::Group,
-                inbox: self.inbox_url.parse()?,
-                public_key,
-                endpoints,
-                followers: self.followers_url.parse()?,
-                manually_approves_followers: !self.automatically_approves_followers,
-                name: self.name,
-                outbox: format!("{}/outbox", self.iri).parse()?,
-                preferred_username: self.username,
-                url: self.url.parse()?,
-            })),
-            // Handle all other actor types as Person for ActivityPub compatibility
-            ActorType::Person
-            | ActorType::Service
-            | ActorType::Application
-            | ActorType::Organization => Ok(ActorObject::Person(Person {
-                id: ObjectId::parse(&self.iri)?,
-                r#type: PersonType::Person,
-                inbox: self.inbox_url.parse()?,
-                public_key,
-                endpoints,
-                followers: self.followers_url.parse()?,
-                manually_approves_followers: !self.automatically_approves_followers,
-                name: self.name,
-                outbox: format!("{}/outbox", self.iri).parse()?,
-                preferred_username: self.username,
-                url: self.url.parse()?,
-            })),
-        }
+        actor_object(self)
     }
 
     async fn verify(
@@ -266,5 +219,57 @@ impl ActivityPubFederationActor for Actor {
 
     fn inbox(&self) -> Url {
         self.inbox_url.parse().expect("Inbox URL should be valid")
+    }
+}
+
+/// The document an actor of ours is served as.
+pub fn actor_object(actor: Actor) -> Result<ActorObject, AppError> {
+    let public_key = PublicKey {
+        id: format!("{}#main-key", actor.iri)
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid IRI URL: {}", e))?,
+        owner: actor
+            .iri
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid IRI URL: {}", e))?,
+        public_key_pem: actor.public_key_pem,
+    };
+
+    let endpoints = serde_json::json!({
+        "type": "as:Endpoints",
+        "sharedInbox": format!("https://{}/ap/inbox", actor.instance_host)
+    });
+
+    match actor.r#type {
+        ActorType::Group => Ok(ActorObject::Group(Group {
+            id: ObjectId::parse(&actor.iri)?,
+            r#type: GroupType::Group,
+            inbox: actor.inbox_url.parse()?,
+            public_key,
+            endpoints,
+            followers: actor.followers_url.parse()?,
+            manually_approves_followers: !actor.automatically_approves_followers,
+            name: actor.name,
+            outbox: format!("{}/outbox", actor.iri).parse()?,
+            preferred_username: actor.username,
+            url: actor.url.parse()?,
+        })),
+        // Handle all other actor types as Person for ActivityPub compatibility
+        ActorType::Person
+        | ActorType::Service
+        | ActorType::Application
+        | ActorType::Organization => Ok(ActorObject::Person(Person {
+            id: ObjectId::parse(&actor.iri)?,
+            r#type: PersonType::Person,
+            inbox: actor.inbox_url.parse()?,
+            public_key,
+            endpoints,
+            followers: actor.followers_url.parse()?,
+            manually_approves_followers: !actor.automatically_approves_followers,
+            name: actor.name,
+            outbox: format!("{}/outbox", actor.iri).parse()?,
+            preferred_username: actor.username,
+            url: actor.url.parse()?,
+        })),
     }
 }
