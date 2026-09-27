@@ -206,6 +206,34 @@ pub fn enforce_origin(data: &mut [u8], session_user_id: u8) -> Option<u8> {
 mod tests {
     use super::*;
 
+    /// Nothing the server sends is a frame a client may send it. A client
+    /// that could put a REPLAY_BATCH, a SEQUENCED or a WELCOME into the room
+    /// would be believed by everyone in it: the batch as history, the
+    /// envelope as a canonical position, the welcome as their own id.
+    #[test]
+    fn refuses_every_frame_only_the_server_sends() {
+        use crate::web::handlers::collaborate::messages::MessageType;
+        for msg_type in [
+            MessageType::ReplayStart,
+            MessageType::Layers,
+            MessageType::SessionExpired,
+            MessageType::Leave,
+            MessageType::Sequenced,
+            MessageType::ResetRequest,
+            MessageType::ResetPoint,
+            MessageType::Welcome,
+            MessageType::CaughtUp,
+            MessageType::ReplayBatch,
+        ] {
+            let mut frame = vec![msg_type as u8];
+            frame.resize(64, 0);
+            assert!(
+                matches!(validate(&frame), Err(Rejected::UnknownType(_))),
+                "{msg_type:?}"
+            );
+        }
+    }
+
     /// The frames the client encoders actually produce, at the sizes they
     /// produce them. Kept beside the table so a layout change breaks here
     /// rather than in a session.
