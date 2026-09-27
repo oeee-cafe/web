@@ -25,7 +25,7 @@ use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
 use crate::web::state::AppState;
 
-use super::ExtractFtlLang;
+use crate::web::i18n::ExtractFtlLang;
 
 /// A button on the page: the product it asks the app to sell, and its own
 /// words where staff gave it some.

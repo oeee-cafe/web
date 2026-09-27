@@ -4,7 +4,7 @@ use crate::models::password_reset_challenge::{
     find_password_reset_challenge_by_token, PasswordResetChallenge,
 };
 use crate::models::user::{find_user_by_email, update_password};
-use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
+use crate::web::i18n::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::state::AppState;
 use axum::extract::State;
 use axum::response::{Html, IntoResponse, Redirect};

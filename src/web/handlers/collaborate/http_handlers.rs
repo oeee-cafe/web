@@ -2,7 +2,7 @@ use crate::app_error::AppError;
 use crate::models::community::find_community_by_id;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
-use crate::web::handlers::{ExtractAcceptLanguage, ExtractFtlLang};
+use crate::web::i18n::{ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::presence::{Activity, Presence};
 use crate::web::state::AppState;
 use axum::body::Bytes;

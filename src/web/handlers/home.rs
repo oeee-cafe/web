@@ -1,4 +1,3 @@
-use super::ExtractFtlLang;
 use crate::app_error::AppError;
 use crate::feed_period;
 use crate::models::actor::Actor;
@@ -8,6 +7,7 @@ use crate::models::post::{
 };
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
+use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;

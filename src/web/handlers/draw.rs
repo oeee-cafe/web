@@ -9,7 +9,8 @@ use crate::models::post::{
 };
 use crate::models::user::{AuthSession, User};
 use crate::web::context::CommonContext;
-use crate::web::handlers::{safe_decode_hash, safe_parse_uuid, ExtractFtlLang};
+use crate::web::handlers::{safe_decode_hash, safe_parse_uuid};
+use crate::web::i18n::ExtractFtlLang;
 use crate::web::presence::{Activity, Presence};
 use crate::web::responses::ErrorResponse;
 use crate::web::state::AppState;

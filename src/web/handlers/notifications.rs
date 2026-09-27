@@ -21,7 +21,7 @@ use crate::{
         user::AuthSession,
     },
     web::{
-        context::CommonContext, handlers::ExtractFtlLang, responses::UnreadCountResponse,
+        context::CommonContext, i18n::ExtractFtlLang, responses::UnreadCountResponse,
         state::AppState,
     },
 };

@@ -13,7 +13,7 @@ use crate::models::user::{
     AuthSession, DeleteConfirmation,
 };
 use crate::web::context::CommonContext;
-use crate::web::handlers::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
+use crate::web::i18n::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::language::{language_set_cookie, parse_language};
 use crate::web::state::AppState;
 use axum::response::{IntoResponse, Redirect};

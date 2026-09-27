@@ -9,7 +9,7 @@ use crate::web::context::CommonContext;
 use crate::web::handlers::home::{
     comments_batch, comments_context, feed_context, CommentsQuery, HOME_POSTS_PER_BATCH,
 };
-use crate::web::handlers::ExtractFtlLang;
+use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;

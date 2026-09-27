@@ -4,7 +4,7 @@ use crate::models::user::{
     create_user, update_user_preferred_language, AuthSession, Credentials, UserDraft,
 };
 use crate::web::handlers::identity::{link_pending_identity, pending_provider_name};
-use crate::web::handlers::{
+use crate::web::i18n::{
     detect_preferred_language, get_bundle, safe_format_message, safe_get_message, ExtractFtlLang,
 };
 use crate::web::state::AppState;
@@ -17,7 +17,7 @@ use minijinja::context;
 use serde::Deserialize;
 use tower_sessions::Session;
 
-use super::ExtractAcceptLanguage;
+use crate::web::i18n::ExtractAcceptLanguage;
 
 // This allows us to extract the "next" field from the query string. We use this
 // to redirect after log in.

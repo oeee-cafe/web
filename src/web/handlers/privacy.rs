@@ -6,7 +6,7 @@ use axum::{extract::State, response::Html};
 
 use minijinja::context;
 
-use super::ExtractFtlLang;
+use crate::web::i18n::ExtractFtlLang;
 
 pub async fn privacy(
     State(state): State<AppState>,

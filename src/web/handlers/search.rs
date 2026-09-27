@@ -2,7 +2,7 @@ use crate::app_error::AppError;
 use crate::models::handle::LoginName;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
-use crate::web::handlers::ExtractFtlLang;
+use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::Query;
 use axum::extract::State;
