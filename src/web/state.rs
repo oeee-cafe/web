@@ -30,10 +30,10 @@ pub struct AppState {
     /// Outgoing ActivityPub deliveries (crate::federation).
     pub deliverer: Arc<crate::federation::Deliverer>,
     /// Fetches other servers' actors and objects.
-    pub fetcher: Arc<feder::fetch::Fetcher>,
+    pub fetcher: Arc<ojak::fetch::Fetcher>,
     /// Where received activities wait for the inbox worker: the deliverer's
     /// table, in a queue of their own.
-    pub inbox_queue: feder::queue::SharedQueue,
+    pub inbox_queue: ojak::queue::SharedQueue,
 }
 
 impl AppState {

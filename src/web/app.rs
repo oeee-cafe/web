@@ -141,13 +141,13 @@ fn static_router() -> Router {
 
 pub struct App {
     state: AppState,
-    federation: feder::federation::Federation<AppState>,
+    federation: ojak::federation::Federation<AppState>,
 }
 
 impl App {
     pub async fn new(
         state: AppState,
-        federation: feder::federation::Federation<AppState>,
+        federation: ojak::federation::Federation<AppState>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         sqlx::migrate!().run(&state.db_pool).await?;
 
@@ -410,7 +410,7 @@ impl App {
 
         let app = Router::new()
             .route("/", get(home))
-            // Feder answers these when ActivityPub is asked for; what is left
+            // Ojak answers these when ActivityPub is asked for; what is left
             // is a browser, sent to the page.
             .route("/ap/users/{user_id}", get(activitypub_user_page))
             .route("/ap/posts/{post_id}", get(activitypub_post_page))
@@ -625,7 +625,7 @@ impl App {
         // site's own layers: actors, posts, their collections, WebFinger,
         // NodeInfo, and the inboxes.
         let serving_state = self.state.clone();
-        let app = feder_axum::wrap(app, self.federation.clone(), move |_| {
+        let app = ojak_axum::wrap(app, self.federation.clone(), move |_| {
             Some(serving_state.clone())
         })
         // Outermost, so it also covers panics raised inside the layers

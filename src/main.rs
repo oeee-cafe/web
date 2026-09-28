@@ -292,9 +292,9 @@ fn main() {
                     eprintln!("error setting up ActivityPub delivery: {}", e);
                     exit(1);
                 });
-            let fetcher = Arc::new(feder::fetch::Fetcher::new(
+            let fetcher = Arc::new(ojak::fetch::Fetcher::new(
                 client,
-                feder::delivery::Scheme::DraftCavage,
+                ojak::delivery::Scheme::DraftCavage,
             ));
             let kv = oeee_cafe::federation::kv(db_pool.clone())
                 .await
@@ -303,7 +303,7 @@ fn main() {
                     exit(1);
                 });
             let inbox_queue =
-                feder::queue::shared(feder_postgres::PostgresQueue::new(db_pool.clone()));
+                ojak::queue::shared(ojak_postgres::PostgresQueue::new(db_pool.clone()));
 
             let live = Live::new(redis_pool.clone());
             let push_service = push_service.with_live(live.clone());
@@ -344,7 +344,7 @@ fn main() {
             // the way the deliverer sends: what it holds then is leased, and
             // the other colour takes it when the lease lapses.
             {
-                let worker = feder::federation::InboxWorker::new(
+                let worker = ojak::federation::InboxWorker::new(
                     federation.clone(),
                     state.clone(),
                     inbox_queue,

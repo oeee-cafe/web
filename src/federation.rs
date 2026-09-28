@@ -1,13 +1,13 @@
-//! Outgoing ActivityPub deliveries, through feder.
+//! Outgoing ActivityPub deliveries, through ojak.
 //!
 //! Deliveries used to wait in activitypub_federation's in-memory queue, which
 //! a blue/green deploy emptied: whatever was queued or being retried when the
 //! old colour stopped was never sent. They now wait in PostgreSQL, in the
-//! `feder_queue` table feder-postgres creates, and both colours claim from it
+//! `ojak_queue` table ojak-postgres creates, and both colours claim from it
 //! while both are up; a claim is a lease, so what a stopped colour was holding
 //! is taken again when the lease lapses.
 //!
-//! Everything else is feder's too: what other servers fetch is served from
+//! Everything else is ojak's too: what other servers fetch is served from
 //! [`serving`], what they send is received there and acted on in
 //! [`listeners`], and remote actors are fetched with its fetcher.
 
@@ -15,17 +15,17 @@ pub mod listeners;
 pub mod serving;
 
 use crate::models::actor::Actor;
-use feder::client::{Client, ClientConfig};
-use feder::deliverer::{DelivererConfig, SenderKeys};
-use feder::delivery::{PrivateKey, SenderKey};
-use feder::queue::QueueError;
-use feder_postgres::PostgresQueue;
+use ojak::client::{Client, ClientConfig};
+use ojak::deliverer::{DelivererConfig, SenderKeys};
+use ojak::delivery::{PrivateKey, SenderKey};
+use ojak::queue::QueueError;
+use ojak_postgres::PostgresQueue;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// The deliverer every part of the site sends through.
-pub type Deliverer = feder::deliverer::Deliverer<PostgresQueue, ActorKeys>;
+pub type Deliverer = ojak::deliverer::Deliverer<PostgresQueue, ActorKeys>;
 
 /// The guarded client every request to another server goes through.
 /// `allow_private` names networks it may reach although they are not public,
@@ -49,14 +49,14 @@ pub fn client(domain: &str, allow_private: &[String]) -> anyhow::Result<Client> 
     })?)
 }
 
-/// The store feder keeps remote keys and received activities' ids in, in
-/// the `feder_kv` table, created if it is not there.
+/// The store ojak keeps remote keys and received activities' ids in, in
+/// the `ojak_kv` table, created if it is not there.
 ///
 /// # Errors
 ///
 /// When the table cannot be created.
-pub async fn kv(pool: PgPool) -> anyhow::Result<feder_postgres::PostgresKvStore> {
-    let kv = feder_postgres::PostgresKvStore::new(pool);
+pub async fn kv(pool: PgPool) -> anyhow::Result<ojak_postgres::PostgresKvStore> {
+    let kv = ojak_postgres::PostgresKvStore::new(pool);
     kv.initialize().await?;
     Ok(kv)
 }
@@ -69,7 +69,7 @@ pub async fn kv(pool: PgPool) -> anyhow::Result<feder_postgres::PostgresKvStore>
 pub async fn deliverer(pool: PgPool, client: Client) -> anyhow::Result<Deliverer> {
     let queue = PostgresQueue::new(pool.clone());
     queue.initialize().await?;
-    Ok(feder::deliverer::Deliverer::new(
+    Ok(ojak::deliverer::Deliverer::new(
         queue,
         ActorKeys::new(pool),
         client,

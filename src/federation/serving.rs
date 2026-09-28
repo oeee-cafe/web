@@ -1,5 +1,5 @@
 //! What other servers fetch — actors, posts, their collections, WebFinger
-//! and NodeInfo — served by feder.
+//! and NodeInfo — served by ojak.
 //!
 //! Each route is a dispatcher registered with the template that also builds
 //! its URIs, so an actor cannot name a collection that is not served. A
@@ -15,10 +15,10 @@ use crate::web::handlers::activitypub::{actor_object, create_note_from_post};
 use crate::web::state::AppState;
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};
-use feder::federation::{
+use ojak::federation::{
     ActorRef, Collection, Context, Federation, First, Found, NodeInfo, Page, Software,
 };
-use feder::template::Values;
+use ojak::template::Values;
 use serde_json::Value;
 use url::Url;
 use uuid::Uuid;
@@ -32,8 +32,8 @@ type Ctx = Context<AppState>;
 /// When the configured domain is not a host, or a template is wrong.
 pub fn federation(
     domain: &str,
-    fetcher: std::sync::Arc<feder::fetch::Fetcher>,
-    kv: feder_postgres::PostgresKvStore,
+    fetcher: std::sync::Arc<ojak::fetch::Fetcher>,
+    kv: ojak_postgres::PostgresKvStore,
 ) -> anyhow::Result<Federation<AppState>> {
     let origin = Url::parse(&format!("https://{domain}")).context("the configured domain")?;
     let builder = Federation::builder()
@@ -80,7 +80,7 @@ pub fn federation(
         .nodeinfo(nodeinfo)
         // A reply to a post here, addressed to its author's followers, is
         // passed on to them (ActivityPub §7.1.2), signed by the author.
-        .forward(|ctx: Ctx, forward: feder::federation::Forward| async move {
+        .forward(|ctx: Ctx, forward: ojak::federation::Forward| async move {
             forward_to_followers(&ctx, forward).await
         })
         // Another server being down, gone or wrong is not a bug here, and
@@ -106,8 +106,8 @@ pub fn federation(
 /// communities here whose followers collections it names, as it arrived.
 /// This site is no portable actor's gateway, so there is nothing to forward
 /// to gateways.
-async fn forward_to_followers(ctx: &Ctx, forward: feder::federation::Forward) -> anyhow::Result<()> {
-    let feder::federation::ForwardTo::Collections(collections) = forward.to else {
+async fn forward_to_followers(ctx: &Ctx, forward: ojak::federation::Forward) -> anyhow::Result<()> {
+    let ojak::federation::ForwardTo::Collections(collections) = forward.to else {
         return Ok(());
     };
     let state = ctx.data();
@@ -125,8 +125,7 @@ async fn forward_to_followers(ctx: &Ctx, forward: feder::federation::Forward) ->
             continue;
         };
         let inboxes =
-            crate::models::follow::get_follower_shared_inboxes_for_actor(&mut tx, actor.id)
-                .await?;
+            crate::models::follow::get_follower_shared_inboxes_for_actor(&mut tx, actor.id).await?;
         tx.commit().await?;
         let inboxes: Vec<Url> = inboxes
             .iter()
@@ -145,7 +144,7 @@ async fn forward_to_followers(ctx: &Ctx, forward: feder::federation::Forward) ->
     Ok(())
 }
 
-/// The site's error, for feder's log.
+/// The site's error, for ojak's log.
 fn app(error: crate::app_error::AppError) -> anyhow::Error {
     anyhow::anyhow!("{error}")
 }
@@ -376,19 +375,19 @@ async fn nodeinfo(ctx: Ctx) -> anyhow::Result<NodeInfo> {
 
 #[cfg(test)]
 mod tests {
-    /// Templates that overlap, or claim a path feder serves, stop the build;
+    /// Templates that overlap, or claim a path ojak serves, stop the build;
     /// this is where that would be found rather than at start-up.
     #[tokio::test]
     async fn the_federation_builds() {
         let client = crate::federation::client("oeee.cafe", &[]).unwrap();
-        let fetcher = std::sync::Arc::new(feder::fetch::Fetcher::new(
+        let fetcher = std::sync::Arc::new(ojak::fetch::Fetcher::new(
             client,
-            feder::delivery::Scheme::DraftCavage,
+            ojak::delivery::Scheme::DraftCavage,
         ));
         let pool = sqlx::postgres::PgPoolOptions::new()
             .connect_lazy("postgres:///x")
             .unwrap();
-        let kv = feder_postgres::PostgresKvStore::new(pool);
+        let kv = ojak_postgres::PostgresKvStore::new(pool);
         super::federation("oeee.cafe", fetcher, kv).expect("the federation builds");
     }
 }

@@ -261,16 +261,16 @@ async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
         // Nothing here federates; the deliverer is never run, and its table is
         // only created if something queues.
         deliverer: Arc::new(crate::federation::Deliverer::new(
-            feder_postgres::PostgresQueue::new(db.clone()),
+            ojak_postgres::PostgresQueue::new(db.clone()),
             crate::federation::ActorKeys::new(db.clone()),
-            feder::client::Client::new(feder::client::ClientConfig::default()).expect("client"),
-            feder::deliverer::DelivererConfig::default(),
+            ojak::client::Client::new(ojak::client::ClientConfig::default()).expect("client"),
+            ojak::deliverer::DelivererConfig::default(),
         )),
-        fetcher: Arc::new(feder::fetch::Fetcher::new(
-            feder::client::Client::new(feder::client::ClientConfig::default()).expect("client"),
-            feder::delivery::Scheme::DraftCavage,
+        fetcher: Arc::new(ojak::fetch::Fetcher::new(
+            ojak::client::Client::new(ojak::client::ClientConfig::default()).expect("client"),
+            ojak::delivery::Scheme::DraftCavage,
         )),
-        inbox_queue: feder::queue::shared(feder_postgres::PostgresQueue::new(db.clone())),
+        inbox_queue: ojak::queue::shared(ojak_postgres::PostgresQueue::new(db.clone())),
     };
     let app = Router::new()
         .route("/ws/{room}/{user}", get(upgrade))
