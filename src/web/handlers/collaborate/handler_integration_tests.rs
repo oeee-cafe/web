@@ -268,7 +268,7 @@ async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
         )),
         fetcher: Arc::new(ojak::fetch::Fetcher::new(
             ojak::client::Client::new(ojak::client::ClientConfig::default()).expect("client"),
-            ojak::delivery::Scheme::DraftCavage,
+            ojak::sig::Scheme::DraftCavage,
         )),
         inbox_queue: ojak::queue::shared(ojak_postgres::PostgresQueue::new(db.clone())),
     };

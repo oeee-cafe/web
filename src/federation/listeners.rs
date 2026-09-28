@@ -454,7 +454,7 @@ async fn react(
 /// can show, and stays a ❤️.
 async fn on_like(ctx: Ctx, received: Received<Like>) -> Result<(), AppError> {
     let like = &received.activity;
-    let emoji = ojak_core::meaning::like_reaction(like)
+    let emoji = ojak_vocab::meaning::like_reaction(like)
         .and_then(|reaction| crate::models::reaction::normalize_emoji(reaction.content))
         .unwrap_or("❤️")
         .to_owned();
@@ -470,7 +470,7 @@ async fn on_like(ctx: Ctx, received: Received<Like>) -> Result<(), AppError> {
 
 async fn on_emoji_react(ctx: Ctx, received: Received<EmojiReact>) -> Result<(), AppError> {
     let react_to = &received.activity;
-    let Some(reaction) = ojak_core::meaning::emoji_reaction(react_to) else {
+    let Some(reaction) = ojak_vocab::meaning::emoji_reaction(react_to) else {
         return Ok(());
     };
     react(

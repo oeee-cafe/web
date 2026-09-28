@@ -89,35 +89,27 @@ rustls-pki-types = "1.15.1"
 rustls-webpki = { version = "0.103.15", features = ["ring"] }
 x509-parser = "0.18.1"
 
-# Outgoing ActivityPub deliveries (src/federation.rs). Pinned, since ojak's
+# Outgoing ActivityPub deliveries (src/federation.rs), and actors' key pairs
+# (src/models/actor.rs). Pinned, since ojak's
 # main moves; bump the rev to take a newer one.
 [dependencies.ojak]
 git = "https://github.com/eunha-space/ojak.git"
-rev = "05dc0b5520f29edf553e06c093380c64e0ddc482"
+rev = "56559541e9601c06c7f66fe360fddabdd0564c55"
 
 [dependencies.ojak-postgres]
 git = "https://github.com/eunha-space/ojak.git"
-rev = "05dc0b5520f29edf553e06c093380c64e0ddc482"
-
-# Actors' key pairs (src/models/actor.rs).
-[dependencies.ojak-runtime]
-git = "https://github.com/eunha-space/ojak.git"
-rev = "05dc0b5520f29edf553e06c093380c64e0ddc482"
+rev = "56559541e9601c06c7f66fe360fddabdd0564c55"
 
 # The vocabulary incoming activities are read into, and what they mean
 # (src/federation/listeners.rs).
 [dependencies.ojak-vocab]
 git = "https://github.com/eunha-space/ojak.git"
-rev = "05dc0b5520f29edf553e06c093380c64e0ddc482"
-
-[dependencies.ojak-core]
-git = "https://github.com/eunha-space/ojak.git"
-rev = "05dc0b5520f29edf553e06c093380c64e0ddc482"
+rev = "56559541e9601c06c7f66fe360fddabdd0564c55"
 
 # Serving what other servers fetch (src/federation/serving.rs).
 [dependencies.ojak-axum]
 git = "https://github.com/eunha-space/ojak.git"
-rev = "05dc0b5520f29edf553e06c093380c64e0ddc482"
+rev = "56559541e9601c06c7f66fe360fddabdd0564c55"
 
 [dependencies.sqlx]
 version = "0.8.6"
