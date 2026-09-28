@@ -382,7 +382,7 @@ mod tests {
         let client = crate::federation::client("oeee.cafe", &[]).unwrap();
         let fetcher = std::sync::Arc::new(ojak::fetch::Fetcher::new(
             client,
-            ojak::delivery::Scheme::DraftCavage,
+            ojak::sig::Scheme::DraftCavage,
         ));
         let pool = sqlx::postgres::PgPoolOptions::new()
             .connect_lazy("postgres:///x")

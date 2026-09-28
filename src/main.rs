@@ -294,7 +294,7 @@ fn main() {
                 });
             let fetcher = Arc::new(ojak::fetch::Fetcher::new(
                 client,
-                ojak::delivery::Scheme::DraftCavage,
+                ojak::sig::Scheme::DraftCavage,
             ));
             let kv = oeee_cafe::federation::kv(db_pool.clone())
                 .await
