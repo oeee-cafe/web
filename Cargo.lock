@@ -1885,93 +1885,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
-name = "feder"
-version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
-dependencies = [
- "chrono",
- "feder-core",
- "feder-jsonld",
- "feder-runtime",
- "feder-vocab",
- "futures-util",
- "http 1.5.0",
- "ipnet",
- "percent-encoding",
- "reqwest",
- "serde_json",
- "tokio",
- "url",
-]
-
-[[package]]
-name = "feder-axum"
-version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
-dependencies = [
- "axum",
- "feder",
-]
-
-[[package]]
-name = "feder-core"
-version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
-dependencies = [
- "feder-vocab",
-]
-
-[[package]]
-name = "feder-jsonld"
-version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
-dependencies = [
- "iri-string",
- "serde_json",
-]
-
-[[package]]
-name = "feder-postgres"
-version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
-dependencies = [
- "feder",
- "serde_json",
- "sqlx",
-]
-
-[[package]]
-name = "feder-runtime"
-version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "bs58",
- "chrono",
- "ed25519-dalek",
- "ml-dsa",
- "rand_core 0.6.4",
- "reqwest",
- "rsa",
- "serde_jcs",
- "serde_json",
- "sha2 0.10.9",
- "url",
-]
-
-[[package]]
-name = "feder-vocab"
-version = "0.1.0"
-source = "git+https://github.com/limeburst/feder.git?rev=298d79c63125802f9ac3e3683d2705abb781fbe4#298d79c63125802f9ac3e3683d2705abb781fbe4"
-dependencies = [
- "feder-jsonld",
- "iri-string",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "ff"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3733,12 +3646,6 @@ dependencies = [
  "data-encoding",
  "data-url",
  "emojis",
- "feder",
- "feder-axum",
- "feder-core",
- "feder-postgres",
- "feder-runtime",
- "feder-vocab",
  "flate2",
  "fluent",
  "fluent-langneg 0.14.2",
@@ -3758,6 +3665,12 @@ dependencies = [
  "markdown",
  "minijinja",
  "minijinja-contrib",
+ "ojak",
+ "ojak-axum",
+ "ojak-core",
+ "ojak-postgres",
+ "ojak-runtime",
+ "ojak-vocab",
  "rand 0.8.8",
  "redis",
  "reqwest",
@@ -3795,6 +3708,93 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12f40cff3dde1b6087cc5d5f5d4d65712f34016a03ed60e9c08dcc392736b5b7"
 dependencies = [
  "asn1-rs",
+]
+
+[[package]]
+name = "ojak"
+version = "0.1.0"
+source = "git+https://github.com/eunha-space/ojak.git?rev=05dc0b5520f29edf553e06c093380c64e0ddc482#05dc0b5520f29edf553e06c093380c64e0ddc482"
+dependencies = [
+ "chrono",
+ "futures-util",
+ "http 1.5.0",
+ "ipnet",
+ "ojak-core",
+ "ojak-jsonld",
+ "ojak-runtime",
+ "ojak-vocab",
+ "percent-encoding",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "ojak-axum"
+version = "0.1.0"
+source = "git+https://github.com/eunha-space/ojak.git?rev=05dc0b5520f29edf553e06c093380c64e0ddc482#05dc0b5520f29edf553e06c093380c64e0ddc482"
+dependencies = [
+ "axum",
+ "ojak",
+]
+
+[[package]]
+name = "ojak-core"
+version = "0.1.0"
+source = "git+https://github.com/eunha-space/ojak.git?rev=05dc0b5520f29edf553e06c093380c64e0ddc482#05dc0b5520f29edf553e06c093380c64e0ddc482"
+dependencies = [
+ "ojak-vocab",
+]
+
+[[package]]
+name = "ojak-jsonld"
+version = "0.1.0"
+source = "git+https://github.com/eunha-space/ojak.git?rev=05dc0b5520f29edf553e06c093380c64e0ddc482#05dc0b5520f29edf553e06c093380c64e0ddc482"
+dependencies = [
+ "iri-string",
+ "serde_json",
+]
+
+[[package]]
+name = "ojak-postgres"
+version = "0.1.0"
+source = "git+https://github.com/eunha-space/ojak.git?rev=05dc0b5520f29edf553e06c093380c64e0ddc482#05dc0b5520f29edf553e06c093380c64e0ddc482"
+dependencies = [
+ "ojak",
+ "serde_json",
+ "sqlx",
+]
+
+[[package]]
+name = "ojak-runtime"
+version = "0.1.0"
+source = "git+https://github.com/eunha-space/ojak.git?rev=05dc0b5520f29edf553e06c093380c64e0ddc482#05dc0b5520f29edf553e06c093380c64e0ddc482"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "bs58",
+ "chrono",
+ "ed25519-dalek",
+ "ml-dsa",
+ "rand_core 0.6.4",
+ "reqwest",
+ "rsa",
+ "serde_jcs",
+ "serde_json",
+ "sha2 0.10.9",
+ "url",
+]
+
+[[package]]
+name = "ojak-vocab"
+version = "0.1.0"
+source = "git+https://github.com/eunha-space/ojak.git?rev=05dc0b5520f29edf553e06c093380c64e0ddc482#05dc0b5520f29edf553e06c093380c64e0ddc482"
+dependencies = [
+ "iri-string",
+ "ojak-jsonld",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

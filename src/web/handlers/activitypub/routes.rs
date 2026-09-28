@@ -1,6 +1,6 @@
 //! Where a browser that opens one of this site's ActivityPub IDs is sent.
 //!
-//! What other servers fetch and post is feder's (src/federation): these
+//! What other servers fetch and post is ojak's (src/federation): these
 //! routes are reached only by a request that did not ask for ActivityPub,
 //! which is a person, who is sent to the page the ID is of.
 

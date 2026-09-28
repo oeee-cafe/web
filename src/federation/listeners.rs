@@ -1,17 +1,17 @@
 //! What this site does with the activities other servers send it.
 //!
-//! Feder receives them (src/federation/serving.rs registers the inboxes): by
+//! Ojak receives them (src/federation/serving.rs registers the inboxes): by
 //! the time a listener here runs, the sender is authenticated, the activity
-//! is read into feder's vocabulary, and anything embedded that the sender
+//! is read into ojak's vocabulary, and anything embedded that the sender
 //! could not vouch for is a reference. What is left is what only this site
 //! can decide: that an activity acts on something its sender owns, and what
 //! it does to the database.
 
-use feder::federation::{Builder, Context, Received};
-use feder_vocab::generated::{
+use ojak::federation::{Builder, Context, Received};
+use ojak_vocab::generated::{
     AnyObject, Create, Delete, EmojiReact, Follow, Like, LinkOrObject, Note, Undo, Update,
 };
-use feder_vocab::json::Text;
+use ojak_vocab::json::Text;
 use serde_json::json;
 use url::Url;
 use uuid::Uuid;
@@ -37,7 +37,7 @@ type Ctx = Context<AppState>;
 
 /// Register this site's listeners.
 pub fn register(builder: Builder<AppState>) -> Builder<AppState> {
-    // The site's error, for feder's log and the queue's.
+    // The site's error, for ojak's log and the queue's.
     fn logged(error: AppError) -> anyhow::Error {
         match error {
             AppError::Anyhow(error) => error,
@@ -454,7 +454,7 @@ async fn react(
 /// can show, and stays a ❤️.
 async fn on_like(ctx: Ctx, received: Received<Like>) -> Result<(), AppError> {
     let like = &received.activity;
-    let emoji = feder_core::meaning::like_reaction(like)
+    let emoji = ojak_core::meaning::like_reaction(like)
         .and_then(|reaction| crate::models::reaction::normalize_emoji(reaction.content))
         .unwrap_or("❤️")
         .to_owned();
@@ -470,7 +470,7 @@ async fn on_like(ctx: Ctx, received: Received<Like>) -> Result<(), AppError> {
 
 async fn on_emoji_react(ctx: Ctx, received: Received<EmojiReact>) -> Result<(), AppError> {
     let react_to = &received.activity;
-    let Some(reaction) = feder_core::meaning::emoji_reaction(react_to) else {
+    let Some(reaction) = ojak_core::meaning::emoji_reaction(react_to) else {
         return Ok(());
     };
     react(

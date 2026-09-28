@@ -35,7 +35,7 @@ fn should_filter_from_sentry(err: &anyhow::Error) -> bool {
 /// Whether `cause` is another server's doing: a fetch refused, gone, not
 /// ActivityPub, or not the object it claims to be.
 pub fn is_remote(cause: &(dyn std::error::Error + 'static)) -> bool {
-    cause.downcast_ref::<feder::fetch::FetchError>().is_some()
+    cause.downcast_ref::<ojak::fetch::FetchError>().is_some()
 }
 
 /// Why a request failed, and so what it is answered with.
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn a_remote_answering_with_html_is_not_reported() {
-        let err = anyhow::Error::new(feder::fetch::FetchError::NotActivityPub("text/html".into()));
+        let err = anyhow::Error::new(ojak::fetch::FetchError::NotActivityPub("text/html".into()));
         assert!(should_filter_from_sentry(&err));
         assert!(should_filter_from_sentry(
             &err.context("while fetching an actor")
