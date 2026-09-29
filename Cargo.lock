@@ -3711,7 +3711,7 @@ dependencies = [
 [[package]]
 name = "ojak"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=56559541e9601c06c7f66fe360fddabdd0564c55#56559541e9601c06c7f66fe360fddabdd0564c55"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3738,7 +3738,7 @@ dependencies = [
 [[package]]
 name = "ojak-axum"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=56559541e9601c06c7f66fe360fddabdd0564c55#56559541e9601c06c7f66fe360fddabdd0564c55"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
 dependencies = [
  "axum",
  "ojak",
@@ -3747,7 +3747,7 @@ dependencies = [
 [[package]]
 name = "ojak-jsonld"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=56559541e9601c06c7f66fe360fddabdd0564c55#56559541e9601c06c7f66fe360fddabdd0564c55"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
 dependencies = [
  "iri-string",
  "serde_json",
@@ -3756,7 +3756,7 @@ dependencies = [
 [[package]]
 name = "ojak-postgres"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=56559541e9601c06c7f66fe360fddabdd0564c55#56559541e9601c06c7f66fe360fddabdd0564c55"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
 dependencies = [
  "ojak",
  "serde_json",
@@ -3766,7 +3766,7 @@ dependencies = [
 [[package]]
 name = "ojak-vocab"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=56559541e9601c06c7f66fe360fddabdd0564c55#56559541e9601c06c7f66fe360fddabdd0564c55"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
 dependencies = [
  "iri-string",
  "ojak-jsonld",
