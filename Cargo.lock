@@ -3711,7 +3711,7 @@ dependencies = [
 [[package]]
 name = "ojak"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc#f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3728,8 +3728,9 @@ dependencies = [
  "rand_core 0.6.4",
  "reqwest",
  "rsa",
- "serde_jcs",
  "serde_json",
+ "serde_json_canonicalizer",
+ "sfv",
  "sha2 0.10.9",
  "tokio",
  "url",
@@ -3738,7 +3739,7 @@ dependencies = [
 [[package]]
 name = "ojak-axum"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc#f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc"
 dependencies = [
  "axum",
  "ojak",
@@ -3747,7 +3748,7 @@ dependencies = [
 [[package]]
 name = "ojak-jsonld"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc#f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc"
 dependencies = [
  "iri-string",
  "serde_json",
@@ -3756,7 +3757,7 @@ dependencies = [
 [[package]]
 name = "ojak-postgres"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc#f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc"
 dependencies = [
  "ojak",
  "serde_json",
@@ -3766,7 +3767,7 @@ dependencies = [
 [[package]]
 name = "ojak-vocab"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=f9d508c81413866782ca46a15c25bdd9fa1c5054#f9d508c81413866782ca46a15c25bdd9fa1c5054"
+source = "git+https://github.com/eunha-space/ojak.git?rev=f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc#f3ee691cb1b5ef025b1e6b2b3b2bd36202aa4dcc"
 dependencies = [
  "iri-string",
  "ojak-jsonld",
@@ -4838,9 +4839,9 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "ryu-js"
-version = "0.2.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6518fc26bced4d53678a22d6e423e9d8716377def84545fe328236e3af070e7f"
+checksum = "04d056b875a9d2e6cb9a61d127afee9ac5999b9f87bcb32079d1318e505be714"
 
 [[package]]
 name = "salsa20"
@@ -5153,17 +5154,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_jcs"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cacecf649bc1a7c5f0e299cc813977c6a78116abda2b93b1ee01735b71ead9a8"
-dependencies = [
- "ryu-js",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "serde_json"
 version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5174,6 +5164,17 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "serde_json_canonicalizer"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe52319a927259afbfa5180c5157cd8167edfd3e8c254f9558c7fef44c5649f2"
+dependencies = [
+ "ryu-js",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -5239,6 +5240,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+]
+
+[[package]]
+name = "sfv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "890ef0e5532daf21fdaa3dbaf991417187f3a87ab69231fe69be942495746480"
+dependencies = [
+ "base64 0.22.1",
+ "indexmap 2.14.2",
+ "ref-cast",
 ]
 
 [[package]]
@@ -5797,7 +5809,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
