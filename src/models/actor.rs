@@ -362,7 +362,7 @@ pub async fn create_actor_for_user(
     find_or_create_local_instance(tx, &config.domain, None, None).await?;
 
     // Generate RSA keypair for ActivityPub
-    let (private_key_pem, public_key_pem) = ojak::sig::signature::generate_rsa_keypair()?;
+    let (private_key_pem, public_key_pem) = ojak::sig::signature::generate_rsa_keypair(&mut rand::rngs::OsRng)?;
 
     let now = Utc::now();
 
@@ -537,7 +537,7 @@ pub async fn create_actor_for_community(
     find_or_create_local_instance(tx, &config.domain, None, None).await?;
 
     // Generate RSA keypair for ActivityPub
-    let (private_key_pem, public_key_pem) = ojak::sig::signature::generate_rsa_keypair()?;
+    let (private_key_pem, public_key_pem) = ojak::sig::signature::generate_rsa_keypair(&mut rand::rngs::OsRng)?;
 
     let now = Utc::now();
 
