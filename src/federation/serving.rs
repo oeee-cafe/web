@@ -16,9 +16,8 @@ use crate::web::state::AppState;
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};
 use ojak::federation::{
-    ActorRef, Collection, Context, Federation, First, Found, NodeInfo, Page, Software,
+    ActorRef, Collection, Context, Federation, First, Found, NodeInfo, Page, Software, Values,
 };
-use ojak::template::Values;
 use serde_json::Value;
 use url::Url;
 use uuid::Uuid;
