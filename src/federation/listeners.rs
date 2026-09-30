@@ -93,14 +93,8 @@ pub async fn resolve_actor(state: &AppState, iri: &Url) -> Result<Actor, AppErro
 
 /// The post of this site's `iri` names, by either of its addresses:
 /// `https://domain/@name/{id}` or `https://domain/ap/posts/{id}`.
-fn local_post_id(state: &AppState, iri: &str) -> Option<Uuid> {
-    let domain = &state.config.domain;
-    let id = if let Some(rest) = iri.strip_prefix(&format!("https://{domain}/@")) {
-        &rest[rest.find('/')? + 1..]
-    } else {
-        iri.strip_prefix(&format!("https://{domain}/ap/posts/"))?
-    };
-    Uuid::parse_str(id).ok()
+fn local_post_id(ctx: &Ctx, iri: &str) -> Option<Uuid> {
+    Uuid::parse_str(&ctx.parse_object("note", iri)?["post_id"]).ok()
 }
 
 /// Push the notifications `notifications` names, after the transaction that
@@ -271,7 +265,7 @@ async fn on_create(ctx: Ctx, received: Received<Create>) -> Result<(), AppError>
         .reply_targets
         .first()
         .and_then(LinkOrObject::id)
-        .and_then(|target| local_post_id(state, target.as_str()))
+        .and_then(|target| local_post_id(&ctx, target.as_str()))
     else {
         return Ok(());
     };
@@ -393,7 +387,7 @@ async fn on_delete(ctx: Ctx, received: Received<Delete>) -> Result<(), AppError>
 
 /// A reaction to a post of this site's, from its IRI.
 async fn react(
-    state: &AppState,
+    ctx: &Ctx,
     sender: &Url,
     reaction_iri: Option<&str>,
     object: Option<&AnyObject>,
@@ -403,10 +397,11 @@ async fn react(
         reaction_iri,
         object
             .and_then(AnyObject::id)
-            .and_then(|iri| local_post_id(state, iri.as_str())),
+            .and_then(|iri| local_post_id(ctx, iri.as_str())),
     ) else {
         return Ok(());
     };
+    let state = ctx.data();
     let mut tx = state.db_pool.begin().await?;
     let Some(post) = find_post_by_id(&mut tx, post_id).await? else {
         return Ok(());
@@ -459,7 +454,7 @@ async fn on_like(ctx: Ctx, received: Received<Like>) -> Result<(), AppError> {
         .unwrap_or("❤️")
         .to_owned();
     react(
-        ctx.data(),
+        &ctx,
         &received.sender,
         like.id.as_ref().map(|iri| iri.as_str()),
         first_object(&like.objects),
@@ -474,7 +469,7 @@ async fn on_emoji_react(ctx: Ctx, received: Received<EmojiReact>) -> Result<(), 
         return Ok(());
     };
     react(
-        ctx.data(),
+        &ctx,
         &received.sender,
         react_to.id.as_ref().map(|iri| iri.as_str()),
         first_object(&react_to.objects),
