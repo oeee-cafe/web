@@ -52,6 +52,11 @@ pub fn federation(
         .actor("person", "/ap/users/{user_id}", person)
         .actor("group", "/ap/communities/{community_id}", group)
         .object("note", "/ap/posts/{post_id}", note)
+        // A post's page, which is also where people and other servers find
+        // it, as Mastodon's are: `name` is its author's or its community's,
+        // and `note` answers by the id alone, as the page redirects any other
+        // name to the right one (models/post/urls.rs).
+        .object_alias("note", "/@{name}/{post_id}")
         .collection(
             "followers",
             "/ap/users/{user_id}/followers",
