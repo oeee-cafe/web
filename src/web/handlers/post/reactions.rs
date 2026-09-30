@@ -213,11 +213,13 @@ pub async fn add_reaction(
 
             // The Note by its id, which is what a server that holds it knows it
             // by; the page's address moves with the post's community.
-            let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
+            let post_url = state
+                .uris
+                .object_uri("note", &[("post_id", &post_id.to_string())])?;
 
             let emoji_react = EmojiReact {
                 actor: Some(actor.iri.url().clone()),
-                object: post_url.parse()?,
+                object: post_url,
                 content: emoji.to_string(),
                 r#type: "EmojiReact".to_string(),
                 id: reaction.iri.parse()?,
@@ -351,11 +353,13 @@ pub async fn remove_reaction(
 
             // The Note by its id, which is what a server that holds it knows it
             // by; the page's address moves with the post's community.
-            let post_url = format!("https://{}/ap/posts/{}", state.config.domain, post_id);
+            let post_url = state
+                .uris
+                .object_uri("note", &[("post_id", &post_id.to_string())])?;
 
             let emoji_react = EmojiReact {
                 actor: Some(actor.iri.url().clone()),
-                object: post_url.parse()?,
+                object: post_url,
                 content: form.emoji.clone(),
                 r#type: "EmojiReact".to_string(),
                 id: reaction.iri.parse()?,

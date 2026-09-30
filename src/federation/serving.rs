@@ -16,13 +16,48 @@ use crate::web::state::AppState;
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};
 use ojak::federation::{
-    ActorRef, Collection, Context, Federation, First, Found, NodeInfo, Page, Software, Values,
+    ActorRef, Collection, Context, Federation, First, Found, NodeInfo, Page, Software, Uris, Values,
 };
 use serde_json::Value;
 use url::Url;
 use uuid::Uuid;
 
 type Ctx = Context<AppState>;
+
+/// The origin this site serves, from its configured domain.
+///
+/// # Errors
+///
+/// When the configured domain is not a host.
+pub fn origin(domain: &str) -> anyhow::Result<Url> {
+    Url::parse(&format!("https://{domain}")).context("the configured domain")
+}
+
+/// The URIs of what `federation` serves, in this site's origin: what
+/// `AppState::uris` holds.
+///
+/// # Errors
+///
+/// When the configured domain is not a host.
+pub fn uris(federation: &Federation<AppState>, domain: &str) -> anyhow::Result<Uris> {
+    Ok(federation.uris(origin(domain)?))
+}
+
+/// The same URIs where nothing is served, such as the command line, from a
+/// federation built only for its templates.
+///
+/// # Errors
+///
+/// As [`federation`].
+pub fn uris_unserved(domain: &str, pool: sqlx::PgPool) -> anyhow::Result<Uris> {
+    let client = crate::federation::client(domain, &[])?;
+    let fetcher = std::sync::Arc::new(ojak::fetch::Fetcher::new(
+        client,
+        ojak::sig::Scheme::DraftCavage,
+    ));
+    let kv = ojak_postgres::PostgresKvStore::new(pool);
+    uris(&federation(domain, fetcher, kv)?, domain)
+}
 
 /// The federation this site serves.
 ///
@@ -34,9 +69,8 @@ pub fn federation(
     fetcher: std::sync::Arc<ojak::fetch::Fetcher>,
     kv: ojak_postgres::PostgresKvStore,
 ) -> anyhow::Result<Federation<AppState>> {
-    let origin = Url::parse(&format!("https://{domain}")).context("the configured domain")?;
     let builder = Federation::builder()
-        .origin(origin)
+        .origin(origin(domain)?)
         .inbox("person", "/ap/users/{user_id}/inbox")
         .inbox("group", "/ap/communities/{community_id}/inbox")
         .shared_inbox("/ap/inbox")
@@ -185,7 +219,7 @@ async fn person(ctx: Ctx, user_id: String) -> anyhow::Result<Found<Value>> {
     let mut tx = ctx.data().db_pool.begin().await?;
     match Actor::find_by_user_id(&mut tx, user_id).await? {
         Some(actor) => Ok(Found::Found(serde_json::to_value(
-            actor_object(actor).map_err(app)?,
+            actor_object(actor, &ctx.data().uris).map_err(app)?,
         )?)),
         None => Ok(Found::NotFound),
     }
@@ -203,7 +237,7 @@ async fn group(ctx: Ctx, community_id: String) -> anyhow::Result<Found<Value>> {
     let mut tx = ctx.data().db_pool.begin().await?;
     match Actor::find_by_community_id(&mut tx, community_id).await? {
         Some(actor) => Ok(Found::Found(serde_json::to_value(
-            actor_object(actor).map_err(app)?,
+            actor_object(actor, &ctx.data().uris).map_err(app)?,
         )?)),
         None => Ok(Found::NotFound),
     }
@@ -254,7 +288,7 @@ async fn note(ctx: Ctx, values: Values) -> anyhow::Result<Found<Value>> {
         None => match find_user_by_id(&mut tx, author_id).await? {
             Some(user) => {
                 tracing::info!(user = %user.id, "creating a missing actor for a post's author");
-                create_actor_for_user(&mut tx, &user, &state.config).await?
+                create_actor_for_user(&mut tx, &user, &state.config, &state.uris).await?
             }
             None => return Ok(Found::NotFound),
         },
@@ -265,6 +299,7 @@ async fn note(ctx: Ctx, values: Values) -> anyhow::Result<Found<Value>> {
         &author,
         &state.config.domain,
         &state.config.r2_public_endpoint_url,
+        &state.uris,
     )
     .await
     .map_err(app)?;
@@ -393,5 +428,45 @@ mod tests {
             .unwrap();
         let kv = ojak_postgres::PostgresKvStore::new(pool);
         super::federation("oeee.cafe", fetcher, kv).expect("the federation builds");
+    }
+
+    /// The URIs built from the templates are the ones this site has always
+    /// stored and published: actors' rows are written with them once, and
+    /// other servers hold them.
+    #[tokio::test]
+    async fn uris_are_the_ones_already_published() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres:///x")
+            .unwrap();
+        let uris = super::uris_unserved("oeee.cafe", pool).unwrap();
+        let id = "0190b2a4-0000-7000-8000-000000000000";
+        let built = [
+            uris.actor_uri("person", id),
+            uris.inbox_uri("person", id),
+            uris.collection_uri("followers", id),
+            uris.key_id("person", id),
+            uris.actor_uri("group", id),
+            uris.inbox_uri("group", id),
+            uris.collection_uri("community_followers", id),
+            uris.key_id("group", id),
+            uris.shared_inbox_uri(),
+            uris.object_uri("note", &[("post_id", id)]),
+        ]
+        .map(|uri| uri.unwrap().to_string());
+        assert_eq!(
+            built,
+            [
+                format!("https://oeee.cafe/ap/users/{id}"),
+                format!("https://oeee.cafe/ap/users/{id}/inbox"),
+                format!("https://oeee.cafe/ap/users/{id}/followers"),
+                format!("https://oeee.cafe/ap/users/{id}#main-key"),
+                format!("https://oeee.cafe/ap/communities/{id}"),
+                format!("https://oeee.cafe/ap/communities/{id}/inbox"),
+                format!("https://oeee.cafe/ap/communities/{id}/followers"),
+                format!("https://oeee.cafe/ap/communities/{id}#main-key"),
+                "https://oeee.cafe/ap/inbox".to_owned(),
+                format!("https://oeee.cafe/ap/posts/{id}"),
+            ]
+        );
     }
 }

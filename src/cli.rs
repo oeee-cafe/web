@@ -267,13 +267,16 @@ async fn run(args: impl IntoIterator<Item = String>) -> Result<()> {
         }
         Commands::BackfillActors => {
             println!("Starting actor backfill for existing users...");
-            let created_count = backfill_actors_for_existing_users(&mut tx, &cfg).await?;
+            let uris = oeee_cafe::federation::serving::uris_unserved(&cfg.domain, db.clone())?;
+            let created_count = backfill_actors_for_existing_users(&mut tx, &cfg, &uris).await?;
             tx.commit().await?;
             println!("✅ Created {} actors for existing users", created_count);
         }
         Commands::BackfillCommunityActors => {
             println!("Starting actor backfill for existing communities...");
-            let created_count = backfill_actors_for_existing_communities(&mut tx, &cfg).await?;
+            let uris = oeee_cafe::federation::serving::uris_unserved(&cfg.domain, db.clone())?;
+            let created_count =
+                backfill_actors_for_existing_communities(&mut tx, &cfg, &uris).await?;
             tx.commit().await?;
             println!(
                 "✅ Created {} actors for existing communities",

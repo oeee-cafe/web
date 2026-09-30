@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::app_error::AppError;
 use crate::models::actor::{Actor, ActorIri, ActorType};
+use ojak::federation::Uris;
 
 use super::is_web_address;
 
@@ -180,11 +181,14 @@ pub fn remote_actor(json: ActorObject) -> Result<Actor, AppError> {
 }
 
 /// The document an actor of ours is served as.
-pub fn actor_object(actor: Actor) -> Result<ActorObject, AppError> {
+pub fn actor_object(actor: Actor, uris: &Uris) -> Result<ActorObject, AppError> {
+    let key_id = match (actor.user_id, actor.community_id) {
+        (Some(user_id), _) => uris.key_id("person", &user_id.to_string())?,
+        (None, Some(community_id)) => uris.key_id("group", &community_id.to_string())?,
+        (None, None) => return Err(anyhow::anyhow!("{} is not an actor of ours", actor.iri).into()),
+    };
     let public_key = PublicKey {
-        id: format!("{}#main-key", actor.iri)
-            .parse()
-            .map_err(|e| anyhow::anyhow!("Invalid IRI URL: {}", e))?,
+        id: key_id,
         owner: actor
             .iri
             .parse()
@@ -194,7 +198,7 @@ pub fn actor_object(actor: Actor) -> Result<ActorObject, AppError> {
 
     let endpoints = serde_json::json!({
         "type": "as:Endpoints",
-        "sharedInbox": format!("https://{}/ap/inbox", actor.instance_host)
+        "sharedInbox": uris.shared_inbox_uri()?
     });
 
     match actor.r#type {

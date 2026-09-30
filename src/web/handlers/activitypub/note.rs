@@ -2,6 +2,7 @@
 
 use activitystreams_kinds::activity::{CreateType, UpdateType};
 use activitystreams_kinds::object::NoteType;
+use ojak::federation::Uris;
 use serde::{Deserialize, Serialize};
 use url::Url;
 use uuid::Uuid;
@@ -252,6 +253,7 @@ pub async fn create_note_from_post(
     author_actor: &Actor,
     domain: &str,
     r2_public_endpoint_url: &str,
+    uris: &Uris,
 ) -> Result<Note, AppError> {
     // Get post details
     let post = find_post_by_id(tx, post_id).await?;
@@ -301,7 +303,7 @@ pub async fn create_note_from_post(
     let (post_url, audience) =
         note_page_and_audience(tx, &post, post_id, author_actor, domain).await?;
 
-    let note_id: Url = format!("https://{}/ap/posts/{}", domain, post_id).parse()?;
+    let note_id = uris.object_uri("note", &[("post_id", &post_id.to_string())])?;
 
     // Set up audience - public post
     let to = vec!["https://www.w3.org/ns/activitystreams#Public".to_string()];
@@ -335,6 +337,7 @@ pub async fn create_updated_note_from_post(
     author_actor: &Actor,
     domain: &str,
     r2_public_endpoint_url: &str,
+    uris: &Uris,
 ) -> Result<Note, AppError> {
     // Get post details
     let post = find_post_by_id(tx, post_id).await?;
@@ -384,7 +387,7 @@ pub async fn create_updated_note_from_post(
     let (post_url, audience) =
         note_page_and_audience(tx, &post, post_id, author_actor, domain).await?;
 
-    let note_id: Url = format!("https://{}/ap/posts/{}", domain, post_id).parse()?;
+    let note_id = uris.object_uri("note", &[("post_id", &post_id.to_string())])?;
 
     // Set up audience - public post
     let to = vec!["https://www.w3.org/ns/activitystreams#Public".to_string()];

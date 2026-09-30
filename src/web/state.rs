@@ -34,6 +34,10 @@ pub struct AppState {
     /// Where received activities wait for the inbox worker: the deliverer's
     /// table, in a queue of their own.
     pub inbox_queue: ojak::queue::SharedQueue,
+    /// The URIs of what the federation serves, built from the templates it
+    /// serves them at (crate::federation::serving), for code with no
+    /// request to ask.
+    pub uris: ojak::federation::Uris,
 }
 
 impl AppState {

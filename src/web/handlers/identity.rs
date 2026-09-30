@@ -1449,6 +1449,7 @@ pub async fn do_identity_welcome(
         &mut tx,
         UserDraft::without_password(login_name, display_name),
         &state.config,
+        &state.uris,
     )
     .await?;
     if let Some(email) = identity.email.clone() {

@@ -39,6 +39,7 @@ pub(super) async fn send_post_to_followers(
         actor,
         &state.config.domain,
         &state.config.r2_public_endpoint_url,
+        &state.uris,
     )
     .await?;
 
@@ -116,6 +117,7 @@ pub(super) async fn send_post_to_community_followers(
                 &mut tx,
                 &community,
                 &state.config,
+                &state.uris,
             )
             .await
             {
@@ -217,6 +219,7 @@ pub(super) async fn send_post_update_to_followers(
         actor,
         &state.config.domain,
         &state.config.r2_public_endpoint_url,
+        &state.uris,
     )
     .await?;
 
