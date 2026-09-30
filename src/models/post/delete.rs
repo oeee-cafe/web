@@ -135,8 +135,9 @@ pub async fn delete_post_with_activity(
             crate::models::actor::Actor::find_by_user_id(tx, author_id).await?
         {
             // Create the object URL that was deleted
-            let object_url = format!("https://{}/ap/posts/{}", state.config.domain, id);
-            let object_url = object_url.parse()?;
+            let object_url = state
+                .uris
+                .object_uri("note", &[("post_id", &id.to_string())])?;
 
             // Send Delete activity - don't fail if this fails
             if let Err(e) = crate::web::handlers::activitypub::send_delete_activity(

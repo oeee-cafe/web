@@ -100,7 +100,7 @@ pub async fn send_update_activity(
     let inbox_urls = inbox_urls?;
 
     // Create the updated actor object
-    let actor_object = super::actor_object(actor.clone())?;
+    let actor_object = super::actor_object(actor.clone(), &app_state.uris)?;
 
     // Generate activity ID
     let activity_id = generate_object_id(&app_state.config.domain)?;

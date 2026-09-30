@@ -103,7 +103,7 @@ pub async fn do_signup(
         return Ok(Redirect::to("/signup").into_response());
     }
 
-    let user = create_user(&mut tx, user_draft, &state.config).await?;
+    let user = create_user(&mut tx, user_draft, &state.config, &state.uris).await?;
 
     // Auto-set language preference from browser if it matches a supported language
     if let Some(lang) = detect_preferred_language(&accept_language) {

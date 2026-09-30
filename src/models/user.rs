@@ -451,6 +451,7 @@ pub async fn create_user(
     tx: &mut Transaction<'_, Postgres>,
     user_draft: UserDraft,
     config: &AppConfig,
+    uris: &ojak::federation::Uris,
 ) -> Result<User> {
     let q = query!(
         "
@@ -485,7 +486,7 @@ pub async fn create_user(
     };
 
     // Create actor for the user
-    create_actor_for_user(tx, &user, config).await?;
+    create_actor_for_user(tx, &user, config, uris).await?;
 
     Ok(user)
 }

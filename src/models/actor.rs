@@ -1,5 +1,6 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use ojak::federation::Uris;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{query_as, Postgres, Transaction, Type};
@@ -357,6 +358,7 @@ pub async fn create_actor_for_user(
     tx: &mut Transaction<'_, Postgres>,
     user: &User,
     config: &AppConfig,
+    uris: &Uris,
 ) -> Result<Actor> {
     // Ensure local instance exists
     find_or_create_local_instance(tx, &config.domain, None, None).await?;
@@ -366,11 +368,12 @@ pub async fn create_actor_for_user(
 
     let now = Utc::now();
 
-    let iri = format!("https://{}/ap/users/{}", config.domain, user.id);
+    let id = user.id.to_string();
+    let iri = uris.actor_uri("person", &id)?.to_string();
     let handle = format!("@{}@{}", user.login_name, config.domain);
-    let inbox_url = format!("https://{}/ap/users/{}/inbox", config.domain, user.id);
-    let shared_inbox_url = format!("https://{}/ap/inbox", config.domain);
-    let followers_url = format!("https://{}/ap/users/{}/followers", config.domain, user.id);
+    let inbox_url = uris.inbox_uri("person", &id)?.to_string();
+    let shared_inbox_url = uris.shared_inbox_uri()?.to_string();
+    let followers_url = uris.collection_uri("followers", &id)?.to_string();
     let url = format!("https://{}/@{}", config.domain, user.login_name);
 
     let actor = query_as!(Actor,
@@ -422,6 +425,7 @@ pub async fn create_actor_for_user(
 pub async fn backfill_actors_for_existing_users(
     tx: &mut Transaction<'_, Postgres>,
     config: &AppConfig,
+    uris: &Uris,
 ) -> Result<usize> {
     // Get user IDs who don't have actors
     let user_ids = query_as!(
@@ -441,7 +445,7 @@ pub async fn backfill_actors_for_existing_users(
         if let Some(user_id) = row.id
             && let Some(user) = find_user_by_id(tx, user_id).await?
         {
-            create_actor_for_user(tx, &user, config).await?;
+            create_actor_for_user(tx, &user, config, uris).await?;
             created_count += 1;
         }
     }
@@ -532,6 +536,7 @@ pub async fn create_actor_for_community(
     tx: &mut Transaction<'_, Postgres>,
     community: &Community,
     config: &AppConfig,
+    uris: &Uris,
 ) -> Result<Actor> {
     // Ensure local instance exists
     find_or_create_local_instance(tx, &config.domain, None, None).await?;
@@ -541,17 +546,12 @@ pub async fn create_actor_for_community(
 
     let now = Utc::now();
 
-    let iri = format!("https://{}/ap/communities/{}", config.domain, community.id);
+    let id = community.id.to_string();
+    let iri = uris.actor_uri("group", &id)?.to_string();
     let handle = format!("@{}@{}", community.slug, config.domain);
-    let inbox_url = format!(
-        "https://{}/ap/communities/{}/inbox",
-        config.domain, community.id
-    );
-    let shared_inbox_url = format!("https://{}/ap/inbox", config.domain);
-    let followers_url = format!(
-        "https://{}/ap/communities/{}/followers",
-        config.domain, community.id
-    );
+    let inbox_url = uris.inbox_uri("group", &id)?.to_string();
+    let shared_inbox_url = uris.shared_inbox_uri()?.to_string();
+    let followers_url = uris.collection_uri("community_followers", &id)?.to_string();
     let url = community_page_url(&config.domain, &community.slug);
 
     let actor = query_as!(Actor,
@@ -603,6 +603,7 @@ pub async fn create_actor_for_community(
 pub async fn backfill_actors_for_existing_communities(
     tx: &mut Transaction<'_, Postgres>,
     config: &AppConfig,
+    uris: &Uris,
 ) -> Result<usize> {
     use crate::models::community::get_communities;
 
@@ -629,13 +630,13 @@ pub async fn backfill_actors_for_existing_communities(
             FROM actors 
             WHERE iri = $1
             "#,
-            format!("https://{}/ap/communities/{}", config.domain, community.id)
+            uris.actor_uri("group", &community.id.to_string())?.to_string()
         )
         .fetch_optional(&mut **tx)
         .await?;
 
         if existing_actor.is_none() {
-            create_actor_for_community(tx, &community, config).await?;
+            create_actor_for_community(tx, &community, config, uris).await?;
             created_count += 1;
             println!("✓ Created actor for community: {}", community.name);
         }

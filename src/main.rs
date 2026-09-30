@@ -308,6 +308,18 @@ fn main() {
             let live = Live::new(redis_pool.clone());
             let push_service = push_service.with_live(live.clone());
 
+            let federation =
+                oeee_cafe::federation::serving::federation(&cfg.domain, fetcher.clone(), kv)
+                    .unwrap_or_else(|e| {
+                        eprintln!("error setting up ActivityPub: {}", e);
+                        exit(1);
+                    });
+            let uris = oeee_cafe::federation::serving::uris(&federation, &cfg.domain)
+                .unwrap_or_else(|e| {
+                    eprintln!("error setting up ActivityPub: {}", e);
+                    exit(1);
+                });
+
             let state = AppState {
                 config: cfg.clone(),
                 env: oeee_cafe::web::templates::Templates::new(env),
@@ -321,12 +333,8 @@ fn main() {
                 deliverer: Arc::new(deliverer),
                 fetcher: fetcher.clone(),
                 inbox_queue: inbox_queue.clone(),
+                uris,
             };
-            let federation = oeee_cafe::federation::serving::federation(&cfg.domain, fetcher, kv)
-                .unwrap_or_else(|e| {
-                    eprintln!("error setting up ActivityPub: {}", e);
-                    exit(1);
-                });
             // Sends what is queued until shutdown is signalled. What it holds
             // then is leased, and the other colour takes it when the lease
             // lapses.

@@ -79,7 +79,7 @@ pub async fn do_create_community(
 
     // Create actor for the community (only for non-member_only communities)
     if visibility != CommunityVisibility::Private {
-        match create_actor_for_community(&mut tx, &community, &state.config).await {
+        match create_actor_for_community(&mut tx, &community, &state.config, &state.uris).await {
             Ok(_) => {
                 let _ = tx.commit().await;
                 Ok(Redirect::to(&format!("/@{}", community.slug)).into_response())

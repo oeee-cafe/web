@@ -271,6 +271,7 @@ async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
             ojak::sig::Scheme::DraftCavage,
         )),
         inbox_queue: ojak::queue::shared(ojak_postgres::PostgresQueue::new(db.clone())),
+        uris: crate::federation::serving::uris_unserved("localhost", db.clone()).expect("uris"),
     };
     let app = Router::new()
         .route("/ws/{room}/{user}", get(upgrade))
