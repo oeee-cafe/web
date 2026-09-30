@@ -625,8 +625,8 @@ impl App {
         // site's own layers: actors, posts, their collections, WebFinger,
         // NodeInfo, and the inboxes.
         let serving_state = self.state.clone();
-        let app = ojak_axum::wrap(app, self.federation.clone(), move |parts| {
-            federation_serves(parts).then(|| serving_state.clone())
+        let app = ojak_axum::wrap(app, self.federation.clone(), move |_| {
+            Some(serving_state.clone())
         })
         // Outermost, so it also covers panics raised inside the layers
         // above. Without this axum drops the connection on a panic: the
@@ -760,47 +760,4 @@ async fn shutdown_signal(
     // Tell live drawing sessions to wind down now, in parallel with axum
     // draining the plain HTTP connections.
     shutdown.signal();
-}
-
-/// Whether ojak sees `request` at all. A post is also served at its page,
-/// `/@{name}/{post_id}` (federation/serving.rs), and ojak answers anything
-/// but a GET or HEAD to a path it serves with 405, before it asks whether
-/// the request wants ActivityPub; so what is posted to the pages beside a
-/// post's, `/@{login_name}/follow` or `/@{login_name}/guestbook`, would never
-/// reach them. Nothing under `/@` is ojak's to receive.
-fn federation_serves(request: &axum::http::request::Parts) -> bool {
-    use axum::http::Method;
-    !request.uri.path().starts_with("/@") || matches!(request.method, Method::GET | Method::HEAD)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::federation_serves;
-    use axum::http::{Method, Request};
-
-    const ID: &str = "0190b2a4-0000-7000-8000-000000000000";
-
-    fn serves(method: Method, path: &str) -> bool {
-        let (parts, ()) = Request::builder()
-            .method(method)
-            .uri(path)
-            .body(())
-            .unwrap()
-            .into_parts();
-        federation_serves(&parts)
-    }
-
-    /// A follow, a guestbook entry or a report is the site's, though its
-    /// path has the shape of a post's; a post fetched there, and an inbox
-    /// posted to, are ojak's.
-    #[test]
-    fn what_is_posted_under_a_profile_is_the_sites() {
-        assert!(!serves(Method::POST, "/@someone/follow"));
-        assert!(!serves(Method::POST, "/@someone/guestbook"));
-        assert!(!serves(Method::DELETE, "/@someone/settings/links/1"));
-        assert!(serves(Method::GET, &format!("/@someone/{ID}")));
-        assert!(serves(Method::HEAD, &format!("/@someone/{ID}")));
-        assert!(serves(Method::POST, "/ap/inbox"));
-        assert!(serves(Method::POST, &format!("/ap/users/{ID}/inbox")));
-    }
 }
