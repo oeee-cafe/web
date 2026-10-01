@@ -56,6 +56,7 @@ type PageWindow = Window &
       store: {
         purchased(proofs: unknown): Promise<string[]>;
         ticket(): Promise<{ ticket: string; user: string } | null>;
+        ended(outcome: string): void;
       };
       signIn: {
         answer(told: Record<string, unknown>): void;
@@ -1112,6 +1113,9 @@ describe("what the apps test against (appContract.json)", () => {
       supporter: ["cafe.oeee.supporter.2026"],
     });
     supporter.window.document.querySelector<HTMLElement>(".supporter-buy")!.click();
+    // Every button waits while a press is out, so the purchase has to end,
+    // as a cancelled sheet ends it, before Restore can be pressed.
+    supporter.window.oeeeApp.store.ended("cancelled");
     supporter.window.document.querySelector<HTMLElement>(".supporter-restore")!.click();
     sent.push(...supporter.sent.filter((message) => /^(prices|purchase|restore)$/.test(message.type)));
 
