@@ -89,6 +89,10 @@ pub async fn deliverer(pool: PgPool, client: Client) -> anyhow::Result<Deliverer
 /// Queue `activity` from `actor` to `inboxes`, leaving out this site's own:
 /// a local recipient already has what it would be sent.
 ///
+/// What is sent about one thing reaches each inbox in the order it was sent:
+/// a post's `Delete` does not overtake its `Create` while the `Create` is
+/// being retried, nor an `Undo` the like or follow it undoes.
+///
 /// # Errors
 ///
 /// When the queue cannot be written.
@@ -99,9 +103,38 @@ pub async fn send(
     activity: &serde_json::Value,
     inboxes: Vec<url::Url>,
 ) -> Result<(), QueueError> {
+    let batch = ojak::deliverer::Batch {
+        ordering_key: ordering_key(activity),
+        ..ojak::deliverer::Batch::default()
+    };
     deliverer
-        .send(actor.iri.as_str(), activity, remote(domain, inboxes))
+        .send_batch(
+            actor.iri.as_str(),
+            activity,
+            remote(domain, inboxes),
+            &batch,
+        )
         .await
+}
+
+/// What `activity` is about, which what is sent about the same thing is
+/// ordered by: its object, or for an `Undo`, what the activity it undoes is
+/// about, so that both are in one order.
+fn ordering_key(activity: &serde_json::Value) -> Option<String> {
+    let object = activity.get("object")?;
+    if activity.get("type").and_then(serde_json::Value::as_str) == Some("Undo")
+        && object.is_object()
+    {
+        return ordering_key(object);
+    }
+    match object {
+        serde_json::Value::String(id) => Some(id.clone()),
+        serde_json::Value::Object(object) => object
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        _ => None,
+    }
 }
 
 /// `inboxes` without this site's own.
@@ -164,7 +197,29 @@ impl SenderKeys for ActorKeys {
 
 #[cfg(test)]
 mod tests {
-    use super::remote;
+    use super::{ordering_key, remote};
+    use serde_json::json;
+
+    #[test]
+    fn what_is_sent_about_one_thing_is_ordered_by_it() {
+        let note = "https://oeee.cafe/ap/posts/1";
+        let create = json!({"type": "Create", "object": {"id": note, "type": "Note"}});
+        let delete = json!({"type": "Delete", "object": {"id": note, "type": "Tombstone"}});
+        assert_eq!(ordering_key(&create).as_deref(), Some(note));
+        assert_eq!(ordering_key(&delete).as_deref(), Some(note));
+
+        let bob = "https://mastodon.example/users/bob";
+        let follow =
+            json!({"id": "https://oeee.cafe/ap/follows/1", "type": "Follow", "object": bob});
+        let undo = json!({"type": "Undo", "object": follow});
+        assert_eq!(ordering_key(&follow).as_deref(), Some(bob));
+        assert_eq!(ordering_key(&undo).as_deref(), Some(bob));
+        assert_eq!(
+            ordering_key(&json!({"type": "Undo", "object": "https://x.example/1"})).as_deref(),
+            Some("https://x.example/1")
+        );
+        assert_eq!(ordering_key(&json!({"type": "Update"})), None);
+    }
 
     #[test]
     fn this_sites_own_inboxes_are_left_out() {
