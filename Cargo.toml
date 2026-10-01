@@ -94,22 +94,22 @@ x509-parser = "0.18.1"
 # main moves; bump the rev to take a newer one.
 [dependencies.ojak]
 git = "https://github.com/eunha-space/ojak.git"
-rev = "8a31d53d6a36ddbe3dede2621d92cecfc0bd9873"
+rev = "1b4d08f2060d2ae573dd4cb4c7e8e0c3017d72a1"
 
 [dependencies.ojak-postgres]
 git = "https://github.com/eunha-space/ojak.git"
-rev = "8a31d53d6a36ddbe3dede2621d92cecfc0bd9873"
+rev = "1b4d08f2060d2ae573dd4cb4c7e8e0c3017d72a1"
 
 # The vocabulary incoming activities are read into, and what they mean
 # (src/federation/listeners.rs).
 [dependencies.ojak-vocab]
 git = "https://github.com/eunha-space/ojak.git"
-rev = "8a31d53d6a36ddbe3dede2621d92cecfc0bd9873"
+rev = "1b4d08f2060d2ae573dd4cb4c7e8e0c3017d72a1"
 
 # Serving what other servers fetch (src/federation/serving.rs).
 [dependencies.ojak-axum]
 git = "https://github.com/eunha-space/ojak.git"
-rev = "8a31d53d6a36ddbe3dede2621d92cecfc0bd9873"
+rev = "1b4d08f2060d2ae573dd4cb4c7e8e0c3017d72a1"
 
 [dependencies.sqlx]
 version = "0.8.6"
