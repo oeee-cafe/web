@@ -249,6 +249,50 @@ fn renders_post_detail() {
         .expect("post_detail.jinja renders");
 }
 
+/// Staff watch a NEO replay on the post's own admin page, removed post or
+/// not -- the sample is deleted -- and the drawing waits under the viewer as
+/// its poster. Tegaki's player is a page of its own, so that one is a link.
+#[test]
+fn post_detail_plays_the_replay() {
+    let env = test_env();
+    let template = env
+        .get_template("admin/post_detail.jinja")
+        .expect("template loads");
+    let render = |post: serde_json::Value| {
+        template
+            .render(context! {
+                current_user => current_user(),
+                post => post,
+                draft_post_count => 0,
+                unread_notification_count => 0,
+                ftl_lang => "ko",
+                r2_public_endpoint_url => "https://r2.example.test",
+            })
+            .expect("post_detail.jinja renders")
+    };
+
+    let mut neo = sample_post();
+    neo["replay_filename"] = json!("ab12.pch");
+    let rendered = render(neo);
+    assert!(rendered.contains("id=\"admin-post-replay\""));
+    assert!(rendered.contains("data-replay=\"https://r2.example.test/replay/ab/ab12.pch\""));
+    assert!(rendered.contains("data-lang=\"ko\""));
+    assert!(rendered.contains("neo-cucumber-replay-controls"));
+    assert!(rendered.contains("neo-cucumber-replay.js"));
+
+    let mut tegaki = sample_post();
+    tegaki["replay_filename"] = json!("cd34.tgkr");
+    tegaki["deleted_at"] = json!(null);
+    tegaki["deletion_reason"] = json!(null);
+    let rendered = render(tegaki);
+    assert!(!rendered.contains("admin-post-replay"));
+    assert!(rendered.contains("/replay\">watch</a>"));
+
+    let rendered = render(sample_post());
+    assert!(!rendered.contains("admin-post-replay"));
+    assert!(!rendered.contains("neo-cucumber-replay.js"));
+}
+
 fn sample_banner(is_explicit: bool) -> serde_json::Value {
     json!({
         "id": "00000000-0000-0000-0000-00000000000b",
