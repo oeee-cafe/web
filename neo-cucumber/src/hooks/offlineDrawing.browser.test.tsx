@@ -247,6 +247,36 @@ describe("offline drawing end to end", () => {
     expectMatch(api, await replayThroughNeo(api));
   });
 
+  /**
+   * A canvas cannot keep a colour under zero alpha, so in NEO a pixel the
+   * eraser has cleared reads back as 0x00000000 -- the same as one nothing
+   * was ever drawn on -- and a flood beside it runs straight through. A
+   * buffer that kept the stroke's red under the cleared alpha made the fill
+   * stop at an invisible wall, and the replay, run by NEO, did not.
+   */
+  it("matches when a fill crosses ground the eraser cleared", async () => {
+    const { api, strokeThrough, updateDrawingState } =
+      await mountOfflineDrawing(drawingState({ brushSize: 4, color: "#c80000" }));
+
+    await strokeThrough([
+      [4, 30],
+      [76, 30],
+    ]);
+    await updateDrawingState({ brushType: "eraser", brushSize: 12 });
+    await strokeThrough([
+      [2, 30],
+      [78, 30],
+    ]);
+    await updateDrawingState({ brushType: "fill", color: "#0000ff" });
+    await strokeThrough([[40, 8]]);
+
+    const layer = api.drawingEngine!.layers.background;
+    // On the line the eraser cleared.
+    const cleared = (30 * W + 40) * 4;
+    expect(Array.from(layer.subarray(cleared, cleared + 4))).toEqual([0, 0, 255, 255]);
+    expectMatch(api, await replayThroughNeo(api));
+  });
+
   it("matches when the pen color is changed mid-stroke", async () => {
     const { api, updateDrawingState, press, moveTo, release } =
       await mountOfflineDrawing(drawingState({ color: "#800000" }));

@@ -30,6 +30,15 @@ export interface PixelSurface {
  * artefact. Playback therefore renders strokes very slightly differently from
  * the painter; the player applies the replay's restore frame when it reaches
  * the end so it still finishes on exactly the artwork.
+ *
+ * The one part of that it does reproduce is the part every browser agrees
+ * on: under zero alpha a canvas has no colour to keep, so a pixel written
+ * transparent reads back as 0x00000000. NEO's eraser only lowers alpha and
+ * leaves the stroke's colour behind, and its flood fill compares whole
+ * 32-bit pixels -- so on a canvas, ground the eraser cleared is the same
+ * ground as ground never drawn on, and a buffer that kept the red under it
+ * stopped the fill at an invisible wall the replay then ran straight
+ * through.
  */
 export class BufferSurface implements PixelSurface {
   private readonly buffer: Uint8ClampedArray;
@@ -85,10 +94,18 @@ export class BufferSurface implements PixelSurface {
 
     const span = (endX - startX) * 4;
     if (span <= 0 || endY <= startY) return;
+    const buffer = this.buffer;
     for (let row = startY; row < endY; row++) {
       const src = (row * data.width + startX) * 4;
       const dst = ((y + row) * this.width + x + startX) * 4;
-      this.buffer.set(data.data.subarray(src, src + span), dst);
+      buffer.set(data.data.subarray(src, src + span), dst);
+      for (let i = dst; i < dst + span; i += 4) {
+        if (buffer[i + 3] === 0) {
+          buffer[i] = 0;
+          buffer[i + 1] = 0;
+          buffer[i + 2] = 0;
+        }
+      }
     }
     this.onWrite?.(x + startX, y + startY, x + endX - 1, y + endY - 1);
   }
