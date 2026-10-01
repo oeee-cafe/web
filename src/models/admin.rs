@@ -38,6 +38,9 @@ pub struct AdminPost {
     pub image_filename: String,
     pub image_width: i32,
     pub image_height: i32,
+    /// The recording, `<sha256>.pch` (NEO) or `.tgkr` (Tegaki). None for a
+    /// drawing saved without one.
+    pub replay_filename: Option<String>,
     pub published_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -102,6 +105,7 @@ pub async fn find_all_posts(
             images.image_filename,
             images.width AS image_width,
             images.height AS image_height,
+            images.replay_filename,
             posts.published_at,
             posts.created_at,
             posts.deleted_at,
@@ -181,6 +185,7 @@ pub async fn find_post_by_id(
             images.image_filename,
             images.width AS image_width,
             images.height AS image_height,
+            images.replay_filename,
             posts.published_at,
             posts.created_at,
             posts.deleted_at,

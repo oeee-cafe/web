@@ -19,13 +19,34 @@
   </div>
 
   {# The drawing at its own size, framed as the painter frames its canvas,
-     and beside it (below, on a phone) what staff act on and look up. #}
+     and beside it (below, on a phone) what staff act on and look up.
+
+     A NEO replay plays here, whatever the author allowed and whether or not
+     the post is still up: the viewer the post page uses mounts over the
+     drawing, keeps it as its poster and fetches the recording only when a
+     control is pressed. #}
+  {% set inline_replay = post.replay_filename and post.replay_filename[-4:] == ".pch" %}
   <div class="admin-post">
-    <img class="admin-drawing admin-post-drawing"
-         width="{{ post.image_width }}"
-         height="{{ post.image_height }}"
-         alt="{{ post.title or 'Untitled' }}"
-         src="{{ stored_url("image", post.image_filename) }}" />
+    {% if inline_replay %}
+      <div class="admin-post-drawing neo-cucumber-replay" id="admin-post-replay"
+           data-replay="{{ stored_url("replay", post.replay_filename) }}"
+           data-width="{{ post.image_width }}"
+           data-height="{{ post.image_height }}"
+           data-lang="{{ ftl_lang }}">
+        <img class="admin-drawing neo-cucumber-replay-poster"
+             width="{{ post.image_width }}"
+             height="{{ post.image_height }}"
+             alt="{{ post.title or 'Untitled' }}"
+             src="{{ stored_url("image", post.image_filename) }}" />
+        {% include "replay_controls.jinja" %}
+      </div>
+    {% else %}
+      <img class="admin-drawing admin-post-drawing"
+           width="{{ post.image_width }}"
+           height="{{ post.image_height }}"
+           alt="{{ post.title or 'Untitled' }}"
+           src="{{ stored_url("image", post.image_filename) }}" />
+    {% endif %}
 
     <div class="admin-post-side ds-stack">
       {% include "admin/post_flag_panel.jinja" %}
@@ -82,6 +103,19 @@
           <th scope="row">Views</th>
           <td>{{ post.viewer_count }}</td>
         </tr>
+        <tr>
+          <th scope="row">Replay</th>
+          <td>
+            {% if post.replay_filename %}
+              <a href="{{ stored_url("replay", post.replay_filename) }}"><code>{{ post.replay_filename }}</code></a>
+              {% if not inline_replay and post.published_at and not post.deleted_at %}
+                — <a href="{{ post_url(post) }}/replay">watch</a>
+              {% endif %}
+            {% else %}
+              <span class="muted">none</span>
+            {% endif %}
+          </td>
+        </tr>
       </table>
 
       {% if post.published_at and not post.deleted_at %}
@@ -91,4 +125,23 @@
       {% endif %}
     </div>
   </div>
+  {% if inline_replay %}
+    <script>
+      (function () {
+        var box = document.getElementById("admin-post-replay");
+        var script = document.createElement("script");
+        script.src = "{{ '/static/viewer/neo-cucumber-replay.js' | cachebuster | safe }}";
+        script.onload = function () {
+          window.NeoCucumberReplay.mount(box, {
+            replay: box.getAttribute("data-replay"),
+            poster: box.querySelector("img").getAttribute("src"),
+            width: parseInt(box.getAttribute("data-width"), 10),
+            height: parseInt(box.getAttribute("data-height"), 10),
+            lang: box.getAttribute("data-lang")
+          });
+        };
+        document.head.appendChild(script);
+      })();
+    </script>
+  {% endif %}
 {% endblock admin_content %}
