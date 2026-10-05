@@ -3,6 +3,8 @@
 use activitystreams_kinds::activity::{CreateType, UpdateType};
 use activitystreams_kinds::object::NoteType;
 use ojak::federation::Uris;
+use ojak_vocab::generated::{InteractionPolicy, InteractionRule};
+use ojak_vocab::ACTIVITYSTREAMS_PUBLIC;
 use serde::{Deserialize, Serialize};
 use url::Url;
 use uuid::Uuid;
@@ -78,6 +80,8 @@ pub struct Note {
         deserialize_with = "lenient_url_deser"
     )]
     audience: Option<Url>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    interaction_policy: Option<InteractionPolicy>,
     #[serde(flatten)]
     extra: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -168,6 +172,17 @@ impl Note {
             tag: params.tag,
             source: None,
             audience: params.audience,
+            // Every published drawing permits quotes by anyone, whether
+            // fetched directly or delivered in a Create or Update.
+            interaction_policy: Some(InteractionPolicy {
+                can_quote: Some(Box::new(InteractionRule {
+                    automatic_approvals: vec![ACTIVITYSTREAMS_PUBLIC
+                        .parse()
+                        .expect("the public collection is a valid IRI")],
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }),
             extra: std::collections::HashMap::new(),
         }
     }
@@ -448,6 +463,41 @@ impl UpdateNote {
             to,
             cc,
             published,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn published_notes_allow_public_quotes_in_creates_and_updates() {
+        for updated in [None, Some("2026-10-05T00:00:00Z".to_string())] {
+            let note = Note::from_params(NoteParams {
+                id: "https://oeee.cafe/ap/posts/1".parse().unwrap(),
+                attributed_to: "https://oeee.cafe/ap/users/1".parse().unwrap(),
+                content: "A drawing".into(),
+                to: vec!["https://www.w3.org/ns/activitystreams#Public".into()],
+                cc: vec![],
+                published: "2026-10-04T00:00:00Z".into(),
+                updated,
+                url: "https://oeee.cafe/@artist/1".parse().unwrap(),
+                attachment: vec![],
+                tag: vec![],
+                audience: None,
+            });
+            let document = serde_json::to_value(note).unwrap();
+            let policy = &document["interactionPolicy"];
+            assert_eq!(
+                policy["canQuote"]["automaticApproval"],
+                "https://www.w3.org/ns/activitystreams#Public"
+            );
+            assert!(policy["canQuote"].get("manualApproval").is_none());
+            // Quotes do not change the defaults for other interactions.
+            assert!(policy.get("canReply").is_none());
+            assert!(policy.get("canLike").is_none());
+            assert!(policy.get("canAnnounce").is_none());
         }
     }
 }
