@@ -1,11 +1,7 @@
 {# The loading bar: a thin line under the header while the next page is on
    its way, so a tap is seen to have been taken.
 
-   Only in the apps (data-app, theme_head.jinja). A browser shows a page
-   load in its own chrome, and the trips it cannot see -- htmx's -- already
-   answer at the press: the toolbar's links with a skeleton, a page's pills
-   by dimming the content. In an app there is no chrome, and a link inside a
-   page keeps that page up, unchanged, until the next has come.
+   Shown in browsers and apps, for ordinary page loads and htmx navigation.
 
    The bar hangs from the header's bottom edge, inside it, so it goes
    wherever the header goes -- pinned, pulled down with a refresh, scrolled
@@ -30,7 +26,6 @@
    boosted swap runs this again; the document listeners are added once. #}
 <script>
   (function () {
-    if (!document.documentElement.getAttribute("data-app")) return;
     if (window.oeeeLoadingBar) return;
 
     var bar = null;
