@@ -602,7 +602,7 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   to { opacity: 0.55; }
 }
 
-/* The loading bar (loading_bar.jinja): in the apps, a line along the
+/* The loading bar (loading_bar.jinja): a line along the
    header's bottom edge while the next page is on its way. It creeps most of
    the way across and slows as it goes, never arriving by itself; the page
    arriving runs it to the end and lets it fade. It shows only after a
