@@ -14,7 +14,7 @@
    htmx's swap, or for a page load, the new document -- or, for a trip that
    never lands (a download, a cancelled load), a timeout.
 
-   Clicks and submits start it at the press. In the apps built on WebKit, a
+   Clicks and submits start it at the press. In browsers and apps built on WebKit, a
    press that loads a page holds the load back a frame, until the bar is on
    the screen (leave(), below).
    Any page load that is neither
@@ -81,14 +81,15 @@
     // the page on the screen the moment a load begins -- scripts go on
     // running, but nothing they change is shown again -- so a bar started in
     // the same turn as the load is never seen. Measured in the simulator: the
-    // page's own clock stopped at the tap. So in the apps built on it, the
+    // page's own clock stopped at the tap. So in browsers and apps built on it, the
     // bar goes up first, at once rather than after the usual moment, and the
     // load is begun a frame later, once it has been painted; what is on the
     // screen is then frozen with the bar in it, and its creep runs on the
     // compositor, which the freeze does not stop. Chromium, under the
     // Android and Windows apps, keeps painting the page until the next one
     // arrives, so there nothing is held back.
-    var holds = /^(ios|macos)$/.test(document.documentElement.getAttribute("data-app"));
+    var holds = /^(ios|macos)$/.test(document.documentElement.getAttribute("data-app")) ||
+      (/AppleWebKit\//.test(navigator.userAgent) && !/(Chrome|Chromium|Edg|OPR|Android)\//.test(navigator.userAgent));
     // A page that asks before it is left -- a drawing not yet saved, a
     // collaborative session drawn in -- may be stayed on, and nothing tells
     // the page it was: the question is the browser's or the app's, and
