@@ -29,8 +29,8 @@
  *   doesn't touch any fork entry's affected area applies directly; one that
  *   overlaps triggers a replay of history with the fork re-applied on top.
  * - UNDO_POINT messages delimit strokes; UNDO/redo marks a user's entries and
- *   replays. Undo takes effect on server echo (like Drawpile), keeping every
- *   client's marking order identical.
+ *   replays. Pending undo/redo is projected locally without changing canonical
+ *   marking; server echoes confirm it and remote ordering reconciles it.
  * - RESET_POINT (sent after a server session reset) squashes everything at or
  *   below the reset's base sequence into a new base savepoint.
  */
@@ -178,9 +178,8 @@ const MAX_SAVEPOINTS = 8;
  * count says nothing about what a copy weighs.
  *
  * So they are bounded by both. Dropping one costs nothing but a longer replay
- * on the paths that reach for an older position -- a diverged fork, a
- * checkpoint's cut -- and never the common one, which always starts from the
- * newest savepoint. Trading replay length for memory is the right way round
+ * on paths that reach for an older position: undo, a diverged fork, or a
+ * checkpoint's cut. Recent gesture savepoints keep ordinary undo short. Trading replay length for memory is the right way round
  * when memory is what has run out.
  */
 const MAX_SAVEPOINT_BYTES = 64 * 1024 * 1024;
@@ -419,6 +418,7 @@ export class CanvasHistory {
   /** Who has drawn since the last savepoint, so the rest can share its arrays. */
   private releaseRenames?: () => void;
   private fork: ForkEntry[] = [];
+  private projectionRendered = true;
   /**
    * Canonical messages seen while the fork has been waiting for its echoes,
    * against `MAX_FORK_FALLBEHIND`. Reset whenever the fork empties.
@@ -523,6 +523,7 @@ export class CanvasHistory {
   reset(): void {
     this.entries = [];
     this.fork = [];
+    this.projectionRendered = true;
     this.canonicalLog = [];
     this.openBatch = null;
     // Copies survive a checkpoint, as they do in the room: a paste after it
@@ -596,11 +597,14 @@ export class CanvasHistory {
    * Anyone who has no entry in it joined after it was taken, so their pair is
    * blanked rather than left showing work the replay is about to redraw.
    */
-  private restoreLayers(sp: Savepoint): void {
+  private restoreLayers(sp: Savepoint, owners?: Set<ActorKey>): void {
     // Anyone the savepoint knows about must exist before the sweep below, or
     // a participant who left and whose pair was released never comes back.
-    for (const owner of sp.layers.keys()) this.engine.layersFor(owner);
+    for (const owner of sp.layers.keys()) {
+      if (!owners || owners.has(owner)) this.engine.layersFor(owner);
+    }
     for (const owner of this.engine.ownerIds()) {
+      if (owners && !owners.has(owner)) continue;
       const live = this.engine.layersFor(owner);
       const saved = sp.layers.get(owner);
       if (saved) {
@@ -631,7 +635,7 @@ export class CanvasHistory {
 
   /**
    * Counts the local user's undoable/redoable strokes, projecting the effect
-   * of unconfirmed fork messages. Undo takes effect only on server echo, so
+   * of unconfirmed fork messages. Canonical marking waits for the echo, so
    * without this projection a quickly repeated undo click would send multiple
    * UNDO messages and revert more strokes than intended.
    */
@@ -683,9 +687,10 @@ export class CanvasHistory {
     });
   }
 
-  /** Applies an optimistic operation emitted through the public API. */
+  /** Applies a local operation, including a projected undo/redo. */
   handleLocalOperation(entry: LocalPainterOperation): void {
     const msg = toHistoryOperation(entry.actorId, entry.operation);
+    const before = msg.type === "undo" ? this.projectedEntries() : undefined;
     this.record({ source: "local", op: msg.type, actor: entry.actorId });
     this.fork.push({
       id: entry.id,
@@ -699,6 +704,7 @@ export class CanvasHistory {
     } else if (msg.type !== "undo") {
       this.applyDrawSync(msg, this.liveSource, this.liveStrokes);
     }
+    if (before) this.previewUndo(before);
     // Update undo/redo button state immediately (projected over the fork)
     this.notify();
   }
@@ -710,6 +716,7 @@ export class CanvasHistory {
    */
   registerOptimisticOperation(entry: LocalPainterOperation): void {
     const msg = toHistoryOperation(entry.actorId, entry.operation);
+    const before = msg.type === "undo" ? this.projectedEntries() : undefined;
     this.record({ source: "local", op: msg.type, actor: entry.actorId });
     this.fork.push({ id: entry.id, msg, area: affectedArea(msg) });
     if (msg.type === "undoPoint") {
@@ -720,6 +727,7 @@ export class CanvasHistory {
       // before the paste arrived would find nothing to hand back.
       this.liveStrokes.clipboards.set(actorKey(entry.actorId), this.engine.getClipboard());
     }
+    if (before) this.previewUndo(before);
     this.notify();
   }
 
@@ -890,8 +898,7 @@ export class CanvasHistory {
       }
     }
 
-    // Echo of our own fork head: already on the canvas (except undo/undoPoint
-    // which take effect now)
+    // Echo of our own fork head: the projected canvas already includes it.
     const actor = "userId" in msg ? actorKey(msg.userId) : "";
 
     if (this.fork.length > 0 && this.fork[0].id === id) {
@@ -900,13 +907,16 @@ export class CanvasHistory {
       // Caught up with itself: the fork is keeping pace again.
       if (this.fork.length === 0) this.forkFallbehind = 0;
       if (msg.type === "undo") {
-        await this.processUndo(msg.userId, msg.redo);
+        const first = this.markUndo(msg.userId, msg.redo);
+        if (!this.projectionRendered) {
+          await this.replayFrom(first >= 0 ? this.savepointFor(first) : this.latestSavepoint());
+        }
       } else if (msg.type === "undoPoint") {
         this.appendUndoPoint(msg, seq);
       } else {
         this.entries.push({ seq, msg, undo: "done" });
       }
-      this.maybeSavepoint();
+      this.maybeSavepoint(msg.type !== "undoPoint");
       this.notify();
       return;
     }
@@ -1007,7 +1017,8 @@ export class CanvasHistory {
       if (this.openBatch && this.openBatch.points.length > 0) {
         pendingAreas.push(this.openBatch.area);
       }
-      const concurrent = pendingAreas.every((a) => areasConcurrent(a, area));
+      const concurrent = !this.fork.some((f) => f.msg.type === "undo") &&
+        pendingAreas.every((a) => areasConcurrent(a, area));
       this.record({
         source: "canonical", op: msg.type, actor, seq,
         action: concurrent ? "concurrent" : "replay",
@@ -1119,6 +1130,7 @@ export class CanvasHistory {
     if (msg.type === "undo") {
       await this.processUndo(msg.userId, msg.redo);
     } else if (msg.type === "undoPoint") {
+      this.maybeSavepoint(true);
       this.appendUndoPoint(msg, seq);
       this.liveStrokes.set(actorKey(msg.userId), null);
       if (replay) {
@@ -1143,9 +1155,10 @@ export class CanvasHistory {
   /** Appends an undo point; a new operation by a user kills their redo. */
   private appendUndoPoint(
     msg: Extract<HistoryOperation, { type: "undoPoint" }>,
-    seq?: number
+    seq?: number,
+    entries = this.entries,
   ): void {
-    for (const entry of this.entries) {
+    for (const entry of entries) {
       if (
         "userId" in entry.msg &&
         actorKey(entry.msg.userId) === actorKey(msg.userId) &&
@@ -1154,14 +1167,16 @@ export class CanvasHistory {
         entry.undo = "gone";
       }
     }
-    this.entries.push({ seq, msg, undo: "done" });
+    entries.push({ seq, msg, undo: "done" });
   }
 
   /** Marks entries and replays; no-op if there is nothing to undo/redo. */
   private async processUndo(userId: HistoryActorId, redo: boolean): Promise<void> {
+    const before = this.projectedEntries();
     const first = this.markUndo(userId, redo);
     if (first < 0) return;
-    await this.replayFrom(this.savepointFor(first));
+    const after = this.projectedEntries();
+    await this.replayFrom(this.savepointFor(first), this.undoOwners(before, after));
   }
 
   /**
@@ -1172,19 +1187,21 @@ export class CanvasHistory {
    * end of history become undone. Redo: the user's entries from their
    * earliest undone undo point to their next undo point become done again.
    */
-  private markUndo(userId: HistoryActorId, redo: boolean): number {
+  private markUndo(
+    userId: HistoryActorId, redo: boolean, entries = this.entries, invalidate = true,
+  ): number {
     let first = -1;
     if (redo) {
-      first = this.entries.findIndex(
+      first = entries.findIndex(
         (e) =>
           e.msg.type === "undoPoint" &&
           actorKey(e.msg.userId) === actorKey(userId) &&
           e.undo === "undone"
       );
       if (first < 0) return -1;
-      let next = this.entries.length;
-      for (let i = first + 1; i < this.entries.length; i++) {
-        const e = this.entries[i];
+      let next = entries.length;
+      for (let i = first + 1; i < entries.length; i++) {
+        const e = entries[i];
         if (
           e.msg.type === "undoPoint" &&
           actorKey(e.msg.userId) === actorKey(userId)
@@ -1194,7 +1211,7 @@ export class CanvasHistory {
         }
       }
       for (let i = first; i < next; i++) {
-        const e = this.entries[i];
+        const e = entries[i];
         if (
           "userId" in e.msg &&
           actorKey(e.msg.userId) === actorKey(userId) &&
@@ -1204,8 +1221,8 @@ export class CanvasHistory {
         }
       }
     } else {
-      for (let i = this.entries.length - 1; i >= 0; i--) {
-        const e = this.entries[i];
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const e = entries[i];
         if (
           e.msg.type === "undoPoint" &&
           actorKey(e.msg.userId) === actorKey(userId) &&
@@ -1216,8 +1233,8 @@ export class CanvasHistory {
         }
       }
       if (first < 0) return -1;
-      for (let i = first; i < this.entries.length; i++) {
-        const e = this.entries[i];
+      for (let i = first; i < entries.length; i++) {
+        const e = entries[i];
         if (
           "userId" in e.msg &&
           actorKey(e.msg.userId) === actorKey(userId) &&
@@ -1229,7 +1246,7 @@ export class CanvasHistory {
     }
 
     // Savepoints past the modified region no longer describe replayable state
-    this.savepoints = this.savepoints.filter((s) => s.index <= first);
+    if (invalidate) this.savepoints = this.savepoints.filter((s) => s.index <= first);
     return first;
   }
 
@@ -1237,43 +1254,94 @@ export class CanvasHistory {
    * Restores a savepoint, replays all done entries after it, then re-applies
    * the unconfirmed fork on top.
    */
-  private async replayFrom(sp: Savepoint): Promise<void> {
-    // Before the restore wipes it: in the fork, it is re-applied below.
-    this.flushLocalWork();
-    this.restoreLayers(sp);
-    const strokes = cloneStrokes(sp.strokes);
-    for (let i = sp.index; i < this.entries.length; i++) {
-      const entry = this.entries[i];
-      if (entry.undo !== "done") continue;
-      // Yield only for a message whose decode has not happened yet. A rollback
-      // between savepoints can span sixty-odd entries, and awaiting each one
-      // spent a turn of the event loop apiece to wait for values already in
-      // hand -- with the canvas showing the savepoint until the last resolved.
-      if (!this.applyMessageSync(entry.msg, this.liveSource, strokes)) {
-        await this.applyMessage(entry.msg, this.liveSource, strokes);
-      }
-    }
+  /** Canonical entries plus pending gestures, with undo applied only to copies. */
+  private projectedEntries(): Entry[] {
+    const entries = this.entries.map((entry) => ({ ...entry }));
     for (const f of this.fork) {
-      if (f.msg.type === "undoPoint") {
-        // Keyed by the entry's own actor, exactly as the confirmed entries
-        // above are, so a boundary always clears the state the strokes
-        // beside it are drawn under.
-        strokes.set(actorKey(f.msg.userId), null);
-      } else if (f.msg.type !== "undo") {
-        this.applyDrawSync(f.msg, this.liveSource, strokes);
+      if (f.msg.type === "undo") {
+        this.markUndo(f.msg.userId, f.msg.redo, entries, false);
+      } else if (f.msg.type === "undoPoint") {
+        this.appendUndoPoint(f.msg, undefined, entries);
+      } else {
+        entries.push({ msg: f.msg, undo: "done" });
       }
     }
-    if (this.openBatch && this.openBatch.points.length > 0) {
+    return entries;
+  }
+
+  /** Independent participant pairs can be restored without touching the room. */
+  private undoOwners(before: Entry[], after: Entry[]): Set<ActorKey> | undefined {
+    // Clipboard and cross-owner pen state can couple otherwise separate pairs.
+    // Keep the complete replay for those histories, including undone operations.
+    if (after.some(({ msg }) => msg.type === "region" ||
+      ("targetOwner" in msg && "userId" in msg &&
+        actorKey(msg.targetOwner) !== actorKey(msg.userId)))) return undefined;
+    const owners = new Set<ActorKey>();
+    for (let i = 0; i < after.length; i++) {
+      const entry = after[i];
+      if (before[i]?.undo === entry.undo) continue;
+      if ("targetOwner" in entry.msg) owners.add(actorKey(entry.msg.targetOwner));
+    }
+    return owners;
+  }
+
+  private previewUndo(before: Entry[]): void {
+    this.flushLocalWork();
+    const entries = this.projectedEntries();
+    this.projectionRendered = this.renderReplay(
+      this.latestSavepoint(), entries, this.undoOwners(before, entries),
+    );
+  }
+
+  private async replayFrom(sp: Savepoint, owners?: Set<ActorKey>): Promise<void> {
+    this.flushLocalWork();
+    // Decode before restoring, so an asynchronous PNG never exposes half a replay.
+    for (const entry of this.projectedEntries()) {
+      if (entry.undo === "done" && entry.msg.type === "snapshot" &&
+          !this.snapshotCache.has(entry.msg)) {
+        this.snapshotCache.set(entry.msg, await pngDataToLayer(
+          entry.msg.pngData, this.engine.imageWidth, this.engine.imageHeight,
+        ));
+      }
+    }
+    this.projectionRendered = this.renderReplay(sp, this.projectedEntries(), owners);
+  }
+
+  private renderReplay(sp: Savepoint, entries: Entry[], owners?: Set<ActorKey>): boolean {
+    // A canonical savepoint after a pending undo's first changed entry contains
+    // ink the projection removed. Start before that entry without evicting it.
+    const first = entries.findIndex((entry, i) =>
+      i < this.entries.length && entry.undo !== this.entries[i].undo);
+    if (first >= 0 && first < sp.index) sp = this.savepointFor(first);
+    // A decode already in flight will render the latest projection on completion.
+    if (entries.some((entry) => entry.undo === "done" &&
+      entry.msg.type === "snapshot" && !this.snapshotCache.has(entry.msg))) return false;
+    this.restoreLayers(sp, owners);
+    const strokes = cloneStrokes(sp.strokes);
+    for (let i = sp.index; i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry.undo !== "done") continue;
+      if (owners && "userId" in entry.msg && !owners.has(actorKey(entry.msg.userId))) continue;
+      this.applyMessageSync(entry.msg, this.liveSource, strokes);
+    }
+    if (owners) {
+      for (const [actor, state] of this.liveStrokes) {
+        if (!owners.has(actor)) strokes.set(actor, state);
+      }
+      for (const [actor, clipboard] of this.liveStrokes.clipboards) {
+        if (!owners.has(actor)) strokes.clipboards.set(actor, clipboard);
+      }
+    }
+    if (this.openBatch && this.openBatch.points.length > 0 &&
+        (!owners || owners.has(this.openBatch.targetOwner))) {
       this.applyStrokePoints(
-        this.localUserId,
-        this.openBatch,
-        this.openBatch.points,
-        this.liveSource(this.openBatch.targetOwner),
-        strokes
+        this.localUserId, this.openBatch, this.openBatch.points,
+        this.liveSource(this.openBatch.targetOwner), strokes,
       );
     }
     this.liveStrokes = strokes;
-    this.queueUpdates();
+    this.queueUpdates(owners);
+    return true;
   }
 
   private savepointFor(index: number): Savepoint {
@@ -1352,12 +1420,18 @@ export class CanvasHistory {
     return bytes;
   }
 
-  private maybeSavepoint(): void {
+  /** A settled gesture is a useful restore position even before 64 entries. */
+  saveGesture(): void {
+    this.maybeSavepoint(true);
+  }
+
+  private maybeSavepoint(gesture = false): void {
     // Savepoints must capture confirmed-only state, and a stroke still under
     // the pointer is not even in the fork yet
     if (this.hasPendingLocal || this.localWork?.drawing()) return;
     const last = this.latestSavepoint();
-    if (this.entries.length - last.index < SAVEPOINT_INTERVAL) return;
+    if (this.entries.length === last.index ||
+        (!gesture && this.entries.length - last.index < SAVEPOINT_INTERVAL)) return;
     const captured = this.captureLayers();
     this.savepoints.push({
       index: this.entries.length,
@@ -1600,12 +1674,13 @@ export class CanvasHistory {
    * engine cannot have seen: a savepoint restored under a replay, a decoded
    * snapshot, a blanked canvas.
    */
-  private queueUpdates(): void {
+  private queueUpdates(owners?: Set<ActorKey>): void {
     // Every participant's, not just our own. A replay rewrites whoever's
     // layers the entries touch, and an undo of somebody else's fill rewrites
     // theirs: repainting only ours would leave their canvas showing pixels
     // the buffer behind it no longer has.
     for (const owner of this.engine.ownerIds()) {
+      if (owners && !owners.has(owner)) continue;
       this.engine.queueLayerUpdate("foreground", owner);
       this.engine.queueLayerUpdate("background", owner);
     }
