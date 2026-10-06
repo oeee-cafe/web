@@ -526,7 +526,12 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
         ? {
             kind: "session",
             onOperation: emitLocalOperation!,
-            onPointerRelease: synchronization.onPointerUp,
+            onPointerRelease: () => {
+              // The drawing hook clears its active flag after this callback.
+              // Capture once that happens; late echoes capture when the fork settles.
+              void Promise.resolve().then(() => synchronizationHistoryRef.current?.saveGesture());
+              synchronization.onPointerUp?.();
+            },
           }
         : { kind: "offline", recordReplay: config.recordReplay ?? true },
     [synchronization, emitLocalOperation, config.recordReplay],

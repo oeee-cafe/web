@@ -186,10 +186,15 @@ class FakeEngine {
       const buf = (targets ?? this.layers)[layer as "foreground"];
       buf[(rect.y * SIZE + rect.x) * 4] = color.r;
     }
+    const owner = this.ownerOf((targets ?? this.layers)[layer as "foreground"]);
+    if (tool !== "copy" && owner) this.noteWrite(owner);
     this.ops.push(`region:${tool}:${targets ? "fork" : "live"}`);
   }
   eraseAll(layer: string, targets?: { foreground: Uint8ClampedArray; background: Uint8ClampedArray }) {
-    (targets ?? this.layers)[layer as "foreground"].fill(0);
+    const buf = (targets ?? this.layers)[layer as "foreground"];
+    const owner = this.ownerOf(buf);
+    if (owner) this.noteWrite(owner);
+    buf.fill(0);
     this.ops.push(`eraseAll:${layer}`);
   }
   drawBezier(
@@ -201,6 +206,8 @@ class FakeEngine {
     target?: Uint8ClampedArray
   ) {
     const buf = target ?? this.layers[layer];
+    const owner = this.ownerOf(buf);
+    if (owner) this.noteWrite(owner);
     buf[(points[1] * SIZE + points[0]) * 4] = color.r;
     this.ops.push(`bezier:${points.join(",")}`);
   }
@@ -216,6 +223,8 @@ class FakeEngine {
     into?: Uint8ClampedArray
   ) {
     const buf = into ?? this.layers[layer];
+    const owner = this.ownerOf(buf);
+    if (owner) this.noteWrite(owner);
     buf[(y * SIZE + x) * 4] = color.r;
     this.ops.push(`text:${text}`);
   }
@@ -754,7 +763,7 @@ describe("local fork reconciliation", () => {
     // pending gesture is dropped and history is rebuilt without it.
     await remote(history, stroke(LOCAL, 50, 50, 200), 3);
     expect(engine.ops).toEqual([
-      "line:10,10-10,10:100", // confirmed gesture, replayed
+      // The confirmed gesture is already in the recent savepoint.
       // The same participant, with no undo point since, so this continues
       // their own line rather than opening a new one.
       "line:50,50-10,10:200",
@@ -878,7 +887,7 @@ describe("collaborative undo", () => {
     expect(redFor(engine, REMOTE, 1, 1)).toBe(0);
   });
 
-  it("reflects our own fill's undo, once the server echoes it", async () => {
+  it("previews our own fill's undo and confirms it without another repaint", async () => {
     const { engine, history } = setup();
     local(history, encodeUndoPoint(LOCAL));
     const bytes = encodeFill(LOCAL, LOCAL, "foreground", 4, 4, 30, 0, 0, 255);
@@ -889,8 +898,13 @@ describe("collaborative undo", () => {
     await remote(history, bytes, 2);
     const undo = encodeUndo(LOCAL, false);
     local(history, undo);
+    expect(red(engine, 1, 1)).toBe(0);
+    engine.repaints.length = 0;
+    engine.ops.length = 0;
     await remote(history, undo, 3);
     expect(red(engine, 1, 1)).toBe(0);
+    expect(engine.repaints).toEqual([]);
+    expect(engine.ops).toEqual([]);
   });
 
   it("repaints the canvas of whoever's fill was undone, not only our own", async () => {
@@ -1113,7 +1127,7 @@ describe("the tool messages through history", () => {
     expect(red(engine, 3, 3)).toBe(42);
     expect(history.canUndo()).toBe(true);
 
-    // Undo only lands once the server echoes it back
+    // Undo previews the gesture before the server echoes it back
     const undo = encodeUndo(LOCAL, false);
     local(history, undo);
     await remote(history, undo, 3);
@@ -1538,5 +1552,160 @@ describe("the stroke under the pointer", () => {
     pen.lift();
     await remote(history, stroke(REMOTE, 1, 1, 1), 71);
     expect(history.savepointCountForTest()).toBe(2);
+  });
+});
+
+describe("optimistic undo reconciliation", () => {
+  async function confirmedStroke(history: CanvasHistory, actor: number,
+    x: number, y: number, r: number, seq: number) {
+    await remote(history, encodeUndoPoint(actor), seq);
+    await remote(history, stroke(actor, x, y, r), seq + 1);
+  }
+
+  it("previews repeated undo and redo, with free matching echoes", async () => {
+    const { engine, history } = setup();
+    await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
+    await confirmedStroke(history, LOCAL, 4, 4, 150, 3);
+    const undo = encodeUndo(LOCAL, false);
+    const redo = encodeUndo(LOCAL, true);
+    local(history, undo);
+    expect(red(engine, 4, 4)).toBe(0);
+    expect(red(engine, 2, 2)).toBe(100);
+    local(history, undo);
+    expect(red(engine, 2, 2)).toBe(0);
+    local(history, redo);
+    expect(red(engine, 2, 2)).toBe(100);
+    expect(red(engine, 4, 4)).toBe(0);
+    engine.repaints.length = 0;
+    engine.ops.length = 0;
+    await remote(history, undo, 5);
+    await remote(history, undo, 6);
+    await remote(history, redo, 7);
+    expect(engine.repaints).toEqual([]);
+    expect(engine.ops).toEqual([]);
+    expect(history.hasPendingLocal).toBe(false);
+    expect(history.canUndo()).toBe(true);
+    expect(history.canRedo()).toBe(true);
+  });
+
+  it("undoes a gesture whose stroke is still waiting for its echo", async () => {
+    const { engine, history } = setup();
+    local(history, encodeUndoPoint(LOCAL));
+    const mark = localStroke(history, 2, 2, 100);
+    local(history, encodeUndo(LOCAL, false));
+    expect(red(engine, 2, 2)).toBe(0);
+    await remote(history, encodeUndoPoint(LOCAL), 1);
+    await remote(history, mark, 2);
+    expect(red(engine, 2, 2)).toBe(0);
+    await remote(history, encodeUndo(LOCAL, false), 3);
+    expect(red(engine, 2, 2)).toBe(0);
+  });
+
+  it("restores and repaints only the independent participant pair", async () => {
+    const { engine, history } = setup();
+    await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
+    await confirmedStroke(history, REMOTE, 4, 4, 150, 3);
+    engine.ops.length = 0;
+    engine.ownedRepaints.length = 0;
+    local(history, encodeUndo(LOCAL, false));
+    expect(red(engine, 2, 2)).toBe(0);
+    expect(redFor(engine, REMOTE, 4, 4)).toBe(150);
+    expect(engine.ops).toEqual([]);
+    expect(engine.ownedRepaints).toEqual(["all:1/foreground", "all:1/background"]);
+  });
+
+  it("retains recent gesture snapshots so undo need not replay old strokes", async () => {
+    const { engine, history } = setup();
+    for (let i = 0; i < 5; i++) {
+      await confirmedStroke(history, LOCAL, i + 1, i + 1, 100 + i, i * 2 + 1);
+    }
+    expect(history.savepointCountForTest()).toBeGreaterThan(1);
+    engine.ops.length = 0;
+    local(history, encodeUndo(LOCAL, false));
+    expect(red(engine, 5, 5)).toBe(0);
+    expect(red(engine, 4, 4)).toBe(103);
+    expect(engine.ops).toEqual([]);
+  });
+
+  it("reconciles a remote mark on the undone participant's pair", async () => {
+    const { engine, history } = setup();
+    await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
+    local(history, encodeUndo(LOCAL, false));
+    await remote(history, encodeUndoPoint(REMOTE), 3);
+    await remote(history, encodeStroke(REMOTE, LOCAL, "foreground", 1, "solid",
+      200, 0, 0, 255, [{ x: 2, y: 2 }]), 4);
+    expect(red(engine, 2, 2)).toBe(200);
+    await remote(history, encodeUndo(LOCAL, false), 5);
+    expect(red(engine, 2, 2)).toBe(200);
+    await remote(history, encodeUndo(REMOTE, false), 6);
+    expect(red(engine, 2, 2)).toBe(0);
+  });
+
+  it("projects clipboard dependencies through the full replay", async () => {
+    const { engine, history } = setup();
+    await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
+    await remote(history, encodeUndoPoint(REMOTE), 3);
+    await remote(history, encodeRegion(REMOTE, LOCAL, "foreground", "copy",
+      { x: 2, y: 2, width: 1, height: 1 }, { r: 0, g: 0, b: 0, a: 255 }, 1), 4);
+    await remote(history, encodeRegion(REMOTE, REMOTE, "foreground", "paste",
+      { x: 4, y: 4, width: 1, height: 1 }, { r: 0, g: 0, b: 0, a: 255 }, 1), 5);
+    expect(redFor(engine, REMOTE, 4, 4)).toBe(100);
+    local(history, encodeUndo(LOCAL, false));
+    expect(redFor(engine, REMOTE, 4, 4)).toBe(0);
+    await remote(history, encodeUndo(LOCAL, false), 6);
+    expect(redFor(engine, REMOTE, 4, 4)).toBe(0);
+  });
+
+  it("reconciles dropped optimistic undo when server order diverges", async () => {
+    const { engine, history } = setup();
+    await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
+    local(history, encodeUndo(LOCAL, false));
+    expect(red(engine, 2, 2)).toBe(0);
+    await history.handleCanonicalOperation({
+      id: "other-connection", actorId: "1", sequence: 3,
+      operation: { kind: "undo-boundary" },
+    });
+    expect(red(engine, 2, 2)).toBe(100);
+    expect(history.hasPendingLocal).toBe(false);
+  });
+});
+
+
+describe("gesture snapshots and projected redo branches", () => {
+  it("captures on release when the final stroke echo arrived before the pointer lifted", async () => {
+    const { history } = setup();
+    let drawing = true;
+    history.setLocalWork({ drawing: () => drawing, flush: () => {} });
+    local(history, encodeUndoPoint(LOCAL));
+    const mark = localStroke(history, 2, 2, 100);
+    await remote(history, encodeUndoPoint(LOCAL), 1);
+    await remote(history, mark, 2);
+    expect(history.savepointCountForTest()).toBe(1);
+    drawing = false;
+    history.saveGesture();
+    expect(history.savepointCountForTest()).toBe(2);
+  });
+
+  it("keeps a new gesture after pending undo and kills the redo branch", async () => {
+    const { engine, history } = setup();
+    await remote(history, encodeUndoPoint(LOCAL), 1);
+    await remote(history, stroke(LOCAL, 2, 2, 100), 2);
+    local(history, encodeUndo(LOCAL, false));
+    local(history, encodeUndoPoint(LOCAL));
+    const mark = localStroke(history, 4, 4, 150);
+    expect(red(engine, 2, 2)).toBe(0);
+    expect(red(engine, 4, 4)).toBe(150);
+    expect(history.canRedo()).toBe(false);
+    // Force reconciliation while both the undo and new gesture are pending.
+    await remote(history, encodeUndoPoint(REMOTE), 3);
+    await remote(history, stroke(REMOTE, 6, 6, 200), 4);
+    expect(red(engine, 2, 2)).toBe(0);
+    expect(red(engine, 4, 4)).toBe(150);
+    await remote(history, encodeUndo(LOCAL, false), 5);
+    await remote(history, encodeUndoPoint(LOCAL), 6);
+    await remote(history, mark, 7);
+    expect(red(engine, 2, 2)).toBe(0);
+    expect(red(engine, 4, 4)).toBe(150);
+    expect(history.canRedo()).toBe(false);
   });
 });

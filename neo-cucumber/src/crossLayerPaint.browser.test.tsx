@@ -157,16 +157,8 @@ it("does not conjure a participant out of the name we used to have", async () =>
   act(() => painter.unmount());
 });
 
-/**
- * In a collaborative session the canonical stream is the only history.
- *
- * The painter also carries an offline, snapshot-based undo for when it is used
- * alone. Running that one as well puts a stale copy of our own layers straight
- * onto the canvas -- a revert nobody else sees, because it was never an
- * operation -- so the drawing jumps back further here than it did for anyone
- * watching. Pressing undo may only send.
- */
-it("undoing in a session only sends, and never moves the canvas by itself", async () => {
+/** Session undo previews canonical history without using the offline stack. */
+it("previews session undo before the server echoes it", async () => {
   const sent: string[] = [];
   const element = document.createElement("div");
   document.body.appendChild(element);
@@ -202,12 +194,12 @@ it("undoing in a session only sends, and never moves the canvas by itself", asyn
   const before = litPixels(element, 32, 24);
   expect(before).toBeGreaterThan(0);
 
-  // Undo, with nothing echoed back yet. The canvas must not have moved.
+  // Undo previews the canonical gesture, with nothing echoed back yet.
   act(() => painter.undo());
   await act(async () => new Promise((resolve) => setTimeout(resolve, 150)));
 
   expect(sent).toContain("undo");
-  expect(litPixels(element, 32, 24)).toBe(before);
+  expect(litPixels(element, 32, 24)).toBe(0);
 
   act(() => painter.unmount());
 });
