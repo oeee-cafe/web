@@ -21,6 +21,7 @@ use crate::web::context::CommonContext;
 use crate::web::i18n::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
 
 use super::page::community_header_context;
+use minijinja::value::Serde;
 
 #[derive(Deserialize)]
 pub struct CreateCommunityForm {
@@ -126,7 +127,7 @@ pub async fn create_community_form(
             "create_community.jinja",
             common_ctx,
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
             },
         )
         .await?;
@@ -183,8 +184,8 @@ pub async fn hx_edit_community(
         .render(
             "community_edit.jinja",
             context! {
-                current_user => auth_session.user,
-                community,
+                current_user => Serde(auth_session.user),
+                community => Serde(community),
                 community_id => id,
                 domain => state.config.domain.clone(),
                 unread_notification_count => common_ctx.unread_notification_count,
@@ -294,9 +295,9 @@ pub async fn hx_do_edit_community(
                         template,
                         "community_edit_block",
                         context! {
-                            current_user => auth_session.user,
+                            current_user => Serde(auth_session.user),
                             header => header,
-                            community => updated_community,
+                            community => Serde(&updated_community),
                             community_id => updated_community.id.to_string(),
                             domain => state.config.domain.clone(),
                             ftl_lang
@@ -349,8 +350,8 @@ pub async fn hx_do_edit_community(
                 .render(
                     "community_edit.jinja",
                     context! {
-                        current_user => auth_session.user,
-                        community => current_community,
+                        current_user => Serde(auth_session.user),
+                        community => Serde(current_community),
                         community_id => id,
                         domain => state.config.domain.clone(),
                         error_message => error_message,

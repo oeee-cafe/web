@@ -2,6 +2,7 @@
 //! admin template against representative context. Catches syntax errors,
 //! broken inheritance and unknown filters.
 
+use minijinja::value::Serde;
 use minijinja::{context, Environment};
 use serde_json::json;
 
@@ -67,9 +68,9 @@ fn renders_posts_list() {
         .expect("template loads");
     let rendered = template
         .render(context! {
-            current_user => current_user(),
-            posts => vec![sample_post()],
-            communities => sample_communities(),
+            current_user => Serde(current_user()),
+            posts => Serde(vec![sample_post()]),
+            communities => Serde(sample_communities()),
             total => 1,
             has_more => true,
             next_url => "/admin/posts-fragment?offset=60",
@@ -107,9 +108,9 @@ fn renders_posts_list_when_empty() {
         .expect("template loads");
     let rendered = template
         .render(context! {
-            current_user => current_user(),
-            posts => Vec::<serde_json::Value>::new(),
-            communities => sample_communities(),
+            current_user => Serde(current_user()),
+            posts => Serde(Vec::<serde_json::Value>::new()),
+            communities => Serde(sample_communities()),
             total => 0,
             has_more => false,
             next_url => "/admin/posts-fragment?offset=60",
@@ -138,7 +139,7 @@ fn post_titles_are_html_escaped() {
     post["title"] = json!(r#"><//" onerror="alert(1)"#);
     let rendered = template
         .render(context! {
-            posts => vec![post],
+            posts => Serde(vec![post]),
             has_more => false,
             next_url => "",
             r2_public_endpoint_url => "https://example.test",
@@ -166,7 +167,7 @@ fn shared_card_switches_targets_for_admin() {
         .expect("template loads");
     let rendered = template
         .render(context! {
-            posts => vec![sample_post()],
+            posts => Serde(vec![sample_post()]),
             has_more => false,
             next_url => "",
             r2_public_endpoint_url => "https://example.test",
@@ -199,7 +200,7 @@ fn renders_posts_fragment_standalone() {
         .expect("template loads");
     let rendered = template
         .render(context! {
-            posts => vec![sample_post()],
+            posts => Serde(vec![sample_post()]),
             has_more => true,
             next_url => "/admin/posts-fragment?offset=60&author=some%20one",
             r2_public_endpoint_url => "https://example.test",
@@ -223,7 +224,7 @@ fn fragment_omits_sentinel_on_last_batch() {
         .expect("template loads");
     let rendered = template
         .render(context! {
-            posts => vec![sample_post()],
+            posts => Serde(vec![sample_post()]),
             has_more => false,
             next_url => "",
             r2_public_endpoint_url => "https://example.test",
@@ -240,8 +241,8 @@ fn renders_post_detail() {
         .expect("template loads");
     template
         .render(context! {
-            current_user => current_user(),
-            post => sample_post(),
+            current_user => Serde(current_user()),
+            post => Serde(sample_post()),
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",
@@ -261,8 +262,8 @@ fn post_detail_plays_the_replay() {
     let render = |post: serde_json::Value| {
         template
             .render(context! {
-                current_user => current_user(),
-                post => post,
+                current_user => Serde(current_user()),
+                post => Serde(post),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "ko",
@@ -317,7 +318,7 @@ fn post_flag_panel_renders_standalone_for_htmx_swap() {
         .expect("template loads");
 
     let rendered = template
-        .render(context! { post => sample_post() })
+        .render(context! { post => Serde(sample_post()) })
         .expect("flagged panel renders");
     assert!(rendered.contains("flagged explicit by staff"));
     assert!(rendered.contains("Remove explicit flag"));
@@ -329,7 +330,7 @@ fn post_flag_panel_renders_standalone_for_htmx_swap() {
     unflagged["explicit_flagged_at"] = json!(null);
     unflagged["explicit_flagged_by_login_name"] = json!(null);
     let rendered = template
-        .render(context! { post => unflagged })
+        .render(context! { post => Serde(unflagged) })
         .expect("unflagged panel renders");
     assert!(rendered.contains("Flag as explicit"));
     assert!(rendered.contains("value=\"true\""));
@@ -343,8 +344,8 @@ fn renders_banner_queue() {
         .expect("template loads");
     let rendered = template
         .render(context! {
-            current_user => current_user(),
-            banners => vec![sample_banner(false), sample_banner(true)],
+            current_user => Serde(current_user()),
+            banners => Serde(vec![sample_banner(false), sample_banner(true)]),
             only_explicit => false,
             has_more => true,
             next_url => "/admin/banners-fragment?offset=60",
@@ -365,7 +366,7 @@ fn renders_banners_fragment_standalone() {
         .expect("template loads");
     let rendered = template
         .render(context! {
-            banners => vec![sample_banner(false)],
+            banners => Serde(vec![sample_banner(false)]),
             has_more => true,
             next_url => "/admin/banners-fragment?offset=60&explicit=on",
             r2_public_endpoint_url => "https://example.test",
@@ -387,7 +388,7 @@ fn banner_card_renders_standalone_for_htmx_swap() {
         .expect("template loads");
     let rendered = template
         .render(context! {
-            banner => sample_banner(true),
+            banner => Serde(sample_banner(true)),
             r2_public_endpoint_url => "https://example.test",
         })
         .expect("banner_card.jinja renders standalone");
@@ -426,8 +427,8 @@ fn sample_session(overrides: serde_json::Value) -> serde_json::Value {
 
 fn sessions_context(sessions: Vec<serde_json::Value>) -> minijinja::Value {
     context! {
-        current_user => current_user(),
-        sessions => sessions,
+        current_user => Serde(current_user()),
+        sessions => Serde(sessions),
         page => 1,
         sort => "active",
         status => "all",
@@ -599,8 +600,8 @@ fn renders_users_list() {
         .expect("template loads");
     template
         .render(context! {
-            current_user => current_user(),
-            users => json!([{
+            current_user => Serde(current_user()),
+            users => Serde(json!([{
                 "id": "00000000-0000-0000-0000-000000000002",
                 "login_name": "someone",
                 "display_name": "Some One",
@@ -609,7 +610,7 @@ fn renders_users_list() {
                 "created_at": "2026-01-01T00:00:00Z",
                 "deleted_at": null,
                 "last_active_at": "2026-04-01T00:00:00Z",
-            }]),
+            }])),
             page => 1,
             sort => "active",
             has_next => false,
@@ -628,8 +629,8 @@ fn renders_communities_list() {
         .expect("template loads");
     template
         .render(context! {
-            current_user => current_user(),
-            communities => sample_communities(),
+            current_user => Serde(current_user()),
+            communities => Serde(sample_communities()),
             sort => "active",
             draft_post_count => 0,
             unread_notification_count => 0,
@@ -646,8 +647,8 @@ fn render_store(error: serde_json::Value, form: serde_json::Value) -> String {
         .get_template("admin/store.jinja")
         .expect("template loads")
         .render(context! {
-            current_user => current_user(),
-            groups => json!([
+            current_user => Serde(current_user()),
+            groups => Serde(json!([
                 {"store": "apple", "products": [
                     {"store": "apple", "product": "cafe.oeee.supporter.2026", "year": 2026,
                      "label": null, "on_sale": true, "selling_now": false,
@@ -663,13 +664,13 @@ fn render_store(error: serde_json::Value, form: serde_json::Value) -> String {
                     {"store": "steam", "product": "481", "year": 2026,
                      "label": null, "on_sale": true, "created_at": "2026-01-01T00:00:00Z"},
                 ]},
-            ]),
-            stores => json!(["apple", "google", "microsoft", "steam"]),
+            ])),
+            stores => Serde(json!(["apple", "google", "microsoft", "steam"])),
             this_year => 2026,
             microsoft_configured => false,
             google_play_configured => false,
-            error,
-            form,
+            error => Serde(error),
+            form => Serde(form),
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",

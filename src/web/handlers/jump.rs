@@ -20,6 +20,7 @@ use crate::models::user::AuthSession;
 use crate::web::handlers::search::search_people;
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
+use minijinja::value::Serde;
 
 /// Rows of each kind: enough to find a place by a few letters of its name,
 /// few enough that the list fits a window without scrolling.
@@ -67,10 +68,10 @@ pub async fn jump(
             "jump_results.jinja",
             context! {
                 q,
-                current_user => auth_session.user,
-                communities,
-                people,
-                tags,
+                current_user => Serde(auth_session.user),
+                communities => Serde(communities),
+                people => Serde(people),
+                tags => Serde(tags),
                 ftl_lang,
             },
         )
@@ -130,14 +131,14 @@ mod tests {
             .expect("jump_results.jinja loads")
             .render(context! {
                 q,
-                current_user => if signed_in { json!({"id": "u", "login_name": "tandemaus"}) } else { json!(null) },
-                communities,
-                people => vec![crate::web::handlers::search::SearchPersonRow {
+                current_user => Serde(if signed_in { json!({"id": "u", "login_name": "tandemaus"}) } else { json!(null) }),
+                communities => Serde(communities),
+                people => Serde(vec![crate::web::handlers::search::SearchPersonRow {
                     login_name: "neo".into(),
                     display_name: "Neo <b>".into(),
                     banner_image_filename: None,
-                }],
-                tags,
+                }]),
+                tags => Serde(tags),
                 ftl_lang => "en",
             })
             .unwrap_or_else(|e| panic!("jump_results.jinja renders: {e:#}"))

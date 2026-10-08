@@ -2,6 +2,7 @@
 
 use crate::web::handlers::test_support;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde_json::json;
 
 use super::chrome;
@@ -66,7 +67,7 @@ fn the_apps_are_told_the_unread_count_and_who_is_signed_in() {
     let toolbar = |current_user: serde_json::Value| {
         env.get_template("toolbar.jinja")
             .unwrap()
-            .render(context! { current_user, ..chrome() })
+            .render(context! { current_user => Serde(current_user), ..chrome() })
             .unwrap()
     };
     assert!(!toolbar(json!(null)).contains("data-signed-in"));

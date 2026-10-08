@@ -4,12 +4,13 @@
 
 use super::test_support;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde_json::json;
 
 fn chrome() -> minijinja::Value {
     context! {
-        current_user => json!(null),
-        messages => Vec::<serde_json::Value>::new(),
+        current_user => Serde(json!(null)),
+        messages => Serde(Vec::<serde_json::Value>::new()),
         draft_post_count => 0,
         unread_notification_count => 0,
         ftl_lang => "en",
@@ -76,17 +77,17 @@ fn public_community_gets_a_card_and_stays_indexable() {
         .get_template("community.jinja")
         .expect("community template loads")
         .render(context! {
-            community => json!({
+            community => Serde(json!({
                 "id": "00000000-0000-0000-0000-000000000001",
                 "name": "Open Studio",
                 "description": "Draw with us",
                 "slug": "open",
                 "visibility": "public",
                 "owner_id": "00000000-0000-0000-0000-000000000002",
-            }),
+            })),
             community_id => "00000000-0000-0000-0000-000000000001",
             domain => "oeee.test",
-            feed => context! { posts => Vec::<serde_json::Value>::new(), has_more => false },
+            feed => context! { posts => Serde(Vec::<serde_json::Value>::new()), has_more => false },
             ..chrome()
         })
         .expect("community renders");
@@ -107,17 +108,17 @@ fn private_community_is_noindexed_and_leaks_no_preview() {
         .get_template("community.jinja")
         .expect("community template loads")
         .render(context! {
-            community => json!({
+            community => Serde(json!({
                 "id": "00000000-0000-0000-0000-000000000001",
                 "name": "Secret Studio",
                 "description": "Members only",
                 "slug": "secret",
                 "visibility": "private",
                 "owner_id": "00000000-0000-0000-0000-000000000002",
-            }),
+            })),
             community_id => "00000000-0000-0000-0000-000000000001",
             domain => "oeee.test",
-            feed => context! { posts => Vec::<serde_json::Value>::new(), has_more => false },
+            feed => context! { posts => Serde(Vec::<serde_json::Value>::new()), has_more => false },
             ..chrome()
         })
         .expect("community renders");
@@ -144,19 +145,19 @@ fn profile_card_uses_the_banner_when_there_is_one() {
         "created_at": "2024-03-05T12:00:00Z",
     });
     let ctx = context! {
-        user => user,
+        user => Serde(user),
         domain => "oeee.test",
-        banner => json!({
+        banner => Serde(json!({
             "image_filename": "abcdef.png",
             "width": 200,
             "height": 40,
-        }),
-        followings => Vec::<serde_json::Value>::new(),
-        links => Vec::<serde_json::Value>::new(),
+        })),
+        followings => Serde(Vec::<serde_json::Value>::new()),
+        links => Serde(Vec::<serde_json::Value>::new()),
         public_count => 0,
-        public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+        public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
         private_count => 0,
-        private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+        private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
         is_following => false,
         ..chrome()
     };

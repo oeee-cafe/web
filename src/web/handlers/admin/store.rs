@@ -18,6 +18,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::Form;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::Deserialize;
 
 /// The time zone /admin/store is read and written in, as its dates are
@@ -224,13 +225,13 @@ async fn render_store_page(
             "admin/store.jinja",
             common_ctx,
             context! {
-                groups,
-                stores => Store::ALL,
+                groups => Serde(groups),
+                stores => Serde(Store::ALL),
                 this_year => current_year(),
                 microsoft_configured => state.config.microsoft_store.is_some(),
                 google_play_configured => state.config.google_play.is_some(),
                 error,
-                form,
+                form => Serde(form),
             },
         )
         .await?)

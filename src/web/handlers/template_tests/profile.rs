@@ -5,6 +5,7 @@ use minijinja::context;
 use serde_json::json;
 
 use super::chrome;
+use minijinja::value::Serde;
 
 /// Achievements along the foot of the profile card, a badge each, named,
 /// with what it was for in its tooltip; no strip at all for someone with
@@ -16,24 +17,24 @@ fn the_profile_shows_what_its_owner_has_achieved() {
         env.get_template("profile.jinja")
             .expect("profile loads")
             .render(context! {
-                user => json!({
+                user => Serde(json!({
                     "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
                     "login_name": "oeee",
                     "display_name": "오이",
                     "created_at": "2024-03-05T12:00:00Z",
-                }),
-                banner => json!(null),
-                links => Vec::<serde_json::Value>::new(),
-                followings => json!([{
+                })),
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(json!([{
                     "login_name": "a", "display_name": "에이",
                     "banner_image_filename": "abcdef.png",
                     "banner_image_width": 200, "banner_image_height": 40,
-                }]),
-                achievements,
+                }])),
+                achievements => Serde(achievements),
                 public_count => 0,
-                public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 private_count => 0,
-                private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 domain => "oeee.cafe",
                 is_following => false,
                 ..chrome()
@@ -97,17 +98,17 @@ fn a_profiles_drawings_are_the_shared_grid() {
         .get_template("profile.jinja")
         .expect("profile loads")
         .render(context! {
-            user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
-            banner => json!(null),
-            links => Vec::<serde_json::Value>::new(),
-            followings => Vec::<serde_json::Value>::new(),
-            achievements => Vec::<serde_json::Value>::new(),
-            comments => json!({"rows": [], "next_url": null, "by_drawing": true}),
+            user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+            banner => Serde(json!(null)),
+            links => Serde(Vec::<serde_json::Value>::new()),
+            followings => Serde(Vec::<serde_json::Value>::new()),
+            achievements => Serde(Vec::<serde_json::Value>::new()),
+            comments => Serde(json!({"rows": [], "next_url": null, "by_drawing": true})),
             comment_count => 0,
             public_count => 75,
             public_feed => feed_context(posts, "/api/profiles/@oeee/posts", 0, None),
             private_count => 0,
-            private_feed => empty,
+            private_feed => Serde(empty),
             domain => "oeee.cafe",
             is_following => false,
             ..chrome()
@@ -146,22 +147,22 @@ fn the_profile_lists_what_its_owner_has_said() {
         env.get_template("profile.jinja")
             .expect("profile loads")
             .render(context! {
-                user => json!({
+                user => Serde(json!({
                     "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
                     "login_name": "oeee",
                     "display_name": "오이",
                     "created_at": "2024-03-05T12:00:00Z",
-                }),
-                banner => json!(null),
-                links => Vec::<serde_json::Value>::new(),
-                followings => Vec::<serde_json::Value>::new(),
-                achievements => Vec::<serde_json::Value>::new(),
-                comments => json!({"rows": rows, "next_url": next_url, "by_drawing": true}),
+                })),
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(Vec::<serde_json::Value>::new()),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
+                comments => Serde(json!({"rows": rows, "next_url": next_url, "by_drawing": true})),
                 comment_count,
                 public_count => 0,
-                public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 private_count => 0,
-                private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 domain => "oeee.cafe",
                 is_following => false,
                 ..chrome()
@@ -212,7 +213,7 @@ fn the_profile_lists_what_its_owner_has_said() {
         .get_template("comments_fragment.jinja")
         .expect("fragment loads")
         .render(context! {
-            comments => json!({"rows": [], "next_url": null, "by_drawing": true}),
+            comments => Serde(json!({"rows": [], "next_url": null, "by_drawing": true})),
             ftl_lang => "en",
         })
         .expect("fragment renders");
@@ -229,18 +230,18 @@ fn the_profile_lists_what_its_owner_has_said() {
         .get_template("profile.jinja")
         .unwrap()
         .render(context! {
-            user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
-            banner => json!(null),
-            links => Vec::<serde_json::Value>::new(),
-            followings => Vec::<serde_json::Value>::new(),
-            achievements => Vec::<serde_json::Value>::new(),
-            comments => json!({"rows": [], "next_url": null, "by_drawing": true}),
+            user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+            banner => Serde(json!(null)),
+            links => Serde(Vec::<serde_json::Value>::new()),
+            followings => Serde(Vec::<serde_json::Value>::new()),
+            achievements => Serde(Vec::<serde_json::Value>::new()),
+            comments => Serde(json!({"rows": [], "next_url": null, "by_drawing": true})),
             comment_count => 3,
             tab => "comments",
             public_count => 1,
-            public_feed => json!({"posts": [{"id": "p1", "title": "t", "user_login_name": "oeee", "image_filename": "abcdef.png", "image_width": 300, "image_height": 300, "is_sensitive": false, "published_at": "2026-08-01T00:00:00Z"}], "headings": [], "has_more": false, "next_url": ""}),
+            public_feed => Serde(json!({"posts": [{"id": "p1", "title": "t", "user_login_name": "oeee", "image_filename": "abcdef.png", "image_width": 300, "image_height": 300, "is_sensitive": false, "published_at": "2026-08-01T00:00:00Z"}], "headings": [], "has_more": false, "next_url": ""})),
             private_count => 0,
-            private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+            private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
             domain => "oeee.cafe",
             is_following => false,
             ..chrome()
@@ -270,21 +271,21 @@ fn the_profile_says_when_its_owner_joined() {
         .get_template("profile.jinja")
         .expect("profile loads")
         .render(context! {
-            user => json!({
+            user => Serde(json!({
                 "id": "u1",
                 "login_name": "oeee",
                 "display_name": "오이",
                 // What chrono's serde writes for a `DateTime<Utc>`.
                 "created_at": "2024-02-29T16:30:00.123456Z",
-            }),
-            banner => json!(null),
-            links => Vec::<serde_json::Value>::new(),
-            followings => Vec::<serde_json::Value>::new(),
-            achievements => Vec::<serde_json::Value>::new(),
+            })),
+            banner => Serde(json!(null)),
+            links => Serde(Vec::<serde_json::Value>::new()),
+            followings => Serde(Vec::<serde_json::Value>::new()),
+            achievements => Serde(Vec::<serde_json::Value>::new()),
             public_count => 0,
-            public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+            public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
             private_count => 0,
-            private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+            private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
             domain => "oeee.cafe",
             is_following => false,
             ..chrome()
@@ -313,16 +314,16 @@ fn a_supporters_profile_says_so_first() {
         env.get_template("profile.jinja")
             .expect("profile loads")
             .render(context! {
-                user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
-                banner => json!(null),
-                links => Vec::<serde_json::Value>::new(),
-                followings => Vec::<serde_json::Value>::new(),
-                achievements => Vec::<serde_json::Value>::new(),
-                supporter_standings,
+                user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(Vec::<serde_json::Value>::new()),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
+                supporter_standings => Serde(supporter_standings),
                 public_count => 0,
-                public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 private_count => 0,
-                private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 domain => "oeee.cafe",
                 is_following => false,
                 ..chrome()
@@ -370,15 +371,15 @@ fn the_profile_shows_everyone_followed_the_same_way() {
         env.get_template("profile.jinja")
             .expect("profile loads")
             .render(context! {
-                user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
-                banner => json!(null),
-                links => Vec::<serde_json::Value>::new(),
-                followings,
-                achievements => Vec::<serde_json::Value>::new(),
+                user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(followings),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
                 public_count => 0,
-                public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 private_count => 0,
-                private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 domain => "oeee.cafe",
                 is_following => false,
                 ..chrome()
@@ -416,21 +417,21 @@ fn the_private_note_sits_beside_the_switch() {
         env.get_template("profile.jinja")
             .expect("profile loads")
             .render(context! {
-                user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
-                current_user => json!({"id": "u1", "login_name": "oeee"}),
-                banner => json!(null),
-                links => Vec::<serde_json::Value>::new(),
-                followings => Vec::<serde_json::Value>::new(),
-                achievements => Vec::<serde_json::Value>::new(),
+                user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+                current_user => Serde(json!({"id": "u1", "login_name": "oeee"})),
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(Vec::<serde_json::Value>::new()),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
                 comment_count => 0,
                 tab,
                 public_count => 0,
-                public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 private_count => 0,
-                private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 domain => "oeee.cafe",
                 is_following => false,
-                messages => Vec::<serde_json::Value>::new(),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "en",
@@ -463,19 +464,19 @@ fn a_profile_keeps_reporting_behind_its_menu() {
         env.get_template("profile.jinja")
             .expect("profile loads")
             .render(context! {
-                user => json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"}),
-                banner => json!({"image_filename": "abcdef.png", "width": 200, "height": 40}),
-                links => Vec::<serde_json::Value>::new(),
-                followings => Vec::<serde_json::Value>::new(),
-                achievements => Vec::<serde_json::Value>::new(),
+                user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+                banner => Serde(json!({"image_filename": "abcdef.png", "width": 200, "height": 40})),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(Vec::<serde_json::Value>::new()),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
                 public_count => 0,
-                public_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 private_count => 0,
-                private_feed => json!({"posts": [], "headings": [], "has_more": false, "next_url": ""}),
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
                 domain => "oeee.cafe",
                 is_following => false,
                 r2_public_endpoint_url => "https://images.example",
-                current_user,
+                current_user => Serde(current_user),
                 ..chrome()
             })
             .expect("profile renders")
@@ -527,10 +528,10 @@ fn the_banner_grid_renders_the_shape_its_handler_passes() {
     };
     let rendered = template
         .render(context! {
-            banners => vec![
+            banners => Serde(vec![
                 (banner(true), "https://img.example/image/ab/abcd1234.png"),
                 (banner(false), "https://img.example/image/ab/abcd1234.png"),
-            ],
+            ]),
             ftl_lang => "en",
         })
         .unwrap_or_else(|e| panic!("banner_grid.jinja renders: {e:#}"));
@@ -560,8 +561,8 @@ fn follow_and_unfollow_each_carry_the_others_words() {
         env.get_template(name)
             .unwrap_or_else(|e| panic!("{name} loads: {e:#}"))
             .render(context! {
-                current_user => json!({"id": "reader"}),
-                user => json!({"id": "artist", "login_name": "artist"}),
+                current_user => Serde(json!({"id": "reader"})),
+                user => Serde(json!({"id": "artist", "login_name": "artist"})),
                 ftl_lang => "en",
             })
             .unwrap_or_else(|e| panic!("{name} renders: {e:#}"))

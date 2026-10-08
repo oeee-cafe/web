@@ -26,6 +26,7 @@ use uuid::Uuid;
 
 use super::comment::CollaborativeParticipant;
 use super::{flash_error_and_redirect, redirect_to_canonical_post, redirect_to_login};
+use minijinja::value::Serde;
 
 /// Whether the author left this drawing open to being relayed.
 ///
@@ -446,11 +447,11 @@ pub async fn post_view(
                 template,
                 "post_edit_block",
                 context! {
-                    current_user => auth_session.user,
+                    current_user => Serde(auth_session.user),
                     post => Some(&post),
                     post_id => id,
-                    tags,
-                    post_community,
+                    tags => Serde(tags),
+                    post_community => Serde(post_community),
                     ftl_lang
                 },
             )
@@ -470,7 +471,7 @@ pub async fn post_view(
                         .map(|uuid| uuid.to_string())
                         .unwrap_or_default(),
                     parent_post_author_login_name => parent_post_author_login_name.clone(),
-                    parent_post_data,
+                    parent_post_data => Serde(parent_post_data),
                     post_id => post.get("id")
                         .and_then(|v| v.as_ref())
                         .ok_or_else(|| AppError::BadRequest("Missing post id".to_string()))?
@@ -478,12 +479,12 @@ pub async fn post_view(
                     community_id,
                     base_url => state.config.base_url.clone(),
                     domain => state.config.domain.clone(),
-                    comments,
-                    collaborative_participants,
-                    reaction_counts,
-                    tags,
-                    child_posts,
-                    post_community,
+                    comments => Serde(comments),
+                    collaborative_participants => Serde(collaborative_participants),
+                    reaction_counts => Serde(reaction_counts),
+                    tags => Serde(tags),
+                    child_posts => Serde(child_posts),
+                    post_community => Serde(post_community),
                 },
             )
             .await
@@ -837,11 +838,11 @@ pub async fn post_view_by_login_name(
                 template,
                 "post_edit_block",
                 context! {
-                    current_user => auth_session.user,
+                    current_user => Serde(auth_session.user),
                     post => Some(&post),
                     post_id => post_id,
-                    tags,
-                    post_community,
+                    tags => Serde(tags),
+                    post_community => Serde(post_community),
                     ftl_lang
                 },
             )
@@ -861,7 +862,7 @@ pub async fn post_view_by_login_name(
                         .map(|uuid| uuid.to_string())
                         .unwrap_or_default(),
                     parent_post_author_login_name => parent_post_author_login_name.clone(),
-                    parent_post_data,
+                    parent_post_data => Serde(parent_post_data),
                     post_id => post.get("id")
                         .and_then(|v| v.as_ref())
                         .ok_or_else(|| AppError::BadRequest("Missing post id".to_string()))?
@@ -869,12 +870,12 @@ pub async fn post_view_by_login_name(
                     community_id,
                     base_url => state.config.base_url.clone(),
                     domain => state.config.domain.clone(),
-                    comments,
-                    collaborative_participants,
-                    reaction_counts,
-                    tags,
-                    child_posts,
-                    post_community,
+                    comments => Serde(comments),
+                    collaborative_participants => Serde(collaborative_participants),
+                    reaction_counts => Serde(reaction_counts),
+                    tags => Serde(tags),
+                    child_posts => Serde(child_posts),
+                    post_community => Serde(post_community),
                 },
             )
             .await
@@ -1129,7 +1130,7 @@ pub async fn post_replay_view_by_login_name(
             template,
             common_ctx,
             context! {
-                presence => Presence::new(Activity::WatchingReplay),
+                presence => Serde(Presence::new(Activity::WatchingReplay)),
                 post => Some(&post),
                 post_id => post_id,
                 community_id,

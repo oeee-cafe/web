@@ -16,6 +16,7 @@ use intl_memoizer::concurrent::IntlLangMemoizer;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use lettre::{Message, SmtpTransport, Transport};
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -30,7 +31,7 @@ pub async fn password_reset_request_page(
         .render(
             "password_reset_request.jinja",
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
                 ftl_lang
             },
         )
@@ -131,7 +132,7 @@ pub async fn password_reset_verify(
             .render(
                 "password_reset_verify.jinja",
                 context! {
-                    token => form.token,
+                    token => Serde(form.token),
                     ftl_lang
                 },
             )
@@ -149,7 +150,7 @@ pub async fn password_reset_verify(
             .render(
                 "password_reset_verify.jinja",
                 context! {
-                    token => form.token,
+                    token => Serde(form.token),
                     ftl_lang
                 },
             )
@@ -184,7 +185,7 @@ pub async fn password_reset_verify(
             .render(
                 "password_reset_verify.jinja",
                 context! {
-                    token => form.token,
+                    token => Serde(form.token),
                     ftl_lang
                 },
             )

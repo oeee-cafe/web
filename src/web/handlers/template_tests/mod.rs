@@ -11,6 +11,7 @@
 
 use super::test_support;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde_json::json;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -66,8 +67,8 @@ fn every_template_parses() {
 
 fn chrome() -> minijinja::Value {
     context! {
-        current_user => json!(null),
-        messages => Vec::<serde_json::Value>::new(),
+        current_user => Serde(json!(null)),
+        messages => Serde(Vec::<serde_json::Value>::new()),
         draft_post_count => 0,
         unread_notification_count => 0,
         ftl_lang => "en",
@@ -122,19 +123,19 @@ fn render_post_page(allow_replay: &str, author_id: &str, viewer: serde_json::Val
     env.get_template("post_view.jinja")
         .unwrap_or_else(|e| panic!("post_view.jinja loads: {e:#}"))
         .render(context! {
-            post => post_page(allow_replay, author_id),
+            post => Serde(post_page(allow_replay, author_id)),
             post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
-            current_user => viewer,
+            current_user => Serde(viewer),
             r2_public_endpoint_url => "https://images.example",
             base_url => "https://oeee.example",
             domain => "oeee.example",
-            comments => Vec::<serde_json::Value>::new(),
-            collaborative_participants => Vec::<serde_json::Value>::new(),
-            reaction_counts => Vec::<serde_json::Value>::new(),
-            tags => Vec::<serde_json::Value>::new(),
-            child_posts => Vec::<serde_json::Value>::new(),
-            post_community => json!(null),
-            parent_post_data => json!(null),
+            comments => Serde(Vec::<serde_json::Value>::new()),
+            collaborative_participants => Serde(Vec::<serde_json::Value>::new()),
+            reaction_counts => Serde(Vec::<serde_json::Value>::new()),
+            tags => Serde(Vec::<serde_json::Value>::new()),
+            child_posts => Serde(Vec::<serde_json::Value>::new()),
+            post_community => Serde(json!(null)),
+            parent_post_data => Serde(json!(null)),
             ..chrome()
         })
         .unwrap_or_else(|e| panic!("post_view.jinja renders: {e:#}"))

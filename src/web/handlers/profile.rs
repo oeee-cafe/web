@@ -42,6 +42,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::web::i18n::ExtractFtlLang;
+use minijinja::value::Serde;
 
 pub async fn do_follow_profile(
     auth_session: AuthSession,
@@ -128,8 +129,8 @@ pub async fn do_follow_profile(
         .render(
             "unfollow_button.jinja",
             context! {
-                current_user => auth_session.user,
-                user,
+                current_user => Serde(auth_session.user),
+                user => Serde(user),
                 ftl_lang,
             },
         )
@@ -168,8 +169,8 @@ pub async fn do_unfollow_profile(
         .render(
             "follow_button.jinja",
             context! {
-                current_user => auth_session.user,
-                user => Some(user),
+                current_user => Serde(auth_session.user),
+                user => Serde(Some(user)),
                 ftl_lang,
             },
         )
@@ -201,7 +202,7 @@ async fn comments_batch(
         Some(last) if has_more => Some(format!("/@{login_name}/comments?after={}", last.id)),
         _ => None,
     };
-    Ok(context! { rows, next_url, by_drawing => true })
+    Ok(context! { rows => Serde(rows), next_url, by_drawing => true })
 }
 
 /// Where a profile tab's grid loads its next batch from.
@@ -439,16 +440,16 @@ async fn render_profile(
             "profile.jinja",
             common_ctx,
             context! {
-                links,
-                banner,
+                links => Serde(links),
+                banner => Serde(banner),
                 is_following => is_current_user_following,
-                followings,
+                followings => Serde(followings),
                 comments,
                 comment_count,
                 tab => tab.name(),
-                achievements,
-                supporter_standings,
-                user => Some(user),
+                achievements => Serde(achievements),
+                supporter_standings => Serde(supporter_standings),
+                user => Serde(Some(user)),
                 domain => state.config.domain.clone(),
                 public_count,
                 public_feed,
@@ -592,9 +593,9 @@ pub async fn profile_iframe(
         .render(
             "profile_iframe.jinja",
             context! {
-                current_user => auth_session.user,
-                user => Some(user),
-                posts,
+                current_user => Serde(auth_session.user),
+                user => Serde(Some(user)),
+                posts => Serde(posts),
                 ftl_lang,
             },
         )
@@ -622,9 +623,9 @@ pub async fn profile_banners_iframe(
         .render(
             template,
             context! {
-                current_user => auth_session.user,
-                followings,
-                user => Some(user),
+                current_user => Serde(auth_session.user),
+                followings => Serde(followings),
+                user => Serde(Some(user)),
                 ftl_lang,
             },
         )
@@ -670,8 +671,8 @@ pub async fn do_move_link_down(
             template,
             "links",
             context! {
-                user => auth_session.user,
-                links => links,
+                user => Serde(auth_session.user),
+                links => Serde(links),
                 ftl_lang,
             },
         )
@@ -717,8 +718,8 @@ pub async fn do_move_link_up(
             template,
             "links",
             context! {
-                user => auth_session.user,
-                links => links,
+                user => Serde(auth_session.user),
+                links => Serde(links),
                 ftl_lang,
             },
         )
@@ -768,8 +769,8 @@ pub async fn do_delete_link(
             template,
             "links",
             context! {
-                user => auth_session.user,
-                links => links,
+                user => Serde(auth_session.user),
+                links => Serde(links),
                 ftl_lang,
             },
         )
@@ -819,8 +820,8 @@ pub async fn do_add_link(
             template,
             "links",
             context! {
-                user => auth_session.user,
-                links => links,
+                user => Serde(auth_session.user),
+                links => Serde(links),
                 ftl_lang,
             },
         )
@@ -852,8 +853,8 @@ pub async fn profile_settings(
             "profile_settings.jinja",
             common_ctx,
             context! {
-                links,
-                user => Some(user),
+                links => Serde(links),
+                user => Serde(Some(user)),
             },
         )
         .await?;
@@ -900,8 +901,8 @@ pub async fn banner_management(
             template,
             common_ctx,
             context! {
-                user => Some(user),
-                banners => banners_with_urls,
+                user => Serde(Some(user)),
+                banners => Serde(banners_with_urls),
             },
         )
         .await?;
@@ -1019,9 +1020,9 @@ pub async fn do_reply_guestbook_entry(
         .render(
             template,
             context! {
-                current_user => auth_session.user,
-                user => author,
-                entry => guestbook_entry,
+                current_user => Serde(auth_session.user),
+                user => Serde(author),
+                entry => Serde(guestbook_entry),
                 ftl_lang,
             },
         )
@@ -1168,9 +1169,9 @@ pub async fn do_write_guestbook_entry(
         .render(
             "guestbook_entry.jinja",
             context! {
-                current_user => auth_session.user,
-                user => Some(recipient_user),
-                entry => guestbook_entry?,
+                current_user => Serde(auth_session.user),
+                user => Serde(Some(recipient_user)),
+                entry => Serde(guestbook_entry?),
                 ftl_lang,
             },
         )
@@ -1209,10 +1210,10 @@ pub async fn guestbook(
             "guestbook.jinja",
             common_ctx,
             context! {
-                banner,
-                user => Some(user),
+                banner => Serde(banner),
+                user => Serde(Some(user)),
                 is_following => is_current_user_following,
-                guestbook_entries,
+                guestbook_entries => Serde(guestbook_entries),
             },
         )
         .await?;
@@ -1252,7 +1253,7 @@ async fn render_banner_grid(
         .render(
             "banner_grid.jinja",
             context! {
-                banners => banners_with_urls,
+                banners => Serde(banners_with_urls),
                 ftl_lang,
             },
         )

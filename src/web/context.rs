@@ -50,7 +50,7 @@ impl CommonContext {
     /// `ctx` with this filled in under it: a key in both is `ctx`'s.
     pub fn merge(self, ctx: minijinja::Value) -> minijinja::Value {
         // The last map to have a key is the one it is read from.
-        minijinja::value::merge_maps([minijinja::Value::from_serialize(&self), ctx])
+        minijinja::value::merge_maps([minijinja::Value::from(minijinja::value::Serde(&self)), ctx])
     }
 
     /// For a page with nobody to count for, such as a signed-out reader's

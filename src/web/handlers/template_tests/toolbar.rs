@@ -5,6 +5,7 @@ use minijinja::context;
 use serde_json::json;
 
 use super::chrome;
+use minijinja::value::Serde;
 
 /// The heart in the toolbar is there when this deployment sells a pack
 /// at all *and* the reader is signed in -- the pack is bought against an
@@ -17,8 +18,8 @@ fn the_toolbar_has_a_heart_only_for_a_signed_in_reader_where_a_pack_is_sold() {
         env.get_template("toolbar.jinja")
             .expect("toolbar loads")
             .render(context! {
-                supporter_packs_on_sale => on_sale,
-                current_user,
+                supporter_packs_on_sale => Serde(on_sale),
+                current_user => Serde(current_user),
                 ..chrome()
             })
             .expect("toolbar renders")
@@ -75,8 +76,8 @@ fn about_is_in_the_bar_signed_out_and_in_the_account_menu_signed_in() {
         env.get_template("toolbar.jinja")
             .expect("toolbar loads")
             .render(context! {
-                current_user,
-                messages => Vec::<serde_json::Value>::new(),
+                current_user => Serde(current_user),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "en",
@@ -128,8 +129,8 @@ fn an_account_with_drafts_has_the_drafts_square_in_the_bar() {
         .get_template("toolbar.jinja")
         .expect("toolbar loads")
         .render(context! {
-            current_user => json!({"id": "00000000-0000-0000-0000-000000000001", "login_name": "oeee", "display_name": "오이"}),
-            messages => Vec::<serde_json::Value>::new(),
+            current_user => Serde(json!({"id": "00000000-0000-0000-0000-000000000001", "login_name": "oeee", "display_name": "오이"})),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 3,
             unread_notification_count => 0,
             ftl_lang => "en",
@@ -193,11 +194,11 @@ fn flash_messages_render_as_notices_by_level() {
         .get_template("design.jinja")
         .expect("design.jinja loads")
         .render(context! {
-            current_user => json!(null),
-            messages => vec![
+            current_user => Serde(json!(null)),
+            messages => Serde(vec![
                 message(axum_messages::Level::Success, "Welcome, Tandemaus"),
                 message(axum_messages::Level::Error, "<b>not bold</b>"),
-            ],
+            ]),
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",
@@ -251,12 +252,12 @@ fn the_toolbar_marks_the_language_in_use() {
             .unwrap_or_else(|e| panic!("home.jinja loads: {e:#}"))
             .render(context! {
                 feed => context! {
-                    posts => Vec::<serde_json::Value>::new(),
+                    posts => Serde(Vec::<serde_json::Value>::new()),
                     has_more => false,
                     next_url => "",
                 },
-                current_user => current_user,
-                messages => Vec::<serde_json::Value>::new(),
+                current_user => Serde(current_user),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => ftl_lang,
@@ -306,12 +307,12 @@ fn nothing_in_the_boosted_nav_reaches_a_module_bundle() {
         .unwrap_or_else(|e| panic!("home.jinja loads: {e:#}"))
         .render(context! {
             feed => context! {
-                posts => Vec::<serde_json::Value>::new(),
+                posts => Serde(Vec::<serde_json::Value>::new()),
                 has_more => false,
                 next_url => "",
             },
-            current_user => json!({ "login_name": "artist", "id": "u1" }),
-            messages => Vec::<serde_json::Value>::new(),
+            current_user => Serde(json!({ "login_name": "artist", "id": "u1" })),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",

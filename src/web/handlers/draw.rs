@@ -31,6 +31,7 @@ use chrono::Duration;
 use data_encoding::BASE64;
 use data_url::DataUrl;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha256::digest;
@@ -197,7 +198,7 @@ pub async fn start_draw(
             template_filename,
             common_ctx,
             context! {
-                presence,
+                presence => Serde(presence),
                 community_name => community.as_ref().map(|c| c.name.clone()),
                 tool => input.tool,
                 width => input.width.parse::<u32>()?,
@@ -676,10 +677,10 @@ pub async fn start_banner_draw(
         .render(
             "draw_banner.jinja",
             context! {
-                presence => Presence::new(Activity::DrawingBanner),
+                presence => Serde(Presence::new(Activity::DrawingBanner)),
                 width => 200,
                 height => 40,
-                current_user => auth_session.user,
+                current_user => Serde(auth_session.user),
                 ftl_lang,
                 painter_config,
             },

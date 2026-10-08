@@ -5,6 +5,7 @@ use minijinja::context;
 use serde_json::json;
 
 use super::chrome;
+use minijinja::value::Serde;
 
 #[test]
 fn the_tag_results_render_for_both_the_page_and_the_search_box() {
@@ -25,7 +26,7 @@ fn the_tag_results_render_for_both_the_page_and_the_search_box() {
 
     let searched = template
         .render(context! {
-            tags => tags.clone(),
+            tags => Serde(tags.clone()),
             search_query => Some("oek"),
             ftl_lang => "en",
         })
@@ -35,7 +36,7 @@ fn the_tag_results_render_for_both_the_page_and_the_search_box() {
 
     let browsing = template
         .render(context! {
-            tags => tags,
+            tags => Serde(tags),
             search_query => None::<String>,
             ftl_lang => "en",
         })
@@ -47,7 +48,7 @@ fn the_tag_results_render_for_both_the_page_and_the_search_box() {
 
     let empty = template
         .render(context! {
-            tags => Vec::<serde_json::Value>::new(),
+            tags => Serde(Vec::<serde_json::Value>::new()),
             search_query => Some("zzzz"),
             ftl_lang => "en",
         })
@@ -65,13 +66,13 @@ fn the_tag_page_draws_the_shared_post_cards() {
         .get_template("tag_view.jinja")
         .unwrap_or_else(|e| panic!("tag_view.jinja loads: {e:#}"))
         .render(context! {
-            tag => json!({
+            tag => Serde(json!({
                 "name": "oekaki",
                 "display_name": "Oekaki",
                 "post_count": 2,
-            }),
+            })),
             post_count => 2,
-            feed => json!({
+            feed => Serde(json!({
                 "posts": [{
                     "id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
                     "title": "Tandemaus",
@@ -86,7 +87,7 @@ fn the_tag_page_draws_the_shared_post_cards() {
                 }],
                 "has_more": true,
                 "next_url": "/tags/oekaki/posts?offset=60&limit=60",
-            }),
+            })),
             ..chrome()
         })
         .unwrap_or_else(|e| panic!("tag_view.jinja renders: {e:#}"));
@@ -115,9 +116,9 @@ fn the_tag_page_names_the_tag_in_its_link_preview() {
         .unwrap_or_else(|e| panic!("tag_view.jinja loads: {e:#}"))
         .render(context! {
             // A tag in a non-Latin script has to survive being put in a URL.
-            tag => json!({ "name": "그림", "display_name": "그림", "post_count": 0 }),
+            tag => Serde(json!({ "name": "그림", "display_name": "그림", "post_count": 0 })),
             post_count => 0,
-            feed => json!({ "posts": [], "has_more": false, "next_url": "" }),
+            feed => Serde(json!({ "posts": [], "has_more": false, "next_url": "" })),
             ..chrome()
         })
         .unwrap_or_else(|e| panic!("tag_view.jinja renders empty: {e:#}"));
@@ -153,9 +154,9 @@ fn a_tags_comments_go_beside_its_drawings_and_on_a_page_of_their_own() {
         env.get_template(template)
             .unwrap_or_else(|e| panic!("{template} loads: {e:#}"))
             .render(context! {
-                tag => json!({ "name": "그림", "display_name": "그림", "post_count": 1 }),
+                tag => Serde(json!({ "name": "그림", "display_name": "그림", "post_count": 1 })),
                 post_count => 1,
-                feed => json!({
+                feed => Serde(json!({
                     "posts": [{
                         "id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
                         "title": "Tandemaus",
@@ -170,8 +171,8 @@ fn a_tags_comments_go_beside_its_drawings_and_on_a_page_of_their_own() {
                     }],
                     "has_more": false,
                     "next_url": "",
-                }),
-                comments => comments.clone(),
+                })),
+                comments => Serde(comments.clone()),
                 ..chrome()
             })
             .unwrap_or_else(|e| panic!("{template} renders: {e:#}"))
@@ -218,11 +219,11 @@ fn the_tag_suggestions_are_options_a_keyboard_can_reach() {
         .get_template("tag_autocomplete.jinja")
         .unwrap_or_else(|e| panic!("tag_autocomplete.jinja loads: {e:#}"))
         .render(context! {
-            tags => vec![json!({
+            tags => Serde(vec![json!({
                 "name": "oekaki",
                 "display_name": "Oekaki",
                 "post_count": 12,
-            })],
+            })]),
             ftl_lang => "en",
         })
         .unwrap_or_else(|e| panic!("tag_autocomplete.jinja renders: {e:#}"));

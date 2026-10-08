@@ -5,6 +5,7 @@ use minijinja::context;
 use serde_json::json;
 
 use super::chrome;
+use minijinja::value::Serde;
 
 /// Signing up asks for agreement to the two pages it links, and the box
 /// is required in the page as the handler requires it on the server.
@@ -15,8 +16,8 @@ fn signup_asks_for_agreement_to_the_guidelines_and_privacy_policy() {
         .get_template("signup.jinja")
         .expect("signup loads")
         .render(context! {
-            current_user => json!(null),
-            messages => Vec::<serde_json::Value>::new(),
+            current_user => Serde(json!(null)),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             next => "/collaborate",
             ftl_lang => "en",
         })
@@ -40,10 +41,10 @@ fn the_welcome_page_asks_for_a_handle_and_the_agreement() {
             .expect("welcome loads")
             .render(context! {
                 provider => "Steam",
-                provider_name,
+                provider_name => Serde(provider_name),
                 login_name => "",
                 display_name => "오이",
-                error,
+                error => Serde(error),
                 next => "/collaborate",
                 ..chrome()
             })
@@ -74,7 +75,7 @@ fn signing_in_offers_steam_only_where_it_is_on_and_says_what_it_will_link() {
             .render(context! {
                 next => "/draw",
                 steam_enabled,
-                linking_provider,
+                linking_provider => Serde(linking_provider),
                 ..chrome()
             })
             .expect("login renders")
@@ -105,7 +106,7 @@ fn signing_in_offers_apple_only_where_it_is_on() {
             .render(context! {
                 next => "/draw",
                 apple_enabled,
-                linking_provider,
+                linking_provider => Serde(linking_provider),
                 ..chrome()
             })
             .expect("login renders")
@@ -127,7 +128,7 @@ fn signing_in_offers_google_only_where_it_is_on() {
             .render(context! {
                 next => "/draw",
                 google_enabled,
-                linking_provider,
+                linking_provider => Serde(linking_provider),
                 ..chrome()
             })
             .expect("login renders")
@@ -159,12 +160,12 @@ fn apples_answer_is_posted_on_as_it_came() {
         .get_template("identity_apple_return.jinja")
         .expect("return page loads")
         .render(context! {
-            answer => json!({
+            answer => Serde(json!({
                 "state": "the-state",
                 "id_token": "a.b.c",
                 "user": r#"{"name":{"firstName":"\"><script>"}}"#,
                 "error": null,
-            }),
+            })),
             ftl_lang => "en",
         })
         .expect("return page renders");

@@ -11,6 +11,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{header, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -75,10 +76,10 @@ pub async fn admin_collaborative_sessions(
             "admin/collaborative_sessions.jinja",
             common_ctx,
             context! {
-                sessions => sessions,
+                sessions => Serde(sessions),
                 page => page,
-                sort => query.sort,
-                status => query.status,
+                sort => Serde(query.sort),
+                status => Serde(query.status),
                 has_next => has_next,
             },
         )

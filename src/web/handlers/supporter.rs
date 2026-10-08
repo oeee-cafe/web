@@ -24,6 +24,7 @@ use crate::models::supporter::{current_year, mark_for, standings, Store};
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
 use crate::web::state::AppState;
+use minijinja::value::Serde;
 
 use crate::web::i18n::ExtractFtlLang;
 
@@ -108,15 +109,15 @@ pub async fn supporter_page(
             common_ctx,
             context! {
                 this_year => year,
-                store,
-                offers,
+                store => Serde(store),
+                offers => Serde(offers),
                 // Restoring is the App Store's word for it. Google Play has the same
                 // thing -- what the device's Google account owns, handed over again
                 // -- and Steam and the Microsoft Store say it every time they are
                 // asked.
                 restorable => matches!(store, Some(Store::Apple | Store::Google)),
                 nothing_this_year,
-                supporter_standings,
+                supporter_standings => Serde(supporter_standings),
                 worn_mark,
                 supports_this_year,
             },

@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::redirect_to_canonical_post;
+use minijinja::value::Serde;
 
 #[derive(Deserialize)]
 pub struct AddReactionForm {
@@ -108,8 +109,8 @@ pub async fn add_reaction(
                 .render(
                     "post_reactions.jinja",
                     context! {
-                        current_user => auth_session.user,
-                        reaction_counts => reaction_counts,
+                        current_user => Serde(auth_session.user),
+                        reaction_counts => Serde(reaction_counts),
                         post_id => post_id.to_string(),
                         login_name => login_name,
                     },
@@ -247,8 +248,8 @@ pub async fn add_reaction(
         .render(
             "post_reactions.jinja",
             context! {
-                current_user => auth_session.user,
-                reaction_counts => reaction_counts,
+                current_user => Serde(auth_session.user),
+                reaction_counts => Serde(reaction_counts),
                 post_id => post_id.to_string(),
                 login_name => login_name,
             },
@@ -396,8 +397,8 @@ pub async fn remove_reaction(
         .render(
             "post_reactions.jinja",
             context! {
-                current_user => auth_session.user,
-                reaction_counts => reaction_counts,
+                current_user => Serde(auth_session.user),
+                reaction_counts => Serde(reaction_counts),
                 post_id => post_id.to_string(),
                 login_name => login_name,
             },
@@ -506,7 +507,7 @@ pub async fn post_reactions_detail(
         post_title => post_data.get("title").and_then(|t| t.as_ref()).unwrap_or(&"Untitled".to_string()),
         post_id => post_id,
         login_name => login_name,
-        grouped_reactions => grouped_reactions,
+        grouped_reactions => Serde(grouped_reactions),
     }).await?;
 
     Ok(Html(rendered).into_response())

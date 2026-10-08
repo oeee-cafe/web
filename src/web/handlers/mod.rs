@@ -9,9 +9,8 @@ use axum::{extract::FromRequestParts, http::request::Parts};
 use data_encoding::BASE64URL_NOPAD;
 use uuid::Uuid;
 
-use minijinja::context;
-
 use super::state::AppState;
+use minijinja::context;
 
 pub mod about;
 pub mod account;
