@@ -253,6 +253,10 @@ fn main() {
             oeee_cafe::web::templates::add_to_environment(&mut env);
 
             env.set_loader(path_loader(&template_path));
+            // A template is re-read when its file changes, which costs a
+            // `stat` on every lookup. Production's templates come with the
+            // image and never change under it.
+            env.set_auto_reload(cfg.env != "production");
 
             let db_pool = cfg.connect_database().await.unwrap_or_else(|e| {
                 eprintln!("error connecting to database: {}", e);

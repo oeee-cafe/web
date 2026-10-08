@@ -10,6 +10,7 @@ use axum::extract::{Path, Query, State};
 use axum::response::Html;
 use axum::Form;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::Deserialize;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
@@ -66,7 +67,7 @@ pub async fn admin_banners(
             "admin/banners.jinja",
             common_ctx,
             context! {
-                banners => banners,
+                banners => Serde(banners),
                 only_explicit => query.explicit.is_some(),
                 has_more => has_more,
                 next_url => next_url,
@@ -93,7 +94,7 @@ pub async fn admin_banners_fragment(
         .render(
             "admin/banners_fragment.jinja",
             context! {
-                banners => banners,
+                banners => Serde(banners),
                 has_more => has_more,
                 next_url => next_url,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
@@ -131,7 +132,7 @@ pub async fn admin_flag_banner(
         .render(
             "admin/banner_card.jinja",
             context! {
-                banner => banner,
+                banner => Serde(banner),
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
             },
         )

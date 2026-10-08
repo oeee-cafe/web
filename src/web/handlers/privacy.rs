@@ -4,9 +4,8 @@ use crate::web::context::CommonContext;
 use crate::web::state::AppState;
 use axum::{extract::State, response::Html};
 
-use minijinja::context;
-
 use crate::web::i18n::ExtractFtlLang;
+use minijinja::context;
 
 pub async fn privacy(
     State(state): State<AppState>,

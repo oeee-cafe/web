@@ -25,9 +25,8 @@
 //! than putting a pill there.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
 
-use minijinja::value::{Object, Value};
+use minijinja::value::Value;
 use minijinja::{context, Environment, Error, ErrorKind, State};
 
 use crate::models::supporter::marks_for;
@@ -36,9 +35,6 @@ use crate::models::supporter::marks_for;
 /// render's top-level context, however deeply it is imported
 /// (`State::lookup`), so `supporter_slot` finds it from inside `handle()`.
 const NONCE: &str = "__people_nonce";
-/// The render's temp (`State::get_temp`) that the printed names are kept in.
-const PRINTED: &str = "__people_printed";
-
 /// How long a page waits for a connection to ask about its supporters.
 const LOOKUP_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
 
@@ -46,23 +42,21 @@ const OPEN: char = '\u{E000}';
 const CLOSE: char = '\u{E001}';
 
 /// The login names a render has printed a handle for, in order, each with
-/// the text the pill will say.
+/// the text the pill will say. Kept as the render's extension
+/// (`State::get_extension`), which includes and macros share.
 #[derive(Debug, Default)]
-struct Printed(Mutex<Vec<(String, String)>>);
-
-impl Object for Printed {}
+struct Printed(Vec<(String, String)>);
 
 /// `supporter_slot(login_name, text)`, for person_macro.jinja's `handle()`:
 /// records the name and returns the placeholder its pill will take.
 /// Outside [`Templates`] -- a test rendering a template on its own -- there
 /// is nothing to record into, and it returns none, which `handle()` answers
 /// by drawing the pill without a mark.
-pub fn supporter_slot(state: &State, login_name: String, text: String) -> Value {
+pub fn supporter_slot(state: &mut State, login_name: String, text: String) -> Value {
     let Some(nonce) = state.lookup(NONCE) else {
         return Value::from(());
     };
-    let printed = state.get_or_set_temp_object(PRINTED, Printed::default);
-    let mut printed = printed.0.lock().unwrap();
+    let printed = &mut state.get_or_insert_extension_with(Printed::default).0;
     let index = printed.len();
     printed.push((login_name, text));
     Value::from_safe_string(format!("{OPEN}{nonce}:{index}{CLOSE}"))
@@ -160,17 +154,16 @@ impl Templates {
         let nonce = uuid::Uuid::new_v4().simple().to_string();
         let ctx = context! { __people_nonce => &nonce, ..ctx };
         let template = self.env.get_template(name)?;
-        let printed = |state: &State| {
+        let printed = |state: &mut State| {
             state
-                .get_temp(PRINTED)
-                .and_then(|value| value.downcast_object::<Printed>())
-                .map(|printed| std::mem::take(&mut *printed.0.lock().unwrap()))
+                .get_extension_mut::<Printed>()
+                .map(|printed| std::mem::take(&mut printed.0))
                 .unwrap_or_default()
         };
         match block {
             None => {
-                let captured = template.render_captured(ctx)?;
-                let printed = printed(captured.state());
+                let mut captured = template.render_captured(ctx)?;
+                let printed = captured.with_state_mut(printed);
                 Ok(Rendered {
                     output: captured.into_output(),
                     nonce,
@@ -240,8 +233,7 @@ impl Templates {
         }
         // The pill is person_macro.jinja's, drawn by its own macro.
         let person = self.env.get_template("person_macro.jinja")?;
-        let person = person.render_captured(())?;
-        let person = person.state();
+        let mut person = person.render_captured(())?;
         let pill = |index: usize| -> Result<String, Error> {
             let (login_name, text) = rendered.printed.get(index).ok_or_else(|| {
                 Error::new(
@@ -250,7 +242,9 @@ impl Templates {
                 )
             })?;
             let mark = marks.get(login_name).cloned();
-            person.call_macro("pill", &[Value::from(mark), Value::from(text.as_str())])
+            person.with_state_mut(|state| {
+                state.call_macro("pill", &[Value::from(mark), Value::from(text.as_str())])
+            })
         };
         replace_placeholders(&rendered.output, &rendered.nonce, pill)
     }

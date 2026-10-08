@@ -5,6 +5,7 @@ use minijinja::context;
 use serde_json::json;
 
 use super::chrome;
+use minijinja::value::Serde;
 
 /// The credits: a section on /about that every badge leads to, left out
 /// while there is nobody in it.
@@ -15,8 +16,8 @@ fn the_about_page_thanks_its_supporters() {
         env.get_template("about.jinja")
             .expect("about loads")
             .render(context! {
-                supporters,
-                users_with_public_posts_and_banner => Vec::<serde_json::Value>::new(),
+                supporters => Serde(supporters),
+                users_with_public_posts_and_banner => Serde(Vec::<serde_json::Value>::new()),
                 ..chrome()
             })
             .expect("about renders")
@@ -45,8 +46,8 @@ fn the_about_page_names_the_commit_it_runs() {
         env.get_template("about.jinja")
             .expect("about loads")
             .render(context! {
-                supporters => Vec::<serde_json::Value>::new(),
-                users_with_public_posts_and_banner => Vec::<serde_json::Value>::new(),
+                supporters => Serde(Vec::<serde_json::Value>::new()),
+                users_with_public_posts_and_banner => Serde(Vec::<serde_json::Value>::new()),
                 git_commit,
                 ..chrome()
             })

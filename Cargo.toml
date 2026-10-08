@@ -45,8 +45,13 @@ lettre = "0.11.6"
 markdown = "1.0.0"
 # `urlencode` is not on by default: templates need it to put a tag name in
 # a URL, and a tag can be 그림.
-minijinja = { version = "2.12.0", features = ["loader", "urlencode", "json"] }
-minijinja-contrib = { version = "2.12.0", features = ["datetime", "timezone"] }
+minijinja = { version = "3.0.0", features = ["urlencode", "json", "serde"] }
+minijinja-contrib = { version = "3.0.0", features = ["datetime", "timezone"] }
+# minijinja-contrib's date filters look `tz="Asia/Seoul"` up through Jiff,
+# which reads the system's zoneinfo, and debian:trixie-slim installs no
+# tzdata. Bundling the database, as minijinja 2 did, keeps them working
+# wherever the binary runs.
+jiff = { version = "0.2.37", features = ["tzdb-bundle-always"] }
 rand = "0.8.5"
 reqwest = { version = "0.12", features = ["json"] }
 rpassword = "7.4.0"

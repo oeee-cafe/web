@@ -22,6 +22,7 @@ use minijinja::context;
 
 use crate::web::context::CommonContext;
 use crate::web::i18n::ExtractFtlLang;
+use minijinja::value::Serde;
 
 pub async fn redirect_community_to_unified(Path(slug): Path<String>) -> Redirect {
     Redirect::permanent(&format!("/@{}", slug))
@@ -86,7 +87,7 @@ pub(super) async fn community_header_context(
     let stats = get_community_stats(tx, community.id).await?;
     Ok(context! {
         owner => owner.map(|u| context! {
-            login_name => u.login_name,
+            login_name => Serde(u.login_name),
             display_name => u.display_name,
         }),
         posts_count => stats.total_posts,
@@ -161,8 +162,8 @@ pub(crate) async fn render_community_page(
                 template,
                 "community_edit_block",
                 context! {
-                    current_user => auth_session.user,
-                    community => Some(&community),
+                    current_user => Serde(&auth_session.user),
+                    community => Serde(Some(&community)),
                     header => header,
                     community_id => community_uuid.to_string(),
                     domain => state.config.domain.clone(),
@@ -202,7 +203,7 @@ pub(crate) async fn render_community_page(
             template,
             common_ctx,
             context! {
-                community => Some(&community),
+                community => Serde(Some(&community)),
                 header => header,
                 community_id => community_uuid.to_string(),
                 domain => state.config.domain.clone(),
@@ -418,9 +419,9 @@ pub async fn community_iframe(
         .render(
             "community_iframe.jinja",
             context! {
-                current_user => auth_session.user,
-                community => community,
-                posts,
+                current_user => Serde(auth_session.user),
+                community => Serde(community),
+                posts => Serde(posts),
                 ftl_lang,
             },
         )
@@ -515,7 +516,7 @@ pub async fn community_comments(
             template,
             common_ctx,
             context! {
-                community => community,
+                community => Serde(&community),
                 header => header,
                 community_id => community_uuid.to_string(),
                 comments => comments_context(comments, &community_comments_path(&community.slug)),

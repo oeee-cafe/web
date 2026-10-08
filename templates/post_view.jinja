@@ -45,8 +45,8 @@
   {% if not post_community or post_community.visibility != "private" %}
     <meta property="og:site_name" content="{{ ftl_get_message('brand') }}" />
     <meta property="og:type" content="article" />
-    <meta property="og:title" content="{{ post.title }}" />
-    <meta property="og:description" content="{{ post.content }}" />
+    <meta property="og:title" content="{{ post.title or "" }}" />
+    <meta property="og:description" content="{{ post.content or "" }}" />
     {# The canonical post URL, the same form the page links to itself by;
        /posts/id and any other handle only redirect there. #}
     <meta property="og:url"

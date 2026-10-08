@@ -5,6 +5,7 @@ use minijinja::context;
 use serde_json::json;
 
 use super::{chrome, replay_post};
+use minijinja::value::Serde;
 
 /// The painter pages carry the site's toolbar, so every window has the
 /// same title bar and the desktop app can seat its controls in it. It has
@@ -19,10 +20,10 @@ fn the_painter_pages_carry_the_toolbar() {
         .render(context! {
             width => 300,
             height => 300,
-            community_id => json!(null),
+            community_id => Serde(json!(null)),
             painter_config => "{}",
-            current_user => json!({"login_name": "someone", "display_name": "Someone"}),
-            messages => Vec::<serde_json::Value>::new(),
+            current_user => Serde(json!({"login_name": "someone", "display_name": "Someone"})),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 2,
             unread_notification_count => 3,
             ftl_lang => "en",
@@ -63,12 +64,12 @@ fn pages_say_what_their_reader_is_doing_for_steam() {
             env.get_template(template_name)
                 .unwrap_or_else(|e| panic!("{template_name} loads: {e:#}"))
                 .render(context! {
-                    presence,
+                    presence => Serde(presence),
                     painter_config => "{}",
-                    parent_post => json!(null),
-                    post => replay_post(),
+                    parent_post => Serde(json!(null)),
+                    post => Serde(replay_post()),
                     post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
-                    community_id => json!(null),
+                    community_id => Serde(json!(null)),
                     ..chrome()
                 })
                 .unwrap_or_else(|e| panic!("{template_name} renders: {e:#}"))
@@ -89,7 +90,7 @@ fn pages_say_what_their_reader_is_doing_for_steam() {
         .get_template("presence_meta.jinja")
         .unwrap()
         .render(context! {
-            presence => json!({"activity": "collaborating", "community": null, "group": "0123abcd"}),
+            presence => Serde(json!({"activity": "collaborating", "community": null, "group": "0123abcd"})),
         })
         .unwrap();
     assert!(room.contains(r#"content="collaborating" data-group="0123abcd" />"#));
@@ -107,10 +108,10 @@ fn drawing_pages_mount_the_offline_painter() {
             .unwrap_or_else(|e| panic!("{template_name} loads: {e:#}"))
             .render(context! {
                 painter_config => config,
-                parent_post => json!(null),
+                parent_post => Serde(json!(null)),
                 community_name => "Two Tone",
-                current_user => json!(null),
-                messages => Vec::<serde_json::Value>::new(),
+                current_user => Serde(json!(null)),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "en",
@@ -156,8 +157,8 @@ fn banner_pages_mount_the_small_offline_painter() {
             .unwrap_or_else(|e| panic!("{template_name} loads: {e:#}"))
             .render(context! {
                 painter_config => config,
-                current_user => json!({ "login_name": "artist" }),
-                messages => Vec::<serde_json::Value>::new(),
+                current_user => Serde(json!({ "login_name": "artist" })),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "en",
@@ -179,8 +180,8 @@ fn banner_pages_mount_the_small_offline_painter() {
 /// every message in it has been escaped for HTML.
 fn guest_chrome() -> minijinja::Value {
     context! {
-        current_user => json!(null),
-        messages => Vec::<serde_json::Value>::new(),
+        current_user => Serde(json!(null)),
+        messages => Serde(Vec::<serde_json::Value>::new()),
         draft_post_count => 0,
         unread_notification_count => 0,
         ftl_lang => "en",
@@ -231,13 +232,13 @@ fn a_signed_in_painter_has_no_guest_notice() {
             height => 300,
             tool => "neo",
             painter_config => "{}",
-            current_user => json!({
+            current_user => Serde(json!({
                 "id": "00000000-0000-0000-0000-000000000001",
                 "login_name": "someone",
                 "display_name": "Someone",
                 "email_verified_at": "2026-01-01T00:00:00Z",
-            }),
-            messages => Vec::<serde_json::Value>::new(),
+            })),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",
@@ -255,7 +256,7 @@ fn a_guest_can_start_a_drawing_and_find_its_drafts() {
     let rendered = env
         .get_template("draft_posts.jinja")
         .expect("drafts template loads")
-        .render(context! { posts => Vec::<serde_json::Value>::new(), ..guest_chrome() })
+        .render(context! { posts => Serde(Vec::<serde_json::Value>::new()), ..guest_chrome() })
         .expect("drafts render for a guest");
     // The toolbar's draw button, signed out as well as in, and the
     // dialog it opens to ask for the canvas size.

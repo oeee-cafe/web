@@ -9,6 +9,7 @@ use axum::extract::State;
 use axum::response::{Html, IntoResponse};
 use chrono::{DateTime, Utc};
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
@@ -194,8 +195,8 @@ pub async fn search_page(
             common_ctx,
             context! {
                 search_query,
-                people,
-                posts,
+                people => Serde(people),
+                posts => Serde(posts),
             },
         )
         .await?;

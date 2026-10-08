@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 use crate::web::context::CommonContext;
 use crate::web::i18n::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
+use minijinja::value::Serde;
 
 // ========== Member Management Endpoints ==========
 
@@ -717,13 +718,13 @@ pub async fn members_page(
 
     let template = "community_members.jinja";
     let rendered = state.render_page(template, common_ctx, context! {
-        community,
-        members => members_with_details,
-        pending_invitations,
-        user_role,
+        community => Serde(community),
+        members => Serde(members_with_details),
+        pending_invitations => Serde(pending_invitations),
+        user_role => Serde(user_role),
         can_invite => matches!(user_role, Some(CommunityMemberRole::Owner) | Some(CommunityMemberRole::Moderator)),
         can_remove => matches!(user_role, Some(CommunityMemberRole::Owner) | Some(CommunityMemberRole::Moderator)),
-        messages => messages.into_iter().collect::<Vec<_>>(),
+        messages => Serde(messages.into_iter().collect::<Vec<_>>()),
     }).await?;
 
     Ok(Html(rendered).into_response())

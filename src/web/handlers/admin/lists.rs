@@ -9,6 +9,7 @@ use crate::web::state::AppState;
 use axum::extract::{Query, State};
 use axum::response::Html;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::Deserialize;
 
 const USERS_PER_PAGE: i64 = 100;
@@ -43,9 +44,9 @@ pub async fn admin_users(
             "admin/users.jinja",
             common_ctx,
             context! {
-                users => users,
+                users => Serde(users),
                 page => page,
-                sort => query.sort,
+                sort => Serde(query.sort),
                 has_next => has_next,
             },
         )
@@ -72,8 +73,8 @@ pub async fn admin_communities(
             "admin/communities.jinja",
             common_ctx,
             context! {
-                communities => communities,
-                sort => query.sort,
+                communities => Serde(communities),
+                sort => Serde(query.sort),
             },
         )
         .await?;

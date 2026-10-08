@@ -15,6 +15,7 @@ use axum::extract::{Path, Query, State};
 use axum::response::Html;
 use axum::Form;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::Deserialize;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
@@ -137,12 +138,12 @@ async fn render_posts(
             "admin/posts.jinja",
             common_ctx,
             context! {
-                posts => posts,
-                communities => communities,
+                posts => Serde(posts),
+                communities => Serde(communities),
                 total => total,
                 has_more => has_more,
                 next_url => next_url,
-                filter_author => resolved.author_login_name,
+                filter_author => Serde(resolved.author_login_name),
                 filter_community => resolved.community_slug,
                 include_drafts => resolved.filter.include_drafts,
                 include_deleted => resolved.filter.include_deleted,
@@ -171,7 +172,7 @@ pub async fn admin_posts_fragment(
         .render(
             "admin/posts_fragment.jinja",
             context! {
-                posts => posts,
+                posts => Serde(posts),
                 has_more => has_more,
                 next_url => next_url,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
@@ -263,7 +264,7 @@ pub async fn admin_post_detail(
             "admin/post_detail.jinja",
             common_ctx,
             context! {
-                post => post,
+                post => Serde(post),
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
             },
         )
@@ -297,7 +298,10 @@ pub async fn admin_flag_post(
     tx.commit().await?;
 
     let rendered = state
-        .render("admin/post_flag_panel.jinja", context! { post => post })
+        .render(
+            "admin/post_flag_panel.jinja",
+            context! { post => Serde(post) },
+        )
         .await?;
 
     Ok(Html(rendered))

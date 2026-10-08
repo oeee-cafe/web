@@ -23,6 +23,7 @@ use uuid::Uuid;
 
 use super::federation::{send_post_to_community_followers, send_post_to_followers};
 use super::get_community_slug_url;
+use minijinja::value::Serde;
 
 pub async fn post_publish_form(
     auth_session: AuthSession,
@@ -449,7 +450,7 @@ pub async fn draft_posts(
             "draft_posts.jinja",
             common_ctx,
             context! {
-                posts => posts,
+                posts => Serde(posts),
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
             },
         )

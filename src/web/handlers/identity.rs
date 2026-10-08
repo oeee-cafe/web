@@ -67,6 +67,7 @@ use crate::web::i18n::{
     ExtractAcceptLanguage, ExtractFtlLang,
 };
 use crate::web::state::AppState;
+use minijinja::value::Serde;
 
 type Bundle<'a> = FluentBundle<&'a FluentResource, IntlLangMemoizer>;
 
@@ -522,7 +523,7 @@ pub async fn apple_callback(
         .render(
             "identity_apple_return.jinja",
             context! {
-                answer,
+                answer => Serde(answer),
                 ftl_lang,
             },
         )
@@ -1292,7 +1293,7 @@ pub async fn handoff_done(
         .render(
             "identity_handoff_done.jinja",
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
                 ftl_lang,
             },
         )
@@ -1335,14 +1336,14 @@ async fn welcome_page(
         .render(
             "identity_welcome.jinja",
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
                 ftl_lang,
                 provider => pending.identity.provider.display_name(),
-                provider_name => pending.identity.name,
+                provider_name => pending.identity.name.clone(),
                 login_name,
                 display_name,
                 error,
-                next => pending.next,
+                next => pending.next.clone(),
             },
         )
         .await?;

@@ -16,6 +16,7 @@ use super::db;
 use super::preview::preview_versions;
 use super::types::*;
 use super::utils::get_preferred_locale;
+use minijinja::value::Serde;
 
 /// The canvases a session can be created with.
 ///
@@ -335,8 +336,8 @@ pub async fn collaborate_sessions_fragment(
         .render(
             "collaborate_sessions_fragment.jinja",
             context! {
-                viewer_sessions,
-                active_sessions,
+                viewer_sessions => Serde(viewer_sessions),
+                active_sessions => Serde(active_sessions),
                 ftl_lang,
             },
         )
@@ -465,8 +466,8 @@ pub async fn collaborate_lobby(
             template,
             common_ctx,
             context! {
-                viewer_sessions => viewer_sessions,
-                active_sessions => active_sessions,
+                viewer_sessions => Serde(viewer_sessions),
+                active_sessions => Serde(active_sessions),
                 // Shared card fragment contract, sentinel included: the gallery pages
                 // through /api/collaborate/posts the way Home's feeds page through
                 // theirs.
@@ -481,9 +482,9 @@ pub async fn collaborate_lobby(
                 has_postable_communities => !member_communities.is_empty()
                     || !participated_communities.is_empty()
                     || !other_communities.is_empty(),
-                member_communities => member_communities,
-                participated_communities => participated_communities,
-                other_communities => other_communities,
+                member_communities => Serde(member_communities),
+                participated_communities => Serde(participated_communities),
+                other_communities => Serde(other_communities),
                 selected_community_slug => query.community,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
                 canvas_sizes => canvas_size_options(),
@@ -744,7 +745,7 @@ pub async fn serve_collaborative_app(
         None => None,
     };
     tx.commit().await?;
-    let chrome = common_ctx.merge(context! { presence });
+    let chrome = common_ctx.merge(context! { presence => Serde(presence) });
     let head = state
         .render("collaborate_chrome_head.jinja", chrome.clone())
         .await?;
@@ -777,6 +778,7 @@ mod tests {
     use super::{canvas_size_options, MAX_PARTICIPANTS_CHOICES};
     use crate::web::handlers::test_support;
     use minijinja::context;
+    use minijinja::value::Serde;
     use serde_json::json;
 
     fn sample_community(id: &str, name: &str, slug: &str, visibility: &str) -> serde_json::Value {
@@ -852,24 +854,24 @@ mod tests {
             "public",
         );
         context! {
-            current_user => if signed_in {
+            current_user => Serde(if signed_in {
                 json!({"login_name": "someone", "email_verified_at": "2026-01-01T00:00:00Z"})
             } else {
                 json!(null)
-            },
-            active_sessions => active_sessions,
-            viewer_sessions => viewer_sessions,
+            }),
+            active_sessions => Serde(active_sessions),
+            viewer_sessions => Serde(viewer_sessions),
             feed => context! {
-                posts => posts,
+                posts => Serde(posts),
                 has_more => false,
                 next_url => "",
             },
             canvas_sizes => canvas_size_options(),
             participant_choices => MAX_PARTICIPANTS_CHOICES,
             has_postable_communities => signed_in,
-            member_communities => members,
-            participated_communities => participated,
-            other_communities => others,
+            member_communities => Serde(members),
+            participated_communities => Serde(participated),
+            other_communities => Serde(others),
             selected_community_slug => "open",
             draft_post_count => 0,
             unread_notification_count => 0,
@@ -1238,8 +1240,8 @@ mod tests {
             .expect("template loads");
         let rendered = template
             .render(context! {
-                viewer_sessions => Vec::<serde_json::Value>::new(),
-                active_sessions => vec![sample_session(json!({}))],
+                viewer_sessions => Serde(Vec::<serde_json::Value>::new()),
+                active_sessions => Serde(vec![sample_session(json!({}))]),
                 ftl_lang => "en",
             })
             .expect("renders");
@@ -1261,9 +1263,9 @@ mod tests {
             .expect("template loads");
         let rendered = template
             .render(context! {
-                current_user => json!(null),
-                active_sessions => Vec::<serde_json::Value>::new(),
-                viewer_sessions => Vec::<serde_json::Value>::new(),
+                current_user => Serde(json!(null)),
+                active_sessions => Serde(Vec::<serde_json::Value>::new()),
+                viewer_sessions => Serde(Vec::<serde_json::Value>::new()),
                 feed => crate::web::handlers::home::feed_context(
                     Vec::new(),
                     "/api/collaborate/posts",
@@ -1273,7 +1275,7 @@ mod tests {
                 canvas_sizes => canvas_size_options(),
             participant_choices => MAX_PARTICIPANTS_CHOICES,
                 has_postable_communities => false,
-                selected_community_slug => json!(null),
+                selected_community_slug => Serde(json!(null)),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "en",
@@ -1289,7 +1291,7 @@ mod tests {
         let rendered = fragment
             .render(context! {
                 feed => context! {
-                    posts => vec![sample_post()],
+                    posts => Serde(vec![sample_post()]),
                     has_more => true,
                     next_url => "/api/collaborate/posts?offset=60&limit=60",
                 },

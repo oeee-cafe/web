@@ -24,6 +24,7 @@ use crate::{
         state::AppState,
     },
 };
+use minijinja::value::Serde;
 
 /// Rows per batch in the notification list.
 ///
@@ -57,7 +58,7 @@ pub async fn notifications_fragment(
         .render(
             "notifications_fragment.jinja",
             context! {
-                notifications => as_shown(notifications, opened),
+                notifications => Serde(as_shown(notifications, opened)),
                 has_more => has_more,
                 next_url => notifications_fragment_url(offset + NOTIFICATIONS_PER_BATCH, opened),
                 ftl_lang,
@@ -171,10 +172,10 @@ pub async fn list_notifications(
             template,
             common_ctx,
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
-                notifications => as_shown(notifications, Some(opened)),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
+                notifications => Serde(as_shown(notifications, Some(opened))),
                 unseen => unseen,
-                invitations => invitations_with_details,
+                invitations => Serde(invitations_with_details),
                 // Same key names the fragment uses, so the first batch and every
                 // scrolled batch render through one template.
                 has_more => has_more,
@@ -331,6 +332,7 @@ mod tests {
     use super::{as_shown, notifications_fragment_url};
     use crate::web::handlers::test_support;
     use minijinja::context;
+    use minijinja::value::Serde;
     use serde_json::json;
 
     fn sample_notification() -> serde_json::Value {
@@ -409,10 +411,10 @@ mod tests {
             .expect("template loads");
         template
             .render(context! {
-                current_user => json!({"login_name": "someone"}),
-                messages => Vec::<serde_json::Value>::new(),
-                notifications => notifications,
-                invitations => invitations,
+                current_user => Serde(json!({"login_name": "someone"})),
+                messages => Serde(Vec::<serde_json::Value>::new()),
+                notifications => Serde(notifications),
+                invitations => Serde(invitations),
                 draft_post_count => 0,
                 unread_notification_count => 1,
                 unseen => unseen,
@@ -649,7 +651,7 @@ mod tests {
             .expect("template loads");
         let rendered = template
             .render(context! {
-                notifications => vec![sample_reaction()],
+                notifications => Serde(vec![sample_reaction()]),
                 has_more => true,
                 next_url => "/api/notifications/items?offset=30",
                 ftl_lang => "en",
@@ -670,7 +672,7 @@ mod tests {
             .expect("template loads");
         let rendered = template
             .render(context! {
-                notifications => vec![sample_reaction()],
+                notifications => Serde(vec![sample_reaction()]),
                 has_more => false,
                 next_url => "",
                 ftl_lang => "en",

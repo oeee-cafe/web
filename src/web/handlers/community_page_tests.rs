@@ -1,5 +1,6 @@
 use super::test_support;
 use minijinja::context;
+use minijinja::value::Serde;
 use serde_json::json;
 
 /// Saving or cancelling the edit form asks for the header block alone, and
@@ -14,15 +15,15 @@ fn the_header_block_renders_without_a_feed() {
         .expect("community template loads")
         .render_captured_to(
             context! {
-                current_user => json!(null),
-                community => json!({
+                current_user => Serde(json!(null)),
+                community => Serde(json!({
                     "id": "00000000-0000-0000-0000-000000000001",
                     "name": "Open Studio",
                     "description": "Draw with us",
                     "slug": "open",
                     "visibility": "public",
                     "owner_id": "00000000-0000-0000-0000-000000000002",
-                }),
+                })),
                 community_id => "00000000-0000-0000-0000-000000000001",
                 domain => "oeee.test",
                 ftl_lang => "en",
@@ -48,18 +49,18 @@ fn the_drawings_and_the_comments_are_a_pill_apart() {
     let env = test_support::env();
     let base = || {
         context! {
-            current_user => json!(null),
-            messages => Vec::<serde_json::Value>::new(),
+            current_user => Serde(json!(null)),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 0,
             unread_notification_count => 0,
-            community => json!({
+            community => Serde(json!({
                 "id": "00000000-0000-0000-0000-000000000001",
                 "name": "Open Studio",
                 "description": "Draw with us",
                 "slug": "open",
                 "visibility": "public",
                 "owner_id": "00000000-0000-0000-0000-000000000002",
-            }),
+            })),
             community_id => "00000000-0000-0000-0000-000000000001",
             domain => "oeee.test",
             ftl_lang => "en",
@@ -89,7 +90,7 @@ fn the_drawings_and_the_comments_are_a_pill_apart() {
         .get_template("community_comments.jinja")
         .expect("comments loads")
         .render(context! {
-            comments => json!({"rows": [{
+            comments => Serde(json!({"rows": [{
                 "id": "0c8f0000-0000-0000-0000-000000000001",
                 "post_id": "0c8f0000-0000-0000-0000-000000000002",
                 "actor_id": "0c8f0000-0000-0000-0000-000000000003",
@@ -106,7 +107,7 @@ fn the_drawings_and_the_comments_are_a_pill_apart() {
                 "post_image_filename": "abcdef.png",
                 "post_image_width": 300,
                 "post_image_height": 300,
-            }], "next_url": null}),
+            }], "next_url": null})),
             ..base()
         })
         .expect("comments render");
@@ -146,19 +147,19 @@ fn the_header_credits_the_owner_and_drawing_opens_a_dialog() {
         env.get_template("community.jinja")
             .expect("community template loads")
             .render(context! {
-                current_user => json!({"id": "00000000-0000-0000-0000-000000000003"}),
-                messages => Vec::<serde_json::Value>::new(),
+                current_user => Serde(json!({"id": "00000000-0000-0000-0000-000000000003"})),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
-                community => community,
-                header => json!({
+                community => Serde(community),
+                header => Serde(json!({
                     "owner": {"login_name": "keeper", "display_name": "The Keeper"},
                     "posts_count": 12,
                     "contributors_count": 4,
-                }),
+                })),
                 community_id => "00000000-0000-0000-0000-000000000001",
                 domain => "oeee.test",
-                feed => json!({"posts": [], "has_more": false}),
+                feed => Serde(json!({"posts": [], "has_more": false})),
                 ftl_lang => "en",
             })
             .expect("community renders")
@@ -194,12 +195,12 @@ fn the_edit_card_is_one_swappable_element() {
             .get_template("community_edit.jinja")
             .expect("edit template loads")
             .render(context! {
-                community => json!({
+                community => Serde(json!({
                     "name": "Open Studio",
                     "slug": "open",
                     "description": "Draw with us",
                     "visibility": visibility,
-                }),
+                })),
                 community_id => "00000000-0000-0000-0000-000000000001",
                 ftl_lang => "en",
             })
@@ -230,13 +231,13 @@ fn drafts_share_the_grid_and_its_control() {
         .get_template("draft_posts.jinja")
         .expect("drafts template loads")
         .render(context! {
-            current_user => json!({"login_name": "someone"}),
-            messages => Vec::<serde_json::Value>::new(),
+            current_user => Serde(json!({"login_name": "someone"})),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 1,
             unread_notification_count => 0,
             ftl_lang => "en",
             r2_public_endpoint_url => "https://example.test",
-            posts => vec![json!({
+            posts => Serde(vec![json!({
                 "id": "00000000-0000-0000-0000-000000000001",
                 "title": null,
                 "content": null,
@@ -246,7 +247,7 @@ fn drafts_share_the_grid_and_its_control() {
                 "image_width": 300,
                 "image_height": 300,
                 "updated_at": updated,
-            })],
+            })]),
         })
         .expect("drafts render");
     assert!(rendered.contains("class=\"posts-grid\" id=\"post-feed-grid\""));
@@ -269,13 +270,13 @@ fn a_guestbook_list_is_empty_to_the_letter() {
         env.get_template("guestbook.jinja")
             .expect("loads")
             .render(context! {
-                user => json!({"login_name": "oeee", "display_name": "오이", "id": "u1"}),
-                current_user => json!(null),
-                messages => Vec::<serde_json::Value>::new(),
+                user => Serde(json!({"login_name": "oeee", "display_name": "오이", "id": "u1"})),
+                current_user => Serde(json!(null)),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "en",
-                guestbook_entries => entries,
+                guestbook_entries => Serde(entries),
             })
             .expect("renders")
     };
@@ -296,7 +297,7 @@ fn a_guestbook_list_is_empty_to_the_letter() {
     let alone = env
         .get_template("guestbook_entry.jinja")
         .expect("loads")
-        .render(context! { entry, user => json!({"login_name": "oeee"}), current_user => json!(null), ftl_lang => "en" })
+        .render(context! { entry => Serde(entry), user => Serde(json!({"login_name": "oeee"})), current_user => Serde(json!(null)), ftl_lang => "en" })
         .expect("renders");
     assert!(
         alone.starts_with("<div") && alone.ends_with("</div>"),
@@ -329,12 +330,12 @@ fn a_thrown_away_draft_updates_the_count_and_empties_the_page() {
         .get_template("draft_posts.jinja")
         .expect("loads")
         .render(context! {
-            current_user => json!({"login_name": "someone"}),
-            messages => Vec::<serde_json::Value>::new(),
+            current_user => Serde(json!({"login_name": "someone"})),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",
-            posts => Vec::<serde_json::Value>::new(),
+            posts => Serde(Vec::<serde_json::Value>::new()),
         })
         .expect("renders");
     for id in ["drafts-count", "drafts-tools", "drafts-body"] {
@@ -381,22 +382,22 @@ fn the_grid_continues_from_the_communitys_own_endpoint() {
         .get_template("community.jinja")
         .expect("community template loads")
         .render(context! {
-            current_user => json!(null),
-            messages => Vec::<serde_json::Value>::new(),
+            current_user => Serde(json!(null)),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 0,
             unread_notification_count => 0,
-            community => json!({
+            community => Serde(json!({
                 "id": "00000000-0000-0000-0000-000000000001",
                 "name": "Open Studio",
                 "description": "Draw with us",
                 "slug": "open",
                 "visibility": "public",
                 "owner_id": "00000000-0000-0000-0000-000000000002",
-            }),
+            })),
             community_id => "00000000-0000-0000-0000-000000000001",
             domain => "oeee.test",
             feed => feed_context(posts, "/api/communities/@open/posts", 0, None),
-            comments => json!({
+            comments => Serde(json!({
                 "rows": [{
                     "post_id": "00000000-0000-0000-0000-000000000001",
                     "post_author_login_name": "artist",
@@ -407,7 +408,7 @@ fn the_grid_continues_from_the_communitys_own_endpoint() {
                     "created_at": "2026-01-02T03:04:05Z",
                 }],
                 "next_url": "/api/communities/@open/comments?after=00000000-0000-0000-0000-000000000009",
-            }),
+            })),
             ftl_lang => "en",
         })
         .expect("community renders");

@@ -5,6 +5,7 @@ use minijinja::context;
 use serde_json::json;
 
 use super::chrome;
+use minijinja::value::Serde;
 
 /// Only a supporter is asked whether to be in the credits, and the box
 /// says what they chose.
@@ -35,7 +36,7 @@ fn render_account(
         .get_template("account.jinja")
         .expect("account loads")
         .render(context! {
-            current_user => json!({
+            current_user => Serde(json!({
                 "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
                 "login_name": "oeee",
                 "display_name": "오이",
@@ -45,13 +46,13 @@ fn render_account(
                 "preferred_language": null,
                 "show_sensitive_content": false,
                 "role": "user",
-            }),
+            })),
             languages => vec![("ko", "한국어"), ("en", "English")],
-            identities => json!([{"provider": "steam", "display_hint": "오이", "subject": "76561197960287930"}]),
+            identities => Serde(json!([{"provider": "steam", "display_hint": "오이", "subject": "76561197960287930"}])),
             has_password => true,
-            show_in_credits,
-            supporter_platforms,
-            worn_mark,
+            show_in_credits => Serde(show_in_credits),
+            supporter_platforms => Serde(supporter_platforms),
+            worn_mark => Serde(worn_mark),
             steam_enabled => true,
             steam_linked => true,
             ..chrome()
@@ -77,15 +78,15 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
             .render(context! {
                 this_year => 2026,
                 restorable => store == json!("apple"),
-                store,
-                offers,
+                store => Serde(store),
+                offers => Serde(offers),
                 nothing_this_year,
                 supports_this_year => supporter_standings
                     .as_array()
                     .is_some_and(|standings| standings.iter().any(|s| s["year"] == json!(2026))),
-                supporter_standings,
-                worn_mark => json!("steam"),
-                ..context! { current_user, ..chrome() }
+                supporter_standings => Serde(supporter_standings),
+                worn_mark => Serde(json!("steam")),
+                ..context! { current_user => Serde(current_user), ..chrome() }
             })
             .expect("supporter renders")
     };
@@ -226,7 +227,7 @@ fn the_account_page_asks_what_the_account_can_answer() {
         env.get_template("account.jinja")
             .expect("account loads")
             .render(context! {
-                current_user => json!({
+                current_user => Serde(json!({
                     "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
                     "login_name": "oeee",
                     "display_name": "오이",
@@ -236,9 +237,9 @@ fn the_account_page_asks_what_the_account_can_answer() {
                     "preferred_language": null,
                     "show_sensitive_content": false,
                     "role": "user",
-                }),
+                })),
                 languages => vec![("ko", "한국어"), ("en", "English")],
-                identities,
+                identities => Serde(identities),
                 has_password,
                 steam_enabled => true,
                 steam_linked => false,
@@ -246,7 +247,7 @@ fn the_account_page_asks_what_the_account_can_answer() {
                 apple_linked => false,
                 google_enabled => true,
                 google_linked => false,
-                messages => Vec::<serde_json::Value>::new(),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "en",

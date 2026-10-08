@@ -18,6 +18,7 @@ use uuid::Uuid;
 
 use crate::web::context::CommonContext;
 use crate::web::i18n::ExtractFtlLang;
+use minijinja::value::Serde;
 
 /// Communities per batch in the public directory.
 const COMMUNITIES_PER_BATCH: i64 = 20;
@@ -123,7 +124,7 @@ pub async fn communities_fragment(
     tx.commit().await?;
 
     let rendered = state.render("community_cards_fragment.jinja", context! {
-        communities => communities,
+        communities => Serde(communities),
         has_more => has_more,
         next_url => communities_fragment_url(query.sort, term, offset + COMMUNITIES_PER_BATCH),
         r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
@@ -387,17 +388,17 @@ pub async fn communities(
             template,
             common_ctx,
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
                 sort => sort.as_param(),
                 // Same key names the fragment uses, so the first batch and every
                 // scrolled batch render through one template.
                 has_more => public_has_more,
                 next_url => communities_fragment_url(sort, None, COMMUNITIES_PER_BATCH),
-                official_communities,
+                official_communities => Serde(official_communities),
                 // Key name must match community_cards_fragment.jinja's loop variable;
                 // the page includes that template with this context.
-                communities => public_communities,
-                your_communities,
+                communities => Serde(public_communities),
+                your_communities => Serde(your_communities),
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
             },
         )
@@ -412,6 +413,7 @@ mod tests {
     use crate::models::community::CommunitySort;
     use crate::web::handlers::test_support;
     use minijinja::context;
+    use minijinja::value::Serde;
     use serde_json::json;
 
     fn sample_community() -> serde_json::Value {
@@ -440,11 +442,11 @@ mod tests {
         current_user: serde_json::Value,
     ) -> minijinja::Value {
         context! {
-            current_user => current_user,
-            messages => Vec::<serde_json::Value>::new(),
-            your_communities => your_communities,
-            official_communities => Vec::<serde_json::Value>::new(),
-            communities => vec![sample_community()],
+            current_user => Serde(current_user),
+            messages => Serde(Vec::<serde_json::Value>::new()),
+            your_communities => Serde(your_communities),
+            official_communities => Serde(Vec::<serde_json::Value>::new()),
+            communities => Serde(vec![sample_community()]),
             sort => "active",
             has_more => true,
             next_url => "/api/communities/cards?offset=20&sort=active",
@@ -604,7 +606,7 @@ mod tests {
             .expect("template loads");
         let rendered = template
             .render(context! {
-                communities => vec![sample_community()],
+                communities => Serde(vec![sample_community()]),
                 has_more => true,
                 next_url => "/api/communities/cards?offset=20&sort=posts",
                 r2_public_endpoint_url => "https://example.test",
@@ -622,7 +624,7 @@ mod tests {
             .expect("template loads");
         let rendered = template
             .render(context! {
-                communities => Vec::<serde_json::Value>::new(),
+                communities => Serde(Vec::<serde_json::Value>::new()),
                 has_more => false,
                 next_url => "",
                 r2_public_endpoint_url => "https://example.test",

@@ -14,11 +14,11 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{extract::State, response::Html};
 use axum_messages::Messages;
+use minijinja::value::Serde;
 use serde::Deserialize;
 use uuid::Uuid;
 
 use minijinja::context;
-
 /// Posts fetched per batch on the home grid.
 ///
 /// Has to comfortably exceed one screenful at the *densest* thumbnail size, or
@@ -46,7 +46,7 @@ pub(crate) fn comments_context(
         }
         _ => None,
     };
-    context! { rows, next_url }
+    context! { rows => Serde(rows), next_url }
 }
 
 /// A batch of comments in `scope`, as `viewer` may see them.
@@ -110,8 +110,8 @@ pub(crate) fn feed_context(
         next_url.push_str(&key);
     }
     context! {
-        posts,
-        headings,
+        posts => Serde(posts),
+        headings => Serde(headings),
         has_more,
         next_url,
     }
@@ -229,7 +229,7 @@ async fn feed_page(
             "home.jinja",
             common_ctx,
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
                 feed_switch => feed.name(),
                 feed_view => "drawings",
                 feed => feed_context(posts, feed.batch_path(), 0, None),
@@ -263,7 +263,7 @@ async fn feed_comments_page(
             "home_comments.jinja",
             common_ctx,
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
                 feed_switch => feed.name(),
                 feed_view => "comments",
                 comments => comments_context(comments, feed.comments_batch_path()),
@@ -539,6 +539,7 @@ mod tests {
     use crate::web::handlers::test_support;
     use chrono::Datelike;
     use minijinja::context;
+    use minijinja::value::Serde;
     use serde_json::json;
 
     fn sample_post() -> serde_json::Value {
@@ -559,7 +560,7 @@ mod tests {
     fn home_context(posts: Vec<serde_json::Value>, has_more: bool) -> minijinja::Value {
         context! {
             feed => context! {
-                posts => posts.clone(),
+                posts => Serde(posts.clone()),
                 has_more => has_more,
                 next_url => format!(
                     "/api/home/posts?offset={}&limit={}",
@@ -567,12 +568,12 @@ mod tests {
                     super::HOME_POSTS_PER_BATCH
                 ),
             },
-            current_user => json!(null),
+            current_user => Serde(json!(null)),
             feed_switch => "recent",
             feed_view => "drawings",
             comments => super::comments_context(Vec::new(), "/api/home/comments"),
             comments_url => "/comments",
-            messages => Vec::<serde_json::Value>::new(),
+            messages => Serde(Vec::<serde_json::Value>::new()),
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",
@@ -622,7 +623,7 @@ mod tests {
 
         let signed_in = |feed_switch: &str| {
             home.render(context! {
-                current_user => json!({"login_name": "someone"}),
+                current_user => Serde(json!({"login_name": "someone"})),
                 feed_switch,
                 ..home_context(vec![sample_post()], false)
             })
@@ -749,11 +750,11 @@ mod tests {
         let template = env.get_template("home.jinja").expect("template loads");
         let rendered = template
             .render(context! {
-                current_user => json!({"login_name": "someone"}),
+                current_user => Serde(json!({"login_name": "someone"})),
                 feed_switch => "following",
-                messages => Vec::<serde_json::Value>::new(),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 feed => context! {
-                    posts => vec![sample_post()],
+                    posts => Serde(vec![sample_post()]),
                     has_more => true,
                     next_url => "/api/following/posts?offset=60&limit=60",
                 },
@@ -779,11 +780,11 @@ mod tests {
         let template = env.get_template("home.jinja").expect("template loads");
         let rendered = template
             .render(context! {
-                current_user => json!({"login_name": "someone"}),
+                current_user => Serde(json!({"login_name": "someone"})),
                 feed_switch => "communities",
-                messages => Vec::<serde_json::Value>::new(),
+                messages => Serde(Vec::<serde_json::Value>::new()),
                 feed => context! {
-                    posts => Vec::<serde_json::Value>::new(),
+                    posts => Serde(Vec::<serde_json::Value>::new()),
                     has_more => false,
                     next_url => "",
                 },
@@ -980,7 +981,7 @@ mod tests {
             .get_template("home.jinja")
             .expect("template loads")
             .render(context! {
-                current_user => json!({"login_name": "someone"}),
+                current_user => Serde(json!({"login_name": "someone"})),
                 feed_switch => "following",
                 comments => super::comments_context(rows, "/api/following/comments"),
                 comments_url => "/following/comments",
@@ -1005,7 +1006,7 @@ mod tests {
             env.get_template(template)
                 .expect("template loads")
                 .render(context! {
-                    current_user => json!({"login_name": "someone"}),
+                    current_user => Serde(json!({"login_name": "someone"})),
                     feed_switch,
                     feed_view,
                     comments => super::comments_context(vec![sample_comment()], "/api/joined/comments"),
@@ -1044,7 +1045,7 @@ mod tests {
         let rendered = template
             .render(context! {
                 feed => context! {
-                    posts => vec![sample_post()],
+                    posts => Serde(vec![sample_post()]),
                     has_more => true,
                     next_url => "/api/home/posts?offset=120&limit=60",
                 },

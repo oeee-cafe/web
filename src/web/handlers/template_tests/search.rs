@@ -2,6 +2,7 @@
 
 use crate::web::handlers::test_support;
 use minijinja::context;
+use minijinja::value::Serde;
 
 use super::chrome;
 
@@ -24,8 +25,8 @@ fn render_search_with_people(
         .unwrap_or_else(|e| panic!("search.jinja loads: {e:#}"))
         .render(context! {
             search_query,
-            people,
-            posts,
+            people => Serde(people),
+            posts => Serde(posts),
             ..chrome()
         })
         .unwrap_or_else(|e| panic!("search.jinja renders: {e:#}"))

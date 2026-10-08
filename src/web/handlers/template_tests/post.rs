@@ -5,6 +5,7 @@ use minijinja::context;
 use serde_json::json;
 
 use super::{chrome, post_page, render_post_page};
+use minijinja::value::Serde;
 
 /// Posting a comment swaps the list for the one the server sends back.
 /// The form used to sit inside the swapped element, so it went with it
@@ -65,22 +66,22 @@ fn a_post_in_a_community_is_linked_under_the_community() {
         .get_template("post_view.jinja")
         .unwrap_or_else(|e| panic!("post_view.jinja loads: {e:#}"))
         .render(context! {
-            post => post,
+            post => Serde(post),
             post_id => id,
-            current_user => json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "user", "login_name": "viewer"}),
+            current_user => Serde(json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "user", "login_name": "viewer"})),
             r2_public_endpoint_url => "https://images.example",
             base_url => "https://oeee.example",
             domain => "oeee.example",
-            comments => Vec::<serde_json::Value>::new(),
-            collaborative_participants => Vec::<serde_json::Value>::new(),
-            reaction_counts => Vec::<serde_json::Value>::new(),
-            tags => Vec::<serde_json::Value>::new(),
-            child_posts => vec![
+            comments => Serde(Vec::<serde_json::Value>::new()),
+            collaborative_participants => Serde(Vec::<serde_json::Value>::new()),
+            reaction_counts => Serde(Vec::<serde_json::Value>::new()),
+            tags => Serde(Vec::<serde_json::Value>::new()),
+            child_posts => Serde(vec![
                 reply("00000000-0000-0000-0000-00000000000a", json!("club")),
                 reply("00000000-0000-0000-0000-00000000000b", json!(null)),
-            ],
-            post_community => json!(null),
-            parent_post_data => json!(null),
+            ]),
+            post_community => Serde(json!(null)),
+            parent_post_data => Serde(json!(null)),
             ..chrome()
         })
         .unwrap_or_else(|e| panic!("post_view.jinja renders: {e:#}"));
@@ -200,13 +201,13 @@ fn the_edit_form_reflects_the_stored_replay_switch() {
     let render = |allow_replay: &str| {
         template
             .render(context! {
-                post => json!({
+                post => Serde(json!({
                     "title": "Tandemaus",
                     "content": "a description",
                     "is_sensitive": "false",
                     "allow_relay": "true",
                     "allow_replay": allow_replay,
-                }),
+                })),
                 post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
                 tags => "",
                 ..chrome()
@@ -245,19 +246,19 @@ fn the_relay_page_renders_with_and_without_a_community() {
     let render = |community_name: serde_json::Value, community_slug: serde_json::Value| {
         template
             .render(context! {
-                parent_post => json!({
+                parent_post => Serde(json!({
                     "id": "9c881320-2b43-4afa-b2bb-7128c8a3e985",
                     "title": "Tandemaus",
                     "image_width": "640",
                     "image_height": "480",
                     "image_filename": "abcdef0123.png",
                     "login_name": "someone",
-                }),
+                })),
                 width => 640,
                 height => 480,
-                community_name => community_name,
-                community_slug => community_slug,
-                community_id => json!(null),
+                community_name => Serde(community_name),
+                community_slug => Serde(community_slug),
+                community_id => Serde(json!(null)),
                 is_relay => true,
                 painter_config => "{}",
                 ..chrome()
@@ -298,7 +299,7 @@ fn a_comment_deletes_itself_through_the_sites_own_route() {
         .get_template("post_comments.jinja")
         .expect("post_comments loads")
         .render(context! {
-            comments => json!([{
+            comments => Serde(json!([{
                 "id": "0c8f0000-0000-0000-0000-000000000001",
                 "actor_name": "Someone",
                 "handle": {"login_name": "someone", "name": null, "host": null},
@@ -308,9 +309,9 @@ fn a_comment_deletes_itself_through_the_sites_own_route() {
                 "created_at": "2026-01-02T03:04:05Z",
                 "deleted_at": null,
                 "children": [],
-            }]),
-            current_user => json!({"login_name": "someone"}),
-            supporters => json!({}),
+            }])),
+            current_user => Serde(json!({"login_name": "someone"})),
+            supporters => Serde(json!({})),
             ftl_lang => "en",
         })
         .expect("post_comments renders");
@@ -363,21 +364,21 @@ fn supporters_wear_their_platforms_mark_on_a_post_page() {
     ]);
     let page_context = || {
         context! {
-            post => post_page("true", "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d"),
+            post => Serde(post_page("true", "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d")),
             post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
             r2_public_endpoint_url => "https://images.example",
             base_url => "https://oeee.example",
             domain => "oeee.example",
-            comments => comments.clone(),
-            collaborative_participants => json!([
+            comments => Serde(comments.clone()),
+            collaborative_participants => Serde(json!([
                 {"login_name": "someone", "display_name": "Someone"},
                 {"login_name": "friend", "display_name": "Friend"},
-            ]),
-            reaction_counts => Vec::<serde_json::Value>::new(),
-            tags => Vec::<serde_json::Value>::new(),
-            child_posts => Vec::<serde_json::Value>::new(),
-            post_community => json!(null),
-            parent_post_data => json!(null),
+            ])),
+            reaction_counts => Serde(Vec::<serde_json::Value>::new()),
+            tags => Serde(Vec::<serde_json::Value>::new()),
+            child_posts => Serde(Vec::<serde_json::Value>::new()),
+            post_community => Serde(json!(null)),
+            parent_post_data => Serde(json!(null)),
             ..chrome()
         }
     };
@@ -426,7 +427,7 @@ fn supporters_wear_their_platforms_mark_on_a_post_page() {
     let fragment = templates
         .render_with(
             "post_comments.jinja",
-            context! { comments, ..chrome() },
+            context! { comments => Serde(comments), ..chrome() },
             supporting,
         )
         .unwrap();
@@ -446,7 +447,7 @@ fn a_comment_names_its_author_by_the_design_systems_person() {
         .get_template("post_comments.jinja")
         .unwrap()
         .render(context! {
-            comments => json!([comment(Some("plain"), "Plain"), comment(None, "far")]),
+            comments => Serde(json!([comment(Some("plain"), "Plain"), comment(None, "far")])),
             ..chrome()
         })
         .unwrap();

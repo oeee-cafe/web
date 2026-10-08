@@ -14,6 +14,7 @@ use crate::web::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::response::{Html, IntoResponse, Redirect};
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::{Deserialize, Serialize};
 
 /// Tags listed on the directory, and matches returned by a search.
@@ -141,7 +142,7 @@ async fn tag_page(
             },
             common_ctx,
             context! {
-                tag => tag,
+                tag => Serde(tag),
                 post_count,
                 feed => feed_context(posts, &format!("{}/posts", tag_url(&name)), 0, None),
                 comments => comments_context(comments, &tag_comments_path(&name)),
@@ -288,7 +289,10 @@ pub async fn tag_autocomplete(
     };
 
     let rendered = state
-        .render("tag_autocomplete.jinja", context! { tags, ftl_lang })
+        .render(
+            "tag_autocomplete.jinja",
+            context! { tags => Serde(tags), ftl_lang },
+        )
         .await?;
 
     Ok(Html(rendered).into_response())
@@ -364,7 +368,7 @@ pub async fn tag_cards(
         .render(
             "tag_results.jinja",
             context! {
-                tags,
+                tags => Serde(tags),
                 search_query,
                 ftl_lang,
             },
@@ -392,7 +396,7 @@ pub async fn tag_discovery(
             "tag_discovery.jinja",
             common_ctx,
             context! {
-                tags,
+                tags => Serde(tags),
                 search_query,
                 sort_by => sort.as_param(),
             },

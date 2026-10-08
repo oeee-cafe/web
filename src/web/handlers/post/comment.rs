@@ -18,6 +18,7 @@ use crate::web::state::AppState;
 use axum::response::IntoResponse;
 use axum::{extract::State, response::Html, Form};
 use minijinja::context;
+use minijinja::value::Serde;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -276,8 +277,8 @@ pub async fn do_create_comment(
         .render(
             "post_comments.jinja",
             context! {
-                comments => comments,
-                current_user => auth_session.user,
+                comments => Serde(comments),
+                current_user => Serde(auth_session.user),
                 ftl_lang
             },
         )

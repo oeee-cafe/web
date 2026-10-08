@@ -5,10 +5,10 @@ use crate::models::user::{find_users_with_public_posts_and_banner, AuthSession};
 use crate::web::context::CommonContext;
 use crate::web::state::AppState;
 use axum::{extract::State, response::Html};
-
-use minijinja::context;
+use minijinja::value::Serde;
 
 use crate::web::i18n::ExtractFtlLang;
+use minijinja::context;
 
 pub async fn about(
     State(state): State<AppState>,
@@ -30,8 +30,8 @@ pub async fn about(
             "about.jinja",
             common_ctx,
             context! {
-                users_with_public_posts_and_banner,
-                supporters,
+                users_with_public_posts_and_banner => Serde(users_with_public_posts_and_banner),
+                supporters => Serde(supporters),
                 git_commit => git_commit(),
             },
         )

@@ -26,6 +26,7 @@ use uuid::Uuid;
 
 use super::federation::{community_federates, send_post_update_to_followers};
 use super::get_community_slug_url;
+use minijinja::value::Serde;
 
 pub async fn post_edit_community(
     auth_session: AuthSession,
@@ -346,10 +347,10 @@ pub async fn post_edit_community(
             context! {
                 post,
                 post_id => id,
-                current_community,
-                unlisted_communities,
-                public_participated_communities,
-                public_other_communities,
+                current_community => Serde(current_community),
+                unlisted_communities => Serde(unlisted_communities),
+                public_participated_communities => Serde(public_participated_communities),
+                public_other_communities => Serde(public_other_communities),
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
                 base_url => state.config.base_url.clone(),
             },
@@ -513,7 +514,7 @@ pub async fn hx_edit_post(
         .render(
             "post_edit.jinja",
             context! {
-                current_user => auth_session.user,
+                current_user => Serde(auth_session.user),
                 post,
                 post_id => id,
                 tags => tags_string,
@@ -641,10 +642,10 @@ pub async fn hx_do_edit_post(
             template,
             "post_edit_block",
             context! {
-                current_user => auth_session.user,
+                current_user => Serde(auth_session.user),
                     post,
                 post_id => id,
-                tags,
+                tags => Serde(tags),
                 ftl_lang
             },
         )

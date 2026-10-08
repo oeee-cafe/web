@@ -30,6 +30,7 @@ use intl_memoizer::concurrent::IntlLangMemoizer;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use lettre::{Message, SmtpTransport, Transport};
 use minijinja::context;
+use minijinja::value::Serde;
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use uuid::Uuid;
@@ -94,7 +95,7 @@ pub async fn account(
                 steam_linked => identities.iter().any(|i| i.provider == "steam"),
                 apple_linked => identities.iter().any(|i| i.provider == "apple"),
                 google_linked => identities.iter().any(|i| i.provider == "google"),
-                identities,
+                identities => Serde(identities),
                 has_password,
                 show_in_credits,
                 supporter_platforms,
@@ -104,7 +105,7 @@ pub async fn account(
                 steam_enabled => state.config.steam.is_some(),
                 apple_enabled => state.config.apple.is_some(),
                 google_enabled => state.config.google.is_some(),
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
             },
         )
         .await?;
@@ -296,7 +297,7 @@ pub async fn verify_email_verification_code(
             .map(|l| l.to_string())
             .unwrap_or_else(|| "en".to_string());
         let rendered = state.render(template, context! {
-            challenge_id => challenge.id,
+            challenge_id => Serde(challenge.id),
             email => challenge.email,
             message => safe_get_message(&bundle, "account-change-email-error-token-mismatch"),
             success => false,
@@ -313,7 +314,7 @@ pub async fn verify_email_verification_code(
             .map(|l| l.to_string())
             .unwrap_or_else(|| "en".to_string());
         let rendered = state.render(template, context! {
-            challenge_id => challenge.id,
+            challenge_id => Serde(challenge.id),
             email => challenge.email,
             message => safe_get_message(&bundle, "account-change-email-error-token-expired"),
             success => false,
@@ -341,7 +342,7 @@ pub async fn verify_email_verification_code(
         .render(
             template,
             context! {
-                challenge_id => challenge.id,
+                challenge_id => Serde(challenge.id),
                 email => challenge.email,
                 message => safe_get_message(&bundle, "account-change-email-success"),
                 success => true,
@@ -384,7 +385,7 @@ pub async fn request_email_verification_code(
             .map(|l| l.to_string())
             .unwrap_or_else(|| "en".to_string());
         return Ok(Html(state.render("email_edit.jinja", context! {
-            current_user => auth_session.user,
+            current_user => Serde(auth_session.user),
             message => safe_get_message(&bundle, "account-change-email-error-already-verified"),
             ftl_lang,
         }).await?)
@@ -411,7 +412,7 @@ pub async fn request_email_verification_code(
         .render(
             "email_verify.jinja",
             context! {
-                challenge_id => email_verification_challenge.id,
+                challenge_id => Serde(email_verification_challenge.id),
                 email => form.email,
                 ftl_lang,
             },

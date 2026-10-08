@@ -18,6 +18,7 @@ use serde::Deserialize;
 use tower_sessions::Session;
 
 use crate::web::i18n::ExtractAcceptLanguage;
+use minijinja::value::Serde;
 
 // This allows us to extract the "next" field from the query string. We use this
 // to redirect after log in.
@@ -36,7 +37,7 @@ pub async fn signup(
         .render(
             "signup.jinja",
             context! {
-                messages => messages.into_iter().collect::<Vec<_>>(),
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
                 next => next,
                 ftl_lang
             },
@@ -141,7 +142,7 @@ pub async fn login(
         .render(
             "login.jinja",
             context! {
-                messages => collected_messages,
+                messages => Serde(collected_messages),
                 next => next,
                 // A provider's account waiting for this sign-in to be linked to.
                 linking_provider => pending_provider_name(&session).await,
