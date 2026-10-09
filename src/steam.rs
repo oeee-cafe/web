@@ -85,9 +85,10 @@ pub enum TicketRejected {
     Banned,
 }
 
-/// Checks a hex-encoded Web API ticket with Steam and says whose it is, and
-/// which of `packs` -- the catalogue's Steam products, on sale or not
-/// (`store_product::packs`) -- that account owns.
+/// Checks a hex-encoded Web API ticket with Steam and says whose it is,
+/// whether that account bought Oeee Cafe itself, and which of `packs` -- the
+/// catalogue's Steam products, on sale or not (`store_product::packs`) -- it
+/// owns.
 ///
 /// Steam gives no email address, so the identity never carries one.
 pub async fn verify_ticket(
@@ -162,6 +163,15 @@ pub async fn verify_ticket(
             None
         }
     };
+    let bought_app = match owns_outright(config, &params.steamid, config.app_id).await {
+        Ok(owned) => Some(owned),
+        Err(error) => {
+            // Unknown, which changes nothing; asked again with the next
+            // ticket or the next recheck.
+            tracing::warn!("could not check with Steam who owns the app: {error:#}");
+            None
+        }
+    };
 
     let name = persona_name(config, &params.steamid)
         .await
@@ -176,6 +186,7 @@ pub async fn verify_ticket(
         name,
         email: None,
         purchased,
+        bought_app,
     }))
 }
 
@@ -202,8 +213,10 @@ struct Ownership {
 /// written out, with the year it counts for -- `steam_id` owns now, or
 /// `None` when there are none to own.
 ///
-/// The app itself is never one of them: owning Oeee Cafe is not supporting
-/// it, and a catalogue that names only `app_id` asks Steam nothing at all.
+/// The app itself is never one of them: buying Oeee Cafe earns the
+/// `STEAM_SUPPORTER` achievement (`VerifiedIdentity::bought_app`), not a
+/// year's mark, and a catalogue that names only `app_id` asks Steam nothing
+/// at all.
 /// Nor is anything that is not an app id, which Steam could not be asked
 /// about.
 ///
@@ -288,16 +301,22 @@ async fn persona_name(config: &SteamConfig, steam_id: &str) -> Result<Option<Str
         .filter(|name| !name.is_empty()))
 }
 
-/// Unlocks `achievements` (their API names in Steamworks) for `steam_id`.
+/// Unlocks `achievements` (their API names in Steamworks) for `steam_id`,
+/// or locks them again when not `unlocked`.
 ///
 /// Server-side, with the publisher key, through `SetUserStatsForGame`: the
 /// achievements are set to be unlocked by the game server only, so the app
 /// cannot grant them and an account earns them however it drew -- in the
 /// app, in a browser or on a phone.
+///
+/// Locking is a value of 0, which Valve's documentation neither promises
+/// nor rules out; it is only ever asked for `STEAM_SUPPORTER` after a
+/// refund.
 pub async fn set_achievements(
     config: &SteamConfig,
     steam_id: &str,
     achievements: &[String],
+    unlocked: bool,
 ) -> Result<()> {
     let url = format!(
         "{}/ISteamUserStats/SetUserStatsForGame/v1/",
@@ -311,7 +330,7 @@ pub async fn set_achievements(
     ];
     for (i, name) in achievements.iter().enumerate() {
         form.push((format!("name[{i}]"), name.clone()));
-        form.push((format!("value[{i}]"), "1".to_string()));
+        form.push((format!("value[{i}]"), u8::from(unlocked).to_string()));
     }
     let response = http().post(url).form(&form).send().await?;
     let status = response.status();
@@ -338,6 +357,9 @@ pub async fn set_achievements(
 /// the server runs. An achievement Steam turns away or cannot be reached for
 /// is tried again next time round; nothing is lost by waiting.
 ///
+/// The ones taken back go as their own call, locked: should Steam refuse to
+/// lock one, that call is retried by itself and holds up nobody's unlocks.
+///
 /// Both colours run this for a moment during a deploy. Unlocking an
 /// achievement twice is unlocking it once, so they do no harm.
 pub async fn sync_achievements(db: sqlx::PgPool, config: SteamConfig) {
@@ -359,23 +381,31 @@ pub async fn sync_achievements(db: sqlx::PgPool, config: SteamConfig) {
             }
         };
         for account in waiting {
-            if let Err(error) =
-                set_achievements(&config, &account.steam_id, &account.achievements).await
+            for (achievements, unlocked) in
+                [(&account.achievements, true), (&account.revoked, false)]
             {
-                tracing::warn!(
-                    user_id = %account.user_id,
-                    "Steam did not take achievements: {error:#}"
-                );
-                continue;
-            }
-            let marked = async {
-                let mut tx = db.begin().await?;
-                mark_synced(&mut tx, account.user_id, &account.achievements).await?;
-                tx.commit().await?;
-                anyhow::Ok(())
-            };
-            if let Err(error) = marked.await {
-                tracing::warn!("could not record achievements Steam took: {error:#}");
+                if achievements.is_empty() {
+                    continue;
+                }
+                if let Err(error) =
+                    set_achievements(&config, &account.steam_id, achievements, unlocked).await
+                {
+                    tracing::warn!(
+                        user_id = %account.user_id,
+                        unlocked,
+                        "Steam did not take achievements: {error:#}"
+                    );
+                    continue;
+                }
+                let marked = async {
+                    let mut tx = db.begin().await?;
+                    mark_synced(&mut tx, account.user_id, achievements, !unlocked).await?;
+                    tx.commit().await?;
+                    anyhow::Ok(())
+                };
+                if let Err(error) = marked.await {
+                    tracing::warn!("could not record achievements Steam took: {error:#}");
+                }
             }
         }
     }
@@ -452,6 +482,55 @@ pub async fn recheck_supporters(db: sqlx::PgPool, config: SteamConfig) {
     }
 }
 
+/// Asks Steam again, once a day, whether each Steam account that earned
+/// someone `STEAM_SUPPORTER` still owns the app, so a refund takes it back
+/// without anyone signing in -- and a refunded account cannot open the app
+/// to hand over a ticket. A check Steam cannot answer changes nothing.
+///
+/// Separate from [`recheck_supporters`], which asks about the Supporter
+/// Packs and has nothing to do while the catalogue lists none.
+///
+/// Both colours run this for a moment during a deploy, and asking twice is
+/// harmless.
+pub async fn recheck_app_purchases(db: sqlx::PgPool, config: SteamConfig) {
+    use crate::models::achievement::{record_app_purchase, steam_purchases_due_for_check};
+
+    let mut every = tokio::time::interval(Duration::from_secs(10 * 60));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        every.tick().await;
+        let due = match db.begin().await {
+            Ok(mut tx) => steam_purchases_due_for_check(&mut tx, 100).await,
+            Err(error) => Err(error.into()),
+        };
+        let due = match due {
+            Ok(due) => due,
+            Err(error) => {
+                tracing::warn!("could not list Steam purchases to recheck: {error:#}");
+                continue;
+            }
+        };
+        for steam_id in due {
+            let owned = match owns_outright(&config, &steam_id, config.app_id).await {
+                Ok(owned) => owned,
+                Err(error) => {
+                    tracing::warn!("could not recheck a Steam purchase of the app: {error:#}");
+                    continue;
+                }
+            };
+            let recorded = async {
+                let mut tx = db.begin().await?;
+                record_app_purchase(&mut tx, &steam_id, owned).await?;
+                tx.commit().await?;
+                anyhow::Ok(())
+            };
+            if let Err(error) = recorded.await {
+                tracing::warn!("could not record a Steam purchase recheck: {error:#}");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -469,6 +548,16 @@ mod tests {
     }
 
     async fn fake_steam_owned_by(publisher_banned: bool, owner: &'static str) -> SteamConfig {
+        fake_steam_selling(publisher_banned, owner, &["480", "481"]).await
+    }
+
+    /// Steam, where `owner` holds the copies of `owned` -- app ids, the app
+    /// itself (480) among them or not.
+    async fn fake_steam_selling(
+        publisher_banned: bool,
+        owner: &'static str,
+        owned: &'static [&'static str],
+    ) -> SteamConfig {
         let app = Router::new()
             .route(
                 "/ISteamUserAuth/AuthenticateUserTicket/v1/",
@@ -492,11 +581,12 @@ mod tests {
             )
             .route(
                 "/ISteamUser/CheckAppOwnership/v2/",
-                // Owns the Supporter Pack (481), not only the free app (480).
                 get(move |Query(q): Query<HashMap<String, String>>| async move {
-                    let dlc = q.get("appid").map(String::as_str) == Some("481");
+                    let ownsapp = q
+                        .get("appid")
+                        .is_some_and(|app_id| owned.contains(&app_id.as_str()));
                     Json::<Value>(json!({"appownership": {
-                        "ownsapp": dlc,
+                        "ownsapp": ownsapp,
                         "permanent": true,
                         "timestamp": "2026-09-22T00:00:00Z",
                         "ownersteamid": owner,
@@ -560,6 +650,27 @@ mod tests {
             Some(vec![2026]),
             "the year of the pack it owns"
         );
+        assert_eq!(identity.bought_app, Some(true));
+    }
+
+    /// Buying the app and buying a pack are two questions with two answers.
+    #[tokio::test]
+    async fn the_app_is_asked_about_whether_or_not_there_are_packs() {
+        let config = fake_steam_selling(false, STEAM_ID, &["480"]).await;
+        let identity = verify_ticket(&config, &[], "14000000abcdef")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(identity.bought_app, Some(true));
+        assert_eq!(identity.purchased, None);
+
+        let config = fake_steam_selling(false, STEAM_ID, &["481"]).await;
+        let identity = verify_ticket(&config, &this_years(), "14000000abcdef")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(identity.bought_app, Some(false), "a pack is not the app");
+        assert_eq!(identity.purchased.as_deref().map(years), Some(vec![2026]));
     }
 
     #[tokio::test]
@@ -637,6 +748,7 @@ mod tests {
             Some(Vec::new()),
             "a borrowed copy is none"
         );
+        assert_eq!(identity.bought_app, Some(false), "nor is a borrowed app");
     }
 
     #[tokio::test]
@@ -688,7 +800,7 @@ mod tests {
         };
 
         let achievements = ["FIRST_DRAWING".to_string(), "FIRST_RELAY".to_string()];
-        set_achievements(&config, STEAM_ID, &achievements)
+        set_achievements(&config, STEAM_ID, &achievements, true)
             .await
             .unwrap();
         let form = seen.lock().unwrap().take().unwrap();
@@ -700,8 +812,17 @@ mod tests {
         assert_eq!(form["name[1]"], "FIRST_RELAY");
         assert_eq!(form["value[1]"], "1");
 
+        // Taken back: the same names, locked.
+        set_achievements(&config, STEAM_ID, &achievements[..1], false)
+            .await
+            .unwrap();
+        let form = seen.lock().unwrap().take().unwrap();
+        assert_eq!(form["count"], "1");
+        assert_eq!(form["name[0]"], "FIRST_DRAWING");
+        assert_eq!(form["value[0]"], "0");
+
         config.web_api_key = "wrong".to_string();
-        assert!(set_achievements(&config, STEAM_ID, &achievements)
+        assert!(set_achievements(&config, STEAM_ID, &achievements, true)
             .await
             .is_err());
     }

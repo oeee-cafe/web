@@ -195,6 +195,12 @@ impl App {
             // one added at /admin/store is asked about without a restart.
             tokio::task::spawn(crate::steam::recheck_supporters(
                 self.state.db_pool.clone(),
+                steam.clone(),
+            ));
+            // STEAM_SUPPORTER, from whether each Steam account that earned
+            // it still owns the app: a refund takes it back.
+            tokio::task::spawn(crate::steam::recheck_app_purchases(
+                self.state.db_pool.clone(),
                 steam,
             ));
         }

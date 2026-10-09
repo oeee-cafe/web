@@ -10,6 +10,10 @@
 //! Achievements are the site's; Steam hears about them afterwards, from
 //! `steam::sync_achievements`, which works through the rows Steam has not yet
 //! accepted.
+//!
+//! An achievement is kept for good, with one exception: `STEAM_SUPPORTER`,
+//! for buying Oeee Cafe on Steam, goes when Steam says the purchase was
+//! refunded ([`record_app_purchase`]), and Steam is told to lock it again.
 
 use anyhow::Result;
 use sqlx::types::Uuid;
@@ -77,17 +81,118 @@ pub async fn award_achievements(tx: &mut Transaction<'_, Postgres>, user_id: Uui
     Ok(())
 }
 
-/// Gives `user_id` an achievement that is not derived from what the site
-/// stores: having bought Oeee Cafe on Steam, which only Steam knows.
-pub async fn grant_achievement(
+/// Gives `user_id` `STEAM_SUPPORTER` for `steam_id`'s purchase of the app:
+/// not derived from what the site stores, because only Steam knows it. A
+/// row taken back after a refund is given back, and Steam is told again.
+///
+/// One purchase earns it for one account, as a Supporter Pack belongs to
+/// one (`models::supporter`): signing into another account inside the Steam
+/// app moves it there, and the account it leaves no longer has it.
+pub async fn grant_steam_supporter(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
-    achievement: &str,
+    steam_id: &str,
+) -> Result<()> {
+    // The account it leaves loses the purchase too, so neither a recheck
+    // nor a refund of it comes back to that account. Steam is told to lock
+    // it for the Steam account that account is linked to -- unless that is
+    // the one that bought the app, which still owns it, and whose
+    // achievement Steam should go on showing.
+    query!(
+        r#"
+        UPDATE user_achievements a
+        SET revoked_at = COALESCE(a.revoked_at, now()),
+            steam_owner = NULL,
+            steam_synced_at = CASE
+                -- Already taken back, by a refund: whatever Steam is still
+                -- to be told stands.
+                WHEN a.revoked_at IS NOT NULL THEN a.steam_synced_at
+                WHEN EXISTS (
+                    SELECT 1 FROM user_identities i
+                    WHERE i.user_id = a.user_id AND i.provider = 'steam' AND i.subject = $2
+                ) THEN COALESCE(a.steam_synced_at, now())
+            END
+        WHERE a.achievement = 'STEAM_SUPPORTER'
+          AND a.steam_owner = $2
+          AND a.user_id <> $1
+        "#,
+        user_id,
+        steam_id,
+    )
+    .execute(&mut **tx)
+    .await?;
+    query!(
+        r#"
+        INSERT INTO user_achievements (user_id, achievement, steam_owner, steam_checked_at)
+        VALUES ($1, 'STEAM_SUPPORTER', $2, now())
+        ON CONFLICT (user_id, achievement) DO UPDATE
+        SET steam_owner = EXCLUDED.steam_owner,
+            steam_checked_at = now(),
+            revoked_at = NULL,
+            earned_at = CASE
+                WHEN user_achievements.revoked_at IS NULL THEN user_achievements.earned_at
+                ELSE now()
+            END,
+            steam_synced_at = CASE
+                WHEN user_achievements.revoked_at IS NULL THEN user_achievements.steam_synced_at
+            END
+        "#,
+        user_id,
+        steam_id,
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// A Steam account whose purchase of the app earned someone
+/// `STEAM_SUPPORTER`, revoked or not, and not asked about for a day.
+pub async fn steam_purchases_due_for_check(
+    tx: &mut Transaction<'_, Postgres>,
+    limit: i64,
+) -> Result<Vec<String>> {
+    let owners = sqlx::query_scalar!(
+        r#"
+        SELECT steam_owner AS "steam_owner!"
+        FROM user_achievements
+        WHERE steam_owner IS NOT NULL
+        GROUP BY steam_owner
+        HAVING bool_or(steam_checked_at IS NULL)
+            OR min(steam_checked_at) < now() - interval '1 day'
+        ORDER BY min(steam_checked_at) NULLS FIRST
+        LIMIT $1
+        "#,
+        limit,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(owners)
+}
+
+/// What Steam says now about `steam_id`'s purchase of the app, for every
+/// account it earned `STEAM_SUPPORTER`: refunded takes it back, and owned
+/// again -- a refund Steam reversed -- gives it back. Either change has
+/// Steam told.
+pub async fn record_app_purchase(
+    tx: &mut Transaction<'_, Postgres>,
+    steam_id: &str,
+    owned: bool,
 ) -> Result<()> {
     query!(
-        "INSERT INTO user_achievements (user_id, achievement) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        user_id,
-        achievement,
+        r#"
+        UPDATE user_achievements
+        SET steam_checked_at = now(),
+            revoked_at = CASE
+                WHEN $2 THEN NULL
+                ELSE COALESCE(revoked_at, now())
+            END,
+            steam_synced_at = CASE
+                WHEN (revoked_at IS NULL) = $2 THEN steam_synced_at
+            END
+        WHERE achievement = 'STEAM_SUPPORTER' AND steam_owner = $1
+        "#,
+        steam_id,
+        owned,
     )
     .execute(&mut **tx)
     .await?;
@@ -110,7 +215,7 @@ pub async fn list_achievements(
     user_id: Uuid,
 ) -> Result<Vec<Earned>> {
     let rows = query!(
-        "SELECT achievement, earned_at FROM user_achievements WHERE user_id = $1 ORDER BY earned_at, achievement",
+        "SELECT achievement, earned_at FROM user_achievements WHERE user_id = $1 AND revoked_at IS NULL ORDER BY earned_at, achievement",
         user_id
     )
     .fetch_all(&mut **tx)
@@ -163,11 +268,13 @@ pub async fn resend_achievements_to_steam(
 }
 
 /// Achievements a linked Steam account has not yet accepted, a batch at a
-/// time, oldest first.
+/// time, oldest first: the ones to unlock, and the ones taken back that
+/// Steam is to lock again.
 pub struct Unsynced {
     pub user_id: Uuid,
     pub steam_id: String,
     pub achievements: Vec<String>,
+    pub revoked: Vec<String>,
 }
 
 pub async fn unsynced_achievements(
@@ -179,7 +286,8 @@ pub async fn unsynced_achievements(
         SELECT
             a.user_id,
             i.subject AS steam_id,
-            array_agg(a.achievement ORDER BY a.achievement) AS "achievements!"
+            array_remove(array_agg(CASE WHEN a.revoked_at IS NULL THEN a.achievement END ORDER BY a.achievement), NULL) AS "achievements!",
+            array_remove(array_agg(CASE WHEN a.revoked_at IS NOT NULL THEN a.achievement END ORDER BY a.achievement), NULL) AS "revoked!"
         FROM user_achievements a
         JOIN user_identities i ON i.user_id = a.user_id AND i.provider = 'steam'
         WHERE a.steam_synced_at IS NULL
@@ -197,22 +305,29 @@ pub async fn unsynced_achievements(
             user_id: row.user_id,
             steam_id: row.steam_id,
             achievements: row.achievements,
+            revoked: row.revoked,
         })
         .collect())
 }
 
+/// Records that Steam took `achievements` as unlocked, or as locked when
+/// `revoked`. One that changed the other way since it was sent stays
+/// unsynced, to be sent again as it is now.
 pub async fn mark_synced(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
     achievements: &[String],
+    revoked: bool,
 ) -> Result<()> {
     query!(
         r#"
         UPDATE user_achievements SET steam_synced_at = now()
         WHERE user_id = $1 AND achievement = ANY($2) AND steam_synced_at IS NULL
+          AND (revoked_at IS NOT NULL) = $3
         "#,
         user_id,
         achievements,
+        revoked,
     )
     .execute(&mut **tx)
     .await?;
@@ -447,7 +562,7 @@ mod tests {
         assert_eq!(waiting[0].steam_id, "76561190000000009");
         assert_eq!(waiting[0].achievements, ["FIRST_DRAWING"]);
 
-        mark_synced(&mut tx, with_steam, &waiting[0].achievements)
+        mark_synced(&mut tx, with_steam, &waiting[0].achievements, false)
             .await
             .unwrap();
         assert!(!unsynced_achievements(&mut tx, 1000)
@@ -465,5 +580,167 @@ mod tests {
             .iter()
             .any(|u| u.user_id == with_steam));
         tx.rollback().await.unwrap();
+    }
+
+    /// Unsynced for `user_id`: (to unlock, to lock).
+    async fn waiting_for_steam(
+        tx: &mut Transaction<'_, Postgres>,
+        user_id: Uuid,
+    ) -> Option<(Vec<String>, Vec<String>)> {
+        unsynced_achievements(tx, 1000)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|u| u.user_id == user_id)
+            .map(|u| (u.achievements, u.revoked))
+    }
+
+    #[tokio::test]
+    async fn a_refund_takes_steam_supporter_back_and_steam_is_told() {
+        let Some(mut tx) = tx().await else { return };
+        let buyer = user(&mut tx, "achievement_test_f").await;
+        let steam_id = "76561190000000020";
+        query!(
+            "INSERT INTO user_identities (user_id, provider, subject) VALUES ($1, 'steam', $2)",
+            buyer,
+            steam_id
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        let supporter = ["STEAM_SUPPORTER".to_string()];
+
+        grant_steam_supporter(&mut tx, buyer, steam_id)
+            .await
+            .unwrap();
+        assert_eq!(earned_live(&mut tx, buyer).await, supporter);
+        assert_eq!(
+            waiting_for_steam(&mut tx, buyer).await,
+            Some((supporter.to_vec(), vec![]))
+        );
+        mark_synced(&mut tx, buyer, &supporter, false)
+            .await
+            .unwrap();
+
+        // Still owned: nothing changes, and Steam is not told again.
+        record_app_purchase(&mut tx, steam_id, true).await.unwrap();
+        assert_eq!(waiting_for_steam(&mut tx, buyer).await, None);
+
+        // Refunded: gone from the profile, and Steam is to lock it.
+        record_app_purchase(&mut tx, steam_id, false).await.unwrap();
+        assert!(earned_live(&mut tx, buyer).await.is_empty());
+        assert_eq!(
+            waiting_for_steam(&mut tx, buyer).await,
+            Some((vec![], supporter.to_vec()))
+        );
+        // An unlock sent before the refund does not count as the lock.
+        mark_synced(&mut tx, buyer, &supporter, false)
+            .await
+            .unwrap();
+        assert!(waiting_for_steam(&mut tx, buyer).await.is_some());
+        mark_synced(&mut tx, buyer, &supporter, true).await.unwrap();
+        assert_eq!(waiting_for_steam(&mut tx, buyer).await, None);
+
+        // Asked again while still refunded: Steam is not told twice.
+        record_app_purchase(&mut tx, steam_id, false).await.unwrap();
+        assert_eq!(waiting_for_steam(&mut tx, buyer).await, None);
+
+        // Bought again: back, and unlocked again.
+        grant_steam_supporter(&mut tx, buyer, steam_id)
+            .await
+            .unwrap();
+        assert_eq!(earned_live(&mut tx, buyer).await, supporter);
+        assert_eq!(
+            waiting_for_steam(&mut tx, buyer).await,
+            Some((supporter.to_vec(), vec![]))
+        );
+
+        // Another account's refund is not this one's.
+        record_app_purchase(&mut tx, "76561190000000021", false)
+            .await
+            .unwrap();
+        assert_eq!(earned_live(&mut tx, buyer).await, supporter);
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn steam_supporter_moves_with_the_purchase() {
+        let Some(mut tx) = tx().await else { return };
+        let steam_id = "76561190000000030";
+        let linked = user(&mut tx, "achievement_test_g").await;
+        let other = user(&mut tx, "achievement_test_h").await;
+        let elsewhere = user(&mut tx, "achievement_test_i").await;
+        for (id, subject) in [(linked, steam_id), (elsewhere, "76561190000000031")] {
+            query!(
+                "INSERT INTO user_identities (user_id, provider, subject) VALUES ($1, 'steam', $2)",
+                id,
+                subject
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+        let supporter = ["STEAM_SUPPORTER".to_string()];
+
+        // Earned by the account linked to the Steam account that bought it,
+        // then by a password account signed in inside the Steam app.
+        grant_steam_supporter(&mut tx, linked, steam_id)
+            .await
+            .unwrap();
+        mark_synced(&mut tx, linked, &supporter, false)
+            .await
+            .unwrap();
+        grant_steam_supporter(&mut tx, other, steam_id)
+            .await
+            .unwrap();
+        assert!(earned_live(&mut tx, linked).await.is_empty());
+        assert_eq!(earned_live(&mut tx, other).await, supporter);
+        // The buyer's Steam account still owns the app: Steam is not told
+        // to lock it.
+        assert_eq!(waiting_for_steam(&mut tx, linked).await, None);
+
+        // A recheck of the purchase, or a refund of it, is the new holder's
+        // alone.
+        record_app_purchase(&mut tx, steam_id, true).await.unwrap();
+        assert!(earned_live(&mut tx, linked).await.is_empty());
+        record_app_purchase(&mut tx, steam_id, false).await.unwrap();
+        assert!(earned_live(&mut tx, other).await.is_empty());
+        assert!(earned_live(&mut tx, linked).await.is_empty());
+
+        // Bought again and moved to an account linked to some other Steam
+        // account, then away from it: that Steam account is told to lock it.
+        grant_steam_supporter(&mut tx, elsewhere, steam_id)
+            .await
+            .unwrap();
+        mark_synced(&mut tx, elsewhere, &supporter, false)
+            .await
+            .unwrap();
+        grant_steam_supporter(&mut tx, linked, steam_id)
+            .await
+            .unwrap();
+        assert_eq!(earned_live(&mut tx, linked).await, supporter);
+        assert!(earned_live(&mut tx, elsewhere).await.is_empty());
+        assert!(earned_live(&mut tx, other).await.is_empty());
+        assert_eq!(
+            waiting_for_steam(&mut tx, elsewhere).await,
+            Some((vec![], supporter.to_vec()))
+        );
+
+        // Nor does a recheck bring it back to an account it was refunded
+        // on before it moved.
+        record_app_purchase(&mut tx, steam_id, true).await.unwrap();
+        assert!(earned_live(&mut tx, other).await.is_empty());
+        assert!(earned_live(&mut tx, elsewhere).await.is_empty());
+        assert_eq!(earned_live(&mut tx, linked).await, supporter);
+        tx.rollback().await.unwrap();
+    }
+
+    async fn earned_live(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) -> Vec<String> {
+        list_achievements(tx, user_id)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|e| e.achievement)
+            .collect()
     }
 }

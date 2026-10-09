@@ -170,6 +170,7 @@ pub async fn verify_id_token(
         name: name_from_user(user),
         email,
         purchased: None,
+        bought_app: None,
     }))
 }
 

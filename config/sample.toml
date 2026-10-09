@@ -51,6 +51,8 @@ fcm_project_id = ""
 # user's. The achievements' API names in Steamworks are FIRST_DRAWING,
 # FIRST_RELAY, FIRST_COLLABORATION and STEAM_SUPPORTER, each set to be unlocked by the game
 # server ("Set By: Official GS"); the server unlocks them itself.
+# STEAM_SUPPORTER is for buying the app itself (app_id), not a Supporter Pack,
+# and a refund locks it again.
 # [steam]
 # app_id = 0
 # web_api_key = ""

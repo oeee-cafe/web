@@ -317,6 +317,7 @@ mod tests {
             name: Some("오이".to_string()),
             email: Some("oeee@example.test".to_string()),
             purchased: None,
+            bought_app: None,
         }
     }
 

@@ -919,6 +919,7 @@ mod tests {
                 name: None,
                 email: None,
                 purchased: Some(vec![pack(this_year())]),
+                bought_app: None,
             },
         )
         .await
@@ -1024,6 +1025,7 @@ mod tests {
                 name: None,
                 email: None,
                 purchased: None,
+                bought_app: None,
             },
         )
         .await

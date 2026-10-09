@@ -70,25 +70,16 @@ pub struct VerifiedIdentity {
     /// -- the DLCs, on Steam. `None` when that could not be asked, which
     /// leaves the account's standing as it was, and `Some` of nothing when
     /// it owns none. Whichever account it signs into supports the years it
-    /// names, and keeps the achievement after.
+    /// names.
     #[serde(default)]
     pub purchased: Option<Vec<OwnedProduct>>,
-}
-
-impl VerifiedIdentity {
-    /// The achievement for having bought the Supporter Pack from this
-    /// provider.
-    fn supporter_achievement(&self) -> Option<&'static str> {
-        match self.provider {
-            Provider::Steam => Some("STEAM_SUPPORTER"),
-            Provider::Apple | Provider::Google => None,
-        }
-        .filter(|_| {
-            self.purchased
-                .as_deref()
-                .is_some_and(|packs| !packs.is_empty())
-        })
-    }
+    /// Whether the provider says this account bought the app itself -- Oeee
+    /// Cafe on Steam, which is sold rather than given away. Whichever
+    /// account it signs into earns `STEAM_SUPPORTER` for it, until Steam
+    /// says the purchase was refunded. `None` when it was not asked or could
+    /// not answer, which changes nothing.
+    #[serde(default)]
+    pub bought_app: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -284,8 +275,12 @@ pub async fn touch_identity(
 }
 
 /// Records the packs the provider says `identity` owns now as `user_id`'s,
-/// and gives that account the achievement if it owns any -- bought since it
-/// signed in, or before the achievement existed.
+/// and gives that account `STEAM_SUPPORTER` if it bought the app on Steam --
+/// since it signed in, or before the achievement existed. Not for a
+/// Supporter Pack: the pack is the mark beside a name, and the achievement
+/// is for paying for Oeee Cafe on Steam at all. A Steam account that says it
+/// no longer owns the app has been refunded, and takes the achievement back
+/// from whoever its purchase earned it.
 ///
 /// The packs are the account's, not the identity's: the Steam app hands over
 /// a ticket for whoever is signed in here, linked or not (see
@@ -303,8 +298,14 @@ pub async fn refresh_standing(
         super::supporter::record_owned_products(tx, user_id, store, &identity.subject, packs)
             .await?;
     }
-    if let Some(achievement) = identity.supporter_achievement() {
-        super::achievement::grant_achievement(tx, user_id, achievement).await?;
+    match (identity.provider, identity.bought_app) {
+        (Provider::Steam, Some(true)) => {
+            super::achievement::grant_steam_supporter(tx, user_id, &identity.subject).await?
+        }
+        (Provider::Steam, Some(false)) => {
+            super::achievement::record_app_purchase(tx, &identity.subject, false).await?
+        }
+        _ => {}
     }
     Ok(())
 }
@@ -406,6 +407,7 @@ mod tests {
             name: Some("오이".to_string()),
             email: None,
             purchased: Some(Vec::new()),
+            bought_app: None,
         }
     }
 
@@ -539,7 +541,7 @@ mod tests {
         // Bought, then linked.
         let buyer = user(&mut tx, "identity_test_h", None, None).await;
         let bought = VerifiedIdentity {
-            purchased: Some(vec![pack()]),
+            bought_app: Some(true),
             ..steam("76561190000000011")
         };
         link_identity(&mut tx, buyer.id, &bought)
@@ -560,13 +562,43 @@ mod tests {
             &mut tx,
             borrower.id,
             &VerifiedIdentity {
-                purchased: Some(vec![pack()]),
-                ..borrowed
+                bought_app: Some(true),
+                ..borrowed.clone()
             },
         )
         .await
         .unwrap();
         assert!(has_supporter_achievement(&mut tx, borrower.id).await);
+
+        // Steam not answering changes nothing; Steam saying it is no longer
+        // owned is a refund, and takes it back.
+        touch_identity(&mut tx, borrower.id, &borrowed)
+            .await
+            .unwrap();
+        assert!(has_supporter_achievement(&mut tx, borrower.id).await);
+        touch_identity(
+            &mut tx,
+            borrower.id,
+            &VerifiedIdentity {
+                bought_app: Some(false),
+                ..borrowed
+            },
+        )
+        .await
+        .unwrap();
+        assert!(!has_supporter_achievement(&mut tx, borrower.id).await);
+
+        // A Supporter Pack is the mark beside a name, not the achievement.
+        let packer = user(&mut tx, "identity_test_j", None, None).await;
+        let packed = VerifiedIdentity {
+            purchased: Some(vec![pack()]),
+            ..steam("76561190000000013")
+        };
+        link_identity(&mut tx, packer.id, &packed)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!has_supporter_achievement(&mut tx, packer.id).await);
         tx.rollback().await.unwrap();
     }
 
