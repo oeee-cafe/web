@@ -4134,6 +4134,23 @@ html[data-store="steam"] .auth-steam {
   }
 }
 
+/* Signing in with Discord, offered everywhere; in the apps, in a browser of
+   the system's (app_sign_in.jinja). Discord's blurple with white words, the
+   same in both themes, as Discord's own buttons are. */
+.ds-button.auth-discord,
+.ds-button.auth-discord:visited {
+  border-color: #5865f2;
+  background-color: #5865f2;
+  color: #fff;
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .ds-button.auth-discord:hover {
+    border-color: #4752c4;
+    background-color: #4752c4;
+  }
+}
+
 
 
 /* The agreement: a box to tick, and the two pages it agrees to. */

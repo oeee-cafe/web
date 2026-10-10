@@ -151,6 +151,30 @@ fn signing_in_offers_google_only_where_it_is_on() {
     assert!(!ko.contains("google-light.svg"));
 }
 
+#[test]
+fn signing_in_offers_discord_only_where_it_is_on() {
+    let env = test_support::env();
+    let render = |discord_enabled: bool, linking_provider: serde_json::Value| {
+        env.get_template("login.jinja")
+            .expect("login loads")
+            .render(context! {
+                next => "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985",
+                discord_enabled,
+                linking_provider => Serde(linking_provider),
+                ..chrome()
+            })
+            .expect("login renders")
+    };
+    assert!(!render(false, json!(null)).contains(r#"href="/auth/discord"#));
+    let on = render(true, json!(null));
+    assert!(on.contains("auth-discord"));
+    // Back to the room the friend was asked into, once signed in.
+    assert!(on.contains("/auth/discord?next="));
+    assert!(on.contains("9c881320-2b43-4afa-b2bb-7128c8a3e985"));
+    assert!(on.contains("sign-in-with-discord"));
+    assert!(!render(true, json!("Discord")).contains(r#"href="/auth/discord"#));
+}
+
 /// Apple's answer, posted on from this site: every field it carried, as
 /// a value and never as markup.
 #[test]

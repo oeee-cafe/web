@@ -47,10 +47,10 @@ use crate::web::handlers::home::{
     my_communities_feed, my_timeline, recent_comments_page,
 };
 use crate::web::handlers::identity::{
-    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, do_apple_sign_in,
-    do_google_sign_in, do_identity_welcome, do_steam_sign_in, do_unlink_identity, google_callback,
-    google_sign_in, google_start, handoff_claim, handoff_done, handoff_start, identity_welcome,
-    steam_app_only,
+    apple_callback, apple_sign_in, apple_start, cancel_pending_identity, discord_callback,
+    discord_sign_in, do_apple_sign_in, do_google_sign_in, do_identity_welcome, do_steam_sign_in,
+    do_unlink_identity, google_callback, google_sign_in, google_start, handoff_claim, handoff_done,
+    handoff_start, identity_welcome, steam_app_only,
 };
 use crate::web::handlers::notifications::{
     delete_notification_handler, get_unread_notification_count, list_notifications,
@@ -596,6 +596,8 @@ impl App {
             .route("/auth/google", post(do_google_sign_in))
             .route("/auth/google/callback", get(google_callback))
             .route("/auth/google/start", post(google_start))
+            .route("/auth/discord", get(discord_sign_in))
+            .route("/auth/discord/callback", get(discord_callback))
             .route("/auth/handoff/start", post(handoff_start))
             .route("/auth/handoff/claim", post(handoff_claim))
             .route("/auth/handoff/done", get(handoff_done))

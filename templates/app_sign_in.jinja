@@ -28,7 +28,10 @@
    on iOS and macOS (in ASWebAuthenticationSession, which Google allows,
    sent straight to Google's page so the sheet names Google), both on
    Windows (Google there straight to Google's page too, which saves the
-   browser a stop at this site on its way). Google on iOS and macOS once
+   browser a stop at this site on its way), and Discord in every app, by
+   /auth/discord, whose sign-in wants the person's Discord password or
+   passkey, which the browser has and the web view does not. Discord has
+   no sheet anywhere. Google on iOS and macOS once
    had a sheet of the app's own, with an OAuth client and a token exchange
    of its own to keep; this is the site's own sign-in, in the same system
    sheet.
@@ -299,11 +302,13 @@
       browser(provider, next, "provider");
     }
 
+    // Discord, in a browser in every app, by this site's own page: the
+    // person's Discord password or passkey is in the browser, not here.
     var WAYS = {
-      ios: { apple: native, google: atGoogle },
-      macos: { apple: native, google: atGoogle },
-      android: { apple: browser, google: native },
-      windows: { apple: browser, google: atGoogle }
+      ios: { apple: native, google: atGoogle, discord: browser },
+      macos: { apple: native, google: atGoogle, discord: browser },
+      android: { apple: browser, google: native, discord: browser },
+      windows: { apple: browser, google: atGoogle, discord: browser }
     };
     var root = document.documentElement;
     var ways = WAYS[root.getAttribute("data-app")];
@@ -321,7 +326,7 @@
         if (event.defaultPrevented || event.button !== 0) return;
         var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
         if (!link || link.origin !== new URL(document.baseURI).origin) return;
-        var provider = (/^\/auth\/(apple|google)$|^\/auth\/(steam)\/app$/.exec(link.pathname) || []).filter(Boolean)[1];
+        var provider = (/^\/auth\/(apple|google|discord)$|^\/auth\/(steam)\/app$/.exec(link.pathname) || []).filter(Boolean)[1];
         if (!provider || !ways[provider]) return;
         event.preventDefault();
         var next = new URL(link.href).searchParams.get("next");

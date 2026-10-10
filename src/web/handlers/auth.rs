@@ -149,6 +149,7 @@ pub async fn login(
                 steam_enabled => state.config.steam.is_some(),
                 apple_enabled => state.config.apple.is_some(),
                 google_enabled => state.config.google.is_some(),
+                discord_enabled => state.config.discord.is_some(),
                 ftl_lang
             },
         )

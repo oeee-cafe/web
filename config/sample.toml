@@ -79,6 +79,14 @@ fcm_project_id = ""
 # client_id = "0000.apps.googleusercontent.com"
 # client_secret = ""
 
+# Sign in with Discord. Leave the table out to turn it off. client_id and
+# client_secret are the Oeee Cafe application's (Discord Developer Portal >
+# the application > OAuth2), with {base_url}/auth/discord/callback added as a
+# redirect. Every app signs in with it in a browser of the system's.
+# [discord]
+# client_id = "1558602531133722646"
+# client_secret = ""
+
 # The App Store's side of the iOS app: what the Supporter Pack is sold as,
 # and the key that asks Apple about a purchase. Separate credentials from
 # [apple] above, from App Store Connect > Users and Access > Integrations >

@@ -33,8 +33,8 @@
         <button type="submit" form="identity-cancel" class="ds-button auth-secondary">{{ ftl_get_message("identity-cancel") }}</button>
       {% endif %}
 
-      {% if not linking_provider and (steam_enabled or apple_enabled or google_enabled) %}
-        {{ sign_in_providers("sign-in-other-ways", ftl_lang, next, steam_enabled, apple_enabled, google_enabled) }}
+      {% if not linking_provider and (steam_enabled or apple_enabled or google_enabled or discord_enabled) %}
+        {{ sign_in_providers("sign-in-other-ways", ftl_lang, next, steam_enabled, apple_enabled, google_enabled, discord_enabled) }}
       {% endif %}
 
       <div class="auth-divider"><span>{{ ftl_get_message("forgot-password") }}</span></div>

@@ -6,8 +6,8 @@
    where the reader was going and which providers are on are handed over;
    `question` is the message key over the buttons. The card around it
    takes the buttons' 40px for its own (`auth-card-providers`, style.css). #}
-{% macro sign_in_providers(question, lang, next, steam_enabled, apple_enabled, google_enabled) -%}
-  <div class="auth-social{% if steam_enabled and not apple_enabled and not google_enabled %} auth-steam{% endif %}">
+{% macro sign_in_providers(question, lang, next, steam_enabled, apple_enabled, google_enabled, discord_enabled=false) -%}
+  <div class="auth-social{% if steam_enabled and not apple_enabled and not google_enabled and not discord_enabled %} auth-steam{% endif %}">
     <div class="auth-divider"><span>{{ ftl_get_message(question) }}</span></div>
     {% if steam_enabled %}
       {# Only the Oeee Cafe app on Steam can follow this: it stops the
@@ -58,6 +58,17 @@
           <span class="auth-google-drawn"><img src="{{ '/static/signin/google-mark.svg' | cachebuster | safe }}" width="20" height="20" alt="" /><span>{{ ftl_get_message("sign-in-with-google") }}</span></span>
         {%- endif %}
       </a>
+    {% endif %}
+    {% if discord_enabled %}
+      {# Discord's sign-in page, and back, in a browser: in every app the
+         page takes the press itself and opens this in a browser of the
+         system's (app_sign_in.jinja), where the person's Discord
+         password or passkey is. Most who press it were asked into a
+         collaborative room from Discord and have no account here yet.
+
+         Discord's colour, and its name in the reader's language, at the
+         card's 40px (style.css). #}
+      <a class="ds-button auth-secondary auth-discord" href="/auth/discord{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-discord") }}</a>
     {% endif %}
   </div>
 {%- endmacro %}

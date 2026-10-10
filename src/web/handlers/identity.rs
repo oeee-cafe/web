@@ -1,5 +1,5 @@
-//! Signing in with another service's account: Steam, Apple and Google now,
-//! Microsoft after them.
+//! Signing in with another service's account: Steam, Apple, Google and
+//! Discord now, Microsoft after them.
 //!
 //! A provider's own handler turns what its client sent into a
 //! [`VerifiedIdentity`] and hands it to [`sign_in_with`], which is the same
@@ -33,6 +33,13 @@
 //! in a browser of the system's ([`handoff_start`]), and the Android app
 //! with Credential Manager, whose ID token the page posts to
 //! [`do_google_sign_in`] as the Steam app's page posts its ticket.
+//!
+//! Discord comes back by a GET too ([`discord_callback`]), and has no ID
+//! token: the code is traded for an access token, and Discord asked whose it
+//! is (`crate::discord`). Every app signs in with it in a browser of the
+//! system's, as the desktop and iOS apps do with Google: Discord's sign-in
+//! asks for a password or a passkey, which the person keeps there, not in an
+//! app's web view.
 
 use axum::extract::{Path, Query, State};
 use axum::http::header::ORIGIN;
@@ -50,6 +57,7 @@ use tower_sessions::Session;
 
 use crate::app_error::AppError;
 use crate::apple;
+use crate::discord;
 use crate::google;
 use crate::models::identity::{
     find_user_by_identity, find_user_by_verified_email, link_identity, touch_identity,
@@ -999,6 +1007,140 @@ async fn finish_google_sign_in(
     .await
 }
 
+const DISCORD_REQUEST_KEY: &str = "identity.discord";
+
+/// A sign-in with Discord under way: the state its answer has to carry back.
+/// Discord has no ID token, and so no nonce (`crate::discord`).
+#[derive(Serialize, Deserialize)]
+struct DiscordRequest {
+    state: String,
+    next: Option<String>,
+    started_at: DateTime<Utc>,
+    /// The app's handoff this sign-in was started for; see [`AppleRequest`].
+    #[serde(default)]
+    handoff: Option<String>,
+}
+
+fn discord_redirect_uri(base_url: &str) -> String {
+    format!("{}/auth/discord/callback", base_url.trim_end_matches('/'))
+}
+
+/// Sends the browser to Discord to sign in, remembering the state its answer
+/// has to carry back.
+pub async fn discord_sign_in(
+    auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    Query(query): Query<NextQuery>,
+) -> Result<Response, AppError> {
+    let Some(config) = state.config.discord.as_ref() else {
+        let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "discord-sign-in-unavailable"));
+        return Ok(Redirect::to(back_for(&auth_session)).into_response());
+    };
+
+    let request = DiscordRequest {
+        state: random_token(),
+        next: local_next(query.next.as_deref()),
+        started_at: Utc::now(),
+        handoff: pending_handoff(&state, query.handoff.as_deref()).await,
+    };
+    let url = discord::authorize_url(
+        config,
+        &discord_redirect_uri(&state.config.base_url),
+        &request.state,
+    );
+    session
+        .insert(DISCORD_REQUEST_KEY, request)
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    Ok(Redirect::to(&url).into_response())
+}
+
+/// Where Discord sends the browser back: a top-level GET, as Google's is, so
+/// the answer is read here. Its fields are Google's: a code and the state,
+/// or an error such as `access_denied`.
+pub async fn discord_callback(
+    mut auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    Query(answer): Query<GoogleAnswer>,
+) -> Result<Response, AppError> {
+    let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+    let back = back_for(&auth_session);
+
+    // Each sign-in's state answers once, from this browser's session.
+    let request = session
+        .remove::<DiscordRequest>(DISCORD_REQUEST_KEY)
+        .await
+        .ok()
+        .flatten()
+        .filter(|request| Utc::now() - request.started_at <= Duration::minutes(PENDING_FOR));
+    let Some(config) = state.config.discord.as_ref() else {
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "discord-sign-in-unavailable"));
+        return Ok(Redirect::to(back).into_response());
+    };
+    // Put away without signing in: the page stays as it was.
+    if answer.error.is_some() {
+        return Ok(Redirect::to(back).into_response());
+    }
+    let invalid = || -> Result<Response, AppError> {
+        messages
+            .clone()
+            .error(say(&bundle, "identity-sign-in-invalid", Provider::Discord));
+        Ok(Redirect::to(back).into_response())
+    };
+    let failed = |error: anyhow::Error| -> Result<Response, AppError> {
+        // Not a refusal -- that is Ok(None), said where it happens -- but
+        // Discord not answering at all.
+        tracing::error!("Discord could not be asked who signed in: {error:#}");
+        messages
+            .clone()
+            .error(say(&bundle, "identity-sign-in-failed", Provider::Discord));
+        Ok(Redirect::to(back).into_response())
+    };
+    let (Some(request), Some(code)) = (request, answer.code.as_deref()) else {
+        return invalid();
+    };
+    if answer.state.as_deref() != Some(request.state.as_str()) {
+        return invalid();
+    }
+
+    let redirect_uri = discord_redirect_uri(&state.config.base_url);
+    let token = match discord::exchange_code(config, &redirect_uri, code).await {
+        Ok(Some(token)) => token,
+        Ok(None) => return invalid(),
+        Err(error) => return failed(error),
+    };
+    let identity = match discord::identify(config, &token).await {
+        Ok(Some(identity)) => identity,
+        Ok(None) => return invalid(),
+        Err(error) => return failed(error),
+    };
+
+    if let Some(done) = handed_off(&state, request.handoff.as_deref(), &identity).await {
+        return Ok(done);
+    }
+    sign_in_with(
+        &mut auth_session,
+        &session,
+        &messages,
+        &bundle,
+        &state,
+        identity,
+        request.next,
+    )
+    .await
+}
+
 /// A handoff's id, short enough to follow one through the log and hashed so
 /// the log never holds the id itself -- which is as good as the sign-in it
 /// is waiting for (`crate::handoff`).
@@ -1114,6 +1256,7 @@ pub async fn handoff_start(
     let configured = match Provider::parse(&form.provider) {
         Some(Provider::Apple) => state.config.apple.is_some(),
         Some(Provider::Google) => state.config.google.is_some(),
+        Some(Provider::Discord) => state.config.discord.is_some(),
         // Steam signs in from inside the app already; it needs no browser.
         Some(Provider::Steam) | None => false,
     };

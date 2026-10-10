@@ -116,6 +116,11 @@ pub struct AppConfig {
     /// not offer it.
     #[serde(default)]
     pub google: Option<GoogleConfig>,
+
+    /// Sign in with Discord, as a `[discord]` table. Unset means the site
+    /// does not offer it.
+    #[serde(default)]
+    pub discord: Option<DiscordConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,6 +213,32 @@ fn default_google_keys_url() -> String {
 
 fn default_google_token_url() -> String {
     "https://oauth2.googleapis.com/token".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DiscordConfig {
+    /// The application's id (Discord Developer Portal > the application >
+    /// OAuth2), the same application the desktop app shows presence as, with
+    /// `{base_url}/auth/discord/callback` among its redirects.
+    pub client_id: String,
+    /// Its client secret. Only ever sent to Discord's token endpoint, to
+    /// trade a code for an access token.
+    pub client_secret: String,
+    /// Where a code is traded for a token. Only a test changes it.
+    #[serde(default = "default_discord_token_url")]
+    pub token_url: String,
+    /// Where a token says whose it is. Only a test changes it.
+    #[serde(default = "default_discord_user_url")]
+    pub user_url: String,
+}
+
+fn default_discord_token_url() -> String {
+    "https://discord.com/api/oauth2/token".to_string()
+}
+
+fn default_discord_user_url() -> String {
+    "https://discord.com/api/users/@me".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -375,6 +406,7 @@ mod tests {
             app_store: Option<AppStoreConfig>,
             microsoft_store: Option<MicrosoftStoreConfig>,
             google_play: Option<GooglePlayConfig>,
+            discord: Option<DiscordConfig>,
         }
 
         let sample =
@@ -415,6 +447,9 @@ mod tests {
             "the default is the real one"
         );
         assert!(parsed.apple.is_some_and(|apple| !apple.app_ids.is_empty()));
+        let discord = parsed.discord.expect("a [discord] table");
+        assert_eq!(discord.token_url, "https://discord.com/api/oauth2/token");
+        assert_eq!(discord.user_url, "https://discord.com/api/users/@me");
 
         let store = parsed.app_store.expect("an [app_store] table");
         assert_eq!(store.bundle_id, "cafe.oeee");

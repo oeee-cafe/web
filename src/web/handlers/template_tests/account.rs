@@ -247,6 +247,8 @@ fn the_account_page_asks_what_the_account_can_answer() {
                 apple_linked => false,
                 google_enabled => true,
                 google_linked => false,
+                discord_enabled => true,
+                discord_linked => false,
                 messages => Serde(Vec::<serde_json::Value>::new()),
                 draft_post_count => 0,
                 unread_notification_count => 0,
@@ -263,6 +265,7 @@ fn the_account_page_asks_what_the_account_can_answer() {
     assert!(with_password.contains("/auth/steam/app?next=/account"));
     assert!(with_password.contains("/auth/apple?next=/account"));
     assert!(with_password.contains("/auth/google?next=/account"));
+    assert!(with_password.contains("/auth/discord?next=/account"));
 
     let without = render(
         false,
@@ -297,4 +300,12 @@ fn the_account_page_asks_what_the_account_can_answer() {
     assert!(google.contains("Google: oeee@example.test"));
     assert!(!google.contains("Google: 오이"));
     assert!(apple.contains(r#"action="/account/identities/apple/unlink""#));
+
+    // Discord tells its accounts apart by name, not by address.
+    let discord = render(
+        true,
+        json!([{"provider": "discord", "display_hint": "넬리", "email": "nelly@example.test", "subject": "80351110224678912"}]),
+    );
+    assert!(discord.contains("Discord: 넬리"));
+    assert!(discord.contains(r#"action="/account/identities/discord/unlink""#));
 }

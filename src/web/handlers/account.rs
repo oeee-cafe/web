@@ -95,6 +95,7 @@ pub async fn account(
                 steam_linked => identities.iter().any(|i| i.provider == "steam"),
                 apple_linked => identities.iter().any(|i| i.provider == "apple"),
                 google_linked => identities.iter().any(|i| i.provider == "google"),
+                discord_linked => identities.iter().any(|i| i.provider == "discord"),
                 identities => Serde(identities),
                 has_password,
                 show_in_credits,
@@ -105,6 +106,7 @@ pub async fn account(
                 steam_enabled => state.config.steam.is_some(),
                 apple_enabled => state.config.apple.is_some(),
                 google_enabled => state.config.google.is_some(),
+                discord_enabled => state.config.discord.is_some(),
                 messages => Serde(messages.into_iter().collect::<Vec<_>>()),
             },
         )

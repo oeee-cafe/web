@@ -68,10 +68,11 @@
         {# A Google or Apple account is told apart by its address -- for
            Apple, possibly the relay it was given -- which is what each
            provider's own account screens show; a name is only a fallback.
-           Steam has no address. #}
+           Steam has no address, and Discord tells its accounts apart by
+           name. #}
         {% for identity in identities %}
           <form method="post" action="/account/identities/{{ identity.provider }}/unlink" class="settings-row">
-            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% elif identity.provider == "apple" %}Apple{% elif identity.provider == "google" %}Google{% else %}{{ identity.provider }}{% endif %}{% if identity.provider in ["google", "apple"] and identity.email %}: {{ identity.email }}{% elif identity.display_hint %}: {{ identity.display_hint }}{% elif identity.email %}: {{ identity.email }}{% endif %}</span>
+            <span class="settings-row-text">{% if identity.provider == "steam" %}Steam{% elif identity.provider == "apple" %}Apple{% elif identity.provider == "google" %}Google{% elif identity.provider == "discord" %}Discord{% else %}{{ identity.provider }}{% endif %}{% if identity.provider in ["google", "apple"] and identity.email %}: {{ identity.email }}{% elif identity.display_hint %}: {{ identity.display_hint }}{% elif identity.email %}: {{ identity.email }}{% endif %}</span>
             <button type="submit" class="ds-button" data-haptic="light">{{ ftl_get_message("account-unlink") }}</button>
           </form>
         {% else %}
@@ -88,6 +89,10 @@
         {% if google_enabled and not google_linked %}
           {# Not inside most of the apps; see login.jinja. #}
           <a class="ds-button auth-google" href="/auth/google?next=/account">{{ ftl_get_message("account-link-google") }}</a>
+        {% endif %}
+        {% if discord_enabled and not discord_linked %}
+          {# In a browser from inside the apps; see login.jinja. #}
+          <a class="ds-button auth-discord" href="/auth/discord?next=/account">{{ ftl_get_message("account-link-discord") }}</a>
         {% endif %}
       </div>
     </section>

@@ -1,5 +1,5 @@
 //! Accounts from other services that sign into an Oeee Cafe account: Steam,
-//! Apple and Google now, Microsoft after them.
+//! Apple, Google and Discord now, Microsoft after them.
 //!
 //! A provider is only ever asked one thing -- who is this? -- and answers
 //! with a [`VerifiedIdentity`]. Everything after that (signing in, linking to
@@ -21,6 +21,7 @@ pub enum Provider {
     Steam,
     Apple,
     Google,
+    Discord,
 }
 
 impl Provider {
@@ -30,6 +31,7 @@ impl Provider {
             Provider::Steam => "steam",
             Provider::Apple => "apple",
             Provider::Google => "google",
+            Provider::Discord => "discord",
         }
     }
 
@@ -38,6 +40,7 @@ impl Provider {
             "steam" => Some(Provider::Steam),
             "apple" => Some(Provider::Apple),
             "google" => Some(Provider::Google),
+            "discord" => Some(Provider::Discord),
             _ => None,
         }
     }
@@ -48,6 +51,7 @@ impl Provider {
             Provider::Steam => "Steam",
             Provider::Apple => "Apple",
             Provider::Google => "Google",
+            Provider::Discord => "Discord",
         }
     }
 }
@@ -58,7 +62,7 @@ impl Provider {
 pub struct VerifiedIdentity {
     pub provider: Provider,
     /// The provider's stable id for the person: a SteamID64, Apple's or
-    /// Google's `sub`.
+    /// Google's `sub`, a Discord account's id.
     pub subject: String,
     /// What the provider calls them, such as a Steam persona name. Offered as
     /// the display name of a new account.
