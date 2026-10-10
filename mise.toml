@@ -1,6 +1,9 @@
 [tools]
 pnpm = "10.15.0"
 python = "3.13"
+# What .github/workflows/image.yml uploads the debug info and source maps to
+# Sentry with (mise-action installs it from here).
+sentry-cli = "3.8.0"
 # For `sqlx migrate add`, matched to the sqlx the server runs migrations with
 # on boot (Cargo.toml).
 "cargo:sqlx-cli" = { version = "0.8.6", features = "postgres", default-features = false }
