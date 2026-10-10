@@ -77,10 +77,22 @@ impl Presence {
         if community.is_some_and(|c| c.visibility == CommunityVisibility::Private) {
             return self;
         }
-        self.join = Some(format!("/collaborate/{session_id}"));
+        self.join = Some(join_path(session_id));
         self.seats = Some(seats);
         self
     }
+}
+
+/// What `join` says for a room.
+fn join_path(session_id: Uuid) -> String {
+    format!("/collaborate/{session_id}")
+}
+
+/// The room a `join` names, for a friend Discord sent here with it: it comes
+/// back from whoever passed it on, so nothing but a room's path is a room.
+pub fn joined_room(join: &str) -> Option<Uuid> {
+    let id = Uuid::parse_str(join.strip_prefix("/collaborate/")?).ok()?;
+    (join_path(id) == join).then_some(id)
 }
 
 /// A community's name, if it is one anybody may see.
@@ -146,6 +158,26 @@ mod tests {
         let private = community(CommunityVisibility::Private);
         let room = Presence::new(Activity::Collaborating).joinable(id, 4, Some(&private));
         assert_eq!((room.join, room.seats), (None, None));
+    }
+
+    #[test]
+    fn only_a_rooms_own_path_is_a_room() {
+        let id = Uuid::parse_str("9c881320-2b43-4afa-b2bb-7128c8a3e985").unwrap();
+        let joinable = Presence::new(Activity::Collaborating).joinable(id, 4, None);
+        assert_eq!(joined_room(&joinable.join.unwrap()), Some(id));
+        for join in [
+            "",
+            "/collaborate/",
+            "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+            "/collaborate/9C881320-2B43-4AFA-B2BB-7128C8A3E985",
+            "/collaborate/9c8813202b434afab2bb7128c8a3e985",
+            "/collaborate/{9c881320-2b43-4afa-b2bb-7128c8a3e985}",
+            "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985/ws",
+            "https://example.com/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985",
+            "//example.com",
+        ] {
+            assert_eq!(joined_room(join), None, "{join}");
+        }
     }
 
     #[test]

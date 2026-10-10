@@ -3,7 +3,7 @@ use crate::models::community::find_community_by_id;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
 use crate::web::i18n::{ExtractAcceptLanguage, ExtractFtlLang};
-use crate::web::presence::{Activity, Presence};
+use crate::web::presence::{joined_room, Activity, Presence};
 use crate::web::state::AppState;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
@@ -705,6 +705,24 @@ pub async fn save_collaborative_session(
         post_url,
     })
     .into_response())
+}
+
+#[derive(serde::Deserialize)]
+pub struct DiscordJoin {
+    #[serde(default)]
+    secret: String,
+}
+
+/// Where Discord's phone app sends a friend who accepted an invitation into
+/// a room: the Developer Portal's Deep Link URL is the site, to which Discord
+/// adds `/_discord/join?secret=`, the secret being the room's `join`
+/// (presence.rs). So on to the room, where everything else is decided as for
+/// anyone holding its link; the iOS app opens this itself, as every page.
+/// Anything that is not a room's path goes nowhere: Discord hands over
+/// whatever the inviter's app said.
+pub async fn discord_join(Query(query): Query<DiscordJoin>) -> Result<Response, AppError> {
+    let room = joined_room(&query.secret).ok_or_else(|| AppError::NotFound("Room".to_string()))?;
+    Ok(axum::response::Redirect::to(&format!("/collaborate/{room}")).into_response())
 }
 
 /// The collaborative drawing app: a page built by Vite and served as a file,

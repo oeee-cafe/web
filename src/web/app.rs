@@ -23,7 +23,7 @@ use crate::web::handlers::admin::{
 use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, require_login, signup};
 use crate::web::handlers::collaborate::{
     claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
-    create_collaborative_session_form, get_auth_info, get_collaboration_meta,
+    create_collaborative_session_form, discord_join, get_auth_info, get_collaboration_meta,
     load_more_collaborative_posts, report_session_diagnostics, save_collaborative_session,
     serve_collaborative_app, serve_session_preview, upload_session_preview,
     websocket_collaborate_handler,
@@ -560,6 +560,8 @@ impl App {
             )
             .route("/api/auth", get(get_auth_info))
             .route("/collaboration/{uuid}/meta", get(get_collaboration_meta))
+            // An invitation into a room accepted in Discord's phone app.
+            .route("/_discord/join", get(discord_join))
             // The quick switcher's list (jump.jinja).
             .route("/jump", get(crate::web::handlers::jump::jump))
             // What an open page hears without asking (crate::live).
