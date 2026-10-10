@@ -25,8 +25,8 @@ pub fn build_id() -> &'static str {
     })
 }
 
-/// The full commit this build was made from, as `deploy.py` passed it to the
-/// image in `GIT_COMMIT`. `None` outside a deployed image, where there is no
+/// The full commit this build was made from, as the image workflow passed it
+/// to the image in `GIT_COMMIT`. `None` outside a deployed image, where there is no
 /// commit to speak of: a local build may have uncommitted changes in it.
 pub fn git_commit() -> Option<&'static str> {
     static GIT_COMMIT: OnceLock<Option<String>> = OnceLock::new();

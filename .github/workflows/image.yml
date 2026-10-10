@@ -1,14 +1,11 @@
 # Builds oeee-cafe for every commit on main and pushes it to GHCR as
-# ghcr.io/oeee-cafe/web:<commit>, which is what `mise run deploy` has the
-# server pull. The development Mac deploys over a cellular connection, so the
-# image and the debug info never pass through it: GitHub builds the image and
-# uploads the debug info to Sentry, and the server downloads the image itself.
-# `mise run deploy:local` still builds on the Mac and ships over ssh, for when
-# this is broken or GitHub is down.
+# ghcr.io/oeee-cafe/web:<commit>, which is what a deploy has the server pull.
+# The development Mac deploys over a cellular connection, so the image and the
+# debug info never pass through it: GitHub builds the image and uploads the debug info to Sentry,
+# and the server downloads the image itself.
 #
-# The same Dockerfile and the same steps as deploy.py's build_and_ship, in the
-# same order: debug info reaches Sentry before the image is pushed, so an image
-# the server can pull is always one whose stack traces Sentry can symbolicate.
+# Debug info reaches Sentry before the image is pushed, so an image the server
+# can pull is always one whose stack traces Sentry can symbolicate.
 name: Image
 
 on:
@@ -132,8 +129,8 @@ jobs:
       # versions the static asset URLs the server hands out, so each deploy
       # invalidates browser and CDN caches exactly once. No provenance
       # attestation, so what the server pulls is one plain arm64 manifest.
-      # deploy.py waits for this step by name (IMAGE_PUSH_STEP), not for the
-      # run, so a deploy pulls without waiting for the caches to save.
+      # A deploy waits for this step by name, not for the run, so it pulls
+      # without waiting for the caches to save. Renaming it breaks that.
       - name: Build and push the image
         uses: docker/build-push-action@v7
         with:

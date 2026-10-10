@@ -680,8 +680,8 @@ impl App {
 }
 
 // Long enough for open sessions to close cleanly, short enough to stay inside
-// the container's stop grace period (see `stop_grace_period` in
-// docker-compose.yml) so the wait never ends in a SIGKILL instead.
+// the container's stop grace period (`stop_grace_period`, 20s, where the
+// container is defined) so the wait never ends in a SIGKILL instead.
 const WEBSOCKET_DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 const WEBSOCKET_DRAIN_POLL: std::time::Duration = std::time::Duration::from_millis(50);
 

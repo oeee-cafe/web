@@ -65,7 +65,7 @@ fn main() {
             sentry::init((
                 dsn,
                 sentry::ClientOptions {
-                    // The commit, which is the name deploy.py creates the
+                    // The commit, which is the name a deploy creates the
                     // release under in Sentry: the crate's version is
                     // 0.1.0 in every build, so it named every deploy the
                     // same release.

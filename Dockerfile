@@ -29,8 +29,9 @@ ENV DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5433/oeee_c
 # inside this RUN.
 #
 # The release profile builds full debug info, and it is split off here: the
-# image gets the binary without it, and deploy.py takes oeee-cafe.debug from
-# the debug-files stage below and uploads it to Sentry, which puts file, line
+# image gets the binary without it, and the image workflow takes
+# oeee-cafe.debug from the debug-files stage below and uploads it to Sentry,
+# which puts file, line
 # and inlined frames back into its stack traces by the GNU build id the two
 # share. The symbol table stays in, so a backtrace in `docker logs` still
 # names its functions.
@@ -56,7 +57,8 @@ RUN pnpm install --frozen-lockfile
 # dist-offline/ for the drawing page) are built with a source map beside each
 # file. sentry-cli stamps a debug id into every file and its map, which is
 # how Sentry pairs an event's frames with the map without a release to go by;
-# then the stamped files and maps are set aside for deploy.py to upload, and
+# then the stamped files and maps are set aside for the image workflow to
+# upload, and
 # the maps are deleted from what the runtime image serves.
 RUN pnpm run build && \
     pnpm exec sentry-cli sourcemaps inject dist dist-offline && \
@@ -90,9 +92,9 @@ COPY tegaki/ ./tegaki/
 COPY locales/ ./locales/
 COPY static/ ./static/
 COPY templates/ ./templates/
-# Admin/ops commands are `./oeee-cafe cli ...`. `mise run cli` finds whichever
-# blue/green colour is serving and runs them inside it, e.g.
-#   mise run cli -- set-role <login_name> admin
+# Admin/ops commands are `./oeee-cafe cli ...`, run in whichever blue/green
+# colour is serving, e.g.
+#   ./oeee-cafe cli -c config/config.toml set-role <login_name> admin
 COPY --from=rust-builder /app/oeee-cafe ./
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist/ ./neo-cucumber/dist/
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-viewer/ ./neo-cucumber/dist-viewer/
