@@ -10,6 +10,11 @@
 //!
 //! Only a public community is named. Rich presence is shown to every one of
 //! a player's Steam friends, who are not the community's members.
+//!
+//! A collaborative room also says how to join it, for Discord: the Oeee Cafe
+//! app on Windows hands it over as the join secret of the player's activity,
+//! which Discord gives only to a friend the player invited or let in, and
+//! never shows. So unlike `group` it may be the room's own address.
 
 use serde::Serialize;
 use uuid::Uuid;
@@ -36,6 +41,11 @@ pub struct Presence {
     /// friends drawing together as a group. Derived from the room's id rather
     /// than the id itself: a room's id is what joins it.
     pub group: Option<String>,
+    /// Where a friend asked in goes: the room's path. None for a room a
+    /// friend could not enter (`joinable`).
+    pub join: Option<String>,
+    /// How many may be in the room at once, beside `join`.
+    pub seats: Option<i32>,
 }
 
 impl Presence {
@@ -44,6 +54,8 @@ impl Presence {
             activity,
             community: None,
             group: None,
+            join: None,
+            seats: None,
         }
     }
 
@@ -55,6 +67,18 @@ impl Presence {
     pub fn in_room(mut self, session_id: Uuid) -> Self {
         let digest = sha256::digest(format!("oeee-presence:{session_id}"));
         self.group = Some(digest[..16].to_string());
+        self
+    }
+
+    /// Lets friends be asked into the room, when anyone signed in may enter
+    /// it: not one in a private community, whose members alone may
+    /// (`viewer_may_enter`), and who a player's friends mostly are not.
+    pub fn joinable(mut self, session_id: Uuid, seats: i32, community: Option<&Community>) -> Self {
+        if community.is_some_and(|c| c.visibility == CommunityVisibility::Private) {
+            return self;
+        }
+        self.join = Some(format!("/collaborate/{session_id}"));
+        self.seats = Some(seats);
         self
     }
 }
@@ -87,6 +111,41 @@ mod tests {
             .group
             .unwrap();
         assert_ne!(a, other);
+    }
+
+    fn community(visibility: CommunityVisibility) -> Community {
+        Community {
+            id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            name: "오이카페".into(),
+            slug: "oeee".into(),
+            description: String::new(),
+            visibility,
+            updated_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            background_color: None,
+            foreground_color: None,
+        }
+    }
+
+    #[test]
+    fn a_room_anyone_may_enter_says_how_to_join_it() {
+        let id = Uuid::parse_str("9c881320-2b43-4afa-b2bb-7128c8a3e985").unwrap();
+        for c in [
+            None,
+            Some(community(CommunityVisibility::Public)),
+            Some(community(CommunityVisibility::Unlisted)),
+        ] {
+            let room = Presence::new(Activity::Collaborating).joinable(id, 4, c.as_ref());
+            assert_eq!(
+                room.join.as_deref(),
+                Some("/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985")
+            );
+            assert_eq!(room.seats, Some(4));
+        }
+        let private = community(CommunityVisibility::Private);
+        let room = Presence::new(Activity::Collaborating).joinable(id, 4, Some(&private));
+        assert_eq!((room.join, room.seats), (None, None));
     }
 
     #[test]

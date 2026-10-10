@@ -722,7 +722,8 @@ pub async fn serve_collaborative_app(
     let mut tx = state.db_pool.begin().await?;
     let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
     // In a room: drawing together, grouped with friends in the same room,
-    // and the community named if it is public. The lobby is browsing.
+    // and the community named if it is public, and while the room is open,
+    // how a friend joins it. The lobby is browsing.
     let presence = match session_id {
         Some(Path(session_id)) => {
             let community_id = sqlx::query_scalar!(
@@ -736,10 +737,17 @@ pub async fn serve_collaborative_app(
                 Some(id) => find_community_by_id(&mut tx, id).await?,
                 None => None,
             };
+            let presence = Presence::new(Activity::Collaborating)
+                .in_community(community.as_ref())
+                .in_room(session_id);
+            // None once the room has ended, which nobody can join.
             Some(
-                Presence::new(Activity::Collaborating)
-                    .in_community(community.as_ref())
-                    .in_room(session_id),
+                match db::get_session_info(&state.db_pool, session_id).await? {
+                    Some(open) => {
+                        presence.joinable(session_id, open.max_participants, community.as_ref())
+                    }
+                    None => presence,
+                },
             )
         }
         None => None,

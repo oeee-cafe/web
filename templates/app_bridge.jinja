@@ -23,11 +23,16 @@
    `type`. The apps ignore types they do not know and fields they do not
    know, so the site can add either without a release of any of them.
 
-   page     {path, signedIn, presence, community, group, painting, refreshable}
+   page     {path, signedIn, presence, community, group, join, seats, party,
+             painting, refreshable}
             On every page, and again whenever any of it changes: a boosted
-            navigation, a back swipe that restored the page. `signedIn` is
+            navigation, a back swipe that restored the page, someone coming
+            into or leaving a collaborative room. `signedIn` is
             null on a page without the toolbar, which cannot tell. `presence`
-            is presence_meta.jinja's activity, or null for browsing;
+            is presence_meta.jinja's activity, or null for browsing; `join`
+            is the path a friend asked into a collaborative room opens, with
+            its `seats` and the `party` in it now, all three null on any
+            other page and in a room a friend could not enter;
             `painting` is whether leaving would lose a drawing in progress,
             and `refreshable` whether pulling down may reload the page --
             neither a painter nor a replay may be.
@@ -51,14 +56,18 @@
             one bar. Each is null on a page without the design system's
             stylesheet.
    words    {leaveTitle, leaveBody, leave, stay, saveImage, copyImage,
-             share, copyLink, savedImage, savedFile, saveFailed}
+             share, copyLink, savedImage, savedFile, saveFailed,
+             presenceBrowsing, presenceDrawing, presenceRelaying,
+             presenceCollaborating, presenceDrawingBanner,
+             presenceWatchingReplay}
             What an app says in dialogs and menus of its own over the page
             -- the leave prompt, the long press on a drawing, the right-click
-            menu -- in the page's language, from the site's catalogues
-            (locales/*.ftl, the app-* messages). Sent once a page, since the
-            reader can change language between pages. An app keeps words of
-            its own only for what it says with no page to speak for it: a
-            site that cannot be reached.
+            menu -- and on Discord, what the reader is doing for each
+            presence_meta.jinja activity, in the page's language, from the
+            site's catalogues (locales/*.ftl, the app-* messages). Sent once
+            a page, since the reader can change language between pages. An
+            app keeps words of its own only for what it says with no page to
+            speak for it: a site that cannot be reached.
    haptic   {name}
             "light", "medium", "selection", "success", "warning" or "error":
             a control that is felt as well as seen.
@@ -242,12 +251,16 @@
       var meta = boosted ? null : document.querySelector('meta[name="oeee-presence"]');
       var presence = meta ? meta.getAttribute("content") : null;
       var bar = document.querySelector(".nav-bar");
+      var join = (meta && meta.getAttribute("data-join")) || null;
       return {
         path: location.pathname,
         signedIn: bar ? bar.hasAttribute("data-signed-in") : null,
         presence: presence,
         community: (meta && meta.getAttribute("data-community")) || null,
         group: (meta && meta.getAttribute("data-group")) || null,
+        join: join,
+        seats: join ? parseInt(meta.getAttribute("data-seats"), 10) || null : null,
+        party: join ? parseInt(meta.getAttribute("data-party"), 10) || null : null,
         painting: PAINTING.test(presence || ""),
         refreshable: !presence
       };
@@ -279,7 +292,13 @@
       copyLink: {{ ftl_get_message("app-copy-link")|tojson }},
       savedImage: {{ ftl_get_message("app-saved-image")|tojson }},
       savedFile: {{ ftl_get_message("app-saved-file")|tojson }},
-      saveFailed: {{ ftl_get_message("app-save-failed")|tojson }}
+      saveFailed: {{ ftl_get_message("app-save-failed")|tojson }},
+      presenceBrowsing: {{ ftl_get_message("app-presence-browsing")|tojson }},
+      presenceDrawing: {{ ftl_get_message("app-presence-drawing")|tojson }},
+      presenceRelaying: {{ ftl_get_message("app-presence-relaying")|tojson }},
+      presenceCollaborating: {{ ftl_get_message("app-presence-collaborating")|tojson }},
+      presenceDrawingBanner: {{ ftl_get_message("app-presence-drawing-banner")|tojson }},
+      presenceWatchingReplay: {{ ftl_get_message("app-presence-watching-replay")|tojson }}
     };
 
     function report() {
@@ -294,6 +313,8 @@
     document.addEventListener("DOMContentLoaded", report);
     // The bell put in place by a live event (live.jinja), not by a swap.
     document.addEventListener("oeee:bell", report);
+    // Someone came into or left a collaborative room (presence_meta.jinja).
+    document.addEventListener("oeee:presence", report);
     window.addEventListener("load", report);
     window.addEventListener("pageshow", function (event) {
       if (event.persisted) boosted = false;

@@ -658,6 +658,13 @@ app-saved-image = Saved to Pictures
 app-saved-file = Saved to Downloads
 app-save-failed = Couldn't save
 app-steam-sign-in-failed = Steam could not sign you in. Make sure Steam is running and try again.
+# What Discord shows someone doing, to their friends (discord.rs in oeee-cafe-desktop)
+app-presence-browsing = Browsing Oeee Cafe
+app-presence-drawing = Drawing
+app-presence-relaying = Drawing a relay
+app-presence-collaborating = Drawing together
+app-presence-drawing-banner = Drawing a banner
+app-presence-watching-replay = Watching a replay
 window-minimize = Minimize
 window-maximize = Maximize
 window-restore = Restore

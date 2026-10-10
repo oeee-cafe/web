@@ -175,7 +175,7 @@ async function open(options: Options = {}): Promise<Page> {
     }
   </script>`;
   const presence = options.presence
-    ? `<meta name="oeee-presence" content="${options.presence}" data-community="오이카페 &quot;모에화&quot;" data-group="0123456789abcdef">`
+    ? `<meta name="oeee-presence" content="${options.presence}" data-community="오이카페 &quot;모에화&quot;" data-group="0123456789abcdef" data-join="/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985" data-seats="4" data-party="2">`
     : "";
   const body = `
     <nav class="nav-bar" data-window-drag${options.signedIn ? " data-signed-in" : ""}
@@ -312,7 +312,10 @@ describe("what the site tells the apps", () => {
     const page = await open({ signedIn: true, presence: "collaborating" });
     const message = last(page, "page");
     expect(keys(message)).toEqual(
-      ["community", "group", "painting", "path", "presence", "refreshable", "signedIn", "type", "v"],
+      [
+        "community", "group", "join", "painting", "party", "path", "presence", "refreshable", "seats",
+        "signedIn", "type", "v",
+      ],
     );
     expect(message).toMatchObject({
       v: 1,
@@ -320,10 +323,20 @@ describe("what the site tells the apps", () => {
       presence: "collaborating",
       community: '오이카페 "모에화"',
       group: "0123456789abcdef",
+      join: "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985",
+      seats: 4,
+      party: 2,
       painting: true,
       refreshable: false,
     });
     expect(typeof message.path).toBe("string");
+  });
+
+  it("says again who is in a room when someone comes or goes", async () => {
+    const page = await open({ signedIn: true, presence: "collaborating" });
+    page.window.document.querySelector('meta[name="oeee-presence"]')!.setAttribute("data-party", "3");
+    page.window.document.dispatchEvent(new page.window.Event("oeee:presence"));
+    expect(last(page, "page")).toMatchObject({ join: "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985", seats: 4, party: 3 });
   });
 
   it("cannot say who is signed in on a page without the toolbar, and says so", async () => {
@@ -362,7 +375,9 @@ describe("what the site tells the apps", () => {
     const message = last(page, "words");
     expect(keys(message)).toEqual(
       [
-        "copyImage", "copyLink", "leave", "leaveBody", "leaveTitle", "saveFailed",
+        "copyImage", "copyLink", "leave", "leaveBody", "leaveTitle", "presenceBrowsing",
+        "presenceCollaborating", "presenceDrawing", "presenceDrawingBanner", "presenceRelaying",
+        "presenceWatchingReplay", "saveFailed",
         "saveImage", "savedFile", "savedImage", "share", "stay", "type", "v",
       ],
     );

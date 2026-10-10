@@ -1,3 +1,5 @@
-{# What the reader is doing here, for the Oeee Cafe app on Steam to show
-   their friends (src/web/presence.rs). Nothing reads it in a browser. #}
-{% if presence %}<meta name="oeee-presence" content="{{ presence.activity }}"{% if presence.community %} data-community="{{ presence.community }}"{% endif %}{% if presence.group %} data-group="{{ presence.group }}"{% endif %} />{% endif %}
+{# What the reader is doing here, for the Oeee Cafe app on Steam and on
+   Discord to show their friends (src/web/presence.rs). Nothing reads it in a
+   browser. A collaborative room keeps `data-party` up to date itself, with
+   how many are in it (frontend/collaborate/App.tsx). #}
+{% if presence %}<meta name="oeee-presence" content="{{ presence.activity }}"{% if presence.community %} data-community="{{ presence.community }}"{% endif %}{% if presence.group %} data-group="{{ presence.group }}"{% endif %}{% if presence.join %} data-join="{{ presence.join }}" data-seats="{{ presence.seats }}"{% endif %} />{% endif %}

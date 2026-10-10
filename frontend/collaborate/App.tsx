@@ -258,6 +258,19 @@ export default function App() {
     );
   }, [participants]);
 
+  /**
+   * How many are in the room, for the Oeee Cafe app to show beside the
+   * invitation it hands Discord (presence_meta.jinja, app_bridge.jinja). The
+   * server's roster of who is seated, as of its last word: someone leaving is
+   * counted until the next roster.
+   */
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="oeee-presence"][data-join]');
+    if (!meta || participants.size === 0) return;
+    meta.setAttribute("data-party", String(participants.size));
+    document.dispatchEvent(new Event("oeee:presence"));
+  }, [participants]);
+
   const clearParticipants = useCallback(() => setParticipants(new Map()), []);
   const addParticipant = useCallback((
     userId: string, username: string, joinedAt: number, sessionId?: number,

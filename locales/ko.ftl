@@ -617,6 +617,13 @@ app-saved-image = 사진에 저장했습니다
 app-saved-file = 다운로드에 저장했습니다
 app-save-failed = 저장하지 못했습니다
 app-steam-sign-in-failed = Steam으로 로그인하지 못했습니다. Steam이 실행 중인지 확인하고 다시 시도해 주세요.
+# What Discord shows someone doing, to their friends (discord.rs in oeee-cafe-desktop)
+app-presence-browsing = 오이카페 구경 중
+app-presence-drawing = 그림 그리는 중
+app-presence-relaying = 이어그리기 중
+app-presence-collaborating = 함께 그리는 중
+app-presence-drawing-banner = 배너 그리는 중
+app-presence-watching-replay = 리플레이 보는 중
 window-minimize = 최소화
 window-maximize = 최대화
 window-restore = 이전 크기로

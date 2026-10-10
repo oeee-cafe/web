@@ -617,6 +617,13 @@ app-saved-image = 已保存到图片
 app-saved-file = 已保存到下载
 app-save-failed = 无法保存
 app-steam-sign-in-failed = 无法通过 Steam 登录。请确认 Steam 正在运行，然后重试。
+# What Discord shows someone doing, to their friends (discord.rs in oeee-cafe-desktop)
+app-presence-browsing = 正在浏览黄瓜咖啡馆
+app-presence-drawing = 正在画画
+app-presence-relaying = 正在画接力
+app-presence-collaborating = 正在一起画画
+app-presence-drawing-banner = 正在画横幅
+app-presence-watching-replay = 正在看回放
 window-minimize = 最小化
 window-maximize = 最大化
 window-restore = 向下还原
