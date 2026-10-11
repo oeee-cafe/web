@@ -349,6 +349,14 @@
         "type": "discord"
       }
     ],
+    "steam": [
+      {
+        "action": "invite",
+        "join": "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985",
+        "v": 1,
+        "type": "steam"
+      }
+    ],
     "caption": [
       {
         "place": {

@@ -115,6 +115,12 @@
             `user`, a Discord id as a string (a number cannot hold one), to
             the room showing. Asked only on a page the app has told
             discord.state (below), so never where nothing would answer.
+   steam    {action, join}
+            The Steam build of the Windows app (data-store="steam"):
+            "invite" opens Steam's own invitation over the window, the
+            reader's Steam friends to ask into the room `join` opens -- the
+            page's `join`, above. A friend who accepts has Steam open their
+            own app on it (steam.rs in oeee-cafe-desktop). Nothing answers.
    share    {title, text}
    download {name, mime, data}
             What Android's web view cannot do itself (app_polyfills.jinja).
@@ -414,6 +420,11 @@
           var data = { action: action };
           if (user) data.user = user;
           return post("discord", data, true);
+        }
+      },
+      steam: {
+        invite: function (join) {
+          return post("steam", { action: "invite", join: join }, true);
         }
       },
       post: post,

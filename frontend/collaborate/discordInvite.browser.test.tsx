@@ -197,3 +197,50 @@ describe("inviting Discord friends from the session", () => {
     expect(host!.textContent).toContain("No friend by that name.");
   });
 });
+
+describe("inviting Steam friends from the session", () => {
+  let invited: string[] = [];
+
+  function steamApp() {
+    invited = [];
+    (window as unknown as { oeeeApp: unknown }).oeeeApp = {
+      connected: () => true,
+      discord: { known: () => ({ state: null, friends: null }), ask: () => true },
+      steam: {
+        invite: (join: string) => {
+          invited.push(join);
+          return true;
+        },
+      },
+    };
+  }
+
+  afterEach(() => document.documentElement.removeAttribute("data-store"));
+
+  it("opens Steam's own invitation for the room, in the Steam build", async () => {
+    document.documentElement.setAttribute("data-store", "steam");
+    steamApp();
+    room(true);
+    await render();
+    expect(button("Invite")).toBeUndefined();
+    await press("Steam");
+    expect(invited).toEqual([ROOM]);
+  });
+
+  it("is offered nowhere else, nor in a session a friend could not enter", async () => {
+    // The Microsoft Store's build has no Steam.
+    document.documentElement.setAttribute("data-store", "microsoft");
+    steamApp();
+    room(true);
+    await render();
+    expect(button("Steam")).toBeUndefined();
+    act(() => root!.unmount());
+    host!.remove();
+
+    document.documentElement.setAttribute("data-store", "steam");
+    document.head.querySelectorAll('meta[name="oeee-presence"]').forEach((meta) => meta.remove());
+    room(false);
+    await render();
+    expect(button("Steam")).toBeUndefined();
+  });
+});

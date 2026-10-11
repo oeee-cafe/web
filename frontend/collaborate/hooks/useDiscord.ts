@@ -51,5 +51,10 @@ export type Discord = ReturnType<typeof useDiscord>;
  * Discord's invitation is that.
  */
 export function roomIsJoinable(): boolean {
-  return document.querySelector('meta[name="oeee-presence"][data-join]') !== null;
+  return roomJoin() !== null;
+}
+
+/** The path that joins this room, as presence.rs says it, or null. */
+export function roomJoin(): string | null {
+  return document.querySelector('meta[name="oeee-presence"][data-join]')?.getAttribute("data-join") || null;
 }

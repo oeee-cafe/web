@@ -73,6 +73,9 @@ type PageWindow = Window &
         known(): { state: unknown; friends: unknown };
         ask(action: string, user?: string): boolean;
       };
+      steam: {
+        invite(join: string): boolean;
+      };
     };
   };
 
@@ -1220,6 +1223,11 @@ describe("what the apps test against (appContract.json)", () => {
     discord.window.oeeeApp.discord.ask("connect");
     discord.window.oeeeApp.discord.ask("invite", "80351110224678912");
     sent.push(...discord.sent.filter((message) => message.type === "discord"));
+
+    // The room's Steam Invite, in the Steam build.
+    const steamRoom = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
+    steamRoom.window.oeeeApp.steam.invite("/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985");
+    sent.push(last(steamRoom, "steam"));
 
     // One example of each distinct message, in the order first sent.
     const byType: Record<string, Message[]> = {};

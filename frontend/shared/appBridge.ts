@@ -101,3 +101,31 @@ export function onDiscord(listener: (heard: DiscordHeard) => void): () => void {
 export function askDiscord(action: "connect" | "disconnect" | "friends" | "invite", user?: string): boolean {
   return discordMembers()?.ask(action, user) ?? false;
 }
+
+interface SteamMembers {
+  invite(join: string): boolean;
+}
+
+function steamMembers(): SteamMembers | undefined {
+  const app = (window as unknown as { oeeeApp?: { connected(): boolean; steam?: SteamMembers } }).oeeeApp;
+  return app && app.connected() ? app.steam : undefined;
+}
+
+/**
+ * Whether Steam's invitation can be offered: in the Steam build of the
+ * Windows app only (data-store="steam", theme_head.jinja), which is the
+ * one with Steam to ask (steam.rs in oeee-cafe-desktop).
+ */
+export function steamCanInvite(): boolean {
+  return document.documentElement.getAttribute("data-store") === "steam" && steamMembers() !== undefined;
+}
+
+/**
+ * Opens Steam's own invitation over the window, for the room `join` opens.
+ * Steam lists the friends and sends it; nothing comes back. False outside
+ * the Steam build.
+ */
+export function inviteSteamFriends(join: string): boolean {
+  if (!steamCanInvite()) return false;
+  return steamMembers()?.invite(join) ?? false;
+}

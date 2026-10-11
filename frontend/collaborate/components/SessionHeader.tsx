@@ -2,7 +2,8 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Icon, NEO_BUTTON, NEO_BUTTON_ON } from "neo-cucumber";
 import { useState } from "react";
 
-import { roomIsJoinable, useDiscord } from "../hooks/useDiscord";
+import { inviteSteamFriends, steamCanInvite } from "../../shared/appBridge";
+import { roomIsJoinable, roomJoin, useDiscord } from "../hooks/useDiscord";
 import { DiscordInvite, DiscordMark } from "./DiscordInvite";
 
 interface CollaborationMeta {
@@ -37,6 +38,11 @@ export interface SessionHeaderProps {
  * In the Windows app with Discord, Invite sits beside Share and opens the
  * Discord friends to ask in (DiscordInvite), when the room is one a friend
  * could enter. Share stays for everyone else.
+ *
+ * In the Steam build, Steam's own Invite sits there too: it opens Steam's
+ * invitation over the window, where Steam lists the friends, and a friend
+ * who accepts has Steam open their app on the room. Only friends with
+ * Oeee Cafe on Steam can come in that way.
  */
 export const SessionHeader = ({
   canvasMeta,
@@ -47,6 +53,7 @@ export const SessionHeader = ({
   const discord = useDiscord();
   const [inviting, setInviting] = useState(false);
   const canInvite = discord.state !== null && roomIsJoinable();
+  const steamJoin = steamCanInvite() ? roomJoin() : null;
 
   const handleShare = () => {
     if (navigator.share) {
@@ -109,10 +116,21 @@ export const SessionHeader = ({
           <Trans>Invite</Trans>
         </button>
       )}
+      {steamJoin && (
+        <button
+          type="button"
+          onClick={() => inviteSteamFriends(steamJoin)}
+          className={`${NEO_BUTTON} ${canInvite ? "" : "ml-auto"} flex shrink-0 items-center gap-[3px]`}
+          title={t`Invite Steam friends`}
+        >
+          <Icon icon="material-symbols:group-add" width={14} height={14} />
+          Steam
+        </button>
+      )}
       <button
         type="button"
         onClick={handleShare}
-        className={`${NEO_BUTTON} ${canInvite ? "" : "ml-auto"} flex shrink-0 items-center gap-[3px]`}
+        className={`${NEO_BUTTON} ${canInvite || steamJoin ? "" : "ml-auto"} flex shrink-0 items-center gap-[3px]`}
         title={t`Share this session`}
       >
         <Icon icon="material-symbols:upload" width={14} height={14} />
