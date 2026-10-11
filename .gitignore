@@ -1,5 +1,6 @@
 /target
-/frontend/collaborate/.vite/
+# Vite and its SWC plugin cache, per machine; one was committed once at 7.9 MB.
+.vite/
 /config/*
 .env
 .sqlx/
