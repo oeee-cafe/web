@@ -1274,7 +1274,15 @@ export class CanvasHistory {
    *   history; a joiner would start that stroke's next chunk with a dot
    *   where the room continued a line;
    * - below the copy any paste above it pastes, because a joiner holds
-   *   nobody's clipboard.
+   *   nobody's clipboard. Only a paste already in history can be seen,
+   *   which is enough while paste follows copy as NEO's does: the copy is
+   *   then within its author's reach whenever the paste is sent, and the
+   *   first rule keeps the cut under it. A paste tool decoupled from copy
+   *   -- a paste button, a clipboard that outlives a tool change, pasting
+   *   a copy twice -- would send pastes of copies long out of reach, and
+   *   no rule over history can protect those: the clipboards would have to
+   *   travel with the checkpoint, as a snapshot kind of their own, which
+   *   is a protocol change to make before such a tool, not after.
    *
    * Lowering the cut for one can break another, so they are checked until
    * none moves it. If what is left frees nothing -- everything since the
