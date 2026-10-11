@@ -2896,6 +2896,20 @@ a.ds-handle:visited {
   text-decoration: none;
 }
 
+/* The pill is 18px tall, too short a target for a finger; this reaches
+   3px past it above and below, so what can be tapped is at least 24px
+   without the pill or its line growing. No further: a member's name is a
+   link on the line above, and a pill that reached it would take its taps,
+   since the pill is the one on top. */
+a.ds-handle::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: 0;
+  bottom: -3px;
+  left: 0;
+}
+
 @media (hover: hover), (min--moz-device-pixel-ratio: 0) {
   a.ds-handle:hover {
     border-color: var(--ds-ink);

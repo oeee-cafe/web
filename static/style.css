@@ -1165,8 +1165,12 @@ nav a:visited,
   margin-bottom: 0;
 }
 
+/* The padding, given back by the margins, is room for the handle's tap
+   area (a.ds-handle::after in ds.css), which the overflow would otherwise
+   cut to the pill's own 18px. */
 .post-inspector-byline {
-  margin-bottom: 4px;
+  margin: -3px 0 1px;
+  padding: 3px 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -4504,9 +4508,15 @@ html[data-app] .about-stores {
   font-weight: 600;
 }
 
+/* Padded and given it back, as the post's byline is, so the overflow
+   leaves the handle's tap area whole. */
 .member-meta,
 .comment-row-meta {
   display: block;
+  margin-top: -3px;
+  margin-bottom: -3px;
+  padding-top: 3px;
+  padding-bottom: 3px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
