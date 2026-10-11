@@ -65,6 +65,11 @@ function besideChat(header: HTMLElement | null, ceiling: number): WindowOrigin {
  * chat, whose frame clips what it holds and is moved by a transform while it
  * is dragged.
  *
+ * A Discord friend who pressed Ask to Join on the reader's activity is
+ * listed under the buttons until they are let in or put off: Let in answers
+ * their request with an invitation, as Discord's own notification would, and
+ * Not now only takes them off the list.
+ *
  * In the Steam build, Steam's own Invite sits there too: it opens Steam's
  * invitation over the window, where Steam lists the friends, and a friend
  * who accepts has Steam open their app on the room. Only friends with
@@ -168,6 +173,44 @@ export const SessionHeader = ({
         <Trans>Share</Trans>
       </button>
     </div>
+    {canInvite &&
+      discord.requests.map((request) => {
+        const fate = discord.invitations[request.id];
+        const name = request.name;
+        return (
+          <div key={request.id} role="status" className="flex min-w-0 items-center gap-[4px]">
+            <DiscordMark />
+            <span className="min-w-0 flex-1 truncate">
+              {fate === "failed" ? (
+                <Trans>Couldn’t let {name} in</Trans>
+              ) : (
+                <Trans>{name} asks to join</Trans>
+              )}
+            </span>
+            <button
+              type="button"
+              disabled={fate === "sending"}
+              onClick={() => discord.letIn(request.id)}
+              className={`${NEO_BUTTON} shrink-0 !px-[5px] !py-0`}
+            >
+              {fate === "sending" ? (
+                <Trans>Sending…</Trans>
+              ) : fate === "failed" ? (
+                <Trans>Try again</Trans>
+              ) : (
+                <Trans>Let in</Trans>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => discord.dismiss(request.id)}
+              className={`${NEO_BUTTON} shrink-0 !px-[5px] !py-0`}
+            >
+              <Trans>Not now</Trans>
+            </button>
+          </div>
+        );
+      })}
     {canInvite &&
       inviting &&
       createPortal(

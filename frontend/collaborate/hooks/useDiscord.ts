@@ -6,6 +6,7 @@ import {
   onDiscord,
   type DiscordFriend,
   type DiscordLinked,
+  type DiscordRequest,
 } from "../../shared/appBridge";
 
 /** An invitation's fate: on its way, sent, or not. */
@@ -13,13 +14,15 @@ export type InvitationFate = "sending" | "sent" | "failed";
 
 /**
  * Discord, as the Windows app last said: whether the reader's account is
- * connected, and their friends once asked for. A state of null is a page
+ * connected, their friends once asked for, and the friends asking to be let
+ * into the room. A state of null is a page
  * no app with Discord spoke to -- a browser, another app -- where the room
  * offers nothing of Discord at all.
  */
 export function useDiscord() {
   const [state, setState] = useState<DiscordLinked | null>(() => discordKnown().state);
   const [friends, setFriends] = useState<DiscordFriend[] | null>(() => discordKnown().friends);
+  const [requests, setRequests] = useState<DiscordRequest[]>(() => discordKnown().requests);
   // By the friend's id.
   const [invitations, setInvitations] = useState<Record<string, InvitationFate>>({});
 
@@ -28,6 +31,7 @@ export function useDiscord() {
       onDiscord((heard) => {
         if (heard.kind === "state") setState(heard.value);
         else if (heard.kind === "friends") setFriends(heard.value);
+        else if (heard.kind === "requests") setRequests(heard.value);
         else {
           const { user, sent } = heard.value;
           setInvitations((current) => ({ ...current, [user]: sent ? "sent" : "failed" }));
@@ -40,7 +44,18 @@ export function useDiscord() {
     if (askDiscord("invite", id)) setInvitations((current) => ({ ...current, [id]: "sending" }));
   };
 
-  return { state, friends, invitations, invite };
+  // Letting a friend in is answering their request with an invitation, so
+  // its fate is told as an invitation's is; the app takes the request off
+  // the list once it is sent.
+  const letIn = (id: string) => {
+    if (askDiscord("letIn", id)) setInvitations((current) => ({ ...current, [id]: "sending" }));
+  };
+
+  const dismiss = (id: string) => {
+    if (askDiscord("dismiss", id)) setRequests((current) => current.filter((request) => request.id !== id));
+  };
+
+  return { state, friends, requests, invitations, invite, letIn, dismiss };
 }
 
 export type Discord = ReturnType<typeof useDiscord>;

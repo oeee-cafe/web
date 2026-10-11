@@ -13,6 +13,10 @@ pub struct SessionInfo {
     pub height: i32,
     pub title: Option<String>,
     pub max_participants: i32,
+    /// When it opened, in milliseconds since the epoch. `created_at` is a
+    /// TIMESTAMP written by NOW() in the connection's zone, which sqlx sets
+    /// to UTC, and it is read back through a connection of the same pool.
+    pub opened_at: i64,
 }
 
 pub async fn get_session_info(
@@ -21,7 +25,9 @@ pub async fn get_session_info(
 ) -> Result<Option<SessionInfo>, sqlx::Error> {
     let session = sqlx::query!(
         r#"
-        SELECT owner_id, width, height, title, max_participants FROM collaborative_sessions
+        SELECT owner_id, width, height, title, max_participants,
+               (EXTRACT(EPOCH FROM created_at::timestamptz) * 1000)::bigint AS "opened_at!"
+        FROM collaborative_sessions
         WHERE id = $1 AND ended_at IS NULL
         "#,
         room_uuid
@@ -35,6 +41,7 @@ pub async fn get_session_info(
         height: s.height,
         title: s.title,
         max_participants: s.max_participants,
+        opened_at: s.opened_at,
     }))
 }
 

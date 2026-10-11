@@ -13,11 +13,15 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Plural-Forms: \n"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:187
+msgid "{name} asks to join"
+msgstr "{name} 님이 참여를 요청했어요"
+
 #: ../frontend/collaborate/components/modals/AuthErrorModal.tsx:15
 msgid "Authentication Failed"
 msgstr "인증 실패"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:132
+#: ../frontend/collaborate/components/SessionHeader.tsx:139
 msgid "by"
 msgstr "작성자:"
 
@@ -25,7 +29,7 @@ msgstr "작성자:"
 msgid "Cancel"
 msgstr "취소"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:90
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:91
 msgid "Close"
 msgstr "닫기"
 
@@ -37,11 +41,11 @@ msgstr "Discord 연결"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "Discord를 한 번 연결하면 여기서 친구를 보고 이 세션으로 초대할 수 있어요."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:110
+#: ../frontend/collaborate/components/SessionHeader.tsx:117
 msgid "Connected"
 msgstr "연결됨"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:116
+#: ../frontend/collaborate/components/SessionHeader.tsx:123
 msgid "Connecting"
 msgstr "연결 중"
 
@@ -58,12 +62,16 @@ msgstr "연결 중..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "연결이 끊어졌습니다. 작업이 로컬에 저장되었습니다."
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:185
+msgid "Couldn’t let {name} in"
+msgstr "{name} 님을 들이지 못했어요"
+
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:122
+#: ../frontend/collaborate/components/SessionHeader.tsx:129
 msgid "Disconnected"
 msgstr "연결 끊어짐"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:82
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:85
 msgid "Discord friends"
 msgstr "Discord 친구"
 
@@ -99,21 +107,25 @@ msgid "Initializing collaboration session..."
 msgstr "협업 세션 초기화 중..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:145
+#: ../frontend/collaborate/components/SessionHeader.tsx:152
 msgid "Invite"
 msgstr "초대"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:68
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:65
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:142
+#: ../frontend/collaborate/components/SessionHeader.tsx:149
 msgid "Invite Discord friends"
 msgstr "Discord 친구 초대"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
+#: ../frontend/collaborate/components/SessionHeader.tsx:160
 msgid "Invite Steam friends"
 msgstr "Steam 친구 초대"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:128
+#: ../frontend/collaborate/components/SessionHeader.tsx:201
+msgid "Let in"
+msgstr "들이기"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:135
 msgid "Loading"
 msgstr "로딩 중"
 
@@ -143,6 +155,7 @@ msgid "No Title"
 msgstr "제목 없음"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:79
+#: ../frontend/collaborate/components/SessionHeader.tsx:209
 msgid "Not now"
 msgstr "나중에"
 
@@ -202,6 +215,7 @@ msgid "Send"
 msgstr "전송"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:133
+#: ../frontend/collaborate/components/SessionHeader.tsx:197
 msgid "Sending…"
 msgstr "보내는 중…"
 
@@ -221,11 +235,11 @@ msgstr "세션 만석"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "세션이 종료됩니다. 그림을 갤러리에 저장 중..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:166
+#: ../frontend/collaborate/components/SessionHeader.tsx:173
 msgid "Share"
 msgstr "공유"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:163
+#: ../frontend/collaborate/components/SessionHeader.tsx:170
 msgid "Share this session"
 msgstr "이 세션 공유"
 
@@ -258,6 +272,7 @@ msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the firs
 msgstr "이 세션이 가득 찼습니다 ({currentUserCount}/{maxUsers}명). 처음 {maxUsers}명의 사용자만 세션에 참여할 수 있습니다."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:137
+#: ../frontend/collaborate/components/SessionHeader.tsx:199
 msgid "Try again"
 msgstr "다시 시도"
 

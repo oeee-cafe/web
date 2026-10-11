@@ -13,11 +13,15 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Plural-Forms: \n"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:187
+msgid "{name} asks to join"
+msgstr "{name} 请求加入"
+
 #: ../frontend/collaborate/components/modals/AuthErrorModal.tsx:15
 msgid "Authentication Failed"
 msgstr "验证失败"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:132
+#: ../frontend/collaborate/components/SessionHeader.tsx:139
 msgid "by"
 msgstr "作者:"
 
@@ -25,7 +29,7 @@ msgstr "作者:"
 msgid "Cancel"
 msgstr "取消"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:90
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:91
 msgid "Close"
 msgstr "关闭"
 
@@ -37,11 +41,11 @@ msgstr "关联 Discord"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "关联一次 Discord，即可在这里看到好友并邀请他们加入这个会话。"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:110
+#: ../frontend/collaborate/components/SessionHeader.tsx:117
 msgid "Connected"
 msgstr "已连接"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:116
+#: ../frontend/collaborate/components/SessionHeader.tsx:123
 msgid "Connecting"
 msgstr "连接中"
 
@@ -58,12 +62,16 @@ msgstr "连接中..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "连接丢失。您的作品已本地保存。"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:185
+msgid "Couldn’t let {name} in"
+msgstr "未能让 {name} 加入"
+
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:122
+#: ../frontend/collaborate/components/SessionHeader.tsx:129
 msgid "Disconnected"
 msgstr "已断开"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:82
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:85
 msgid "Discord friends"
 msgstr "Discord 好友"
 
@@ -99,21 +107,25 @@ msgid "Initializing collaboration session..."
 msgstr "正在初始化协作会话..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:145
+#: ../frontend/collaborate/components/SessionHeader.tsx:152
 msgid "Invite"
 msgstr "邀请"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:68
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:65
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:142
+#: ../frontend/collaborate/components/SessionHeader.tsx:149
 msgid "Invite Discord friends"
 msgstr "邀请 Discord 好友"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
+#: ../frontend/collaborate/components/SessionHeader.tsx:160
 msgid "Invite Steam friends"
 msgstr "邀请 Steam 好友"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:128
+#: ../frontend/collaborate/components/SessionHeader.tsx:201
+msgid "Let in"
+msgstr "让其加入"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:135
 msgid "Loading"
 msgstr "加载中"
 
@@ -143,6 +155,7 @@ msgid "No Title"
 msgstr "无标题"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:79
+#: ../frontend/collaborate/components/SessionHeader.tsx:209
 msgid "Not now"
 msgstr "以后再说"
 
@@ -202,6 +215,7 @@ msgid "Send"
 msgstr "发送"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:133
+#: ../frontend/collaborate/components/SessionHeader.tsx:197
 msgid "Sending…"
 msgstr "正在发送…"
 
@@ -221,11 +235,11 @@ msgstr "会话已满"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "会话即将结束。正在保存绘画到画廊..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:166
+#: ../frontend/collaborate/components/SessionHeader.tsx:173
 msgid "Share"
 msgstr "分享"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:163
+#: ../frontend/collaborate/components/SessionHeader.tsx:170
 msgid "Share this session"
 msgstr "分享此会话"
 
@@ -258,6 +272,7 @@ msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the firs
 msgstr "此会话已满（{currentUserCount}/{maxUsers} 位用户）。只有前 {maxUsers} 位用户可以加入会话。"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:137
+#: ../frontend/collaborate/components/SessionHeader.tsx:199
 msgid "Try again"
 msgstr "重试"
 

@@ -13,11 +13,15 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:187
+msgid "{name} asks to join"
+msgstr "{name} asks to join"
+
 #: ../frontend/collaborate/components/modals/AuthErrorModal.tsx:15
 msgid "Authentication Failed"
 msgstr "Authentication Failed"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:132
+#: ../frontend/collaborate/components/SessionHeader.tsx:139
 msgid "by"
 msgstr "by"
 
@@ -25,7 +29,7 @@ msgstr "by"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:90
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:91
 msgid "Close"
 msgstr "Close"
 
@@ -37,11 +41,11 @@ msgstr "Connect Discord"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "Connect Discord once to see your friends here and invite them to this session."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:110
+#: ../frontend/collaborate/components/SessionHeader.tsx:117
 msgid "Connected"
 msgstr "Connected"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:116
+#: ../frontend/collaborate/components/SessionHeader.tsx:123
 msgid "Connecting"
 msgstr "Connecting"
 
@@ -58,12 +62,16 @@ msgstr "Connecting..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "Connection lost. Your work is saved locally."
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:185
+msgid "Couldn’t let {name} in"
+msgstr "Couldn’t let {name} in"
+
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:122
+#: ../frontend/collaborate/components/SessionHeader.tsx:129
 msgid "Disconnected"
 msgstr "Disconnected"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:82
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:85
 msgid "Discord friends"
 msgstr "Discord friends"
 
@@ -99,21 +107,25 @@ msgid "Initializing collaboration session..."
 msgstr "Initializing collaboration session..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:145
+#: ../frontend/collaborate/components/SessionHeader.tsx:152
 msgid "Invite"
 msgstr "Invite"
 
-#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:68
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:65
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:142
+#: ../frontend/collaborate/components/SessionHeader.tsx:149
 msgid "Invite Discord friends"
 msgstr "Invite Discord friends"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
+#: ../frontend/collaborate/components/SessionHeader.tsx:160
 msgid "Invite Steam friends"
 msgstr "Invite Steam friends"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:128
+#: ../frontend/collaborate/components/SessionHeader.tsx:201
+msgid "Let in"
+msgstr "Let in"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:135
 msgid "Loading"
 msgstr "Loading"
 
@@ -143,6 +155,7 @@ msgid "No Title"
 msgstr "No Title"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:79
+#: ../frontend/collaborate/components/SessionHeader.tsx:209
 msgid "Not now"
 msgstr "Not now"
 
@@ -202,6 +215,7 @@ msgid "Send"
 msgstr "Send"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:133
+#: ../frontend/collaborate/components/SessionHeader.tsx:197
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -221,11 +235,11 @@ msgstr "Session Full"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "Session is ending. The drawing is being saved to the gallery..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:166
+#: ../frontend/collaborate/components/SessionHeader.tsx:173
 msgid "Share"
 msgstr "Share"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:163
+#: ../frontend/collaborate/components/SessionHeader.tsx:170
 msgid "Share this session"
 msgstr "Share this session"
 
@@ -258,6 +272,7 @@ msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the firs
 msgstr "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:137
+#: ../frontend/collaborate/components/SessionHeader.tsx:199
 msgid "Try again"
 msgstr "Try again"
 

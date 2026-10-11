@@ -158,6 +158,7 @@
         "join": "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985",
         "seats": 4,
         "party": 2,
+        "since": 1760140800000,
         "painting": true,
         "refreshable": false,
         "v": 1,
@@ -172,6 +173,7 @@
         "join": null,
         "seats": null,
         "party": null,
+        "since": null,
         "painting": false,
         "refreshable": true,
         "v": 1,
@@ -347,6 +349,12 @@
         "user": "80351110224678912",
         "v": 1,
         "type": "discord"
+      },
+      {
+        "action": "letIn",
+        "user": "80351110224678912",
+        "v": 1,
+        "type": "discord"
       }
     ],
     "steam": [
@@ -388,6 +396,7 @@
     "caption",
     "discord.state",
     "discord.friends",
+    "discord.requests",
     "discord.invited"
   ],
   "commands": [

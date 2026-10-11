@@ -46,6 +46,10 @@ pub struct Presence {
     pub join: Option<String>,
     /// How many may be in the room at once, beside `join`.
     pub seats: Option<i32>,
+    /// When the room opened, in milliseconds since the epoch: the clock
+    /// Discord shows beside the activity, the same for everyone in the room
+    /// and not started again by a reload.
+    pub since: Option<i64>,
 }
 
 impl Presence {
@@ -56,6 +60,7 @@ impl Presence {
             group: None,
             join: None,
             seats: None,
+            since: None,
         }
     }
 
@@ -67,6 +72,12 @@ impl Presence {
     pub fn in_room(mut self, session_id: Uuid) -> Self {
         let digest = sha256::digest(format!("oeee-presence:{session_id}"));
         self.group = Some(digest[..16].to_string());
+        self
+    }
+
+    /// When the room opened, for Discord's clock.
+    pub fn opened(mut self, since: i64) -> Self {
+        self.since = Some(since);
         self
     }
 

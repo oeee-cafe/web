@@ -69,8 +69,9 @@ type PageWindow = Window &
       discord: {
         state(linked: unknown): void;
         friends(list: unknown): void;
+        requests(list: unknown): void;
         invited(result: unknown): void;
-        known(): { state: unknown; friends: unknown };
+        known(): { state: unknown; friends: unknown; requests: unknown };
         ask(action: string, user?: string): boolean;
       };
       steam: {
@@ -185,7 +186,7 @@ async function open(options: Options = {}): Promise<Page> {
     }
   </script>`;
   const presence = options.presence
-    ? `<meta name="oeee-presence" content="${options.presence}" data-community="오이카페 &quot;모에화&quot;" data-group="0123456789abcdef" data-join="/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985" data-seats="4" data-party="2">`
+    ? `<meta name="oeee-presence" content="${options.presence}" data-community="오이카페 &quot;모에화&quot;" data-group="0123456789abcdef" data-since="1760140800000" data-join="/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985" data-seats="4" data-party="2">`
     : "";
   const body = `
     <nav class="nav-bar" data-window-drag${options.signedIn ? " data-signed-in" : ""}
@@ -325,7 +326,7 @@ describe("what the site tells the apps", () => {
     expect(keys(message)).toEqual(
       [
         "community", "group", "join", "painting", "party", "path", "presence", "refreshable", "seats",
-        "signedIn", "type", "v",
+        "signedIn", "since", "type", "v",
       ],
     );
     expect(message).toMatchObject({
@@ -337,6 +338,7 @@ describe("what the site tells the apps", () => {
       join: "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985",
       seats: 4,
       party: 2,
+      since: 1760140800000,
       painting: true,
       refreshable: false,
     });
@@ -1273,6 +1275,7 @@ describe("what the apps test against (appContract.json)", () => {
     const discord = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows store/steam" });
     discord.window.oeeeApp.discord.ask("connect");
     discord.window.oeeeApp.discord.ask("invite", "80351110224678912");
+    discord.window.oeeeApp.discord.ask("letIn", "80351110224678912");
     sent.push(...discord.sent.filter((message) => message.type === "discord"));
 
     // The room's Steam Invite, in the Steam build.
@@ -1374,14 +1377,17 @@ describe("what the apps test against (appContract.json)", () => {
     const linked = { connected: true, connecting: false, name: "넬리" };
     page.window.oeeeApp.discord.state(linked);
     page.window.oeeeApp.discord.friends([{ id: "1", name: "a", status: "online", playing: false }]);
+    page.window.oeeeApp.discord.requests([{ id: "2", name: "b" }]);
     page.window.oeeeApp.discord.invited({ user: "1", sent: true });
     expect(page.window.oeeeApp.discord.known()).toEqual({
       state: linked,
       friends: [{ id: "1", name: "a", status: "online", playing: false }],
+      requests: [{ id: "2", name: "b" }],
     });
     expect(heard).toEqual([
       { kind: "state", value: linked },
       { kind: "friends", value: [{ id: "1", name: "a", status: "online", playing: false }] },
+      { kind: "requests", value: [{ id: "2", name: "b" }] },
       { kind: "invited", value: { user: "1", sent: true } },
     ]);
     // Asked again and again, each is said: a second invitation is not the

@@ -67,14 +67,34 @@ export interface DiscordFriend {
   playing: boolean;
 }
 
+/**
+ * A Discord friend who pressed Ask to Join on the reader's activity in
+ * Discord, waiting to be let into the room.
+ */
+export interface DiscordRequest {
+  /** A Discord id, as a friend's is. */
+  id: string;
+  name: string;
+}
+
 export type DiscordHeard =
   | { kind: "state"; value: DiscordLinked }
   | { kind: "friends"; value: DiscordFriend[] }
+  | { kind: "requests"; value: DiscordRequest[] }
   | { kind: "invited"; value: { user: string; sent: boolean } };
 
+/** What the page asks of the reader's Discord account (app_bridge.jinja). */
+export type DiscordAction = "connect" | "disconnect" | "friends" | "invite" | "letIn" | "dismiss";
+
+interface DiscordKnown {
+  state: DiscordLinked | null;
+  friends: DiscordFriend[] | null;
+  requests?: DiscordRequest[] | null;
+}
+
 interface DiscordMembers {
-  known(): { state: DiscordLinked | null; friends: DiscordFriend[] | null };
-  ask(action: "connect" | "disconnect" | "friends" | "invite", user?: string): boolean;
+  known(): DiscordKnown;
+  ask(action: DiscordAction, user?: string): boolean;
 }
 
 function discordMembers(): DiscordMembers | undefined {
@@ -86,8 +106,9 @@ function discordMembers(): DiscordMembers | undefined {
  * (app_bridge.jinja keeps it). A state of null is a page no app with Discord
  * has spoken to, where nothing about Discord is offered.
  */
-export function discordKnown(): { state: DiscordLinked | null; friends: DiscordFriend[] | null } {
-  return discordMembers()?.known() ?? { state: null, friends: null };
+export function discordKnown(): { state: DiscordLinked | null; friends: DiscordFriend[] | null; requests: DiscordRequest[] } {
+  const known = discordMembers()?.known();
+  return { state: known?.state ?? null, friends: known?.friends ?? null, requests: known?.requests ?? [] };
 }
 
 /** Hears whatever the app says of Discord from now on. Returns the stop. */
@@ -98,7 +119,7 @@ export function onDiscord(listener: (heard: DiscordHeard) => void): () => void {
 }
 
 /** Asks the app something of the reader's Discord account; false outside it. */
-export function askDiscord(action: "connect" | "disconnect" | "friends" | "invite", user?: string): boolean {
+export function askDiscord(action: DiscordAction, user?: string): boolean {
   return discordMembers()?.ask(action, user) ?? false;
 }
 

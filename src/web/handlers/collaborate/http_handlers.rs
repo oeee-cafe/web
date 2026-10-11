@@ -544,8 +544,9 @@ pub async fn create_collaborative_session_form(
 }
 
 /// Checks a session's settings against what this server offers and who may
-/// post where, and records it.
-async fn insert_session(
+/// post where, and records it. The lobby's form opens one here, and so does
+/// `/draw` in Discord (discord_interactions.rs).
+pub(crate) async fn insert_session(
     state: &AppState,
     user_id: Uuid,
     request: CreateSessionRequest,
@@ -761,9 +762,11 @@ pub async fn serve_collaborative_app(
             // None once the room has ended, which nobody can join.
             Some(
                 match db::get_session_info(&state.db_pool, session_id).await? {
-                    Some(open) => {
-                        presence.joinable(session_id, open.max_participants, community.as_ref())
-                    }
+                    Some(open) => presence.opened(open.opened_at).joinable(
+                        session_id,
+                        open.max_participants,
+                        community.as_ref(),
+                    ),
                     None => presence,
                 },
             )

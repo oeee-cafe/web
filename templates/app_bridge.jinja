@@ -24,7 +24,7 @@
    know, so the site can add either without a release of any of them.
 
    page     {path, signedIn, presence, community, group, join, seats, party,
-             painting, refreshable}
+             since, painting, refreshable}
             On every page, and again whenever any of it changes: a boosted
             navigation, a back swipe that restored the page, someone coming
             into or leaving a collaborative room. `signedIn` is
@@ -32,7 +32,9 @@
             is presence_meta.jinja's activity, or null for browsing; `join`
             is the path a friend asked into a collaborative room opens, with
             its `seats` and the `party` in it now, all three null on any
-            other page and in a room a friend could not enter;
+            other page and in a room a friend could not enter; `since` is
+            when the room opened, in milliseconds since the epoch, for the
+            clock beside a Discord activity, null outside a room;
             `painting` is whether leaving would lose a drawing in progress,
             and `refreshable` whether pulling down may reload the page --
             neither a painter nor a replay may be.
@@ -114,7 +116,9 @@
             consent screen, once -- or "disconnect" it; "friends" for the
             room's invite picker, answered now and as they change; "invite"
             `user`, a Discord id as a string (a number cannot hold one), to
-            the room showing. Asked only on a page the app has told
+            the room showing; "letIn" a `user` who asked to join it -- their
+            request answered with an invitation -- or "dismiss" their
+            request, which Discord is not told of. Asked only on a page the app has told
             discord.state (below), so never where nothing would answer.
    steam    {action, join}
             The Steam build of the Windows app (data-store="steam"):
@@ -191,12 +195,16 @@
                              or null outside the Microsoft Store build
      painter.command(name), painter.preferPen()
                              frontend/shared/appBridge.ts, on a drawing page
-     discord.state(linked), discord.friends(list), discord.invited(result)
+     discord.state(linked), discord.friends(list), discord.requests(list),
+     discord.invited(result)
                              here: the reader's Discord account in the
                              Windows app, which tells every page it shows
                              {connected, connecting, name}; the friends it
                              was asked for, [{id, name, status, playing}];
-                             and {user, sent} for an invitation. Kept for
+                             in a room, the friends who pressed Ask to Join
+                             in Discord and are waiting, [{id, name}], again
+                             whenever that changes; and {user, sent} for an
+                             invitation, letting someone in included. Kept for
                              what loads after (discord.known()) and said as
                              the oeee:discord event, for the room
                              (frontend/shared/appBridge.ts) and the account
@@ -286,6 +294,7 @@
         join: join,
         seats: join ? parseInt(meta.getAttribute("data-seats"), 10) || null : null,
         party: join ? parseInt(meta.getAttribute("data-party"), 10) || null : null,
+        since: (meta && parseInt(meta.getAttribute("data-since"), 10)) || null,
         painting: PAINTING.test(presence || ""),
         refreshable: !presence
       };
@@ -403,7 +412,7 @@
 
     // The reader's Discord account in the Windows app, as it last said, for
     // whatever part of the page asks after it was told.
-    var discord = { state: null, friends: null };
+    var discord = { state: null, friends: null, requests: null };
     function heardFromDiscord(kind, value) {
       if (kind !== "invited") discord[kind] = value;
       document.dispatchEvent(new CustomEvent("oeee:discord", { detail: { kind: kind, value: value } }));
@@ -415,6 +424,7 @@
       discord: {
         state: function (linked) { heardFromDiscord("state", linked); },
         friends: function (list) { heardFromDiscord("friends", list); },
+        requests: function (list) { heardFromDiscord("requests", list); },
         invited: function (result) { heardFromDiscord("invited", result); },
         known: function () { return discord; },
         ask: function (action, user) {

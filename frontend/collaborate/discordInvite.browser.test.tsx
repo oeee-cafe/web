@@ -48,7 +48,7 @@ function room(joinable: boolean) {
   document.head.appendChild(meta);
 }
 
-async function say(kind: "state" | "friends" | "invited", value: unknown) {
+async function say(kind: "state" | "friends" | "requests" | "invited", value: unknown) {
   await act(async () => {
     document.dispatchEvent(new CustomEvent("oeee:discord", { detail: { kind, value } }));
   });
@@ -174,6 +174,49 @@ describe("inviting Discord friends from the session", () => {
     await say("invited", { user: "2", sent: false });
     expect(second.textContent).toBe("Try again");
     expect(second.disabled).toBe(false);
+  });
+
+  it("lists friends who asked to join, lets them in by an invitation, and puts them off", async () => {
+    app({ connected: true, connecting: false, name: "oeee" });
+    room(true);
+    await render();
+    expect(document.body.textContent).not.toContain("asks to join");
+
+    await say("requests", [
+      { id: "80351110224678912", name: "넬리" },
+      { id: "2", name: "pickle" },
+    ]);
+    expect(document.body.textContent).toContain("넬리 asks to join");
+    expect(document.body.textContent).toContain("pickle asks to join");
+
+    const first = button("Let in")!;
+    await act(async () => first.click());
+    expect(asked.at(-1)).toEqual({ action: "letIn", user: "80351110224678912" });
+    expect(first.textContent).toBe("Sending…");
+    expect(first.disabled).toBe(true);
+
+    // Not let in: said so, and offered again.
+    await say("invited", { user: "80351110224678912", sent: false });
+    expect(document.body.textContent).toContain("Couldn’t let 넬리 in");
+    expect(first.textContent).toBe("Try again");
+
+    // Put off: gone from the list at once, and the app told.
+    const [, second] = [...document.body.querySelectorAll("button")].filter((b) => b.textContent === "Not now");
+    await act(async () => second.click());
+    expect(asked.at(-1)).toEqual({ action: "dismiss", user: "2" });
+    expect(document.body.textContent).not.toContain("pickle");
+
+    // The app takes a friend let in off the list.
+    await say("requests", []);
+    expect(document.body.textContent).not.toContain("asks to join");
+  });
+
+  it("shows no requests in a session a friend could not enter", async () => {
+    app({ connected: true, connecting: false, name: "oeee" });
+    room(false);
+    await render();
+    await say("requests", [{ id: "2", name: "pickle" }]);
+    expect(document.body.textContent).not.toContain("pickle");
   });
 
   it("gives the buttons a row of their own, apart from who and whether", async () => {
