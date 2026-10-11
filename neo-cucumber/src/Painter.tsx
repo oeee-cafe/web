@@ -130,6 +130,12 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     adjustPenSize,
   } = useDrawingState();
   const palettePresets = usePalettePresets(config.palettePresets);
+  // What the toolbox and the shortcuts offer; see `PainterOptions.textTool`.
+  const textTool = config.textTool ?? true;
+  const tools = useMemo(
+    () => (textTool ? ALL_TOOLS : ALL_TOOLS.filter((tool) => tool !== "text")),
+    [textTool],
+  );
 
   // Initialize two-tone palette immediately if in two-tone mode
   // Use useLayoutEffect to ensure synchronous execution before first paint
@@ -1182,7 +1188,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     (action: ShortcutAction) => {
       switch (action.kind) {
         case "tool":
-          updateBrushType(action.tool);
+          if (tools.includes(action.tool)) updateBrushType(action.tool);
           break;
         case "drawType":
           setDrawingState((prev) => ({ ...prev, drawType: action.drawType }));
@@ -1220,7 +1226,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     },
     [
       updateBrushType, setDrawingState, handleZoomIn, handleZoomOut,
-      shownHistory.canUndo, shownHistory.canRedo, undo, redo,
+      shownHistory.canUndo, shownHistory.canRedo, undo, redo, tools,
     ]
   );
 
@@ -1290,6 +1296,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
             {controls.kind === "toolbox" && <ShortcutHelp
               open={showShortcuts}
               onClose={() => setShowShortcuts(false)}
+              tools={tools}
             />}
             {controls.kind === "toolbox" && twoToneConfig === null && (
               // A shortcut nobody can find is a shortcut nobody uses, so the
@@ -1333,7 +1340,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
                 canvasRef={canvasContainerRef}
                 // An offline drawing records lineType straight into the .pch,
                 // which already has codes for every one of these.
-                tools={ALL_TOOLS}
+                tools={tools}
                 drawingState={drawingState}
                 historyState={shownHistory}
                 paletteColors={paletteColors}

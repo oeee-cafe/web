@@ -359,6 +359,10 @@ export default function App() {
       // `.pch` could not describe one anyway: it addresses two layers, and
       // every participant here has a pair.
       recordReplay: false,
+      // Text is the one mark the browser rasterises with the viewer's own
+      // fonts, so the same message can draw different pixels on different
+      // machines. Text already in a session's history is still drawn.
+      textTool: false,
       synchronization: {
         // Stands in only until WELCOME assigns the session id every canonical
         // message is keyed by; see `handleWelcome`.

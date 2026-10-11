@@ -1,9 +1,12 @@
 import { NEO_BUTTON, NEO_KBD, NEO_PANEL } from "./neo/neoClasses";
+import type { ToolId } from "../neo/tools";
 import { SHORTCUTS, describeAction, type Shortcut } from "../constants/shortcuts";
 
 interface ShortcutHelpProps {
   open: boolean;
   onClose: () => void;
+  /** The tools this painter offers; a key for any other is not listed. */
+  tools: readonly ToolId[];
 }
 
 const GROUPS: Shortcut["group"][] = [
@@ -18,7 +21,7 @@ const GROUPS: Shortcut["group"][] = [
  * The shortcut list, rendered from the same table the bindings come from --
  * so it cannot teach a key that does nothing.
  */
-export function ShortcutHelp({ open, onClose }: ShortcutHelpProps) {
+export function ShortcutHelp({ open, onClose, tools }: ShortcutHelpProps) {
   if (!open) return null;
 
   return (
@@ -44,7 +47,9 @@ export function ShortcutHelp({ open, onClose }: ShortcutHelpProps) {
 
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {GROUPS.map((group) => {
-            const rows = SHORTCUTS.filter((s) => s.group === group);
+            const rows = SHORTCUTS.filter(
+              (s) => s.group === group && (s.action.kind !== "tool" || tools.includes(s.action.tool)),
+            );
             if (rows.length === 0) return null;
             return (
               <section key={group}>

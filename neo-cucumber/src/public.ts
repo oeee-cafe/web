@@ -179,6 +179,17 @@ export interface PainterOptions {
    * empty file that looks like a drawing nobody made.
    */
   recordReplay?: boolean;
+  /**
+   * Whether the toolbox offers NEO's text tool. On by default.
+   *
+   * A collaborative host turns it off. Text is rasterised by the browser's
+   * `fillText` in a font each viewer's own system supplies, so the same text
+   * message can come out as different pixels on different machines -- the
+   * one mark that can, where every other tool is arithmetic on a buffer. In a
+   * room that is two people looking at different pictures. Text already in a
+   * history is still drawn; this only stops anybody adding more.
+   */
+  textTool?: boolean;
   /** Called after the pixels or replay history change. */
   onChange?: (state: PainterChange) => void;
   /** Called for asynchronous errors that cannot be returned to the caller. */
