@@ -35,7 +35,9 @@ use serde_json::{json, Value};
 use crate::config::DiscordConfig;
 use crate::locale::LOCALES;
 use crate::models::identity::{find_user_by_identity, Provider};
-use crate::web::handlers::collaborate::{insert_session, CreateSessionRequest};
+use crate::web::handlers::collaborate::{
+    insert_session, CreateSessionRequest, CANVAS_SIZES, DEFAULT_CANVAS_SIZE,
+};
 use crate::web::state::AppState;
 
 /// The command's name, the same in every language: the app's own, so it
@@ -44,10 +46,13 @@ pub const COMMAND: &str = "oeee-cafe";
 
 /// What a session may be, as the lobby offers it (`CANVAS_SIZES`,
 /// `MAX_PARTICIPANTS_CHOICES`), and what `/oeee-cafe` alone opens.
-const SIZES: [&str; 2] = ["300x300", "1024x768"];
 const SEATS: [i32; 4] = [2, 4, 6, 8];
-const DEFAULT_SIZE: &str = "300x300";
 const DEFAULT_SEATS: i32 = 4;
+
+/// A canvas size as the command's choice carries it, "1024x768".
+fn size_value((width, height): (u32, u32)) -> String {
+    format!("{width}x{height}")
+}
 
 /// The longest title the command takes, which Discord enforces before it
 /// sends anything.
@@ -159,11 +164,15 @@ struct Asked {
 }
 
 fn asked(interaction: &Interaction) -> Option<Asked> {
-    let size = match interaction.option("size") {
-        Some(value) => value.as_str().filter(|size| SIZES.contains(size))?,
-        None => DEFAULT_SIZE,
+    let (width, height) = match interaction.option("size") {
+        Some(value) => {
+            let size = value.as_str()?;
+            CANVAS_SIZES
+                .into_iter()
+                .find(|&offered| size_value(offered) == size)?
+        }
+        None => DEFAULT_CANVAS_SIZE,
     };
-    let (width, height) = size.split_once('x')?;
     let seats = match interaction.option("seats") {
         Some(value) => value
             .as_i64()
@@ -179,8 +188,8 @@ fn asked(interaction: &Interaction) -> Option<Asked> {
         .map(|title| title.chars().take(TITLE_MOST.into()).collect());
     Some(Asked {
         title,
-        width: width.parse().ok()?,
-        height: height.parse().ok()?,
+        width: width as i32,
+        height: height as i32,
         seats,
     })
 }
@@ -439,7 +448,10 @@ pub fn commands() -> Value {
                 "name": "size",
                 "description": size,
                 "description_localizations": size_localizations,
-                "choices": SIZES.iter().map(|size| json!({ "name": size, "value": size })).collect::<Vec<_>>(),
+                "choices": CANVAS_SIZES.into_iter().map(|(width, height)| json!({
+                    "name": format!("{width}×{height}"),
+                    "value": size_value((width, height)),
+                })).collect::<Vec<_>>(),
             },
             {
                 // An integer.
@@ -579,21 +591,21 @@ mod tests {
             with(json!([])),
             Some(Asked {
                 title: None,
-                width: 300,
-                height: 300,
+                width: 1024,
+                height: 768,
                 seats: 4
             })
         );
         assert_eq!(
             with(json!([
                 {"name": "title", "value": "  밤의 고양이 "},
-                {"name": "size", "value": "1024x768"},
+                {"name": "size", "value": "1000x1000"},
                 {"name": "seats", "value": 8},
             ])),
             Some(Asked {
                 title: Some("밤의 고양이".into()),
-                width: 1024,
-                height: 768,
+                width: 1000,
+                height: 1000,
                 seats: 8
             })
         );
@@ -604,6 +616,7 @@ mod tests {
             None
         );
         assert_eq!(with(json!([{"name": "size", "value": "4096x4096"}])), None);
+        assert_eq!(with(json!([{"name": "size", "value": "1024×768"}])), None);
         assert_eq!(with(json!([{"name": "seats", "value": 3}])), None);
         assert_eq!(with(json!([{"name": "seats", "value": "4"}])), None);
     }

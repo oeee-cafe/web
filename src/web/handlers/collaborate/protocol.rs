@@ -21,10 +21,12 @@ use std::fmt;
 /// The largest snapshot payload the server will accept.
 ///
 /// A snapshot is a PNG of one layer of one participant's canvas. The largest
-/// canvas a session can be created with is 1024×768 (`CANVAS_SIZES`, which the
-/// create endpoint now insists on), which is 3 MiB of RGBA before PNG does
-/// anything to it; four leaves room for a canvas that compresses badly without
-/// leaving the ceiling meaningless.
+/// canvas a session can be created with is 1000×1000 (`CANVAS_SIZES`, which
+/// the create endpoint insists on), which is 3.8 MiB of RGBA before PNG does
+/// anything to it; four is room for one that does not compress at all, which
+/// PNG stores at a few bytes a row more than the pixels
+/// (`the_largest_canvas_fits_a_snapshot_however_badly_it_compresses`),
+/// without leaving the ceiling meaningless.
 ///
 /// This is what bounds a whole checkpoint, and through it the history ceiling:
 /// two snapshots per participant, at most `MAX_PARTICIPANTS_CHOICES`'s largest
@@ -205,6 +207,22 @@ pub fn enforce_origin(data: &mut [u8], session_user_id: u8) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The most a PNG of an offered canvas can be: every pixel in RGBA, a
+    /// filter byte a row, zlib's stored blocks when nothing compresses (five
+    /// bytes in every 65,535), and a kilobyte for the chunks around it.
+    #[test]
+    fn the_largest_canvas_fits_a_snapshot_however_badly_it_compresses() {
+        for (width, height) in crate::web::handlers::collaborate::CANVAS_SIZES {
+            let (width, height) = (width as usize, height as usize);
+            let data = height * (width * 4 + 1);
+            let worst = data + data.div_ceil(65_535) * 5 + 1024;
+            assert!(
+                worst <= MAX_SNAPSHOT_BYTES,
+                "{width}x{height} can take {worst} bytes"
+            );
+        }
+    }
 
     /// Nothing the server sends is a frame a client may send it. A client
     /// that could put a REPLAY_BATCH, a SEQUENCED or a WELCOME into the room

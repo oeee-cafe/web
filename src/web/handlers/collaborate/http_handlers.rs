@@ -26,18 +26,28 @@ use minijinja::value::Serde;
 /// any size at all -- and a session's size is what bounds every checkpoint
 /// snapshot of it, which is what `MAX_SNAPSHOT_BYTES` is derived from and what
 /// the history ceiling is sized against.
-pub const CANVAS_SIZES: [(u32, u32); 2] = [(300, 300), (1024, 768)];
+pub const CANVAS_SIZES: [(u32, u32); 3] = [(300, 300), (1024, 768), (1000, 1000)];
+
+/// The one the lobby's form starts on, and what `/oeee-cafe` in Discord
+/// opens unless asked otherwise.
+pub const DEFAULT_CANVAS_SIZE: (u32, u32) = (1024, 768);
 
 /// The seats a session can offer. A checkpoint holds two snapshots per
 /// participant, so this is the other half of what bounds one.
 pub const MAX_PARTICIPANTS_CHOICES: [i32; 4] = [2, 4, 6, 8];
 
-/// `CANVAS_SIZES` as the form wants them: the value it posts back, and the
-/// label a person reads.
-fn canvas_size_options() -> Vec<(String, String)> {
+/// `CANVAS_SIZES` as the form wants them: the value it posts back, the
+/// label a person reads, and whether it is the one chosen to begin with.
+fn canvas_size_options() -> Vec<(String, String, bool)> {
     CANVAS_SIZES
         .iter()
-        .map(|(width, height)| (format!("{width}x{height}"), format!("{width}×{height}")))
+        .map(|&(width, height)| {
+            (
+                format!("{width}x{height}"),
+                format!("{width}×{height}"),
+                (width, height) == DEFAULT_CANVAS_SIZE,
+            )
+        })
         .collect()
 }
 
@@ -985,6 +995,22 @@ mod tests {
             .render(lobby_context(true, vec![]))
             .expect("renders signed in");
         assert!(rendered.contains("create-session-form"));
+    }
+
+    #[test]
+    fn the_new_session_form_starts_on_1024_by_768_and_offers_1000_by_1000() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("collaborate_lobby.jinja")
+            .expect("template loads")
+            .render(lobby_context(true, vec![]))
+            .expect("renders signed in");
+        assert!(rendered.contains(r#"<option value="1024x768" selected>1024×768</option>"#));
+        assert!(rendered.contains(r#"<option value="1000x1000">1000×1000</option>"#));
+        assert!(rendered.contains(r#"<option value="300x300">300×300</option>"#));
+        let sizes = &rendered[rendered.find(r#"id="canvas-size""#).unwrap()..];
+        let sizes = &sizes[..sizes.find("</select>").unwrap()];
+        assert_eq!(sizes.matches(" selected>").count(), 1);
     }
 
     #[test]

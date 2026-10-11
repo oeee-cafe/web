@@ -60,7 +60,7 @@
             <label for="canvas-size">{{ ftl_get_message("collaborate-canvas-size-label") }}</label>
             <div class="field">
               <select id="canvas-size" name="canvas-size" class="ds-select" required>
-                {% for size_value, size_label in canvas_sizes %}<option value="{{ size_value }}">{{ size_label }}</option>{% endfor %}
+                {% for size_value, size_label, chosen in canvas_sizes %}<option value="{{ size_value }}"{% if chosen %} selected{% endif %}>{{ size_label }}</option>{% endfor %}
               </select>
             </div>
 

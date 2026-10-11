@@ -39,6 +39,21 @@ describe("public painter lifecycle", () => {
     ).toThrow(expect.objectContaining({ code: "invalid-options" }));
   });
 
+  it("accepts a 1000×1000 canvas, the tallest a collaborative room offers", async () => {
+    const element = document.createElement("div");
+    let painter!: ReturnType<typeof mount>;
+    act(() => {
+      painter = mount(element, {
+        width: 1000,
+        height: 1000,
+        mode: { kind: "standard" },
+        controls: { kind: "none" },
+      });
+    });
+    await act(async () => painter.ready);
+    act(() => painter.unmount());
+  });
+
   it("accepts a 1024×768 canvas", async () => {
     const element = document.createElement("div");
     let painter!: ReturnType<typeof mount>;

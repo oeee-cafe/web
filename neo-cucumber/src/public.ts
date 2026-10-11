@@ -143,7 +143,7 @@ export type PainterControls =
   | { kind: "toolbox" };
 
 export interface PainterOptions {
-  /** Integer dimensions: width 1–1024 and height 1–800. */
+  /** Integer dimensions: width 1–1024 and height 1–1000. */
   width: number;
   height: number;
   mode: PainterMode;
