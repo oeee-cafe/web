@@ -87,12 +87,12 @@ fcm_project_id = ""
 # [discord]
 # client_id = "1558602531133722646"
 # client_secret = ""
-# The application's public key (General Information), for /draw: Discord
+# The application's public key (General Information), for /oeee-cafe: Discord
 # sends each use to {base_url}/api/discord/interactions (the Interactions
 # Endpoint URL), and the site tells Discord the command on boot. Under
 # Installation, User Install with the applications.commands scope lets
-# people add the app to their own account and use /draw anywhere. Leave the
-# key out to turn /draw off.
+# people add the app to their own account and use /oeee-cafe anywhere. Leave the
+# key out to turn /oeee-cafe off.
 # public_key = ""
 
 # The App Store's side of the iOS app: what the Supporter Pack is sold as,

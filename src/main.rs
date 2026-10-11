@@ -366,7 +366,7 @@ fn main() {
                     worker.run_until(shutdown.signalled()).await;
                 });
             }
-            // `/draw`, told to Discord: the same list each boot, so the other
+            // `/oeee-cafe`, told to Discord: the same list each boot, so the other
             // colour telling it too changes nothing.
             if let Some(discord) = cfg.discord.clone().filter(|d| d.public_key.is_some()) {
                 tokio::spawn(async move {

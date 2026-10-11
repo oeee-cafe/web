@@ -236,7 +236,7 @@ pub struct DiscordConfig {
     #[serde(default = "default_discord_revoke_url")]
     pub revoke_url: String,
     /// The application's public key (General Information), which Discord
-    /// signs what it sends `/api/discord/interactions` with: `/draw`. Left
+    /// signs what it sends `/api/discord/interactions` with: `/oeee-cafe`. Left
     /// out, the endpoint answers nothing and the commands are not told to
     /// Discord.
     #[serde(default)]

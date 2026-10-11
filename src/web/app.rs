@@ -572,7 +572,7 @@ impl App {
                 "/api/discord/revoke",
                 post(crate::web::handlers::discord_app::app_revoke),
             )
-            // `/draw`, typed in a Discord chat (discord_interactions.rs).
+            // `/oeee-cafe`, typed in a Discord chat (discord_interactions.rs).
             .route(
                 "/api/discord/interactions",
                 post(crate::web::handlers::discord_interactions::interactions),

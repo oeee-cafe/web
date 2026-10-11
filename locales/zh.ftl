@@ -643,7 +643,7 @@ window-maximize = 最大化
 window-restore = 向下还原
 window-close = 关闭
 
-# /draw, typed in a Discord chat (discord_interactions.rs). The command's
+# /oeee-cafe, typed in a Discord chat (discord_interactions.rs). The command's
 # descriptions are at most 100 characters.
 discord-command-draw = 在 Oeee Cafe 为这里的所有人开一个绘画会话
 discord-command-draw-title = 会话名称
@@ -652,6 +652,6 @@ discord-command-draw-seats = 可同时作画的人数
 discord-draw-started = **{ $name }** 开了一个最多 { $seats } 人的绘画会话。一起来画吧！
 discord-draw-started-titled = **{ $name }** 开了绘画会话“{ $title }”，最多 { $seats } 人。一起来画吧！
 discord-draw-join = 加入
-discord-draw-link-first = 用 Discord 登录 Oeee Cafe 一次后，就能用 /draw 开会话了。
+discord-draw-link-first = 用 Discord 登录 Oeee Cafe 一次后，就能用 /oeee-cafe 开会话了。
 discord-draw-sign-in = 用 Discord 登录
 discord-draw-failed = 无法开启会话，请稍后再试。

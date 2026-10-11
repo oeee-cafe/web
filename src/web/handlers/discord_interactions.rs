@@ -1,4 +1,4 @@
-//! `/draw`, typed in any Discord chat: a collaborative room, and a Join
+//! `/oeee-cafe`, typed in any Discord chat: a collaborative room, and a Join
 //! button for everyone in the chat.
 //!
 //! Oeee Cafe is a Discord app people add to their own account (a user
@@ -38,11 +38,12 @@ use crate::models::identity::{find_user_by_identity, Provider};
 use crate::web::handlers::collaborate::{insert_session, CreateSessionRequest};
 use crate::web::state::AppState;
 
-/// The command's name, the same in every language.
-pub const DRAW: &str = "draw";
+/// The command's name, the same in every language: the app's own, so it
+/// stands apart from every other app's commands in the picker.
+pub const COMMAND: &str = "oeee-cafe";
 
 /// What a session may be, as the lobby offers it (`CANVAS_SIZES`,
-/// `MAX_PARTICIPANTS_CHOICES`), and what `/draw` alone opens.
+/// `MAX_PARTICIPANTS_CHOICES`), and what `/oeee-cafe` alone opens.
 const SIZES: [&str; 2] = ["300x300", "1024x768"];
 const SEATS: [i32; 4] = [2, 4, 6, 8];
 const DEFAULT_SIZE: &str = "300x300";
@@ -148,7 +149,7 @@ impl Interaction {
     }
 }
 
-/// What `/draw` was asked for, checked against what the lobby offers.
+/// What `/oeee-cafe` was asked for, checked against what the lobby offers.
 #[derive(Debug, PartialEq, Eq)]
 struct Asked {
     title: Option<String>,
@@ -223,7 +224,7 @@ pub async fn interactions(
             if interaction
                 .data
                 .as_ref()
-                .is_some_and(|data| data.name == DRAW) =>
+                .is_some_and(|data| data.name == COMMAND) =>
         {
             Json(draw(&state, &interaction).await).into_response()
         }
@@ -231,7 +232,7 @@ pub async fn interactions(
     }
 }
 
-/// `/draw`: the room, or why not, in the language of whoever typed it.
+/// `/oeee-cafe`: the room, or why not, in the language of whoever typed it.
 async fn draw(state: &AppState, interaction: &Interaction) -> Value {
     let words = Words::new(interaction.locale.as_deref());
     let base_url = state.config.base_url.trim_end_matches('/');
@@ -258,7 +259,7 @@ async fn draw(state: &AppState, interaction: &Interaction) -> Value {
             );
         }
         Err(error) => {
-            tracing::error!("/draw could not look up a Discord account: {error:#}");
+            tracing::error!("/oeee-cafe could not look up a Discord account: {error:#}");
             return only_them(words.get("discord-draw-failed", None), None);
         }
     };
@@ -274,7 +275,7 @@ async fn draw(state: &AppState, interaction: &Interaction) -> Value {
     let session_id = match insert_session(state, user.id, request).await {
         Ok(id) => id,
         Err(error) => {
-            tracing::error!("/draw could not open a room: {error:?}");
+            tracing::error!("/oeee-cafe could not open a room: {error:?}");
             return only_them(words.get("discord-draw-failed", None), None);
         }
     };
@@ -415,7 +416,7 @@ pub fn commands() -> Value {
     let (size, size_localizations) = described("discord-command-draw-size");
     let (seats, seats_localizations) = described("discord-command-draw-seats");
     json!([{
-        "name": DRAW,
+        "name": COMMAND,
         // A slash command.
         "type": 1,
         "description": description,
@@ -452,10 +453,16 @@ pub fn commands() -> Value {
     }])
 }
 
-/// Tells Discord the application's commands, replacing whatever it had:
-/// the same list every time, so a boot that tells it again changes
-/// nothing. A token for the application itself first, by its client
-/// credentials, which may do no more than this.
+/// Discord's type for an Activity's Entry Point command, which Discord makes
+/// itself when Activities are turned on for the application.
+const PRIMARY_ENTRY_POINT: u64 = 4;
+
+/// Tells Discord the application's commands, replacing whatever it had
+/// besides an Entry Point, which Discord will not have replaced and which
+/// is not the site's: it is asked for first and handed back as it was. The
+/// same list every time, so a boot that tells it again changes nothing. A
+/// token for the application itself first, by its client credentials,
+/// which may do no more than this.
 pub async fn register(config: &DiscordConfig) -> anyhow::Result<()> {
     #[derive(Deserialize)]
     struct Token {
@@ -481,10 +488,26 @@ pub async fn register(config: &DiscordConfig) -> anyhow::Result<()> {
         config.api_url.trim_end_matches('/'),
         config.client_id
     );
+    let had = http
+        .get(&url)
+        .bearer_auth(&token.access_token)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<Vec<Value>>()
+        .await?;
+    let mut list = match commands() {
+        Value::Array(list) => list,
+        _ => unreachable!("the commands are a list"),
+    };
+    list.extend(
+        had.into_iter()
+            .filter(|command| command["type"].as_u64() == Some(PRIMARY_ENTRY_POINT)),
+    );
     let response = http
-        .put(url)
-        .bearer_auth(token.access_token)
-        .json(&commands())
+        .put(&url)
+        .bearer_auth(&token.access_token)
+        .json(&list)
         .send()
         .await?;
     if !response.status().is_success() {
@@ -533,15 +556,15 @@ mod tests {
     #[test]
     fn whoever_typed_it_is_the_member_in_a_server_and_the_user_elsewhere() {
         let in_server = interaction(json!({
-            "type": 2, "data": {"name": "draw"},
+            "type": 2, "data": {"name": "oeee-cafe"},
             "member": {"user": {"id": "80351110224678912"}},
         }));
         assert_eq!(in_server.user_id(), Some("80351110224678912"));
         let in_dm = interaction(json!({
-            "type": 2, "data": {"name": "draw"}, "user": {"id": "42"},
+            "type": 2, "data": {"name": "oeee-cafe"}, "user": {"id": "42"},
         }));
         assert_eq!(in_dm.user_id(), Some("42"));
-        let nobody = interaction(json!({ "type": 2, "data": {"name": "draw"} }));
+        let nobody = interaction(json!({ "type": 2, "data": {"name": "oeee-cafe"} }));
         assert_eq!(nobody.user_id(), None);
     }
 
@@ -549,7 +572,7 @@ mod tests {
     fn the_command_asks_only_for_what_the_lobby_offers() {
         let with = |options: Value| {
             asked(&interaction(json!({
-                "type": 2, "data": {"name": "draw", "options": options},
+                "type": 2, "data": {"name": "oeee-cafe", "options": options},
             })))
         };
         assert_eq!(
@@ -634,7 +657,7 @@ mod tests {
     fn a_description_is_within_what_discord_takes() {
         let commands = commands();
         let draw = &commands[0];
-        assert_eq!(draw["name"], DRAW);
+        assert_eq!(draw["name"], COMMAND);
         let mut descriptions = vec![&draw["description"]];
         descriptions.extend(
             draw["description_localizations"]
@@ -661,12 +684,15 @@ mod tests {
         );
     }
 
+    static ENTRY_POINT: std::sync::LazyLock<Value> =
+        std::sync::LazyLock::new(|| json!({"id": "1", "type": 4, "name": "launch", "handler": 2}));
+
     /// Discord, as far as telling it the commands goes: a token for the
     /// application's own credentials, then the list, which it keeps.
     #[tokio::test]
     async fn the_commands_are_told_with_a_token_for_the_application_itself() {
         use axum::extract::Path;
-        use axum::routing::{post, put};
+        use axum::routing::{get, post};
         use std::sync::{Arc, Mutex};
 
         let kept: Arc<Mutex<Option<(String, Value)>>> = Arc::default();
@@ -690,7 +716,17 @@ mod tests {
             )
             .route(
                 "/applications/{id}/commands",
-                put(
+                get(|headers: HeaderMap| async move {
+                    let bearer = headers.get("authorization").and_then(|v| v.to_str().ok());
+                    if bearer != Some("Bearer app-token") {
+                        return (StatusCode::UNAUTHORIZED, Json(json!([])));
+                    }
+                    (
+                        StatusCode::OK,
+                        Json(json!([ENTRY_POINT.clone(), {"id": "2", "type": 1, "name": "draw"}])),
+                    )
+                })
+                .put(
                     move |Path(id): Path<String>, headers: HeaderMap, Json(body): Json<Value>| {
                         let keeping = keeping.clone();
                         async move {
@@ -720,7 +756,11 @@ mod tests {
         register(&config).await.unwrap();
         let (id, body) = kept.lock().unwrap().take().expect("the commands");
         assert_eq!(id, "app");
-        assert_eq!(body, commands());
+        // Ours, and Discord's Entry Point as it was; an old command of ours
+        // is gone.
+        let mut expected = commands().as_array().unwrap().clone();
+        expected.push(ENTRY_POINT.clone());
+        assert_eq!(body, Value::Array(expected));
 
         config.client_secret = "wrong".into();
         assert!(register(&config).await.is_err());
