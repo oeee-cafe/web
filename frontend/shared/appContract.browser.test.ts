@@ -60,7 +60,7 @@ type PageWindow = Window &
       };
       signIn: {
         answer(told: Record<string, unknown>): void;
-        resume(): void;
+        resume(code?: string): void;
         unopened(): void;
       };
       password: {
