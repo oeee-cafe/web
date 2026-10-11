@@ -13,9 +13,12 @@
 //! 2. the app opens the system browser at `/auth/<provider>?handoff=<id>`,
 //!    which signs in there as any browser would -- including making an
 //!    account, if that is what it comes to;
-//! 3. the site records against the handoff *who the provider said that was*
-//!    -- not an account here -- and the browser is told to go back;
-//! 4. the page claims the handoff with the `id` and the `secret`, and the
+//! 3. once the person in the browser has said it was they who asked, the
+//!    site records against the handoff *who the provider said that was* --
+//!    not an account here -- and the browser is told to go back to the app,
+//!    with a `code` for it;
+//! 4. the page claims the handoff with the `id`, the `secret` and the
+//!    `code` the app passed it, and the
 //!    site does with that identity, in the app's own session, exactly what
 //!    it would have done had the sign-in happened there: sign in, link it
 //!    to whoever is already signed in, or ask for a username.
@@ -47,13 +50,39 @@
 //! could not do it. It has to be launched as a Custom Tab, which goes to a
 //! browser package and is not re-routed.
 //!
-//! What it does *not* defend against, which is worth saying plainly: the
-//! `id` is as good as the sign-in it is waiting for. Anyone who learns one
-//! that is still pending can sign in *as themselves* in their own browser
-//! against it, and the app that started it would then be signed in as them
-//! -- a forced login, of the same shape as a stolen OAuth `state`. So the id
-//! is 32 random bytes, it is never logged, and it lives for minutes. It is
-//! only ever handed from the app to the system browser.
+//! What the secret does not stop. `/auth/handoff/start` is open to anyone
+//! -- its Origin check keeps another site's page out, not a script, which
+//! sends whatever Origin it likes -- so somebody can start a handoff of
+//! their own and send the URL it answers with to somebody else: "sign in to
+//! Oeee Cafe here", with Google's page straight away if they asked for `at`.
+//! Whoever follows it signs in in their own browser, the provider says who
+//! they are, and the handoff holds *their* identity -- for whoever holds the
+//! secret, which is the sender, who claims it signed out and is now signed
+//! in as them. The same shape works the other way round: an id that leaks
+//! from a real app's handoff lets someone sign in *as themselves* against
+//! it, and the app that started it is then signed in as them, a forced
+//! login like a stolen OAuth `state`.
+//!
+//! Two things stand in the way, and either would be thin alone:
+//!
+//! - the browser records nothing until whoever is at it has been asked. The
+//!   provider's answer waits in the browser's session, and a page of this
+//!   site (`/auth/handoff/confirm`) says which account is about to be signed
+//!   in to the app, and that it is only to be let through by somebody who
+//!   just pressed sign in inside the app on this device -- not by somebody
+//!   who was sent a link. That is a warning, which can be ignored.
+//! - so going on also makes a one-time `code`, kept here only as a hash
+//!   beside the identity, and hands it to the app on *this* device in the
+//!   `oeee-cafe://handoff/done?code=...` the browser is left to open. A claim
+//!   needs that code, and the sender of a link is on another device and
+//!   never sees it. A claim without one is only ever told `waiting`, so it
+//!   asks on, harmlessly, until the handoff runs out.
+//!
+//! Still not defended against: another program on the same device that has
+//! claimed the `oeee-cafe` scheme for itself, which Android and Windows
+//! allow, being the one the code is opened in. That is somebody already on
+//! the device. The id and the code are each 32 random bytes, never logged,
+//! and live for minutes.
 
 use crate::models::identity::VerifiedIdentity;
 use crate::redis::RedisPool;
@@ -79,6 +108,12 @@ struct Handoff {
     /// What the provider said, once it has said it. `None` while the
     /// browser is still out there.
     identity: Option<VerifiedIdentity>,
+    /// The SHA-256 of the code the browser handed the app on its device
+    /// along with the identity (see the module documentation). Absent while
+    /// the handoff waits, and from one recorded by the release before there
+    /// were codes, which still reads.
+    #[serde(default)]
+    code_hash: Option<String>,
 }
 
 /// The two halves of a new handoff: the `id` the browser is sent with, and
@@ -130,6 +165,7 @@ pub async fn start(pool: &RedisPool, next: Option<String>) -> Result<Started> {
         secret_hash: sha256::digest(secret.as_str()),
         next,
         identity: None,
+        code_hash: None,
     };
     write(&mut connect(pool).await?, &id, &handoff, HANDOFF_FOR).await?;
     Ok(Started { id, secret })
@@ -143,25 +179,33 @@ pub async fn is_pending(pool: &RedisPool, id: &str) -> Result<bool> {
     Ok(handoff.is_some_and(|h| h.identity.is_none()))
 }
 
-/// Records what the provider said. The handoff then waits for the app.
+/// Records what the provider said, once the person in the browser has said
+/// it was theirs to send, and answers the code the app on that device is to
+/// claim it with. The handoff then waits for the app.
 ///
-/// Answers `false` when there is no such handoff any more -- it expired
+/// Answers `None` when there is no such handoff any more -- it expired
 /// while the person was signing in, or it has already been claimed -- which
 /// is not an error, only a sign-in that arrived too late to be carried.
-pub async fn verified(pool: &RedisPool, id: &str, identity: &VerifiedIdentity) -> Result<bool> {
+pub async fn verified(
+    pool: &RedisPool,
+    id: &str,
+    identity: &VerifiedIdentity,
+) -> Result<Option<String>> {
     let mut conn = connect(pool).await?;
     // Whatever is left of the original life, so signing in does not extend
     // how long an unclaimed handoff lingers.
     let ttl: i64 = conn.ttl(key(id)).await?;
     let Some(mut handoff) = read(&mut conn, id).await? else {
-        return Ok(false);
+        return Ok(None);
     };
     if handoff.identity.is_some() {
-        return Ok(false);
+        return Ok(None);
     }
+    let code = random_token();
     handoff.identity = Some(identity.clone());
+    handoff.code_hash = Some(sha256::digest(code.as_str()));
     write(&mut conn, id, &handoff, ttl.max(1) as u64).await?;
-    Ok(true)
+    Ok(Some(code))
 }
 
 /// What a look at a handoff found.
@@ -172,11 +216,12 @@ pub enum Claim {
         identity: Box<VerifiedIdentity>,
         next: Option<String>,
     },
-    /// Nobody has finished signing in for it yet. Ask again.
+    /// Nobody has finished signing in for it yet -- or somebody has, and a
+    /// claim without the code is not let take it. Ask again.
     Waiting,
-    /// No such handoff, the wrong secret, or one already spent. The three
-    /// are one answer on purpose: an id being probed learns nothing from
-    /// which it was.
+    /// No such handoff, the wrong secret or code, or one already spent.
+    /// They are one answer on purpose: an id being probed learns nothing
+    /// from which it was.
     Unknown,
 }
 
@@ -184,19 +229,45 @@ pub enum Claim {
 /// about to do -- which provider account, and whose -- before doing it.
 /// Linking one account to another is not something to do behind somebody's
 /// back on the strength of an id alone.
-pub async fn peek(pool: &RedisPool, id: &str, secret: &str) -> Result<Claim> {
+///
+/// `code` is what the browser handed the app on its device ([`verified`]),
+/// and nothing is ready without it.
+pub async fn peek(pool: &RedisPool, id: &str, secret: &str, code: Option<&str>) -> Result<Claim> {
     let Some(handoff) = read(&mut connect(pool).await?, id).await? else {
         return Ok(Claim::Unknown);
     };
+    Ok(answer(handoff, secret, code))
+}
+
+/// What [`peek`] found, from the handoff it read.
+fn answer(handoff: Handoff, secret: &str, code: Option<&str>) -> Claim {
     if !secret_matches(&handoff.secret_hash, secret) {
-        return Ok(Claim::Unknown);
+        return Claim::Unknown;
+    }
+    match code.filter(|code| !code.is_empty()) {
+        // The wrong code says no more than the wrong secret does, and
+        // spends nothing.
+        Some(code) => {
+            if !handoff
+                .code_hash
+                .as_deref()
+                .is_some_and(|hash| secret_matches(hash, code))
+            {
+                return Claim::Unknown;
+            }
+        }
+        // No code yet: the app has not been handed one -- or never will
+        // be, being on another device than the browser, or a build from
+        // before there were codes. It asks on, harmlessly, until the
+        // handoff runs out.
+        None => return Claim::Waiting,
     }
     match handoff.identity {
-        None => Ok(Claim::Waiting),
-        Some(identity) => Ok(Claim::Ready {
+        None => Claim::Waiting,
+        Some(identity) => Claim::Ready {
             identity: Box::new(identity),
             next: handoff.next,
-        }),
+        },
     }
 }
 
@@ -216,7 +287,7 @@ pub async fn spend(pool: &RedisPool, id: &str, secret: &str) -> Result<bool> {
 }
 
 /// Compares in a way that does not say, by how long it took, how much of the
-/// secret was right.
+/// secret, or the code, was right.
 fn secret_matches(expected_hash: &str, secret: &str) -> bool {
     let actual = sha256::digest(secret);
     let (a, b) = (expected_hash.as_bytes(), actual.as_bytes());
@@ -289,7 +360,8 @@ pub async fn back_from_provider(pool: &RedisPool, state: &str) -> Result<Option<
 }
 
 /// Against the Redis `REDIS_URL` names, under keys of their own. Skipped
-/// when there is no Redis to reach.
+/// when there is no Redis to reach; the ones about what a claim is answered
+/// need none.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,6 +400,78 @@ mod tests {
         }
     }
 
+    /// A claim as the app makes it, with the code the browser handed it.
+    async fn look(pool: &RedisPool, started: &Started, code: &str) -> Claim {
+        peek(pool, &started.id, &started.secret, Some(code))
+            .await
+            .unwrap()
+    }
+
+    /// A handoff as the browser leaves it once somebody has said yes.
+    fn handed(secret: &str, code: &str) -> Handoff {
+        Handoff {
+            secret_hash: sha256::digest(secret),
+            next: Some("/draw".to_string()),
+            identity: Some(identity("g-0")),
+            code_hash: Some(sha256::digest(code)),
+        }
+    }
+
+    #[test]
+    fn the_code_from_the_browser_is_what_lets_a_claim_take_it() {
+        let (secret, code) = (random_token(), random_token());
+        let ready = |claim: Claim| subject_of(&claim) == Some("g-0");
+
+        assert!(ready(answer(handed(&secret, &code), &secret, Some(&code))));
+        // The wrong code is no handoff at all, whatever the secret: whoever
+        // started it on another device and sent somebody the link never
+        // saw the code the browser handed this device's app.
+        for wrong in ["not-the-code", &random_token(), &code.to_uppercase()] {
+            assert_eq!(
+                answer(handed(&secret, &code), &secret, Some(wrong)),
+                Claim::Unknown,
+                "{wrong:?}"
+            );
+        }
+        assert_eq!(
+            answer(handed(&secret, &code), &random_token(), Some(&code)),
+            Claim::Unknown
+        );
+    }
+
+    #[test]
+    fn a_claim_without_the_code_only_waits() {
+        let (secret, code) = (random_token(), random_token());
+        // Told to wait -- not refused, so an app from before codes asks on
+        // harmlessly until the handoff runs out. An empty code is no code.
+        assert_eq!(
+            answer(handed(&secret, &code), &secret, None),
+            Claim::Waiting
+        );
+        assert_eq!(
+            answer(handed(&secret, &code), &secret, Some("")),
+            Claim::Waiting
+        );
+    }
+
+    /// A handoff recorded by the release before codes: it still reads, and
+    /// no code claims it.
+    #[test]
+    fn a_handoff_recorded_before_codes_reads_and_takes_no_code() {
+        let secret = random_token();
+        let before: Handoff = serde_json::from_value(serde_json::json!({
+            "secret_hash": sha256::digest(secret.as_str()),
+            "next": null,
+            "identity": identity("g-old"),
+        }))
+        .expect("reads");
+        assert_eq!(before.code_hash, None);
+        assert_eq!(
+            answer(before, &secret, Some(&random_token())),
+            Claim::Unknown
+        );
+    }
+
     #[tokio::test]
     async fn a_handoff_carries_what_the_provider_said_once() {
         let Some(pool) = pool().await else { return };
@@ -336,22 +480,27 @@ mod tests {
         // Waiting until the browser gets somewhere.
         assert!(is_pending(&pool, &started.id).await.unwrap());
         assert_eq!(
-            peek(&pool, &started.id, &started.secret).await.unwrap(),
+            peek(&pool, &started.id, &started.secret, None)
+                .await
+                .unwrap(),
             Claim::Waiting
         );
 
-        assert!(verified(&pool, &started.id, &identity("g-1"))
+        let code = verified(&pool, &started.id, &identity("g-1"))
             .await
-            .unwrap());
+            .unwrap()
+            .expect("a code");
+        assert_eq!(code.len(), 64);
+        assert!(code.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')));
         assert!(!is_pending(&pool, &started.id).await.unwrap());
 
         // A peek says what it is without using it up, so the app can ask
         // before it links anything.
-        let looked = peek(&pool, &started.id, &started.secret).await.unwrap();
+        let looked = look(&pool, &started, &code).await;
         assert_eq!(subject_of(&looked), Some("g-1"));
         assert!(matches!(&looked, Claim::Ready { next, .. } if next.as_deref() == Some("/draw")));
         assert_eq!(
-            subject_of(&peek(&pool, &started.id, &started.secret).await.unwrap()),
+            subject_of(&look(&pool, &started, &code).await),
             Some("g-1"),
             "a peek must not spend it"
         );
@@ -360,14 +509,12 @@ mod tests {
         // Spent: only the first spend wins, which is what stops one
         // sign-in being used twice.
         assert!(!spend(&pool, &started.id, &started.secret).await.unwrap());
-        assert_eq!(
-            peek(&pool, &started.id, &started.secret).await.unwrap(),
-            Claim::Unknown
-        );
+        assert_eq!(look(&pool, &started, &code).await, Claim::Unknown);
     }
 
     /// The whole thread, end to end, without a browser: start a handoff,
-    /// have a provider sign-in record an identity against it, and claim it.
+    /// have a provider sign-in record an identity against it, and claim it
+    /// with the code the browser handed the app.
     #[tokio::test]
     async fn a_handoff_carries_an_identity_from_one_place_to_another() {
         let Some(pool) = pool().await else { return };
@@ -375,19 +522,22 @@ mod tests {
 
         // Nothing to take yet.
         assert_eq!(
-            peek(&pool, &started.id, &started.secret).await.unwrap(),
+            peek(&pool, &started.id, &started.secret, None)
+                .await
+                .unwrap(),
             Claim::Waiting
         );
         // The browser arrives at /auth/google?handoff=<id> and is let in.
         assert!(is_pending(&pool, &started.id).await.unwrap());
 
-        // Google says who it is; the browser hands that over and stops.
+        // Google says who it is, the person says it was they who asked, and
+        // the browser hands that over with a code for the app.
         let said = identity("110169484474386276334");
-        assert!(verified(&pool, &started.id, &said).await.unwrap());
+        let code = verified(&pool, &started.id, &said).await.unwrap().unwrap();
 
         // The app looks before it acts, and what it sees is what the
         // provider said -- not an account, which is the point.
-        match peek(&pool, &started.id, &started.secret).await.unwrap() {
+        match look(&pool, &started, &code).await {
             Claim::Ready { identity, next } => {
                 assert_eq!(*identity, said);
                 assert_eq!(next.as_deref(), Some("/draw"));
@@ -397,25 +547,24 @@ mod tests {
 
         // Acting on it spends it, once.
         assert!(spend(&pool, &started.id, &started.secret).await.unwrap());
-        assert_eq!(
-            peek(&pool, &started.id, &started.secret).await.unwrap(),
-            Claim::Unknown
-        );
+        assert_eq!(look(&pool, &started, &code).await, Claim::Unknown);
     }
 
     #[tokio::test]
     async fn the_secret_is_what_claims_it() {
         let Some(pool) = pool().await else { return };
         let started = start(&pool, None).await.unwrap();
-        verified(&pool, &started.id, &identity("g-2"))
+        let code = verified(&pool, &started.id, &identity("g-2"))
             .await
+            .unwrap()
             .unwrap();
 
-        // The id alone does not claim: knowing it is not enough, which is
-        // the whole reason the secret stays in the app.
+        // The id alone does not claim, nor the id and the code: knowing
+        // them is not enough, which is the whole reason the secret stays in
+        // the app.
         for wrong in ["", "not-the-secret", &random_token()] {
             assert_eq!(
-                peek(&pool, &started.id, wrong).await.unwrap(),
+                peek(&pool, &started.id, wrong, Some(&code)).await.unwrap(),
                 Claim::Unknown,
                 "{wrong:?}"
             );
@@ -424,11 +573,10 @@ mod tests {
                 "{wrong:?}"
             );
         }
+        // Nor the secret with the wrong code, which spends nothing either.
+        assert_eq!(look(&pool, &started, &random_token()).await, Claim::Unknown);
         // And none of that spent it.
-        assert_eq!(
-            subject_of(&peek(&pool, &started.id, &started.secret).await.unwrap()),
-            Some("g-2")
-        );
+        assert_eq!(subject_of(&look(&pool, &started, &code).await), Some("g-2"));
         forget(&pool, &started.id).await.unwrap();
     }
 
@@ -438,27 +586,34 @@ mod tests {
         let made_up = random_token();
         assert!(!is_pending(&pool, &made_up).await.unwrap());
         assert_eq!(
-            peek(&pool, &made_up, &random_token()).await.unwrap(),
+            peek(&pool, &made_up, &random_token(), None).await.unwrap(),
             Claim::Unknown
         );
         // Finishing a sign-in for one that was never started carries nothing.
-        assert!(!verified(&pool, &made_up, &identity("g-3")).await.unwrap());
+        assert_eq!(
+            verified(&pool, &made_up, &identity("g-3")).await.unwrap(),
+            None
+        );
     }
 
     #[tokio::test]
     async fn only_the_first_answer_counts() {
         let Some(pool) = pool().await else { return };
         let started = start(&pool, None).await.unwrap();
-        assert!(verified(&pool, &started.id, &identity("first"))
+        let code = verified(&pool, &started.id, &identity("first"))
             .await
-            .unwrap());
+            .unwrap()
+            .unwrap();
         // A second browser finishing against the same handoff does not
-        // replace the identity waiting to be handed over.
-        assert!(!verified(&pool, &started.id, &identity("second"))
-            .await
-            .unwrap());
+        // replace the identity waiting to be handed over, or its code.
         assert_eq!(
-            subject_of(&peek(&pool, &started.id, &started.secret).await.unwrap()),
+            verified(&pool, &started.id, &identity("second"))
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            subject_of(&look(&pool, &started, &code).await),
             Some("first")
         );
         forget(&pool, &started.id).await.unwrap();
@@ -471,7 +626,9 @@ mod tests {
         forget(&pool, &started.id).await.unwrap();
         assert!(!is_pending(&pool, &started.id).await.unwrap());
         assert_eq!(
-            peek(&pool, &started.id, &started.secret).await.unwrap(),
+            peek(&pool, &started.id, &started.secret, None)
+                .await
+                .unwrap(),
             Claim::Unknown
         );
     }

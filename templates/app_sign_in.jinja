@@ -41,15 +41,23 @@
         URL is this site's -- or Google's sign-in page, where the Apple and
         Windows apps are sent straight to -- and opens it in the browser, or
         calls window.oeeeApp.signIn.unopened();
-     2. the page asks the site (POST /auth/handoff/claim) until the browser
-        has finished, at which point the site signs *this* session in; the
-        app calls window.oeeeApp.signIn.resume() when it is brought back to
-        the front, so the page asks at once. An app whose sheet closes by
-        itself (iOS and macOS) calls resume() when it returned by
-        oeee-cafe://handoff/done and unopened() when it was put away --
-        which the page answers by asking once more before letting the
-        handoff go, since the reader may have put it away just after
-        signing in.
+     2. the browser signs in, asks the person there whether it was they who
+        pressed sign in in the app (identity_handoff_confirm.jinja), and on
+        a yes opens oeee-cafe://handoff/done?code=<code>, where <code> is 64
+        lowercase hex characters (identity_handoff_done.jinja). The app
+        passes it to the page as window.oeeeApp.signIn.resume(code);
+     3. the page asks the site (POST /auth/handoff/claim with id, secret
+        and the code) until the browser has finished, at which point the
+        site signs *this* session in. Without the code the site only ever
+        answers "waiting": it is what says the browser that signed in is
+        the one beside this app, and not one somebody else was sent a link
+        to (src/handoff.rs). The app calls resume(code) when it returned by
+        oeee-cafe://handoff/done, and resume() with nothing when it is
+        brought back to the front any other way, so the page asks at once
+        either way. An app whose sheet closes by itself (iOS and macOS)
+        calls unopened() when it was put away -- which the page answers by
+        asking once more before letting the handoff go, since the reader
+        may have put it away just after signing in.
 
    Steam, in the build that sells through Steam (data-store="steam"): the
    page sends  signIn {provider: "steam"}, with no nonce, and the app answers
@@ -183,8 +191,10 @@
 
     // -- The system's browser, and back ------------------------------------
 
-    // The handoff under way: its id, its secret, and its URL.
+    // The handoff under way: its id, its secret, and its URL -- and, once
+    // the app has been handed it, the browser's code.
     var pending = null;
+    var CODE = /^[0-9a-f]{64}$/;
     var asking = null;
     // Whether an ask is in flight. Two at once can spend the handoff between
     // them: one gets the sign-in and the other "there is no such handoff",
@@ -223,7 +233,7 @@
     function ask(confirmed) {
       if (!pending || inFlight || deciding) return;
       inFlight = true;
-      var fields = { id: pending.id, secret: pending.secret };
+      var fields = { id: pending.id, secret: pending.secret, code: pending.code };
       if (confirmed) fields.confirm = "1";
       post("/auth/handoff/claim", fields)
         .then(function (claimed) {
@@ -340,9 +350,14 @@
     window.oeeeApp.signIn = {
       answer: answer,
       // Back in front, probably from the browser: ask now rather than at the
-      // next turn of the clock.
-      resume: function () {
-        if (pending) ask(false);
+      // next turn of the clock. `code` is the one in
+      // oeee-cafe://handoff/done?code=..., when that is how the app came
+      // back; it is kept for every ask after, since nothing is handed over
+      // without it. Anything that is not a code is no code.
+      resume: function (code) {
+        if (!pending) return;
+        if (typeof code === "string" && CODE.test(code)) pending.code = code;
+        ask(false);
       },
       // The browser could not be opened, or was put away. Put away can be
       // after the sign-in finished there and before the page asked, so the

@@ -41,8 +41,14 @@ fn http() -> &'static reqwest::Client {
 }
 
 /// Where to send the browser to sign in. `identify` for who they are and
-/// `email` for an address Discord vouches for, nothing more. `prompt=none`
-/// so someone who has let the site in before is not asked again.
+/// `email` for an address Discord vouches for, nothing more.
+///
+/// No `prompt=none`, though it would spare someone who has let the site in
+/// before Discord's screen: that screen is the one place the person sees
+/// they are signing in to Oeee Cafe at all. Without it, a link opened in a
+/// browser already signed in to Discord comes back signed in without
+/// anybody having pressed anything -- which is what a link sent to someone
+/// else is counting on (`crate::handoff`).
 pub fn authorize_url(config: &DiscordConfig, redirect_uri: &str, state: &str) -> String {
     let mut url = url::Url::parse(AUTHORIZE_URL).expect("Discord's authorize URL");
     url.query_pairs_mut()
@@ -50,9 +56,20 @@ pub fn authorize_url(config: &DiscordConfig, redirect_uri: &str, state: &str) ->
         .append_pair("redirect_uri", redirect_uri)
         .append_pair("response_type", "code")
         .append_pair("scope", "identify email")
-        .append_pair("state", state)
-        .append_pair("prompt", "none");
+        .append_pair("state", state);
     url.into()
+}
+
+/// What Discord said when it said no, as much of it as is worth a log line.
+/// Its refusals are a line of JSON, but whatever answers at its address --
+/// an error page from something in between, say -- is not bound to be, and
+/// anybody may send the app's endpoints a grant to be refused.
+fn told(body: &str) -> String {
+    const ENOUGH: usize = 200;
+    match body.char_indices().nth(ENOUGH) {
+        Some((cut, _)) => format!("{}...", &body[..cut]),
+        None => body.to_string(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -82,7 +99,10 @@ pub async fn exchange_code(
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        tracing::info!("Discord would not trade the code ({status}): {body}");
+        tracing::info!(
+            "Discord would not trade the code ({status}): {}",
+            told(&body)
+        );
         return Ok(None);
     }
     Ok(response
@@ -169,6 +189,13 @@ pub enum AppGrant {
     AuthorizationCode {
         code: String,
         redirect_uri: String,
+        /// Required, though Discord would trade a code without it: the
+        /// verifier is what makes the code worthless to anyone who only saw
+        /// it go by -- another program on the computer listening on the
+        /// redirect's port, say -- and the secret added here would
+        /// otherwise trade it for them. Missing reads as empty, and empty
+        /// is turned away.
+        #[serde(default)]
         code_verifier: String,
     },
     RefreshToken {
@@ -199,8 +226,9 @@ pub fn is_apps_redirect(redirect_uri: &str) -> bool {
 }
 
 /// Trades what the app sent for tokens. `Ok(None)` when Discord will not:
-/// a code used or stale, a refresh token revoked, or a redirect that is not
-/// the app's.
+/// a code used or stale, a refresh token revoked -- or when it is not asked
+/// at all, for a redirect that is not the app's or a code without a PKCE
+/// verifier.
 pub async fn app_tokens(config: &DiscordConfig, grant: &AppGrant) -> Result<Option<AppTokens>> {
     let mut form = vec![
         ("client_id", config.client_id.as_str()),
@@ -212,7 +240,7 @@ pub async fn app_tokens(config: &DiscordConfig, grant: &AppGrant) -> Result<Opti
             redirect_uri,
             code_verifier,
         } => {
-            if !is_apps_redirect(redirect_uri) {
+            if !is_apps_redirect(redirect_uri) || code_verifier.trim().is_empty() {
                 return Ok(None);
             }
             form.extend([
@@ -233,7 +261,10 @@ pub async fn app_tokens(config: &DiscordConfig, grant: &AppGrant) -> Result<Opti
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        tracing::info!("Discord would not trade the app's grant ({status}): {body}");
+        tracing::info!(
+            "Discord would not trade the app's grant ({status}): {}",
+            told(&body)
+        );
         return Ok(None);
     }
     Ok(Some(response.json::<AppTokens>().await?))
@@ -273,7 +304,8 @@ mod tests {
 
     /// Discord's token endpoint and `/users/@me`, on a port of their own. The
     /// code `"good"` is traded for `TOKEN` -- with the verifier
-    /// `"the-verifier"`, for a redirect to the app's -- and so is `REFRESH`;
+    /// `"the-verifier"`, or none at all, for a redirect to the app's -- and
+    /// so is `REFRESH`;
     /// `TOKEN` names `user`.
     async fn fake_discord(user: Value) -> DiscordConfig {
         let app = Router::new()
@@ -289,7 +321,10 @@ mod tests {
                                 && (!field("redirect_uri")
                                     .unwrap_or("")
                                     .starts_with("http://127.0.0.1")
-                                    || field("code_verifier") == Some("the-verifier"))
+                                    || matches!(
+                                        field("code_verifier").map(str::trim),
+                                        Some("the-verifier" | "") | None
+                                    ))
                         }
                         Some("refresh_token") => field("refresh_token") == Some(REFRESH),
                         _ => false,
@@ -477,6 +512,47 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn a_code_without_its_verifier_is_not_traded() {
+        // A fake Discord that, like the real one, would trade the code for
+        // a redirect to the app with no verifier at all -- so a refusal here
+        // is this site's, not Discord's.
+        let config = fake_discord(user()).await;
+        for verifier in ["", "  "] {
+            let bare = AppGrant::AuthorizationCode {
+                code: "good".into(),
+                redirect_uri: "http://127.0.0.1:54321/callback".into(),
+                code_verifier: verifier.into(),
+            };
+            assert_eq!(
+                app_tokens(&config, &bare).await.unwrap(),
+                None,
+                "{verifier:?}"
+            );
+        }
+        // Left out, it reads as empty and is turned away the same.
+        let missing: AppGrant = serde_json::from_value(json!({
+            "grant_type": "authorization_code",
+            "code": "good",
+            "redirect_uri": "http://127.0.0.1:54321/callback",
+        }))
+        .unwrap();
+        assert_eq!(app_tokens(&config, &missing).await.unwrap(), None);
+    }
+
+    #[test]
+    fn what_discord_said_is_logged_only_so_far() {
+        assert_eq!(
+            told("{\"error\": \"invalid_grant\"}"),
+            "{\"error\": \"invalid_grant\"}"
+        );
+        let long = "오".repeat(5000);
+        let logged = told(&long);
+        assert_eq!(logged.chars().count(), 203);
+        assert!(logged.ends_with("..."));
+        assert_eq!(told(&"x".repeat(200)), "x".repeat(200));
+    }
+
     #[test]
     fn the_app_says_which_grant_it_is_asking_for() {
         let code: AppGrant = serde_json::from_value(json!({
@@ -514,6 +590,8 @@ mod tests {
         assert_eq!(query["response_type"], "code");
         assert_eq!(query["scope"], "identify email");
         assert_eq!(query["state"], "the-state");
+        // Discord's own screen is always shown: see `authorize_url`.
+        assert!(!query.contains_key("prompt"));
         // The secret is only ever sent to Discord's token endpoint.
         assert!(!url.as_str().contains(SECRET));
     }

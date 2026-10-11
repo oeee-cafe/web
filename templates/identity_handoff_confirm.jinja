@@ -1,0 +1,30 @@
+{% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("handoff-approve-title") }}
+{% endblock title %}
+{% block content %}
+  {# A browser has signed in with a provider on behalf of an Oeee Cafe app
+     (src/handoff.rs), and nothing has been handed over yet. Whoever started
+     the handoff holds the secret that claims it -- which is the app on this
+     device when the person here pressed sign in in it, and somebody else
+     entirely when the link was sent to them. So the person is asked, with
+     the account named, and told plainly which of the two it has to be.
+
+     Going on records the sign-in and hands the app on this device the code
+     its claim needs (identity_handoff_done.jinja); not going on forgets the
+     handoff. Both post here, from this site's own page. #}
+  <div class="auth-page">
+    <form method="post" action="/auth/handoff/confirm" class="ds-card auth-card">
+      <h1 class="auth-title">{{ ftl_get_message("handoff-approve-title") }}</h1>
+      <p class="auth-lede">{{ ftl_format_pattern("handoff-approve-body", {"provider": provider}) }}</p>
+      <p class="auth-lede">
+        <strong>{{ provider }}</strong>
+        {% if provider_name %}<br />{{ provider_name }}{% endif %}
+        {% if provider_email %}<br />{{ provider_email }}{% endif %}
+      </p>
+      <p class="auth-error" role="alert">{{ ftl_get_message("handoff-approve-warning") }}</p>
+      <button type="submit" class="ds-button ds-button-primary auth-submit">{{ ftl_get_message("handoff-approve-continue") }}</button>
+      <button type="submit" name="cancel" value="1" class="ds-button auth-secondary">{{ ftl_get_message("handoff-approve-cancel") }}</button>
+    </form>
+  </div>
+{% endblock content %}

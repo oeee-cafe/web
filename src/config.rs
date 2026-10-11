@@ -186,7 +186,7 @@ fn default_apple_keys_url() -> String {
     "https://appleid.apple.com/auth/keys".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct GoogleConfig {
     /// The OAuth client id of the **Web application** client (Google Cloud
@@ -215,7 +215,7 @@ fn default_google_token_url() -> String {
     "https://oauth2.googleapis.com/token".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct DiscordConfig {
     /// The application's id (Discord Developer Portal > the application >
@@ -249,7 +249,7 @@ fn default_discord_revoke_url() -> String {
     "https://discord.com/api/oauth2/token/revoke".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct SteamConfig {
     /// The app id of Oeee Cafe on Steam.
@@ -266,7 +266,7 @@ pub struct SteamConfig {
     pub openid_url: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct MicrosoftStoreConfig {
     /// The Microsoft Entra tenant the app below is registered in, whose id
@@ -358,6 +358,63 @@ impl<T> fmt::Debug for KeyFile<T> {
     }
 }
 
+/// Stands in for a secret in a config's `Debug`, for the same reason
+/// `KeyFile` does: configs are logged. Whether there is one is worth
+/// seeing; what it is is not.
+fn redacted(secret: &str) -> &'static str {
+    if secret.is_empty() {
+        "(empty)"
+    } else {
+        "(redacted)"
+    }
+}
+
+impl fmt::Debug for GoogleConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GoogleConfig")
+            .field("client_id", &self.client_id)
+            .field("client_secret", &redacted(&self.client_secret))
+            .field("keys_url", &self.keys_url)
+            .field("token_url", &self.token_url)
+            .finish()
+    }
+}
+
+impl fmt::Debug for DiscordConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DiscordConfig")
+            .field("client_id", &self.client_id)
+            .field("client_secret", &redacted(&self.client_secret))
+            .field("token_url", &self.token_url)
+            .field("user_url", &self.user_url)
+            .field("revoke_url", &self.revoke_url)
+            .finish()
+    }
+}
+
+impl fmt::Debug for SteamConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SteamConfig")
+            .field("app_id", &self.app_id)
+            .field("web_api_key", &redacted(&self.web_api_key))
+            .field("web_api_url", &self.web_api_url)
+            .field("openid_url", &self.openid_url)
+            .finish()
+    }
+}
+
+impl fmt::Debug for MicrosoftStoreConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MicrosoftStoreConfig")
+            .field("tenant_id", &self.tenant_id)
+            .field("client_id", &self.client_id)
+            .field("client_secret", &redacted(&self.client_secret))
+            .field("token_url", &self.token_url)
+            .field("collections_url", &self.collections_url)
+            .finish()
+    }
+}
+
 fn default_google_play_api_url() -> String {
     "https://androidpublisher.googleapis.com".to_string()
 }
@@ -406,6 +463,46 @@ impl AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_logged_config_says_there_is_a_secret_and_not_what_it_is() {
+        let discord = DiscordConfig {
+            client_id: "1558602531133722646".into(),
+            client_secret: "hunter2-discord".into(),
+            token_url: default_discord_token_url(),
+            user_url: default_discord_user_url(),
+            revoke_url: default_discord_revoke_url(),
+        };
+        let google = GoogleConfig {
+            client_id: "0000.apps.googleusercontent.com".into(),
+            client_secret: "hunter2-google".into(),
+            keys_url: default_google_keys_url(),
+            token_url: default_google_token_url(),
+        };
+        let steam = SteamConfig {
+            app_id: 1,
+            web_api_key: "hunter2-steam".into(),
+            web_api_url: default_steam_web_api_url(),
+            openid_url: default_steam_openid_url(),
+        };
+        let microsoft = MicrosoftStoreConfig {
+            tenant_id: "t".into(),
+            client_id: "c".into(),
+            client_secret: "hunter2-microsoft".into(),
+            token_url: None,
+            collections_url: default_microsoft_collections_url(),
+        };
+        for logged in [
+            format!("{discord:?}"),
+            format!("{google:?}"),
+            format!("{steam:?}"),
+            format!("{microsoft:?}"),
+        ] {
+            assert!(!logged.contains("hunter2"), "{logged}");
+            assert!(logged.contains("(redacted)"), "{logged}");
+        }
+        assert!(format!("{discord:?}").contains("1558602531133722646"));
+    }
 
     /// The sample is the only written account of what a config looks like,
     /// and a table shaped wrong is a server that does not boot.

@@ -24,17 +24,24 @@
     var status = section.querySelector("[data-discord-status]");
     var connect = section.querySelector("[data-discord-connect]");
     var disconnect = section.querySelector("[data-discord-disconnect]");
-    // Connected, the account is named as the linked ones above are:
-    // "Discord: " and its name, in every language.
+    // Connected, the account is named by the reader's language's own
+    // wording -- Chinese puts a full-width colon after "Discord" -- with
+    // the name the app says put where "{name}" is. A function, not a
+    // string, as the replacement: a name with "$&" in it stays as it is.
     var WORDS = {
       off: {{ ftl_get_message("account-discord-not-connected")|tojson }},
-      connecting: {{ ftl_get_message("account-discord-connecting")|tojson }}
+      connecting: {{ ftl_get_message("account-discord-connecting")|tojson }},
+      connected: {{ ftl_format_pattern("account-discord-connected", {"name": "{name}"})|tojson }}
     };
+
+    function named(name) {
+      return WORDS.connected.replace("{name}", function () { return name; });
+    }
 
     function show(linked) {
       if (!linked || !document.body.contains(section)) return;
       section.hidden = false;
-      if (linked.connected) status.textContent = linked.name ? "Discord: " + linked.name : "Discord";
+      if (linked.connected) status.textContent = linked.name ? named(linked.name) : "Discord";
       else status.textContent = linked.connecting ? WORDS.connecting : WORDS.off;
       disconnect.hidden = !linked.connected;
       connect.hidden = linked.connected;

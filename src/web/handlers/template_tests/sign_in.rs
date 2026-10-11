@@ -205,6 +205,55 @@ fn signing_in_offers_discord_only_where_it_is_on() {
     assert!(!render(true, json!("Discord")).contains(r#"href="/auth/discord"#));
 }
 
+/// A browser that signed in for an app asks before handing anything over:
+/// which account, and not to go on from a link somebody sent.
+#[test]
+fn a_browser_signing_in_for_an_app_asks_first() {
+    let env = test_support::env();
+    let rendered = env
+        .get_template("identity_handoff_confirm.jinja")
+        .expect("confirm loads")
+        .render(context! {
+            provider => "Google",
+            provider_name => "오이",
+            provider_email => "oeee@example.test",
+            ..chrome()
+        })
+        .expect("confirm renders");
+    assert!(rendered.contains(r#"action="/auth/handoff/confirm""#));
+    assert!(rendered.contains("handoff-approve-body(provider=Google)"));
+    assert!(rendered.contains("오이"));
+    assert!(rendered.contains("oeee@example.test"));
+    assert!(rendered.contains("handoff-approve-warning"));
+    assert!(rendered.contains(r#"name="cancel""#));
+}
+
+/// Back to the app, with the code its claim needs when there is one, and
+/// without any when there is not.
+#[test]
+fn the_browser_hands_the_app_its_code() {
+    let env = test_support::env();
+    let render = |code: serde_json::Value| {
+        env.get_template("identity_handoff_done.jinja")
+            .expect("done loads")
+            .render(context! { code => Serde(code), ..chrome() })
+            .expect("done renders")
+    };
+    let code = "0123456789abcdef".repeat(4);
+    let with = render(json!(code));
+    assert!(with.contains(&format!(r#"href="oeee-cafe://handoff/done?code={code}""#)));
+    assert!(with.contains(&format!(
+        r#"location.replace("oeee-cafe://handoff/done?code={code}")"#
+    )));
+
+    let without = render(json!(null));
+    assert!(without.contains(r#"href="oeee-cafe://handoff/done""#));
+    assert!(without.contains(r#"location.replace("oeee-cafe://handoff/done")"#));
+    // Not `code=` anywhere: the page's own sign-in script (app_sign_in.jinja)
+    // describes the link it would carry.
+    assert!(!without.contains(r#""oeee-cafe://handoff/done?code"#));
+}
+
 /// Apple's answer, posted on from this site: every field it carried, as
 /// a value and never as markup.
 #[test]

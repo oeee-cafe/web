@@ -328,4 +328,7 @@ fn the_apps_discord_account_waits_for_the_app_to_say() {
     // Asked of the app over the bridge, not linked to like a sign-in.
     assert!(rendered.contains(r#"discord.ask("connect")"#));
     assert!(!rendered.contains("/auth/discord"));
+    // Named in the reader's own wording, with the name put in by the page.
+    assert!(rendered.contains("account-discord-connected(name={name})"));
+    assert!(!rendered.contains(r#""Discord: ""#));
 }

@@ -430,7 +430,7 @@ pub async fn steam_callback(
         }
     };
 
-    if let Some(done) = handed_off(&state, request.handoff.as_deref(), &identity).await {
+    if let Some(done) = handed_off(&state, &session, request.handoff.as_deref(), &identity).await {
         return Ok(done);
     }
     sign_in_with(
@@ -745,7 +745,7 @@ async fn apple_sign_in_going(
         }
     };
 
-    if let Some(done) = handed_off(&state, request.handoff.as_deref(), &identity).await {
+    if let Some(done) = handed_off(&state, &session, request.handoff.as_deref(), &identity).await {
         return Ok(done);
     }
     sign_in_with(
@@ -1111,7 +1111,7 @@ async fn finish_google_sign_in(
         }
     };
 
-    if let Some(done) = handed_off(state, handoff, &identity).await {
+    if let Some(done) = handed_off(state, session, handoff, &identity).await {
         return Ok(done);
     }
     sign_in_with(
@@ -1245,7 +1245,7 @@ pub async fn discord_callback(
         Err(error) => return failed(error),
     };
 
-    if let Some(done) = handed_off(&state, request.handoff.as_deref(), &identity).await {
+    if let Some(done) = handed_off(&state, &session, request.handoff.as_deref(), &identity).await {
         return Ok(done);
     }
     sign_in_with(
@@ -1283,8 +1283,32 @@ async fn pending_handoff(state: &AppState, handoff: Option<&str>) -> Option<Stri
     }
 }
 
-/// Hands what the provider just said to the app waiting for it, if one is,
-/// and answers where to leave the browser when it did.
+const HANDOFF_ANSWER_KEY: &str = "identity.handoff";
+
+/// What a provider said in a browser signing in for an app, waiting in that
+/// browser's session for the person at it to say it was they who asked
+/// ([`handoff_confirm`]). Nothing is recorded against the handoff before
+/// then (`crate::handoff`).
+#[derive(Serialize, Deserialize)]
+struct HandoffAnswer {
+    id: String,
+    identity: VerifiedIdentity,
+    verified_at: DateTime<Utc>,
+}
+
+/// The answer waiting in the session, while it is still recent.
+async fn handoff_answer(session: &Session) -> Option<HandoffAnswer> {
+    session
+        .get::<HandoffAnswer>(HANDOFF_ANSWER_KEY)
+        .await
+        .ok()
+        .flatten()
+        .filter(|answer| Utc::now() - answer.verified_at <= Duration::minutes(PENDING_FOR))
+}
+
+/// Takes what the provider just said aside for the app waiting for it, if
+/// one is, and answers where to leave the browser when it did: the page
+/// that asks whether to hand it over.
 ///
 /// Called as soon as an identity is verified and *before* anything is done
 /// with it: a browser signing in on an app's behalf signs nobody in here,
@@ -1292,32 +1316,46 @@ async fn pending_handoff(state: &AppState, handoff: Option<&str>) -> Option<Stri
 /// to do about the identity is the app session's to decide, in
 /// [`handoff_claim`], where the person deciding is the one already signed
 /// in there.
+///
+/// Not even the message is carried yet. Whoever is at this browser may have
+/// been sent the link by somebody else, who started the handoff and holds
+/// its secret; recorded now, the identity would be theirs to claim. So it
+/// waits in this browser's session until the person here says they asked.
 async fn handed_off(
     state: &AppState,
+    session: &Session,
     handoff: Option<&str>,
     identity: &VerifiedIdentity,
 ) -> Option<Response> {
     let id = handoff?;
     let mark = handoff_mark(id);
-    match crate::handoff::verified(&state.redis_pool, id, identity).await {
+    match crate::handoff::is_pending(&state.redis_pool, id).await {
+        Ok(true) => {}
         // Claimed already, or waited too long: nothing is listening, so the
         // browser carries on as an ordinary sign-in.
         Ok(false) => {
             tracing::info!("handoff {mark}: nothing waiting for it; signing in here instead");
-            None
-        }
-        Ok(true) => {
-            tracing::info!(
-                "handoff {mark}: {} said who this is; the app can take it",
-                identity.provider.as_str()
-            );
-            Some(Redirect::to("/auth/handoff/done").into_response())
+            return None;
         }
         Err(error) => {
-            tracing::error!("handoff {mark}: could not be handed to the app: {error:#}");
-            None
+            tracing::error!("handoff {mark}: could not be looked up: {error:#}");
+            return None;
         }
     }
+    let answer = HandoffAnswer {
+        id: id.to_string(),
+        identity: identity.clone(),
+        verified_at: Utc::now(),
+    };
+    if let Err(error) = session.insert(HANDOFF_ANSWER_KEY, answer).await {
+        tracing::error!("handoff {mark}: could not be kept to ask about: {error}");
+        return None;
+    }
+    tracing::info!(
+        "handoff {mark}: {} said who this is; asking whether to hand it over",
+        identity.provider.as_str()
+    );
+    Some(Redirect::to("/auth/handoff/confirm").into_response())
 }
 
 /// Where a redirect was going, for an app's page to go there itself.
@@ -1423,6 +1461,11 @@ pub struct HandoffClaimForm {
     secret: String,
     /// Sent on the second ask, once the person has seen what will be linked.
     confirm: Option<String>,
+    /// The code the browser handed the app on its device, in
+    /// `oeee-cafe://handoff/done?code=...`, which the app passes the page
+    /// (app_sign_in.jinja). Nothing is ready without it.
+    #[serde(default)]
+    code: Option<String>,
 }
 
 /// Claims a handoff: takes what the provider said in the browser and does
@@ -1430,7 +1473,10 @@ pub struct HandoffClaimForm {
 /// linking stays safe. The session that acts is this one, the app's, the one
 /// holding the secret; a browser that merely knew the id could put an
 /// identity into the handoff but can never make this session accept it
-/// unseen.
+/// unseen. Nor can a session that holds the secret make use of a browser it
+/// does not sit beside: the `code` that browser hands the app on its own
+/// device has to come with the claim, and without it the answer is only
+/// ever `waiting` (`crate::handoff`).
 ///
 /// Without `confirm`, a handoff that would be *linked* to the account
 /// already signed in here is only described, not acted on, so the app can
@@ -1451,7 +1497,13 @@ pub async fn handoff_claim(
     let say = |status: &str| axum::Json(serde_json::json!({ "status": status })).into_response();
 
     let mark = handoff_mark(&form.id);
-    let looked = crate::handoff::peek(&state.redis_pool, &form.id, &form.secret).await?;
+    let looked = crate::handoff::peek(
+        &state.redis_pool,
+        &form.id,
+        &form.secret,
+        form.code.as_deref(),
+    )
+    .await?;
     let (identity, next) = match looked {
         crate::handoff::Claim::Waiting => return Ok(say("waiting")),
         crate::handoff::Claim::Unknown => {
@@ -1546,12 +1598,121 @@ pub async fn handoff_claim(
     Ok(axum::Json(serde_json::json!({ "status": "ready", "next": go })).into_response())
 }
 
-/// What the browser is left on once it has signed in for an app. The app is
-/// going on by itself; there is nothing more to do in this window.
-pub async fn handoff_done(
+/// Asks the person in a browser that has just signed in for an app whether
+/// it was they who asked, before anything is handed over: which provider
+/// account is about to be signed in to the Oeee Cafe app, and a warning not
+/// to go on from a link somebody sent. See `crate::handoff` for why.
+pub async fn handoff_confirm(
+    session: Session,
     messages: Messages,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let Some(answer) = handoff_answer(&session).await else {
+        return Ok(Redirect::to("/").into_response());
+    };
+    let rendered = state
+        .render(
+            "identity_handoff_confirm.jinja",
+            context! {
+                messages => Serde(messages.into_iter().collect::<Vec<_>>()),
+                ftl_lang,
+                provider => answer.identity.provider.display_name(),
+                provider_name => answer.identity.name,
+                provider_email => answer.identity.email,
+            },
+        )
+        .await?;
+    Ok(Html(rendered).into_response())
+}
+
+#[derive(Deserialize)]
+pub struct HandoffConfirmForm {
+    /// Present when the person said no.
+    cancel: Option<String>,
+}
+
+/// The answer to [`handoff_confirm`]. Going on records the identity against
+/// the handoff with a fresh code, and leaves the browser on the page that
+/// hands that code to the app on this device; the claim needs it. Saying no
+/// forgets the handoff, so the app -- or whoever sent the link -- is told
+/// there is nothing to take.
+#[allow(clippy::too_many_arguments)]
+pub async fn do_handoff_confirm(
+    mut auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    messages: Messages,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HandoffConfirmForm>,
+) -> Result<Response, AppError> {
+    if !from_this_site(&headers, &state.config.base_url) {
+        return Err(AppError::Forbidden);
+    }
+    // Answers once, whichever way.
+    let answer = handoff_answer(&session).await;
+    let _ = session.remove::<HandoffAnswer>(HANDOFF_ANSWER_KEY).await;
+    let Some(answer) = answer else {
+        return Ok(Redirect::to("/").into_response());
+    };
+    let mark = handoff_mark(&answer.id);
+
+    if form.cancel.is_some() {
+        if let Err(error) = crate::handoff::forget(&state.redis_pool, &answer.id).await {
+            tracing::warn!("handoff {mark}: could not be forgotten: {error:#}");
+        }
+        tracing::info!("handoff {mark}: refused in the browser");
+        return Ok(Redirect::to("/").into_response());
+    }
+
+    match crate::handoff::verified(&state.redis_pool, &answer.id, &answer.identity).await {
+        Ok(Some(code)) => {
+            tracing::info!(
+                "handoff {mark}: {} handed over; the app can take it",
+                answer.identity.provider.as_str()
+            );
+            let mut response = handoff_done_page(&state, messages, ftl_lang, Some(code))
+                .await?
+                .into_response();
+            // The page carries the code: kept by nothing between here and
+            // the browser, nor by the browser itself.
+            response.headers_mut().insert(
+                axum::http::header::CACHE_CONTROL,
+                HeaderValue::from_static("no-store"),
+            );
+            Ok(response)
+        }
+        // Claimed already, or waited too long while the question was open:
+        // nothing is listening, so the browser carries on as an ordinary
+        // sign-in, as it would have had it come back later still.
+        Ok(None) => {
+            tracing::info!("handoff {mark}: nothing waiting for it; signing in here instead");
+            let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+            sign_in_with(
+                &mut auth_session,
+                &session,
+                &messages,
+                &bundle,
+                &state,
+                answer.identity,
+                None,
+            )
+            .await
+        }
+        Err(error) => {
+            tracing::error!("handoff {mark}: could not be handed to the app: {error:#}");
+            Err(error.into())
+        }
+    }
+}
+
+async fn handoff_done_page(
+    state: &AppState,
+    messages: Messages,
+    ftl_lang: String,
+    code: Option<String>,
 ) -> Result<Html<String>, AppError> {
     let rendered = state
         .render(
@@ -1559,10 +1720,25 @@ pub async fn handoff_done(
             context! {
                 messages => Serde(messages.into_iter().collect::<Vec<_>>()),
                 ftl_lang,
+                code,
             },
         )
         .await?;
     Ok(Html(rendered))
+}
+
+/// What the browser is left on once it has signed in for an app. The app is
+/// going on by itself; there is nothing more to do in this window.
+///
+/// Only [`do_handoff_confirm`] leaves a browser here with the code the app
+/// needs. Reached by itself -- a bookmark, a browser restoring its tabs --
+/// it carries none, and the app is not let take anything on its strength.
+pub async fn handoff_done(
+    messages: Messages,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+) -> Result<Html<String>, AppError> {
+    handoff_done_page(&state, messages, ftl_lang, None).await
 }
 
 /// A handle as the `users` table's own constraint allows it:
