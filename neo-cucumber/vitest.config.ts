@@ -31,6 +31,16 @@ export default defineConfig({
         find: "react-dom",
         replacement: path.resolve(import.meta.dirname, "node_modules/react-dom"),
       },
+      // Nothing under ../frontend has a node_modules of its own to find these
+      // in, as vite.config.ts says for the build.
+      {
+        find: "@lingui/core",
+        replacement: path.resolve(import.meta.dirname, "node_modules/@lingui/core"),
+      },
+      {
+        find: "@lingui/react",
+        replacement: path.resolve(import.meta.dirname, "node_modules/@lingui/react"),
+      },
     ],
   },
   // Tailwind too: component tests render the real components, and without it
