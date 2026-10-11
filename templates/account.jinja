@@ -92,7 +92,7 @@
         {% endif %}
         {% if discord_enabled and not discord_linked %}
           {# In a browser from inside the apps; see login.jinja. #}
-          <a class="ds-button auth-discord" href="/auth/discord?next=/account">{{ ftl_get_message("account-link-discord") }}</a>
+          <a class="ds-button auth-discord" href="/auth/discord?next=/account"><img class="auth-discord-mark" src="{{ '/static/signin/discord-mark.svg' | cachebuster | safe }}" width="24" height="18" alt="" />{{ ftl_get_message("account-link-discord") }}</a>
         {% endif %}
       </div>
     </section>

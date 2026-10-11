@@ -4151,6 +4151,17 @@ html[data-store="steam"] .auth-steam {
   }
 }
 
+/* Discord's symbol before the words, on their line and kept its own
+   shape: a margin rather than `gap`, which Firefox 56 has not got for
+   flexbox (see .auth-google-drawn). */
+.auth-discord-mark {
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
 
 
 /* The agreement: a box to tick, and the two pages it agrees to. */

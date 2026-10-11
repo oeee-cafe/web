@@ -172,6 +172,7 @@ fn signing_in_offers_discord_only_where_it_is_on() {
     assert!(on.contains("/auth/discord?next="));
     assert!(on.contains("9c881320-2b43-4afa-b2bb-7128c8a3e985"));
     assert!(on.contains("sign-in-with-discord"));
+    assert!(on.contains("/static/signin/discord-mark.svg"));
     assert!(!render(true, json!("Discord")).contains(r#"href="/auth/discord"#));
 }
 

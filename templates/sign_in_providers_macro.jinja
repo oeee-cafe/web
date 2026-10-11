@@ -66,9 +66,10 @@
          password or passkey is. Most who press it were asked into a
          collaborative room from Discord and have no account here yet.
 
-         Discord's colour, and its name in the reader's language, at the
-         card's 40px (style.css). #}
-      <a class="ds-button auth-secondary auth-discord" href="/auth/discord{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-discord") }}</a>
+         Discord's blurple, its symbol in white as its branding page
+         gives it (static/signin/discord-mark.svg, unaltered), and the
+         words in the reader's language, at the card's 40px (style.css). #}
+      <a class="ds-button auth-secondary auth-discord" href="/auth/discord{% if next %}?next={{ next|urlencode }}{% endif %}"><img class="auth-discord-mark" src="{{ '/static/signin/discord-mark.svg' | cachebuster | safe }}" width="24" height="18" alt="" />{{ ftl_get_message("sign-in-with-discord") }}</a>
     {% endif %}
   </div>
 {%- endmacro %}
