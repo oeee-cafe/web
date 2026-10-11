@@ -883,15 +883,23 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
           `Checkpoint is ${checkpoint.width}x${checkpoint.height}; painter is ${canvasWidth}x${canvasHeight}`,
         );
       }
-      const decoded = await Promise.all(
-        checkpoint.layers.map(async (entry) => ({
+      // One pair at a time, with a turn of the event loop before each: the
+      // decoder runs on this thread, a layer takes tens of milliseconds, and
+      // a checkpoint holds up to sixteen. Decoded all at once, a join on a
+      // large canvas was that long a freeze, which on the machines the
+      // Firefox 56 floor is for is the tab asking whether to stop the page.
+      // The encoder paces its layers the same way.
+      const decoded: { actorId: string; background: Uint8ClampedArray; foreground: Uint8ClampedArray }[] = [];
+      for (const entry of checkpoint.layers) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        decoded.push({
           actorId: entry.actorId,
           background: await pngDataToLayer(
             new Uint8Array(await entry.background.arrayBuffer()), canvasWidth, canvasHeight),
           foreground: await pngDataToLayer(
             new Uint8Array(await entry.foreground.arrayBuffer()), canvasWidth, canvasHeight),
-        })),
-      );
+        });
+      }
       // A checkpoint is the whole canvas, so anyone it does not mention has no
       // work in it and must be blanked rather than left holding stale pixels.
       const named = new Set(decoded.map((entry) => entry.actorId));

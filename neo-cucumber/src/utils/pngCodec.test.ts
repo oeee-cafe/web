@@ -41,6 +41,23 @@ describe("a layer as PNG", () => {
     for (let y = 0; y < 5; y++) expect(raw[y * (9 * 4 + 1)]).toBeLessThanOrEqual(4);
   });
 
+  /**
+   * Most of a layer is transparent, and a transparent row is the one case
+   * the encoder decides without trying every filter. It has to come out as
+   * the filter it would have chosen anyway, and come back exactly.
+   */
+  it("writes a transparent row as the unfiltered zeros it is, and reads it back", () => {
+    const layer = translucentLayer(12, 6);
+    layer.fill(0, 12 * 4 * 1, 12 * 4 * 3); // rows 1 and 2
+    const png = encodeLayerPng(layer, 12, 6);
+    const view = new DataView(png.buffer, png.byteOffset);
+    const raw = unzlibSync(png.subarray(41, 41 + view.getUint32(33)));
+    for (const y of [1, 2]) {
+      expect(Array.from(raw.subarray(y * (12 * 4 + 1), (y + 1) * (12 * 4 + 1)))).toEqual(new Array(12 * 4 + 1).fill(0));
+    }
+    expect(Array.from(decodeLayerPng(png, 12, 6)!)).toEqual(Array.from(layer));
+  });
+
   it("is the same bytes for the same layer, wherever it is encoded", () => {
     const layer = translucentLayer(64, 16);
     expect(Array.from(encodeLayerPng(layer, 64, 16))).toEqual(Array.from(encodeLayerPng(layer, 64, 16)));

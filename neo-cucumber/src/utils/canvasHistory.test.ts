@@ -1304,17 +1304,25 @@ describe("a checkpoint cut behind the head", () => {
 
   type Event = { seq: number; bytes: ArrayBuffer } | { seq: number; resetBase: number };
 
-  /** A room's canonical stream, played into `history` as it is made. */
+  /**
+   * A room's canonical stream, played as it is made into `there`, a client
+   * in the room from the start, and into `late`, one that joins from the
+   * first checkpoint and stays -- and uploads about half the checkpoints
+   * after that, since what a joiner holds is all it has to cut from.
+   */
   async function session(seed: number, length: number) {
     const rand = random(seed);
     const pick = <T,>(items: T[]) => items[Math.floor(rand() * items.length)];
     const users = [LOCAL, REMOTE, 3];
     const there = setup();
+    let late: ReturnType<typeof setup> | null = null;
     const events: Event[] = [];
     let seq = 1;
     const send = async (bytes: ArrayBuffer) => {
       events.push({ seq, bytes });
-      await remote(there.history, bytes, seq++);
+      await remote(there.history, bytes, seq);
+      if (late) await remote(late.history, bytes, seq);
+      seq++;
     };
     const drawing = new Set<number>();
     /** Where each user last copied: NEO pastes straight after a copy. */
@@ -1326,6 +1334,7 @@ describe("a checkpoint cut behind the head", () => {
     let pending: (Checkpoint & { at: number }) | null = null;
     let last: Checkpoint | null = null;
     let declined = 0;
+    let taken = 0;
     const point = () => ({ x: Math.floor(rand() * SIZE), y: Math.floor(rand() * SIZE) });
 
     while (seq <= length) {
@@ -1357,31 +1366,40 @@ describe("a checkpoint cut behind the head", () => {
         await send(encodeRegion(user, user, "foreground", tool,
           { x: p.x, y: p.y, width: 1, height: 1 }, { r: 0, g: 0, b: 0, a: 255 }, 1));
       } else if (roll < 0.75 && !pending) {
-        // Somebody uploads a checkpoint, cut where the history says, unless
-        // it says there is none to take yet. The room sequences its
+        // Somebody uploads a checkpoint, cut where their history says,
+        // unless it says there is none to take yet. The room sequences its
         // RESET_POINT a few messages later, and undos can land in between.
-        const cut = there.history.checkpointCut(seq - 1);
+        const uploader = late && rand() < 0.5 ? late : there;
+        const cut = uploader.history.checkpointCut(seq - 1);
+        // Whoever wins the offer, the room gets the same checkpoint: a cut
+        // is decided from the canonical history, which both hold alike. A
+        // client that had been in the room used to decline for a copy its
+        // base savepoint remembered and a joiner's did not.
+        if (late) expect(there.history.checkpointCut(seq - 1)).toBe(late.history.checkpointCut(seq - 1));
         if (cut === null) {
           declined++;
         } else {
           const layers = new Map(
-            [...(await there.history.layersAt(cut))].map(([owner, pair]) => [
+            [...(await uploader.history.layersAt(cut))].map(([owner, pair]) => [
               owner,
               { foreground: pair.foreground.slice(), background: pair.background.slice() },
             ]),
           );
           pending = { cut, layers, at: seq + Math.floor(rand() * 10) };
+          taken++;
         }
       }
       if (pending && seq >= pending.at) {
         events.push({ seq, resetBase: pending.cut });
         await there.history.handleResetPoint(pending.cut);
+        if (late) await late.history.handleResetPoint(pending.cut);
         last = { cut: pending.cut, layers: pending.layers };
         seq++;
         pending = null;
+        if (!late) late = await joinFrom(events, last);
       }
     }
-    return { there, events, last, declined };
+    return { there, late, events, last, declined, taken };
   }
 
   async function joinFrom(
@@ -1421,7 +1439,7 @@ describe("a checkpoint cut behind the head", () => {
   const landed: { cut: number; at: number }[][] = [];
   for (const { seed, length } of runs) {
     it(`leaves a joiner where the room is (seed ${seed}, ${length} messages)`, async () => {
-      const { there, events, last } = await session(seed, length);
+      const { there, late, events, last } = await session(seed, length);
       landed.push(events.flatMap((event) => ("resetBase" in event ? [{ cut: event.resetBase, at: event.seq }] : [])));
       // A room in which no checkpoint could be cut has nothing to join from;
       // the next test makes sure that is the exception.
@@ -1430,6 +1448,12 @@ describe("a checkpoint cut behind the head", () => {
       const owners = new Set([...there.engine.owners.keys(), ...joined.engine.owners.keys()]);
       expect(layersOf(joined.engine, owners)).toEqual(layersOf(there.engine, owners));
       expect([joined.history.canUndo(), joined.history.canRedo()])
+        .toEqual([there.history.canUndo(), there.history.canRedo()]);
+      // And the one who joined at the first checkpoint and stayed, through
+      // every later one, some of which it cut itself.
+      expect(late).not.toBeNull();
+      expect(layersOf(late!.engine, owners)).toEqual(layersOf(there.engine, owners));
+      expect([late!.history.canUndo(), late!.history.canRedo()])
         .toEqual([there.history.canUndo(), there.history.canRedo()]);
     });
   }

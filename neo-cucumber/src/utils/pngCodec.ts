@@ -63,6 +63,17 @@ export function encodeLayerPng(
   for (let y = 0; y < height; y++) {
     const row = y * stride;
     const up = row - stride;
+    // A layer is mostly transparent, and a row of zeros costs nothing under
+    // the first filter, which no other can beat: `filtered` is already zero
+    // there, filter byte included, so the four other passes are skipped.
+    let blank = true;
+    for (let i = 0; i < stride; i++) {
+      if (layer[row + i] !== 0) {
+        blank = false;
+        break;
+      }
+    }
+    if (blank) continue;
     let best = 0;
     let bestCost = Infinity;
     for (let type = 0; type < 5; type++) {
