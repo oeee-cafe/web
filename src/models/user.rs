@@ -631,6 +631,7 @@ pub async fn delete_user(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
     confirmation: DeleteConfirmation<'_>,
+    config: &AppConfig,
 ) -> Result<()> {
     // First, find the user
     let user = find_user_by_id(tx, id).await?;
@@ -721,21 +722,38 @@ pub async fn delete_user(
         .await?;
     }
 
-    // Soft delete and anonymize user
+    // Soft delete and anonymize user. The login name is given up, so that
+    // somebody (the same person included) can sign up with it again. What
+    // replaces it is random rather than derived from the id: the id is public
+    // in the actor's IRI, and a name anyone could predict is one anyone could
+    // register first and so make this account impossible to delete.
+    let released_login_name = format!("deleted_{}", Uuid::new_v4().simple());
     query!(
         r#"
         UPDATE users
         SET
             deleted_at = NOW(),
+            login_name = $2,
             email = NULL,
             display_name = '[deleted]',
             password_hash = NULL,
             updated_at = NOW()
         WHERE id = $1
         "#,
-        id
+        id,
+        released_login_name
     )
     .execute(&mut **tx)
+    .await?;
+
+    // The actor's handle is unique too, and WebFinger answers by it.
+    super::actor::update_actor_for_user(
+        tx,
+        id,
+        released_login_name,
+        "[deleted]".to_string(),
+        config,
+    )
     .await?;
 
     Ok(())
@@ -745,14 +763,14 @@ pub async fn delete_user_with_activity(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
     confirmation: DeleteConfirmation<'_>,
-    _config: &AppConfig,
+    config: &AppConfig,
     state: Option<&crate::web::state::AppState>,
 ) -> Result<()> {
     // Get the user's actor before deletion
     let actor = super::actor::Actor::find_by_user_id(tx, id).await?;
 
     // Delete the user
-    delete_user(tx, id, confirmation).await?;
+    delete_user(tx, id, confirmation, config).await?;
 
     // If state is provided and actor exists, send ActivityPub Delete activity
     if let (Some(state), Some(actor)) = (state, actor) {

@@ -1,0 +1,1 @@
+-- The released names cannot be given back: they may already be taken again.
