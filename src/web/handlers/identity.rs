@@ -40,6 +40,12 @@
 //! system's, as the desktop and iOS apps do with Google: Discord's sign-in
 //! asks for a password or a passkey, which the person keeps there, not in an
 //! app's web view.
+//!
+//! Steam signs in two ways. The Steam app's page posts a ticket
+//! ([`do_steam_sign_in`]), which also says what the account owns.
+//! Everywhere else Steam's OpenID comes back by a GET ([`steam_callback`]),
+//! in a browser of the system's from the other apps, and says only who
+//! someone is: it earns no `STEAM_SUPPORTER` and records no Supporter Pack.
 
 use axum::extract::{Path, Query, State};
 use axum::http::header::ORIGIN;
@@ -300,30 +306,143 @@ pub struct NextQuery {
     handoff: Option<String>,
 }
 
-/// `/auth/steam/app` is the Steam sign-in button's link, which only the
-/// Steam build of the app gets anything from: there the page takes the press
-/// itself, asks the app for a Web API ticket and posts it to `/auth/steam`
-/// (app_sign_in.jinja), so the link is never followed. A browser, or any
-/// other build, follows it and lands here instead, to be told so.
-pub async fn steam_app_only(
+const STEAM_REQUEST_KEY: &str = "identity.steam";
+
+/// A sign-in with Steam in a browser under way: the state its `return_to`
+/// carries, which Steam's answer has to come back to.
+#[derive(Serialize, Deserialize)]
+struct SteamRequest {
+    state: String,
+    next: Option<String>,
+    started_at: DateTime<Utc>,
+    /// The app's handoff this sign-in was started for; see [`AppleRequest`].
+    #[serde(default)]
+    handoff: Option<String>,
+}
+
+fn steam_return_to(base_url: &str, state: &str) -> String {
+    format!(
+        "{}/auth/steam/callback?state={state}",
+        base_url.trim_end_matches('/')
+    )
+}
+
+/// `/auth/steam` is the Steam sign-in button's link. The Steam build of the
+/// app never follows it: there the page takes the press itself, asks the app
+/// for a Web API ticket and posts it here instead (app_sign_in.jinja,
+/// [`do_steam_sign_in`]). Everywhere else this sends the browser to Steam's
+/// sign-in page (`steam::openid`), remembering the state its answer has to
+/// carry back. `/auth/steam/app`, the link before there was a browser
+/// sign-in, comes here too.
+pub async fn steam_sign_in(
     auth_session: AuthSession,
+    session: Session,
     ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     messages: Messages,
+    State(state): State<AppState>,
     Query(query): Query<NextQuery>,
-) -> impl IntoResponse {
+) -> Result<Response, AppError> {
+    let Some(config) = state.config.steam.as_ref() else {
+        let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "steam-sign-in-unavailable"));
+        return Ok(Redirect::to(back_for(&auth_session)).into_response());
+    };
+
+    let request = SteamRequest {
+        state: random_token(),
+        next: local_next(query.next.as_deref()),
+        started_at: Utc::now(),
+        handoff: pending_handoff(&state, query.handoff.as_deref()).await,
+    };
+    let url = steam::openid::authorize_url(
+        config,
+        state.config.base_url.trim_end_matches('/'),
+        &steam_return_to(&state.config.base_url, &request.state),
+    );
+    session
+        .insert(STEAM_REQUEST_KEY, request)
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    Ok(Redirect::to(&url).into_response())
+}
+
+/// Where Steam sends the browser back: a top-level GET, as Google's is, so
+/// the answer is read here. Its query is the `state` this site gave
+/// `return_to` and Steam's `openid.*` fields, all of them checked with
+/// Steam (`steam::openid::verify`).
+///
+/// It says who someone is and nothing about what they own: a sign-in here
+/// earns no `STEAM_SUPPORTER` and records no Supporter Pack.
+pub async fn steam_callback(
+    mut auth_session: AuthSession,
+    session: Session,
+    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
+    messages: Messages,
+    State(state): State<AppState>,
+    Query(answer): Query<std::collections::HashMap<String, String>>,
+) -> Result<Response, AppError> {
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
-    messages
-        .clone()
-        .info(safe_get_message(&bundle, "steam-sign-in-app-only"));
-    let back = if auth_session.user.is_some() {
-        "/account".to_string()
-    } else {
-        match local_next(query.next.as_deref()) {
-            Some(next) => format!("/login?next={}", urlencoding::encode(&next)),
-            None => "/login".to_string(),
+    let back = back_for(&auth_session);
+
+    // Each sign-in's state answers once, from this browser's session.
+    let request = session
+        .remove::<SteamRequest>(STEAM_REQUEST_KEY)
+        .await
+        .ok()
+        .flatten()
+        .filter(|request| Utc::now() - request.started_at <= Duration::minutes(PENDING_FOR));
+    let Some(config) = state.config.steam.as_ref() else {
+        messages
+            .clone()
+            .error(safe_get_message(&bundle, "steam-sign-in-unavailable"));
+        return Ok(Redirect::to(back).into_response());
+    };
+    // Put away without signing in: the page stays as it was.
+    if answer.get("openid.mode").map(String::as_str) == Some("cancel") {
+        return Ok(Redirect::to(back).into_response());
+    }
+    let invalid = || -> Result<Response, AppError> {
+        messages
+            .clone()
+            .error(say(&bundle, "identity-sign-in-invalid", Provider::Steam));
+        Ok(Redirect::to(back).into_response())
+    };
+    let Some(request) = request else {
+        return invalid();
+    };
+    if answer.get("state") != Some(&request.state) {
+        return invalid();
+    }
+
+    let return_to = steam_return_to(&state.config.base_url, &request.state);
+    let identity = match steam::openid::verify(config, &return_to, &answer).await {
+        Ok(Some(identity)) => identity,
+        Ok(None) => return invalid(),
+        Err(error) => {
+            // Not a refusal -- that is Ok(None) -- but Steam not answering.
+            tracing::error!("Steam could not be asked who signed in: {error:#}");
+            messages
+                .clone()
+                .error(say(&bundle, "identity-sign-in-failed", Provider::Steam));
+            return Ok(Redirect::to(back).into_response());
         }
     };
-    Redirect::to(&back)
+
+    if let Some(done) = handed_off(&state, request.handoff.as_deref(), &identity).await {
+        return Ok(done);
+    }
+    sign_in_with(
+        &mut auth_session,
+        &session,
+        &messages,
+        &bundle,
+        &state,
+        identity,
+        request.next,
+    )
+    .await
 }
 
 #[derive(Deserialize)]
@@ -1257,8 +1376,10 @@ pub async fn handoff_start(
         Some(Provider::Apple) => state.config.apple.is_some(),
         Some(Provider::Google) => state.config.google.is_some(),
         Some(Provider::Discord) => state.config.discord.is_some(),
-        // Steam signs in from inside the app already; it needs no browser.
-        Some(Provider::Steam) | None => false,
+        // The Steam app signs in with a ticket and never asks; the other
+        // apps sign in with Steam in a browser.
+        Some(Provider::Steam) => state.config.steam.is_some(),
+        None => false,
     };
     if !configured {
         return Err(AppError::NotFound("Sign-in provider".to_string()));

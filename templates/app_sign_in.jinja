@@ -31,7 +31,8 @@
    browser a stop at this site on its way), and Discord in every app, by
    /auth/discord, whose sign-in wants the person's Discord password or
    passkey, which the browser has and the web view does not. Discord has
-   no sheet anywhere. Google on iOS and macOS once
+   no sheet anywhere. Steam goes the same way, by /auth/steam, in every
+   app but the Steam build (below). Google on iOS and macOS once
    had a sheet of the app's own, with an OAuth client and a token exchange
    of its own to keep; this is the site's own sign-in, in the same system
    sheet.
@@ -117,8 +118,8 @@
     // -- Steam --------------------------------------------------------------
 
     // Only the build that sells through Steam can ask Steam for a ticket
-    // (data-store="steam"), and its button is a link to /auth/steam/app,
-    // which a browser follows to be told so. No nonce: the ticket names the
+    // (data-store="steam"), and its button is a link to /auth/steam, which
+    // a browser follows to Steam's own sign-in page. No nonce: the ticket names the
     // site's own identity ("oeee-cafe", steam/client.rs in oeee-cafe-desktop)
     // and the site asks Steam about it (src/steam.rs).
     var steamNext;
@@ -304,11 +305,13 @@
 
     // Discord, in a browser in every app, by this site's own page: the
     // person's Discord password or passkey is in the browser, not here.
+    // Steam the same, in every app but the Steam build, which asks Steam
+    // for a ticket instead (below).
     var WAYS = {
-      ios: { apple: native, google: atGoogle, discord: browser },
-      macos: { apple: native, google: atGoogle, discord: browser },
-      android: { apple: browser, google: native, discord: browser },
-      windows: { apple: browser, google: atGoogle, discord: browser }
+      ios: { apple: native, google: atGoogle, discord: browser, steam: browser },
+      macos: { apple: native, google: atGoogle, discord: browser, steam: browser },
+      android: { apple: browser, google: native, discord: browser, steam: browser },
+      windows: { apple: browser, google: atGoogle, discord: browser, steam: browser }
     };
     var root = document.documentElement;
     var ways = WAYS[root.getAttribute("data-app")];
@@ -326,7 +329,7 @@
         if (event.defaultPrevented || event.button !== 0) return;
         var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
         if (!link || link.origin !== new URL(document.baseURI).origin) return;
-        var provider = (/^\/auth\/(apple|google|discord)$|^\/auth\/(steam)\/app$/.exec(link.pathname) || []).filter(Boolean)[1];
+        var provider = (/^\/auth\/(apple|google|discord|steam)$/.exec(link.pathname) || [])[1];
         if (!provider || !ways[provider]) return;
         event.preventDefault();
         var next = new URL(link.href).searchParams.get("next");

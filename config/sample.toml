@@ -46,9 +46,10 @@ apns_topic = "cafe.oeee"
 fcm_service_account_path = ""
 fcm_project_id = ""
 
-# Sign in with Steam, from the Oeee Cafe app on Steam, and its achievements.
-# Leave the table out to turn both off. web_api_key is a publisher key, not a
-# user's. The achievements' API names in Steamworks are FIRST_DRAWING,
+# Sign in with Steam -- with a ticket in the Oeee Cafe app on Steam, with
+# Steam's OpenID everywhere else -- and its achievements. Leave the table out
+# to turn both off. web_api_key is a publisher key, not a user's. Only a
+# sign-in in the Steam app earns STEAM_SUPPORTER. The achievements' API names in Steamworks are FIRST_DRAWING,
 # FIRST_RELAY, FIRST_COLLABORATION and STEAM_SUPPORTER, each set to be unlocked by the game
 # server ("Set By: Official GS"); the server unlocks them itself.
 # STEAM_SUPPORTER is for buying the app itself (app_id), not a Supporter Pack,

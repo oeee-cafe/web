@@ -513,7 +513,6 @@ about-design = 디자인 시스템
 about-version = 버전
 post-no-reactions = 아직 반응이 없습니다.
 sign-in-with-steam = Steam으로 로그인
-steam-sign-in-app-only = Steam 로그인은 Steam용 오이카페 앱에서 할 수 있습니다.
 steam-sign-in-unavailable = 지금은 Steam으로 로그인할 수 없습니다.
 steam-sign-in-banned = 이 Steam 계정으로는 오이카페에 로그인할 수 없습니다.
 sign-in-with-apple = Apple로 로그인

@@ -262,7 +262,7 @@ fn the_account_page_asks_what_the_account_can_answer() {
     assert!(with_password.contains(r#"name="password""#));
     assert!(!with_password.contains(r#"id="delete_login_name""#));
     assert!(with_password.contains("account-linked-accounts-none"));
-    assert!(with_password.contains("/auth/steam/app?next=/account"));
+    assert!(with_password.contains("/auth/steam?next=/account"));
     assert!(with_password.contains("/auth/apple?next=/account"));
     assert!(with_password.contains("/auth/google?next=/account"));
     assert!(with_password.contains("/auth/discord?next=/account"));

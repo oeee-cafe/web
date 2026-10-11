@@ -5,6 +5,10 @@
 //! Steam's partner Web API with the publisher key, and Steam answers with the
 //! SteamID it was issued to. Nothing the app says about who is signed in is
 //! taken on its word.
+//!
+//! Everywhere else -- a browser, the other apps -- signs in with Steam's
+//! OpenID instead ([`openid`]), which says who someone is and nothing about
+//! what they own.
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -15,6 +19,8 @@ use serde::Deserialize;
 use crate::config::SteamConfig;
 use crate::models::identity::{Provider, VerifiedIdentity};
 use crate::models::supporter::OwnedProduct;
+
+pub mod openid;
 
 /// What the app names when it asks for a ticket, and what the ticket is
 /// checked against: a ticket made for some other service is not accepted
@@ -612,6 +618,7 @@ mod tests {
             app_id: 480,
             web_api_key: "publisher-key".to_string(),
             web_api_url: format!("http://{addr}"),
+            openid_url: String::new(),
         }
     }
 
@@ -767,6 +774,7 @@ mod tests {
             web_api_key: "k".to_string(),
             // Nothing listens here; reaching it would be an error, not Invalid.
             web_api_url: "http://127.0.0.1:9".to_string(),
+            openid_url: String::new(),
         };
         for ticket in ["", "   ", "not-hex", "14000000&key=x"] {
             let result = verify_ticket(&config, &this_years(), ticket).await.unwrap();
@@ -797,6 +805,7 @@ mod tests {
             app_id: 480,
             web_api_key: "publisher-key".to_string(),
             web_api_url: format!("http://{addr}"),
+            openid_url: String::new(),
         };
 
         let achievements = ["FIRST_DRAWING".to_string(), "FIRST_RELAY".to_string()];

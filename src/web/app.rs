@@ -50,7 +50,7 @@ use crate::web::handlers::identity::{
     apple_callback, apple_sign_in, apple_start, cancel_pending_identity, discord_callback,
     discord_sign_in, do_apple_sign_in, do_google_sign_in, do_identity_welcome, do_steam_sign_in,
     do_unlink_identity, google_callback, google_sign_in, google_start, handoff_claim, handoff_done,
-    handoff_start, identity_welcome, steam_app_only,
+    handoff_start, identity_welcome, steam_callback, steam_sign_in,
 };
 use crate::web::handlers::notifications::{
     delete_notification_handler, get_unread_notification_count, list_notifications,
@@ -586,8 +586,10 @@ impl App {
             // Outside the protected routes: signing out when already signed
             // out is just going home.
             .route("/logout", post(do_logout))
-            .route("/auth/steam/app", get(steam_app_only))
+            .route("/auth/steam/app", get(steam_sign_in))
+            .route("/auth/steam", get(steam_sign_in))
             .route("/auth/steam", post(do_steam_sign_in))
+            .route("/auth/steam/callback", get(steam_callback))
             .route("/auth/apple", get(apple_sign_in))
             .route("/auth/apple", post(do_apple_sign_in))
             .route("/auth/apple/callback", post(apple_callback))

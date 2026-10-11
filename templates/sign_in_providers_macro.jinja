@@ -1,20 +1,13 @@
 {# Signing in with another provider, as a section of /login's card under
-   "Or sign in with". Steam alone shows only in the Steam app, so a section
-   holding nothing else hides with it.
+   "Or sign in with".
 
    An imported macro does not see the page's context, so the language,
    where the reader was going and which providers are on are handed over;
    `question` is the message key over the buttons. The card around it
    takes the buttons' 40px for its own (`auth-card-providers`, style.css). #}
 {% macro sign_in_providers(question, lang, next, steam_enabled, apple_enabled, google_enabled, discord_enabled=false) -%}
-  <div class="auth-social{% if steam_enabled and not apple_enabled and not google_enabled and not discord_enabled %} auth-steam{% endif %}">
+  <div class="auth-social">
     <div class="auth-divider"><span>{{ ftl_get_message(question) }}</span></div>
-    {% if steam_enabled %}
-      {# Only the Oeee Cafe app on Steam can follow this: it stops the
-         navigation, asks Steam for a ticket and posts it to /auth/steam.
-         Hidden everywhere else, where following it would only say so. #}
-      <a class="ds-button auth-secondary auth-steam" href="/auth/steam/app{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-steam") }}</a>
-    {% endif %}
     {% if apple_enabled %}
       {# Apple's sign-in page, and back, in a browser. In every app the
          page takes the press itself (app_sign_in.jinja): a sheet of the
@@ -58,6 +51,14 @@
           <span class="auth-google-drawn"><img src="{{ '/static/signin/google-mark.svg' | cachebuster | safe }}" width="20" height="20" alt="" /><span>{{ ftl_get_message("sign-in-with-google") }}</span></span>
         {%- endif %}
       </a>
+    {% endif %}
+    {% if steam_enabled %}
+      {# Steam's sign-in page, and back, in a browser (/auth/steam). The
+         Oeee Cafe app on Steam never follows it: the page takes the press
+         itself, asks Steam for a ticket and posts it to /auth/steam. The
+         other apps open it in a browser of the system's
+         (app_sign_in.jinja). #}
+      <a class="ds-button auth-secondary auth-steam" href="/auth/steam{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-steam") }}</a>
     {% endif %}
     {% if discord_enabled %}
       {# Discord's sign-in page, and back, in a browser: in every app the

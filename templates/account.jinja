@@ -78,10 +78,6 @@
         {% else %}
           <p class="ds-help">{{ ftl_get_message("account-linked-accounts-none") }}</p>
         {% endfor %}
-        {% if steam_enabled and not steam_linked %}
-          {# Followed only inside the Oeee Cafe app on Steam; see login.jinja. #}
-          <a class="ds-button auth-steam" href="/auth/steam/app?next=/account">{{ ftl_get_message("account-link-steam") }}</a>
-        {% endif %}
         {% if apple_enabled and not apple_linked %}
           {# Not inside most of the apps; see login.jinja. #}
           <a class="ds-button auth-apple" href="/auth/apple?next=/account">{{ ftl_get_message("account-link-apple") }}</a>
@@ -89,6 +85,11 @@
         {% if google_enabled and not google_linked %}
           {# Not inside most of the apps; see login.jinja. #}
           <a class="ds-button auth-google" href="/auth/google?next=/account">{{ ftl_get_message("account-link-google") }}</a>
+        {% endif %}
+        {% if steam_enabled and not steam_linked %}
+          {# A ticket in the Oeee Cafe app on Steam, a browser elsewhere;
+             see sign_in_providers_macro.jinja. #}
+          <a class="ds-button auth-steam" href="/auth/steam?next=/account">{{ ftl_get_message("account-link-steam") }}</a>
         {% endif %}
         {% if discord_enabled and not discord_linked %}
           {# In a browser from inside the apps; see login.jinja. #}

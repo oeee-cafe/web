@@ -513,7 +513,6 @@ about-design = デザインシステム
 about-version = バージョン
 post-no-reactions = まだリアクションはありません。
 sign-in-with-steam = Steamでログイン
-steam-sign-in-app-only = SteamでのログインはSteam版OEEEカフェアプリで利用できます。
 steam-sign-in-unavailable = 現在Steamでログインできません。
 steam-sign-in-banned = このSteamアカウントではOEEEカフェにログインできません。
 sign-in-with-apple = Appleでサインイン

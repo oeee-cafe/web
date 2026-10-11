@@ -3910,17 +3910,6 @@ html[data-store] .supporter-elsewhere {
   font-size: var(--ds-text-m);
 }
 
-/* Signing in with Steam takes a ticket only the Oeee Cafe app on Steam can
-   ask Steam for, so it shows only there: the build that sells through
-   Steam marks the page's root element before anything is drawn. */
-.auth-steam {
-  display: none;
-}
-
-html[data-store="steam"] .auth-steam {
-  display: block;
-}
-
 /* The providers' own sign-in buttons on /login (login.jinja), across the
    card at the 40px both draw them: Apple's from its button service at the
    column's 330px, and Google's from its branding kit, its background
@@ -3968,8 +3957,7 @@ html[data-store="steam"] .auth-steam {
 }
 
 /* On /login the site's own buttons and fields take the providers' 40px
-   height. `display` is left to the rules above, which is what keeps
-   Steam's hidden outside its app. The questions between them stay on one
+   height. `display` is left to the rules above. The questions between them stay on one
    line: the longest ("パスワードをお忘れですか？") is 146px of a 330px
    column. */
 .auth-card-providers .ds-input {

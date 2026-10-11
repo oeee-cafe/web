@@ -82,19 +82,48 @@ fn signing_in_offers_steam_only_where_it_is_on_and_says_what_it_will_link() {
     };
 
     let off = render(false, json!(null));
-    assert!(!off.contains(r#"href="/auth/steam/app"#));
+    assert!(!off.contains(r#"href="/auth/steam"#));
     assert!(!off.contains("identity-login-notice"));
 
     let on = render(true, json!(null));
     assert!(on.contains("auth-steam"));
-    assert!(on.contains("/auth/steam/app?next="));
+    assert!(on.contains("/auth/steam?next="));
 
     // Signing in to claim a Steam account: say so, offer a way out, and
     // do not offer Steam again.
     let linking = render(true, json!("Steam"));
     assert!(linking.contains("identity-login-notice(provider=Steam)"));
     assert!(linking.contains(r#"action="/auth/cancel""#));
-    assert!(!linking.contains(r#"href="/auth/steam/app"#));
+    assert!(!linking.contains(r#"href="/auth/steam"#));
+}
+
+#[test]
+fn steam_is_offered_just_above_discord() {
+    let env = test_support::env();
+    let page = env
+        .get_template("login.jinja")
+        .expect("login loads")
+        .render(context! {
+            next => "/draw",
+            steam_enabled => true,
+            apple_enabled => true,
+            google_enabled => true,
+            discord_enabled => true,
+            linking_provider => Serde(json!(null)),
+            ..chrome()
+        })
+        .expect("login renders");
+    let at = |needle: &str| {
+        page.find(needle)
+            .unwrap_or_else(|| panic!("{needle} is offered"))
+    };
+    let (apple, google, steam, discord) = (
+        at(r#"href="/auth/apple"#),
+        at(r#"href="/auth/google"#),
+        at(r#"href="/auth/steam"#),
+        at(r#"href="/auth/discord"#),
+    );
+    assert!(apple < google && google < steam && steam < discord);
 }
 
 #[test]

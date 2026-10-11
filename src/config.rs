@@ -252,6 +252,10 @@ pub struct SteamConfig {
     /// Where the partner Web API is. Only a test changes it.
     #[serde(default = "default_steam_web_api_url")]
     pub web_api_url: String,
+    /// Where a browser signs in with Steam (OpenID 2.0), everywhere but the
+    /// Steam app. Only a test changes it.
+    #[serde(default = "default_steam_openid_url")]
+    pub openid_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -358,6 +362,10 @@ fn default_steam_web_api_url() -> String {
     "https://partner.steam-api.com".to_string()
 }
 
+fn default_steam_openid_url() -> String {
+    "https://steamcommunity.com/openid/login".to_string()
+}
+
 fn default_log_level() -> String {
     "info".to_string()
 }
@@ -446,6 +454,7 @@ mod tests {
             steam.web_api_url, "https://partner.steam-api.com",
             "the default is the real one"
         );
+        assert_eq!(steam.openid_url, "https://steamcommunity.com/openid/login");
         assert!(parsed.apple.is_some_and(|apple| !apple.app_ids.is_empty()));
         let discord = parsed.discord.expect("a [discord] table");
         assert_eq!(discord.token_url, "https://discord.com/api/oauth2/token");

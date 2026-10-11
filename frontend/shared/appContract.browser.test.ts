@@ -187,7 +187,7 @@ async function open(options: Options = {}): Promise<Page> {
        src="/image/9c881320.png"></a>
     <a class="auth-apple" href="/auth/apple?next=%2Fafter">Apple</a>
     <a class="auth-google" href="/auth/google?next=%2Fafter">Google</a>
-    <a class="auth-steam" href="/auth/steam/app?next=%2Fafter">Steam</a>
+    <a class="auth-steam" href="/auth/steam?next=%2Fafter">Steam</a>
     ${(options.supporter ?? [])
       .map((product) => `<button class="supporter-buy" data-product="${product}"></button>`)
       .join("")}
@@ -774,7 +774,7 @@ describe("what a store gives an app", () => {
 
 describe("signing in for an app", () => {
   /** Presses a sign-in button, and says whether the page took the press. */
-  function press(page: Page, provider: "apple" | "google"): boolean {
+  function press(page: Page, provider: "apple" | "google" | "steam"): boolean {
     const link = page.window.document.querySelector(`.auth-${provider}`)!;
     let taken = false;
     // Last to hear the click: records whether the page took it, and keeps
@@ -830,6 +830,23 @@ describe("signing in for an app", () => {
     expect(keys(message)).toEqual(["type", "url", "v"]);
     expect(message.url).toBe(new URL("/auth/apple?handoff=I", page.window.document.baseURI).href);
     expect(message.url).toMatch(/^https?:\/\/[^/]+\/auth\/apple\?handoff=I$/);
+    page.window.oeeeApp.signIn.unopened();
+  });
+
+  it("signs in with Steam in a browser in every build but the Steam one", async () => {
+    // The Microsoft Store's build, which has no Steam to ask for a ticket.
+    const page = await open({
+      userAgent: "Mozilla/5.0 OeeeCafe platform/windows",
+      store: "microsoft",
+      answers: { "/auth/handoff/start": { id: "I", secret: "X", url: "/auth/steam?handoff=I" } },
+    });
+    expect(press(page, "steam")).toBe(true);
+    await settle();
+    await settle();
+    const started = page.asked.find((request) => request.url === "/auth/handoff/start")!;
+    expect(Object.fromEntries(new URLSearchParams(started.body))).toEqual({ provider: "steam", next: "/after" });
+    expect(last(page, "browse").url).toMatch(/^https?:\/\/[^/]+\/auth\/steam\?handoff=I$/);
+    expect(page.sent.some((message) => message.type === "signIn")).toBe(false);
     page.window.oeeeApp.signIn.unopened();
   });
 

@@ -513,7 +513,6 @@ about-design = 设计系统
 about-version = 版本
 post-no-reactions = 还没有回应。
 sign-in-with-steam = 通过 Steam 登录
-steam-sign-in-app-only = 通过 Steam 登录仅在 Steam 版黄瓜咖啡馆应用中可用。
 steam-sign-in-unavailable = 目前无法通过 Steam 登录。
 steam-sign-in-banned = 此 Steam 账户无法登录黄瓜咖啡馆。
 sign-in-with-apple = 通过 Apple 登录

@@ -541,7 +541,6 @@ about-design = Design System
 about-version = Version
 post-no-reactions = No reactions yet.
 sign-in-with-steam = Sign in with Steam
-steam-sign-in-app-only = Signing in with Steam works in the Oeee Cafe app on Steam.
 steam-sign-in-unavailable = Signing in with Steam is not available right now.
 steam-sign-in-banned = This Steam account cannot sign in to Oeee Cafe.
 sign-in-with-apple = Sign in with Apple
