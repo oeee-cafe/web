@@ -92,6 +92,16 @@ describe("the cost of a canonical message", () => {
         id: "warm", actorId: "2", sequence: 1, operation: remoteDot(4, 4),
       });
     });
+    // And the windows settled. A `ResizeObserver` reports once on the first
+    // frame after it starts observing, and in this small page that report
+    // moves the toolbox window up to fit -- a real change, made once, but on
+    // whichever frame comes next. The bursts below take a millisecond or two
+    // and yield nothing to a frame, so it landed in the first or the second
+    // depending on when the frame fell, and failed this about one run in
+    // seven for something no message caused.
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
 
     const marks = 40;
     let sequence = 2;
