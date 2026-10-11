@@ -1163,7 +1163,11 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
-.toolbar-menu-who span {
+/* The line that holds the handle, and only that: a descendant selector
+   also reached the pill and the mark inside it, outranked
+   .ds-handle-supporter's ink, and left a supporter's handle in the muted
+   grey on the accent's lime, which in the dark theme is barely there. */
+.toolbar-menu-who > span {
   display: block;
   color: var(--ds-muted);
 }
