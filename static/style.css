@@ -3916,46 +3916,6 @@ html[data-store] .supporter-elsewhere {
    widened to match (static/signin/). One picture for light and one for
    dark; the theme rules below show one of the pair. On a screen narrower
    than the card the pictures scale down with it, keeping their shape. */
-.auth-provider {
-  display: block;
-  margin-top: var(--ds-space-2);
-  text-decoration: none;
-}
-
-.auth-provider img {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
-  .auth-provider:hover {
-    opacity: 0.9;
-  }
-}
-
-.auth-provider .auth-provider-dark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .auth-provider .auth-provider-light {
-    display: none;
-  }
-
-  :root:not([data-theme="light"]) .auth-provider .auth-provider-dark {
-    display: block;
-  }
-}
-
-:root[data-theme="dark"] .auth-provider .auth-provider-light {
-  display: none;
-}
-
-:root[data-theme="dark"] .auth-provider .auth-provider-dark {
-  display: block;
-}
-
 /* On /login the site's own buttons and fields take the providers' 40px
    height. `display` is left to the rules above. The questions between them stay on one
    line: the longest ("パスワードをお忘れですか？") is 146px of a 330px
@@ -3976,56 +3936,6 @@ html[data-store] .supporter-elsewhere {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Google draws its button in English only, so in the other languages it
-   is drawn here to Google's measurements: 40px tall with a 4px corner, the
-   kit's 20px G 10px from the words and the pair centred, in Roboto Medium
-   14px, and the kit's own colours for each theme. Spaced with a margin
-   rather than `gap`, which Firefox 56 does not have for flexbox and which
-   this file, never seeing the legacy build pass, cannot fall back from. */
-.auth-google-drawn {
-  display: -webkit-box;
-  display: flex;
-  -webkit-box-align: center;
-  align-items: center;
-  -webkit-box-pack: center;
-  justify-content: center;
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid #747775;
-  border-radius: 4px;
-  background-color: #fff;
-  color: #1f1f1f;
-  font-family: Roboto, var(--ds-font);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-  letter-spacing: 0.25px;
-  white-space: nowrap;
-}
-
-.auth-provider .auth-google-drawn img {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  margin-right: 10px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .auth-google-drawn {
-    border-color: #8e918f;
-    background-color: #131314;
-    color: #e3e3e3;
-  }
-}
-
-:root[data-theme="dark"] .auth-google-drawn {
-  border-color: #8e918f;
-  background-color: #131314;
-  color: #e3e3e3;
 }
 
 /* Signing in with Apple, offered everywhere: a browser goes to Apple's page
@@ -4139,18 +4049,17 @@ html[data-store] .supporter-elsewhere {
   }
 }
 
-/* Discord's symbol before the words, on their line and kept its own
+/* A provider's logo before the words, on their line and kept its own
    shape: a margin rather than `gap`, which Firefox 56 has not got for
-   flexbox (see .auth-google-drawn). */
-.auth-discord-mark {
+   flexbox, and which this file, never seeing the legacy build pass, cannot
+   fall back from. */
+.auth-provider-mark {
   display: inline-block;
   margin-right: 8px;
   vertical-align: middle;
   position: relative;
   top: -1px;
 }
-
-
 
 /* The agreement: a box to tick, and the two pages it agrees to. */
 .auth-agree {

@@ -3,8 +3,9 @@
 
    An imported macro does not see the page's context, so the language,
    where the reader was going and which providers are on are handed over;
-   `question` is the message key over the buttons. The card around it
-   takes the buttons' 40px for its own (`auth-card-providers`, style.css). #}
+   `question` is the message key over the buttons. Each is the site's own
+   button in the provider's colours with the provider's logo before the
+   words, at the card's 40px (`auth-card-providers`, style.css). #}
 {% macro sign_in_providers(question, lang, next, steam_enabled, apple_enabled, google_enabled, discord_enabled=false) -%}
   <div class="auth-social">
     <div class="auth-divider"><span>{{ ftl_get_message(question) }}</span></div>
@@ -14,20 +15,10 @@
          platform's own on iOS and macOS, and elsewhere the browser, with
          the answer handed back to this session.
 
-         The button is Apple's own, drawn by Apple in the reader's
-         language at the card's 330x40, black on light and white on dark
-         as it asks; the theme's picture shows and the other hides
-         (style.css). Its `border_radius` counts the picture's own
-         pixels, which at `scale=2` are half a CSS pixel: 8 is the 4px
-         corner of Google's button beside it. #}
-      {%- set apple_locale = {"ko": "ko_KR", "ja": "ja_JP", "zh": "zh_CN"}[lang] or "en_US" -%}
-      {%- set apple_button = "https://appleid.cdn-apple.com/appleid/button?height=40&width=330&type=sign-in&border=false&border_radius=8&scale=2&locale=" ~ apple_locale ~ "&color=" %}
-      <a class="auth-provider auth-apple" href="/auth/apple{% if next %}?next={{ next|urlencode }}{% endif %}">
-        <img class="auth-provider-light" src="{{ apple_button }}black" width="330" height="40"
-             alt="{{ ftl_get_message("sign-in-with-apple") }}" referrerpolicy="no-referrer" />
-        <img class="auth-provider-dark" src="{{ apple_button }}white" width="330" height="40"
-             alt="{{ ftl_get_message("sign-in-with-apple") }}" referrerpolicy="no-referrer" />
-      </a>
+         The site's button in Apple's colours, black on light and white
+         on dark as Apple asks, with Apple's logo drawn inline in the
+         words' own colour so it turns with the theme (style.css). #}
+      <a class="ds-button auth-secondary auth-apple" href="/auth/apple{% if next %}?next={{ next|urlencode }}{% endif %}"><svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>{{ ftl_get_message("sign-in-with-apple") }}</a>
     {% endif %}
     {% if google_enabled %}
       {# Google's sign-in page, and back, in a browser. Google refuses
@@ -37,28 +28,21 @@
          system's -- a sheet on iOS and macOS, the browser on Windows --
          with the answer handed back.
 
-         Google's branding kit (static/signin/) draws its button in
-         English only. In English the button is Google's own; in the
-         other languages it is the kit's G beside the words, laid out to
-         Google's measurements (style.css). #}
-      <a class="auth-provider auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}">
-        {%- if lang == "en" %}
-          <img class="auth-provider-light" src="{{ '/static/signin/google-light.svg' | cachebuster | safe }}" width="330" height="40"
-               alt="{{ ftl_get_message("sign-in-with-google") }}" />
-          <img class="auth-provider-dark" src="{{ '/static/signin/google-dark.svg' | cachebuster | safe }}" width="330" height="40"
-               alt="{{ ftl_get_message("sign-in-with-google") }}" />
-        {%- else %}
-          <span class="auth-google-drawn"><img src="{{ '/static/signin/google-mark.svg' | cachebuster | safe }}" width="20" height="20" alt="" /><span>{{ ftl_get_message("sign-in-with-google") }}</span></span>
-        {%- endif %}
-      </a>
+         The site's button in Google's colours for each theme, with the
+         G from Google's branding kit (static/signin/google-mark.svg,
+         unaltered) before the words in the reader's language (style.css). #}
+      <a class="ds-button auth-secondary auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}"><img class="auth-provider-mark" src="{{ '/static/signin/google-mark.svg' | cachebuster | safe }}" width="18" height="18" alt="" />{{ ftl_get_message("sign-in-with-google") }}</a>
     {% endif %}
     {% if steam_enabled %}
       {# Steam's sign-in page, and back, in a browser (/auth/steam). The
          Oeee Cafe app on Steam never follows it: the page takes the press
          itself, asks Steam for a ticket and posts it to /auth/steam. The
          other apps open it in a browser of the system's
-         (app_sign_in.jinja). #}
-      <a class="ds-button auth-secondary auth-steam" href="/auth/steam{% if next %}?next={{ next|urlencode }}{% endif %}">{{ ftl_get_message("sign-in-with-steam") }}</a>
+         (app_sign_in.jinja).
+
+         The site's own button, with Steam's logo drawn inline in the
+         words' colour so it turns with the theme. #}
+      <a class="ds-button auth-secondary auth-steam" href="/auth/steam{% if next %}?next={{ next|urlencode }}{% endif %}"><svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.253 0-2.265-1.014-2.265-2.265z"/></svg>{{ ftl_get_message("sign-in-with-steam") }}</a>
     {% endif %}
     {% if discord_enabled %}
       {# Discord's sign-in page, and back, in a browser: in every app the
@@ -70,7 +54,7 @@
          Discord's blurple, its symbol in white as its branding page
          gives it (static/signin/discord-mark.svg, unaltered), and the
          words in the reader's language, at the card's 40px (style.css). #}
-      <a class="ds-button auth-secondary auth-discord" href="/auth/discord{% if next %}?next={{ next|urlencode }}{% endif %}"><img class="auth-discord-mark" src="{{ '/static/signin/discord-mark.svg' | cachebuster | safe }}" width="24" height="18" alt="" />{{ ftl_get_message("sign-in-with-discord") }}</a>
+      <a class="ds-button auth-secondary auth-discord" href="/auth/discord{% if next %}?next={{ next|urlencode }}{% endif %}"><img class="auth-provider-mark auth-discord-mark" src="{{ '/static/signin/discord-mark.svg' | cachebuster | safe }}" width="24" height="18" alt="" />{{ ftl_get_message("sign-in-with-discord") }}</a>
     {% endif %}
   </div>
 {%- endmacro %}

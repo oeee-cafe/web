@@ -48,15 +48,26 @@ They are unmodified.
 brand assets, used under its sign-in branding guidelines; not covered by
 this repository's licence.
 
-`static/signin/google-light.svg` and `google-dark.svg` are the kit's
-square "Sign in with Google" buttons for Android and web, their background
-widened from 180 to 330 and the G and words moved to its centre, and
-`google-mark.svg` is its square G-only button cropped to the G, without the
-button behind it. Each has one addition: flat wedges in the gradient's own
-colours under the G, which the gradient covers wherever it draws, for
-Firefox 56 -- the kit paints the G with a `conic-gradient` inside a
-`foreignObject`, and without one the G is nearly empty. The Apple button on
-`/login` is not copied here; it is Apple's, requested from Apple.
+`static/signin/google-mark.svg` is the kit's square G-only button cropped
+to the G, without the button behind it, with one addition: flat wedges in
+the gradient's own colours under the G, which the gradient covers wherever
+it draws, for Firefox 56 -- the kit paints the G with a `conic-gradient`
+inside a `foreignObject`, and without one the G is nearly empty.
+
+## Sign in with Apple
+
+<https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple>
+— the Apple logo is Apple's trademark, used under its sign-in guidelines;
+not covered by this repository's licence. The button on `/login` draws it
+inline, the path as Simple Icons publishes it
+(<https://simpleicons.org>, CC0).
+
+## Sign in through Steam
+
+<https://partner.steamgames.com/doc/marketing/branding> — the Steam logo is
+Valve's trademark; not covered by this repository's licence. The button on
+`/login` draws it inline, the path as Simple Icons publishes it
+(<https://simpleicons.org>, CC0).
 
 ## PaintBBS NEO
 

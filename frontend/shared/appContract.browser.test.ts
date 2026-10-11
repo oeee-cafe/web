@@ -501,7 +501,7 @@ describe("what the site's controls feel like, read off the markup", () => {
     const pressables = [
       '<a class="profile-chip" href="#">#tag</a>',
       '<button class="ds-notice-close"><svg></svg></button>',
-      '<a class="auth-provider auth-apple" href="#"><img alt=""></a>',
+      '<a class="ds-button auth-apple" href="#"><svg></svg>Apple</a>',
       '<button class="neo-button bg-(--neo-icon)">Undo</button>',
       '<details class="toolbar-menu"><summary><span class="ds-button profile-more-button">⋯</span></summary></details>',
       '<details class="reaction-custom"><summary class="reaction-button reaction-add"><svg></svg></summary></details>',
