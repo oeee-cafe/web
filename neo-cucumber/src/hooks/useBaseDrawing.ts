@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { DrawingEngine } from "../DrawingEngine";
 import { useCanvasHistory } from "./useCanvasHistory";
 import type { BrushType, DrawingState } from "../types/drawing";
+import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from "../constants/drawing";
 import {
   brushTypeFor,
   isImmediateTool,
@@ -134,6 +135,8 @@ interface DrawingEventCallbacks {
   isVirtualRight?: () => boolean;
   /** Called once the armed press has been spent, so the button can release. */
   onVirtualRightUsed?: () => void;
+  /** A Ctrl+Alt drag set the brush size. */
+  onBrushSize?: (size: number) => void;
   /**
    * A flood fill was asked for. Returns true when the recorder ran the flood
    * itself -- a session does, to capture what it covered -- so this hook does
@@ -326,6 +329,8 @@ export const useBaseDrawing = (
     panStartY: 0,
     panLastX: 0,
     panLastY: 0,
+    /** A Ctrl+Alt drag in progress: the size it began at, and where. */
+    sizing: null as { value0: number; y0: number } | null,
     activePointerId: null as number | null,
   });
 
@@ -777,6 +782,17 @@ export const useBaseDrawing = (
         console.warn("Failed to capture pointer:", error);
       }
 
+      // NEO's Ctrl+Alt drag sizes the brush instead of drawing: one step per
+      // screen pixel, down for bigger (painter.js, SliderTool with `alt`).
+      // It is checked before the eyedropper, which Ctrl or Alt alone asks for.
+      if (e.ctrlKey && e.altKey && !e.shiftKey) {
+        drawingStateRef.current.sizing = {
+          value0: currentDrawingStateRef.current.brushSize,
+          y0: e.clientY,
+        };
+        return;
+      }
+
       // NEO's right press is the eyedropper: it takes the colour under the
       // pointer instead of drawing. Ctrl and Alt say the same thing, as they
       // do in NEO, and the toolbox's sticky button says it once for a device
@@ -956,6 +972,7 @@ export const useBaseDrawing = (
         drawingStateRef.current.activePointerId = null;
         drawingStateRef.current.isDrawing = false;
         drawingStateRef.current.isPanning = false;
+        drawingStateRef.current.sizing = null;
         isDrawingRef.current = false;
         strokeParamsRef.current = null;
         if (lineStartRef.current) {
@@ -998,6 +1015,11 @@ export const useBaseDrawing = (
       }
 
       if (drawingStateRef.current.activePointerId !== e.pointerId) return;
+
+      if (drawingStateRef.current.sizing) {
+        cleanupPointerState(e.pointerId);
+        return;
+      }
 
       if (isDrawingDisabledRef.current && !drawingStateRef.current.isPanning) return;
 
@@ -1318,6 +1340,15 @@ export const useBaseDrawing = (
 
       if (drawingStateRef.current.activePointerId !== e.pointerId) return;
 
+      const sizing = drawingStateRef.current.sizing;
+      if (sizing) {
+        const size = Math.round(sizing.value0 + (e.clientY - sizing.y0));
+        callbacks?.onBrushSize?.(
+          Math.max(MIN_BRUSH_SIZE, Math.min(MAX_BRUSH_SIZE, size)),
+        );
+        return;
+      }
+
       if (drawingStateRef.current.isPanning) {
         const rawDeltaX = e.clientX - drawingStateRef.current.panLastX;
         const rawDeltaY = e.clientY - drawingStateRef.current.panLastY;
@@ -1466,6 +1497,7 @@ export const useBaseDrawing = (
         drawingStateRef.current.activePointerId = null;
         drawingStateRef.current.isDrawing = false;
         drawingStateRef.current.isPanning = false;
+        drawingStateRef.current.sizing = null;
         isDrawingRef.current = false;
         strokeParamsRef.current = null;
       }

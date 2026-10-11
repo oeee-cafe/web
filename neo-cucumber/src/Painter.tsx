@@ -575,6 +575,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       onPickColor: adoptPickedColor,
       isVirtualRight,
       onVirtualRightUsed: releaseVirtualRight,
+      onBrushSize: setPenSize,
     },
     placement,
   });

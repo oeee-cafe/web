@@ -58,7 +58,8 @@ export interface PainterDrawingOptions {
     /** The pointer moved over the canvas, or left it. */
     onHoverMove?: (at: { x: number; y: number } | null) => void;
   };
-  /** The eyedropper and the toolbox's sticky right-click button. */
+  /** What a modified press does instead of drawing: the eyedropper, the
+   * toolbox's sticky right-click button, and Ctrl+Alt sizing. */
   picking?: {
     /** The colour a right press found, for the host to adopt as the current one. */
     onPickColor?: (color: { r: number; g: number; b: number }) => void;
@@ -66,6 +67,8 @@ export interface PainterDrawingOptions {
     isVirtualRight?: () => boolean;
     /** Called when an armed press has been spent, so the button can release. */
     onVirtualRightUsed?: () => void;
+    /** The size a Ctrl+Alt drag on the canvas has reached. */
+    onBrushSize?: (size: number) => void;
   };
   /**
    * Copy and paste as NEO does them: the painter switches itself from copy
@@ -228,6 +231,7 @@ export const usePainterDrawing = (options: PainterDrawingOptions) => {
       optionsRef.current.picking?.onPickColor?.(color),
     isVirtualRight: () => optionsRef.current.picking?.isVirtualRight?.() ?? false,
     onVirtualRightUsed: () => optionsRef.current.picking?.onVirtualRightUsed?.(),
+    onBrushSize: (size: number) => optionsRef.current.picking?.onBrushSize?.(size),
     onToolChange: (tool: ToolId) => optionsRef.current.placement?.onToolChange?.(tool),
     onPastePreview: (display: PasteDisplay | null) =>
       optionsRef.current.placement?.onPastePreview?.(display),
