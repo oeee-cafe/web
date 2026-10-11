@@ -21,7 +21,7 @@
 //! the shortest way to one.
 
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::config::DiscordConfig;
 use crate::models::identity::{Provider, VerifiedIdentity};
@@ -152,6 +152,110 @@ fn identity(user: User) -> Option<VerifiedIdentity> {
     })
 }
 
+/// What the desktop app asks to be traded for a Discord account's tokens
+/// (`/api/discord/token`): the code its consent screen gave, with the
+/// redirect and PKCE verifier it was asked with, or a refresh token.
+///
+/// The app connects the player's own Discord account with the Social SDK,
+/// to list their friends and invite them into a room
+/// (oeee-cafe-desktop's discord/linking.rs). This application is a
+/// confidential client -- it signs people in here with its secret -- and
+/// the SDK can trade codes itself only for public ones, so the app asks
+/// here and the site adds the secret. Nothing is kept, and nothing about the
+/// tokens is tied to an Oeee Cafe account: they are the app's to hold.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "grant_type", rename_all = "snake_case")]
+pub enum AppGrant {
+    AuthorizationCode {
+        code: String,
+        redirect_uri: String,
+        code_verifier: String,
+    },
+    RefreshToken {
+        refresh_token: String,
+    },
+}
+
+/// The tokens handed back to the app: Discord's own, and only these.
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct AppTokens {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: i64,
+}
+
+/// Whether `redirect_uri` is where the SDK listens on the player's own
+/// computer for the consent screen's answer: http on 127.0.0.1, any port,
+/// at /callback. A code for any other redirect -- this site's own sign-in
+/// among them -- is not the app's to trade.
+pub fn is_apps_redirect(redirect_uri: &str) -> bool {
+    url::Url::parse(redirect_uri).is_ok_and(|url| {
+        url.scheme() == "http"
+            && url.host_str() == Some("127.0.0.1")
+            && url.path() == "/callback"
+            && url.query().is_none()
+            && url.username().is_empty()
+    })
+}
+
+/// Trades what the app sent for tokens. `Ok(None)` when Discord will not:
+/// a code used or stale, a refresh token revoked, or a redirect that is not
+/// the app's.
+pub async fn app_tokens(config: &DiscordConfig, grant: &AppGrant) -> Result<Option<AppTokens>> {
+    let mut form = vec![
+        ("client_id", config.client_id.as_str()),
+        ("client_secret", config.client_secret.as_str()),
+    ];
+    match grant {
+        AppGrant::AuthorizationCode {
+            code,
+            redirect_uri,
+            code_verifier,
+        } => {
+            if !is_apps_redirect(redirect_uri) {
+                return Ok(None);
+            }
+            form.extend([
+                ("grant_type", "authorization_code"),
+                ("code", code.as_str()),
+                ("redirect_uri", redirect_uri.as_str()),
+                ("code_verifier", code_verifier.as_str()),
+            ]);
+        }
+        AppGrant::RefreshToken { refresh_token } => {
+            form.extend([
+                ("grant_type", "refresh_token"),
+                ("refresh_token", refresh_token.as_str()),
+            ]);
+        }
+    }
+    let response = http().post(&config.token_url).form(&form).send().await?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        tracing::info!("Discord would not trade the app's grant ({status}): {body}");
+        return Ok(None);
+    }
+    Ok(Some(response.json::<AppTokens>().await?))
+}
+
+/// Tells Discord the app is done with a token, which takes the application
+/// off the player's authorized apps. What Discord answers is not the app's
+/// business: it forgets the token either way.
+pub async fn revoke(config: &DiscordConfig, token: &str) -> Result<()> {
+    http()
+        .post(&config.revoke_url)
+        .form(&[
+            ("client_id", config.client_id.as_str()),
+            ("client_secret", config.client_secret.as_str()),
+            ("token", token),
+            ("token_type_hint", "refresh_token"),
+        ])
+        .send()
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,9 +269,12 @@ mod tests {
     const CLIENT_ID: &str = "1558602531133722646";
     const SECRET: &str = "a-client-secret";
     const TOKEN: &str = "an-access-token";
+    const REFRESH: &str = "a-refresh-token";
 
     /// Discord's token endpoint and `/users/@me`, on a port of their own. The
-    /// code `"good"` is traded for `TOKEN`, and `TOKEN` names `user`.
+    /// code `"good"` is traded for `TOKEN` -- with the verifier
+    /// `"the-verifier"`, for a redirect to the app's -- and so is `REFRESH`;
+    /// `TOKEN` names `user`.
     async fn fake_discord(user: Value) -> DiscordConfig {
         let app = Router::new()
             .route(
@@ -175,7 +282,19 @@ mod tests {
                 post(|Form(form): Form<HashMap<String, String>>| async move {
                     let ours = form.get("client_id").map(String::as_str) == Some(CLIENT_ID)
                         && form.get("client_secret").map(String::as_str) == Some(SECRET);
-                    if !ours || form.get("code").map(String::as_str) != Some("good") {
+                    let field = |name: &str| form.get(name).map(String::as_str);
+                    let granted = match field("grant_type") {
+                        Some("authorization_code") => {
+                            field("code") == Some("good")
+                                && (!field("redirect_uri")
+                                    .unwrap_or("")
+                                    .starts_with("http://127.0.0.1")
+                                    || field("code_verifier") == Some("the-verifier"))
+                        }
+                        Some("refresh_token") => field("refresh_token") == Some(REFRESH),
+                        _ => false,
+                    };
+                    if !ours || !granted {
                         return (
                             StatusCode::BAD_REQUEST,
                             Json(json!({"error": "invalid_grant"})),
@@ -183,7 +302,13 @@ mod tests {
                     }
                     (
                         StatusCode::OK,
-                        Json(json!({"access_token": TOKEN, "token_type": "Bearer"})),
+                        Json(json!({
+                            "access_token": TOKEN,
+                            "token_type": "Bearer",
+                            "refresh_token": REFRESH,
+                            "expires_in": 604800,
+                            "scope": "identify email",
+                        })),
                     )
                 }),
             )
@@ -205,6 +330,7 @@ mod tests {
             client_secret: SECRET.to_string(),
             token_url: format!("http://{addr}/token"),
             user_url: format!("http://{addr}/users/@me"),
+            revoke_url: format!("http://{addr}/revoke"),
         }
     }
 
@@ -278,6 +404,99 @@ mod tests {
         .is_none());
     }
 
+    #[tokio::test]
+    async fn the_apps_code_and_refresh_token_are_traded_for_tokens() {
+        let config = fake_discord(user()).await;
+        let traded = app_tokens(
+            &config,
+            &AppGrant::AuthorizationCode {
+                code: "good".into(),
+                redirect_uri: "http://127.0.0.1:54321/callback".into(),
+                code_verifier: "the-verifier".into(),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            traded,
+            Some(AppTokens {
+                access_token: TOKEN.into(),
+                refresh_token: REFRESH.into(),
+                expires_in: 604800,
+            })
+        );
+        let refreshed = app_tokens(
+            &config,
+            &AppGrant::RefreshToken {
+                refresh_token: REFRESH.into(),
+            },
+        )
+        .await
+        .unwrap();
+        assert!(refreshed.is_some());
+
+        // The wrong verifier, a stale refresh token: Discord says no, and
+        // so does this.
+        let wrong = AppGrant::AuthorizationCode {
+            code: "good".into(),
+            redirect_uri: "http://127.0.0.1:54321/callback".into(),
+            code_verifier: "another".into(),
+        };
+        assert_eq!(app_tokens(&config, &wrong).await.unwrap(), None);
+        let stale = AppGrant::RefreshToken {
+            refresh_token: "revoked".into(),
+        };
+        assert_eq!(app_tokens(&config, &stale).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn only_a_code_given_to_the_app_is_traded_for_it() {
+        let config = fake_discord(user()).await;
+        // A code given to this site's sign-in, which Discord would trade,
+        // is not the app's: it is never asked.
+        let sites = AppGrant::AuthorizationCode {
+            code: "good".into(),
+            redirect_uri: CALLBACK.into(),
+            code_verifier: "the-verifier".into(),
+        };
+        assert_eq!(app_tokens(&config, &sites).await.unwrap(), None);
+
+        assert!(is_apps_redirect("http://127.0.0.1/callback"));
+        assert!(is_apps_redirect("http://127.0.0.1:61234/callback"));
+        for redirect in [
+            "https://127.0.0.1/callback",
+            "http://localhost/callback",
+            "http://127.0.0.1.example.com/callback",
+            "http://evil@127.0.0.1/callback",
+            "http://127.0.0.1/callback?next=x",
+            "http://127.0.0.1/other",
+            "https://oeee.cafe/auth/discord/callback",
+            "",
+        ] {
+            assert!(!is_apps_redirect(redirect), "{redirect}");
+        }
+    }
+
+    #[test]
+    fn the_app_says_which_grant_it_is_asking_for() {
+        let code: AppGrant = serde_json::from_value(json!({
+            "grant_type": "authorization_code",
+            "code": "c",
+            "redirect_uri": "http://127.0.0.1/callback",
+            "code_verifier": "v",
+        }))
+        .unwrap();
+        assert!(matches!(code, AppGrant::AuthorizationCode { .. }));
+        let refresh: AppGrant =
+            serde_json::from_value(json!({"grant_type": "refresh_token", "refresh_token": "r"}))
+                .unwrap();
+        assert!(matches!(refresh, AppGrant::RefreshToken { .. }));
+        assert!(
+            serde_json::from_value::<AppGrant>(json!({"grant_type": "client_credentials"}))
+                .is_err()
+        );
+    }
+
     #[test]
     fn the_browser_is_sent_to_discord_with_what_comes_back() {
         let config = DiscordConfig {
@@ -285,6 +504,7 @@ mod tests {
             client_secret: SECRET.to_string(),
             token_url: String::new(),
             user_url: String::new(),
+            revoke_url: String::new(),
         };
         let url = url::Url::parse(&authorize_url(&config, CALLBACK, "the-state")).unwrap();
         let query: HashMap<_, _> = url.query_pairs().into_owned().collect();

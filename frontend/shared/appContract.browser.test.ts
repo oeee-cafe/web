@@ -66,6 +66,13 @@ type PageWindow = Window &
       password: {
         answer(told: Record<string, unknown>): void;
       };
+      discord: {
+        state(linked: unknown): void;
+        friends(list: unknown): void;
+        invited(result: unknown): void;
+        known(): { state: unknown; friends: unknown };
+        ask(action: string, user?: string): boolean;
+      };
     };
   };
 
@@ -1207,6 +1214,13 @@ describe("what the apps test against (appContract.json)", () => {
     hear(behind, "notification", NOTIFICATION);
     sent.push(last(behind, "notify"));
 
+    // The room's invite picker and the account page, asking after the
+    // reader's Discord account in the Windows app.
+    const discord = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows store/steam" });
+    discord.window.oeeeApp.discord.ask("connect");
+    discord.window.oeeeApp.discord.ask("invite", "80351110224678912");
+    sent.push(...discord.sent.filter((message) => message.type === "discord"));
+
     // One example of each distinct message, in the order first sent.
     const byType: Record<string, Message[]> = {};
     for (const message of site(sent) as Message[]) {
@@ -1292,6 +1306,30 @@ describe("what the apps test against (appContract.json)", () => {
       if (member === "command") continue;
       expect(typeof found(member), member).toBe("function");
     }
+  });
+
+  it("keeps what the app said of Discord for what asks after, and says it as it comes", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows store/steam" });
+    const heard: unknown[] = [];
+    page.window.document.addEventListener("oeee:discord", (event: Event) => heard.push((event as CustomEvent).detail));
+    const linked = { connected: true, connecting: false, name: "넬리" };
+    page.window.oeeeApp.discord.state(linked);
+    page.window.oeeeApp.discord.friends([{ id: "1", name: "a", status: "online", playing: false }]);
+    page.window.oeeeApp.discord.invited({ user: "1", sent: true });
+    expect(page.window.oeeeApp.discord.known()).toEqual({
+      state: linked,
+      friends: [{ id: "1", name: "a", status: "online", playing: false }],
+    });
+    expect(heard).toEqual([
+      { kind: "state", value: linked },
+      { kind: "friends", value: [{ id: "1", name: "a", status: "online", playing: false }] },
+      { kind: "invited", value: { user: "1", sent: true } },
+    ]);
+    // Asked again and again, each is said: a second invitation is not the
+    // first one repeated.
+    page.window.oeeeApp.discord.ask("friends");
+    page.window.oeeeApp.discord.ask("friends");
+    expect(page.sent.filter((message) => message.type === "discord")).toHaveLength(2);
   });
 
   it("asks whether leaving would lose work, and shows the page is being left, in the words every app uses", async () => {

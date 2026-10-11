@@ -48,3 +48,56 @@ export function feelInApp(name: Haptic): void {
   const app = (window as unknown as { oeeeApp?: { connected(): boolean; feel(name: string): void } }).oeeeApp;
   if (app && app.connected()) app.feel(name);
 }
+
+/** The reader's Discord account in the Windows app (discord.rs in oeee-cafe-desktop). */
+export interface DiscordLinked {
+  connected: boolean;
+  /** Asking Discord, or trading what it gave: not yet either way. */
+  connecting: boolean;
+  name: string | null;
+}
+
+/** A Discord friend the reader can invite into the room. */
+export interface DiscordFriend {
+  /** A Discord id: a string, since a number cannot hold one. */
+  id: string;
+  name: string;
+  status: "online" | "idle" | "dnd" | "offline";
+  /** In Oeee Cafe now. */
+  playing: boolean;
+}
+
+export type DiscordHeard =
+  | { kind: "state"; value: DiscordLinked }
+  | { kind: "friends"; value: DiscordFriend[] }
+  | { kind: "invited"; value: { user: string; sent: boolean } };
+
+interface DiscordMembers {
+  known(): { state: DiscordLinked | null; friends: DiscordFriend[] | null };
+  ask(action: "connect" | "disconnect" | "friends" | "invite", user?: string): boolean;
+}
+
+function discordMembers(): DiscordMembers | undefined {
+  return (window as unknown as { oeeeApp?: { discord?: DiscordMembers } }).oeeeApp?.discord;
+}
+
+/**
+ * What the Windows app last said of the reader's Discord account and friends
+ * (app_bridge.jinja keeps it). A state of null is a page no app with Discord
+ * has spoken to, where nothing about Discord is offered.
+ */
+export function discordKnown(): { state: DiscordLinked | null; friends: DiscordFriend[] | null } {
+  return discordMembers()?.known() ?? { state: null, friends: null };
+}
+
+/** Hears whatever the app says of Discord from now on. Returns the stop. */
+export function onDiscord(listener: (heard: DiscordHeard) => void): () => void {
+  const heard = (event: Event) => listener((event as CustomEvent<DiscordHeard>).detail);
+  document.addEventListener("oeee:discord", heard);
+  return () => document.removeEventListener("oeee:discord", heard);
+}
+
+/** Asks the app something of the reader's Discord account; false outside it. */
+export function askDiscord(action: "connect" | "disconnect" | "friends" | "invite", user?: string): boolean {
+  return discordMembers()?.ask(action, user) ?? false;
+}

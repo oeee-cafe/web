@@ -231,6 +231,10 @@ pub struct DiscordConfig {
     /// Where a token says whose it is. Only a test changes it.
     #[serde(default = "default_discord_user_url")]
     pub user_url: String,
+    /// Where the desktop app's tokens are given back. Only a test changes
+    /// it.
+    #[serde(default = "default_discord_revoke_url")]
+    pub revoke_url: String,
 }
 
 fn default_discord_token_url() -> String {
@@ -239,6 +243,10 @@ fn default_discord_token_url() -> String {
 
 fn default_discord_user_url() -> String {
     "https://discord.com/api/users/@me".to_string()
+}
+
+fn default_discord_revoke_url() -> String {
+    "https://discord.com/api/oauth2/token/revoke".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

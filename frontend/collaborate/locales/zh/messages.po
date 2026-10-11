@@ -17,7 +17,7 @@ msgstr ""
 msgid "Authentication Failed"
 msgstr "验证失败"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:86
+#: ../frontend/collaborate/components/SessionHeader.tsx:98
 msgid "by"
 msgstr "作者:"
 
@@ -25,13 +25,25 @@ msgstr "作者:"
 msgid "Cancel"
 msgstr "取消"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:64
+#: ../frontend/collaborate/components/DiscordInvite.tsx:76
+msgid "Connect Discord"
+msgstr "关联 Discord"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:65
+msgid "Connect Discord once to see your friends here and invite them to this session."
+msgstr "关联一次 Discord，即可在这里看到好友并邀请他们加入这个会话。"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:76
 msgid "Connected"
 msgstr "已连接"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:70
+#: ../frontend/collaborate/components/SessionHeader.tsx:82
 msgid "Connecting"
 msgstr "连接中"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:61
+msgid "Connecting to Discord…"
+msgstr "正在连接 Discord…"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:41
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:63
@@ -43,7 +55,7 @@ msgid "Connection lost. Your work is saved locally."
 msgstr "连接丢失。您的作品已本地保存。"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:76
+#: ../frontend/collaborate/components/SessionHeader.tsx:88
 msgid "Disconnected"
 msgstr "已断开"
 
@@ -61,10 +73,14 @@ msgstr "保存会话失败。请尝试下载为 PNG。"
 msgid "Go to Lobby"
 msgstr "去大厅"
 
-#: ../frontend/collaborate/App.tsx:928
-#: ../frontend/collaborate/App.tsx:932
+#: ../frontend/collaborate/App.tsx:941
+#: ../frontend/collaborate/App.tsx:945
 msgid "Help"
 msgstr "帮助"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:122
+msgid "in Oeee Cafe"
+msgstr "在黄瓜咖啡馆"
 
 #: ../frontend/collaborate/components/modals/InitializationErrorModal.tsx:17
 msgid "Initialization Failed"
@@ -74,9 +90,23 @@ msgstr "初始化失败"
 msgid "Initializing collaboration session..."
 msgstr "正在初始化协作会话..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:82
+#: ../frontend/collaborate/components/DiscordInvite.tsx:139
+#: ../frontend/collaborate/components/SessionHeader.tsx:109
+msgid "Invite"
+msgstr "邀请"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:57
+#: ../frontend/collaborate/components/SessionHeader.tsx:106
+msgid "Invite Discord friends"
+msgstr "邀请 Discord 好友"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:94
 msgid "Loading"
 msgstr "加载中"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:102
+msgid "Loading friends…"
+msgstr "正在加载好友…"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:41
 #: ../frontend/collaborate/components/modals/LoadingModal.tsx:12
@@ -87,9 +117,25 @@ msgstr "加载中..."
 msgid "Message too long (max 500 characters)"
 msgstr "消息过长（最多 500 个字符）"
 
-#: ../frontend/collaborate/App.tsx:781
+#: ../frontend/collaborate/components/DiscordInvite.tsx:106
+msgid "No Discord friends to invite yet."
+msgstr "还没有可以邀请的 Discord 好友。"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:106
+msgid "No friend by that name."
+msgstr "没有叫这个名字的好友。"
+
+#: ../frontend/collaborate/App.tsx:794
 msgid "No Title"
 msgstr "无标题"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:79
+msgid "Not now"
+msgstr "以后再说"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:83
+msgid "Or use + in any Discord chat."
+msgstr "也可以在任意 Discord 聊天里用 + 邀请。"
 
 #. placeholder {0}: participants.size
 #: ../frontend/collaborate/components/Chat.tsx:207
@@ -118,24 +164,37 @@ msgstr "保存为 PNG"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "要把这幅画保存到画廊吗？保存后所有人的协作会话都会结束，谁都无法继续绘制。"
 
-#: ../frontend/collaborate/App.tsx:965
-#: ../frontend/collaborate/App.tsx:1014
+#: ../frontend/collaborate/App.tsx:978
+#: ../frontend/collaborate/App.tsx:1027
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:122
 msgid "Save to Gallery"
 msgstr "保存到画廊"
 
-#: ../frontend/collaborate/App.tsx:965
-#: ../frontend/collaborate/App.tsx:1014
+#: ../frontend/collaborate/App.tsx:978
+#: ../frontend/collaborate/App.tsx:1027
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:117
 msgid "Saving..."
 msgstr "保存中..."
 
+#: ../frontend/collaborate/components/DiscordInvite.tsx:95
+#: ../frontend/collaborate/components/DiscordInvite.tsx:96
+msgid "Search friends"
+msgstr "搜索好友"
+
 #: ../frontend/collaborate/components/Chat.tsx:289
 msgid "Send"
 msgstr "发送"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:133
+msgid "Sending…"
+msgstr "正在发送…"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:135
+msgid "Sent"
+msgstr "已发送"
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:78
 msgid "Session Expired"
@@ -149,11 +208,11 @@ msgstr "会话已满"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "会话即将结束。正在保存绘画到画廊..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:95
+#: ../frontend/collaborate/components/SessionHeader.tsx:119
 msgid "Share"
 msgstr "分享"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:92
+#: ../frontend/collaborate/components/SessionHeader.tsx:116
 msgid "Share this session"
 msgstr "分享此会话"
 
@@ -184,6 +243,10 @@ msgstr "此会话已保存。您只能将其下载为 PNG。"
 #: ../frontend/collaborate/components/modals/RoomFullModal.tsx:27
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "此会话已满（{currentUserCount}/{maxUsers} 位用户）。只有前 {maxUsers} 位用户可以加入会话。"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:137
+msgid "Try again"
+msgstr "重试"
 
 #: ../frontend/collaborate/components/Chat.tsx:280
 msgid "Type a message..."

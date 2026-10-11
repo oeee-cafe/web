@@ -1,5 +1,9 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Icon, NEO_BUTTON } from "neo-cucumber";
+import { Icon, NEO_BUTTON, NEO_BUTTON_ON } from "neo-cucumber";
+import { useState } from "react";
+
+import { roomIsJoinable, useDiscord } from "../hooks/useDiscord";
+import { DiscordInvite, DiscordMark } from "./DiscordInvite";
 
 interface CollaborationMeta {
   title: string;
@@ -29,6 +33,10 @@ export interface SessionHeaderProps {
  *
  * It sits below the title bar rather than in it because the title bar is the
  * handle the window is dragged by, and Share has to stay a button.
+ *
+ * In the Windows app with Discord, Invite sits beside Share and opens the
+ * Discord friends to ask in (DiscordInvite), when the room is one a friend
+ * could enter. Share stays for everyone else.
  */
 export const SessionHeader = ({
   canvasMeta,
@@ -36,6 +44,9 @@ export const SessionHeader = ({
   isCatchingUp,
 }: SessionHeaderProps) => {
   const { t } = useLingui();
+  const discord = useDiscord();
+  const [inviting, setInviting] = useState(false);
+  const canInvite = discord.state !== null && roomIsJoinable();
 
   const handleShare = () => {
     if (navigator.share) {
@@ -57,6 +68,7 @@ export const SessionHeader = ({
   };
 
   return (
+    <>
     <div className="flex w-full items-center gap-[6px] px-[3px] pt-[3px] text-[11px] leading-[14px]">
       {connectionState === "connected" && !isCatchingUp && (
         <div className="flex shrink-0 items-center gap-[3px] opacity-80">
@@ -85,15 +97,29 @@ export const SessionHeader = ({
       <div className="min-w-0 truncate opacity-70">
         <Trans>by</Trans> @{canvasMeta.ownerLoginName}
       </div>
+      {canInvite && (
+        <button
+          type="button"
+          onClick={() => setInviting((open) => !open)}
+          aria-expanded={inviting}
+          className={`${NEO_BUTTON} ml-auto flex shrink-0 items-center gap-[3px] ${inviting ? NEO_BUTTON_ON : ""}`}
+          title={t`Invite Discord friends`}
+        >
+          <DiscordMark />
+          <Trans>Invite</Trans>
+        </button>
+      )}
       <button
         type="button"
         onClick={handleShare}
-        className={`${NEO_BUTTON} ml-auto flex shrink-0 items-center gap-[3px]`}
+        className={`${NEO_BUTTON} ${canInvite ? "" : "ml-auto"} flex shrink-0 items-center gap-[3px]`}
         title={t`Share this session`}
       >
         <Icon icon="material-symbols:upload" width={14} height={14} />
         <Trans>Share</Trans>
       </button>
     </div>
+    {canInvite && inviting && <DiscordInvite discord={discord} onClose={() => setInviting(false)} />}
+    </>
   );
 };

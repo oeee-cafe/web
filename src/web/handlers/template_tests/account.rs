@@ -309,3 +309,23 @@ fn the_account_page_asks_what_the_account_can_answer() {
     assert!(discord.contains("Discord: 넬리"));
     assert!(discord.contains(r#"action="/account/identities/discord/unlink""#));
 }
+
+/// The reader's Discord account in the Windows app has a section of its
+/// own, apart from the accounts that sign in here, hidden until the app
+/// says where it stands -- so a browser, which never will, never shows it.
+#[test]
+fn the_apps_discord_account_waits_for_the_app_to_say() {
+    let env = test_support::env();
+    let rendered = env
+        .get_template("account_discord_app.jinja")
+        .expect("the section loads")
+        .render(context! { ftl_lang => "en" })
+        .expect("the section renders");
+    assert!(rendered.contains(r#"id="account-discord-app" hidden"#));
+    assert!(rendered.contains("account-in-this-app"));
+    assert!(rendered.contains("account-discord-connect"));
+    assert!(rendered.contains("account-discord-disconnect"));
+    // Asked of the app over the bridge, not linked to like a sign-in.
+    assert!(rendered.contains(r#"discord.ask("connect")"#));
+    assert!(!rendered.contains("/auth/discord"));
+}

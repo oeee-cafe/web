@@ -562,6 +562,15 @@ impl App {
             .route("/collaboration/{uuid}/meta", get(get_collaboration_meta))
             // An invitation into a room accepted in Discord's phone app.
             .route("/_discord/join", get(discord_join))
+            // The desktop app's Discord account, traded for it (discord_app.rs).
+            .route(
+                "/api/discord/token",
+                post(crate::web::handlers::discord_app::app_token),
+            )
+            .route(
+                "/api/discord/revoke",
+                post(crate::web::handlers::discord_app::app_revoke),
+            )
             // The quick switcher's list (jump.jinja).
             .route("/jump", get(crate::web::handlers::jump::jump))
             // What an open page hears without asking (crate::live).

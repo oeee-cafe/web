@@ -17,7 +17,7 @@ msgstr ""
 msgid "Authentication Failed"
 msgstr "Authentication Failed"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:86
+#: ../frontend/collaborate/components/SessionHeader.tsx:98
 msgid "by"
 msgstr "by"
 
@@ -25,13 +25,25 @@ msgstr "by"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:64
+#: ../frontend/collaborate/components/DiscordInvite.tsx:76
+msgid "Connect Discord"
+msgstr "Connect Discord"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:65
+msgid "Connect Discord once to see your friends here and invite them to this session."
+msgstr "Connect Discord once to see your friends here and invite them to this session."
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:76
 msgid "Connected"
 msgstr "Connected"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:70
+#: ../frontend/collaborate/components/SessionHeader.tsx:82
 msgid "Connecting"
 msgstr "Connecting"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:61
+msgid "Connecting to Discord…"
+msgstr "Connecting to Discord…"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:41
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:63
@@ -43,7 +55,7 @@ msgid "Connection lost. Your work is saved locally."
 msgstr "Connection lost. Your work is saved locally."
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:76
+#: ../frontend/collaborate/components/SessionHeader.tsx:88
 msgid "Disconnected"
 msgstr "Disconnected"
 
@@ -61,10 +73,14 @@ msgstr "Failed to save session. Please try downloading as PNG instead."
 msgid "Go to Lobby"
 msgstr "Go to Lobby"
 
-#: ../frontend/collaborate/App.tsx:928
-#: ../frontend/collaborate/App.tsx:932
+#: ../frontend/collaborate/App.tsx:941
+#: ../frontend/collaborate/App.tsx:945
 msgid "Help"
 msgstr "Help"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:122
+msgid "in Oeee Cafe"
+msgstr "in Oeee Cafe"
 
 #: ../frontend/collaborate/components/modals/InitializationErrorModal.tsx:17
 msgid "Initialization Failed"
@@ -74,9 +90,23 @@ msgstr "Initialization Failed"
 msgid "Initializing collaboration session..."
 msgstr "Initializing collaboration session..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:82
+#: ../frontend/collaborate/components/DiscordInvite.tsx:139
+#: ../frontend/collaborate/components/SessionHeader.tsx:109
+msgid "Invite"
+msgstr "Invite"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:57
+#: ../frontend/collaborate/components/SessionHeader.tsx:106
+msgid "Invite Discord friends"
+msgstr "Invite Discord friends"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:94
 msgid "Loading"
 msgstr "Loading"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:102
+msgid "Loading friends…"
+msgstr "Loading friends…"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:41
 #: ../frontend/collaborate/components/modals/LoadingModal.tsx:12
@@ -87,9 +117,25 @@ msgstr "Loading..."
 msgid "Message too long (max 500 characters)"
 msgstr "Message too long (max 500 characters)"
 
-#: ../frontend/collaborate/App.tsx:781
+#: ../frontend/collaborate/components/DiscordInvite.tsx:106
+msgid "No Discord friends to invite yet."
+msgstr "No Discord friends to invite yet."
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:106
+msgid "No friend by that name."
+msgstr "No friend by that name."
+
+#: ../frontend/collaborate/App.tsx:794
 msgid "No Title"
 msgstr "No Title"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:79
+msgid "Not now"
+msgstr "Not now"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:83
+msgid "Or use + in any Discord chat."
+msgstr "Or use + in any Discord chat."
 
 #. placeholder {0}: participants.size
 #: ../frontend/collaborate/components/Chat.tsx:207
@@ -118,24 +164,37 @@ msgstr "Save as PNG"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 
-#: ../frontend/collaborate/App.tsx:965
-#: ../frontend/collaborate/App.tsx:1014
+#: ../frontend/collaborate/App.tsx:978
+#: ../frontend/collaborate/App.tsx:1027
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:122
 msgid "Save to Gallery"
 msgstr "Save to Gallery"
 
-#: ../frontend/collaborate/App.tsx:965
-#: ../frontend/collaborate/App.tsx:1014
+#: ../frontend/collaborate/App.tsx:978
+#: ../frontend/collaborate/App.tsx:1027
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:117
 msgid "Saving..."
 msgstr "Saving..."
 
+#: ../frontend/collaborate/components/DiscordInvite.tsx:95
+#: ../frontend/collaborate/components/DiscordInvite.tsx:96
+msgid "Search friends"
+msgstr "Search friends"
+
 #: ../frontend/collaborate/components/Chat.tsx:289
 msgid "Send"
 msgstr "Send"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:133
+msgid "Sending…"
+msgstr "Sending…"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:135
+msgid "Sent"
+msgstr "Sent"
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:78
 msgid "Session Expired"
@@ -149,11 +208,11 @@ msgstr "Session Full"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "Session is ending. The drawing is being saved to the gallery..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:95
+#: ../frontend/collaborate/components/SessionHeader.tsx:119
 msgid "Share"
 msgstr "Share"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:92
+#: ../frontend/collaborate/components/SessionHeader.tsx:116
 msgid "Share this session"
 msgstr "Share this session"
 
@@ -184,6 +243,10 @@ msgstr "This session has already been saved. You can only download it as a PNG."
 #: ../frontend/collaborate/components/modals/RoomFullModal.tsx:27
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:137
+msgid "Try again"
+msgstr "Try again"
 
 #: ../frontend/collaborate/components/Chat.tsx:280
 msgid "Type a message..."

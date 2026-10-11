@@ -1,0 +1,51 @@
+{# The reader's Discord account in the Windows app (discord.rs in
+   oeee-cafe-desktop): connected to the app, to invite friends from a room,
+   or not. It is the app's, kept on that computer, and not one of the
+   accounts above, which sign into this site from anywhere -- so it has a
+   heading of its own, and shows only where the app has said where it
+   stands (app_bridge.jinja's discord.state): never in a browser or another
+   app. #}
+<section class="settings-group" id="account-discord-app" hidden>
+  <div class="profile-section-label">{{ ftl_get_message("account-in-this-app") }}</div>
+  <div class="ds-card settings-card">
+    <div class="settings-row">
+      <span class="settings-row-text" data-discord-status></span>
+      <button type="button" class="ds-button" data-discord-disconnect hidden>{{ ftl_get_message("account-discord-disconnect") }}</button>
+      <button type="button" class="ds-button auth-discord" data-discord-connect hidden><img class="auth-discord-mark" src="{{ '/static/signin/discord-mark.svg' | cachebuster | safe }}" width="24" height="18" alt="" />{{ ftl_get_message("account-discord-connect") }}</button>
+    </div>
+    <p class="ds-help">{{ ftl_get_message("account-discord-help") }}</p>
+  </div>
+</section>
+<script>
+  (function () {
+    var section = document.getElementById("account-discord-app");
+    var discord = window.oeeeApp && window.oeeeApp.discord;
+    if (!section || !discord) return;
+    var status = section.querySelector("[data-discord-status]");
+    var connect = section.querySelector("[data-discord-connect]");
+    var disconnect = section.querySelector("[data-discord-disconnect]");
+    // Connected, the account is named as the linked ones above are:
+    // "Discord: " and its name, in every language.
+    var WORDS = {
+      off: {{ ftl_get_message("account-discord-not-connected")|tojson }},
+      connecting: {{ ftl_get_message("account-discord-connecting")|tojson }}
+    };
+
+    function show(linked) {
+      if (!linked || !document.body.contains(section)) return;
+      section.hidden = false;
+      if (linked.connected) status.textContent = linked.name ? "Discord: " + linked.name : "Discord";
+      else status.textContent = linked.connecting ? WORDS.connecting : WORDS.off;
+      disconnect.hidden = !linked.connected;
+      connect.hidden = linked.connected;
+      connect.disabled = !!linked.connecting;
+    }
+
+    connect.addEventListener("click", function () { discord.ask("connect"); });
+    disconnect.addEventListener("click", function () { discord.ask("disconnect"); });
+    document.addEventListener("oeee:discord", function (event) {
+      if (event.detail && event.detail.kind === "state") show(event.detail.value);
+    });
+    show(discord.known().state);
+  })();
+</script>

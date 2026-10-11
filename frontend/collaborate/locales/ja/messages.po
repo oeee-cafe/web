@@ -17,7 +17,7 @@ msgstr ""
 msgid "Authentication Failed"
 msgstr "認証に失敗しました"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:86
+#: ../frontend/collaborate/components/SessionHeader.tsx:98
 msgid "by"
 msgstr "作成者:"
 
@@ -25,13 +25,25 @@ msgstr "作成者:"
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:64
+#: ../frontend/collaborate/components/DiscordInvite.tsx:76
+msgid "Connect Discord"
+msgstr "Discordを連携"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:65
+msgid "Connect Discord once to see your friends here and invite them to this session."
+msgstr "Discordを一度連携すると、ここでフレンドを見てこのセッションに招待できます。"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:76
 msgid "Connected"
 msgstr "接続済み"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:70
+#: ../frontend/collaborate/components/SessionHeader.tsx:82
 msgid "Connecting"
 msgstr "接続中"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:61
+msgid "Connecting to Discord…"
+msgstr "Discordに接続中…"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:41
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:63
@@ -43,7 +55,7 @@ msgid "Connection lost. Your work is saved locally."
 msgstr "接続が失われました。作業はローカルに保存されました。"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:76
+#: ../frontend/collaborate/components/SessionHeader.tsx:88
 msgid "Disconnected"
 msgstr "切断済み"
 
@@ -61,10 +73,14 @@ msgstr "セッションの保存に失敗しました。代わりに PNG とし�
 msgid "Go to Lobby"
 msgstr "ロビーに戻る"
 
-#: ../frontend/collaborate/App.tsx:928
-#: ../frontend/collaborate/App.tsx:932
+#: ../frontend/collaborate/App.tsx:941
+#: ../frontend/collaborate/App.tsx:945
 msgid "Help"
 msgstr "ヘルプ"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:122
+msgid "in Oeee Cafe"
+msgstr "OEEEカフェにいます"
 
 #: ../frontend/collaborate/components/modals/InitializationErrorModal.tsx:17
 msgid "Initialization Failed"
@@ -74,9 +90,23 @@ msgstr "初期化に失敗しました"
 msgid "Initializing collaboration session..."
 msgstr "コラボレーションセッションを初期化中..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:82
+#: ../frontend/collaborate/components/DiscordInvite.tsx:139
+#: ../frontend/collaborate/components/SessionHeader.tsx:109
+msgid "Invite"
+msgstr "招待"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:57
+#: ../frontend/collaborate/components/SessionHeader.tsx:106
+msgid "Invite Discord friends"
+msgstr "Discordのフレンドを招待"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:94
 msgid "Loading"
 msgstr "読み込み中"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:102
+msgid "Loading friends…"
+msgstr "フレンドを読み込み中…"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:41
 #: ../frontend/collaborate/components/modals/LoadingModal.tsx:12
@@ -87,9 +117,25 @@ msgstr "読み込み中..."
 msgid "Message too long (max 500 characters)"
 msgstr "メッセージが長すぎます（最大500文字）"
 
-#: ../frontend/collaborate/App.tsx:781
+#: ../frontend/collaborate/components/DiscordInvite.tsx:106
+msgid "No Discord friends to invite yet."
+msgstr "招待できるDiscordのフレンドはまだいません。"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:106
+msgid "No friend by that name."
+msgstr "その名前のフレンドはいません。"
+
+#: ../frontend/collaborate/App.tsx:794
 msgid "No Title"
 msgstr "無題"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:79
+msgid "Not now"
+msgstr "あとで"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:83
+msgid "Or use + in any Discord chat."
+msgstr "Discordのチャットの＋からも招待できます。"
 
 #. placeholder {0}: participants.size
 #: ../frontend/collaborate/components/Chat.tsx:207
@@ -118,24 +164,37 @@ msgstr "PNG として保存"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "この絵をギャラリーに保存しますか？保存すると全員のセッションが終了し、誰も続きを描けなくなります。"
 
-#: ../frontend/collaborate/App.tsx:965
-#: ../frontend/collaborate/App.tsx:1014
+#: ../frontend/collaborate/App.tsx:978
+#: ../frontend/collaborate/App.tsx:1027
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:122
 msgid "Save to Gallery"
 msgstr "ギャラリーに保存"
 
-#: ../frontend/collaborate/App.tsx:965
-#: ../frontend/collaborate/App.tsx:1014
+#: ../frontend/collaborate/App.tsx:978
+#: ../frontend/collaborate/App.tsx:1027
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:117
 msgid "Saving..."
 msgstr "保存中..."
 
+#: ../frontend/collaborate/components/DiscordInvite.tsx:95
+#: ../frontend/collaborate/components/DiscordInvite.tsx:96
+msgid "Search friends"
+msgstr "フレンドを検索"
+
 #: ../frontend/collaborate/components/Chat.tsx:289
 msgid "Send"
 msgstr "送信"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:133
+msgid "Sending…"
+msgstr "送信中…"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:135
+msgid "Sent"
+msgstr "送信済み"
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:78
 msgid "Session Expired"
@@ -149,11 +208,11 @@ msgstr "セッション満員"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "セッションが終了します。描画をギャラリーに保存中..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:95
+#: ../frontend/collaborate/components/SessionHeader.tsx:119
 msgid "Share"
 msgstr "共有"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:92
+#: ../frontend/collaborate/components/SessionHeader.tsx:116
 msgid "Share this session"
 msgstr "このセッションを共有"
 
@@ -184,6 +243,10 @@ msgstr "このセッションはすでに保存されています。PNG とし�
 #: ../frontend/collaborate/components/modals/RoomFullModal.tsx:27
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "このセッションは満員です（{currentUserCount}/{maxUsers}ユーザー）。最初の{maxUsers}ユーザーのみがセッションに参加できます。"
+
+#: ../frontend/collaborate/components/DiscordInvite.tsx:137
+msgid "Try again"
+msgstr "もう一度"
 
 #: ../frontend/collaborate/components/Chat.tsx:280
 msgid "Type a message..."

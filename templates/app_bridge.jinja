@@ -107,6 +107,14 @@
             a path on this site. The app shows it as the system's
             notification and, pressed, opens `url` in the window. The page
             shows it as a toast as well, as it does in every app.
+   discord  {action, user?}
+            Windows, with Discord: the reader's Discord account in the app
+            (discord.rs in oeee-cafe-desktop). "connect" it -- Discord's
+            consent screen, once -- or "disconnect" it; "friends" for the
+            room's invite picker, answered now and as they change; "invite"
+            `user`, a Discord id as a string (a number cannot hold one), to
+            the room showing. Asked only on a page the app has told
+            discord.state (below), so never where nothing would answer.
    share    {title, text}
    download {name, mime, data}
             What Android's web view cannot do itself (app_polyfills.jinja).
@@ -176,6 +184,16 @@
                              or null outside the Microsoft Store build
      painter.command(name), painter.preferPen()
                              frontend/shared/appBridge.ts, on a drawing page
+     discord.state(linked), discord.friends(list), discord.invited(result)
+                             here: the reader's Discord account in the
+                             Windows app, which tells every page it shows
+                             {connected, connecting, name}; the friends it
+                             was asked for, [{id, name, status, playing}];
+                             and {user, sent} for an invitation. Kept for
+                             what loads after (discord.known()) and said as
+                             the oeee:discord event, for the room
+                             (frontend/shared/appBridge.ts) and the account
+                             page (account_discord_app.jinja).
 
    And --oeee-text-scale on the root, which is CSS rather than a call: the
    Android app sets it; on iOS the page measures it itself (theme_head.jinja).
@@ -376,9 +394,28 @@
       });
     }
 
+    // The reader's Discord account in the Windows app, as it last said, for
+    // whatever part of the page asks after it was told.
+    var discord = { state: null, friends: null };
+    function heardFromDiscord(kind, value) {
+      if (kind !== "invited") discord[kind] = value;
+      document.dispatchEvent(new CustomEvent("oeee:discord", { detail: { kind: kind, value: value } }));
+    }
+
     window.oeeeApp = {
       // Whether an app is listening at all.
       connected: function () { return !!channel(); },
+      discord: {
+        state: function (linked) { heardFromDiscord("state", linked); },
+        friends: function (list) { heardFromDiscord("friends", list); },
+        invited: function (result) { heardFromDiscord("invited", result); },
+        known: function () { return discord; },
+        ask: function (action, user) {
+          var data = { action: action };
+          if (user) data.user = user;
+          return post("discord", data, true);
+        }
+      },
       post: post,
       // A control felt as well as seen.
       feel: function (name) {

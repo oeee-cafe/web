@@ -336,6 +336,19 @@
         "type": "notify"
       }
     ],
+    "discord": [
+      {
+        "action": "connect",
+        "v": 1,
+        "type": "discord"
+      },
+      {
+        "action": "invite",
+        "user": "80351110224678912",
+        "v": 1,
+        "type": "discord"
+      }
+    ],
     "caption": [
       {
         "place": {
@@ -364,7 +377,10 @@
     "store.ticket",
     "painter.command",
     "painter.preferPen",
-    "caption"
+    "caption",
+    "discord.state",
+    "discord.friends",
+    "discord.invited"
   ],
   "commands": [
     "recent",
