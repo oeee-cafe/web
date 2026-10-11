@@ -46,22 +46,75 @@ export function toCanonicalOperation(entry: ArchivedEntry) {
   };
 }
 
+/** The base a RESET_POINT names, or null for any other message. */
+export function checkpointBase(entry: ArchivedEntry): number | null {
+  const message = decodeMessage(entry.payload.slice().buffer as ArrayBuffer);
+  return message?.type === "resetPoint" ? message.baseSeq : null;
+}
+
+export type DrawableEntry = {
+  entry: ArchivedEntry;
+  operation: NonNullable<ReturnType<typeof toCanonicalOperation>>;
+  /**
+   * The bases of the RESET_POINTs recorded since the drawable entry before
+   * this one, to be compacted at before it is applied.
+   */
+  checkpoints: number[];
+};
+
 /**
  * The entries a replay actually draws.
  *
- * RESET_POINT is dropped: it tells a live client that history below a base was
- * squashed into snapshots it is about to receive, and a recording has no
- * snapshots because it kept the operations instead. Applying everything from
- * the first message reaches the same canvas by the longer road, which is the
- * road the recording is.
+ * A RESET_POINT is not one of them: it tells a live client that history
+ * below a base was squashed into snapshots, and a recording has no snapshots
+ * because it kept the operations instead. Applying everything from the first
+ * message reaches the same canvas by the longer road, which is the road the
+ * recording is.
+ *
+ * It is not dropped, though, because pixels are not all it changes. Every
+ * client in the room compacted at it, and what is compacted can no longer be
+ * undone: an undo sent after it reaches only what was drawn since, and finds
+ * nothing if its sender drew nothing since. A replay that skipped it let the
+ * same undo reach under it and take back a stroke the room kept -- which is
+ * how session 486a0954's replay lost two of babguette's strokes, undone a
+ * second after a checkpoint froze them, that stayed on everyone's canvas.
+ *
+ * So each one rides on the drawable entry after it, which is applied right
+ * after the compaction a live client would have done, and the positions a
+ * scrubber and the log count by stay those of the marks alone. Ones after the
+ * last mark come back from `trailingCheckpoints`.
  */
-export function drawableEntries(entries: ArchivedEntry[]) {
-  return entries
-    .map((entry) => ({ entry, operation: toCanonicalOperation(entry) }))
-    .filter(
-      (held): held is { entry: ArchivedEntry; operation: NonNullable<ReturnType<typeof toCanonicalOperation>> } =>
-        held.operation !== null,
-    );
+export function drawableEntries(entries: ArchivedEntry[]): DrawableEntry[] {
+  const drawable: DrawableEntry[] = [];
+  let checkpoints: number[] = [];
+  for (const entry of entries) {
+    const operation = toCanonicalOperation(entry);
+    if (operation) {
+      drawable.push({ entry, operation, checkpoints });
+      checkpoints = [];
+      continue;
+    }
+    const base = checkpointBase(entry);
+    if (base !== null) checkpoints.push(base);
+  }
+  return drawable;
+}
+
+/** The RESET_POINTs after the last drawable entry, which none carries yet. */
+export function trailingCheckpoints(entries: ArchivedEntry[]): number[] {
+  const trailing: number[] = [];
+  for (let index = entries.length - 1; index >= 0; index--) {
+    if (toCanonicalOperation(entries[index])) break;
+    const base = checkpointBase(entries[index]);
+    if (base !== null) trailing.unshift(base);
+  }
+  return trailing;
+}
+
+/** Applies one drawable entry the way a live client reached it. */
+export async function applyDrawable(painter: PainterHandle, held: DrawableEntry): Promise<void> {
+  for (const base of held.checkpoints) await painter.compactCanonicalHistory(base);
+  await painter.applyCanonicalOperation(held.operation);
 }
 
 /**
@@ -124,6 +177,8 @@ type ReplayOptions = {
 
 export function createReplay(options: ReplayOptions): ReplayHandle {
   const drawable = drawableEntries(options.entries);
+  /** Checkpoints recorded after the last mark, for the next one appended. */
+  let trailing = trailingCheckpoints(options.entries);
   const due = timeline(drawable.map((held) => held.entry));
   let painter = options.painter;
   /** How many messages are on the canvas. -1 is blank. */
@@ -145,7 +200,7 @@ export function createReplay(options: ReplayOptions): ReplayHandle {
 
   const applyThrough = async (target: number) => {
     for (let index = applied + 1; index <= target && !destroyed; index++) {
-      await painter.applyCanonicalOperation(drawable[index].operation);
+      await applyDrawable(painter, drawable[index]);
       applied = index;
     }
   };
@@ -163,7 +218,7 @@ export function createReplay(options: ReplayOptions): ReplayHandle {
         }
         // Not due yet, and everything after it is later still.
         if (due[next] > virtual) break;
-        await painter.applyCanonicalOperation(drawable[next].operation);
+        await applyDrawable(painter, drawable[next]);
         applied = next;
         // Out of budget: the rest is due on the frames after this one, where
         // the clock will still be ahead of them.
@@ -232,7 +287,14 @@ export function createReplay(options: ReplayOptions): ReplayHandle {
     append(entries: ArchivedEntry[]) {
       // The same schedule `timeline` would have made had these been there
       // from the start: each is due its capped gap after the one before.
-      for (const held of drawableEntries(entries)) {
+      const fresh = drawableEntries(entries);
+      if (fresh.length > 0) {
+        fresh[0].checkpoints = trailing.concat(fresh[0].checkpoints);
+        trailing = trailingCheckpoints(entries);
+      } else {
+        trailing = trailing.concat(trailingCheckpoints(entries));
+      }
+      for (const held of fresh) {
         const last = drawable.length - 1;
         if (last < 0) {
           due.push(0);

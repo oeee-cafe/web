@@ -17,7 +17,7 @@ import { mount } from "neo-cucumber";
 import { isRenderable, type ArchiveManifest, type ArchivedEntry } from "./archiveLog";
 import { compare, type Pixels } from "./compare";
 import { el, type SessionDetails } from "./dom";
-import { drawableEntries } from "./player";
+import { applyDrawable, drawableEntries } from "./player";
 
 type Outcome = "match" | "differs" | "incomplete" | "unavailable";
 
@@ -57,8 +57,11 @@ async function replayToEnd(manifest: ArchiveManifest, entries: ArchivedEntry[]):
   try {
     await painter.ready;
     painter.setInteractionEnabled(false);
+    // Checkpoints included: compacting at one changes no pixel, but an undo
+    // after it could otherwise reach under it and take back a stroke the
+    // room kept. Ones after the last mark change nothing at all.
     for (const held of drawableEntries(entries)) {
-      await painter.applyCanonicalOperation(held.operation);
+      await applyDrawable(painter, held);
     }
     return await painter.exportPng();
   } finally {

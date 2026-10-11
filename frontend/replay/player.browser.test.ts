@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, type PainterHandle, type PainterOperation } from "neo-cucumber";
-import { encodePainterOperation } from "../collaborate/binaryProtocol";
+import { encodePainterOperation, encodeUndo, encodeUndoPoint } from "../collaborate/binaryProtocol";
 import { decodeArchive, type ArchivedEntry } from "./archiveLog";
-import { createReplay, drawableEntries, timeline, MAX_GAP_MS } from "./player";
+import { createReplay, drawableEntries, timeline, trailingCheckpoints, MAX_GAP_MS } from "./player";
 
 /**
  * A replay has to reach the canvas it recorded.
@@ -45,25 +45,44 @@ function stroke(at: { x: number; y: number }): PainterOperation {
 
 /** A recording, framed exactly as the server writes one. */
 function archive(marks: { user: number; at: number; point: { x: number; y: number } }[]): Uint8Array {
-  const senders = [...new Set(marks.map((mark) => `conn-${mark.user}`))];
+  return recording(
+    marks.map((mark) => ({
+      user: mark.user,
+      at: mark.at,
+      payload: new Uint8Array(encodePainterOperation(mark.user, stroke(mark.point))),
+    })),
+  );
+}
+
+/** Any messages at all, sequenced from one in the order given. */
+function recording(messages: { user: number; at: number; payload: Uint8Array }[]): Uint8Array {
+  const senders = [...new Set(messages.map((message) => `conn-${message.user}`))];
   const raw = HISTORY.replace(/-/g, "").match(/../g)!.map((b) => parseInt(b, 16));
   const bytes: number[] = [...MAGIC, ...raw, senders.length];
   for (const sender of senders) {
     const name = [...new TextEncoder().encode(sender)];
     bytes.push(name.length, ...name);
   }
-  marks.forEach((mark, index) => {
-    const payload = new Uint8Array(encodePainterOperation(mark.user, stroke(mark.point)));
+  messages.forEach((message, index) => {
     const fixed = new Uint8Array(22);
     const view = new DataView(fixed.buffer);
     fixed[0] = 0;
-    fixed[1] = senders.indexOf(`conn-${mark.user}`);
+    fixed[1] = senders.indexOf(`conn-${message.user}`);
     view.setBigUint64(2, BigInt(index + 1), true);
-    view.setBigUint64(10, BigInt(mark.at), true);
-    view.setUint32(18, payload.length, true);
-    bytes.push(...fixed, ...payload);
+    view.setBigUint64(10, BigInt(message.at), true);
+    view.setUint32(18, message.payload.length, true);
+    bytes.push(...fixed, ...message.payload);
   });
   return Uint8Array.from(bytes);
+}
+
+/** RESET_POINT as the server sequences it: a base and a snapshot count. */
+function resetPoint(base: number): Uint8Array {
+  const payload = new Uint8Array(11);
+  payload[0] = 0x0d;
+  new DataView(payload.buffer).setBigUint64(1, BigInt(base), true);
+  payload[9] = 2;
+  return payload;
 }
 
 async function newPainter(host: HTMLElement): Promise<PainterHandle> {
@@ -111,10 +130,13 @@ function inkAt(point: { x: number; y: number }, shownOnly = false): boolean {
 }
 
 async function harness(marks: Parameters<typeof archive>[0], painters: PainterHandle[] = []) {
+  return harnessOf(decodeArchive(archive(marks)) as ArchivedEntry[], painters);
+}
+
+async function harnessOf(entries: ArchivedEntry[], painters: PainterHandle[] = []) {
   const host = document.createElement("div");
   document.body.appendChild(host);
   hosts.push(host);
-  const entries = decodeArchive(archive(marks)) as ArchivedEntry[];
   const painter = await newPainter(host);
   painters.push(painter);
   const replay = createReplay({
@@ -300,17 +322,113 @@ describe("what a replay draws", () => {
    * into snapshots it is about to receive. A recording has no snapshots
    * because it kept the operations instead, so the marker is nothing to draw
    * and applying it as one would be applying a message that is not a mark.
+   * It is kept on the mark after it, which compacts at it first.
    */
-  it("skips the messages that were never marks", () => {
-    const resetPoint = new Uint8Array(11);
-    resetPoint[0] = 0x0d;
+  it("carries a checkpoint on the mark after it rather than drawing it", () => {
     const drawing = new Uint8Array(encodePainterOperation(1, stroke(FIRST)));
     const entries: ArchivedEntry[] = [
-      { at: 1, seq: 1, from: "c", historyId: HISTORY, payload: resetPoint },
+      { at: 1, seq: 1, from: "c", historyId: HISTORY, payload: resetPoint(0) },
       { at: 2, seq: 2, from: "c", historyId: HISTORY, payload: drawing },
+      { at: 3, seq: 3, from: "c", historyId: HISTORY, payload: resetPoint(2) },
     ];
     const drawable = drawableEntries(entries);
     expect(drawable).toHaveLength(1);
     expect(drawable[0].entry.seq).toBe(2);
+    expect(drawable[0].checkpoints).toEqual([0]);
+    expect(trailingCheckpoints(entries)).toEqual([2]);
+  });
+});
+
+/**
+ * An undo cannot reach under a checkpoint.
+ *
+ * Every client in the room compacts at a RESET_POINT, and what is compacted
+ * is frozen: an undo sent after it -- clicked before its sender's own client
+ * had compacted, say -- finds nothing of theirs above the base and does
+ * nothing. Session 486a0954 at 15:02:38 is this exactly: babguette drew, a
+ * checkpoint landed at the end of the stroke, and the two undos that followed
+ * left both strokes on everybody's canvas. The replay, which skipped the
+ * checkpoint, took them both back.
+ */
+describe("undo across a checkpoint", () => {
+  const undoPoint = () => new Uint8Array(encodeUndoPoint(1));
+  const undo = () => new Uint8Array(encodeUndo(1, false));
+  const mark = (point: { x: number; y: number }) =>
+    new Uint8Array(encodePainterOperation(1, stroke(point)));
+  const THIRD = { x: 24, y: 36 };
+
+  // seq 1-4: two strokes. seq 5: the checkpoint at the end of them.
+  const frozen = [
+    { user: 1, at: 1000, payload: undoPoint() },
+    { user: 1, at: 1001, payload: mark(FIRST) },
+    { user: 1, at: 1100, payload: undoPoint() },
+    { user: 1, at: 1101, payload: mark(SECOND) },
+    { user: 1, at: 1200, payload: resetPoint(4) },
+  ];
+
+  it("leaves what the checkpoint froze where the room left it", async () => {
+    const { replay } = await harnessOf(
+      decodeArchive(
+        recording([
+          ...frozen,
+          { user: 1, at: 1300, payload: undo() },
+          { user: 1, at: 1301, payload: undo() },
+        ]),
+      ) as ArchivedEntry[],
+    );
+    await replay.seek(replay.length - 1);
+    await settle();
+    expect(inkAt(FIRST)).toBe(true);
+    expect(inkAt(SECOND)).toBe(true);
+  });
+
+  it("still undoes what was drawn after it", async () => {
+    const { replay } = await harnessOf(
+      decodeArchive(
+        recording([
+          ...frozen,
+          { user: 1, at: 1300, payload: undoPoint() },
+          { user: 1, at: 1301, payload: mark(THIRD) },
+          { user: 1, at: 1400, payload: undo() },
+          // Nothing of theirs above the base is left to take.
+          { user: 1, at: 1401, payload: undo() },
+        ]),
+      ) as ArchivedEntry[],
+    );
+    await replay.seek(replay.length - 1);
+    await settle();
+    expect(inkAt(THIRD)).toBe(false);
+    expect(inkAt(FIRST)).toBe(true);
+    expect(inkAt(SECOND)).toBe(true);
+  });
+
+  /** A live session's checkpoint can be the last thing in one poll and the
+   * undo the first thing in the next. */
+  it("holds when the checkpoint and the undo arrive in different appends", async () => {
+    const whole = decodeArchive(
+      recording([...frozen, { user: 1, at: 1300, payload: undo() }]),
+    ) as ArchivedEntry[];
+    const { replay } = await harnessOf(whole.slice(0, frozen.length));
+    replay.append(whole.slice(frozen.length));
+    await replay.seek(replay.length - 1);
+    await settle();
+    expect(inkAt(FIRST)).toBe(true);
+    expect(inkAt(SECOND)).toBe(true);
+  });
+
+  /** Seeking back starts over from blank, and the checkpoint has to be
+   * applied again on the way forward. */
+  it("holds after seeking back and forward again", async () => {
+    const { replay } = await harnessOf(
+      decodeArchive(
+        recording([...frozen, { user: 1, at: 1300, payload: undo() }]),
+      ) as ArchivedEntry[],
+    );
+    await replay.seek(replay.length - 1);
+    await replay.seek(0);
+    await replay.seek(replay.length - 1);
+    await settle();
+    expect(inkAt(FIRST)).toBe(true);
+    expect(inkAt(SECOND)).toBe(true);
   });
 });
