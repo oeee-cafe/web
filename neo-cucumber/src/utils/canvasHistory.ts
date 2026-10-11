@@ -1263,7 +1263,16 @@ export class CanvasHistory {
    *   operation split by the cut would be undone on one side of it only.
    *   And a stroke arrives in several messages, each carrying on from where
    *   the last left off, which a joiner does not know. So everyone's first
-   *   entry above the cut is an undo point;
+   *   entry above the cut is an undo point. Only what is already sequenced
+   *   can be checked, though: a chunk still on its way carries on from the
+   *   one before it too, and nothing in history says a gesture is over.
+   *   That is safe while the gesture's undo point is within reach, since
+   *   the first rule keeps the cut below it -- which leaves one gesture a
+   *   cut can split: a single drag that outlasts `UNDO_WINDOW`, two
+   *   thousand of the room's messages with the pen never lifted, whose
+   *   undo point has left the window. Known, and not decidable from
+   *   history; a joiner would start that stroke's next chunk with a dot
+   *   where the room continued a line;
    * - below the copy any paste above it pastes, because a joiner holds
    *   nobody's clipboard.
    *
