@@ -10,3 +10,7 @@
 
 # Vitest browser failure screenshots, as neo-cucumber already ignores.
 **/__screenshots__/
+
+# pnpm's fallback content store, made in the project root when it cannot use
+# the one in ~/Library/pnpm.
+.pnpm-store/
