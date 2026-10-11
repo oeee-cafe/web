@@ -27,6 +27,63 @@ const inkPixels = async (png: Blob, width: number, height: number) => {
 };
 
 describe("public painter lifecycle", () => {
+  // The replay inspector never enables drawing, and a zoomed-in recording is
+  // only any use if it can still be moved around.
+  it("pans with a middle drag while interaction is disabled, and draws nothing", async () => {
+    const element = document.createElement("div");
+    document.body.appendChild(element);
+    let painter!: ReturnType<typeof mount>;
+    act(() => {
+      painter = mount(element, {
+        width: 1000,
+        height: 1000,
+        mode: { kind: "standard" },
+        controls: { kind: "none" },
+      });
+    });
+    await act(async () => painter.ready);
+    act(() => painter.setInteractionEnabled(false));
+
+    const canvas = element.querySelector("#canvas") as HTMLCanvasElement;
+    const box = canvas.getBoundingClientRect();
+    const send = async (type: string, x: number, y: number, ctrlKey = false) => {
+      await act(async () => {
+        canvas.dispatchEvent(new PointerEvent(type, {
+          pointerId: 1,
+          pointerType: "mouse",
+          button: type === "pointermove" ? -1 : 1,
+          buttons: type === "pointerup" ? 0 : 4,
+          clientX: box.left + x,
+          clientY: box.top + y,
+          ctrlKey,
+          bubbles: true,
+        }));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+    };
+    const translate = () =>
+      /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
+        element.querySelector<HTMLElement>("[style*='translate']")?.style.transform ?? "",
+      )?.slice(1).map(Number) ?? [0, 0];
+
+    const before = translate();
+    // Ctrl as well, which would otherwise take a colour instead of panning.
+    await send("pointerdown", 200, 200, true);
+    await send("pointermove", 260, 230, true);
+    await send("pointerup", 260, 230, true);
+    const after = translate();
+    expect(after[0] - before[0]).toBeCloseTo(60, 0);
+    expect(after[1] - before[1]).toBeCloseTo(30, 0);
+
+    let ink = -1;
+    await act(async () => {
+      ink = await inkPixels(await painter.exportPng(), 1000, 1000);
+    });
+    expect(ink).toBe(0);
+    act(() => painter.unmount());
+    element.remove();
+  });
+
   it("rejects invalid dimensions with a stable error code", () => {
     const element = document.createElement("div");
     expect(() =>

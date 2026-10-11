@@ -730,7 +730,11 @@ export const useBaseDrawing = (
 
       if (controlsElement?.contains(target as Node)) return;
 
-      if (isDrawingDisabledRef.current) return;
+      // Disabled is no edits, not no looking: a middle drag still moves the
+      // canvas, which is how the replay inspector, which never enables
+      // drawing, gets around a zoomed-in picture.
+      const viewOnly = isDrawingDisabledRef.current;
+      if (viewOnly && e.button !== 1) return;
 
       if (
         !(
@@ -786,6 +790,22 @@ export const useBaseDrawing = (
         console.warn("Failed to capture pointer:", error);
       }
 
+      const startPan = () => {
+        drawingStateRef.current.isPanning = true;
+        drawingStateRef.current.panStartX = e.clientX;
+        drawingStateRef.current.panStartY = e.clientY;
+        drawingStateRef.current.panLastX = e.clientX;
+        drawingStateRef.current.panLastY = e.clientY;
+      };
+
+      // Straight to the pan, past the modifiers: Ctrl+Alt would size the
+      // brush and Ctrl or Alt alone would take a colour, and neither is
+      // looking.
+      if (viewOnly) {
+        startPan();
+        return;
+      }
+
       // NEO's Ctrl+Alt drag sizes the brush instead of drawing, down for
       // bigger (painter.js, SliderTool with `alt`). NEO moves a size per
       // pixel; this moves one per SIZE_DRAG_PIXELS, the slider's rate, which
@@ -822,11 +842,7 @@ export const useBaseDrawing = (
         (e.pointerType === "touch" && e.buttons === 0) ||
         (e.button === 0 && currentDrawingStateRef.current.brushType === "pan")
       ) {
-        drawingStateRef.current.isPanning = true;
-        drawingStateRef.current.panStartX = e.clientX;
-        drawingStateRef.current.panStartY = e.clientY;
-        drawingStateRef.current.panLastX = e.clientX;
-        drawingStateRef.current.panLastY = e.clientY;
+        startPan();
         return;
       }
 
