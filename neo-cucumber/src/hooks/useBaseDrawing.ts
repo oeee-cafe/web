@@ -2,7 +2,11 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { DrawingEngine } from "../DrawingEngine";
 import { useCanvasHistory } from "./useCanvasHistory";
 import type { BrushType, DrawingState } from "../types/drawing";
-import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from "../constants/drawing";
+import {
+  MAX_BRUSH_SIZE,
+  MIN_BRUSH_SIZE,
+  SIZE_DRAG_PIXELS,
+} from "../constants/drawing";
 import {
   brushTypeFor,
   isImmediateTool,
@@ -782,9 +786,11 @@ export const useBaseDrawing = (
         console.warn("Failed to capture pointer:", error);
       }
 
-      // NEO's Ctrl+Alt drag sizes the brush instead of drawing: one step per
-      // screen pixel, down for bigger (painter.js, SliderTool with `alt`).
-      // It is checked before the eyedropper, which Ctrl or Alt alone asks for.
+      // NEO's Ctrl+Alt drag sizes the brush instead of drawing, down for
+      // bigger (painter.js, SliderTool with `alt`). NEO moves a size per
+      // pixel; this moves one per SIZE_DRAG_PIXELS, the slider's rate, which
+      // is why. It is checked before the eyedropper, which Ctrl or Alt alone
+      // asks for.
       if (e.ctrlKey && e.altKey && !e.shiftKey) {
         drawingStateRef.current.sizing = {
           value0: currentDrawingStateRef.current.brushSize,
@@ -1342,7 +1348,9 @@ export const useBaseDrawing = (
 
       const sizing = drawingStateRef.current.sizing;
       if (sizing) {
-        const size = Math.round(sizing.value0 + (e.clientY - sizing.y0));
+        const size = Math.round(
+          sizing.value0 + (e.clientY - sizing.y0) / SIZE_DRAG_PIXELS,
+        );
         callbacks?.onBrushSize?.(
           Math.max(MIN_BRUSH_SIZE, Math.min(MAX_BRUSH_SIZE, size)),
         );

@@ -4,6 +4,21 @@ import type { ToolId } from "../neo/tools";
 export const MIN_BRUSH_SIZE = 1;
 export const MAX_BRUSH_SIZE = 30;
 
+/**
+ * Pixels of drag per brush size, for every gesture that drags a size: the
+ * slider once it has been pressed, and Ctrl+Alt on the canvas.
+ *
+ * Seven is NEO's own slow rate -- SizeSlider.slide's `(y - y0) / 7`, which it
+ * uses only once the pointer has left the slider. NEO's Ctrl+Alt drag is far
+ * faster, a size per pixel, so all thirty fit in a flick; that sweeps rather
+ * than tunes, and on a trackpad it could not land on a size at all. Both run
+ * at seven here, so a size is found the same way wherever it is dragged.
+ *
+ * Only how a size is chosen differs from NEO. A size draws exactly as it
+ * does there, so nothing recorded can tell.
+ */
+export const SIZE_DRAG_PIXELS = 7;
+
 // Two-tone mode gives each pen its own remembered size, like Tegaki does:
 // a thin foreground pen for drawing, a fat background pen for erasing.
 // Indices match the two-tone palette: 0 = background, 1 = foreground.

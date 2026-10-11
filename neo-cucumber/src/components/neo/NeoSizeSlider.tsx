@@ -1,5 +1,9 @@
 import { useEffect, useRef } from "react";
-import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from "../../constants/drawing";
+import {
+  MAX_BRUSH_SIZE,
+  MIN_BRUSH_SIZE,
+  SIZE_DRAG_PIXELS,
+} from "../../constants/drawing";
 import {
   NEO_BAR_LABEL,
   NEO_SIZE_SLIDER,
@@ -11,8 +15,6 @@ import {
 // in NEO's drag arithmetic, which is why they are here and not only in CSS.
 const BAR = 33;
 const OFFSET = 4;
-/** NEO's slow rate: one step per this many pixels of drag. */
-const STEP = 7;
 /**
  * Pixels of scrolling that make one step, for a device that scrolls in
  * pixels. A wheel's notch is far more than this and a trackpad's event far
@@ -65,7 +67,7 @@ export function NeoSizeSlider({
   const slide = (y: number) => {
     const state = drag.current;
     if (!state) return;
-    onChange(clamp(state.value0 + (y - state.y0) / STEP));
+    onChange(clamp(state.value0 + (y - state.y0) / SIZE_DRAG_PIXELS));
   };
 
   // The wheel is bound by hand because React's `onWheel` is passive, and a

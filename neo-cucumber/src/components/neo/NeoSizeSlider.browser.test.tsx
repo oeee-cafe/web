@@ -109,7 +109,7 @@ describe("the brush size slider", () => {
 });
 
 describe("Ctrl+Alt drag on the canvas", () => {
-  it("sizes the brush a pixel a step, as NEO does, and draws nothing", async () => {
+  it("sizes the brush a size per seven pixels, as the slider does, and draws nothing", async () => {
     const element = document.createElement("div");
     document.body.appendChild(element);
     const operations: unknown[] = [];
@@ -142,15 +142,18 @@ describe("Ctrl+Alt drag on the canvas", () => {
     };
 
     await send("pointerdown", y);
-    await send("pointermove", y + 5);
+    await send("pointermove", y + 35);
     expect(size()).toBe(before + 5);
-    await send("pointermove", y + 2);
+    // A trackpad's few pixels of drift moves nothing
+    await send("pointermove", y + 37);
+    expect(size()).toBe(before + 5);
+    await send("pointermove", y + 14);
     expect(size()).toBe(before + 2);
     // And never below the smallest
-    await send("pointermove", y - 50);
+    await send("pointermove", y - 350);
     expect(size()).toBe(1);
-    await send("pointermove", y + 3);
-    await send("pointerup", y + 3);
+    await send("pointermove", y + 21);
+    await send("pointerup", y + 21);
     await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
 
     expect(size()).toBe(before + 3);
