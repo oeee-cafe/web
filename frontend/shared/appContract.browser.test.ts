@@ -829,6 +829,52 @@ describe("signing in for an app", () => {
     });
   });
 
+  it("shows the loading bar from a sign-in coming back until it lands, and not before", async () => {
+    const code = "0123456789abcdef".repeat(4);
+    const loading = (page: Page) =>
+      page.window.document.querySelector(".ds-loading-bar")?.classList.contains("is-loading") ?? false;
+
+    // The browser: brought back without a code is not the sign-in coming
+    // back; with one it is, until the handoff is let go.
+    const browsed = await open({
+      loadingBar: true,
+      answers: {
+        "/auth/handoff/start": { id: "I", secret: "X", url: "/auth/apple?handoff=I" },
+        "/auth/handoff/claim": { status: "waiting" },
+      },
+    });
+    expect(press(browsed, "apple")).toBe(true);
+    await settle();
+    await settle();
+    expect(loading(browsed)).toBe(false);
+    browsed.window.oeeeApp.signIn.resume();
+    expect(loading(browsed)).toBe(false);
+    browsed.window.oeeeApp.signIn.resume(code);
+    expect(loading(browsed)).toBe(true);
+    await settle();
+    browsed.window.oeeeApp.signIn.unopened();
+    await settle();
+    await settle();
+    expect(loading(browsed)).toBe(false);
+
+    // A sheet of the app's own: from its token until the site has answered,
+    // here with nothing.
+    const sheet = await open({ loadingBar: true, answers: { "/auth/google/start": { state: "S", nonce: "N" } } });
+    expect(press(sheet, "google")).toBe(true);
+    await settle();
+    await settle();
+    sheet.window.oeeeApp.signIn.answer({ cancelled: true });
+    expect(loading(sheet)).toBe(false);
+    expect(press(sheet, "google")).toBe(true);
+    await settle();
+    await settle();
+    sheet.window.oeeeApp.signIn.answer({ id_token: "T" });
+    expect(loading(sheet)).toBe(true);
+    await settle();
+    await settle();
+    expect(loading(sheet)).toBe(false);
+  });
+
   it("asks the app to open the handoff's page in a browser, as an absolute URL", async () => {
     // Android: Apple has no sheet there.
     const page = await open({

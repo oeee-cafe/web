@@ -101,6 +101,18 @@
       location.replace(next || "/");
     }
 
+    // The loading bar (loading_bar.jinja), from the moment a sign-in comes
+    // back with something until the page it lands on replaces this one.
+    // Between the two the site is checking what came back and nothing on
+    // this page changes, so without it the page looked stuck. Up at once:
+    // the reader has just come back to the page and is looking at it.
+    function working() {
+      if (window.oeeeLoadingBar) window.oeeeLoadingBar.start(null, true);
+    }
+    function idle() {
+      if (window.oeeeLoadingBar) window.oeeeLoadingBar.done();
+    }
+
     // -- A sheet of the platform's own -------------------------------------
 
     // The sign-in under way: its provider and state. One at a time.
@@ -152,6 +164,7 @@
         window.dsAlert(STEAM_FAILED);
         return;
       }
+      working();
       var post = document.createElement("form");
       post.method = "post";
       post.action = "/auth/steam";
@@ -184,11 +197,13 @@
       var fields = told.id_token
         ? { state: request.state, id_token: told.id_token, user: told.user, format: "json" }
         : { state: request.state, error: "failed", format: "json" };
+      working();
       post("/auth/" + request.provider, fields)
         .then(function (where) {
           if (where) go(where.next);
+          else idle();
         })
-        .catch(function () {});
+        .catch(idle);
     }
 
     // -- The system's browser, and back ------------------------------------
@@ -228,6 +243,7 @@
         clearInterval(asking);
         asking = null;
       }
+      if (pending && pending.code) idle();
       pending = null;
       closing = false;
     }
@@ -255,10 +271,15 @@
             // browser's does not stop the page: nothing is asked of the site
             // again until it is answered.
             deciding = true;
+            idle();
             agree(claimed.message).then(function (yes) {
               deciding = false;
-              if (yes) ask(true);
-              else stop();
+              if (yes) {
+                working();
+                ask(true);
+              } else {
+                stop();
+              }
             });
             return;
           }
@@ -357,9 +378,15 @@
       // oeee-cafe://handoff/done?code=..., when that is how the app came
       // back; it is kept for every ask after, since nothing is handed over
       // without it. Anything that is not a code is no code.
+      // A code is the browser having finished, so from here the page is
+      // on its way and shows it; brought back without one, the reader may
+      // only have looked away, and nothing is shown.
       resume: function (code) {
         if (!pending) return;
-        if (typeof code === "string" && CODE.test(code)) pending.code = code;
+        if (typeof code === "string" && CODE.test(code)) {
+          pending.code = code;
+          working();
+        }
         ask(false);
       },
       // The browser could not be opened, or was put away. Put away can be
