@@ -21,6 +21,10 @@ interface NeoToolColumnProps {
   onUpdateColor: (color: string) => void;
   onSetSelectedPaletteIndex: (index: number) => void;
   onSetPaletteColor: (index: number, color: string) => void;
+  /** Whether the toolbox's sticky right-click button is armed. */
+  virtualRight?: boolean;
+  /** Called once an armed press has been spent, so the button can release. */
+  onVirtualRightUsed?: () => void;
 }
 
 /**
@@ -44,6 +48,8 @@ export function NeoToolColumn({
   onUpdateColor,
   onSetSelectedPaletteIndex,
   onSetPaletteColor,
+  virtualRight,
+  onVirtualRightUsed,
 }: NeoToolColumnProps) {
   /**
    * The three tool memories. They are UI state rather than drawing state --
@@ -144,6 +150,8 @@ export function NeoToolColumn({
         reserves={reserves}
         onLoad={loadReserve}
         onSave={saveReserve}
+        virtualRight={virtualRight}
+        onVirtualRightUsed={onVirtualRightUsed}
       />
 
       <NeoLayerControl

@@ -1345,6 +1345,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
                 onSaveCollaborativeDrawing={() => {}}
                 virtualRight={virtualRight}
                 onToggleVirtualRight={toggleVirtualRight}
+                onVirtualRightUsed={releaseVirtualRight}
                 // Only worth a panel once there is more than one participant;
                 // a solitary painter has nobody to hide and nowhere else to
                 // draw, and NEO's own layer button already covers their pair.

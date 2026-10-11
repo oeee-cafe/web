@@ -64,6 +64,8 @@ export interface ToolboxPanelProps {
   /** NEO's Right Click button: whether the next press is a right press. */
   virtualRight?: boolean;
   onToggleVirtualRight?: () => void;
+  /** Called once an armed press has been spent, so the button can release. */
+  onVirtualRightUsed?: () => void;
   /** Whether the palette presets window is open; see `NeoPalettePresetsPanel`. */
   palettePresetsOpen?: boolean;
   /** Absent when there are no presets to offer, which hides the button. */
@@ -114,6 +116,7 @@ export const ToolboxPanel = ({
   onSaveCollaborativeDrawing,
   virtualRight,
   onToggleVirtualRight,
+  onVirtualRightUsed,
   palettePresetsOpen = false,
   onTogglePalettePresets,
   section = "all",
@@ -149,6 +152,8 @@ export const ToolboxPanel = ({
             onUpdateColor={onUpdateColor}
             onSetSelectedPaletteIndex={onSetSelectedPaletteIndex}
             onSetPaletteColor={onSetPaletteColor}
+            virtualRight={virtualRight}
+            onVirtualRightUsed={onVirtualRightUsed}
           />
         )}
 
