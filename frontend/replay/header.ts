@@ -88,10 +88,9 @@ export function header(sessionId: string): Header {
       if (session.ended_at) {
         parts.push(el("span", undefined, `ended ${new Date(session.ended_at).toISOString().slice(0, 16).replace("T", " ")} UTC`));
       } else {
+        // No link into the room: joining takes a seat and puts a layer in the
+        // drawing, so a stray click would show the collaborators an admin.
         parts.push(el("span", "admin-tag inspect-tag-live", "live"));
-        // The ordinary room link and nothing more convenient: joining takes a
-        // seat and puts a layer in the drawing.
-        parts.push(link("open room →", `/collaborate/${session.id}`));
       }
       if (session.saved_post_id) {
         parts.push(link("saved post →", `/@${session.community_slug ?? session.owner_login_name}/${session.saved_post_id}`));

@@ -487,7 +487,14 @@ fn session_list_omits_the_canvas_once_a_session_is_over() {
     assert!(!rendered.contains("/preview?v="));
     // The canvas is a post by then, and that is where it is reachable.
     assert!(rendered.contains("/@someone/00000000-0000-0000-0000-00000000000b"));
-    // Nor is there a live room left to open.
+}
+
+/// Joining a room takes a seat and puts a layer in the drawing, so the
+/// list must not offer a click that would show the collaborators an admin
+/// in their session -- not even for a session that is still live.
+#[test]
+fn session_list_does_not_link_into_the_room() {
+    let rendered = render_sessions(vec![sample_session(json!({}))]);
     assert!(!rendered.contains("/collaborate/00000000-0000-0000-0000-000000000009\""));
 }
 
