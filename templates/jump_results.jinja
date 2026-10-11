@@ -49,7 +49,7 @@
       <a class="jump-item" role="option" href="/@{{ person.login_name }}">
         <span class="jump-chip jump-chip-person" aria-hidden="true">@</span>
         <span class="jump-name">{{ person.display_name }}</span>
-        <span class="jump-detail">{{ handle(person.login_name) }}</span>
+        <span class="jump-detail">{{ handle(person.login_name, link=false) }}</span>
       </a>
     </li>
   {%- endfor %}

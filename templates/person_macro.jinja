@@ -20,6 +20,13 @@
    becomes `pill()` (web::templates). Rendered on its own, as a test does,
    there is nobody to ask and the pill is drawn plain.
 
+   The pill is a link to its person: a local one to their profile, unless
+   `link` says otherwise -- false where the pill is inside a link already,
+   since a link cannot hold another, or a URL of its own. A remote one has
+   no profile here, so it is a link only where it is handed the URL of
+   theirs, and opens it in a tab of its own as every link off the site
+   does.
+
    `handle_text()` is the handle as words, for an attribute: a pill cannot
    go in one, and the render refuses a placeholder that lands there.
 
@@ -38,13 +45,14 @@
   {%- endif -%}
 {%- endmacro %}
 
-{% macro handle(h) -%}
+{% macro handle(h, link=true) -%}
   {%- set login_name = h if h is string else (h.login_name if h is mapping else none) -%}
   {%- if not h -%}
   {%- elif login_name -%}
-    {%- set slot = supporter_slot(login_name, "@" ~ login_name) -%}
+    {%- set href = link if link is string else ("/@" ~ login_name if link else none) -%}
+    {%- set slot = supporter_slot(login_name, "@" ~ login_name, href) -%}
     {%- if slot is none -%}
-      {{ pill(none, "@" ~ login_name) }}
+      {{ pill(none, "@" ~ login_name, href) }}
     {%- else -%}
       {{ slot }}
     {%- endif -%}
@@ -53,21 +61,26 @@
         name that gives way and never the host. The name is a <bdi>, so
         whatever direction its characters run in, it cannot carry the host
         round with it. -#}
-    <span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@{{ h.name }}</bdi><span class="ds-handle-host">@{{ h.host }}</span></span>
+    {%- if link is string -%}
+      <a class="ds-handle ds-handle-remote" href="{{ link }}" target="_blank" rel="noopener noreferrer"><bdi class="ds-handle-name">@{{ h.name }}</bdi><span class="ds-handle-host">@{{ h.host }}</span></a>
+    {%- else -%}
+      <span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@{{ h.name }}</bdi><span class="ds-handle-host">@{{ h.host }}</span></span>
+    {%- endif -%}
   {%- endif -%}
 {%- endmacro %}
 
-{# A local person's pill, with the mark the render found for them, if any.
-   Called back by web::templates, and by handle() when there is nobody to
-   ask. #}
-{% macro pill(mark, text) -%}
+{# A local person's pill, with the mark the render found for them, if any,
+   and a link to `href`, if it has one. Called back by web::templates, and
+   by handle() when there is nobody to ask. #}
+{% macro pill(mark, text, href=none) -%}
+  {%- set tag = "a" if href else "span" -%}
   {%- if mark -%}
-    <span class="ds-handle ds-handle-supporter ds-marked" title="{{ supporter_mark_name(mark) }}">
+    <{{ tag }} class="ds-handle ds-handle-supporter ds-marked"{% if href %} href="{{ href }}"{% endif %} title="{{ supporter_mark_name(mark) }}">
       {{- supporter_mark(mark) -}}
       {{- text -}}
-    </span>
+    </{{ tag }}>
   {%- else -%}
-    <span class="ds-handle">{{ text }}</span>
+    <{{ tag }} class="ds-handle"{% if href %} href="{{ href }}"{% endif %}>{{ text }}</{{ tag }}>
   {%- endif -%}
 {%- endmacro %}
 
@@ -78,6 +91,6 @@
     {%- else -%}
       <span class="ds-person-name">{{ name }}</span>
     {%- endif -%}
-    {{- handle(h) -}}
+    {{- handle(h, href if external else true) -}}
   </span>
 {%- endmacro %}

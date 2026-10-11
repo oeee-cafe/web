@@ -365,8 +365,9 @@ fn nothing_in_the_boosted_nav_reaches_a_module_bundle() {
     for (attr, _) in [("href=\"", 0), ("action=\"", 0)] {
         for piece in nav.split(attr).skip(1) {
             let target = piece.split('"').next().unwrap_or_default();
-            // Profile links carry the viewer's own name.
-            if target.starts_with("/@") {
+            // Profile links carry the viewer's own name; the handle's
+            // pill writes its slash escaped.
+            if target.starts_with("/@") || target.starts_with("&#x2f;@") {
                 continue;
             }
             // The draw form is the one nav entry that does reach a bundle,

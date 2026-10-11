@@ -959,10 +959,13 @@ mod tests {
                 ..home_context(vec![sample_post()], false)
             })
             .expect("renders");
-        assert!(rendered.contains(r#"<span class="comment-row-handle"><span class="ds-handle">@commenter</span> · </span>"#));
+        assert!(rendered.contains(r#"<span class="comment-row-handle"><a class="ds-handle" href="&#x2f;@commenter">@commenter</a> · </span>"#));
         assert!(!rendered.contains("@commenter@oeee.test"));
-        assert!(rendered
-            .contains(r#"<span class="comment-row-handle"><span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@visitor</bdi><span class="ds-handle-host">@elsewhere.test</span></span> · </span>"#));
+        // The remote pill leads to their profile on their own server.
+        assert!(rendered.contains(
+            r#"<span class="comment-row-handle"><a class="ds-handle ds-handle-remote" href="#
+        ));
+        assert!(rendered.contains(r#"<bdi class="ds-handle-name">@visitor</bdi><span class="ds-handle-host">@elsewhere.test</span></a> · </span>"#));
     }
 
     /// A full batch beside the grid loads the next from after its last

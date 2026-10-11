@@ -20,7 +20,7 @@
     {% endif %}
     <span class="profile-follow-text">
       <span class="profile-follow-name">{{ person.display_name }}</span>
-      <span class="profile-follow-handle">{{ handle(person.login_name) }}</span>
+      <span class="profile-follow-handle">{{ handle(person.login_name, link=false) }}</span>
     </span>
   </a>
 {% endmacro %}

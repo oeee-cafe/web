@@ -198,7 +198,7 @@ fn the_profile_lists_what_its_owner_has_said() {
     assert!(with.contains("멋져요"));
     // Headed by the drawing, not by its owner's own name on every row.
     assert!(with.contains(r#"href="/@cat/0c8f0000-0000-0000-0000-000000000002">고양이</a>"#));
-    assert!(with.contains(r#"<span class="ds-handle">@cat</span> · "#));
+    assert!(with.contains(r#"<a class="ds-handle" href="&#x2f;@cat">@cat</a> · "#));
     assert!(!with.contains("comment-row-post"));
     assert!(with.contains(r#"<span class="profile-tab-count">45</span>"#));
     // Minijinja escapes the slashes in an attribute; the browser reads

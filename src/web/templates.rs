@@ -41,24 +41,41 @@ const LOOKUP_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
 const OPEN: char = '\u{E000}';
 const CLOSE: char = '\u{E001}';
 
-/// The login names a render has printed a handle for, in order, each with
-/// the text the pill will say. Kept as the render's extension
-/// (`State::get_extension`), which includes and macros share.
-#[derive(Debug, Default)]
-struct Printed(Vec<(String, String)>);
+/// A handle a render has printed: whose, the text its pill will say, and
+/// where the pill leads, if it is a link.
+#[derive(Debug)]
+struct Slot {
+    login_name: String,
+    text: String,
+    href: Option<String>,
+}
 
-/// `supporter_slot(login_name, text)`, for person_macro.jinja's `handle()`:
-/// records the name and returns the placeholder its pill will take.
-/// Outside [`Templates`] -- a test rendering a template on its own -- there
-/// is nothing to record into, and it returns none, which `handle()` answers
-/// by drawing the pill without a mark.
-pub fn supporter_slot(state: &mut State, login_name: String, text: String) -> Value {
+/// The handles a render has printed, in order. Kept as the render's
+/// extension (`State::get_extension`), which includes and macros share.
+#[derive(Debug, Default)]
+struct Printed(Vec<Slot>);
+
+/// `supporter_slot(login_name, text, href)`, for person_macro.jinja's
+/// `handle()`: records the name and returns the placeholder its pill will
+/// take. Outside [`Templates`] -- a test rendering a template on its own --
+/// there is nothing to record into, and it returns none, which `handle()`
+/// answers by drawing the pill without a mark.
+pub fn supporter_slot(
+    state: &mut State,
+    login_name: String,
+    text: String,
+    href: Option<String>,
+) -> Value {
     let Some(nonce) = state.lookup(NONCE) else {
         return Value::from(());
     };
     let printed = &mut state.get_or_insert_extension_with(Printed::default).0;
     let index = printed.len();
-    printed.push((login_name, text));
+    printed.push(Slot {
+        login_name,
+        text,
+        href,
+    });
     Value::from_safe_string(format!("{OPEN}{nonce}:{index}{CLOSE}"))
 }
 
@@ -79,7 +96,7 @@ pub struct Templates {
 struct Rendered {
     output: String,
     nonce: String,
-    printed: Vec<(String, String)>,
+    printed: Vec<Slot>,
 }
 
 impl Templates {
@@ -137,7 +154,7 @@ impl Templates {
         let mut names: Vec<String> = rendered
             .printed
             .iter()
-            .map(|(name, _)| name.clone())
+            .map(|slot| slot.login_name.clone())
             .collect();
         names.sort();
         names.dedup();
@@ -196,15 +213,11 @@ impl Templates {
     /// a transaction while it renders has one connection already, and with
     /// the pool at its limit -- both colours are up during a deploy -- a
     /// request waiting indefinitely for a second could wait on itself.
-    async fn look_up(
-        &self,
-        db: &sqlx::PgPool,
-        printed: &[(String, String)],
-    ) -> HashMap<String, String> {
+    async fn look_up(&self, db: &sqlx::PgPool, printed: &[Slot]) -> HashMap<String, String> {
         if printed.is_empty() {
             return HashMap::new();
         }
-        let mut names: Vec<String> = printed.iter().map(|(name, _)| name.clone()).collect();
+        let mut names: Vec<String> = printed.iter().map(|slot| slot.login_name.clone()).collect();
         names.sort();
         names.dedup();
         let mut connection = match tokio::time::timeout(LOOKUP_WAIT, db.acquire()).await {
@@ -235,15 +248,22 @@ impl Templates {
         let person = self.env.get_template("person_macro.jinja")?;
         let mut person = person.render_captured(())?;
         let pill = |index: usize| -> Result<String, Error> {
-            let (login_name, text) = rendered.printed.get(index).ok_or_else(|| {
+            let slot = rendered.printed.get(index).ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     "a handle's placeholder is out of range",
                 )
             })?;
-            let mark = marks.get(login_name).cloned();
+            let mark = marks.get(&slot.login_name).cloned();
             person.with_state_mut(|state| {
-                state.call_macro("pill", &[Value::from(mark), Value::from(text.as_str())])
+                state.call_macro(
+                    "pill",
+                    &[
+                        Value::from(mark),
+                        Value::from(slot.text.as_str()),
+                        Value::from(slot.href.clone()),
+                    ],
+                )
             })
         };
         replace_placeholders(&rendered.output, &rendered.nonce, pill)
@@ -447,7 +467,10 @@ mod tests {
             .unwrap();
         assert_eq!(asked, ["fan", "plain"]);
         assert_eq!(page.matches("ds-handle-supporter").count(), 2);
-        assert!(page.contains(r#"<span class="ds-handle">@plain</span>"#));
+        assert!(
+            page.contains(r#"<a class="ds-handle" href="&#x2f;@plain">@plain</a>"#),
+            "{page}"
+        );
         assert!(!page.contains(OPEN));
     }
 
@@ -494,12 +517,12 @@ mod tests {
         let names: Vec<&str> = rendered
             .printed
             .iter()
-            .map(|(name, _)| name.as_str())
+            .map(|slot| slot.login_name.as_str())
             .collect();
         assert_eq!(names, ["inside", "fan"]);
         let marks = HashMap::from([("fan".to_string(), "apple".to_string())]);
         let page = templates.fill(rendered, &marks).unwrap();
-        assert!(page.starts_with(r#"<p><span class="ds-handle">@inside</span> <span class="ds-handle ds-handle-supporter"#));
+        assert!(page.starts_with(r#"<p><a class="ds-handle" href="&#x2f;@inside">@inside</a> <a class="ds-handle ds-handle-supporter"#));
         assert!(!page.contains("outside"));
     }
 

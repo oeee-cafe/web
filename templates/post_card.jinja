@@ -55,7 +55,7 @@
          of its own, and drafts, which were never published, fall back to
          when they were drawn. #}
       <div class="post-card-byline">
-        <a class="post-card-who" href="{% if admin %}/admin/users/{{ handle }}/posts{% else %}/@{{ handle }}{% endif %}">{{ person_handle(handle) }}</a>
+        <a class="post-card-who" href="{% if admin %}/admin/users/{{ handle }}/posts{% else %}/@{{ handle }}{% endif %}">{{ person_handle(handle, link=false) }}</a>
         {%- if post.community_slug %}<span class="post-card-where"><a href="{% if admin %}/admin/communities/{{ post.community_slug }}/posts{% else %}/@{{ post.community_slug }}{% endif %}"
              title="{{ post.community_name }}">{{ post.community_name }}</a></span>
         {%- elif admin %}<span class="post-card-where muted">no community</span>{% endif %}

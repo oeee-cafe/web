@@ -1172,7 +1172,7 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   color: var(--ds-muted);
 }
 
-.toolbar-menu-items a {
+.toolbar-menu-items > a {
   display: block;
   padding: 6px 10px;
   border-radius: 6px;
@@ -1181,12 +1181,12 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   text-decoration: none;
 }
 
-.toolbar-menu-items a:visited {
+.toolbar-menu-items > a:visited {
   color: var(--ds-ink);
 }
 
 @media (hover: hover), (min--moz-device-pixel-ratio: 0) {
-  .toolbar-menu-items a:hover {
+  .toolbar-menu-items > a:hover {
     background-color: var(--ds-hover);
   }
 }
@@ -1931,8 +1931,9 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
 .ds-page .ds-segmented > button:active,
 .toolbar-links a:active,
 .toolbar-end .toolbar-square:active,
-.toolbar-menu-items a:active,
-.toolbar-menu-signout:active {
+.toolbar-menu-items > a:active,
+.toolbar-menu-signout:active,
+a.ds-handle:active {
   background-image: linear-gradient(var(--ds-press), var(--ds-press));
 }
 
@@ -2882,9 +2883,51 @@ html[data-app="windows"] .nav-bar.is-stacked .toolbar-links {
   flex: none;
 }
 
-.ds-handle-supporter {
+/* A pill is a link to its person (person_macro.jinja). It keeps the pill's
+   ink rather than taking a link's, and its ring darkens under the pointer.
+   Above a stretched link's cover, as the other links in a card are, so a
+   comment row or a room's card that is one link as a whole still lets the
+   handle in it lead somewhere else. */
+a.ds-handle,
+a.ds-handle:visited {
+  position: relative;
+  z-index: 1;
+  color: var(--ds-muted);
+  text-decoration: none;
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  a.ds-handle:hover {
+    border-color: var(--ds-ink);
+    color: var(--ds-ink);
+  }
+}
+
+/* A touch screen has no hover, so a press is the ring's only answer there:
+   it darkens as hover does, under the press overlay every control shares
+   (Pressed, below). */
+a.ds-handle:active {
+  border-color: var(--ds-ink);
+  color: var(--ds-ink);
+}
+
+.ds-handle-supporter,
+a.ds-handle-supporter,
+a.ds-handle-supporter:visited {
   border-color: var(--ds-accent);
   background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  a.ds-handle-supporter:hover {
+    border-color: var(--ds-accent-ink);
+    color: var(--ds-accent-ink);
+  }
+}
+
+a.ds-handle-supporter:active {
+  border-color: var(--ds-accent-ink);
   color: var(--ds-accent-ink);
 }
 

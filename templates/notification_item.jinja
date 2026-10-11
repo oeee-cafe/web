@@ -76,7 +76,7 @@
         <a href="/@{{ notification.handle.login_name }}" class="notification-actor">{{ notification.actor_name }}</a>
       {% else %}
         <a href="{{ notification.actor_url }}" class="notification-actor" target="_blank" rel="noopener noreferrer">{{ notification.actor_name }}</a>
-        {{ handle(notification.handle) }}
+        {{ handle(notification.handle, notification.actor_url) }}
       {% endif %}
       {# The actor is a link, so it cannot live inside the pattern; the string
          carries only the remainder ("and N others"). #}

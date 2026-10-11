@@ -452,15 +452,18 @@ fn a_comment_names_its_author_by_the_design_systems_person() {
         })
         .unwrap();
     assert!(
-        fragment.contains(r#"<span class="ds-handle">@plain</span>"#),
+        fragment.contains(r#"<a class="ds-handle" href="&#x2f;@plain">@plain</a>"#),
         "{fragment}"
     );
     // The host in a part of its own, which the name gives way to, and
     // the name in a <bdi> it cannot turn the host round from.
+    // Each pill leads where its name does: the local one to the profile
+    // here, the remote one to theirs, apart.
     assert!(fragment.contains(
-        r#"<span class="ds-handle ds-handle-remote"><bdi class="ds-handle-name">@far</bdi><span class="ds-handle-host">@oeee.example</span></span>"#
+        r#"<bdi class="ds-handle-name">@far</bdi><span class="ds-handle-host">@oeee.example</span></a>"#
     ));
-    assert!(fragment.contains(r#"Plain</a><span class="ds-handle">"#));
+    assert!(fragment.contains(r#"<a class="ds-handle ds-handle-remote" href="#));
+    assert!(fragment.contains(r#"Plain</a><a class="ds-handle" href="#));
     // The remote author's profile is off the site, so it opens apart.
     assert!(fragment.contains(r#"target="_blank" rel="noopener noreferrer">far</a>"#));
 }
