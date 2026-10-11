@@ -1015,7 +1015,7 @@ export default function App() {
             <span className={NEO_TITLEBAR_DOT} />
             <span className={NEO_TITLEBAR_DOT} />
             <span className={NEO_TITLEBAR_DOT} />
-            {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[12px] leading-[18px]">{canvasMeta.title}</span>}
+            {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[11px] leading-[14px]">{canvasMeta.title}</span>}
           </div>
           {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
           <Chat wsRef={wsRef} userId={userIdRef.current} participants={participants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} />

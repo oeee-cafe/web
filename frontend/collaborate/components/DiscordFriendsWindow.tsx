@@ -81,7 +81,7 @@ export const DiscordFriendsWindow = ({ discord, origin, minimumY, onClose }: Dis
           <span className={NEO_TITLEBAR_DOT} />
           <span className={NEO_TITLEBAR_DOT} />
           <span className={NEO_TITLEBAR_DOT} />
-          <span className="ml-[4px] min-w-0 flex-1 truncate text-[12px] leading-[18px]">
+          <span className="ml-[4px] min-w-0 flex-1 truncate text-[11px] leading-[14px]">
             <Trans>Discord friends</Trans>
           </span>
         </div>

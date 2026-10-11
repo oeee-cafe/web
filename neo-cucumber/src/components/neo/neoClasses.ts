@@ -301,23 +301,25 @@ export const NEO_TITLEBAR =
  * `touch-none` is load bearing: without it a drag on a touch screen scrolls
  * the page instead of moving the window.
  *
- * Three 3px dots inside 1px of padding make a strip five pixels tall, which is
- * a fine target for a cursor and no target at all for a fingertip -- and the
- * next thing down is always a tool button, so missing it does not fail
- * harmlessly, it draws. On a coarse pointer the strip grows to 18px, about the
- * height of one of the widgets below it.
+ * It is 16px tall whatever is pointing at it: the height of the modals' title
+ * bars, which are `NEO_TITLEBAR` around 14px of text, so every bar in the
+ * painter is the same chrome. It used to be five pixels -- three dots inside
+ * 1px of padding -- and grew only under a coarse pointer. But a tablet pen
+ * reports a fine pointer, and it is what this painter is most often held
+ * with: it got the five-pixel strip, and the next thing down is always a tool
+ * button that acts on press, so missing the strip does not fail harmlessly.
  *
  * That is well under the 44px a touch target is supposed to be, and it is the
  * whole of the target: dragging the panel by its background was tried and
  * removed, being worth little on a column that is almost entirely widgets.
  * These panels are 52px wide, so a bar sized to the guideline would be a square
- * of chrome sitting on the canvas -- 18px is the compromise, and if it proves
- * too mean under a thumb this is the number to raise.
+ * of chrome sitting on the canvas. Text put in the bar is set at 11px on 14px
+ * leading, as the modals set theirs, so that it does not make the bar taller.
  */
 export const NEO_TITLEBAR_HANDLE =
   NEO_TITLEBAR +
-  " flex touch-none items-center gap-[3px] cursor-grab active:cursor-grabbing " +
-  "pointer-coarse:min-h-[18px] pointer-coarse:gap-[5px] pointer-coarse:px-[4px]";
+  " flex min-h-[16px] touch-none items-center gap-[5px] px-[4px] " +
+  "cursor-grab active:cursor-grabbing";
 
 /**
  * One of the three dots that mark a handle as grabbable. NEO has no such
@@ -325,8 +327,7 @@ export const NEO_TITLEBAR_HANDLE =
  * affordance, and it is the reason a window needs no title to be legible.
  */
 export const NEO_TITLEBAR_DOT =
-  "h-[3px] w-[3px] shrink-0 rounded-full bg-white/70 first:ml-[3px] " +
-  "pointer-coarse:h-[4px] pointer-coarse:w-[4px] pointer-coarse:first:ml-0";
+  "h-[4px] w-[4px] shrink-0 rounded-full bg-white/70";
 
 /**
  * The corner you drag to resize a window, and the ticks drawn in it.

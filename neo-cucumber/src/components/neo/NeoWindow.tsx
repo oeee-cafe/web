@@ -18,8 +18,6 @@ interface NeoWindowProps {
   initialPosition: { x: number; y: number };
   /** Extra classes for the frame, e.g. a width or a z-index. */
   className?: string;
-  /** Sits in the title bar, right of the drag dots. */
-  title?: React.ReactNode;
   /** Enables a visible bottom-right resize handle for larger panels. */
   resizable?: boolean;
   /** Explicit opening size for resizable windows. */
@@ -43,7 +41,6 @@ interface NeoWindowProps {
 export function NeoWindow({
   initialPosition,
   className = "",
-  title,
   resizable = false,
   initialSize,
   constrainToViewport = false,
@@ -206,11 +203,6 @@ export function NeoWindow({
         <span className={NEO_TITLEBAR_DOT} />
         <span className={NEO_TITLEBAR_DOT} />
         <span className={NEO_TITLEBAR_DOT} />
-        {title && (
-          <span className="ml-[4px] truncate text-[11px] leading-none">
-            {title}
-          </span>
-        )}
       </div>
       {children}
       {resizable && (
