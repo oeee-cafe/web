@@ -1113,6 +1113,23 @@ export class CanvasHistory {
 
     const { layers, strokes } = await this.stateAt(cut);
 
+    // An undo of ours still waiting for its echo is drawn as a projection
+    // over the canonical entries, and the cut can change what it will do:
+    // what it was about to take back is frozen from here on, and the room
+    // will answer it with nothing. The echo redraws only when the canvas
+    // shows something other than the projection, and the projection it will
+    // compare against is computed after this, from entries that no longer
+    // hold what the undo took -- so without this the canvas keeps the
+    // strokes removed that every other client kept, and the next savepoint
+    // copies the difference in for good. It is the fallback's case: a cut
+    // at the head, for a room whose history is full. An ordinary cut stays
+    // under everything that can still be undone, and never moves this.
+    const shown =
+      this.projectionRendered && this.fork.some((f) => f.msg.type === "undo")
+        ? this.projectedEntries()
+        : undefined;
+    const squashed = this.entries.slice(0, cut);
+
     this.entries = this.entries.slice(cut);
     this.redoReaches = this.redoReaches.filter((reach) => reach.at > baseSeq);
     this.canonicalLog = this.canonicalLog.filter(
@@ -1133,6 +1150,13 @@ export class CanvasHistory {
         .filter((s) => s.index >= cut)
         .map((s) => ({ ...s, index: s.index - cut })),
     ];
+    if (shown) {
+      const settled = this.projectedEntries();
+      const moved =
+        squashed.some((entry, i) => entry.undo !== shown[i].undo) ||
+        settled.some((entry, i) => entry.undo !== shown[cut + i]?.undo);
+      if (moved) await this.replayFrom(this.latestSavepoint());
+    }
     this.notify();
     return true;
   }

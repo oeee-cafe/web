@@ -2056,6 +2056,66 @@ describe("optimistic undo reconciliation", () => {
     expect(redFor(engine, REMOTE, 4, 4)).toBe(0);
   });
 
+  /**
+   * The case session 486a0954 hit at 15:02:38: an undo pressed, a checkpoint
+   * at the head of history landing before its echo, and the room answering
+   * the undo with nothing because what it took is frozen. The author's
+   * canvas kept the projection -- both strokes gone -- while everyone else
+   * kept them, and the saved post was exported from it.
+   */
+  it("puts back what a head cut froze under an undo still waiting for its echo", async () => {
+    const { engine, history } = setup();
+    await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
+    await confirmedStroke(history, LOCAL, 4, 4, 150, 3);
+    local(history, encodeUndo(LOCAL, false));
+    expect(red(engine, 4, 4)).toBe(0);
+
+    // RESET_POINT at 5, cutting at the head: the room's fallback when its
+    // history is full.
+    await history.handleResetPoint(4);
+    expect(red(engine, 4, 4)).toBe(150);
+
+    await remote(history, encodeUndo(LOCAL, false), 6);
+    expect(red(engine, 4, 4)).toBe(150);
+    expect(red(engine, 2, 2)).toBe(100);
+    expect(history.hasPendingLocal).toBe(false);
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it("takes away again what a head cut froze undone under a redo still waiting for its echo", async () => {
+    const { engine, history } = setup();
+    await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
+    await remote(history, encodeUndo(LOCAL, false), 3);
+    expect(red(engine, 2, 2)).toBe(0);
+    local(history, encodeUndo(LOCAL, true));
+    expect(red(engine, 2, 2)).toBe(100);
+
+    await history.handleResetPoint(3);
+    expect(red(engine, 2, 2)).toBe(0);
+
+    await remote(history, encodeUndo(LOCAL, true), 5);
+    expect(red(engine, 2, 2)).toBe(0);
+    expect(history.canRedo()).toBe(false);
+  });
+
+  /** An ordinary cut stays under everything still undoable, so the pending
+   * undo means the same after it and nothing needs drawing again. */
+  it("leaves the projection alone when the cut does not reach what the undo takes", async () => {
+    const { engine, history } = setup();
+    await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
+    await confirmedStroke(history, LOCAL, 4, 4, 150, 3);
+    local(history, encodeUndo(LOCAL, false));
+    engine.repaints.length = 0;
+
+    await history.handleResetPoint(2);
+    expect(red(engine, 4, 4)).toBe(0);
+    expect(engine.repaints).toEqual([]);
+
+    await remote(history, encodeUndo(LOCAL, false), 6);
+    expect(red(engine, 4, 4)).toBe(0);
+    expect(red(engine, 2, 2)).toBe(100);
+  });
+
   it("reconciles dropped optimistic undo when server order diverges", async () => {
     const { engine, history } = setup();
     await confirmedStroke(history, LOCAL, 2, 2, 100, 1);
