@@ -1057,10 +1057,12 @@ async fn sent_to_google(state: &AppState, oauth_state: &str) -> Option<GoogleReq
             return None;
         }
     };
+    // Without a nonce it was sent to Discord, not here.
+    let nonce = request.nonce?;
     let handoff = pending_handoff(state, Some(&request.id)).await;
     Some(GoogleRequest {
         state: oauth_state.to_string(),
-        nonce: request.nonce,
+        nonce,
         next: None,
         started_at: Utc::now(),
         handoff,
@@ -1128,6 +1130,30 @@ async fn finish_google_sign_in(
 
 const DISCORD_REQUEST_KEY: &str = "identity.discord";
 
+/// The state of a sign-in an app sent the browser straight to Discord for
+/// (`handoff::AtProvider`), carrying its handoff as `/auth/discord?handoff=`
+/// would have, as [`sent_to_google`] does for Google.
+async fn sent_to_discord(state: &AppState, oauth_state: &str) -> Option<DiscordRequest> {
+    let request = match crate::handoff::back_from_provider(&state.redis_pool, oauth_state).await {
+        Ok(request) => request?,
+        Err(error) => {
+            tracing::warn!("A handoff sent to Discord could not be looked up: {error:#}");
+            return None;
+        }
+    };
+    // With a nonce it was sent to Google, not here.
+    if request.nonce.is_some() {
+        return None;
+    }
+    let handoff = pending_handoff(state, Some(&request.id)).await;
+    Some(DiscordRequest {
+        state: oauth_state.to_string(),
+        next: None,
+        started_at: Utc::now(),
+        handoff,
+    })
+}
+
 /// A sign-in with Discord under way: the state its answer has to carry back.
 /// Discord has no ID token, and so no nonce (`crate::discord`).
 #[derive(Serialize, Deserialize)]
@@ -1194,13 +1220,21 @@ pub async fn discord_callback(
     let bundle = bundle_for(&accept_language, auth_session.user.as_ref());
     let back = back_for(&auth_session);
 
-    // Each sign-in's state answers once, from this browser's session.
-    let request = session
+    // Each sign-in's state answers once: from this browser's session, or --
+    // for a browser an app sent straight to Discord -- from the handoff it
+    // was sent for.
+    let mut request = session
         .remove::<DiscordRequest>(DISCORD_REQUEST_KEY)
         .await
         .ok()
         .flatten()
-        .filter(|request| Utc::now() - request.started_at <= Duration::minutes(PENDING_FOR));
+        .filter(|request| Utc::now() - request.started_at <= Duration::minutes(PENDING_FOR))
+        .filter(|request| answer.state.as_deref() == Some(request.state.as_str()));
+    if request.is_none()
+        && let Some(oauth_state) = answer.state.as_deref()
+    {
+        request = sent_to_discord(&state, oauth_state).await;
+    }
     let Some(config) = state.config.discord.as_ref() else {
         messages
             .clone()
@@ -1388,11 +1422,11 @@ pub struct HandoffStartForm {
     provider: String,
     next: Option<String>,
     /// "provider" sends the browser straight to the provider's own page
-    /// rather than through this site's first (`handoff::AtProvider`). Only
-    /// Google, and only asked for by the apps that will open Google's page:
-    /// iOS and macOS, whose sheet names the first page's domain, and
-    /// Windows, where it saves a stop here. Android opens only this site's
-    /// URLs (app_sign_in.jinja).
+    /// rather than through this site's first (`handoff::AtProvider`). Google
+    /// and Discord, asked for by the apps that will open the provider's page:
+    /// iOS and macOS, whose sheet names the first page's domain, for both,
+    /// and Windows for Google, where it saves a stop here. Android opens
+    /// only this site's URLs (app_sign_in.jinja).
     at: Option<String>,
 }
 
@@ -1425,11 +1459,17 @@ pub async fn handoff_start(
 
     let next = local_next(form.next.as_deref());
     let started = crate::handoff::start(&state.redis_pool, next.clone()).await?;
-    let url = match (form.at.as_deref(), state.config.google.as_ref()) {
-        (Some("provider"), Some(config)) if form.provider == "google" => {
+    let at_provider = form.at.as_deref() == Some("provider");
+    let url = match (
+        form.provider.as_str(),
+        state.config.google.as_ref(),
+        state.config.discord.as_ref(),
+    ) {
+        ("google", Some(config), _) if at_provider => {
+            let nonce = random_token();
             let request = crate::handoff::AtProvider {
                 id: started.id.clone(),
-                nonce: random_token(),
+                nonce: Some(nonce.clone()),
             };
             let oauth_state = random_token();
             crate::handoff::send_to_provider(&state.redis_pool, &oauth_state, &request).await?;
@@ -1437,7 +1477,20 @@ pub async fn handoff_start(
                 config,
                 &google_redirect_uri(&state.config.base_url),
                 &oauth_state,
-                &request.nonce,
+                &nonce,
+            )
+        }
+        ("discord", _, Some(config)) if at_provider => {
+            let request = crate::handoff::AtProvider {
+                id: started.id.clone(),
+                nonce: None,
+            };
+            let oauth_state = random_token();
+            crate::handoff::send_to_provider(&state.redis_pool, &oauth_state, &request).await?;
+            discord::authorize_url(
+                config,
+                &discord_redirect_uri(&state.config.base_url),
+                &oauth_state,
             )
         }
         _ => format!(

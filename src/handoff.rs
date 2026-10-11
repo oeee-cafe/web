@@ -309,13 +309,15 @@ const AT_PROVIDER_PREFIX: &str = "oeee:handoff-at-provider:";
 
 /// A sign-in the browser was sent straight to the provider for, rather than
 /// to `/auth/<provider>?handoff=<id>` first: which handoff it is for, and the
-/// nonce the provider's answer has to carry.
+/// nonce the provider's answer has to carry -- Google's; Discord's has none
+/// (`crate::discord`).
 ///
 /// The iOS and macOS apps open the browser in `ASWebAuthenticationSession`,
 /// which first asks whether the app may "use" the first page's domain to sign
 /// in. Sent to this site first, that named oeee.cafe under a Sign in with
-/// Google button; sent to Google, it names Google. The Windows app is sent
-/// straight there too, which saves its browser the stop here. The cost is
+/// Google or Discord button; sent to the provider, it names the provider. The
+/// Windows app is sent straight to Google too, which saves its browser the
+/// stop here. The cost is
 /// that the browser's session cookie cannot carry the handoff and the nonce
 /// to the callback, since the browser never visits this site before Google,
 /// so they are kept here under the OAuth `state` instead. The `state` is as good as
@@ -325,7 +327,11 @@ const AT_PROVIDER_PREFIX: &str = "oeee:handoff-at-provider:";
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AtProvider {
     pub id: String,
-    pub nonce: String,
+    /// Google's, which its ID token has to carry; none for Discord. Which of
+    /// the two a state was sent for is told by this, so one sent to Google
+    /// does not answer at Discord's callback, or the other way about.
+    #[serde(default)]
+    pub nonce: Option<String>,
 }
 
 fn at_provider_key(state: &str) -> String {
@@ -658,7 +664,7 @@ mod tests {
         let state = random_token();
         let request = AtProvider {
             id: random_token(),
-            nonce: random_token(),
+            nonce: Some(random_token()),
         };
         send_to_provider(&pool, &state, &request).await.unwrap();
         assert_eq!(
@@ -670,5 +676,15 @@ mod tests {
             back_from_provider(&pool, &random_token()).await.unwrap(),
             None
         );
+    }
+
+    /// An entry stored before Discord could be sent to directly still reads
+    /// as Google's.
+    #[test]
+    fn an_entry_from_before_reads_as_google() {
+        let stored: AtProvider = serde_json::from_str(r#"{"id":"i","nonce":"n"}"#).unwrap();
+        assert_eq!(stored.nonce.as_deref(), Some("n"));
+        let discord: AtProvider = serde_json::from_str(r#"{"id":"i"}"#).unwrap();
+        assert_eq!(discord.nonce, None);
     }
 }

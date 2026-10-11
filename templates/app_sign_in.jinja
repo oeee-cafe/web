@@ -29,9 +29,10 @@
    sent straight to Google's page so the sheet names Google), both on
    Windows (Google there straight to Google's page too, which saves the
    browser a stop at this site on its way), and Discord in every app, by
-   /auth/discord, whose sign-in wants the person's Discord password or
-   passkey, which the browser has and the web view does not. Discord has
-   no sheet anywhere. Steam goes the same way, by /auth/steam, in every
+   /auth/discord -- or, on iOS and macOS, straight to Discord's page, so
+   the sheet names Discord -- whose sign-in wants the person's Discord
+   password or passkey, which the browser has and the web view does not.
+   Discord has no sheet anywhere. Steam goes the same way, by /auth/steam, in every
    app but the Steam build (below). Google on iOS and macOS once
    had a sheet of the app's own, with an OAuth client and a token exchange
    of its own to keep; this is the site's own sign-in, in the same system
@@ -39,7 +40,8 @@
      1. the page starts a handoff (POST /auth/handoff/start, src/handoff.rs)
         and sends the app  browse {url}  on the bridge; the app checks the
         URL is this site's -- or Google's sign-in page, where the Apple and
-        Windows apps are sent straight to -- and opens it in the browser, or
+        Windows apps are sent straight to, or Discord's, where the Apple
+        apps are -- and opens it in the browser, or
         calls window.oeeeApp.signIn.unopened();
      2. the browser signs in, asks the person there whether it was they who
         pressed sign in in the app (identity_handoff_confirm.jinja), and on
@@ -309,19 +311,20 @@
     // (ASWebAuthenticationSession) first asks whether the app may use the
     // first page's domain to sign in, which then names Google; the Windows
     // app's browser asks nothing, and is saved the stop here.
-    function atGoogle(provider, next) {
+    function atProvider(provider, next) {
       browser(provider, next, "provider");
     }
 
-    // Discord, in a browser in every app, by this site's own page: the
-    // person's Discord password or passkey is in the browser, not here.
-    // Steam the same, in every app but the Steam build, which asks Steam
-    // for a ticket instead (below).
+    // Discord, in a browser in every app: the person's Discord password or
+    // passkey is in the browser, not here. The Apple apps go straight to
+    // Discord's page, for the same question Google's is sent there for; the
+    // others by this site's own. Steam by this site's, in every app but the
+    // Steam build, which asks Steam for a ticket instead (below).
     var WAYS = {
-      ios: { apple: native, google: atGoogle, discord: browser, steam: browser },
-      macos: { apple: native, google: atGoogle, discord: browser, steam: browser },
+      ios: { apple: native, google: atProvider, discord: atProvider, steam: browser },
+      macos: { apple: native, google: atProvider, discord: atProvider, steam: browser },
       android: { apple: browser, google: native, discord: browser, steam: browser },
-      windows: { apple: browser, google: atGoogle, discord: browser, steam: browser }
+      windows: { apple: browser, google: atProvider, discord: browser, steam: browser }
     };
     var root = document.documentElement;
     var ways = WAYS[root.getAttribute("data-app")];

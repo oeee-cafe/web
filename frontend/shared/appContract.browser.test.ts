@@ -197,6 +197,7 @@ async function open(options: Options = {}): Promise<Page> {
        src="/image/9c881320.png"></a>
     <a class="auth-apple" href="/auth/apple?next=%2Fafter">Apple</a>
     <a class="auth-google" href="/auth/google?next=%2Fafter">Google</a>
+    <a class="auth-discord" href="/auth/discord?next=%2Fafter">Discord</a>
     <a class="auth-steam" href="/auth/steam?next=%2Fafter">Steam</a>
     ${(options.supporter ?? [])
       .map((product) => `<button class="supporter-buy" data-product="${product}"></button>`)
@@ -784,7 +785,7 @@ describe("what a store gives an app", () => {
 
 describe("signing in for an app", () => {
   /** Presses a sign-in button, and says whether the page took the press. */
-  function press(page: Page, provider: "apple" | "google" | "steam"): boolean {
+  function press(page: Page, provider: "apple" | "google" | "discord" | "steam"): boolean {
     const link = page.window.document.querySelector(`.auth-${provider}`)!;
     let taken = false;
     // Last to hear the click: records whether the page took it, and keeps
@@ -932,11 +933,15 @@ describe("signing in for an app", () => {
     expect(finished.frame.contentWindow!.location.pathname).toBe("/after");
   }, 10000);
 
-  it("sends Google's browser sign-in straight to Google, and Apple's through the site", async () => {
-    const cases: [string, "apple" | "google", string | null][] = [
+  it("sends Google's browser sign-in straight to Google, Discord's in the Apple apps, and Apple's through the site", async () => {
+    const cases: [string, "apple" | "google" | "discord", string | null][] = [
       ["Mozilla/5.0 OeeeCafe platform/ios", "google", "provider"],
       ["Mozilla/5.0 OeeeCafe platform/macos", "google", "provider"],
       ["Mozilla/5.0 OeeeCafe platform/windows", "google", "provider"],
+      ["Mozilla/5.0 OeeeCafe platform/ios", "discord", "provider"],
+      ["Mozilla/5.0 OeeeCafe platform/macos", "discord", "provider"],
+      ["Mozilla/5.0 OeeeCafe platform/windows", "discord", null],
+      ["Mozilla/5.0 OeeeCafe platform/android", "discord", null],
       ["Mozilla/5.0 OeeeCafe platform/windows", "apple", null],
       ["Mozilla/5.0 OeeeCafe platform/android", "apple", null],
     ];
