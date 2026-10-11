@@ -80,12 +80,12 @@ async function render() {
 }
 
 function button(label: string): HTMLButtonElement | undefined {
-  return [...host!.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
+  return [...document.body.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 }
 
 async function press(label: string) {
   const found = button(label);
-  if (!found) throw new Error(`no ${label} button; there are ${[...host!.querySelectorAll("button")].map((b) => b.textContent)}`);
+  if (!found) throw new Error(`no ${label} button; there are ${[...document.body.querySelectorAll("button")].map((b) => b.textContent)}`);
   await act(async () => found.click());
 }
 
@@ -129,18 +129,18 @@ describe("inviting Discord friends from the session", () => {
     room(true);
     await render();
     await press("Invite");
-    expect(host!.textContent).toContain("Connect Discord once to see your friends here");
-    expect(host!.textContent).toContain("Or use + in any Discord chat.");
+    expect(document.body.textContent).toContain("Connect Discord once to see your friends here");
+    expect(document.body.textContent).toContain("Or use + in any Discord chat.");
     await press("Connect Discord");
     expect(asked).toEqual([{ action: "connect" }]);
 
     // While Discord is asked, the button waits rather than asking again.
     await say("state", { connected: false, connecting: true, name: null });
-    expect(host!.textContent).toContain("Connecting to Discord…");
+    expect(document.body.textContent).toContain("Connecting to Discord…");
     expect(button("Connect Discord")!.disabled).toBe(true);
 
     await press("Not now");
-    expect(host!.textContent).not.toContain("Connecting to Discord…");
+    expect(document.body.textContent).not.toContain("Connecting to Discord…");
   });
 
   it("lists the friends once connected, and sends each one invitation", async () => {
@@ -150,14 +150,14 @@ describe("inviting Discord friends from the session", () => {
     await press("Invite");
     // Asked for as the picker opens.
     expect(asked).toEqual([{ action: "friends" }]);
-    expect(host!.textContent).toContain("Loading friends…");
+    expect(document.body.textContent).toContain("Loading friends…");
 
     await say("friends", FRIENDS);
-    expect(host!.textContent).toContain("넬리");
-    expect(host!.textContent).toContain("in Oeee Cafe");
-    expect(host!.querySelectorAll("li")).toHaveLength(3);
+    expect(document.body.textContent).toContain("넬리");
+    expect(document.body.textContent).toContain("in Oeee Cafe");
+    expect(document.body.querySelectorAll("li")).toHaveLength(3);
 
-    const first = host!.querySelector("li")!.querySelector("button")!;
+    const first = document.body.querySelector("li")!.querySelector("button")!;
     await act(async () => first.click());
     expect(asked.at(-1)).toEqual({ action: "invite", user: "80351110224678912" });
     expect(first.textContent).toBe("Sending…");
@@ -168,11 +168,45 @@ describe("inviting Discord friends from the session", () => {
     expect(first.disabled).toBe(true);
 
     // One that did not go through can be tried again.
-    const second = host!.querySelectorAll("li")[1].querySelector("button")!;
+    const second = document.body.querySelectorAll("li")[1].querySelector("button")!;
     await act(async () => second.click());
     await say("invited", { user: "2", sent: false });
     expect(second.textContent).toBe("Try again");
     expect(second.disabled).toBe(false);
+  });
+
+  it("gives the buttons a row of their own, apart from who and whether", async () => {
+    app({ connected: false, connecting: false, name: null });
+    room(true);
+    await render();
+    const invite = button("Invite")!;
+    const share = button("Share")!;
+    const owner = [...host!.querySelectorAll("div")].find((d) => d.textContent?.trim() === "by @oeee")!;
+    // Below the owner's name, side by side, and not touching.
+    expect(invite.getBoundingClientRect().top).toBeGreaterThanOrEqual(owner.getBoundingClientRect().bottom);
+    expect(share.getBoundingClientRect().left - invite.getBoundingClientRect().right).toBeGreaterThanOrEqual(4);
+  });
+
+  it("opens the friends in a window of their own, which × or Invite again puts away", async () => {
+    app({ connected: true, connecting: false, name: "oeee" });
+    room(true);
+    await render();
+    await press("Invite");
+    const window_ = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(window_).not.toBeNull();
+    expect(window_.textContent).toContain("Discord friends");
+    // On the page, not inside the header it was opened from.
+    expect(host!.contains(window_)).toBe(false);
+    expect(button("Invite")!.getAttribute("aria-expanded")).toBe("true");
+
+    await act(async () => window_.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click());
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(button("Invite")!.getAttribute("aria-expanded")).toBe("false");
+
+    await press("Invite");
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+    await press("Invite");
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it("finds a friend by name", async () => {
@@ -181,20 +215,20 @@ describe("inviting Discord friends from the session", () => {
     await render();
     await press("Invite");
     await say("friends", FRIENDS);
-    const search = host!.querySelector<HTMLInputElement>('input[type="search"]')!;
+    const search = document.body.querySelector<HTMLInputElement>('input[type="search"]')!;
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
     await act(async () => {
       setValue.call(search, "PICK");
       search.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(host!.querySelectorAll("li")).toHaveLength(1);
-    expect(host!.textContent).toContain("pickle");
+    expect(document.body.querySelectorAll("li")).toHaveLength(1);
+    expect(document.body.textContent).toContain("pickle");
 
     await act(async () => {
       setValue.call(search, "nobody");
       search.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(host!.textContent).toContain("No friend by that name.");
+    expect(document.body.textContent).toContain("No friend by that name.");
   });
 });
 

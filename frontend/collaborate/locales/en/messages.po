@@ -17,13 +17,17 @@ msgstr ""
 msgid "Authentication Failed"
 msgstr "Authentication Failed"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:105
+#: ../frontend/collaborate/components/SessionHeader.tsx:132
 msgid "by"
 msgstr "by"
 
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:41
 msgid "Cancel"
 msgstr "Cancel"
+
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:90
+msgid "Close"
+msgstr "Close"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:76
 msgid "Connect Discord"
@@ -33,11 +37,11 @@ msgstr "Connect Discord"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "Connect Discord once to see your friends here and invite them to this session."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:83
+#: ../frontend/collaborate/components/SessionHeader.tsx:110
 msgid "Connected"
 msgstr "Connected"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:89
+#: ../frontend/collaborate/components/SessionHeader.tsx:116
 msgid "Connecting"
 msgstr "Connecting"
 
@@ -55,9 +59,13 @@ msgid "Connection lost. Your work is saved locally."
 msgstr "Connection lost. Your work is saved locally."
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:95
+#: ../frontend/collaborate/components/SessionHeader.tsx:122
 msgid "Disconnected"
 msgstr "Disconnected"
+
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:82
+msgid "Discord friends"
+msgstr "Discord friends"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:79
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
@@ -73,8 +81,8 @@ msgstr "Failed to save session. Please try downloading as PNG instead."
 msgid "Go to Lobby"
 msgstr "Go to Lobby"
 
-#: ../frontend/collaborate/App.tsx:941
-#: ../frontend/collaborate/App.tsx:945
+#: ../frontend/collaborate/App.tsx:942
+#: ../frontend/collaborate/App.tsx:946
 msgid "Help"
 msgstr "Help"
 
@@ -91,20 +99,21 @@ msgid "Initializing collaboration session..."
 msgstr "Initializing collaboration session..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:116
+#: ../frontend/collaborate/components/SessionHeader.tsx:145
 msgid "Invite"
 msgstr "Invite"
 
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:68
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:113
+#: ../frontend/collaborate/components/SessionHeader.tsx:142
 msgid "Invite Discord friends"
 msgstr "Invite Discord friends"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:124
+#: ../frontend/collaborate/components/SessionHeader.tsx:153
 msgid "Invite Steam friends"
 msgstr "Invite Steam friends"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:101
+#: ../frontend/collaborate/components/SessionHeader.tsx:128
 msgid "Loading"
 msgstr "Loading"
 
@@ -129,7 +138,7 @@ msgstr "No Discord friends to invite yet."
 msgid "No friend by that name."
 msgstr "No friend by that name."
 
-#: ../frontend/collaborate/App.tsx:794
+#: ../frontend/collaborate/App.tsx:795
 msgid "No Title"
 msgstr "No Title"
 
@@ -168,16 +177,16 @@ msgstr "Save as PNG"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 
-#: ../frontend/collaborate/App.tsx:978
-#: ../frontend/collaborate/App.tsx:1027
+#: ../frontend/collaborate/App.tsx:979
+#: ../frontend/collaborate/App.tsx:1028
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:122
 msgid "Save to Gallery"
 msgstr "Save to Gallery"
 
-#: ../frontend/collaborate/App.tsx:978
-#: ../frontend/collaborate/App.tsx:1027
+#: ../frontend/collaborate/App.tsx:979
+#: ../frontend/collaborate/App.tsx:1028
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:117
 msgid "Saving..."
@@ -212,11 +221,11 @@ msgstr "Session Full"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "Session is ending. The drawing is being saved to the gallery..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:137
+#: ../frontend/collaborate/components/SessionHeader.tsx:166
 msgid "Share"
 msgstr "Share"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:134
+#: ../frontend/collaborate/components/SessionHeader.tsx:163
 msgid "Share this session"
 msgstr "Share this session"
 

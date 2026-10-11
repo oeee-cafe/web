@@ -158,7 +158,8 @@ export default function App() {
   const [painterReady, setPainterReady] = useState(false);
   // Half the height it used to open at. It was tall enough to reach most of
   // the way down the drawing, and the layers window now shares that column.
-  const [chatSize, setChatSize] = useState({ width: 224, height: 234 });
+  // Then a row taller, for the header's buttons, which have one of their own.
+  const [chatSize, setChatSize] = useState({ width: 224, height: 252 });
   const chatFrameRef = useRef<HTMLDivElement>(null);
   const chatHandleRef = useRef<HTMLDivElement>(null);
   const chatResizeRef = useRef<HTMLDivElement>(null);
@@ -1016,7 +1017,7 @@ export default function App() {
             <span className={NEO_TITLEBAR_DOT} />
             {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[12px] leading-[18px]">{canvasMeta.title}</span>}
           </div>
-          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={view.connection} isCatchingUp={view.catchingUp} />}
+          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
           <Chat wsRef={wsRef} userId={userIdRef.current} participants={participants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} />
           <div ref={chatResizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
             <span className={NEO_RESIZE_GRIP} />

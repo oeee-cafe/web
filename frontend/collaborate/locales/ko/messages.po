@@ -17,13 +17,17 @@ msgstr ""
 msgid "Authentication Failed"
 msgstr "인증 실패"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:105
+#: ../frontend/collaborate/components/SessionHeader.tsx:132
 msgid "by"
 msgstr "작성자:"
 
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:41
 msgid "Cancel"
 msgstr "취소"
+
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:90
+msgid "Close"
+msgstr "닫기"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:76
 msgid "Connect Discord"
@@ -33,11 +37,11 @@ msgstr "Discord 연결"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "Discord를 한 번 연결하면 여기서 친구를 보고 이 세션으로 초대할 수 있어요."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:83
+#: ../frontend/collaborate/components/SessionHeader.tsx:110
 msgid "Connected"
 msgstr "연결됨"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:89
+#: ../frontend/collaborate/components/SessionHeader.tsx:116
 msgid "Connecting"
 msgstr "연결 중"
 
@@ -55,9 +59,13 @@ msgid "Connection lost. Your work is saved locally."
 msgstr "연결이 끊어졌습니다. 작업이 로컬에 저장되었습니다."
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:95
+#: ../frontend/collaborate/components/SessionHeader.tsx:122
 msgid "Disconnected"
 msgstr "연결 끊어짐"
+
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:82
+msgid "Discord friends"
+msgstr "Discord 친구"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:79
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
@@ -73,8 +81,8 @@ msgstr "세션 저장에 실패했습니다. 대신 PNG로 다운로드해 보�
 msgid "Go to Lobby"
 msgstr "로비로 가기"
 
-#: ../frontend/collaborate/App.tsx:941
-#: ../frontend/collaborate/App.tsx:945
+#: ../frontend/collaborate/App.tsx:942
+#: ../frontend/collaborate/App.tsx:946
 msgid "Help"
 msgstr "도움말"
 
@@ -91,20 +99,21 @@ msgid "Initializing collaboration session..."
 msgstr "협업 세션 초기화 중..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:116
+#: ../frontend/collaborate/components/SessionHeader.tsx:145
 msgid "Invite"
 msgstr "초대"
 
+#: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:68
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:113
+#: ../frontend/collaborate/components/SessionHeader.tsx:142
 msgid "Invite Discord friends"
 msgstr "Discord 친구 초대"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:124
+#: ../frontend/collaborate/components/SessionHeader.tsx:153
 msgid "Invite Steam friends"
 msgstr "Steam 친구 초대"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:101
+#: ../frontend/collaborate/components/SessionHeader.tsx:128
 msgid "Loading"
 msgstr "로딩 중"
 
@@ -129,7 +138,7 @@ msgstr "아직 초대할 Discord 친구가 없어요."
 msgid "No friend by that name."
 msgstr "그 이름의 친구가 없어요."
 
-#: ../frontend/collaborate/App.tsx:794
+#: ../frontend/collaborate/App.tsx:795
 msgid "No Title"
 msgstr "제목 없음"
 
@@ -168,16 +177,16 @@ msgstr "PNG로 저장"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "이 그림을 갤러리에 저장할까요? 저장하면 모두의 세션이 끝나고 아무도 이어서 그릴 수 없습니다."
 
-#: ../frontend/collaborate/App.tsx:978
-#: ../frontend/collaborate/App.tsx:1027
+#: ../frontend/collaborate/App.tsx:979
+#: ../frontend/collaborate/App.tsx:1028
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:28
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:44
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:122
 msgid "Save to Gallery"
 msgstr "갤러리에 저장"
 
-#: ../frontend/collaborate/App.tsx:978
-#: ../frontend/collaborate/App.tsx:1027
+#: ../frontend/collaborate/App.tsx:979
+#: ../frontend/collaborate/App.tsx:1028
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:117
 msgid "Saving..."
@@ -212,11 +221,11 @@ msgstr "세션 만석"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "세션이 종료됩니다. 그림을 갤러리에 저장 중..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:137
+#: ../frontend/collaborate/components/SessionHeader.tsx:166
 msgid "Share"
 msgstr "공유"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:134
+#: ../frontend/collaborate/components/SessionHeader.tsx:163
 msgid "Share this session"
 msgstr "이 세션 공유"
 

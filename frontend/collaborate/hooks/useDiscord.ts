@@ -45,6 +45,10 @@ export function useDiscord() {
 
 export type Discord = ReturnType<typeof useDiscord>;
 
+/** The friends window's size as it opens: wide enough for a name beside its
+ *  Invite button, at the chat's text size (DiscordFriendsWindow). */
+export const FRIENDS_WINDOW_SIZE = { width: 220, height: 260 };
+
 /**
  * Whether a friend could be asked into this room at all: the site says how
  * to join one only when anyone signed in may enter it (presence.rs), and

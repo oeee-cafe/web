@@ -23,8 +23,8 @@ export interface DiscordInviteProps {
 }
 
 /**
- * Inviting Discord friends into the room, below the session header in the
- * chat window: why to connect the first time, then the friends, those in
+ * Inviting Discord friends into the room, filling the friends window
+ * (DiscordFriendsWindow): why to connect the first time, then the friends, those in
  * Oeee Cafe first. An invitation is a message in Discord with the room's
  * Join button, sent as Discord's own + would send it, and once sent a
  * friend's button says so, so a second press sends nothing twice.
@@ -46,7 +46,7 @@ export const DiscordInvite = ({ discord, onClose }: DiscordInviteProps) => {
     return (friends ?? []).filter((friend) => !wanted || friend.name.toLowerCase().includes(wanted));
   }, [friends, query]);
 
-  const panel = `${NEO_WELL} mx-[3px] mt-[3px] flex max-h-[160px] min-h-0 shrink-0 flex-col p-[4px] text-[11px] leading-[15px]`;
+  const panel = `${NEO_WELL} m-[3px] flex min-h-0 flex-1 flex-col p-[4px] text-[11px] leading-[15px]`;
 
   if (!state) return null;
 
