@@ -629,6 +629,7 @@ fn renders_users_list() {
                 "deleted_at": null,
                 "last_active_at": "2026-04-01T00:00:00Z",
             }])),
+            filter_query => "",
             page => 1,
             sort => "active",
             has_next => false,
@@ -851,4 +852,172 @@ fn a_store_product_is_checked_before_it_is_added() {
             "{why}"
         );
     }
+}
+
+fn sample_activity(in_range: i64) -> serde_json::Value {
+    json!({ "in_range": in_range, "total": in_range * 40 })
+}
+
+fn render_overview(flagged_sessions: i64, sessions: Vec<serde_json::Value>) -> String {
+    let env = test_env();
+    env.get_template("admin/overview.jinja")
+        .expect("template loads")
+        .render(context! {
+            current_user => Serde(current_user()),
+            range => Serde(json!({
+                "from": "2026-10-05",
+                "to": "2026-10-11",
+                "query": "from=2026-10-05&to=2026-10-11",
+                "description": "2026-10-05 – 2026-10-11",
+            })),
+            presets => Serde(json!([
+                { "label": "Today", "query": "from=2026-10-11&to=2026-10-11", "active": false },
+                { "label": "7 days", "query": "from=2026-10-05&to=2026-10-11", "active": true },
+                { "label": "All time", "query": "from=&to=", "active": false },
+            ])),
+            overview => Serde(json!({
+                "signups": sample_activity(2),
+                "posts": sample_activity(5),
+                "comments": sample_activity(7),
+                "collaborations": sample_activity(1),
+                "purchases": sample_activity(0),
+                "live_sessions": sessions.len(),
+                "flagged_sessions": flagged_sessions,
+                "new_banners": 4,
+            })),
+            sign_in_methods => Serde(json!([
+                {
+                    "name": "Steam",
+                    "provider": "steam",
+                    "signups": { "in_range": 3, "total": 41 },
+                    "accounts": 57,
+                    "used": 23,
+                    "without_password": 44,
+                },
+                {
+                    "name": "Password",
+                    "provider": null,
+                    "signups": { "in_range": 0, "total": 300 },
+                    "accounts": 310,
+                    "used": null,
+                    "without_password": null,
+                },
+            ])),
+            posts => Serde(vec![sample_post()]),
+            signups => Serde(json!([{
+                "id": "00000000-0000-0000-0000-000000000002",
+                "login_name": "newcomer",
+                "display_name": "New Comer",
+                "role": "user",
+                "post_count": 0,
+                "created_at": "2026-01-02T03:04:05Z",
+                "deleted_at": null,
+                "last_active_at": null,
+            }])),
+            sessions => Serde(sessions),
+            r2_public_endpoint_url => "https://r2.example",
+            draft_post_count => 0,
+            unread_notification_count => 0,
+            ftl_lang => "en",
+        })
+        .expect("overview.jinja renders")
+}
+
+/// minijinja writes `/` and `&` in an attribute as entities, which a browser
+/// reads back; the assertions are easier to read in the plain spelling.
+fn unescape(rendered: &str) -> String {
+    rendered.replace("&#x2f;", "/").replace("&amp;", "&")
+}
+
+/// `/admin` is the overview now, so it is the pill's first item and the one
+/// marked there.
+#[test]
+fn overview_is_its_own_section() {
+    let rendered = render_overview(0, vec![]);
+    assert!(rendered.contains(r#"href="/admin" aria-current="page""#));
+    assert!(!rendered.contains(r#"href="/admin/posts" aria-current"#));
+    assert!(rendered.contains("@newcomer"));
+    assert!(rendered.contains("/admin/posts/00000000-0000-0000-0000-000000000001"));
+    assert!(rendered.contains("Nobody is drawing together right now."));
+}
+
+/// The range is chosen above the figures, by preset or by hand, and the
+/// figures are headed by it.
+#[test]
+fn overview_has_a_range_to_choose() {
+    let rendered = unescape(&render_overview(0, vec![]));
+    assert!(rendered
+        .contains(r#"href="/admin?from=2026-10-05&to=2026-10-11" aria-current="page">7 days"#));
+    assert!(rendered.contains(r#"name="from" value="2026-10-05""#));
+    assert!(rendered.contains(r#"name="to" value="2026-10-11""#));
+    assert!(rendered.contains("Activity, 2026-10-05 – 2026-10-11"));
+}
+
+/// Every figure but a zero opens the accounts it counted, over the same
+/// range or, for the all-time column, over all of it.
+#[test]
+fn overview_figures_list_their_accounts() {
+    let rendered = unescape(&render_overview(0, vec![]));
+    assert!(rendered
+        .contains(r#"<a href="/admin/users?stat=posted&from=2026-10-05&to=2026-10-11">5</a>"#));
+    assert!(rendered.contains(r#"<a href="/admin/users?stat=commented&from=&to=">280</a>"#));
+    assert!(
+        !rendered.contains("stat=purchased&from=2026"),
+        "no purchases in range"
+    );
+    assert!(rendered.contains(
+        r#"<a href="/admin/users?provider=steam&stat=provider-signup&from=2026-10-05&to=2026-10-11">3</a>"#
+    ));
+    assert!(rendered
+        .contains(r#"<a href="/admin/users?provider=steam&stat=provider-no-password">44</a>"#));
+    assert!(rendered.contains(r#"<a href="/admin/users?stat=password-set">310</a>"#));
+    // A password's sign-ins are not kept, so there is nothing to count.
+    assert!(rendered.contains(r#"<span class="muted">—</span>"#));
+}
+
+/// The tile that wants a look turns red only when something does.
+#[test]
+fn overview_raises_flagged_collaborations() {
+    let quiet = render_overview(0, vec![]);
+    assert!(!quiet.contains("admin-figure alert"));
+    let flagged = unescape(&render_overview(3, vec![sample_session(json!({}))]));
+    assert!(flagged.contains("admin-figure alert"));
+    assert!(flagged.contains(r#"href="/admin/collaborative-sessions?status=flagged""#));
+    assert!(flagged.contains("/collaborate/00000000-0000-0000-0000-000000000009/preview"));
+    assert!(flagged.contains("link only"));
+}
+
+/// A list opened from a figure names it, and its sort links and pager keep
+/// it.
+#[test]
+fn a_filtered_user_list_says_which_figure() {
+    let env = test_env();
+    let rendered = env
+        .get_template("admin/users.jinja")
+        .expect("template loads")
+        .render(context! {
+            current_user => Serde(current_user()),
+            users => Serde(json!([])),
+            filter => Serde(json!({
+                "description": "Accounts made by signing in with Steam",
+                "range": "2026-10-05 – 2026-10-11",
+                "matching": 3,
+            })),
+            filter_query => "&stat=provider-signup&provider=steam&from=2026-10-05&to=2026-10-11",
+            page => 1,
+            sort => "active",
+            has_next => true,
+            draft_post_count => 0,
+            unread_notification_count => 0,
+            ftl_lang => "en",
+        })
+        .expect("users.jinja renders");
+    let rendered = unescape(&rendered);
+    assert!(rendered.contains("Accounts made by signing in with Steam, 2026-10-05 – 2026-10-11"));
+    assert!(rendered.contains("3 accounts"));
+    assert!(rendered.contains(
+        r#"href="?sort=created&stat=provider-signup&provider=steam&from=2026-10-05&to=2026-10-11""#
+    ));
+    assert!(rendered
+        .contains("&stat=provider-signup&provider=steam&from=2026-10-05&to=2026-10-11&page=2"));
 }

@@ -17,6 +17,7 @@ use sqlx::{query, query_as, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::models::community::CommunityVisibility;
+use crate::models::identity::Provider;
 use crate::models::post::PostDeletionReason;
 use crate::models::user::UserRole;
 
@@ -757,14 +758,116 @@ pub struct AdminUserSummary {
     pub last_active_at: Option<DateTime<Utc>>,
 }
 
+/// A stretch of time to count in, as instants: from `start`, up to but not
+/// including `end`. Either side left open runs to the beginning or the end
+/// of time.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AdminRange {
+    pub start: Option<DateTime<Utc>>,
+    pub end: Option<DateTime<Utc>>,
+}
+
+/// Which accounts a figure on the overview counted, so the user list can show
+/// them. Each matches its figure in `find_overview` or
+/// `find_sign_in_methods`; change them together.
+///
+/// For posts, comments, collaborations and purchases the figure counts the
+/// things and the list the people, so the list can be the shorter.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AdminUserStat {
+    Joined,
+    Posted,
+    /// Comments written here: a federated reply has no account to list.
+    Commented,
+    Collaborated,
+    Purchased,
+    ProviderSignup,
+    ProviderLinked,
+    ProviderUsed,
+    ProviderNoPassword,
+    PasswordSignup,
+    PasswordSet,
+}
+
+impl AdminUserStat {
+    /// As it is written in `?stat=`, and in the query.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AdminUserStat::Joined => "joined",
+            AdminUserStat::Posted => "posted",
+            AdminUserStat::Commented => "commented",
+            AdminUserStat::Collaborated => "collaborated",
+            AdminUserStat::Purchased => "purchased",
+            AdminUserStat::ProviderSignup => "provider-signup",
+            AdminUserStat::ProviderLinked => "provider-linked",
+            AdminUserStat::ProviderUsed => "provider-used",
+            AdminUserStat::ProviderNoPassword => "provider-no-password",
+            AdminUserStat::PasswordSignup => "password-signup",
+            AdminUserStat::PasswordSet => "password-set",
+        }
+    }
+
+    /// The ones that ask about a provider, and mean nothing without one.
+    pub fn needs_provider(self) -> bool {
+        matches!(
+            self,
+            AdminUserStat::ProviderSignup
+                | AdminUserStat::ProviderLinked
+                | AdminUserStat::ProviderUsed
+                | AdminUserStat::ProviderNoPassword
+        )
+    }
+
+    /// The ones that are a standing state rather than something done at a
+    /// time, which a date range does not narrow.
+    pub fn is_timeless(self) -> bool {
+        matches!(
+            self,
+            AdminUserStat::ProviderLinked
+                | AdminUserStat::ProviderNoPassword
+                | AdminUserStat::PasswordSet
+        )
+    }
+
+    /// What the list is of, for its heading.
+    pub fn describe(self, provider: Option<Provider>) -> String {
+        let provider = provider.map_or("a provider", Provider::display_name);
+        match self {
+            AdminUserStat::Joined => "Accounts made".to_string(),
+            AdminUserStat::Posted => "Accounts that published a post".to_string(),
+            AdminUserStat::Commented => "Accounts that commented".to_string(),
+            AdminUserStat::Collaborated => "Accounts that started a collaboration".to_string(),
+            AdminUserStat::Purchased => "Accounts that bought a Supporter Pack".to_string(),
+            AdminUserStat::ProviderSignup => format!("Accounts made by signing in with {provider}"),
+            AdminUserStat::ProviderLinked => format!("Accounts linked to {provider}"),
+            AdminUserStat::ProviderUsed => format!("Accounts last signed in with {provider}"),
+            AdminUserStat::ProviderNoPassword => {
+                format!("Accounts linked to {provider} with no password")
+            }
+            AdminUserStat::PasswordSignup => "Accounts made with a password".to_string(),
+            AdminUserStat::PasswordSet => "Accounts with a password".to_string(),
+        }
+    }
+}
+
+/// Narrows the user list to the accounts one overview figure counted.
+#[derive(Clone, Copy, Debug)]
+pub struct AdminUserFilter {
+    pub stat: AdminUserStat,
+    pub provider: Option<Provider>,
+    pub range: AdminRange,
+}
+
+/// One page of accounts, and how many match in all.
 pub async fn find_all_users(
     tx: &mut Transaction<'_, Postgres>,
     sort: AdminSort,
+    filter: Option<AdminUserFilter>,
     limit: i64,
     offset: i64,
-) -> Result<Vec<AdminUserSummary>> {
-    let rows = query_as!(
-        AdminUserSummary,
+) -> Result<(Vec<AdminUserSummary>, i64)> {
+    let rows = query!(
         r#"
         SELECT
             id AS "id!",
@@ -774,7 +877,8 @@ pub async fn find_all_users(
             created_at AS "created_at!",
             deleted_at,
             post_count AS "post_count!",
-            last_active_at
+            last_active_at,
+            COUNT(*) OVER () AS "matching!"
         FROM (
             SELECT
                 u.id,
@@ -809,6 +913,58 @@ pub async fn find_all_users(
                     )
                 ) AS last_active_at
             FROM users u
+            CROSS JOIN (
+                SELECT
+                    COALESCE($6::timestamptz, '-infinity') AS start,
+                    COALESCE($7::timestamptz, 'infinity') AS finish
+            ) r
+            WHERE $4::text IS NULL OR (u.deleted_at IS NULL AND (
+                ($4 = 'joined'
+                    AND u.created_at >= r.start AND u.created_at < r.finish)
+                OR ($4 = 'posted' AND EXISTS (
+                    SELECT 1 FROM posts p
+                    WHERE p.author_id = u.id AND p.deleted_at IS NULL
+                      AND p.published_at >= r.start AND p.published_at < r.finish))
+                OR ($4 = 'commented' AND EXISTS (
+                    SELECT 1 FROM comments cm
+                    JOIN actors a ON cm.actor_id = a.id
+                    WHERE a.user_id = u.id AND cm.deleted_at IS NULL
+                      AND cm.created_at >= r.start AND cm.created_at < r.finish))
+                -- Zoneless, written in the connection's zone, which the cast
+                -- reads it back in.
+                OR ($4 = 'collaborated' AND EXISTS (
+                    SELECT 1 FROM collaborative_sessions cs
+                    WHERE cs.owner_id = u.id
+                      AND cs.created_at::timestamptz >= r.start
+                      AND cs.created_at::timestamptz < r.finish))
+                OR ($4 = 'purchased' AND EXISTS (
+                    SELECT 1 FROM supporter_purchases sp
+                    WHERE sp.user_id = u.id AND sp.revoked_at IS NULL
+                      AND sp.purchased_at >= r.start AND sp.purchased_at < r.finish))
+                OR ($4 = 'provider-signup'
+                    AND u.created_at >= r.start AND u.created_at < r.finish
+                    AND EXISTS (
+                        SELECT 1 FROM user_identities i
+                        WHERE i.user_id = u.id AND i.provider = $5
+                          AND i.created_at = u.created_at))
+                OR ($4 = 'provider-linked' AND EXISTS (
+                    SELECT 1 FROM user_identities i
+                    WHERE i.user_id = u.id AND i.provider = $5))
+                OR ($4 = 'provider-used' AND EXISTS (
+                    SELECT 1 FROM user_identities i
+                    WHERE i.user_id = u.id AND i.provider = $5
+                      AND i.last_used_at >= r.start AND i.last_used_at < r.finish))
+                OR ($4 = 'provider-no-password' AND u.password_hash IS NULL
+                    AND EXISTS (
+                        SELECT 1 FROM user_identities i
+                        WHERE i.user_id = u.id AND i.provider = $5))
+                OR ($4 = 'password-signup'
+                    AND u.created_at >= r.start AND u.created_at < r.finish
+                    AND NOT EXISTS (
+                        SELECT 1 FROM user_identities i
+                        WHERE i.user_id = u.id AND i.created_at = u.created_at))
+                OR ($4 = 'password-set' AND u.password_hash IS NOT NULL)
+            ))
         ) u
         ORDER BY
             CASE WHEN $1 = 'created' THEN u.created_at END DESC,
@@ -819,8 +975,292 @@ pub async fn find_all_users(
         sort.as_sql(),
         limit,
         offset,
-    );
-    Ok(rows.fetch_all(&mut **tx).await?)
+        filter.map(|filter| filter.stat.as_str()),
+        filter
+            .and_then(|filter| filter.provider)
+            .map(Provider::as_str),
+        filter.and_then(|filter| filter.range.start),
+        filter.and_then(|filter| filter.range.end),
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    let matching = rows.first().map_or(0, |row| row.matching);
+    let users = rows
+        .into_iter()
+        .map(|row| AdminUserSummary {
+            id: row.id,
+            login_name: row.login_name,
+            display_name: row.display_name,
+            role: row.role,
+            post_count: row.post_count,
+            created_at: row.created_at,
+            deleted_at: row.deleted_at,
+            last_active_at: row.last_active_at,
+        })
+        .collect();
+    Ok((users, matching))
+}
+
+/// How many of one thing happened in the range, and ever.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
+pub struct AdminActivity {
+    pub in_range: i64,
+    pub total: i64,
+}
+
+/// The figures on the admin overview, all read in one round trip.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct AdminOverview {
+    /// Accounts created, deleted ones left out of every figure.
+    pub signups: AdminActivity,
+    /// Posts by when they were published; drafts and removed posts excluded.
+    pub posts: AdminActivity,
+    /// Comments, federated replies included, removed ones excluded.
+    pub comments: AdminActivity,
+    pub collaborations: AdminActivity,
+    /// Supporter purchases by when they were made, revoked ones excluded.
+    pub purchases: AdminActivity,
+    /// Sessions nobody has ended, the same `ended_at IS NULL` the lobby lists.
+    pub live_sessions: i64,
+    /// The collaborations list's "Needs a look": a report was filed or the
+    /// replay check came out different. Counts every such session, looked at
+    /// or not -- there is no "reviewed" mark to subtract.
+    pub flagged_sessions: i64,
+    /// Banners put up this week, which is how far back the queue is worth
+    /// paging after a quiet week.
+    pub new_banners: i64,
+}
+
+/// The overview's figures for `range`. Each in-range figure has a matching
+/// `AdminUserStat` in `find_all_users`; change them together.
+pub async fn find_overview(
+    tx: &mut Transaction<'_, Postgres>,
+    range: AdminRange,
+) -> Result<AdminOverview> {
+    let row = query!(
+        r#"
+        WITH
+            r AS (
+                SELECT
+                    COALESCE($1::timestamptz, '-infinity') AS start,
+                    COALESCE($2::timestamptz, 'infinity') AS finish
+            ),
+            u AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE created_at >= r.start AND created_at < r.finish) AS in_range,
+                    COUNT(*) AS total
+                FROM users, r
+                WHERE deleted_at IS NULL
+            ),
+            p AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE published_at >= r.start AND published_at < r.finish) AS in_range,
+                    COUNT(*) AS total
+                FROM posts, r
+                WHERE published_at IS NOT NULL AND deleted_at IS NULL
+            ),
+            c AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE created_at >= r.start AND created_at < r.finish) AS in_range,
+                    COUNT(*) AS total
+                FROM comments, r
+                WHERE deleted_at IS NULL
+            ),
+            -- created_at here is a timestamp without a zone, filled by its
+            -- default now() in the connection's zone, which the cast reads
+            -- it back in.
+            s AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE created_at::timestamptz >= r.start
+                        AND created_at::timestamptz < r.finish) AS in_range,
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE ended_at IS NULL) AS live
+                FROM collaborative_sessions, r
+            ),
+            f AS (
+                SELECT COUNT(*) AS flagged
+                FROM collaborative_session_recordings
+                WHERE reports > 0 OR check_outcome = 'differs'
+            ),
+            sp AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE purchased_at >= r.start AND purchased_at < r.finish) AS in_range,
+                    COUNT(*) AS total
+                FROM supporter_purchases, r
+                WHERE revoked_at IS NULL
+            ),
+            b AS (
+                SELECT COUNT(*) AS new
+                FROM banners
+                WHERE created_at > now() - interval '7 days' AND deleted_at IS NULL
+            )
+        SELECT
+            u.in_range AS "signups_in_range!", u.total AS "signups_total!",
+            p.in_range AS "posts_in_range!", p.total AS "posts_total!",
+            c.in_range AS "comments_in_range!", c.total AS "comments_total!",
+            s.in_range AS "sessions_in_range!", s.total AS "sessions_total!",
+            s.live AS "live_sessions!",
+            f.flagged AS "flagged_sessions!",
+            sp.in_range AS "purchases_in_range!", sp.total AS "purchases_total!",
+            b.new AS "new_banners!"
+        FROM u, p, c, s, f, sp, b
+        "#,
+        range.start,
+        range.end,
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok(AdminOverview {
+        signups: AdminActivity {
+            in_range: row.signups_in_range,
+            total: row.signups_total,
+        },
+        posts: AdminActivity {
+            in_range: row.posts_in_range,
+            total: row.posts_total,
+        },
+        comments: AdminActivity {
+            in_range: row.comments_in_range,
+            total: row.comments_total,
+        },
+        collaborations: AdminActivity {
+            in_range: row.sessions_in_range,
+            total: row.sessions_total,
+        },
+        purchases: AdminActivity {
+            in_range: row.purchases_in_range,
+            total: row.purchases_total,
+        },
+        live_sessions: row.live_sessions,
+        flagged_sessions: row.flagged_sessions,
+        new_banners: row.new_banners,
+    })
+}
+
+/// One way into an account, as the overview's sign-in table shows it: a
+/// provider, or a password.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdminSignInMethod {
+    pub name: String,
+    /// `None` for a password.
+    pub provider: Option<Provider>,
+    /// Accounts made by signing in this way, in the range and ever.
+    pub signups: AdminActivity,
+    /// Live accounts that can sign in this way: linked to the provider, or
+    /// with a password set.
+    pub accounts: i64,
+    /// Accounts whose last sign-in with the provider falls in the range. A
+    /// link counts as a sign-in, and only the last is kept, so a range that
+    /// ends before today misses anyone who has signed in again since. `None`
+    /// for a password, whose sign-ins are not kept.
+    pub used: Option<i64>,
+    /// Linked accounts with no password, for which a provider (this or
+    /// another) or a reset by email is the only way back in.
+    pub without_password: Option<i64>,
+}
+
+/// The sign-in table: each provider in `Provider::ALL`'s order, then
+/// passwords.
+///
+/// An account made through a provider is created and linked in one
+/// transaction (`web::handlers::identity`), so its identity's `created_at`
+/// is its own to the microsecond; that equality is what tells a sign-up
+/// through a provider from a link added later. An account that made itself
+/// with a provider and unlinked it since reads as a password sign-up.
+pub async fn find_sign_in_methods(
+    tx: &mut Transaction<'_, Postgres>,
+    range: AdminRange,
+) -> Result<Vec<AdminSignInMethod>> {
+    let providers: Vec<String> = Provider::ALL
+        .iter()
+        .map(|provider| provider.as_str().to_string())
+        .collect();
+    let rows = query!(
+        r#"
+        SELECT
+            p.provider AS "provider!",
+            COUNT(u.id) FILTER (WHERE i.created_at = u.created_at
+                AND u.created_at >= r.start AND u.created_at < r.finish) AS "signups_in_range!",
+            COUNT(u.id) FILTER (WHERE i.created_at = u.created_at) AS "signups_total!",
+            COUNT(u.id) AS "accounts!",
+            COUNT(u.id) FILTER (WHERE i.last_used_at >= r.start
+                AND i.last_used_at < r.finish) AS "used!",
+            COUNT(u.id) FILTER (WHERE u.password_hash IS NULL) AS "without_password!"
+        FROM unnest($1::text[]) WITH ORDINALITY AS p(provider, ord)
+        CROSS JOIN (
+            SELECT
+                COALESCE($2::timestamptz, '-infinity') AS start,
+                COALESCE($3::timestamptz, 'infinity') AS finish
+        ) r
+        LEFT JOIN user_identities i ON i.provider = p.provider
+        LEFT JOIN users u ON u.id = i.user_id AND u.deleted_at IS NULL
+        GROUP BY p.provider, p.ord
+        ORDER BY p.ord
+        "#,
+        &providers,
+        range.start,
+        range.end,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    let password = query!(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE NOT made_by_provider
+                AND created_at >= COALESCE($1::timestamptz, '-infinity')
+                AND created_at < COALESCE($2::timestamptz, 'infinity')) AS "signups_in_range!",
+            COUNT(*) FILTER (WHERE NOT made_by_provider) AS "signups_total!",
+            COUNT(*) FILTER (WHERE has_password) AS "accounts!"
+        FROM (
+            SELECT
+                u.created_at,
+                u.password_hash IS NOT NULL AS has_password,
+                EXISTS (
+                    SELECT 1 FROM user_identities i
+                    WHERE i.user_id = u.id AND i.created_at = u.created_at
+                ) AS made_by_provider
+            FROM users u
+            WHERE u.deleted_at IS NULL
+        ) u
+        "#,
+        range.start,
+        range.end,
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let mut methods: Vec<AdminSignInMethod> = rows
+        .into_iter()
+        .filter_map(|row| {
+            let provider = Provider::parse(&row.provider)?;
+            Some(AdminSignInMethod {
+                name: provider.display_name().to_string(),
+                provider: Some(provider),
+                signups: AdminActivity {
+                    in_range: row.signups_in_range,
+                    total: row.signups_total,
+                },
+                accounts: row.accounts,
+                used: Some(row.used),
+                without_password: Some(row.without_password),
+            })
+        })
+        .collect();
+    methods.push(AdminSignInMethod {
+        name: "Password".to_string(),
+        provider: None,
+        signups: AdminActivity {
+            in_range: password.signups_in_range,
+            total: password.signups_total,
+        },
+        accounts: password.accounts,
+        used: None,
+        without_password: None,
+    });
+    Ok(methods)
 }
 
 #[cfg(test)]

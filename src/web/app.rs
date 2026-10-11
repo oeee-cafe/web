@@ -12,7 +12,7 @@ use crate::web::handlers::activitypub::{
 };
 use crate::web::handlers::admin::{
     admin_add_store_product, admin_banners, admin_banners_fragment, admin_collaborative_sessions,
-    admin_communities, admin_community_posts, admin_flag_banner, admin_flag_post,
+    admin_communities, admin_community_posts, admin_flag_banner, admin_flag_post, admin_overview,
     admin_post_detail, admin_posts, admin_posts_fragment, admin_set_store_product_details,
     admin_set_store_product_on_sale, admin_set_store_product_sale_window, admin_store,
     admin_user_posts, admin_users, collaborative_archive_manifest, collaborative_archive_tail,
@@ -94,7 +94,6 @@ use anyhow::Result;
 use axum::body::Body;
 use axum::extract::DefaultBodyLimit;
 use axum::http::{header, Response, StatusCode};
-use axum::response::Redirect;
 use axum::routing::{delete, get, post, put};
 use axum::Router;
 use axum_login::AuthManagerLayerBuilder;
@@ -333,7 +332,7 @@ impl App {
             // Staff-only. These live inside the login-gated router so signed-out
             // visitors are redirected to /login; the AdminUser extractor on each
             // handler is what rejects signed-in non-admins with a 403.
-            .route("/admin", get(|| async { Redirect::to("/admin/posts") }))
+            .route("/admin", get(admin_overview))
             .route("/admin/posts", get(admin_posts))
             .route("/admin/posts-fragment", get(admin_posts_fragment))
             .route("/admin/posts/{post_id}", get(admin_post_detail))

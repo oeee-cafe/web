@@ -24,6 +24,7 @@
     </div>
     <div class="admin-bar">
       <nav class="ds-segmented admin-nav" aria-label="Admin" {{ pill.in_place() }}>
+        <a href="/admin"{% if admin_section == "overview" %} aria-current="page"{% endif %}>Overview</a>
         <a href="/admin/posts"{% if admin_section == "posts" %} aria-current="page"{% endif %}>All posts</a>
         <a href="/admin/users"{% if admin_section == "users" %} aria-current="page"{% endif %}>Users</a>
         <a href="/admin/communities"{% if admin_section == "communities" %} aria-current="page"{% endif %}>Communities</a>

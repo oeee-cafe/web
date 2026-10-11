@@ -6,9 +6,8 @@
    feeds' own. What is here only lays those out and adds what staff alone
    see -- the banner, the moderation tags.
 
-   This file is served as written and never sees neo-cucumber's legacy CSS
-   pass, so it keeps to what Firefox 56 reads: no flex `gap` (margins
-   instead), `grid-gap` beside `gap`. */
+   Only staff see these pages, so they need not reach the Firefox 56 floor
+   the painter keeps: flex `gap` spaces things here, not margins. */
 
 /* Loud on purpose: these pages show private communities, drafts and removed
    posts, so which context this is should never be in doubt. The danger
@@ -30,13 +29,13 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: var(--ds-space-3);
   margin-bottom: var(--ds-space-5);
 }
 
 .admin-nav {
   max-width: 100%;
   overflow-x: auto;
-  margin-right: var(--ds-space-3);
 }
 
 /* The page's own title and what it covers. */
@@ -70,28 +69,25 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
+  gap: var(--ds-space-2) var(--ds-space-4);
   margin-bottom: var(--ds-space-4);
-  padding-bottom: var(--ds-space-2);
 }
 
 .admin-filters > * {
-  margin: 0 var(--ds-space-4) var(--ds-space-2) 0;
-}
-
-.admin-filters > :last-child {
-  margin-right: 0;
+  margin: 0;
 }
 
 /* A checkbox and its words, on the fields' line. */
 .admin-check {
   display: flex;
   align-items: center;
+  gap: var(--ds-space-2);
   min-height: var(--ds-control-height);
   font-size: var(--ds-text-m);
 }
 
 .admin-check input {
-  margin: 0 var(--ds-space-2) 0 0;
+  margin: 0;
 }
 
 .admin-empty {
@@ -110,7 +106,6 @@
   display: inline-block;
   max-width: 100%;
   padding: 0 5px;
-  -moz-box-sizing: border-box;
   box-sizing: border-box;
   border: 1px solid var(--ds-line-strong);
   border-radius: var(--ds-radius-s);
@@ -139,13 +134,17 @@
   color: var(--ds-success-text);
 }
 
-/* A session's recording, as a stack of tags in one cell. */
-.admin-recording .admin-tag {
-  margin: 0 var(--ds-space-1) 2px 0;
+/* Tags side by side: a post's state wraps under its title, and a
+   session's recording stays one line, as every cell of a table does. */
+.admin-recording,
+.admin-tags {
+  display: flex;
+  align-items: center;
+  gap: 2px var(--ds-space-1);
 }
 
-.admin-recording .admin-tag + .admin-tag {
-  margin-left: 0;
+.admin-tags {
+  flex-wrap: wrap;
 }
 
 .admin-tag.draft {
@@ -154,15 +153,12 @@
 }
 
 .admin-tags {
-  margin: var(--ds-space-2) 0 0;
+  margin-top: var(--ds-space-2);
+  margin-bottom: 0;
 }
 
 .admin-tags:empty {
   display: none;
-}
-
-.admin-tag + .admin-tag {
-  margin-left: var(--ds-space-1);
 }
 
 /* An error from a form, as a row of the danger tint. */
@@ -208,11 +204,8 @@
 
 /* Several small links in one cell: kept on one line, apart. */
 .admin-row-actions {
-  white-space: nowrap;
-}
-
-.admin-row-actions a + a {
-  margin-left: var(--ds-space-2);
+  display: flex;
+  gap: var(--ds-space-2);
 }
 
 /* Small enough that a hundred rows stay a table rather than a gallery, and
@@ -224,18 +217,14 @@
   height: auto;
   background-color: #fff;
   box-shadow: 0 0 0 1px var(--ds-frame);
-  image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
 }
 
 .admin-pager {
   display: flex;
   align-items: center;
+  gap: var(--ds-space-3);
   margin-top: var(--ds-space-4);
-}
-
-.admin-pager > * + * {
-  margin-left: var(--ds-space-3);
 }
 
 .admin-status {
@@ -251,6 +240,7 @@
 }
 
 .admin-section-help {
+  max-width: 720px;
   margin: 0 0 var(--ds-space-2);
 }
 
@@ -274,16 +264,10 @@
 }
 
 .post-card-tags {
-  margin-bottom: 4px;
-  white-space: normal;
-}
-
-.post-card-tags .admin-tag {
-  margin: 0 var(--ds-space-1) 2px 0;
-}
-
-.post-card-tags .admin-tag + .admin-tag {
-  margin-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--ds-space-1);
+  margin-bottom: 6px;
 }
 
 /* Fixed to the viewport so it stays reachable while scrolling an
@@ -306,7 +290,6 @@
 .admin-sentinel {
   width: 100%;
   padding: var(--ds-space-4);
-  -moz-box-sizing: border-box;
   box-sizing: border-box;
   text-align: center;
 }
@@ -317,7 +300,6 @@
 .admin-banners {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  grid-gap: var(--ds-space-4);
   gap: var(--ds-space-4);
   align-items: start;
 }
@@ -337,11 +319,10 @@
 }
 
 .admin-banner-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
   margin: var(--ds-space-3) 0;
-}
-
-.admin-banner-card-text > * + * {
-  margin-top: var(--ds-space-1);
 }
 
 /* A drawing: a hard 1px frame, square corners, hard pixels. */
@@ -351,7 +332,6 @@
   height: auto;
   background-color: #fff;
   box-shadow: 0 0 0 1px var(--ds-frame);
-  image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
 }
 
@@ -366,6 +346,7 @@
 .admin-post {
   display: flex;
   align-items: flex-start;
+  gap: var(--ds-space-5);
 }
 
 .admin-post-drawing {
@@ -377,7 +358,6 @@
   flex: 1 1 320px;
   min-width: 0;
   max-width: 560px;
-  margin-left: var(--ds-space-5);
 }
 
 /* The record's headings run down the side, so each row's rule is on its
@@ -398,12 +378,14 @@
 
 @media (max-width: 800px) {
   .admin-post {
-    display: block;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--ds-space-4);
   }
 
   .admin-post-side {
+    flex-basis: auto;
     max-width: none;
-    margin: var(--ds-space-4) 0 0;
   }
 }
 
@@ -414,12 +396,9 @@
    --------------------------------------------------------------------------- */
 .admin-sale-window,
 .admin-product-details {
-  white-space: nowrap;
-}
-
-.admin-sale-window > * + *,
-.admin-product-details > * + * {
-  margin-left: var(--ds-space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
 }
 
 .admin-product-year {
@@ -443,7 +422,6 @@
 .admin-fields {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  grid-gap: var(--ds-space-3) var(--ds-space-4);
   gap: var(--ds-space-3) var(--ds-space-4);
   margin-top: var(--ds-space-3);
 }
@@ -457,10 +435,110 @@
 .admin-fields select {
   width: 100%;
   max-width: none;
-  -moz-box-sizing: border-box;
   box-sizing: border-box;
 }
 
 .admin-add-product .ds-actions {
   margin-top: var(--ds-space-4);
+}
+
+/* ---------------------------------------------------------------------------
+   The overview: what is waiting as a row of figures, each a card that goes
+   to its section; then the activity table and the newest of each list.
+   --------------------------------------------------------------------------- */
+.admin-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--ds-space-3);
+}
+
+.ds-selectable a.admin-figure,
+a.admin-figure {
+  display: block;
+  color: var(--ds-ink);
+  text-decoration: none;
+}
+
+a.admin-figure:hover {
+  border-color: var(--ds-ink);
+}
+
+.admin-figure-count {
+  display: block;
+  font-size: var(--ds-text-2xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.admin-figure-label {
+  display: block;
+  margin-top: var(--ds-space-1);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
+/* Not zero, and it is the kind that wants someone: the banner's danger
+   tint, so it reads from across the page. */
+a.admin-figure.alert {
+  border-color: var(--ds-danger);
+  background-color: var(--ds-danger-surface);
+}
+
+a.admin-figure.alert .admin-figure-count,
+a.admin-figure.alert .admin-figure-label {
+  color: var(--ds-danger-text);
+}
+
+/* Figures line up by the digit, right under headings that do the same;
+   the row's name keeps the left. Written as specifically as the design
+   system's table rule (ds.css), or it loses to it. */
+.ds-page .admin-activity table:not([class]) th,
+.ds-page .admin-activity table:not([class]) td {
+  min-width: 56px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-page .admin-activity table:not([class]) th:first-child,
+.ds-page .admin-activity table:not([class]) td:first-child {
+  padding-right: var(--ds-space-5);
+  text-align: left;
+}
+
+.ds-page .admin-activity table:not([class]) {
+  width: auto;
+}
+
+/* A section's label with the way on to all of it at the line's end. */
+.admin-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.admin-section-head > .profile-section-label {
+  margin-top: 0;
+}
+
+.admin-section-head > a {
+  font-size: var(--ds-text-m);
+}
+
+.posts-grid.admin-overview-posts {
+  margin-top: 0;
+}
+
+/* The overview's range: presets, then the days by hand. */
+.admin-range .ds-segmented {
+  align-self: flex-end;
+}
+
+/* A filtered user list says which figure it came from, with the way out. */
+.admin-user-filter {
+  align-items: center;
+}
+
+.admin-user-filter > p {
+  font-size: var(--ds-text-base);
 }

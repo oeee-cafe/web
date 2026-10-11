@@ -1,7 +1,7 @@
 {% extends "admin/base.jinja" %}
 {% set admin_section = "users" %}
 {% macro sort_link(key, label) %}
-  <a href="?sort={{ key }}" {% if sort == key %}class="admin-sort-active"{% endif %}>
+  <a href="?sort={{ key }}{{ filter_query }}" {% if sort == key %}class="admin-sort-active"{% endif %}>
     {{ label }}{% if sort == key %} ▾{% endif %}
   </a>
 {% endmacro %}
@@ -13,6 +13,16 @@
       account produced. Passive browsing is not tracked.
     </p>
   </div>
+  {% if filter %}
+    {# Opened from a figure on the overview. #}
+    <div class="ds-card admin-filters admin-user-filter">
+      <p>
+        <strong>{{ filter.description }}{% if filter.range %}, {{ filter.range }}{% endif %}</strong>
+        <span class="muted">· {{ filter.matching }} account{% if filter.matching != 1 %}s{% endif %}</span>
+      </p>
+      <a class="ds-button ds-button-small" href="/admin/users?sort={{ sort }}">Show every account</a>
+    </div>
+  {% endif %}
   <div class="admin-table-scroll">
     <table>
       <thead>
@@ -61,8 +71,8 @@
   </div>
 
   <div class="admin-pager">
-    {% if page > 1 %}<a class="ds-button ds-button-small" href="?sort={{ sort }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+    {% if page > 1 %}<a class="ds-button ds-button-small" href="?sort={{ sort }}{{ filter_query }}&page={{ page - 1 }}">← Previous</a>{% endif %}
     <span class="muted">Page {{ page }}</span>
-    {% if has_next %}<a class="ds-button ds-button-small" href="?sort={{ sort }}&page={{ page + 1 }}">Next →</a>{% endif %}
+    {% if has_next %}<a class="ds-button ds-button-small" href="?sort={{ sort }}{{ filter_query }}&page={{ page + 1 }}">Next →</a>{% endif %}
   </div>
 {% endblock admin_content %}

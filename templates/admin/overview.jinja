@@ -1,0 +1,262 @@
+{% extends "admin/base.jinja" %}
+{% set admin_section = "overview" %}
+{% import "post_card.jinja" as card %}
+{# A figure that wants a look, as a card that goes to where it can be had.
+   `alert` tints it when the figure is not zero. #}
+{% macro waiting(count, label, href, alert=false) %}
+  <a class="ds-card admin-figure{% if alert and count %} alert{% endif %}" href="{{ href }}">
+    <span class="admin-figure-count">{{ count }}</span>
+    <span class="admin-figure-label">{{ label }}</span>
+  </a>
+{% endmacro %}
+{# A figure, as a link to the accounts it counted. `params` names the
+   figure (`stat=…`, and a provider), and the range when it has one. A zero
+   lists nobody, so it stays plain. #}
+{% macro figure(value, params) -%}
+  <td>{% if value %}<a href="/admin/users?{{ params }}">{{ value }}</a>{% else %}<span class="muted">0</span>{% endif %}</td>
+{%- endmacro %}
+{% macro activity_row(label, figures, stat, href=none) %}
+  <tr>
+    <td>{% if href %}<a href="{{ href }}">{{ label }}</a>{% else %}{{ label }}{% endif %}</td>
+    {{ figure(figures.in_range, "stat=" ~ stat ~ "&" ~ range.query) }}
+    {{ figure(figures.total, "stat=" ~ stat ~ "&from=&to=") }}
+  </tr>
+{% endmacro %}
+{% block admin_content %}
+  <div class="admin-head">
+    <h1 class="admin-title">Overview</h1>
+    <p class="ds-help">
+      The figures below the range count what happened on those days, Seoul
+      time, both ends included. Each links to the accounts it counted — for
+      posts, comments, collaborations and purchases, the people who made
+      them, so the list can be shorter than the figure. Removed posts and
+      comments, deleted accounts and revoked purchases are left out
+      throughout.
+    </p>
+  </div>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Waiting on staff</h2>
+    <div class="admin-figures">
+      {{ waiting(overview.flagged_sessions, "collaborations need a look", "/admin/collaborative-sessions?status=flagged", true) }}
+      {{ waiting(overview.live_sessions, "collaborations live now", "/admin/collaborative-sessions?status=live") }}
+      {{ waiting(overview.new_banners, "banners put up this week", "/admin/banners") }}
+    </div>
+  </section>
+
+  <form class="ds-card admin-filters admin-range" method="get" action="/admin">
+    <nav class="ds-segmented" aria-label="Range">
+      {%- for preset in presets -%}
+        <a href="/admin?{{ preset.query }}"{% if preset.active %} aria-current="page"{% endif %}>{{ preset.label }}</a>
+      {%- endfor -%}
+    </nav>
+    <label class="ds-label">
+      From
+      <input class="ds-input" type="date" name="from" value="{{ range.from }}" />
+    </label>
+    <label class="ds-label">
+      To
+      <input class="ds-input" type="date" name="to" value="{{ range.to }}" />
+    </label>
+    <input type="submit" value="Show" />
+  </form>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Activity, {{ range.description }}</h2>
+    <div class="admin-table-scroll admin-activity">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>In range</th>
+            <th>All time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ activity_row("Sign-ups", overview.signups, "joined", "/admin/users?sort=created") }}
+          {{ activity_row("Posts published", overview.posts, "posted", "/admin/posts") }}
+          {{ activity_row("Comments", overview.comments, "commented") }}
+          {{ activity_row("Collaborations started", overview.collaborations, "collaborated", "/admin/collaborative-sessions?sort=created") }}
+          {{ activity_row("Supporter purchases", overview.purchases, "purchased", "/admin/store") }}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Sign-in, {{ range.description }}</h2>
+    <p class="ds-help admin-section-help">
+      A sign-up through a provider is an account made by signing in with it;
+      a link added to an existing account counts under Accounts only. Only
+      the last sign-in with each provider is kept, linking included, so
+      "Last signed in" misses anyone who has signed in again since the range
+      ended. An account without a password gets back in through a provider
+      or a reset by email.
+    </p>
+    <div class="admin-table-scroll admin-activity">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Sign-ups</th>
+            <th>Sign-ups ever</th>
+            <th>Accounts</th>
+            <th>Last signed in</th>
+            <th>No password</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for method in sign_in_methods %}
+            {% if method.provider %}
+              {% set by = "provider=" ~ method.provider ~ "&stat=provider-" %}
+              <tr>
+                <td>{{ method.name }}</td>
+                {{ figure(method.signups.in_range, by ~ "signup&" ~ range.query) }}
+                {{ figure(method.signups.total, by ~ "signup&from=&to=") }}
+                {{ figure(method.accounts, by ~ "linked") }}
+                {{ figure(method.used, by ~ "used&" ~ range.query) }}
+                {{ figure(method.without_password, by ~ "no-password") }}
+              </tr>
+            {% else %}
+              <tr>
+                <td>{{ method.name }}</td>
+                {{ figure(method.signups.in_range, "stat=password-signup&" ~ range.query) }}
+                {{ figure(method.signups.total, "stat=password-signup&from=&to=") }}
+                {{ figure(method.accounts, "stat=password-set") }}
+                <td><span class="muted">—</span></td>
+                <td><span class="muted">—</span></td>
+              </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <h2 class="profile-section-label">Latest posts</h2>
+      <a href="/admin/posts">all posts →</a>
+    </div>
+    {% if posts %}
+      <div class="posts-grid admin-overview-posts">
+        {% for post in posts %}
+          {{ card.post_card(post, r2_public_endpoint_url, true) }}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">Nothing has been published yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <h2 class="profile-section-label">Live collaborations</h2>
+      <a href="/admin/collaborative-sessions?status=live">all live →</a>
+    </div>
+    {% if sessions %}
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Canvas</th>
+              <th>Title</th>
+              <th>Owner</th>
+              <th>Seats</th>
+              <th>Visibility</th>
+              <th>Last active</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for session in sessions %}
+              <tr>
+                <td>
+                  {% if session.preview_version %}
+                    <img class="admin-session-preview"
+                         src="/collaborate/{{ session.id }}/preview?v={{ session.preview_version }}"
+                         width="{{ session.width }}"
+                         height="{{ session.height }}"
+                         loading="lazy"
+                         decoding="async"
+                         alt="Current canvas of this session">
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if session.title %}
+                    {{ session.title }}
+                  {% else %}
+                    <span class="muted">untitled</span>
+                  {% endif %}
+                </td>
+                <td><a href="/@{{ session.owner_login_name }}" target="_blank">@{{ session.owner_login_name }}</a></td>
+                <td>{{ session.active_participant_count }} / {{ session.max_participants }}</td>
+                <td>
+                  {% if not session.is_public %}
+                    <span class="admin-tag private">link only</span>
+                  {% elif session.community_visibility and session.community_visibility != "public" %}
+                    <span class="admin-tag {{ session.community_visibility }}">{{ session.community_visibility }}</span>
+                  {% else %}
+                    public
+                  {% endif %}
+                </td>
+                <td>{{ session.last_activity|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
+                <td>
+                  <a href="/admin/collaborative-sessions/{{ session.id }}">inspect</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">Nobody is drawing together right now.</p>
+    {% endif %}
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <h2 class="profile-section-label">Newest accounts</h2>
+      <a href="/admin/users?sort=created">all users →</a>
+    </div>
+    <div class="admin-table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Login name</th>
+            <th>Display name</th>
+            <th>Posts</th>
+            <th>Last active</th>
+            <th>Joined</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in signups %}
+            <tr>
+              <td>
+                <a href="/admin/users/{{ user.login_name }}/posts">@{{ user.login_name }}</a>
+                {% if user.deleted_at %}<span class="admin-tag deleted">deleted</span>{% endif %}
+              </td>
+              <td>{{ user.display_name }}</td>
+              <td>{{ user.post_count }}</td>
+              <td>
+                {% if user.last_active_at %}
+                  {{ user.last_active_at|datetimeformat(format="short", tz="Asia/Seoul") }}
+                {% else %}
+                  <span class="muted">never</span>
+                {% endif %}
+              </td>
+              <td>{{ user.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}</td>
+              <td>
+                <a href="/admin/users/{{ user.login_name }}/posts">posts →</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock admin_content %}

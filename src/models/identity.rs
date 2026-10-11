@@ -25,6 +25,14 @@ pub enum Provider {
 }
 
 impl Provider {
+    /// Every provider, in the order the site lists them.
+    pub const ALL: [Provider; 4] = [
+        Provider::Steam,
+        Provider::Apple,
+        Provider::Google,
+        Provider::Discord,
+    ];
+
     /// The name stored in `user_identities.provider` and used in URLs.
     pub fn as_str(self) -> &'static str {
         match self {

@@ -109,45 +109,49 @@
                inspector, for a session recorded before that. Red is what
                wants a look: a report, a recording that starts part-way, or a
                replay that does not come out as what was saved. #}
-            <td class="admin-recording">
+            <td>
               {% set r = session.recording %}
               {% if r %}
-                {% if r.messages %}
-                  <span class="admin-tag">{{ r.messages }} msgs</span>
-                {% endif %}
-                {% if r.first_seq and r.first_seq != 1 %}
-                  <span class="admin-tag deleted" title="Everything before sequence {{ r.first_seq }} is missing">partial</span>
-                {% endif %}
-                {% if r.chat_lines %}
-                  <span class="admin-tag">{{ r.chat_lines }} chat</span>
-                {% endif %}
-                {% if r.reports %}
-                  <span class="admin-tag deleted">{{ r.reports }} report{% if r.reports != 1 %}s{% endif %}</span>
-                {% endif %}
-                {% if r.check_outcome == "match" %}
-                  <span class="admin-tag ok" title="Played back to what was saved, pixel for pixel">replay ✓</span>
-                {% elif r.check_outcome == "differs" %}
-                  <span class="admin-tag deleted" title="{{ r.check_differing_pixels }} of {{ r.check_total_pixels }} pixels differ from the saved post">replay ✗ {{ r.check_differing_pixels }} px</span>
-                {% elif r.check_outcome == "incomplete" %}
-                  <span class="admin-tag draft" title="{{ r.check_note or '' }}">replay incomplete</span>
-                {% endif %}
+                <div class="admin-recording">
+                  {% if r.messages %}
+                    <span class="admin-tag">{{ r.messages }} msgs</span>
+                  {% endif %}
+                  {% if r.first_seq and r.first_seq != 1 %}
+                    <span class="admin-tag deleted" title="Everything before sequence {{ r.first_seq }} is missing">partial</span>
+                  {% endif %}
+                  {% if r.chat_lines %}
+                    <span class="admin-tag">{{ r.chat_lines }} chat</span>
+                  {% endif %}
+                  {% if r.reports %}
+                    <span class="admin-tag deleted">{{ r.reports }} report{% if r.reports != 1 %}s{% endif %}</span>
+                  {% endif %}
+                  {% if r.check_outcome == "match" %}
+                    <span class="admin-tag ok" title="Played back to what was saved, pixel for pixel">replay ✓</span>
+                  {% elif r.check_outcome == "differs" %}
+                    <span class="admin-tag deleted" title="{{ r.check_differing_pixels }} of {{ r.check_total_pixels }} pixels differ from the saved post">replay ✗ {{ r.check_differing_pixels }} px</span>
+                  {% elif r.check_outcome == "incomplete" %}
+                    <span class="admin-tag draft" title="{{ r.check_note or '' }}">replay incomplete</span>
+                  {% endif %}
+                </div>
               {% else %}
                 <span class="muted">—</span>
               {% endif %}
             </td>
-            <td class="admin-row-actions">
-              {# No link into the room itself: joining takes a seat and puts a
-                 layer in the drawing, so one stray click here would show the
-                 collaborators an admin in their session. The canvas preview
-                 and the recording are how this page looks without joining. #}
-              {# The recording of this session's canonical stream, played back
-                 with its log, its conversation and any reports beside it.
-                 Offered for every row: an ended session is exactly the one
-                 worth examining, and the archive outlives the room. #}
-              <a href="/admin/collaborative-sessions/{{ session.id }}">inspect</a>
-              {# The raw file, for running it through something that is not
-                 this site. #}
-              <a href="/admin/collaborative-sessions/{{ session.id }}/archive" download>log ↓</a>
+            <td>
+              <div class="admin-row-actions">
+                {# No link into the room itself: joining takes a seat and puts a
+                   layer in the drawing, so one stray click here would show the
+                   collaborators an admin in their session. The canvas preview
+                   and the recording are how this page looks without joining. #}
+                {# The recording of this session's canonical stream, played back
+                   with its log, its conversation and any reports beside it.
+                   Offered for every row: an ended session is exactly the one
+                   worth examining, and the archive outlives the room. #}
+                <a href="/admin/collaborative-sessions/{{ session.id }}">inspect</a>
+                {# The raw file, for running it through something that is not
+                   this site. #}
+                <a href="/admin/collaborative-sessions/{{ session.id }}/archive" download>log ↓</a>
+              </div>
             </td>
           </tr>
         {% endfor %}
