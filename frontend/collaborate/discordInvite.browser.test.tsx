@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { I18nProvider } from "@lingui/react";
@@ -199,7 +200,9 @@ describe("inviting Discord friends from the session", () => {
     expect(host!.contains(window_)).toBe(false);
     expect(button("Invite")!.getAttribute("aria-expanded")).toBe("true");
 
-    await act(async () => window_.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click());
+    // Pressed as a pointer presses it, which is what the title bar's drag
+    // takes for itself as it goes down: a click() alone never tells.
+    await act(() => userEvent.click(window_.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!));
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
     expect(button("Invite")!.getAttribute("aria-expanded")).toBe("false");
 

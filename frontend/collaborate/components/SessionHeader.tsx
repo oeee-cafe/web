@@ -54,7 +54,9 @@ function besideChat(header: HTMLElement | null, ceiling: number): WindowOrigin {
  * handle the window is dragged by, and Share has to stay a button.
  *
  * The buttons have a row of their own under who and whether: three of them
- * beside the status and the owner's name squeezed both into ellipses.
+ * beside the status and the owner's name squeezed both into ellipses. They
+ * share the row's width, edge to edge, rather than gather at its end and
+ * leave a gap where the row starts.
  *
  * In the Windows app with Discord, Invite sits beside Share and opens the
  * Discord friends to ask in, in a window of their own beside the chat
@@ -132,13 +134,13 @@ export const SessionHeader = ({
         <Trans>by</Trans> @{canvasMeta.ownerLoginName}
       </div>
     </div>
-    <div className="flex flex-wrap items-center justify-end gap-[4px]">
+    <div className="flex items-center gap-[4px]">
       {canInvite && (
         <button
           type="button"
           onClick={() => setInviting((open) => (open ? null : besideChat(headerRef.current, ceiling)))}
           aria-expanded={inviting !== null}
-          className={`${NEO_BUTTON} flex shrink-0 items-center gap-[4px] ${inviting ? NEO_BUTTON_ON : ""}`}
+          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] ${inviting ? NEO_BUTTON_ON : ""}`}
           title={t`Invite Discord friends`}
         >
           <DiscordMark />
@@ -149,7 +151,7 @@ export const SessionHeader = ({
         <button
           type="button"
           onClick={() => inviteSteamFriends(steamJoin)}
-          className={`${NEO_BUTTON} flex shrink-0 items-center gap-[4px]`}
+          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px]`}
           title={t`Invite Steam friends`}
         >
           <Icon icon="material-symbols:group-add" width={14} height={14} />
@@ -159,7 +161,7 @@ export const SessionHeader = ({
       <button
         type="button"
         onClick={handleShare}
-        className={`${NEO_BUTTON} flex shrink-0 items-center gap-[4px]`}
+        className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px]`}
         title={t`Share this session`}
       >
         <Icon icon="material-symbols:upload" width={14} height={14} />

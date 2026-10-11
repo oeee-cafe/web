@@ -71,21 +71,25 @@ export const DiscordFriendsWindow = ({ discord, origin, minimumY, onClose }: Dis
         height: `${size.height}px`,
       }}
     >
-      <div ref={handleRef} className={NEO_TITLEBAR_HANDLE}>
-        <span className={NEO_TITLEBAR_DOT} />
-        <span className={NEO_TITLEBAR_DOT} />
-        <span className={NEO_TITLEBAR_DOT} />
-        <span className="ml-[4px] min-w-0 flex-1 truncate text-[12px] leading-[18px]">
-          <Trans>Discord friends</Trans>
-        </span>
-        {/* Pressed rather than dragged: the title bar takes the pointer for
-            the drag as it goes down, so this keeps it to itself. */}
+      {/* The × sits over the title bar's end but is not inside it: the
+          title bar takes the pointer for the drag as it goes down
+          (attachWindowDrag), listening on itself, so a button within it was
+          never clicked -- and stopping the press in React came too late,
+          React hearing it only once it reached the page's root. */}
+      <div className="relative shrink-0">
+        <div ref={handleRef} className={`${NEO_TITLEBAR_HANDLE} pr-[22px]`}>
+          <span className={NEO_TITLEBAR_DOT} />
+          <span className={NEO_TITLEBAR_DOT} />
+          <span className={NEO_TITLEBAR_DOT} />
+          <span className="ml-[4px] min-w-0 flex-1 truncate text-[12px] leading-[18px]">
+            <Trans>Discord friends</Trans>
+          </span>
+        </div>
         <button
           type="button"
-          onPointerDown={(event) => event.stopPropagation()}
           onClick={onClose}
           aria-label={t`Close`}
-          className="mr-[2px] shrink-0 cursor-pointer px-[4px] text-[14px] leading-[16px] text-(--neo-titlebar-text)"
+          className="absolute top-0 right-[2px] bottom-0 cursor-pointer px-[4px] text-[14px] leading-[16px] text-(--neo-titlebar-text)"
         >
           ×
         </button>
