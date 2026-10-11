@@ -100,6 +100,7 @@ function Harness({ renderRef }: { renderRef: React.RefObject<(() => void) | null
     addChatMessage: (message) => void message,
     handleResetRequest: () => {},
     canUploadCheckpoint: () => false,
+    hasCheckpointToTake: () => false,
     onReconnectCanvas: () => {},
     onCanvasMessage: async () => {},
     onUnreadableSequence: async () => {},

@@ -160,6 +160,8 @@ pub enum ResetPhase {
 pub struct ResetRequestMessage {
     pub timestamp: u64,
     pub phase: ResetPhase,
+    /// The room is nearly out of history; see `URGENT_HISTORY_BYTES`.
+    pub urgent: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -275,7 +277,7 @@ impl ChatMessage {
 
 impl ResetRequestMessage {
     pub fn serialize(&self) -> Vec<u8> {
-        let mut buffer = Vec::with_capacity(1 + 8 + 1);
+        let mut buffer = Vec::with_capacity(1 + 8 + 1 + 1);
         buffer.push(MessageType::ResetRequest as u8);
         buffer.extend_from_slice(&self.timestamp.to_le_bytes());
         // The phase is appended rather than given its own message type so that
@@ -285,6 +287,9 @@ impl ResetRequestMessage {
         // it wins the claim the checkpoint is real, and if it loses,
         // `parse_reset_begin` counts its snapshots off the wire and drops them.
         buffer.push(self.phase as u8);
+        // Appended for the same reason, and absent means "not urgent", which
+        // is what every request was before it existed.
+        buffer.push(u8::from(self.urgent));
 
         buffer
     }
@@ -751,11 +756,13 @@ pub async fn send_reset_request(
     room_uuid: Uuid,
     target_connection: Option<&str>,
     phase: ResetPhase,
+    urgent: bool,
     state: &AppState,
 ) {
     let reset_request = ResetRequestMessage {
         timestamp: get_current_timestamp_ms(),
         phase,
+        urgent,
     };
 
     let room_message = super::redis_state::RoomBroadcast {

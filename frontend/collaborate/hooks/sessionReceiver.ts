@@ -40,10 +40,13 @@ export interface ReceiverHandlers {
   addParticipant: (userId: string, username: string, joinedAt: number, sessionId?: number) => void;
   clearParticipants: () => void;
   addChatMessage: (message: ChatLine) => void;
-  /** The room is asking who can upload a checkpoint. */
-  onResetQuery: () => void;
+  /**
+   * The room is asking who can upload a checkpoint. `urgent` when its
+   * history is nearly full and it needs one whatever it costs.
+   */
+  onResetQuery: (urgent: boolean) => void;
   /** This client answered first, so the checkpoint is its to upload. */
-  onResetSelected: () => void;
+  onResetSelected: (urgent: boolean) => void;
   onReconnectCanvas: (reconnecting: boolean, resumeSequence: number | null) => Promise<void> | void;
   onCanvasMessage: (message: DecodedMessage, raw: Uint8Array, sequence?: number) => Promise<void>;
   /**
@@ -541,10 +544,10 @@ export class SessionReceiver {
         if (message.phase === "query") {
           // The room is asking who can upload a checkpoint. Answering is one
           // byte; the work only starts if we win.
-          handlers.onResetQuery();
+          handlers.onResetQuery(message.urgent);
         } else {
           // We answered first, so it is ours to do.
-          handlers.onResetSelected();
+          handlers.onResetSelected(message.urgent);
         }
         break;
       }

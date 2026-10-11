@@ -213,7 +213,22 @@ impl HistorySize {
 /// on top of whatever the last checkpoint weighs, and is clamped below the hard
 /// ceiling so there is always room to ask before there is no room to draw.
 pub fn effective_auto_reset_bytes(base_bytes: u64) -> u64 {
-    (base_bytes + AUTO_RESET_THRESHOLD_BYTES).min(MAX_HISTORY_BYTES / 10 * 9)
+    (base_bytes + AUTO_RESET_THRESHOLD_BYTES).min(URGENT_HISTORY_BYTES)
+}
+
+/// Past this a room needs a checkpoint whatever it costs.
+///
+/// A client cuts a checkpoint behind everything anybody can still undo, and
+/// declines when that would free nothing yet: the room asks again later, by
+/// which time reach has moved on. A room this close to `MAX_HISTORY_BYTES`
+/// may not have a later -- at the ceiling it refuses every message, so reach
+/// never moves -- and is told so, so that somebody cuts at the head instead,
+/// freezing whatever undo that takes, rather than leaving the room unable to
+/// draw at all.
+pub const URGENT_HISTORY_BYTES: u64 = MAX_HISTORY_BYTES / 10 * 9;
+
+pub fn needs_checkpoint_urgently(bytes: u64) -> bool {
+    bytes > URGENT_HISTORY_BYTES
 }
 
 /// A history as a connecting client is sent it; see `get_history_since`.
@@ -653,6 +668,17 @@ if base > current then
     return redis.error_reply('reset base is ahead of canonical history')
 end
 local entries = redis.call('LRANGE', KEYS[1], 0, -1)
+-- A checkpoint is cut behind the head, so it can be cut behind the one
+-- before it too. Then the older one's snapshots, which carry its base, would
+-- be kept above the new ones and stamp an older canvas over the newer one.
+local first = entries[1]
+if first then
+    local sep = string.find(first, ':', 1, true)
+    if sep and string.byte(first, sep + 1) == 2
+        and tonumber(string.sub(first, 1, sep - 1)) > base then
+        return redis.error_reply('reset base is behind the last checkpoint')
+    end
+end
 local kept = {}
 local kept_bytes = 0
 for i = 1, #entries do
@@ -749,5 +775,25 @@ return {#kept, checkpoint_bytes}
         // very latest, so anything past that has already been asked and has
         // not been given one.
         Ok((size.bytes > effective_auto_reset_bytes(size.base_bytes)).then_some(size))
+    }
+}
+
+#[cfg(test)]
+mod urgency_tests {
+    use super::*;
+
+    /// A client may decline a checkpoint that would take somebody's undo, and
+    /// the room asks again later. A room whose last checkpoint is so heavy
+    /// that auto-reset is pinned at its clamp may have no later, so it has to
+    /// be told it is urgent the moment it is asked at all.
+    #[test]
+    fn a_room_asked_at_the_clamp_is_told_it_is_urgent() {
+        let pinned = effective_auto_reset_bytes(URGENT_HISTORY_BYTES);
+        assert!(needs_checkpoint_urgently(pinned + 1));
+        // An ordinary room is not, and may wait for a checkpoint that costs
+        // nobody anything.
+        assert!(!needs_checkpoint_urgently(
+            effective_auto_reset_bytes(0) + 1
+        ));
     }
 }

@@ -956,6 +956,11 @@ export interface ResetRequestMessage {
   type: "resetRequest";
   timestamp: number;
   phase: ResetPhase;
+  /**
+   * The room's history is nearly full, and it needs a checkpoint even if
+   * taking one now freezes somebody's undo.
+   */
+  urgent: boolean;
 }
 
 export interface ResetPointMessage {
@@ -1253,6 +1258,8 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
         // A server from before the query phase existed sends nine bytes and
         // means "upload", which is what it always meant.
         phase: buffer.length > 9 && buffer[9] === 0 ? "query" : "upload",
+        // Absent from a server that never asked any other way.
+        urgent: buffer.length > 10 && buffer[10] === 1,
       };
 
     case MSG_TYPE.REPLAY_START:

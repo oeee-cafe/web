@@ -38,6 +38,7 @@ const MARK = {
   ownerThreeSnapshot: { x: 30, y: 4 },
   ownerOneAfterBase: { x: 4, y: 24 },
   ownerTwoAfterReset: { x: 30, y: 36 },
+  ownerOneAfterOlderPoint: { x: 52, y: 22 },
 };
 
 beforeEach(() => {
@@ -99,6 +100,53 @@ describe("a full replay that begins at a checkpoint", () => {
 
     // And the operations that raced in after the base was chosen.
     expect(inkAt(MARK.ownerOneAfterBase), "work sequenced after the checkpoint base").toBe(true);
+  });
+
+  /**
+   * A checkpoint is cut behind the head of history, and everything above its
+   * base is kept -- which can include the RESET_POINT of the checkpoint
+   * before it. That point's base is below where this canvas starts and its
+   * snapshots are gone. It is a position to step over. Taken for a
+   * checkpoint that failed to arrive, it left a hole in the drain at its own
+   * sequence, and the newer point then moved the position past the hole --
+   * and past every operation held behind it, which were never drawn.
+   */
+  it("steps over an older checkpoint's point inside the history it kept", async () => {
+    const socket = await mountSession();
+    await act(async () => socket.open());
+    await settle();
+    await act(async () => socket.deliver(welcome(3)));
+    await settle();
+
+    const [ownerOneFg, ownerThreeFg, blank] = await Promise.all([
+      layerPng(MARK.ownerOneSnapshot),
+      layerPng(MARK.ownerThreeSnapshot),
+      layerPng(null),
+    ]);
+
+    await act(async () => {
+      socket.deliver(replayStart(0, RESET_POINT_SEQ + 2));
+      socket.deliver(sequenced(BASE_SEQ, snapshot(3, 1, "foreground", ownerOneFg)));
+      socket.deliver(sequenced(BASE_SEQ, snapshot(3, 1, "background", blank)));
+      socket.deliver(sequenced(BASE_SEQ, snapshot(3, 3, "foreground", ownerThreeFg)));
+      socket.deliver(sequenced(BASE_SEQ, snapshot(3, 3, "background", blank)));
+      socket.deliver(sequenced(BASE_SEQ + 1, stroke(1, MARK.ownerOneAfterBase)));
+      // The checkpoint before this one, cut at 90 and sequenced at 102.
+      socket.deliver(sequenced(BASE_SEQ + 2, resetPoint(BASE_SEQ - 10, 4)));
+      socket.deliver(sequenced(BASE_SEQ + 3, stroke(1, MARK.ownerOneAfterOlderPoint)));
+      socket.deliver(sequenced(RESET_POINT_SEQ, resetPoint(BASE_SEQ, 4)));
+      socket.deliver(sequenced(RESET_POINT_SEQ + 1, stroke(2, MARK.ownerTwoAfterReset)));
+      socket.deliver(sequenced(RESET_POINT_SEQ + 2, stroke(2, { x: MARK.ownerTwoAfterReset.x + 6, y: MARK.ownerTwoAfterReset.y })));
+      socket.deliver(caughtUp(RESET_POINT_SEQ + 2));
+    });
+    await settle(12);
+
+    expect(socket.closedWith, "still connected").toBeNull();
+    expect(inkAt(MARK.ownerOneSnapshot), "the checkpoint").toBe(true);
+    expect(inkAt(MARK.ownerThreeSnapshot), "the checkpoint").toBe(true);
+    expect(inkAt(MARK.ownerOneAfterBase), "work before the older point").toBe(true);
+    expect(inkAt(MARK.ownerOneAfterOlderPoint), "work after the older point").toBe(true);
+    expect(inkAt(MARK.ownerTwoAfterReset), "work after the checkpoint's own point").toBe(true);
   });
 
   /**

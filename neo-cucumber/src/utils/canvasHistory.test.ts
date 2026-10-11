@@ -1111,6 +1111,278 @@ describe("how far undo reaches", () => {
   });
 });
 
+/**
+ * Where a checkpoint is cut: as high as it can go while taking nothing from
+ * anybody -- no undo within reach, no stroke half-drawn, no clipboard a later
+ * paste needs.
+ */
+describe("where a checkpoint is cut", () => {
+  async function send(history: CanvasHistory, bytes: ArrayBuffer, seq: number) {
+    await remote(history, bytes, seq);
+    return seq + 1;
+  }
+
+  it("declines while everything is still within reach", async () => {
+    const { history } = setup();
+    let seq = 1;
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    seq = await send(history, stroke(REMOTE, 1, 1, 10), seq);
+    seq = await send(history, encodeUndoPoint(LOCAL), seq);
+    seq = await send(history, stroke(LOCAL, 2, 2, 20), seq);
+    // Cutting at the head instead is what froze people's undo.
+    expect(history.checkpointCut(seq - 1)).toBeNull();
+  });
+
+  it(`lets go of the points ${UNDO_DEPTH} back`, async () => {
+    const { history } = setup();
+    let seq = 1;
+    for (let i = 0; i <= UNDO_DEPTH; i++) {
+      seq = await send(history, encodeUndoPoint(LOCAL), seq);
+      seq = await send(history, stroke(LOCAL, i % SIZE, 0, i + 1), seq);
+    }
+    // The first stroke (seq 1-2) is out of reach; the second begins at 3.
+    expect(history.checkpointCut(seq - 1)).toBe(2);
+  });
+
+  /**
+   * A redo takes its sender's earliest undone point. One sequenced above the
+   * cut that took a point below it would, on a client that joined from the
+   * cut, take the earliest undone point *above* it instead.
+   */
+  it("goes under what a redo already sequenced above it took", async () => {
+    const { history } = setup();
+    let seq = 1;
+    seq = await send(history, encodeUndoPoint(LOCAL), seq); // 1: out of reach by the end
+    seq = await send(history, stroke(LOCAL, 1, 1, 10), seq);
+    seq = await send(history, encodeUndoPoint(LOCAL), seq); // 3: p
+    seq = await send(history, stroke(LOCAL, 2, 2, 20), seq);
+    seq = await send(history, encodeUndoPoint(LOCAL), seq); // 5: q
+    seq = await send(history, stroke(LOCAL, 3, 3, 30), seq);
+    seq = await send(history, encodeUndo(LOCAL, false), seq); // 7 takes q
+    seq = await send(history, encodeUndo(LOCAL, false), seq); // 8 takes p
+    seq = await send(history, encodeUndoPoint(REMOTE), seq); // 9
+    seq = await send(history, stroke(REMOTE, 4, 4, 40), seq);
+    seq = await send(history, encodeUndo(LOCAL, true), seq); // 11 redoes p
+    for (let i = 0; i < UNDO_DEPTH; i++) {
+      seq = await send(history, encodeUndoPoint(LOCAL), seq);
+      seq = await send(history, stroke(LOCAL, i % SIZE, 5, i + 1), seq);
+    }
+    // Reach alone allows 8, under the remote point at 9; the local user's
+    // first message above that is the redo, so not before their point at 5.
+    // The redo above it took p at 3: a joiner from 4 would redo q instead.
+    expect(history.checkpointCut(seq - 1)).toBe(2);
+  });
+
+  it("does not cut through somebody's stroke", async () => {
+    const { history } = setup();
+    let seq = 1;
+    for (let i = 0; i <= UNDO_DEPTH; i++) {
+      seq = await send(history, encodeUndoPoint(LOCAL), seq);
+      seq = await send(history, stroke(LOCAL, i % SIZE, 0, i + 1), seq);
+    }
+    // The remote user's stroke began at 63 and is still arriving. Without it
+    // the cut would be at 2, under the local user's second stroke.
+    const begun = seq;
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    seq = await send(history, stroke(REMOTE, 1, 1, 9), seq);
+    for (let i = 0; i < UNDO_DEPTH; i++) {
+      seq = await send(history, encodeUndoPoint(LOCAL), seq);
+      seq = await send(history, stroke(LOCAL, i % SIZE, 1, i + 1), seq);
+    }
+    seq = await send(history, stroke(REMOTE, 1, 2, 9), seq);
+    expect(history.checkpointCut(seq - 1)).toBe(begun - 1);
+  });
+
+  it("goes under the copy a later paste pastes", async () => {
+    const { history } = setup();
+    let seq = 1;
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    seq = await send(history, stroke(REMOTE, 0, 0, 1), seq);
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    const copied = seq;
+    seq = await send(history,
+      encodeRegion(REMOTE, REMOTE, "foreground", "copy",
+        { x: 0, y: 0, width: 2, height: 2 }, { r: 0, g: 0, b: 0, a: 255 }, 1), seq);
+    // The remote user's next 30 strokes put their copy out of reach.
+    for (let i = 0; i < UNDO_DEPTH; i++) {
+      seq = await send(history, encodeUndoPoint(REMOTE), seq);
+      seq = await send(history, stroke(REMOTE, i % SIZE, 3, i + 1), seq);
+    }
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    seq = await send(history,
+      encodeRegion(REMOTE, REMOTE, "foreground", "paste",
+        { x: 5, y: 5, width: 2, height: 2 }, { r: 0, g: 0, b: 0, a: 255 }, 1), seq);
+    // Under the copy's own undo point, not merely under the copy.
+    expect(history.checkpointCut(seq - 1)).toBe(copied - 2);
+  });
+});
+
+/**
+ * The property everything above is for: a client that was in the room all
+ * along, compacting at every checkpoint, and one that joins from the last
+ * checkpoint and replays what came after it, end with the same layers and
+ * the same undo buttons -- whatever the room did, and whatever arrived
+ * between a checkpoint being cut and its RESET_POINT being sequenced.
+ */
+describe("a checkpoint cut behind the head", () => {
+  /** Mulberry32: a small seeded generator, so a failure names its seed. */
+  function random(seed: number) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  type Event = { seq: number; bytes: ArrayBuffer } | { seq: number; resetBase: number };
+
+  /** A room's canonical stream, played into `history` as it is made. */
+  async function session(seed: number, length: number) {
+    const rand = random(seed);
+    const pick = <T,>(items: T[]) => items[Math.floor(rand() * items.length)];
+    const users = [LOCAL, REMOTE, 3];
+    const there = setup();
+    const events: Event[] = [];
+    let seq = 1;
+    const send = async (bytes: ArrayBuffer) => {
+      events.push({ seq, bytes });
+      await remote(there.history, bytes, seq++);
+    };
+    const drawing = new Set<number>();
+    /** Where each user last copied: NEO pastes straight after a copy. */
+    const copiedAt = new Map<number, number>();
+    type Checkpoint = {
+      cut: number;
+      layers: Map<string, { foreground: Uint8ClampedArray; background: Uint8ClampedArray }>;
+    };
+    let pending: (Checkpoint & { at: number }) | null = null;
+    let last: Checkpoint | null = null;
+    let declined = 0;
+    const point = () => ({ x: Math.floor(rand() * SIZE), y: Math.floor(rand() * SIZE) });
+
+    while (seq <= length) {
+      const user = pick(users);
+      const roll = rand();
+      if (roll < 0.35) {
+        // A stroke: begun with an undo point, carried on over later messages
+        // that interleave with everybody else's.
+        if (!drawing.has(user) || rand() < 0.3) {
+          await send(encodeUndoPoint(user));
+          drawing.add(user);
+        }
+        const p = point();
+        await send(encodeStroke(user, user, "foreground", 1, "solid", 1 + Math.floor(rand() * 250), 0, 0, 255, [p]));
+      } else if (roll < 0.55) {
+        drawing.delete(user);
+        await send(encodeUndo(user, rand() < 0.3));
+      } else if (roll < 0.62) {
+        drawing.delete(user);
+        await send(encodeUndoPoint(user));
+        await send(encodeFill(user, user, "background", 0, 0, 1 + Math.floor(rand() * 250), 0, 0, 255));
+      } else if (roll < 0.7) {
+        drawing.delete(user);
+        await send(encodeUndoPoint(user));
+        const p = point();
+        const fresh = seq - (copiedAt.get(user) ?? -Infinity) < 40;
+        const tool = fresh && rand() < 0.7 ? "paste" : "copy";
+        if (tool === "copy") copiedAt.set(user, seq);
+        await send(encodeRegion(user, user, "foreground", tool,
+          { x: p.x, y: p.y, width: 1, height: 1 }, { r: 0, g: 0, b: 0, a: 255 }, 1));
+      } else if (roll < 0.75 && !pending) {
+        // Somebody uploads a checkpoint, cut where the history says, unless
+        // it says there is none to take yet. The room sequences its
+        // RESET_POINT a few messages later, and undos can land in between.
+        const cut = there.history.checkpointCut(seq - 1);
+        if (cut === null) {
+          declined++;
+        } else {
+          const layers = new Map(
+            [...(await there.history.layersAt(cut))].map(([owner, pair]) => [
+              owner,
+              { foreground: pair.foreground.slice(), background: pair.background.slice() },
+            ]),
+          );
+          pending = { cut, layers, at: seq + Math.floor(rand() * 10) };
+        }
+      }
+      if (pending && seq >= pending.at) {
+        events.push({ seq, resetBase: pending.cut });
+        await there.history.handleResetPoint(pending.cut);
+        last = { cut: pending.cut, layers: pending.layers };
+        seq++;
+        pending = null;
+      }
+    }
+    return { there, events, last, declined };
+  }
+
+  async function joinFrom(
+    events: Event[],
+    last: { cut: number; layers: Map<string, { foreground: Uint8ClampedArray; background: Uint8ClampedArray }> },
+  ) {
+    const joined = setup();
+    for (const [owner, pair] of last.layers) {
+      joined.engine.layersFor(owner).foreground.set(pair.foreground);
+      joined.engine.layersFor(owner).background.set(pair.background);
+    }
+    joined.history.reset();
+    for (const event of events) {
+      if (event.seq <= last.cut) continue;
+      if ("resetBase" in event) await joined.history.handleResetPoint(event.resetBase);
+      else await remote(joined.history, event.bytes, event.seq);
+    }
+    return joined;
+  }
+
+  function layersOf(engine: FakeEngine, owners: Iterable<string>) {
+    const blank = new Uint8ClampedArray(SIZE * SIZE * 4);
+    return [...owners].sort().map((owner) => {
+      const pair = engine.owners.get(owner);
+      return [owner, Array.from(pair?.foreground ?? blank), Array.from(pair?.background ?? blank)];
+    });
+  }
+
+  // Most short, where reach is bounded by depth; some long enough for the
+  // window to bound it too. As many as this because the rarer rules are
+  // rarely what decides: with the redo rule removed, 5 runs in 330 fail.
+  const runs = [
+    ...Array.from({ length: 200 }, (_, i) => ({ seed: i + 1, length: 600 })),
+    ...Array.from({ length: 20 }, (_, i) => ({ seed: 1000 + i, length: UNDO_WINDOW + 1000 })),
+  ];
+  /** What each run did, for the test after them that asks it of all. */
+  const landed: { cut: number; at: number }[][] = [];
+  for (const { seed, length } of runs) {
+    it(`leaves a joiner where the room is (seed ${seed}, ${length} messages)`, async () => {
+      const { there, events, last } = await session(seed, length);
+      landed.push(events.flatMap((event) => ("resetBase" in event ? [{ cut: event.resetBase, at: event.seq }] : [])));
+      // A room in which no checkpoint could be cut has nothing to join from;
+      // the next test makes sure that is the exception.
+      if (!last) return;
+      const joined = await joinFrom(events, last);
+      const owners = new Set([...there.engine.owners.keys(), ...joined.engine.owners.keys()]);
+      expect(layersOf(joined.engine, owners)).toEqual(layersOf(there.engine, owners));
+      expect([joined.history.canUndo(), joined.history.canRedo()])
+        .toEqual([there.history.canUndo(), there.history.canRedo()]);
+    });
+  }
+
+  /**
+   * Declining is what keeps a cut from taking anybody's undo, and a cut that
+   * always declined would keep that promise by never freeing anything.
+   */
+  it("still frees history, behind the head", () => {
+    expect(landed).toHaveLength(runs.length);
+    const withCheckpoints = landed.filter((resets) => resets.length > 0).length;
+    expect(withCheckpoints).toBeGreaterThanOrEqual(runs.length * 0.8);
+    const all = landed.flat();
+    // Behind the head, often well behind it.
+    expect(all.filter((reset) => reset.cut < reset.at - 100).length).toBeGreaterThan(all.length / 4);
+  });
+});
+
 describe("reset point squashing", () => {
   it("freezes undo below the base seq but keeps newer strokes undoable", async () => {
     const { engine, history } = setup();

@@ -327,8 +327,20 @@ export interface PainterHandle {
     operation: import("./operations").CanonicalPainterOperation,
   ): Promise<void>;
 
-  /** Capture both editable layers at a canonical compaction boundary. */
+  /**
+   * Every participant's layers as they stood at canonical position
+   * `sequence`, which may be behind the canvas on screen; see
+   * `checkpointCut`.
+   */
   exportCheckpoint(sequence: number): Promise<import("./operations").PainterCheckpoint>;
+
+  /**
+   * Where a checkpoint should be cut, with canonical history applied through
+   * `head`: behind everything anybody can still undo, so that cutting there
+   * takes nothing from anyone. Null when no such cut would free anything
+   * yet.
+   */
+  checkpointCut(head: number): number | null;
 
   /** Replace both editable layers and reset controlled history to a checkpoint. */
   applyCheckpoint(checkpoint: import("./operations").PainterCheckpoint): Promise<void>;

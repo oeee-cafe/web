@@ -83,15 +83,18 @@ fn server_frame(name: &str, d: &Value) -> Vec<u8> {
             username: text(&d["username"]),
         }
         .serialize(),
-        "resetRequestQuery" | "resetRequestUpload" => ResetRequestMessage {
-            timestamp: number(&d["timestamp"]),
-            phase: match d["phase"].as_str() {
-                Some("query") => ResetPhase::Query,
-                Some("upload") => ResetPhase::Upload,
-                other => panic!("phase {other:?}"),
-            },
+        "resetRequestQuery" | "resetRequestUpload" | "resetRequestQueryUrgent" => {
+            ResetRequestMessage {
+                timestamp: number(&d["timestamp"]),
+                phase: match d["phase"].as_str() {
+                    Some("query") => ResetPhase::Query,
+                    Some("upload") => ResetPhase::Upload,
+                    other => panic!("phase {other:?}"),
+                },
+                urgent: d["urgent"].as_bool().expect("urgent"),
+            }
+            .serialize()
         }
-        .serialize(),
         "replayStart" => replay_start_frame(
             uuid(&d["historyId"]),
             number(&d["afterSeq"]),

@@ -847,9 +847,16 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       if (!Number.isSafeInteger(sequence) || sequence < 0) {
         throw new Error("Checkpoint sequence must be a non-negative safe integer");
       }
+      // The layers at `sequence`, which the history computes when that is
+      // behind the canvas on screen -- as a checkpoint cut behind everything
+      // still undoable usually is. Without a history, the canvas is all
+      // there is.
+      const history = synchronizationHistoryRef.current;
+      const pairs = history
+        ? [...(await history.layersAt(sequence))]
+        : drawingEngine.ownerIds().map((actorId) => [actorId, drawingEngine.layersFor(actorId)] as const);
       const layers = await Promise.all(
-        drawingEngine.ownerIds().map(async (actorId) => {
-          const pair = drawingEngine.layersFor(actorId);
+        pairs.map(async ([actorId, pair]) => {
           const [background, foreground] = await Promise.all([
             layerToPngBlob(pair.background, canvasWidth, canvasHeight),
             layerToPngBlob(pair.foreground, canvasWidth, canvasHeight),
@@ -962,6 +969,11 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     [],
   );
 
+  const checkpointCut = useCallback((head: number): number | null => {
+    const history = synchronizationHistoryRef.current;
+    return history ? history.checkpointCut(head) : head;
+  }, []);
+
   const compactCanonicalHistory = useCallback(async (sequence: number): Promise<void> => {
     const history = synchronizationHistoryRef.current;
     if (!history) throw new Error("Painter is not in controlled mode");
@@ -1022,6 +1034,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       setLayersOrigin,
       applyCanonicalOperation,
       exportCheckpoint,
+      checkpointCut,
       applyCheckpoint,
       exportSessionArchive,
       synchronizationTrace,
@@ -1030,7 +1043,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       // The owning mount adapter replaces this with its React-root teardown.
       unmount: () => {},
     }),
-    [save, exportPng, exportReplay, loadImage, undo, redo, command, setLocalActorId, setParticipants, setHiddenParticipants, setLayersOrigin, applyCanonicalOperation, exportCheckpoint, applyCheckpoint, exportSessionArchive, compactCanonicalHistory, isSynchronizationSettled, synchronizationTrace],
+    [save, exportPng, exportReplay, loadImage, undo, redo, command, setLocalActorId, setParticipants, setHiddenParticipants, setLayersOrigin, applyCanonicalOperation, exportCheckpoint, checkpointCut, applyCheckpoint, exportSessionArchive, compactCanonicalHistory, isSynchronizationSettled, synchronizationTrace],
   );
 
   // Point the engine, the history and the emitter at the selected participant

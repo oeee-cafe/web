@@ -274,7 +274,14 @@ pub(super) async fn maybe_request_reset(
         size.messages_since_reset(),
         size.bytes_since_reset()
     );
-    messages::send_reset_request(ctx.room_uuid, None, messages::ResetPhase::Query, ctx.state).await;
+    messages::send_reset_request(
+        ctx.room_uuid,
+        None,
+        messages::ResetPhase::Query,
+        redis_messages::needs_checkpoint_urgently(size.bytes),
+        ctx.state,
+    )
+    .await;
 }
 
 /// Asks again regardless of what is already outstanding, for the room that has
@@ -298,7 +305,16 @@ pub(super) async fn force_reset_request(ctx: &SessionContext<'_>) {
             return;
         }
     }
-    messages::send_reset_request(ctx.room_uuid, None, messages::ResetPhase::Query, ctx.state).await;
+    // A room that has run out of history cannot draw until it is given one,
+    // so this one is urgent by definition.
+    messages::send_reset_request(
+        ctx.room_uuid,
+        None,
+        messages::ResetPhase::Query,
+        true,
+        ctx.state,
+    )
+    .await;
 }
 
 /// A client says it is caught up and able to upload the checkpoint. The first
@@ -315,10 +331,26 @@ pub(super) async fn handle_reset_offer(ctx: &SessionContext<'_>) {
                 "Connection {} (user {}) volunteered to checkpoint room {}",
                 ctx.connection_id, ctx.user_login_name, ctx.room_uuid
             );
+            // Asked afresh rather than remembered from the query, which may
+            // have been a while ago.
+            let urgent = match redis_messages::RedisMessageStore::new(ctx.state.redis_pool.clone())
+                .history_size(ctx.room_uuid)
+                .await
+            {
+                Ok(size) => redis_messages::needs_checkpoint_urgently(size.bytes),
+                Err(e) => {
+                    error!(
+                        "Could not size the history of room {}: {}",
+                        ctx.room_uuid, e
+                    );
+                    false
+                }
+            };
             messages::send_reset_request(
                 ctx.room_uuid,
                 Some(ctx.connection_id),
                 messages::ResetPhase::Upload,
+                urgent,
                 ctx.state,
             )
             .await;

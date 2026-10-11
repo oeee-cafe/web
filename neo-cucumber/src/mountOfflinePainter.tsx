@@ -160,6 +160,9 @@ export function mountOfflinePainter(
     async exportCheckpoint(sequence) {
       return (await liveController()).exportCheckpoint(sequence);
     },
+    checkpointCut(head) {
+      return synchronousController().checkpointCut(head);
+    },
     async applyCheckpoint(checkpoint) {
       return (await liveController()).applyCheckpoint(checkpoint);
     },

@@ -78,7 +78,7 @@ interface WebSocketHookParams {
   addParticipant: (userId: string, username: string, joinedAt: number, sessionId?: number) => void;
   clearParticipants: () => void;
   addChatMessage: (message: ChatLine) => void;
-  handleResetRequest: () => void;
+  handleResetRequest: (urgent: boolean) => void;
   /**
    * Whether this client could upload a checkpoint right now: caught up with
    * canonical history and holding a settled canvas. Answering a reset query
@@ -86,6 +86,11 @@ interface WebSocketHookParams {
    * window for a checkpoint that was never coming.
    */
   canUploadCheckpoint: () => boolean;
+  /**
+   * Whether there is a checkpoint worth taking: one that frees history
+   * without taking anybody's undo, or, when the room is `urgent`, any.
+   */
+  hasCheckpointToTake: (urgent: boolean) => boolean;
   onReconnectCanvas: (reconnecting: boolean, resumeSequence: number | null) => Promise<void> | void;
   onCanvasMessage: (message: DecodedMessage, raw: Uint8Array, sequence?: number) => Promise<void>;
   /** A sequenced frame this client cannot read; see `ReceiverHandlers`. */
@@ -142,6 +147,7 @@ export const useWebSocket = ({
   addChatMessage,
   handleResetRequest,
   canUploadCheckpoint,
+  hasCheckpointToTake,
   onReconnectCanvas,
   onCanvasMessage,
   onUnreadableSequence,
@@ -186,9 +192,13 @@ export const useWebSocket = ({
    * list, which weighs its volunteers before choosing between them. If the
    * owner is absent or unable, the beat passes and everyone else answers.
    */
-  const answerResetQuery = useCallback(async () => {
+  const answerResetQuery = useCallback(async (urgent: boolean) => {
     if (!canUploadCheckpoint()) {
       console.log("Checkpoint query declined: not caught up");
+      return;
+    }
+    if (!hasCheckpointToTake(urgent)) {
+      console.log("Checkpoint query declined: everything is still undoable");
       return;
     }
     const isOwner = userIdRef.current === canvasMeta?.ownerId;
@@ -201,7 +211,7 @@ export const useWebSocket = ({
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     ws.send(encodeResetOffer());
-  }, [canUploadCheckpoint, canvasMeta?.ownerId, userIdRef]);
+  }, [canUploadCheckpoint, hasCheckpointToTake, canvasMeta?.ownerId, userIdRef]);
 
   /**
    * The page's callbacks, as of the latest render. The receiver reads them
@@ -216,7 +226,7 @@ export const useWebSocket = ({
     addParticipant,
     clearParticipants,
     addChatMessage,
-    onResetQuery: () => { void answerResetQuery(); },
+    onResetQuery: (urgent) => { void answerResetQuery(urgent); },
     onResetSelected: handleResetRequest,
     onReconnectCanvas,
     onCanvasMessage,

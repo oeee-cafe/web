@@ -669,13 +669,17 @@ async fn growth_in_bytes_asks_for_a_checkpoint_which_then_stands_in_for_it() {
         }
         // The room is asked who can checkpoint it: a query, not yet an order.
         let query = next_of_type(&mut alice, RESET_REQUEST).await;
-        assert_eq!(query.len(), 10);
+        assert_eq!(query.len(), 11);
         assert_eq!(query[9], 0, "phase: query");
+        // Four and a half megabytes is nowhere near full: a client may
+        // decline if a checkpoint would take somebody's undo.
+        assert_eq!(query[10], 0, "not urgent");
 
         // Alice offers, and is told to upload.
         send(&mut alice, vec![RESET_OFFER]).await;
         let order = next_of_type(&mut alice, RESET_REQUEST).await;
         assert_eq!(order[9], 1, "phase: upload");
+        assert_eq!(order[10], 0, "not urgent");
 
         // Her checkpoint: one pair, hers, at the position she has applied.
         send(&mut alice, reset_begin(605, 2)).await;

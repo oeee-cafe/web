@@ -1038,6 +1038,53 @@ async fn future_checkpoint_is_rejected_without_mutating_history() {
     assert!(matches!(&history[0], (1, AxumMessage::Binary(bytes)) if bytes == &payload));
 }
 
+/// A checkpoint is cut behind the head of history, which leaves room for one
+/// cut behind the checkpoint before it. Accepted, it would keep the older
+/// snapshots -- which carry the older base -- above the newer ones.
+#[tokio::test]
+async fn a_checkpoint_behind_the_last_one_is_rejected_without_mutating_history() {
+    let sequences =
+        |entries: &[(u64, AxumMessage)]| entries.iter().map(|(seq, _)| *seq).collect::<Vec<_>>();
+    let harness = start_harness().await;
+    let store = RedisMessageStore::new(harness.pool.clone());
+    let channel = format!("oeee:pubsub:{}", harness.room);
+    for x in 0..6u8 {
+        let payload = vec![0x12, 1, x];
+        let envelope = room_message(payload.clone());
+        store
+            .sequence_and_publish(harness.room, &payload, &envelope.from_connection, &channel)
+            .await
+            .expect("seed operation");
+    }
+    let snapshots = [vec![0x02, 1, 1, 0], vec![0x02, 1, 1, 1]];
+    store
+        .apply_reset(harness.room, 4, &snapshots)
+        .await
+        .expect("the first checkpoint");
+
+    assert!(store
+        .apply_reset(harness.room, 2, &snapshots)
+        .await
+        .is_err());
+    let all = store
+        .get_history_since(harness.room, None)
+        .await
+        .expect("since");
+    assert_eq!(sequences(&all.entries), vec![4, 4, 5, 6]);
+
+    // At or past it is fine, and lagging the head is fine: what is above
+    // the base is kept.
+    store
+        .apply_reset(harness.room, 5, &snapshots)
+        .await
+        .expect("a later checkpoint");
+    let all = store
+        .get_history_since(harness.room, None)
+        .await
+        .expect("since");
+    assert_eq!(sequences(&all.entries), vec![5, 5, 6]);
+}
+
 /// A checkpoint is most of what a busy room's history weighs, so what the
 /// server measures for auto-reset is growth on top of it. Get this wrong and a
 /// room either asks for a checkpoint again the instant one lands, or -- with

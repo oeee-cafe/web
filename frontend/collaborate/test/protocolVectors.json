@@ -57,19 +57,30 @@
       }
     },
     "resetRequestQuery": {
-      "hex": "0b7b68e5cf8b01000000",
+      "hex": "0b7b68e5cf8b0100000000",
       "decoded": {
         "type": "resetRequest",
         "timestamp": 1700000000123,
-        "phase": "query"
+        "phase": "query",
+        "urgent": false
       }
     },
     "resetRequestUpload": {
-      "hex": "0b7b68e5cf8b01000001",
+      "hex": "0b7b68e5cf8b0100000100",
       "decoded": {
         "type": "resetRequest",
         "timestamp": 1700000000123,
-        "phase": "upload"
+        "phase": "upload",
+        "urgent": false
+      }
+    },
+    "resetRequestQueryUrgent": {
+      "hex": "0b7b68e5cf8b0100000001",
+      "decoded": {
+        "type": "resetRequest",
+        "timestamp": 1700000000123,
+        "phase": "query",
+        "urgent": true
       }
     },
     "replayStart": {

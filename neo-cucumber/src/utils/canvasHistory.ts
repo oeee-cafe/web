@@ -443,6 +443,13 @@ export class CanvasHistory {
   /** The furthest canonical position seen, for `projectedAt`. */
   private latestSeq = 0;
   /**
+   * Every canonical redo that took something since the last checkpoint:
+   * where it was sequenced, and the undo point it took. A checkpoint cut
+   * between the two would leave a client that joined from it choosing a
+   * different point for the same redo; see `checkpointCut`.
+   */
+  private redoReaches: { at: number; target: number }[] = [];
+  /**
    * Canonical messages seen while the fork has been waiting for its echoes,
    * against `MAX_FORK_FALLBEHIND`. Reset whenever the fork empties.
    */
@@ -545,6 +552,7 @@ export class CanvasHistory {
   /** Clears everything and takes a base savepoint of the current layers. */
   reset(): void {
     this.entries = [];
+    this.redoReaches = [];
     this.fork = [];
     this.projectionRendered = true;
     this.canonicalLog = [];
@@ -1103,36 +1111,10 @@ export class CanvasHistory {
     }
     if (cut === 0) return false;
 
-    // Compute the state at the cut into temporary buffers, one pair per
-    // participant, allocated as the replay first mentions each of them.
-    const sp = this.savepointFor(cut);
-    const layers = new Map<ActorKey, OwnerLayers>();
-    for (const [owner, saved] of sp.layers) {
-      layers.set(owner, {
-        foreground: new Uint8ClampedArray(saved.foreground),
-        background: new Uint8ClampedArray(saved.background),
-      });
-    }
-    const forkSource: LayerSource = (owner) => {
-      let pair = layers.get(owner);
-      if (!pair) {
-        pair = {
-          foreground: new Uint8ClampedArray(this.engine.imageWidth * this.engine.imageHeight * 4),
-          background: new Uint8ClampedArray(this.engine.imageWidth * this.engine.imageHeight * 4),
-        };
-        layers.set(owner, pair);
-      }
-      return pair;
-    };
-    const strokes = cloneStrokes(sp.strokes);
-    for (let i = sp.index; i < cut; i++) {
-      const entry = this.entries[i];
-      if (entry.undo === "done") {
-        await this.applyMessage(entry.msg, forkSource, strokes);
-      }
-    }
+    const { layers, strokes } = await this.stateAt(cut);
 
     this.entries = this.entries.slice(cut);
+    this.redoReaches = this.redoReaches.filter((reach) => reach.at > baseSeq);
     this.canonicalLog = this.canonicalLog.filter(
       (entry) => entry.sequence > baseSeq,
     );
@@ -1153,6 +1135,216 @@ export class CanvasHistory {
     ];
     this.notify();
     return true;
+  }
+
+  /**
+   * The layers and pen state after the first `cut` entries, computed into
+   * buffers of their own, one pair per participant, allocated as the replay
+   * first mentions each of them.
+   */
+  private async stateAt(cut: number): Promise<{
+    layers: Map<ActorKey, OwnerLayers>;
+    strokes: StrokeStates;
+  }> {
+    const sp = this.savepointFor(cut);
+    const layers = new Map<ActorKey, OwnerLayers>();
+    for (const [owner, saved] of sp.layers) {
+      layers.set(owner, {
+        foreground: new Uint8ClampedArray(saved.foreground),
+        background: new Uint8ClampedArray(saved.background),
+      });
+    }
+    const forkSource: LayerSource = (owner) => {
+      let pair = layers.get(owner);
+      if (!pair) {
+        pair = this.blankPair();
+        layers.set(owner, pair);
+      }
+      return pair;
+    };
+    const strokes = cloneStrokes(sp.strokes);
+    for (let i = sp.index; i < cut; i++) {
+      const entry = this.entries[i];
+      if (entry.undo === "done") {
+        await this.applyMessage(entry.msg, forkSource, strokes);
+      }
+    }
+    return { layers, strokes };
+  }
+
+  private blankPair(): OwnerLayers {
+    const size = this.engine.imageWidth * this.engine.imageHeight * 4;
+    return {
+      foreground: new Uint8ClampedArray(size),
+      background: new Uint8ClampedArray(size),
+    };
+  }
+
+  /**
+   * Every participant's layers as they stood at canonical position `seq`,
+   * which a checkpoint at `seq` is made of: blank for anyone who had not
+   * drawn by then. `seq` must be at or past the last checkpoint, which is
+   * as far back as this history goes.
+   */
+  async layersAt(seq: number): Promise<Map<ActorKey, Readonly<OwnerLayers>>> {
+    let cut = 0;
+    while (
+      cut < this.entries.length &&
+      this.entries[cut].seq !== undefined &&
+      (this.entries[cut].seq as number) <= seq
+    ) {
+      cut++;
+    }
+    const { layers } = await this.stateAt(cut);
+    for (const owner of this.engine.ownerIds()) {
+      if (!layers.has(owner)) layers.set(owner, this.blankPair());
+    }
+    return layers;
+  }
+
+  /**
+   * Where a checkpoint taken now, with canonical history applied through
+   * `head`, should be cut: the highest position at which cutting takes
+   * nothing from anybody.
+   *
+   * A checkpoint cut at the head froze the newest stroke along with
+   * everything else -- the one somebody is most likely to want back -- and
+   * every client compacts at it. Below the cut, a client that joins from the
+   * checkpoint has only pixels, so the cut has to sit where those are all
+   * anyone after it will need:
+   *
+   * - below every undo point still within reach (`undoTarget`). Reach only
+   *   shrinks, so none of them can come back, and an undo sequenced after
+   *   this -- even one already on its way -- takes the same point, or none,
+   *   whether its client was there or joined from here;
+   * - below the point every redo already sequenced above the cut took. A
+   *   redo takes its sender's earliest undone point, and a joiner missing
+   *   that one would take the next. An undo needs no such care: it takes
+   *   the most recent point still done, so one that reached under the cut
+   *   found nothing of its sender's done above it, and a joiner finds the
+   *   same nothing. What it undid lies wholly under the cut, by the rule
+   *   below, so the checkpoint already shows it undone;
+   * - where nobody is part-way through an operation. An undo or a redo
+   *   takes everything from its undo point to the sender's next, so an
+   *   operation split by the cut would be undone on one side of it only.
+   *   And a stroke arrives in several messages, each carrying on from where
+   *   the last left off, which a joiner does not know. So everyone's first
+   *   entry above the cut is an undo point;
+   * - below the copy any paste above it pastes, because a joiner holds
+   *   nobody's clipboard.
+   *
+   * Lowering the cut for one can break another, so they are checked until
+   * none moves it. If what is left frees nothing -- everything since the
+   * last checkpoint is still in somebody's reach -- there is no checkpoint
+   * to take yet, and this says so with null. The room will ask again; by
+   * then reach will have moved on. Falling back to the head instead, as
+   * every checkpoint was cut before this, is what froze people's undo early
+   * in a session, and it can leave somebody part-way through a stroke, which
+   * makes the next cut fall back too.
+   */
+  checkpointCut(head: number): number | null {
+    const entries = this.entries;
+    let cut = head;
+    const lower = (to: number): boolean => {
+      if (to >= cut) return false;
+      cut = to;
+      return true;
+    };
+
+    // Everything within reach of an undo sequenced from here on, judged as
+    // `undoTarget` judges it: newest first, a participant's own points
+    // counted whatever became of them.
+    const at = head + 1;
+    const depths = new Map<ActorKey, number>();
+    /** The undo points whose operations can still change. */
+    const reachable = new Set<number>();
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const e = entries[i];
+      if (e.msg.type !== "undoPoint" || e.seq === undefined) continue;
+      if (at - e.seq > UNDO_WINDOW) break;
+      const key = actorKey(e.msg.userId);
+      const depth = (depths.get(key) ?? 0) + 1;
+      depths.set(key, depth);
+      // Replaced is final: neither an undo nor a redo takes it again.
+      if (depth > UNDO_DEPTH || e.undo === "gone") continue;
+      reachable.add(e.seq);
+      lower(e.seq - 1);
+    }
+
+    for (let moved = true; moved; ) {
+      moved = false;
+      for (const reach of this.redoReaches) {
+        if (reach.at > cut && reach.target <= cut) moved = lower(reach.target - 1) || moved;
+      }
+      const first = entries.findIndex((e) => e.seq !== undefined && e.seq > cut);
+      if (first < 0) break;
+      const started = new Set<ActorKey>();
+      for (let i = first; i < entries.length; i++) {
+        const msg = entries[i].msg;
+        const key = actorKey(msg.userId);
+        if (!started.has(key)) {
+          started.add(key);
+          if (msg.type !== "undoPoint") {
+            // Part-way through an operation: cut before the undo point that
+            // began it -- unless that is under the last checkpoint, where
+            // nothing here can go.
+            const begun = this.lastUndoPointBefore(key, first);
+            if (begun === undefined) return null;
+            moved = lower(begun - 1) || moved;
+          }
+        }
+        if (msg.type === "region" && msg.tool === "paste") {
+          const copied = this.copyPastedBy(key, i, cut, reachable);
+          if (copied === null) return null;
+          if (copied !== undefined) moved = lower(copied - 1) || moved;
+        }
+      }
+    }
+
+    const frees = entries.some((e) => e.seq !== undefined && e.seq <= cut);
+    return frees ? cut : null;
+  }
+
+  /** The sequence of `key`'s last undo point among the first `end` entries. */
+  private lastUndoPointBefore(key: ActorKey, end: number): number | undefined {
+    for (let i = end - 1; i >= 0; i--) {
+      const e = this.entries[i];
+      if (e.msg.type === "undoPoint" && actorKey(e.msg.userId) === key) return e.seq;
+    }
+    return undefined;
+  }
+
+  /**
+   * A copy under `cut` that the paste at entry `paste` may paste: the
+   * sequence to cut under, undefined if there is none, or null if it lies
+   * under the last checkpoint, where nothing can go under it.
+   *
+   * A paste takes its author's last copy still done, which is not always
+   * the last copy -- an undone one is skipped -- and which can change while
+   * the operations around it can still be undone or redone. So this walks
+   * back from the paste: a copy above the cut that is done and out of
+   * everyone's reach is what the paste will always take, and ends the walk;
+   * one that may still change might not be, and the walk goes on; under the
+   * cut, a copy that is done is one a joiner would not have.
+   */
+  private copyPastedBy(
+    key: ActorKey, paste: number, cut: number, reachable: ReadonlySet<number>,
+  ): number | null | undefined {
+    for (let i = paste - 1; i >= 0; i--) {
+      const e = this.entries[i];
+      if (actorKey(e.msg.userId) !== key) continue;
+      if (e.msg.type !== "region" || e.msg.tool !== "copy" || e.seq === undefined) continue;
+      const point = this.lastUndoPointBefore(key, i);
+      if (e.seq > cut) {
+        const settled = e.undo === "done" && (point === undefined || !reachable.has(point));
+        if (settled) return undefined;
+      } else if (e.undo === "done") {
+        return e.seq;
+      }
+    }
+    // Out of entries: what this author last copied before the last
+    // checkpoint, if anything, is in its savepoint and in no joiner's hands.
+    return this.savepoints[0].strokes.clipboards.get(key) ? null : undefined;
   }
 
   /**
@@ -1279,7 +1471,13 @@ export class CanvasHistory {
     }
 
     // Savepoints past the modified region no longer describe replayable state
-    if (invalidate) this.savepoints = this.savepoints.filter((s) => s.index <= first);
+    if (invalidate) {
+      this.savepoints = this.savepoints.filter((s) => s.index <= first);
+      const target = entries[first].seq;
+      if (redo && at !== undefined && target !== undefined) {
+        this.redoReaches.push({ at, target });
+      }
+    }
     return first;
   }
 

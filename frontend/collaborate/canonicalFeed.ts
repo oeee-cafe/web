@@ -156,6 +156,14 @@ export class CanonicalFeed {
     this.snapshots.set(sequence, owners);
   }
 
+  /** Whether snapshots of a checkpoint later than `baseSequence` are held. */
+  holdsCheckpointAfter(baseSequence: number): boolean {
+    for (const sequence of this.snapshots.keys()) {
+      if (sequence > baseSequence) return true;
+    }
+    return false;
+  }
+
   /** How many snapshots the checkpoint at `baseSequence` has, from its RESET_POINT. */
   announceCheckpoint(baseSequence: number, snapshotCount: number): void {
     this.announced.set(baseSequence, snapshotCount);

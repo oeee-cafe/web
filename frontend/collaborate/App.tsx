@@ -544,6 +544,20 @@ export default function App() {
   ) => {
     const painter = painterRef.current;
     if (!painter) return;
+    // An older checkpoint's point, which a newer one is already standing in
+    // for. A checkpoint is cut behind the head of history and the messages
+    // above its base are kept, so a client replaying from it can meet the
+    // point of the one before inside them. That one's snapshots are gone and
+    // its base is below where this canvas will start: it is a position to
+    // step over. Taken for a checkpoint that failed to arrive, it left a hole
+    // in the drain at its own sequence, and the newer point then moved the
+    // position past the hole and past every operation held behind it, which
+    // were never drawn.
+    if (sequence !== undefined && feed.holdsCheckpointAfter(baseSequence)) {
+      feed.holdUnreadable(sequence);
+      await drainCanonical();
+      return;
+    }
     // The snapshots of this checkpoint all carry `baseSequence`, and knowing
     // how many there are is what lets the drain tell whole from half-arrived.
     feed.announceCheckpoint(baseSequence, snapshotCount);
@@ -645,7 +659,23 @@ export default function App() {
     );
   }, [feed, link]);
 
-  const handleResetRequest = useCallback(async () => {
+  /**
+   * Where this client would cut a checkpoint now, or null for none: behind
+   * everything still undoable, or -- only when the room is out of room -- at
+   * the head, which is all a room that cannot draw has left.
+   */
+  const checkpointPosition = useCallback((urgent: boolean): number | null => {
+    const painter = painterRef.current;
+    if (!painter) return null;
+    return painter.checkpointCut(feed.applied) ?? (urgent ? feed.applied : null);
+  }, [feed]);
+
+  const hasCheckpointToTake = useCallback(
+    (urgent: boolean): boolean => checkpointPosition(urgent) !== null,
+    [checkpointPosition],
+  );
+
+  const handleResetRequest = useCallback(async (urgent: boolean) => {
     const painter = painterRef.current;
     const ws = wsRef.current;
     const localId = link.localId;
@@ -664,7 +694,12 @@ export default function App() {
       !painter.isSynchronizationSettled() ||
       feed.applied < link.lastSeq
     ) return;
-    const checkpoint = await painter.exportCheckpoint(feed.applied);
+    // Not at the head of history: there, the checkpoint would freeze the
+    // newest stroke for every client, and with it the undo somebody is about
+    // to reach for. Behind everything still undoable, it takes nothing.
+    const position = checkpointPosition(urgent);
+    if (position === null) return;
+    const checkpoint = await painter.exportCheckpoint(position);
     // Each snapshot is stamped with the participant whose layer it is, not
     // with the uploader: one client uploads the whole canvas on everyone's
     // behalf, and the owner byte is what puts each pair back where it came
@@ -679,7 +714,7 @@ export default function App() {
     snapshots.forEach((snapshot) => ws.send(snapshot));
   // wsRef is created by the WebSocket hook below and is stable for its lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drainCanonical, link]);
+  }, [drainCanonical, checkpointPosition, link]);
 
   /**
    * The canonical position this client's last uploaded preview described.
@@ -747,7 +782,7 @@ export default function App() {
     createOrUpdateCursor, hideCursor,
     addParticipant, clearParticipants,
     addChatMessage,
-    handleResetRequest, canUploadCheckpoint, onReconnectCanvas, onCanvasMessage,
+    handleResetRequest, canUploadCheckpoint, hasCheckpointToTake, onReconnectCanvas, onCanvasMessage,
     onUnreadableSequence,
     onWelcome: handleWelcome,
     onResetPoint: handleResetPoint,
