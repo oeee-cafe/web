@@ -28,9 +28,9 @@
          system's -- a sheet on iOS and macOS, the browser on Windows --
          with the answer handed back.
 
-         The site's button in Google's colours for each theme, with the
-         G from Google's branding kit (static/signin/google-mark.svg,
-         unaltered) before the words in the reader's language (style.css). #}
+         The site's button in Google's colours for each theme, with
+         Google's four-colour G in flat colour (static/signin/google-mark.svg)
+         before the words in the reader's language (style.css). #}
       <a class="ds-button auth-secondary auth-google" href="/auth/google{% if next %}?next={{ next|urlencode }}{% endif %}"><img class="auth-provider-mark" src="{{ '/static/signin/google-mark.svg' | cachebuster | safe }}" width="18" height="18" alt="" />{{ ftl_get_message("sign-in-with-google") }}</a>
     {% endif %}
     {% if steam_enabled %}

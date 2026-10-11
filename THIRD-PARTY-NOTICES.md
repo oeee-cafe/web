@@ -48,11 +48,9 @@ They are unmodified.
 brand assets, used under its sign-in branding guidelines; not covered by
 this repository's licence.
 
-`static/signin/google-mark.svg` is the kit's square G-only button cropped
-to the G, without the button behind it, with one addition: flat wedges in
-the gradient's own colours under the G, which the gradient covers wherever
-it draws, for Firefox 56 -- the kit paints the G with a `conic-gradient`
-inside a `foreignObject`, and without one the G is nearly empty.
+`static/signin/google-mark.svg` is Google's four-colour G as FirebaseUI
+serves it (<https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg>),
+its four paths and colours unaltered, without the editor's metadata.
 
 ## Sign in with Apple
 
