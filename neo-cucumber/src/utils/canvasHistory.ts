@@ -443,6 +443,14 @@ export class CanvasHistory {
   /** The furthest canonical position seen, for `projectedAt`. */
   private latestSeq = 0;
   /**
+   * The position the projection on the canvas was judged from: what
+   * `projectedAt` answered when it was last rendered. An echo of ours that
+   * is ahead of a pending undo in the fork moves `latestSeq` on without
+   * redrawing anything, so what is on screen is not always the projection
+   * at the current `projectedAt`; this is what it is the projection at.
+   */
+  private renderedAt = 0;
+  /**
    * Every canonical redo that took something since the last checkpoint:
    * where it was sequenced, and the undo point it took. A checkpoint cut
    * between the two would leave a client that joined from it choosing a
@@ -910,9 +918,6 @@ export class CanvasHistory {
     msg: HistoryOperation,
     seq?: number,
   ): Promise<void> {
-    // Where history stood before this message, which is where the canvas was
-    // last projected from.
-    const projectedFrom = this.projectedAt();
     if (seq !== undefined && seq > this.latestSeq) this.latestSeq = seq;
     // Somebody else's mark on the pair the pointer is painting: it has to be
     // checked against the stroke in progress, so that stroke has to be in the
@@ -936,10 +941,15 @@ export class CanvasHistory {
 
     if (this.fork.length > 0 && this.fork[0].id === id) {
       this.record({ source: "canonical", op: msg.type, actor, seq, action: "echo" });
-      // What the canvas shows, for an undo: the projection that previewed it.
+      // What the canvas shows, for an undo: the projection that previewed
+      // it, judged from the position it was rendered at -- not from where
+      // history stands now, which an echo of ours ahead of the undo in the
+      // fork can have moved without a redraw. Judged from there, a preview
+      // at the edge of `UNDO_WINDOW` would read as having taken nothing,
+      // agree with the room, and leave on the canvas the stroke it took.
       const shown =
         msg.type === "undo" && this.projectionRendered
-          ? this.projectedEntries(projectedFrom)
+          ? this.projectedEntries(this.renderedAt)
           : undefined;
       this.fork.shift();
       // Caught up with itself: the fork is keeping pace again.
@@ -1126,7 +1136,7 @@ export class CanvasHistory {
     // under everything that can still be undone, and never moves this.
     const shown =
       this.projectionRendered && this.fork.some((f) => f.msg.type === "undo")
-        ? this.projectedEntries()
+        ? this.projectedEntries(this.renderedAt)
         : undefined;
     const squashed = this.entries.slice(0, cut);
 
@@ -1319,7 +1329,6 @@ export class CanvasHistory {
         }
         if (msg.type === "region" && msg.tool === "paste") {
           const copied = this.copyPastedBy(key, i, cut, reachable);
-          if (copied === null) return null;
           if (copied !== undefined) moved = lower(copied - 1) || moved;
         }
       }
@@ -1340,8 +1349,7 @@ export class CanvasHistory {
 
   /**
    * A copy under `cut` that the paste at entry `paste` may paste: the
-   * sequence to cut under, undefined if there is none, or null if it lies
-   * under the last checkpoint, where nothing can go under it.
+   * sequence to cut under, or undefined if there is none.
    *
    * A paste takes its author's last copy still done, which is not always
    * the last copy -- an undone one is skipped -- and which can change while
@@ -1350,10 +1358,24 @@ export class CanvasHistory {
    * everyone's reach is what the paste will always take, and ends the walk;
    * one that may still change might not be, and the walk goes on; under the
    * cut, a copy that is done is one a joiner would not have.
+   *
+   * Running out of entries is not a reason to cut lower, or to decline.
+   * What the author copied before the last checkpoint, if anything, sits
+   * in this client's base savepoint -- and in no joiner's hands already,
+   * since a checkpoint carries pixels and no clipboards. A paste of it is
+   * wrong for a joiner from the last checkpoint and just as wrong for one
+   * from this cut, so declining here protected nobody; it only held the
+   * room without a checkpoint for as long as anyone who had ever copied
+   * had a copy within reach, which with NEO's copy-then-paste is any time
+   * they used the tool. (The one way such a paste can come to take that
+   * older copy is a redo of it landing after its own copy has left reach
+   * while it has not, which a window's worth of idleness between the two
+   * undos and the redo could arrange. It is the same divergence a joiner
+   * from the previous checkpoint already has.)
    */
   private copyPastedBy(
     key: ActorKey, paste: number, cut: number, reachable: ReadonlySet<number>,
-  ): number | null | undefined {
+  ): number | undefined {
     for (let i = paste - 1; i >= 0; i--) {
       const e = this.entries[i];
       if (actorKey(e.msg.userId) !== key) continue;
@@ -1366,9 +1388,7 @@ export class CanvasHistory {
         return e.seq;
       }
     }
-    // Out of entries: what this author last copied before the last
-    // checkpoint, if anything, is in its savepoint and in no joiner's hands.
-    return this.savepoints[0].strokes.clipboards.get(key) ? null : undefined;
+    return undefined;
   }
 
   /**
@@ -1592,10 +1612,12 @@ export class CanvasHistory {
 
   private previewUndo(before: Entry[]): void {
     this.flushLocalWork();
-    const entries = this.projectedEntries();
+    const at = this.projectedAt();
+    const entries = this.projectedEntries(at);
     this.projectionRendered = this.renderReplay(
       this.latestSavepoint(), entries, this.undoOwners(before, entries),
     );
+    if (this.projectionRendered) this.renderedAt = at;
   }
 
   private async replayFrom(sp: Savepoint, owners?: Set<ActorKey>): Promise<void> {
@@ -1609,7 +1631,9 @@ export class CanvasHistory {
         ));
       }
     }
-    this.projectionRendered = this.renderReplay(sp, this.projectedEntries(), owners);
+    const at = this.projectedAt();
+    this.projectionRendered = this.renderReplay(sp, this.projectedEntries(at), owners);
+    if (this.projectionRendered) this.renderedAt = at;
   }
 
   private renderReplay(sp: Savepoint, entries: Entry[], owners?: Set<ActorKey>): boolean {

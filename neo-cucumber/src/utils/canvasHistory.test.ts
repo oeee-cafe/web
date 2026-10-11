@@ -1109,6 +1109,33 @@ describe("how far undo reaches", () => {
     expect(history.canUndo()).toBe(false);
     expect(history.canRedo()).toBe(false);
   });
+
+  /**
+   * A preview is judged from the next position when it is drawn, and an
+   * echo of our own that is ahead of the undo in the fork moves that
+   * position on without redrawing anything. The undo's echo has to compare
+   * the room's answer with what was drawn, not with what would be drawn
+   * now: judged from the later position, a preview at the window's edge
+   * reads as having taken nothing, agrees with the room, and the stroke it
+   * took stays off the canvas that everyone else kept it on.
+   */
+  it("puts back an undo previewed at the window's edge that our own echo carried past it", async () => {
+    const { engine, history } = setup();
+    let seq = await strokes(history, 0, 1, 1);
+    seq = await filler(history, UNDO_WINDOW - 2, seq);
+    // The stroke's point is exactly `UNDO_WINDOW` back from the next position.
+    expect(seq - 1).toBe(UNDO_WINDOW);
+    // Another chunk of the same gesture, still on its way, then the undo.
+    const chunk = localStroke(history, 1, 0, 1);
+    const undo = encodeUndo(LOCAL, false);
+    local(history, undo);
+    expect(red(engine, 0, 0)).toBe(0);
+
+    await remote(history, chunk, seq);
+    await remote(history, undo, seq + 1);
+    expect(red(engine, 0, 0)).toBe(1);
+    expect(history.canUndo()).toBe(false);
+  });
 });
 
 /**
@@ -1214,6 +1241,44 @@ describe("where a checkpoint is cut", () => {
         { x: 5, y: 5, width: 2, height: 2 }, { r: 0, g: 0, b: 0, a: 255 }, 1), seq);
     // Under the copy's own undo point, not merely under the copy.
     expect(history.checkpointCut(seq - 1)).toBe(copied - 2);
+  });
+
+  /**
+   * An older copy under the last checkpoint is in no joiner's hands
+   * already, so it is no reason to decline: a cut here leaves a joiner no
+   * worse off than the last one did. Declining for it held the room without
+   * a checkpoint whenever anybody who had ever copied used the tool again,
+   * because NEO's paste follows its copy, and the walk back from the paste
+   * passes a copy that is still within reach.
+   */
+  it("cuts for a paste whose author's older copy is under the last checkpoint", async () => {
+    const { history } = setup();
+    const region = (tool: "copy" | "paste") =>
+      encodeRegion(REMOTE, REMOTE, "foreground", tool,
+        { x: 0, y: 0, width: 2, height: 2 }, { r: 0, g: 0, b: 0, a: 255 }, 1);
+    let seq = 1;
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    seq = await send(history, region("copy"), seq);
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    seq = await send(history, region("paste"), seq);
+    let third = 0;
+    for (let i = 0; i < UNDO_DEPTH; i++) {
+      if (i === 2) third = seq;
+      seq = await send(history, encodeUndoPoint(REMOTE), seq);
+      seq = await send(history, stroke(REMOTE, i % SIZE, 3, i + 1), seq);
+    }
+    // Thirty strokes put the pair out of reach, and the checkpoint goes
+    // above it.
+    expect(history.checkpointCut(seq - 1)).toBe(4);
+    await history.handleResetPoint(4);
+    // The same pair again, within reach, with nothing older left in history.
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    seq = await send(history, region("copy"), seq);
+    seq = await send(history, encodeUndoPoint(REMOTE), seq);
+    seq = await send(history, region("paste"), seq);
+    // Under the thirty points still within reach, the pair's included, and
+    // no lower: the copy under the last checkpoint holds nothing down.
+    expect(history.checkpointCut(seq - 1)).toBe(third - 1);
   });
 });
 
