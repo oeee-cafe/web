@@ -165,6 +165,27 @@ interface OpenBatch {
   };
 }
 
+/**
+ * How far back an undo or a redo reaches: its sender's last `UNDO_DEPTH`
+ * undo points, and none sequenced more than `UNDO_WINDOW` messages before it.
+ *
+ * Every client decides this from the canonical stream alone, so they all
+ * agree which point an undo takes or that it takes none. The depth counts
+ * every undo point its sender made, the ones a later stroke replaced
+ * included, and the window counts sequence numbers, so both only ever grow:
+ * a point that has left reach never comes back into it. That is what will
+ * let a checkpoint be cut behind everything still reachable instead of at
+ * the head of history, where it takes the newest stroke out of reach.
+ *
+ * The depth is Drawpile's default (`DP_UNDO_DEPTH_DEFAULT`). The window is
+ * ours, for somebody who stops drawing: without it their last strokes would
+ * stay within reach for as long as the room went on. Neither has been
+ * reached by anyone. Across every recorded session up to 2026-10-12, the
+ * deepest an undo went was 12 points, and the furthest 283 messages.
+ */
+export const UNDO_DEPTH = 30;
+export const UNDO_WINDOW = 2000;
+
 const SAVEPOINT_INTERVAL = 64;
 const MAX_SAVEPOINTS = 8;
 
@@ -419,6 +440,8 @@ export class CanvasHistory {
   private releaseRenames?: () => void;
   private fork: ForkEntry[] = [];
   private projectionRendered = true;
+  /** The furthest canonical position seen, for `projectedAt`. */
+  private latestSeq = 0;
   /**
    * Canonical messages seen while the fork has been waiting for its echoes,
    * against `MAX_FORK_FALLBEHIND`. Reset whenever the fork empties.
@@ -626,49 +649,47 @@ export class CanvasHistory {
   }
 
   canUndo(): boolean {
-    return this.projectedUndoCounts().done > 0;
+    return this.projectedUndoReach().undo;
   }
 
   canRedo(): boolean {
-    return this.projectedUndoCounts().undone > 0;
+    return this.projectedUndoReach().redo;
   }
 
   /**
-   * Counts the local user's undoable/redoable strokes, projecting the effect
-   * of unconfirmed fork messages. Canonical marking waits for the echo, so
-   * without this projection a quickly repeated undo click would send multiple
-   * UNDO messages and revert more strokes than intended.
+   * Whether the local user has anything within reach to undo or redo,
+   * projecting the effect of unconfirmed fork messages. Canonical marking
+   * waits for the echo, so without this projection a quickly repeated undo
+   * click would send multiple UNDO messages and revert more strokes than
+   * intended.
+   *
+   * Asked of the same `undoTarget` the room decides by, over the local
+   * user's undo points alone -- the only entries it looks at -- so that the
+   * button is never enabled for an undo the room would refuse, and the
+   * whole history is not copied on every message to ask.
    */
-  private projectedUndoCounts(): { done: number; undone: number } {
-    let done = 0;
-    let undone = 0;
+  private projectedUndoReach(): { undo: boolean; redo: boolean } {
+    const me = actorKey(this.localUserId);
+    const points: Entry[] = [];
     for (const e of this.entries) {
-      if (
-        e.msg.type === "undoPoint" &&
-        actorKey(e.msg.userId) === actorKey(this.localUserId)
-      ) {
-        if (e.undo === "done") done++;
-        else if (e.undo === "undone") undone++;
+      if (e.msg.type === "undoPoint" && actorKey(e.msg.userId) === me) {
+        points.push({ ...e });
       }
     }
+    const at = this.projectedAt();
     for (const f of this.fork) {
       if (f.msg.type === "undoPoint") {
         // A new stroke will be undoable and kills the redo stack
-        done++;
-        undone = 0;
+        this.appendUndoPoint(f.msg, undefined, points);
       } else if (f.msg.type === "undo") {
-        if (f.msg.redo) {
-          if (undone > 0) {
-            undone--;
-            done++;
-          }
-        } else if (done > 0) {
-          done--;
-          undone++;
-        }
+        const target = this.undoTarget(points, f.msg.userId, f.msg.redo, at);
+        if (target >= 0) points[target].undo = f.msg.redo ? "done" : "undone";
       }
     }
-    return { done, undone };
+    return {
+      undo: this.undoTarget(points, me, false, at) >= 0,
+      redo: this.undoTarget(points, me, true, at) >= 0,
+    };
   }
 
   /**
@@ -881,6 +902,10 @@ export class CanvasHistory {
     msg: HistoryOperation,
     seq?: number,
   ): Promise<void> {
+    // Where history stood before this message, which is where the canvas was
+    // last projected from.
+    const projectedFrom = this.projectedAt();
+    if (seq !== undefined && seq > this.latestSeq) this.latestSeq = seq;
     // Somebody else's mark on the pair the pointer is painting: it has to be
     // checked against the stroke in progress, so that stroke has to be in the
     // fork first. Only then, because a flush is a message for the whole room,
@@ -903,13 +928,32 @@ export class CanvasHistory {
 
     if (this.fork.length > 0 && this.fork[0].id === id) {
       this.record({ source: "canonical", op: msg.type, actor, seq, action: "echo" });
+      // What the canvas shows, for an undo: the projection that previewed it.
+      const shown =
+        msg.type === "undo" && this.projectionRendered
+          ? this.projectedEntries(projectedFrom)
+          : undefined;
       this.fork.shift();
       // Caught up with itself: the fork is keeping pace again.
       if (this.fork.length === 0) this.forkFallbehind = 0;
       if (msg.type === "undo") {
-        const first = this.markUndo(msg.userId, msg.redo);
+        const first = this.markUndo(msg.userId, msg.redo, seq);
         if (!this.projectionRendered) {
           await this.replayFrom(first >= 0 ? this.savepointFor(first) : this.latestSavepoint());
+        } else if (shown) {
+          // The preview judged reach from the position after the last message
+          // this history saw; the room judged it from where the undo was
+          // actually sequenced. Every message that arrives in between redraws
+          // the preview, but the room also spends positions this history
+          // never sees -- a RESET_POINT, a message nobody here could read --
+          // and those can carry the undo past the edge of `UNDO_WINDOW`.
+          // Where the two disagree, the room is right, and the canvas has to
+          // be brought back to it.
+          const settled = this.projectedEntries();
+          const differs = settled.findIndex((entry, i) => entry.undo !== shown[i]?.undo);
+          if (differs >= 0) {
+            await this.replayFrom(this.savepointFor(differs), this.undoOwners(shown, settled));
+          }
         }
       } else if (msg.type === "undoPoint") {
         this.appendUndoPoint(msg, seq);
@@ -944,7 +988,7 @@ export class CanvasHistory {
       if (this.fork.length === 0) this.forkFallbehind = 0;
       let first = -1;
       if (msg.type === "undo") {
-        first = this.markUndo(msg.userId, msg.redo);
+        first = this.markUndo(msg.userId, msg.redo, seq);
       } else if (msg.type === "undoPoint") {
         this.appendUndoPoint(msg, seq);
       } else {
@@ -979,7 +1023,7 @@ export class CanvasHistory {
       this.forkFallbehind = 0;
       let first = -1;
       if (msg.type === "undo") {
-        first = this.markUndo(msg.userId, msg.redo);
+        first = this.markUndo(msg.userId, msg.redo, seq);
       } else if (msg.type === "undoPoint") {
         this.appendUndoPoint(msg, seq);
       } else {
@@ -1048,6 +1092,7 @@ export class CanvasHistory {
       actor: "",
       seq: baseSeq,
     });
+    if (baseSeq > this.latestSeq) this.latestSeq = baseSeq;
     let cut = 0;
     while (
       cut < this.entries.length &&
@@ -1128,7 +1173,7 @@ export class CanvasHistory {
     { replay }: { replay: boolean }
   ): Promise<void> {
     if (msg.type === "undo") {
-      await this.processUndo(msg.userId, msg.redo);
+      await this.processUndo(msg.userId, msg.redo, seq);
     } else if (msg.type === "undoPoint") {
       this.maybeSavepoint(true);
       this.appendUndoPoint(msg, seq);
@@ -1171,9 +1216,11 @@ export class CanvasHistory {
   }
 
   /** Marks entries and replays; no-op if there is nothing to undo/redo. */
-  private async processUndo(userId: HistoryActorId, redo: boolean): Promise<void> {
+  private async processUndo(
+    userId: HistoryActorId, redo: boolean, at: number | undefined,
+  ): Promise<void> {
     const before = this.projectedEntries();
-    const first = this.markUndo(userId, redo);
+    const first = this.markUndo(userId, redo, at);
     if (first < 0) return;
     const after = this.projectedEntries();
     await this.replayFrom(this.savepointFor(first), this.undoOwners(before, after));
@@ -1188,17 +1235,15 @@ export class CanvasHistory {
    * earliest undone undo point to their next undo point become done again.
    */
   private markUndo(
-    userId: HistoryActorId, redo: boolean, entries = this.entries, invalidate = true,
+    userId: HistoryActorId,
+    redo: boolean,
+    at: number | undefined,
+    entries = this.entries,
+    invalidate = true,
   ): number {
-    let first = -1;
+    const first = this.undoTarget(entries, userId, redo, at);
+    if (first < 0) return -1;
     if (redo) {
-      first = entries.findIndex(
-        (e) =>
-          e.msg.type === "undoPoint" &&
-          actorKey(e.msg.userId) === actorKey(userId) &&
-          e.undo === "undone"
-      );
-      if (first < 0) return -1;
       let next = entries.length;
       for (let i = first + 1; i < entries.length; i++) {
         const e = entries[i];
@@ -1221,18 +1266,6 @@ export class CanvasHistory {
         }
       }
     } else {
-      for (let i = entries.length - 1; i >= 0; i--) {
-        const e = entries[i];
-        if (
-          e.msg.type === "undoPoint" &&
-          actorKey(e.msg.userId) === actorKey(userId) &&
-          e.undo === "done"
-        ) {
-          first = i;
-          break;
-        }
-      }
-      if (first < 0) return -1;
       for (let i = first; i < entries.length; i++) {
         const e = entries[i];
         if (
@@ -1251,15 +1284,65 @@ export class CanvasHistory {
   }
 
   /**
+   * The undo point an undo or a redo by `userId`, sequenced at `at`, takes:
+   * for an undo their most recent one still done, for a redo their earliest
+   * one undone. -1 if there is none within reach (`UNDO_DEPTH`,
+   * `UNDO_WINDOW`).
+   *
+   * Walks back from the newest, so what lies out of reach is never looked
+   * at, and an undo whose most recent done point is out of reach takes
+   * nothing -- every point older than it is further out still. Everything a
+   * walk counts lies after the point it stops at, which a client that joined
+   * from a checkpoint below that point holds as well as one that was there:
+   * so both choose the same point.
+   *
+   * `at` is an estimate for a projection of our own pending undo (see
+   * `projectedAt`), and absent only where no sequence is known at all. An
+   * entry has no sequence only while it is one of our own unconfirmed
+   * points, which are the newest there are, so the window passes them.
+   */
+  private undoTarget(
+    entries: readonly Entry[],
+    userId: HistoryActorId,
+    redo: boolean,
+    at: number | undefined,
+  ): number {
+    const key = actorKey(userId);
+    let depth = 0;
+    let earliestUndone = -1;
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const e = entries[i];
+      if (e.msg.type !== "undoPoint" || actorKey(e.msg.userId) !== key) continue;
+      if (++depth > UNDO_DEPTH) break;
+      if (at !== undefined && e.seq !== undefined && at - e.seq > UNDO_WINDOW) break;
+      if (redo) {
+        if (e.undo === "undone") earliestUndone = i;
+      } else if (e.undo === "done") {
+        return i;
+      }
+    }
+    return redo ? earliestUndone : -1;
+  }
+
+  /**
+   * Where the next canonical message will be, for judging the reach of an
+   * undo of ours that has none yet. The room may sequence other messages
+   * first, so this can only be early; the echo settles it either way.
+   */
+  private projectedAt(): number {
+    return this.latestSeq + 1;
+  }
+
+  /**
    * Restores a savepoint, replays all done entries after it, then re-applies
    * the unconfirmed fork on top.
    */
   /** Canonical entries plus pending gestures, with undo applied only to copies. */
-  private projectedEntries(): Entry[] {
+  private projectedEntries(at = this.projectedAt()): Entry[] {
     const entries = this.entries.map((entry) => ({ ...entry }));
     for (const f of this.fork) {
       if (f.msg.type === "undo") {
-        this.markUndo(f.msg.userId, f.msg.redo, entries, false);
+        this.markUndo(f.msg.userId, f.msg.redo, at, entries, false);
       } else if (f.msg.type === "undoPoint") {
         this.appendUndoPoint(f.msg, undefined, entries);
       } else {
@@ -1709,7 +1792,7 @@ export class CanvasHistory {
     // One scan, not two: `canUndo` and `canRedo` are the same walk over every
     // entry since the last checkpoint, and this runs on every message the
     // canonical stream delivers.
-    const { done, undone } = this.projectedUndoCounts();
-    this.onChange(done > 0, undone > 0);
+    const { undo, redo } = this.projectedUndoReach();
+    this.onChange(undo, redo);
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CanvasHistory, MAX_FORK_FALLBEHIND } from "./canvasHistory";
+import { CanvasHistory, MAX_FORK_FALLBEHIND, UNDO_DEPTH, UNDO_WINDOW } from "./canvasHistory";
 import {
   BRUSH_TYPE,
   decodeMessage,
@@ -980,6 +980,134 @@ describe("collaborative undo", () => {
 
     await remote(history, encodeUndo(LOCAL, false));
     expect(red(engine, 8, 8)).toBe(0);
+  });
+});
+
+/**
+ * How far back an undo reaches, which every client has to agree on without
+ * asking: a sender's last `UNDO_DEPTH` undo points, none more than
+ * `UNDO_WINDOW` messages before the undo.
+ */
+describe("how far undo reaches", () => {
+  /** Stroke `i` (from 0) on its own pixel, red `i + 1`, so each can be seen. */
+  const at = (i: number) => ({ x: i % SIZE, y: Math.floor(i / SIZE) });
+
+  /** `count` confirmed strokes by the local user from `seq`; the next seq. */
+  async function strokes(history: CanvasHistory, from: number, count: number, seq: number) {
+    for (let i = from; i < from + count; i++) {
+      await remote(history, encodeUndoPoint(LOCAL), seq++);
+      await remote(history, stroke(LOCAL, at(i).x, at(i).y, i + 1), seq++);
+    }
+    return seq;
+  }
+
+  /** Somebody else's strokes, on a pixel nobody looks at; the next seq. */
+  async function filler(history: CanvasHistory, count: number, seq: number) {
+    for (let i = 0; i < count; i++) {
+      await remote(history, stroke(REMOTE, SIZE - 1, SIZE - 1, 1), seq++);
+    }
+    return seq;
+  }
+
+  /** An undo or a redo of ours, sent and confirmed at `seq`. */
+  async function confirmed(history: CanvasHistory, redo: boolean, seq: number) {
+    const bytes = encodeUndo(LOCAL, redo);
+    local(history, bytes);
+    await remote(history, bytes, seq);
+  }
+
+  it(`takes back the last ${UNDO_DEPTH} strokes and no more`, async () => {
+    const { engine, history } = setup();
+    let seq = await strokes(history, 0, UNDO_DEPTH + 1, 1);
+    for (let n = 0; n < UNDO_DEPTH; n++) {
+      expect(history.canUndo()).toBe(true);
+      await confirmed(history, false, seq++);
+    }
+    // The oldest is out of reach: the button says so, and an undo sent
+    // anyway -- by a client that thinks otherwise -- takes nothing.
+    expect(history.canUndo()).toBe(false);
+    await remote(history, encodeUndo(LOCAL, false), seq++);
+    expect(red(engine, at(0).x, at(0).y)).toBe(1);
+    for (let i = 1; i <= UNDO_DEPTH; i++) expect(red(engine, at(i).x, at(i).y)).toBe(0);
+  });
+
+  /**
+   * Counting only the points still standing would let a point come back into
+   * reach: undo five and draw one, and five fewer stand in front of it. A
+   * checkpoint cut below everything reachable relies on that never happening.
+   */
+  it("counts the strokes a new one replaced, so nothing comes back into reach", async () => {
+    const { engine, history } = setup();
+    let seq = await strokes(history, 0, UNDO_DEPTH, 1);
+    for (let n = 0; n < 5; n++) await confirmed(history, false, seq++);
+    // A new stroke: the five undone are replaced, and still counted.
+    seq = await strokes(history, UNDO_DEPTH, 1, seq);
+    let undone = 0;
+    while (history.canUndo()) {
+      await confirmed(history, false, seq++);
+      undone++;
+    }
+    // The new stroke and the 24 still standing behind the five replaced --
+    // all but the first, which is the thirty-first point back.
+    expect(undone).toBe(UNDO_DEPTH - 5);
+    expect(red(engine, at(0).x, at(0).y)).toBe(1);
+    expect(red(engine, at(1).x, at(1).y)).toBe(0);
+  });
+
+  it(`reaches a stroke ${UNDO_WINDOW} messages back, and not one further`, async () => {
+    const near = setup();
+    let seq = await strokes(near.history, 0, 1, 1);
+    // The stroke's undo point is seq 1; an undo at 1 + UNDO_WINDOW reaches it.
+    seq = await filler(near.history, UNDO_WINDOW - 2, seq);
+    expect(near.history.canUndo()).toBe(true);
+    await confirmed(near.history, false, seq);
+    expect(seq).toBe(1 + UNDO_WINDOW);
+    expect(red(near.engine, 0, 0)).toBe(0);
+
+    const far = setup();
+    seq = await strokes(far.history, 0, 1, 1);
+    seq = await filler(far.history, UNDO_WINDOW - 1, seq);
+    expect(far.history.canUndo()).toBe(false);
+    await remote(far.history, encodeUndo(LOCAL, false), seq);
+    expect(red(far.engine, 0, 0)).toBe(1);
+  });
+
+  it("redoes the earliest undone stroke still within reach", async () => {
+    const { engine, history } = setup();
+    let seq = await strokes(history, 0, 1, 1);
+    seq = await filler(history, 1000, seq);
+    seq = await strokes(history, 1, 2, seq);
+    for (let n = 0; n < 3; n++) await confirmed(history, false, seq++);
+    expect([0, 1, 2].map((i) => red(engine, at(i).x, at(i).y))).toEqual([0, 0, 0]);
+
+    // The first stroke leaves the window; the other two do not.
+    seq = await filler(history, UNDO_WINDOW - seq + 2, seq);
+    await confirmed(history, true, seq++);
+    expect([0, 1, 2].map((i) => red(engine, at(i).x, at(i).y))).toEqual([0, 2, 0]);
+    await confirmed(history, true, seq++);
+    expect(history.canRedo()).toBe(false);
+    expect([0, 1, 2].map((i) => red(engine, at(i).x, at(i).y))).toEqual([0, 2, 3]);
+  });
+
+  /**
+   * Our own undo is drawn before the room has sequenced it, judged from
+   * where history stood then. If it lands later than that -- a position the
+   * room spent on a message this history never saw, such as a RESET_POINT --
+   * the stroke can be out of reach by the time it is judged for real, and
+   * the preview has to be taken back.
+   */
+  it("puts back a previewed undo the room found out of reach", async () => {
+    const { engine, history } = setup();
+    let seq = await strokes(history, 0, 1, 1);
+    seq = await filler(history, UNDO_WINDOW - 2, seq);
+    const undo = encodeUndo(LOCAL, false);
+    local(history, undo);
+    expect(red(engine, 0, 0)).toBe(0);
+
+    await remote(history, undo, seq + 1);
+    expect(red(engine, 0, 0)).toBe(1);
+    expect(history.canUndo()).toBe(false);
+    expect(history.canRedo()).toBe(false);
   });
 });
 
