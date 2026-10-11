@@ -3,57 +3,44 @@
  *
  * This is what a checkpoint is made of, and a checkpoint covers a layer pair
  * per participant -- sixteen of these at the largest session size, in one go,
- * on whoever the room asked. So the copies matter: the PNG itself is encoded
- * and decoded off the main thread by the browser, and what is left here is
- * pixel shuffling that has to be worth doing.
+ * on whoever the room asked. They are encoded and decoded by `pngCodec`
+ * rather than by the browser through a canvas, which changed every
+ * translucent pixel it carried.
  */
 
+import { decodeLayerPng, encodeLayerPng } from "./pngCodec";
+
 /**
- * Convert a canvas layer to a PNG Blob
+ * A layer as a PNG Blob, losslessly; see `pngCodec`.
  */
 export async function layerToPngBlob(
   layer: Uint8ClampedArray,
   width: number,
   height: number
 ): Promise<Blob> {
-  // Create a temporary canvas
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-
-  if (!ctx) {
-    throw new Error("Failed to get canvas context");
-  }
-
-  // The layer buffer itself: `ImageData` wraps what it is handed, and
-  // `putImageData` has read it by the time it returns, so copying the layer
-  // first only moved a few megabytes for the sake of it.
-  // The cast is the `SharedArrayBuffer` case `ImageDataArray` excludes; layers
-  // are allocated as plain `new Uint8ClampedArray(n)` and never shared.
-  const imageData = new ImageData(
-    layer as Uint8ClampedArray<ArrayBuffer>,
-    width,
-    height,
-  );
-  ctx.putImageData(imageData, 0, 0);
-
-  // Convert to PNG blob
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
-      } else {
-        reject(new Error("Failed to create PNG blob"));
-      }
-    }, "image/png");
-  });
+  // A layer takes tens of milliseconds, and a checkpoint asks for up to
+  // sixteen at once. A turn of the event loop before each lets the pointer
+  // in between them rather than after all of them.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const png = encodeLayerPng(layer, width, height);
+  return new Blob([png as Uint8Array<ArrayBuffer>], { type: "image/png" });
 }
 
 /**
- * Convert PNG data (Uint8Array) back to a Uint8ClampedArray layer
+ * PNG data back to a layer, exactly as stored when `pngCodec` can read it --
+ * which is every checkpoint a client has written -- and through a canvas,
+ * premultiplication and all, only when it cannot.
  */
 export async function pngDataToLayer(
+  pngData: Uint8Array,
+  width: number,
+  height: number
+): Promise<Uint8ClampedArray> {
+  return decodeLayerPng(pngData, width, height) ?? decodeThroughCanvas(pngData, width, height);
+}
+
+/** The browser's decoder, for a PNG `decodeLayerPng` declines. */
+async function decodeThroughCanvas(
   pngData: Uint8Array,
   width: number,
   height: number
