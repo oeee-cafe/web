@@ -145,8 +145,8 @@ if ARGV[10] == '1' then
     redis.call('RPUSH', KEYS[9], ARGV[8] .. ':' .. frame)
     redis.call('EXPIRE', KEYS[9], tonumber(ARGV[9]))
 end
--- Both auto-reset meters, read here because the write already had to touch
--- every key they are computed from. The caller decides on them without asking
+-- The history's size, which auto-reset is decided on, read here because the
+-- write already had to touch every key it is computed from. The caller decides on them without asking
 -- again.
 return {seq, history_id, grown, messages, redis.call('GET', KEYS[7]) or ''}
 "#;
@@ -185,10 +185,10 @@ fn reset_base_key(room_uuid: Uuid) -> String {
 
 /// What the history weighs, against what the last checkpoint left behind.
 ///
-/// Both meters are reported as growth since that checkpoint, because that is
-/// what a late joiner has to replay on top of it and what a new checkpoint
-/// would remove. Absolute size says nothing useful: most of it is the
-/// checkpoint.
+/// Messages and bytes are both reported as growth since that checkpoint,
+/// because that is what a late joiner has to replay on top of it and what a
+/// new checkpoint would remove. Absolute size says nothing useful: most of it
+/// is the checkpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HistorySize {
     pub messages: usize,
@@ -234,9 +234,9 @@ pub struct HistorySince {
 pub enum Sequenced {
     /// Given this canonical position, with the history weighing `bytes` after.
     ///
-    /// `size` is both auto-reset meters as of this write, read inside the same
-    /// script rather than by a follow-up round trip: the caller checks them on
-    /// every message, and they are only interesting the moment one lands.
+    /// `size` is the history's size as of this write, read inside the same
+    /// script rather than by a follow-up round trip: the caller checks it on
+    /// every message, and it is only interesting the moment one lands.
     Stored {
         seq: u64,
         bytes: u64,
@@ -400,7 +400,7 @@ impl RedisMessageStore {
         Ok(conn.get::<_, Option<u64>>(seq_key(room_uuid)).await?)
     }
 
-    /// Both meters at once, and the checkpoint they are measured from.
+    /// Messages and bytes at once, and the checkpoint they are measured from.
     pub async fn history_size(
         &self,
         room_uuid: Uuid,

@@ -53,6 +53,7 @@ const REPLAY_BATCH: u8 = 0x10;
 const FILL: u8 = 0x12;
 const UNDO_POINT: u8 = 0x14;
 const MOVE_POINTER: u8 = 0x1c;
+const PUT_IMAGE: u8 = 0x1d;
 
 type Socket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
@@ -362,6 +363,20 @@ fn fill(claimed: u8, x: i16) -> Vec<u8> {
     frame
 }
 
+/// A flood fill as the ground it covered, carrying `coverage` bytes: the
+/// heaviest thing an ordinary stroke of the pen puts into history.
+fn put_image(author: u8, x: i16, coverage: usize) -> Vec<u8> {
+    let mut frame = vec![PUT_IMAGE, author, author, 0];
+    frame.extend_from_slice(&x.to_le_bytes());
+    frame.extend_from_slice(&0i16.to_le_bytes());
+    frame.extend_from_slice(&1i16.to_le_bytes());
+    frame.extend_from_slice(&1i16.to_le_bytes());
+    frame.extend_from_slice(&[0, 0, 0, 255]);
+    frame.extend_from_slice(&(coverage as u32).to_le_bytes());
+    frame.resize(frame.len() + coverage, 0);
+    frame
+}
+
 fn snapshot(author: u8, owner: u8, layer: u8) -> Vec<u8> {
     let png = [0x89, b'P', b'N', b'G', 1, 2, 3, 4];
     let mut frame = vec![SNAPSHOT, author, owner, layer];
@@ -619,15 +634,38 @@ async fn a_full_room_turns_the_next_person_away_with_a_policy_close() {
 }
 
 #[tokio::test]
-async fn five_hundred_messages_ask_for_a_checkpoint_which_then_stands_in_for_them() {
+async fn growth_in_bytes_asks_for_a_checkpoint_which_then_stands_in_for_it() {
     let Some(room) = open_room(4).await else {
         return;
     };
     let outcome = tokio::time::timeout(Duration::from_secs(60), async {
         let mut alice = room.connect(0, None).await;
         let (alice_id, first) = opening(&mut alice).await;
-        for _ in 0..500 {
+
+        // Many small messages are not a reason to checkpoint. A checkpoint
+        // freezes everybody's undo, and a count of messages used to ask for
+        // one every minute or two. The request would follow the echo of the
+        // message that crossed the line, before the next one is sequenced,
+        // so a hundred echoes past where it used to come is far enough.
+        for _ in 0..600 {
             send(&mut alice, vec![UNDO_POINT, alice_id]).await;
+        }
+        let mut echoed = 0;
+        while echoed < 600 {
+            let frame = next_frame(&mut alice, "the undo points' echoes").await;
+            assert_ne!(
+                frame[0], RESET_REQUEST,
+                "asked for a checkpoint after {echoed} small messages"
+            );
+            if frame[0] == SEQUENCED && sequenced(&frame).2[0] == UNDO_POINT {
+                echoed += 1;
+            }
+        }
+
+        // Weight is: past four megabytes on top of the checkpoint, which
+        // here is none.
+        for x in 0..5 {
+            send(&mut alice, put_image(alice_id, x, 900 * 1024)).await;
         }
         // The room is asked who can checkpoint it: a query, not yet an order.
         let query = next_of_type(&mut alice, RESET_REQUEST).await;
@@ -640,7 +678,7 @@ async fn five_hundred_messages_ask_for_a_checkpoint_which_then_stands_in_for_the
         assert_eq!(order[9], 1, "phase: upload");
 
         // Her checkpoint: one pair, hers, at the position she has applied.
-        send(&mut alice, reset_begin(500, 2)).await;
+        send(&mut alice, reset_begin(605, 2)).await;
         send(&mut alice, snapshot(alice_id, alice_id, 0)).await;
         send(&mut alice, snapshot(alice_id, alice_id, 1)).await;
         let point = loop {
@@ -650,25 +688,25 @@ async fn five_hundred_messages_ask_for_a_checkpoint_which_then_stands_in_for_the
                 break (seq, payload.to_vec());
             }
         };
-        assert_eq!(point.0, 501, "the point is sequenced after the base");
-        assert_eq!(u64_at(&point.1, 1), 500);
+        assert_eq!(point.0, 606, "the point is sequenced after the base");
+        assert_eq!(u64_at(&point.1, 1), 605);
         assert_eq!(u16::from_le_bytes([point.1[9], point.1[10]]), 2);
 
-        // A late joiner now gets the checkpoint in place of the five hundred.
+        // A late joiner now gets the checkpoint in place of all of it.
         let mut bob = room.connect(1, None).await;
         let (_, replay) = opening(&mut bob).await;
         assert_eq!(
             replay.history_id, first.history_id,
             "a checkpoint keeps the history's identity"
         );
-        assert_eq!(replay.last_seq, 501);
+        assert_eq!(replay.last_seq, 606);
         assert_eq!(
             replay
                 .entries
                 .iter()
                 .map(|(seq, payload)| (*seq, payload[0]))
                 .collect::<Vec<_>>(),
-            vec![(500, SNAPSHOT), (500, SNAPSHOT), (501, RESET_POINT)]
+            vec![(605, SNAPSHOT), (605, SNAPSHOT), (606, RESET_POINT)]
         );
         assert_eq!(
             replay.entries[0].1[2], alice_id,

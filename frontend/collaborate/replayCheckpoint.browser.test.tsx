@@ -13,8 +13,8 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
  *
  * This drives the real session view -- the real painter, the real drain, the
  * real decoder -- from the frames a server would send, because every part of
- * that path had tests and the failure lived between them. A room checkpoints
- * roughly every five hundred messages, so a full replay begins with somebody
+ * that path had tests and the failure lived between them. A busy room
+ * checkpoints, so a full replay begins with somebody
  * else's snapshots and a RESET_POINT that arrives after them, and what those
  * two do to each other is not reachable from a test of either one.
  *

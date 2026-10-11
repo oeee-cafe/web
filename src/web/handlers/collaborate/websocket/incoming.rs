@@ -156,7 +156,7 @@ pub(super) async fn handle_incoming_messages(
             .await
             {
                 Ok(redis_messages::Sequenced::Stored { seq, size, .. }) => {
-                    // The activity stamp and both auto-reset meters came back
+                    // The activity stamp and the history's size came back
                     // with the sequence number, inside the same script. They
                     // used to be three more round trips, taken on every
                     // drawing message before this loop would read the next one

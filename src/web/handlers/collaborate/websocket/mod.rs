@@ -72,16 +72,6 @@ impl ResumeQuery {
 /// the client can start applying before the whole history has arrived.
 const REPLAY_BATCH_BYTES: usize = 256 * 1024;
 
-// How many messages a room may add on top of its last checkpoint before the
-// server asks for a new one (Drawpile's auto-reset). Keeps catch-up for late
-// joiners fast: this is what a joiner has to *apply*, where
-// `AUTO_RESET_THRESHOLD_BYTES` is what it has to be sent. Neither meter stands
-// in for the other -- our operations run from a two-byte undo point to half a
-// megabyte of pixels -- so whichever is reached first asks.
-//
-// Counted from the checkpoint, not from nothing: see `maybe_request_reset`.
-const RESET_THRESHOLD_MESSAGES: usize = 500;
-
 // How often a live connection refreshes its Redis registry entry. Comfortably
 // inside the 30s entry TTL, so a slow beat never drops a live connection out
 // of its room.
