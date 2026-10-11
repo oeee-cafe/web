@@ -72,6 +72,19 @@ impl ResumeQuery {
 /// the client can start applying before the whole history has arrived.
 const REPLAY_BATCH_BYTES: usize = 256 * 1024;
 
+/// How many messages a room may hold above its last checkpoint before it is
+/// asked for a new one. A late joiner applies every one of them before it can
+/// draw -- about 75us each on a laptop, several times that on the machines the
+/// painter's Firefox 56 floor is for -- where `AUTO_RESET_THRESHOLD_BYTES` is
+/// what it has to be sent. Our messages are tiny, so the bytes alone would let
+/// a room grow to a hundred thousand of them first.
+///
+/// Above the history a checkpoint is cut behind, it keeps whatever anybody can
+/// still undo -- up to `UNDO_WINDOW`, 2000 messages, in neo-cucumber's
+/// `canvasHistory.ts` -- so this is well past
+/// that, or the room would be asked again the moment a checkpoint landed.
+pub(in crate::web::handlers::collaborate) const RESET_THRESHOLD_MESSAGES: usize = 4000;
+
 // How often a live connection refreshes its Redis registry entry. Comfortably
 // inside the 30s entry TTL, so a slow beat never drops a live connection out
 // of its room.

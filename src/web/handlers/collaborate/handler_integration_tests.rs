@@ -642,11 +642,11 @@ async fn growth_in_bytes_asks_for_a_checkpoint_which_then_stands_in_for_it() {
         let mut alice = room.connect(0, None).await;
         let (alice_id, first) = opening(&mut alice).await;
 
-        // Many small messages are not a reason to checkpoint. A checkpoint
-        // freezes everybody's undo, and a count of messages used to ask for
-        // one every minute or two. The request would follow the echo of the
-        // message that crossed the line, before the next one is sequenced,
-        // so a hundred echoes past where it used to come is far enough.
+        // Small messages are not a reason to checkpoint until there are a
+        // great many of them: 500 used to ask, which in a busy room was every
+        // minute or two. The request would follow the echo of the message
+        // that crossed the line, before the next one is sequenced, so a
+        // hundred echoes past where it used to come is far enough.
         for _ in 0..600 {
             send(&mut alice, vec![UNDO_POINT, alice_id]).await;
         }
@@ -716,6 +716,43 @@ async fn growth_in_bytes_asks_for_a_checkpoint_which_then_stands_in_for_it() {
             replay.entries[0].1[2], alice_id,
             "whose pair the snapshots are"
         );
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// Bytes are what a late joiner is sent; messages are what it then applies,
+/// and ours are small enough that the bytes alone would let a room reach a
+/// hundred thousand of them first.
+#[tokio::test]
+async fn enough_small_messages_ask_for_a_checkpoint_too() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let threshold = super::websocket::RESET_THRESHOLD_MESSAGES;
+    let outcome = tokio::time::timeout(Duration::from_secs(60), async {
+        let mut alice = room.connect(0, None).await;
+        let (alice_id, _) = opening(&mut alice).await;
+        for _ in 0..threshold {
+            send(&mut alice, vec![UNDO_POINT, alice_id]).await;
+        }
+        let mut echoed = 0;
+        let query = loop {
+            let frame = next_frame(&mut alice, "the query").await;
+            if frame[0] == RESET_REQUEST {
+                break frame;
+            }
+            if frame[0] == SEQUENCED && sequenced(&frame).2[0] == UNDO_POINT {
+                echoed += 1;
+            }
+        };
+        assert!(
+            echoed >= threshold - 1,
+            "asked after only {echoed} messages"
+        );
+        assert_eq!(query[9], 0, "phase: query");
+        assert_eq!(query[10], 0, "not urgent: a client may decline");
     })
     .await;
     room.teardown().await;

@@ -6,7 +6,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::web::handlers::collaborate::{messages, redis_messages, utils};
 
-use super::SessionContext;
+use super::{SessionContext, RESET_THRESHOLD_MESSAGES};
 
 // An in-progress session reset upload from this connection: `count` snapshot
 // messages follow a RESET_BEGIN and replace all history up to `base_seq`.
@@ -232,22 +232,22 @@ pub(super) async fn maybe_request_reset(
     ctx: &SessionContext<'_>,
     size: redis_messages::HistorySize,
 ) {
-    // Bytes only, counted from the last checkpoint rather than from nothing,
-    // because a checkpoint is most of what a busy room's history weighs and
-    // an absolute threshold would be over the moment one landed. This is
-    // Drawpile's rule (`ThinSession::checkAutoResetQuery`).
+    // Two meters, both counted from the last checkpoint rather than from
+    // nothing, because a checkpoint is most of what a busy room's history
+    // weighs and an absolute threshold would be over the moment one landed.
+    // Bytes for what a late joiner has to be sent, as Drawpile meters
+    // (`ThinSession::checkAutoResetQuery`); messages for what it then has to
+    // apply, since ours run from a two-byte undo point to a megabyte of fill.
     //
-    // There used to be a second meter, a checkpoint every 500 messages, to
-    // bound what a late joiner has to apply. It cost undo instead. A
-    // checkpoint is cut at the head of history, and every client freezes the
-    // undo state of everything under it, so the newest stroke -- the one
-    // somebody is about to take back -- goes with it. Our messages are tiny
-    // (a stroke batch is a couple of dozen bytes), so 500 of them came round
-    // every minute or two in a busy room: in one session a whole-canvas
-    // flood fill was frozen a second after it landed and could only be
-    // cleared by hand. Drawpile meters bytes alone, and in a room like that
-    // never checkpoints at all.
-    if size.bytes <= redis_messages::effective_auto_reset_bytes(size.base_bytes) {
+    // The message meter once asked every 500, and that cost undo: checkpoints
+    // were cut at the head of history and every client freezes everything
+    // under one, so the newest stroke went with it, every minute or two in a
+    // busy room. A checkpoint is now cut behind everything anybody can still
+    // undo, and a client declines one that would free nothing yet, so asking
+    // often costs nobody anything.
+    let over_bytes = size.bytes > redis_messages::effective_auto_reset_bytes(size.base_bytes);
+    let over_messages = size.messages_since_reset() >= RESET_THRESHOLD_MESSAGES;
+    if !over_bytes && !over_messages {
         return;
     }
 
