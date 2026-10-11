@@ -366,6 +366,8 @@ mod tests {
             token_url: format!("http://{addr}/token"),
             user_url: format!("http://{addr}/users/@me"),
             revoke_url: format!("http://{addr}/revoke"),
+            public_key: None,
+            api_url: format!("http://{addr}"),
         }
     }
 
@@ -581,6 +583,8 @@ mod tests {
             token_url: String::new(),
             user_url: String::new(),
             revoke_url: String::new(),
+            public_key: None,
+            api_url: String::new(),
         };
         let url = url::Url::parse(&authorize_url(&config, CALLBACK, "the-state")).unwrap();
         let query: HashMap<_, _> = url.query_pairs().into_owned().collect();

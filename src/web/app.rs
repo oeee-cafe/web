@@ -572,6 +572,11 @@ impl App {
                 "/api/discord/revoke",
                 post(crate::web::handlers::discord_app::app_revoke),
             )
+            // `/draw`, typed in a Discord chat (discord_interactions.rs).
+            .route(
+                "/api/discord/interactions",
+                post(crate::web::handlers::discord_interactions::interactions),
+            )
             // The quick switcher's list (jump.jinja).
             .route("/jump", get(crate::web::handlers::jump::jump))
             // What an open page hears without asking (crate::live).

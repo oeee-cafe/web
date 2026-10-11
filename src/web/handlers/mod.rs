@@ -22,6 +22,7 @@ pub mod collaborate_cleanup;
 pub mod community;
 pub mod devices;
 pub mod discord_app;
+pub mod discord_interactions;
 pub mod draw;
 pub mod events;
 pub mod home;

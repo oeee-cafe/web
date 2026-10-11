@@ -235,6 +235,20 @@ pub struct DiscordConfig {
     /// it.
     #[serde(default = "default_discord_revoke_url")]
     pub revoke_url: String,
+    /// The application's public key (General Information), which Discord
+    /// signs what it sends `/api/discord/interactions` with: `/draw`. Left
+    /// out, the endpoint answers nothing and the commands are not told to
+    /// Discord.
+    #[serde(default)]
+    pub public_key: Option<String>,
+    /// Discord's API, which the commands are told to on boot. Only a test
+    /// changes it.
+    #[serde(default = "default_discord_api_url")]
+    pub api_url: String,
+}
+
+fn default_discord_api_url() -> String {
+    "https://discord.com/api/v10".to_string()
 }
 
 fn default_discord_token_url() -> String {
@@ -472,6 +486,8 @@ mod tests {
             token_url: default_discord_token_url(),
             user_url: default_discord_user_url(),
             revoke_url: default_discord_revoke_url(),
+            public_key: None,
+            api_url: default_discord_api_url(),
         };
         let google = GoogleConfig {
             client_id: "0000.apps.googleusercontent.com".into(),

@@ -642,3 +642,16 @@ window-minimize = 최소화
 window-maximize = 최대화
 window-restore = 이전 크기로
 window-close = 닫기
+
+# /draw, typed in a Discord chat (discord_interactions.rs). The command's
+# descriptions are at most 100 characters.
+discord-command-draw = 여기 있는 모두와 함께 오이카페에서 그림 세션을 시작해요
+discord-command-draw-title = 세션 이름
+discord-command-draw-size = 캔버스 크기
+discord-command-draw-seats = 한 번에 그릴 수 있는 인원
+discord-draw-started = **{ $name }** 님이 최대 { $seats }명이 함께 그리는 세션을 열었어요. 같이 그려요!
+discord-draw-started-titled = **{ $name }** 님이 최대 { $seats }명이 함께 그리는 세션 “{ $title }”을(를) 열었어요. 같이 그려요!
+discord-draw-join = 참여하기
+discord-draw-link-first = Discord로 오이카페에 한 번 로그인하면 /draw로 세션을 열 수 있어요.
+discord-draw-sign-in = Discord로 로그인
+discord-draw-failed = 세션을 열지 못했어요. 잠시 후 다시 시도해 주세요.

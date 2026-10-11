@@ -642,3 +642,16 @@ window-minimize = 最小化
 window-maximize = 最大化
 window-restore = 元のサイズに戻す
 window-close = 閉じる
+
+# /draw, typed in a Discord chat (discord_interactions.rs). The command's
+# descriptions are at most 100 characters.
+discord-command-draw = ここにいるみんなとオイカフェでお絵かきセッションを始めます
+discord-command-draw-title = セッションの名前
+discord-command-draw-size = キャンバスのサイズ
+discord-command-draw-seats = 同時に描ける人数
+discord-draw-started = **{ $name }**さんが最大{ $seats }人で描けるセッションを開きました。一緒に描きましょう！
+discord-draw-started-titled = **{ $name }**さんが最大{ $seats }人で描けるセッション「{ $title }」を開きました。一緒に描きましょう！
+discord-draw-join = 参加する
+discord-draw-link-first = 一度Discordでオイカフェにログインすると、/drawでセッションを開けます。
+discord-draw-sign-in = Discordでログイン
+discord-draw-failed = セッションを開けませんでした。しばらくしてからもう一度お試しください。

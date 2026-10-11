@@ -366,6 +366,17 @@ fn main() {
                     worker.run_until(shutdown.signalled()).await;
                 });
             }
+            // `/draw`, told to Discord: the same list each boot, so the other
+            // colour telling it too changes nothing.
+            if let Some(discord) = cfg.discord.clone().filter(|d| d.public_key.is_some()) {
+                tokio::spawn(async move {
+                    if let Err(error) =
+                        oeee_cafe::web::handlers::discord_interactions::register(&discord).await
+                    {
+                        tracing::warn!("Discord's commands were not registered: {error:#}");
+                    }
+                });
+            }
             // This process's one subscription to what the others publish,
             // for as long as it serves.
             state.live.listen(&cfg.redis_url, state.shutdown.clone());

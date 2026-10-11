@@ -683,3 +683,16 @@ window-minimize = Minimize
 window-maximize = Maximize
 window-restore = Restore
 window-close = Close
+
+# /draw, typed in a Discord chat (discord_interactions.rs). The command's
+# descriptions are at most 100 characters.
+discord-command-draw = Start a drawing session on Oeee Cafe for everyone here
+discord-command-draw-title = What the session is called
+discord-command-draw-size = The canvas size
+discord-command-draw-seats = How many can draw at once
+discord-draw-started = **{ $name }** started a drawing session for up to { $seats }. Come draw together!
+discord-draw-started-titled = **{ $name }** started “{ $title }”, a drawing session for up to { $seats }. Come draw together!
+discord-draw-join = Join
+discord-draw-link-first = Sign in to Oeee Cafe with Discord once, and /draw will start sessions as you.
+discord-draw-sign-in = Sign in with Discord
+discord-draw-failed = Couldn’t start a session. Please try again in a moment.

@@ -3636,6 +3636,7 @@ dependencies = [
  "config",
  "data-encoding",
  "data-url",
+ "ed25519-dalek",
  "emojis",
  "flate2",
  "fluent",
