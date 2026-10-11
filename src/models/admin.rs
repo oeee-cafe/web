@@ -664,7 +664,8 @@ pub async fn find_all_banners(
             b.is_explicit,
             b.flagged_at,
             flagger.login_name AS "flagged_by_login_name?",
-            (author.banner_id = b.id) AS "is_active!",
+            -- An author with no banner set compares to NULL, not to false.
+            COALESCE(author.banner_id = b.id, false) AS "is_active!",
             b.created_at
         FROM banners b
         JOIN users author ON b.author_id = author.id
@@ -700,7 +701,8 @@ pub async fn find_banner_by_id(
             b.is_explicit,
             b.flagged_at,
             flagger.login_name AS "flagged_by_login_name?",
-            (author.banner_id = b.id) AS "is_active!",
+            -- An author with no banner set compares to NULL, not to false.
+            COALESCE(author.banner_id = b.id, false) AS "is_active!",
             b.created_at
         FROM banners b
         JOIN users author ON b.author_id = author.id
@@ -819,4 +821,70 @@ pub async fn find_all_users(
         offset,
     );
     Ok(rows.fetch_all(&mut **tx).await?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::PgPool;
+
+    async fn tx() -> Option<Transaction<'static, Postgres>> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        let pool = PgPool::connect(&url).await.ok()?;
+        pool.begin().await.ok()
+    }
+
+    /// A banner whose author has none set, as an account would after its
+    /// active banner were cleared, is listed as not active rather than
+    /// failing the whole queue.
+    #[tokio::test]
+    async fn a_banner_whose_author_has_none_set_is_not_active() {
+        let Some(mut tx) = tx().await else { return };
+        let author = query!(
+            "INSERT INTO users (login_name, display_name) VALUES ($1, $1) RETURNING id",
+            format!("b{}", &Uuid::new_v4().simple().to_string()[..12]),
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+        .id;
+        let image = query!(
+            r#"
+            INSERT INTO images (width, height, paint_duration, stroke_count, image_filename, tool)
+            VALUES (200, 40, '0'::interval, 0, $1, 'neo')
+            RETURNING id
+            "#,
+            format!("{}.png", Uuid::new_v4()),
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+        .id;
+        let banner = query!(
+            "INSERT INTO banners (author_id, image_id) VALUES ($1, $2) RETURNING id",
+            author,
+            image,
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+        .id;
+
+        let listed = find_all_banners(&mut tx, false, 1000, 0).await.unwrap();
+        let listed = listed.iter().find(|b| b.id == banner).expect("listed");
+        assert!(!listed.is_active);
+        let found = find_banner_by_id(&mut tx, banner).await.unwrap().unwrap();
+        assert!(!found.is_active);
+
+        query!(
+            "UPDATE users SET banner_id = $1 WHERE id = $2",
+            banner,
+            author
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        let found = find_banner_by_id(&mut tx, banner).await.unwrap().unwrap();
+        assert!(found.is_active);
+    }
 }
