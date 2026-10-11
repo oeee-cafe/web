@@ -15,6 +15,15 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/** A login name as the way to that person's profile, in a tab of its own so
+ * the inspector stays where it was. */
+export function profileLink(login: string, className?: string): HTMLAnchorElement {
+  const link = el("a", className, login);
+  link.href = `/@${encodeURIComponent(login)}`;
+  link.target = "_blank";
+  return link;
+}
+
 /**
  * Moves the canvas to a position: the index of the last drawing message to
  * apply, -1 for blank. `seq` is the message that was chosen, when that is

@@ -17,7 +17,7 @@ import {
   type ArchivedEntry,
 } from "./archiveLog";
 import { chatPanel } from "./chatPanel";
-import { el, type InspectorData, type Panel, type Seek, type SessionDetails } from "./dom";
+import { el, profileLink, type InspectorData, type Panel, type Seek, type SessionDetails } from "./dom";
 import { header } from "./header";
 import { logPanel } from "./logPanel";
 import { logRows } from "./logRows";
@@ -474,18 +474,24 @@ export async function mountReplay(host: HTMLElement, session: string): Promise<v
 
   const describe = () => {
     const partial = manifest !== null && !isRenderable(manifest);
-    const who = Array.from(names.entries())
-      .map(([id, name]) => `${name} (${id})`)
-      .join(", ");
-    status.textContent =
+    const text = (value: string) => document.createTextNode(value);
+    status.textContent = "";
+    status.append(text(
       `${player.length} drawing messages of ${entries.length} recorded` +
-      `  ·  ${canvas.width}×${canvas.height}` +
-      (who ? `  ·  ${who}` : "") +
+      `  ·  ${canvas.width}×${canvas.height}`,
+    ));
+    // Login names, so each one is the way to that person's profile.
+    Array.from(names.entries()).forEach(([id, name], index) => {
+      status.append(text(index === 0 ? "  ·  " : ", "));
+      status.append(profileLink(name), text(` (${id})`));
+    });
+    status.append(text(
       (manifest && !manifest.sealed && !live ? "  ·  not sealed" : "") +
       (entries.length === 0 && logProblem ? `  ·  ${logProblem}` : "") +
       (partial
         ? `  ·  INCOMPLETE: this recording starts at sequence ${manifest.recording.first_seq}, so everything before it is missing`
-        : "");
+        : ""),
+    ));
     // Said loudly, because a fragment looks exactly like a finished picture.
     status.className = partial ? "ds-notice ds-notice-warning replay-status" : "ds-help replay-status";
   };

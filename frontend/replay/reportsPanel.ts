@@ -8,7 +8,7 @@
  */
 
 import { positionAt } from "./archiveLog";
-import { el, type InspectorData, type Panel, type Seek } from "./dom";
+import { el, profileLink, type InspectorData, type Panel, type Seek } from "./dom";
 import { elapsed } from "./logRows";
 
 /** One entry of the painter's synchronisation trace; see `HistoryTraceEvent`. */
@@ -117,7 +117,9 @@ export function reportsPanel(seek: Seek): Panel {
     const whenMs = filedAt(filed);
     const title = el("h3", "inspect-report-title");
     title.append(
-      el("span", "inspect-chat-who", filed.filed_by ?? "someone"),
+      filed.filed_by
+        ? profileLink(filed.filed_by, "inspect-chat-who")
+        : el("span", "inspect-chat-who", "someone"),
       el("span", "admin-tag inspect-tag-danger", report.reason ?? "no reason given"),
       el(
         "span",

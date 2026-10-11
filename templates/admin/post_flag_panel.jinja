@@ -8,7 +8,7 @@
         <span class="muted">
           {{ post.explicit_flagged_at|datetimeformat(format="short", tz="Asia/Seoul") }}
           {% if post.explicit_flagged_by_login_name %}
-            by @{{ post.explicit_flagged_by_login_name }}
+            by <a href="/admin/users/{{ post.explicit_flagged_by_login_name }}/posts">@{{ post.explicit_flagged_by_login_name }}</a>
           {% endif %}
         </span>
       {% endif %}

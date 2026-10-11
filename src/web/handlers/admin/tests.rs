@@ -322,6 +322,8 @@ fn post_flag_panel_renders_standalone_for_htmx_swap() {
         .expect("flagged panel renders");
     assert!(rendered.contains("flagged explicit by staff"));
     assert!(rendered.contains("Remove explicit flag"));
+    // Whoever flagged it is a way to their posts.
+    assert!(rendered.contains("href=\"/admin/users/admin/posts\""));
     // Flipping back must post the opposite state, not a blind toggle.
     assert!(rendered.contains("value=\"false\""));
 
@@ -393,6 +395,8 @@ fn banner_card_renders_standalone_for_htmx_swap() {
         })
         .expect("banner_card.jinja renders standalone");
     assert!(rendered.contains("hidden from /about"));
+    // Whoever flagged it is a way to their posts.
+    assert!(rendered.contains("by <a href=\"/admin/users/admin/posts\">@admin</a>"));
     // Flipping back must post the opposite state, not a blind toggle.
     assert!(rendered.contains("value=\"false\""));
 }
@@ -445,6 +449,13 @@ fn render_sessions(sessions: Vec<serde_json::Value>) -> String {
         .expect("template loads")
         .render(sessions_context(sessions))
         .expect("collaborative_sessions.jinja renders")
+}
+
+/// The owner is a way to their profile, without leaving the list.
+#[test]
+fn session_list_links_the_owner() {
+    let rendered = render_sessions(vec![sample_session(json!({}))]);
+    assert!(rendered.contains("<a href=\"/@someone\" target=\"_blank\">@someone</a>"));
 }
 
 /// The reason this page exists: a room the lobby will not list for
@@ -605,7 +616,7 @@ fn renders_users_list() {
     let template = env
         .get_template("admin/users.jinja")
         .expect("template loads");
-    template
+    let rendered = template
         .render(context! {
             current_user => Serde(current_user()),
             users => Serde(json!([{
@@ -626,6 +637,8 @@ fn renders_users_list() {
             ftl_lang => "en",
         })
         .expect("users.jinja renders");
+    // The handle is the way to what they have posted.
+    assert!(rendered.contains("<a href=\"/admin/users/someone/posts\">@someone</a>"));
 }
 
 #[test]

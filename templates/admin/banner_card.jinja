@@ -27,7 +27,7 @@
     {% if banner.is_explicit and banner.flagged_at %}
       <div class="muted">
         flagged {{ banner.flagged_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-        {% if banner.flagged_by_login_name %}by @{{ banner.flagged_by_login_name }}{% endif %}
+        {% if banner.flagged_by_login_name %}by <a href="/admin/users/{{ banner.flagged_by_login_name }}/posts">@{{ banner.flagged_by_login_name }}</a>{% endif %}
       </div>
     {% endif %}
   </div>

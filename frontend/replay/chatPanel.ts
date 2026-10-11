@@ -3,7 +3,7 @@
  */
 
 import { positionAt, type ArchivedChat } from "./archiveLog";
-import { el, type InspectorData, type Panel, type Seek } from "./dom";
+import { el, profileLink, type InspectorData, type Panel, type Seek } from "./dom";
 import { elapsed } from "./logRows";
 
 export function chatPanel(seek: Seek): Panel {
@@ -54,7 +54,10 @@ export function chatPanel(seek: Seek): Panel {
         lastShown = null;
         if (chat.length === 0) root.appendChild(el("p", "ds-help inspect-empty", "Nothing was said."));
         rows = chat.map((line, index) => {
-          const row = el(seek ? "button" : "div", "inspect-chat-line");
+          // A row, not a <button>: the speaker's name inside it is a link,
+          // and a link inside a button is neither valid nor clickable in
+          // every engine.
+          const row = el("div", "inspect-chat-line");
           const when = el(
             "span",
             "inspect-time",
@@ -64,13 +67,23 @@ export function chatPanel(seek: Seek): Panel {
           );
           row.append(
             when,
-            el("span", "inspect-chat-who", line.login_name),
+            profileLink(line.login_name, "inspect-chat-who"),
             el("span", "inspect-chat-said", line.message),
           );
           row.title = new Date(line.at).toISOString();
           if (seek) {
-            (row as HTMLButtonElement).type = "button";
-            row.addEventListener("click", () => seek(linePositions[index]));
+            row.setAttribute("role", "button");
+            row.tabIndex = 0;
+            // Following the name is going to their profile, not moving the canvas.
+            row.addEventListener("click", (event) => {
+              if ((event.target as Element).closest("a")) return;
+              seek(linePositions[index]);
+            });
+            row.addEventListener("keydown", (event) => {
+              if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
+              event.preventDefault();
+              seek(linePositions[index]);
+            });
           }
           root.appendChild(row);
           return row;

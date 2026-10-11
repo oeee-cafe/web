@@ -7,7 +7,7 @@
  * or are there under something.
  */
 
-import { el, type InspectorData, type Panel } from "./dom";
+import { el, profileLink, type InspectorData, type Panel } from "./dom";
 import { elapsed } from "./logRows";
 import { participantStats, type PersonStats } from "./people";
 
@@ -143,10 +143,7 @@ export function peoplePanel(onHidden: (actorIds: string[]) => void): Panel & { h
         label.appendChild(box);
         head.appendChild(label);
       }
-      const name = el("a", "inspect-chat-who", person.login);
-      name.href = `/@${encodeURIComponent(person.login)}`;
-      name.target = "_blank";
-      head.appendChild(name);
+      head.appendChild(profileLink(person.login, "inspect-chat-who"));
       if (person.displayName && person.displayName !== person.login) {
         head.appendChild(el("span", "inspect-muted", person.displayName));
       }
