@@ -64,3 +64,26 @@ fn the_about_page_names_the_commit_it_runs() {
     assert!(version < lede, "the version sits under the name");
     assert!(!render(None).contains("about-version"));
 }
+
+/// The way to add Oeee Cafe to Discord, beside the Discord server, only
+/// while the site answers `/oeee-cafe`.
+#[test]
+fn the_about_page_offers_the_discord_app_only_when_it_answers() {
+    let env = test_support::env();
+    let render = |discord_install_url: Option<&str>| {
+        env.get_template("about.jinja")
+            .expect("about loads")
+            .render(context! {
+                supporters => Serde(Vec::<serde_json::Value>::new()),
+                users_with_public_posts_and_banner => Serde(Vec::<serde_json::Value>::new()),
+                discord_install_url,
+                ..chrome()
+            })
+            .expect("about renders")
+    };
+    let url = "https://discord.com/oauth2/authorize?client_id=1&integration_type=1&scope=applications.commands";
+    let about = render(Some(url));
+    assert!(about.contains("client_id=1&amp;integration_type=1"));
+    assert!(about.contains("about-discord-app · /oeee-cafe"));
+    assert!(!render(None).contains("about-discord-app"));
+}

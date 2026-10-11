@@ -112,6 +112,21 @@ pub async fn exchange_code(
         .filter(|token| !token.is_empty()))
 }
 
+/// Where someone adds Oeee Cafe to their own Discord account, for
+/// `/oeee-cafe` in any chat (`web::handlers::discord_interactions`): only
+/// once the site answers the command, which is when it has the application's
+/// public key.
+pub fn install_url(config: &DiscordConfig) -> Option<String> {
+    config.public_key.as_ref()?;
+    let mut url = url::Url::parse(AUTHORIZE_URL).expect("Discord's authorize URL");
+    url.query_pairs_mut()
+        .append_pair("client_id", &config.client_id)
+        // 1 is a user install: the app goes with the person, not a server.
+        .append_pair("integration_type", "1")
+        .append_pair("scope", "applications.commands");
+    Some(url.into())
+}
+
 /// The parts of Discord's user object read here.
 #[derive(Deserialize)]
 struct User {
@@ -382,6 +397,25 @@ mod tests {
     }
 
     const CALLBACK: &str = "https://oeee.cafe/auth/discord/callback";
+
+    #[test]
+    fn the_app_is_offered_for_a_persons_own_account_once_it_answers() {
+        let mut config = DiscordConfig {
+            client_id: "1558602531133722646".into(),
+            client_secret: String::new(),
+            token_url: String::new(),
+            user_url: String::new(),
+            revoke_url: String::new(),
+            public_key: None,
+            api_url: String::new(),
+        };
+        assert_eq!(install_url(&config), None);
+        config.public_key = Some("key".into());
+        assert_eq!(
+            install_url(&config).as_deref(),
+            Some("https://discord.com/oauth2/authorize?client_id=1558602531133722646&integration_type=1&scope=applications.commands")
+        );
+    }
 
     #[tokio::test]
     async fn a_code_is_traded_for_whoever_it_stands_for() {

@@ -332,3 +332,44 @@ fn the_apps_discord_account_waits_for_the_app_to_say() {
     assert!(rendered.contains("account-discord-connected(name={name})"));
     assert!(!rendered.contains(r#""Discord: ""#));
 }
+
+/// Adding the app to Discord, for `/oeee-cafe`: offered only while the site
+/// answers it, and with a word about linking first to whoever has not.
+#[test]
+fn the_account_page_offers_the_discord_app_and_says_to_link_first() {
+    let env = test_support::env();
+    let render = |discord_install_url: Option<&str>, discord_linked: bool| {
+        env.get_template("account.jinja")
+            .expect("account loads")
+            .render(context! {
+                current_user => Serde(json!({
+                    "id": "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d",
+                    "login_name": "oeee",
+                    "display_name": "오이",
+                    "email": null,
+                    "email_verified_at": null,
+                    "created_at": "2026-09-22T00:00:00Z",
+                    "preferred_language": null,
+                    "show_sensitive_content": false,
+                    "role": "user",
+                })),
+                languages => vec![("en", "English")],
+                identities => Serde(json!([])),
+                has_password => true,
+                discord_enabled => true,
+                discord_linked,
+                discord_install_url,
+                ..chrome()
+            })
+            .expect("account renders")
+    };
+    let url = "https://discord.com/oauth2/authorize?client_id=1&integration_type=1&scope=applications.commands";
+    let unlinked = render(Some(url), false);
+    assert!(unlinked.contains(r#"id="account-discord-command""#));
+    assert!(unlinked.contains("client_id=1&amp;integration_type=1"));
+    assert!(unlinked.contains("account-discord-command-link-first"));
+    let linked = render(Some(url), true);
+    assert!(linked.contains(r#"id="account-discord-command""#));
+    assert!(!linked.contains("account-discord-command-link-first"));
+    assert!(!render(None, true).contains("account-discord-command"));
+}

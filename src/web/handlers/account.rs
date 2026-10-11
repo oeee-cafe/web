@@ -107,6 +107,7 @@ pub async fn account(
                 apple_enabled => state.config.apple.is_some(),
                 google_enabled => state.config.google.is_some(),
                 discord_enabled => state.config.discord.is_some(),
+                discord_install_url => state.config.discord.as_ref().and_then(crate::discord::install_url),
                 messages => Serde(messages.into_iter().collect::<Vec<_>>()),
             },
         )

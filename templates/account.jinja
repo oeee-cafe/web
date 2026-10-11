@@ -98,6 +98,18 @@
       </div>
     </section>
 
+    {% if discord_install_url %}
+    {# /oeee-cafe in any Discord chat (discord_interactions.rs), once the
+       app is added to the reader's own Discord account. #}
+    <section class="settings-group" id="account-discord-command">
+      <div class="profile-section-label">{{ ftl_get_message("account-discord-command") }}</div>
+      <div class="ds-card settings-card">
+        <p class="ds-help">{{ ftl_get_message("account-discord-command-help") }}{% if not discord_linked %} {{ ftl_get_message("account-discord-command-link-first") }}{% endif %}</p>
+        <a class="ds-button auth-discord" href="{{ discord_install_url }}" target="_blank" rel="noopener"><img class="auth-discord-mark" src="{{ '/static/signin/discord-mark.svg' | cachebuster | safe }}" width="24" height="18" alt="" />{{ ftl_get_message("account-discord-command-add") }}</a>
+      </div>
+    </section>
+    {% endif %}
+
     {% include "account_discord_app.jinja" %}
 
     {% if show_in_credits is defined and show_in_credits is not none %}

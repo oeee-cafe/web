@@ -33,6 +33,7 @@ pub async fn about(
                 users_with_public_posts_and_banner => Serde(users_with_public_posts_and_banner),
                 supporters => Serde(supporters),
                 git_commit => git_commit(),
+                discord_install_url => state.config.discord.as_ref().and_then(crate::discord::install_url),
             },
         )
         .await?;
