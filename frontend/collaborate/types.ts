@@ -22,6 +22,11 @@ export interface Participant {
   username: string;
   /** No account: a name they chose, shown with a guest badge. */
   isGuest?: boolean;
+  /**
+   * Gone from the room since the last roster: left, or sent out. Still named
+   * on their layers, which stay; no longer listed as here.
+   */
+  left?: boolean;
   joinedAt: number;
   /**
    * The 1-byte id the canonical stream calls them, absent until the server

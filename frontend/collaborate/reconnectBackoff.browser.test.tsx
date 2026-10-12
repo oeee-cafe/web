@@ -97,6 +97,7 @@ function Harness({ renderRef }: { renderRef: React.RefObject<(() => void) | null
     hideCursor: () => {},
     addParticipant: () => {},
     clearParticipants: () => {},
+    markParticipantLeft: () => {},
     addChatMessage: (message) => void message,
     handleResetRequest: () => {},
     canUploadCheckpoint: () => false,

@@ -86,6 +86,7 @@ interface WebSocketHookParams {
     isGuest?: boolean,
   ) => void;
   clearParticipants: () => void;
+  markParticipantLeft: (userId: string) => void;
   addChatMessage: (message: ChatLine) => void;
   handleResetRequest: (urgent: boolean) => void;
   /**
@@ -156,6 +157,7 @@ export const useWebSocket = ({
   hideCursor,
   addParticipant,
   clearParticipants,
+  markParticipantLeft,
   addChatMessage,
   handleResetRequest,
   canUploadCheckpoint,
@@ -241,6 +243,7 @@ export const useWebSocket = ({
     hideCursor,
     addParticipant,
     clearParticipants,
+    markParticipantLeft,
     addChatMessage,
     onResetQuery: (urgent) => { void answerResetQuery(urgent); },
     onResetSelected: handleResetRequest,
@@ -277,13 +280,18 @@ export const useWebSocket = ({
       return envWsUrl;
     }
 
-    const isDevelopment = window.location.hostname === "localhost";
     const pathSegments = window.location.pathname.split("/");
     const sessionId = pathSegments[2]; // /collaborate/:sessionId
+    // The server that served the page, in the page's own scheme. Choosing by
+    // hostname instead sent every plain-HTTP host other than `localhost` --
+    // 127.0.0.1, a LAN address, a `.test` name -- to wss://, which nothing
+    // there answers. Vite's own dev server has no proxy to the Rust one, so a
+    // page it serves still goes to the server's port.
+    const scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const url = new URL(
-      isDevelopment
+      import.meta.env.DEV
         ? `ws://localhost:3000/collaborate/${sessionId}/ws`
-        : `wss://${window.location.host}/collaborate/${sessionId}/ws`,
+        : `${scheme}://${window.location.host}/collaborate/${sessionId}/ws`,
     );
     // Resume only what the painter can carry on from: a settled fork at the
     // applied position. Anything else is a full replay.

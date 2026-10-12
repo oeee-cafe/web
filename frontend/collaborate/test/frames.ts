@@ -95,3 +95,40 @@ export function stroke(userId: number, at: { x: number; y: number }): Uint8Array
   };
   return new Uint8Array(encodePainterOperation(userId, operation));
 }
+
+const nameBytes = (name: string) => {
+  const bytes = new TextEncoder().encode(name);
+  const length = new Uint8Array(2);
+  new DataView(length.buffer).setUint16(0, bytes.length, true);
+  return concat(length, bytes);
+};
+
+/** LAYERS: who is seated, as the server spells it. `flags` is FLAG_GUEST or 0. */
+export const layersFrame = (
+  people: { userId: string; sessionId: number; name: string; flags?: number }[],
+) => {
+  const count = new Uint8Array(2);
+  new DataView(count.buffer).setUint16(0, people.length, true);
+  return concat(
+    Uint8Array.from([MSG_TYPE.LAYERS]),
+    count,
+    ...people.map((person) =>
+      concat(
+        uuidBytes(person.userId),
+        Uint8Array.from([person.sessionId, person.flags ?? 0]),
+        nameBytes(person.name),
+        u64(1000 + person.sessionId),
+      ),
+    ),
+  );
+};
+
+/** LEAVE: somebody's last tab has gone from the room. */
+export const leaveFrame = (userId: string, name: string, flags = 0) =>
+  concat(
+    Uint8Array.from([MSG_TYPE.LEAVE]),
+    uuidBytes(userId),
+    u64(1_700_000_000_000),
+    Uint8Array.from([flags]),
+    nameBytes(name),
+  );

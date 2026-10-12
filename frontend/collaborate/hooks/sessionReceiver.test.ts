@@ -64,6 +64,7 @@ class Page {
       onSynchronizationError: note("onSynchronizationError"),
       createOrUpdateCursor: note("createOrUpdateCursor"),
       hideCursor: note("hideCursor"),
+      markParticipantLeft: note("markParticipantLeft"),
       addParticipant: note("addParticipant"),
       clearParticipants: note("clearParticipants"),
       addChatMessage: note("addChatMessage"),

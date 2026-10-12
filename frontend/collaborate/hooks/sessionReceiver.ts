@@ -47,6 +47,11 @@ export interface ReceiverHandlers {
     isGuest?: boolean,
   ) => void;
   clearParticipants: () => void;
+  /**
+   * Somebody left the room, or was sent out of it. They go from the list of
+   * who is here; what they drew, and the name on it, stays.
+   */
+  markParticipantLeft: (userId: string) => void;
   addChatMessage: (message: ChatLine) => void;
   /**
    * The room is asking who can upload a checkpoint. `urgent` when its
@@ -512,7 +517,10 @@ export class SessionReceiver {
           message: `${message.username} left the session`,
           timestamp: message.timestamp,
         });
-        // Hide the cursor, but keep the participant in the list.
+        // Out of the list of who is here, and the cursor with them. The
+        // server sends this only once their last tab has gone, so a person
+        // still here in another tab is never shown leaving.
+        handlers.markParticipantLeft(message.userId);
         const sessionId = this.uuidToId.get(message.userId);
         if (sessionId !== undefined) handlers.hideCursor(String(sessionId));
         break;

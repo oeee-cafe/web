@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import {
   anchorBesideCanvas,
@@ -291,18 +291,30 @@ export default function App() {
 
   /**
    * How many are in the room, for the Oeee Cafe app to show beside the
-   * invitation it hands Discord (presence_meta.jinja, app_bridge.jinja). The
-   * server's roster of who is seated, as of its last word: someone leaving is
-   * counted until the next roster.
+   * invitation it hands Discord (presence_meta.jinja, app_bridge.jinja): the
+   * server's roster of who is seated, less anybody it has since said left.
    */
   useEffect(() => {
     const meta = document.querySelector('meta[name="oeee-presence"][data-join]');
-    if (!meta || participants.size === 0) return;
-    meta.setAttribute("data-party", String(participants.size));
+    const here = [...participants.values()].filter((participant) => !participant.left).length;
+    if (!meta || here === 0) return;
+    meta.setAttribute("data-party", String(here));
     document.dispatchEvent(new Event("oeee:presence"));
   }, [participants]);
 
   const clearParticipants = useCallback(() => setParticipants(new Map()), []);
+  const markParticipantLeft = useCallback((userId: string) => {
+    setParticipants((current) => {
+      const participant = current.get(userId);
+      if (!participant || participant.left) return current;
+      return new Map(current).set(userId, { ...participant, left: true });
+    });
+  }, []);
+  /** Who is in the room now, for the chat's list; the layers name everyone. */
+  const presentParticipants = useMemo(
+    () => new Map([...participants].filter(([, participant]) => !participant.left)),
+    [participants],
+  );
   const addParticipant = useCallback((
     userId: string, username: string, joinedAt: number, sessionId?: number, isGuest?: boolean,
   ) => {
@@ -829,7 +841,7 @@ export default function App() {
     link, canvasMeta, userIdRef,
     onSynchronizationError: handleSynchronizationError,
     createOrUpdateCursor, hideCursor,
-    addParticipant, clearParticipants,
+    addParticipant, clearParticipants, markParticipantLeft,
     addChatMessage,
     handleResetRequest, canUploadCheckpoint, hasCheckpointToTake, onReconnectCanvas, onCanvasMessage,
     onUnreadableSequence,
@@ -1246,7 +1258,7 @@ export default function App() {
             {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[11px] leading-[14px]">{canvasMeta.title}</span>}
           </div>
           {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
-          <Chat wsRef={wsRef} userId={userIdRef.current} participants={participants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} onRemove={isOwner ? removeParticipant : undefined} />
+          <Chat wsRef={wsRef} userId={userIdRef.current} participants={presentParticipants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} onRemove={isOwner ? removeParticipant : undefined} />
           <div ref={chatResizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
             <span className={NEO_RESIZE_GRIP} />
           </div>
