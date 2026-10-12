@@ -59,7 +59,7 @@
     <div class="form-actions community-form-actions">
       {# Asks for the header back by name (handlers/community.rs), since
          every other htmx request for this address wants the whole page. #}
-      <button type="button" class="ds-button" hx-get="/communities/{{ community_id }}" hx-headers='{"Oeee-Part": "header"}'>{{ ftl_get_message("cancel") }}</button>
+      <button type="button" class="ds-button" hx-get="/@{{ community.slug }}" hx-headers='{"Oeee-Part": "header"}'>{{ ftl_get_message("cancel") }}</button>
       <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("save") }}</button>
     </div>
   </form>
@@ -85,7 +85,7 @@
               id="delete-community-btn"
               class="ds-button ds-button-danger"
               disabled
-              hx-delete="/communities/{{ community_id }}/delete"
+              hx-delete="/communities/{{ community.slug }}/delete"
               hx-confirm="{{ ftl_get_message("community-delete-final-confirm") }}"
               hx-target="body"
               hx-swap="innerHTML"

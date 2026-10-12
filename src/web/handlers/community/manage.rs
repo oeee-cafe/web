@@ -185,8 +185,8 @@ pub async fn hx_edit_community(
             "community_edit.jinja",
             context! {
                 current_user => Serde(auth_session.user),
+                community_id => community.as_ref().map(|c| c.id.to_string()),
                 community => Serde(community),
-                community_id => id,
                 domain => state.config.domain.clone(),
                 unread_notification_count => common_ctx.unread_notification_count,
                 ftl_lang
@@ -211,29 +211,21 @@ pub async fn hx_do_edit_community(
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
 
-    let (community_uuid, original_slug) = if id.starts_with('@') {
-        // Handle @slug format
-        let slug = id
-            .strip_prefix('@')
-            .ok_or_else(|| AppError::BadRequest("Invalid slug format".to_string()))?
-            .to_string();
-        let community = find_community_by_slug(&mut tx, slug.clone()).await?;
-        if let Some(community) = community {
-            (community.id, community.slug)
-        } else {
-            return Err(AppError::NotFound("Community".to_string()));
-        }
+    // The form addresses the community by its id, which a change of slug
+    // leaves alone. `/communities/@slug` is the old permalink's redirect,
+    // which answers GET and nothing else, so a PUT there was a 405 and no
+    // edit was ever saved.
+    let community = if let Some(slug) = id.strip_prefix('@') {
+        find_community_by_slug(&mut tx, slug.to_string()).await?
     } else {
-        // Handle UUID format - redirect to @slug
-        let uuid = Uuid::parse_str(&id)?;
-        let community = find_community_by_id(&mut tx, uuid).await?;
-        if let Some(_community) = &community {
-            // Redirect UUID to @slug format for PUT request
-            return Ok(StatusCode::PERMANENT_REDIRECT.into_response());
-        } else {
-            return Err(AppError::NotFound("Community".to_string()));
-        }
+        find_community_by_id(&mut tx, Uuid::parse_str(&id)?).await?
     };
+    let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
+    let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
+    if community.owner_id != user.id {
+        return Err(AppError::Forbidden);
+    }
+    let (community_uuid, original_slug) = (community.id, community.slug);
 
     // Update the community (with ActivityPub Update activity)
     // Parse visibility from form
@@ -269,7 +261,7 @@ pub async fn hx_do_edit_community(
                 // Use HTMX redirect to navigate to new slug URL
                 Ok(([(
                     "HX-Redirect",
-                    format!("/communities/@{}", form.slug).as_str(),
+                    format!("/@{}", form.slug).as_str(),
                 )],)
                     .into_response())
             } else {
@@ -352,7 +344,7 @@ pub async fn hx_do_edit_community(
                     context! {
                         current_user => Serde(auth_session.user),
                         community => Serde(current_community),
-                        community_id => id,
+                        community_id => community_uuid.to_string(),
                         domain => state.config.domain.clone(),
                         error_message => error_message,
                         ftl_lang
