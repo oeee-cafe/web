@@ -19,6 +19,7 @@ interface ChatMessage {
   type: "user" | "system" | "join" | "leave";
   userId: string;
   username: string;
+  isGuest?: boolean;
   message: string;
   timestamp: number;
 }
@@ -26,8 +27,22 @@ interface ChatMessage {
 interface Participant {
   userId: string;
   username: string;
+  isGuest?: boolean;
   joinedAt: number;
 }
+
+/**
+ * Beside a name somebody without an account chose. The name may be anything,
+ * an account's included, so the badge is what tells the room it is not one.
+ */
+const GuestBadge = () => {
+  const { t } = useLingui();
+  return (
+    <span className="ml-[2px] text-[9px] font-normal opacity-80" title={t`Drawing without an account`}>
+      <Trans>guest</Trans>
+    </span>
+  );
+};
 
 interface ChatProps {
   wsRef: React.RefObject<WebSocket | null>;
@@ -41,10 +56,16 @@ interface ChatProps {
       type: "join" | "leave" | "user";
       userId: string;
       username: string;
+      isGuest: boolean;
       message: string;
       timestamp: number;
     }) => void
   ) => void;
+  /**
+   * The owner's: sends somebody out of the session and keeps them out. Absent
+   * for everybody else, who are offered nothing of the kind.
+   */
+  onRemove?: (participant: Participant) => void;
 }
 
 export const Chat = ({
@@ -54,6 +75,7 @@ export const Chat = ({
   connectionState,
   onChatMessage,
   onAddMessage,
+  onRemove,
 }: ChatProps) => {
   const { t } = useLingui();
 
@@ -215,10 +237,23 @@ export const Chat = ({
               .map((participant) => (
                 <div
                   key={participant.userId}
-                  className="items-center text-[11px] leading-[14px]"
+                  className="flex items-center text-[11px] leading-[14px]"
                   style={getUserStyle(participant.username)}
                 >
                   {participant.username}
+                  {participant.isGuest && <GuestBadge />}
+                  {onRemove && participant.userId !== userId && (
+                    <button
+                      type="button"
+                      onClick={() => onRemove(participant)}
+                      title={t`Remove ${participant.username} from this session`}
+                      aria-label={t`Remove ${participant.username} from this session`}
+                      className="ml-[3px] cursor-pointer border-0 bg-transparent p-0 leading-none opacity-80 hover:opacity-100"
+                      style={{ color: "inherit", font: "inherit" }}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               ))}
           </div>
@@ -249,6 +284,7 @@ export const Chat = ({
                     <div className="flex items-baseline gap-1 text-[11px] leading-[14px]">
                       <span className="shrink-0" style={getUserStyle(msg.username)}>
                         {msg.username}
+                        {msg.isGuest && <GuestBadge />}
                       </span>
                       <span className="shrink-0 text-[10px] leading-[12px] opacity-70">
                         {formatTime(msg.timestamp)}

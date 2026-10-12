@@ -187,6 +187,7 @@ drafts-local-delete-confirm = Delete this drawing from this device? It can't be 
 drafts-local-community-denied = This account can't post in that community. Post it as a personal drawing instead?
 drafts-local-post-failed = Couldn't post this drawing. It's still kept on this device.
 drafts-local-unavailable = Drawings can't be kept on this device, so any drawing saved while signed out isn't shown here.
+drafts-local-collaboration-not-yours = This drawing is from a session another account owns, so it can't be posted from this one. It's still kept on this device.
 
 post-created-at = Created
 post-published-at = Published
@@ -315,6 +316,13 @@ community-draw-together = Draw together
 collaborate-session-created = Created
 collaborate-join-session = Join Session
 collaborate-session-preview-alt = The canvas as it looks right now
+collaborate-guest-badge = guest
+collaborate-guest-nickname-label = Your name
+collaborate-guest-nickname-hint = You're drawing as a guest. If you sign in later, what you drew moves to your account.
+collaborate-sign-in-instead = Sign in instead
+collaborate-guest-community-hint = As a guest, you can only choose a public community.
+collaborate-allow-guests-label = Let people without an account join
+collaborate-allow-guests-description = They choose a name, and it is marked as a guest wherever it appears.
 
 welcome = Welcome, { $name }!
 

@@ -798,10 +798,19 @@ export function encodeText(
   return withMask(buffer, mask);
 }
 
+/**
+ * The flags byte the server puts beside every name it sends (JOIN, CHAT,
+ * LEAVE, each LAYERS entry); `guest::FLAG_GUEST` on the server. Set, the name
+ * is one somebody without an account chose, and may be anybody's: it is
+ * shown with a guest badge and never as an account's handle.
+ */
+export const FLAG_GUEST = 0b0000_0001;
+
 export interface JoinMessage {
   type: "join";
   userId: string;
   username: string;
+  isGuest: boolean;
   timestamp: number;
 }
 
@@ -811,6 +820,7 @@ export interface LayersMessage {
     userId: string;
     sessionId: number;
     username: string;
+    isGuest: boolean;
     joinTimestamp: number;
   }>;
 }
@@ -937,6 +947,7 @@ export interface ChatMessage {
   type: "chat";
   userId: string;
   username: string;
+  isGuest: boolean;
   timestamp: number;
   message: string;
 }
@@ -1027,6 +1038,7 @@ export interface LeaveMessage {
   type: "leave";
   userId: string;
   username: string;
+  isGuest: boolean;
   timestamp: number;
 }
 
@@ -1164,18 +1176,19 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
     }
 
     case MSG_TYPE.JOIN: {
-      // Format: [0x01][UUID:16][timestamp:8][usernameLength:2][username:variable]
-      if (buffer.length < 27) return null; // Minimum: 1 + 16 + 8 + 2 + 0
+      // Format: [0x01][UUID:16][timestamp:8][flags:1][usernameLength:2][username:variable]
+      if (buffer.length < 28) return null; // Minimum: 1 + 16 + 8 + 1 + 2 + 0
 
-      const joinUsernameLength = readUint16LE(buffer, 25);
-      if (buffer.length < 27 + joinUsernameLength) return null;
+      const joinUsernameLength = readUint16LE(buffer, 26);
+      if (buffer.length < 28 + joinUsernameLength) return null;
 
       const joinDecoder = new TextDecoder();
       return {
         type: "join",
         userId: bytesToUuid(buffer.slice(1, 17)),
         timestamp: readUint64LE(buffer, 17),
-        username: joinDecoder.decode(buffer.slice(27, 27 + joinUsernameLength)),
+        isGuest: (buffer[25] & FLAG_GUEST) !== 0,
+        username: joinDecoder.decode(buffer.slice(28, 28 + joinUsernameLength)),
       };
     }
 
@@ -1183,22 +1196,20 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
       if (buffer.length < 3) return null;
       const participantCount = readUint16LE(buffer, 1);
 
-      const participants: Array<{
-        userId: string;
-        sessionId: number;
-        username: string;
-        joinTimestamp: number;
-      }> = [];
+      const participants: LayersMessage["participants"] = [];
       let offset = 3;
 
       for (let i = 0; i < participantCount; i++) {
-        // uuid (16) + session id (1) + name length (2) + timestamp (8)
-        if (offset + 27 > buffer.length) return null;
+        // uuid (16) + session id (1) + flags (1) + name length (2) + timestamp (8)
+        if (offset + 28 > buffer.length) return null;
 
         const userId = bytesToUuid(buffer.slice(offset, offset + 16));
         offset += 16;
 
         const sessionId = buffer[offset];
+        offset += 1;
+
+        const isGuest = (buffer[offset] & FLAG_GUEST) !== 0;
         offset += 1;
 
         const nameLength = readUint16LE(buffer, offset);
@@ -1212,7 +1223,7 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
         const joinTimestamp = readUint64LE(buffer, offset);
         offset += 8;
 
-        participants.push({ userId, sessionId, username, joinTimestamp });
+        participants.push({ userId, sessionId, username, isGuest, joinTimestamp });
       }
 
       return {
@@ -1229,23 +1240,24 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
       };
 
     case MSG_TYPE.CHAT: {
-      // Format: [0x03][UUID:16][timestamp:8][usernameLength:2][username:variable][msgLength:2][msgData:variable]
-      if (buffer.length < 29) return null; // Minimum: 1 + 16 + 8 + 2 + 0 + 2 + 0
+      // Format: [0x03][UUID:16][timestamp:8][flags:1][usernameLength:2][username:variable][msgLength:2][msgData:variable]
+      if (buffer.length < 30) return null; // Minimum: 1 + 16 + 8 + 1 + 2 + 0 + 2 + 0
 
-      const usernameLength = readUint16LE(buffer, 25);
-      if (buffer.length < 29 + usernameLength) return null;
+      const usernameLength = readUint16LE(buffer, 26);
+      if (buffer.length < 30 + usernameLength) return null;
 
-      const msgLength = readUint16LE(buffer, 27 + usernameLength);
-      if (buffer.length < 29 + usernameLength + msgLength) return null;
+      const msgLength = readUint16LE(buffer, 28 + usernameLength);
+      if (buffer.length < 30 + usernameLength + msgLength) return null;
 
       const decoder = new TextDecoder();
       return {
         type: "chat",
         userId: bytesToUuid(buffer.slice(1, 17)),
         timestamp: readUint64LE(buffer, 17),
-        username: decoder.decode(buffer.slice(27, 27 + usernameLength)),
+        isGuest: (buffer[25] & FLAG_GUEST) !== 0,
+        username: decoder.decode(buffer.slice(28, 28 + usernameLength)),
         message: decoder.decode(
-          buffer.slice(29 + usernameLength, 29 + usernameLength + msgLength)
+          buffer.slice(30 + usernameLength, 30 + usernameLength + msgLength)
         ),
       };
     }
@@ -1411,19 +1423,20 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
       };
 
     case MSG_TYPE.LEAVE: {
-      // Format: [0x09][UUID:16][timestamp:8][usernameLength:2][username:variable]
-      if (buffer.length < 27) return null; // Minimum: 1 + 16 + 8 + 2 + 0
+      // Format: [0x09][UUID:16][timestamp:8][flags:1][usernameLength:2][username:variable]
+      if (buffer.length < 28) return null; // Minimum: 1 + 16 + 8 + 1 + 2 + 0
 
-      const leaveUsernameLength = readUint16LE(buffer, 25);
-      if (buffer.length < 27 + leaveUsernameLength) return null;
+      const leaveUsernameLength = readUint16LE(buffer, 26);
+      if (buffer.length < 28 + leaveUsernameLength) return null;
 
       const leaveDecoder = new TextDecoder();
       return {
         type: "leave",
         userId: bytesToUuid(buffer.slice(1, 17)),
         timestamp: readUint64LE(buffer, 17),
+        isGuest: (buffer[25] & FLAG_GUEST) !== 0,
         username: leaveDecoder.decode(
-          buffer.slice(27, 27 + leaveUsernameLength)
+          buffer.slice(28, 28 + leaveUsernameLength)
         ),
       };
     }

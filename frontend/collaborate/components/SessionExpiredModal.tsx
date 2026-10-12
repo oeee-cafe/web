@@ -17,6 +17,16 @@ export interface SessionExpiredModalProps {
    * and this tab never had.
    */
   hasCanvas: boolean;
+  /**
+   * The owner ended it on purpose rather than letting it run out: a guest
+   * owner who kept the drawing on their device.
+   */
+  endedByOwner?: boolean;
+  /**
+   * The owner is a guest: what they can do with it is keep it in this
+   * device's drafts, not post it.
+   */
+  ownerKeepsOnDevice?: boolean;
   onClose: () => void;
   onSaveToGallery: () => Promise<void>;
   onDownloadPNG: () => void;
@@ -29,6 +39,8 @@ export const SessionExpiredModal = ({
   canvasMeta,
   isSaving,
   hasCanvas,
+  endedByOwner = false,
+  ownerKeepsOnDevice = false,
   onClose,
   onSaveToGallery,
   onDownloadPNG,
@@ -89,6 +101,10 @@ export const SessionExpiredModal = ({
       <div className="mb-[12px]">
         {!hasCanvas
           ? t`This collaborative session has ended. Its drawing was not saved to the gallery and is no longer available.`
+          : endedByOwner
+          ? t`The owner ended this session. You can save your work locally as a PNG before leaving.`
+          : isOwner && ownerKeepsOnDevice
+          ? t`This collaborative session has ended due to inactivity. You can keep it on this device and post it after signing in, or download it as a PNG.`
           : isOwner
           ? canvasMeta?.savedPostId
             ? t`This collaborative session has ended due to inactivity. The session has already been saved to the gallery, but you can download it as a PNG.`
@@ -96,7 +112,7 @@ export const SessionExpiredModal = ({
           : t`This collaborative session has ended due to inactivity. You can save your work locally as a PNG before leaving.`}
       </div>
       <div className="flex flex-wrap justify-center gap-[6px]">
-        {!hasCanvas ? null : isOwner ? (
+        {!hasCanvas ? null : isOwner && !endedByOwner ? (
           <>
             {!canvasMeta?.savedPostId && (
               <button
@@ -119,7 +135,7 @@ export const SessionExpiredModal = ({
                 ) : (
                   <>
                     <Icon icon="material-symbols:save" width={14} height={14} />
-                    <Trans>Save to Gallery</Trans>
+                    {ownerKeepsOnDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}
                   </>
                 )}
               </button>

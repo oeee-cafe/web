@@ -21,6 +21,7 @@ use serde::Deserialize;
 use crate::app_error::AppError;
 use crate::discord::{self, AppGrant};
 use crate::redis::RedisPool;
+use crate::web::rate_limit;
 use crate::web::state::AppState;
 
 /// How many asks an address gets in a [`WINDOW`], both endpoints together.
@@ -32,55 +33,17 @@ use crate::web::state::AppState;
 const ASKS: i64 = 20;
 const WINDOW: u64 = 60;
 
-/// Who is asking, as Cloudflare saw them. The site is reached only through
-/// the Cloudflare tunnel and then Caddy, so the connection itself is always
-/// from this machine; `CF-Connecting-IP` is set by Cloudflare, over whatever
-/// a client sent, and is the only address here worth counting by. Without
-/// it -- a development server, reached directly -- everyone is one asker.
+/// Who is asking (`rate_limit::client_ip`). Without an address --
+/// a development server, reached directly -- everyone is one asker.
 fn client_ip(headers: &HeaderMap) -> String {
-    headers
-        .get("cf-connecting-ip")
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|ip| ip.parse::<std::net::IpAddr>().is_ok())
-        .unwrap_or("unknown")
-        .to_string()
+    rate_limit::client_ip(headers).unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Whether `ip` may ask again this minute: a count per address, made when
-/// the first ask of a window arrives and gone when the window is, so a
-/// steady trickle under the limit is never turned away.
-///
-/// Redis being out of reach lets the ask through. This is a fence against
-/// somebody leaning on Discord through the site, not a lock on anything,
-/// and the app's player should not lose Discord because Redis did.
+/// Whether `ip` may ask again this minute. Redis being out of reach lets
+/// the ask through: the app's player should not lose Discord because Redis
+/// did.
 async fn admitted(pool: &RedisPool, ip: &str) -> bool {
-    let key = format!("oeee:discord-app-rate:{ip}");
-    let counted: anyhow::Result<i64> = async {
-        let mut conn = pool.get().await.map_err(|e| anyhow::anyhow!("{e}"))?;
-        // Made with its expiry if it is not there, then counted: the count
-        // keeps the expiry it was made with, so the window does not slide.
-        let (_, count): (Option<String>, i64) = redis::pipe()
-            .atomic()
-            .cmd("SET")
-            .arg(&key)
-            .arg(0)
-            .arg("EX")
-            .arg(WINDOW)
-            .arg("NX")
-            .incr(&key, 1)
-            .query_async(&mut *conn)
-            .await?;
-        Ok(count)
-    }
-    .await;
-    match counted {
-        Ok(count) => count <= ASKS,
-        Err(error) => {
-            tracing::warn!("The Discord app endpoints could not be rate limited: {error:#}");
-            true
-        }
-    }
+    rate_limit::admitted(pool, &format!("oeee:discord-app-rate:{ip}"), ASKS, WINDOW).await
 }
 
 /// Tokens for the app's grant, or 400 when Discord will not give them; 404

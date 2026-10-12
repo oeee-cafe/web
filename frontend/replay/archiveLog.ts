@@ -169,6 +169,8 @@ export type ArchivedChat = {
   at: number;
   user_id: string;
   login_name: string;
+  /** Absent from lines kept before guests could chat. */
+  is_guest?: boolean;
   message: string;
 };
 

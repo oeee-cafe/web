@@ -508,3 +508,42 @@ fn reactions_offer_any_emoji_and_quote_the_ones_they_show() {
         .expect("reactions render signed out");
     assert!(!signed_out.contains("reaction-custom-form"));
 }
+
+/// A guest who drew in the session is on the byline by the name they gave,
+/// marked as a guest, with no profile link and no handle -- the name is
+/// whatever they typed, and could be an account's.
+#[test]
+fn a_guest_on_a_collaborative_byline_is_named_but_not_linked() {
+    let env = test_support::env();
+    let rendered = env
+        .get_template("post_view.jinja")
+        .expect("post_view.jinja loads")
+        .render(context! {
+            post => Serde(post_page("true", "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d")),
+            post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+            r2_public_endpoint_url => "https://images.example",
+            base_url => "https://oeee.example",
+            domain => "oeee.example",
+            comments => Serde(Vec::<serde_json::Value>::new()),
+            collaborative_participants => Serde(json!([
+                {"login_name": "someone", "display_name": "Someone", "is_guest": false},
+                {"login_name": "friend", "display_name": "Friend", "is_guest": false},
+                {"login_name": "", "display_name": "impostor", "is_guest": true},
+            ])),
+            reaction_counts => Serde(Vec::<serde_json::Value>::new()),
+            tags => Serde(Vec::<serde_json::Value>::new()),
+            child_posts => Serde(Vec::<serde_json::Value>::new()),
+            post_community => Serde(json!(null)),
+            parent_post_data => Serde(json!(null)),
+            ..chrome()
+        })
+        .expect("post_view.jinja renders");
+
+    let byline = &rendered[rendered.find("post-inspector-byline").expect("a byline")..];
+    let byline = &byline[..byline.find("post-edit-container").expect("the byline ends")];
+    assert!(byline.contains("Friend"));
+    assert!(rendered.contains(r#"<span class="ds-person-name">impostor</span>"#));
+    assert!(rendered.contains(r#"<span class="ds-guest-badge">collaborate-guest-badge</span>"#));
+    assert!(!rendered.contains(r#"href="/@""#), "a guest is not linked");
+    assert!(!rendered.contains("@impostor"), "nor given a handle");
+}

@@ -7,7 +7,7 @@
  * or are there under something.
  */
 
-import { el, profileLink, type InspectorData, type Panel } from "./dom";
+import { el, personName, type InspectorData, type Panel } from "./dom";
 import { elapsed } from "./logRows";
 import { participantStats, type PersonStats } from "./people";
 
@@ -15,6 +15,7 @@ type Person = {
   /** Session id, when they drew or were seated; the stream's name for them. */
   sessionId: number | null;
   login: string;
+  isGuest: boolean;
   displayName: string | null;
   joinedAt: string | null;
   leftAt: string | null;
@@ -46,6 +47,7 @@ function people(data: InspectorData): Person[] {
       found.push({
         sessionId: id,
         login,
+        isGuest: row?.is_guest ?? false,
         displayName: row?.display_name ?? null,
         joinedAt: row?.joined_at ?? null,
         leftAt: row?.left_at ?? null,
@@ -61,6 +63,7 @@ function people(data: InspectorData): Person[] {
     found.push({
       sessionId: null,
       login: row.login_name,
+      isGuest: row.is_guest ?? false,
       displayName: row.display_name,
       joinedAt: row.joined_at,
       leftAt: row.left_at,
@@ -143,7 +146,7 @@ export function peoplePanel(onHidden: (actorIds: string[]) => void): Panel & { h
         label.appendChild(box);
         head.appendChild(label);
       }
-      head.appendChild(profileLink(person.login, "inspect-chat-who"));
+      head.appendChild(personName(person.login, person.isGuest, "inspect-chat-who"));
       if (person.displayName && person.displayName !== person.login) {
         head.appendChild(el("span", "inspect-muted", person.displayName));
       }

@@ -60,6 +60,9 @@ const RECONNECT_MAX_MS = 10000;
 const RECONNECT_JITTER_MS = 500;
 // The server's close code for a refused join (session over or full).
 const WS_CLOSE_POLICY = 1008;
+// The reason that close carries when the owner sent this person out
+// (`REMOVED_REASON` in websocket/mod.rs).
+export const REMOVED_REASON = "removed from session";
 // How long a participant who does not own the session waits before offering to
 // upload a checkpoint, giving the owner the first refusal. Long enough that the
 // owner's answer wins a same-tick race, short enough that nobody notices when
@@ -75,7 +78,13 @@ interface WebSocketHookParams {
   onSynchronizationError: (error: Error | null) => void;
   createOrUpdateCursor: (userId: string, x: number, y: number, username: string) => void;
   hideCursor: (userId: string) => void;
-  addParticipant: (userId: string, username: string, joinedAt: number, sessionId?: number) => void;
+  addParticipant: (
+    userId: string,
+    username: string,
+    joinedAt: number,
+    sessionId?: number,
+    isGuest?: boolean,
+  ) => void;
   clearParticipants: () => void;
   addChatMessage: (message: ChatLine) => void;
   handleResetRequest: (urgent: boolean) => void;
@@ -110,8 +119,11 @@ interface WebSocketHookParams {
    */
   appliedCanonicalPosition: () => number;
   canResumeCanonicalPosition: () => boolean;
+  /** An empty `postUrl` is a session that ended without becoming a post. */
   onSessionEnded: (postUrl: string) => void;
   onSessionExpired: () => void;
+  /** The owner sent this person out of the session; it will not take them back. */
+  onRemoved?: () => void;
 }
 
 const OPENING_PROGRESS: SyncProgress = {
@@ -158,8 +170,12 @@ export const useWebSocket = ({
   canResumeCanonicalPosition,
   onSessionEnded,
   onSessionExpired,
+  onRemoved,
 }: WebSocketHookParams) => {
   const wsRef = useRef<WebSocket | null>(null);
+  // Read when a socket closes, so a new callback is never a new socket.
+  const onRemovedRef = useRef(onRemoved);
+  onRemovedRef.current = onRemoved;
   const [view, setView] = useState<SessionView>({
     connection: "connecting",
     catchingUp: true,
@@ -447,7 +463,9 @@ export const useWebSocket = ({
       // amount of retrying will change that
       if (event.code === WS_CLOSE_POLICY) {
         console.warn("Server refused the session join:", event.reason);
+        link.shouldConnect = false;
         publish({ connection: "disconnected" });
+        if (event.reason === REMOVED_REASON) onRemovedRef.current?.();
         return;
       }
 

@@ -3,6 +3,7 @@ use crate::models::device::delete_user_device_by_token;
 use crate::models::user::{
     create_user, update_user_preferred_language, AuthSession, Credentials, UserDraft,
 };
+use crate::web::handlers::collaborate::guest::adopt as adopt_guest;
 use crate::web::handlers::identity::{link_pending_identity, pending_provider_name};
 use crate::web::i18n::{
     detect_preferred_language, get_bundle, safe_format_message, safe_get_message, ExtractFtlLang,
@@ -116,6 +117,7 @@ pub async fn do_signup(
     if auth_session.login(&user).await.is_err() {
         return Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response());
     }
+    adopt_guest(&state, &session, user.id).await;
     link_pending_identity(&session, &state, &messages, &bundle, &user).await?;
 
     let mut args = FluentArgs::new();
@@ -205,6 +207,7 @@ pub async fn do_login(
     if auth_session.login(&user).await.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+    adopt_guest(&state, &session, user.id).await;
     if link_pending_identity(&session, &state, &messages, &bundle, &user)
         .await
         .is_err()

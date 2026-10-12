@@ -20,7 +20,7 @@ const MESSAGE_HISTORY_ID_PREFIX: &str = "oeee:msg_history_id:v4:";
 // summing every entry on the path of every drawing message.
 const MESSAGE_BYTES_PREFIX: &str = "oeee:msg_bytes:v4:";
 const RESET_BASE_PREFIX: &str = "oeee:msg_reset_base:v4:";
-const CHAT_HISTORY_PREFIX: &str = "oeee:chat_history:v1:";
+const CHAT_HISTORY_PREFIX: &str = "oeee:chat_history:v2:";
 const MAX_CHAT_MESSAGES: usize = 100;
 
 /// The most a room's canonical history may weigh.

@@ -31,8 +31,11 @@ pub struct CreateCommentForm {
 
 #[derive(Serialize)]
 pub struct CollaborativeParticipant {
+    /// Empty for a guest, who has no account to name.
     pub login_name: String,
+    /// The account's display name, or the name the guest gave.
     pub display_name: String,
+    pub is_guest: bool,
 }
 
 pub async fn do_create_comment(

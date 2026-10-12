@@ -15,6 +15,7 @@ interface CollaborationMeta {
   ownerId: string;
   savedPostId?: string;
   ownerLoginName: string;
+  ownerIsGuest?: boolean;
   maxUsers: number;
   currentUserCount: number;
 }
@@ -136,7 +137,16 @@ export const SessionHeader = ({
         </div>
       )}
       <div className="min-w-0 truncate opacity-70">
-        <Trans>by</Trans> @{canvasMeta.ownerLoginName}
+        {/* A guest's name is not a handle; there is no account behind it. */}
+        {canvasMeta.ownerIsGuest ? (
+          <>
+            <Trans>by</Trans> {canvasMeta.ownerLoginName} <Trans>(guest)</Trans>
+          </>
+        ) : (
+          <>
+            <Trans>by</Trans> @{canvasMeta.ownerLoginName}
+          </>
+        )}
       </div>
     </div>
     <div className="flex items-center gap-[4px]">

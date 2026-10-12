@@ -53,7 +53,13 @@
           {% endif %}
         </div>
         <div class="session-meta">
-          <a class="session-owner" href="/@{{ session.owner_login_name }}">@{{ session.owner_login_name }}</a>
+          {% if session.owner_is_guest %}
+            {# A guest has no profile, and the name is theirs to choose, so
+               it is not dressed as a handle that would link to somebody else. #}
+            <span class="session-owner">{{ session.owner_login_name }} <span class="ds-guest-badge">{{ ftl_get_message("collaborate-guest-badge") }}</span></span>
+          {% else %}
+            <a class="session-owner" href="/@{{ session.owner_login_name }}">@{{ session.owner_login_name }}</a>
+          {% endif %}
           <span class="canvas-size">{{ session.width }}×{{ session.height }}</span>
           <span class="session-time" title="{{ session.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ session.created_at|ago }}</span>
         </div>

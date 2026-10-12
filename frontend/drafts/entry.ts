@@ -29,6 +29,7 @@ interface DraftsWords {
   communityDenied: string;
   postFailed: string;
   unavailable: string;
+  collaborationNotYours: string;
 }
 
 const section = document.getElementById("local-drafts");
@@ -64,7 +65,56 @@ function removeCard(card: HTMLElement): void {
   }
 }
 
+/**
+ * Posts a collaborative session a guest kept here: the session is saved, as
+ * its owner's Save to Gallery would have, and becomes a post at once.
+ *
+ * Signing in made the session this account's (`collaborate::guest::adopt`).
+ * Signed in as some other account, it is not theirs to save, and is left here.
+ */
+async function postCollaboration(
+  draft: LocalDraft,
+  sessionId: string,
+  card: HTMLElement,
+  trigger: HTMLButtonElement,
+): Promise<void> {
+  trigger.disabled = true;
+  try {
+    const response = await fetch(`/collaborate/${encodeURIComponent(sessionId)}`, {
+      method: "POST",
+      body: draftPng(draft),
+      headers: { "Content-Type": "image/png" },
+      credentials: "include",
+    });
+    if (response.status === 401) {
+      window.location.href = `/login?next=${encodeURIComponent(DRAFTS_PATH)}`;
+      return;
+    }
+    if (response.status === 403) {
+      say(words.collaborationNotYours || "This drawing belongs to another account.");
+      trigger.disabled = false;
+      return;
+    }
+    // 409 is "already a post", with the post.
+    if (!response.ok && response.status !== 409) throw new Error(`save ${response.status}`);
+    const result = (await response.json()) as { post_url: string };
+    await deleteLocalDraft(draft.id).catch(console.error);
+    removeCard(card);
+    feelInApp("success");
+    window.location.href = result.post_url;
+  } catch (error) {
+    console.error(error);
+    feelInApp("error");
+    say(words.postFailed || "Couldn't post this drawing.");
+    trigger.disabled = false;
+  }
+}
+
 async function post(draft: LocalDraft, card: HTMLElement, trigger: HTMLButtonElement): Promise<void> {
+  if (draft.collaborativeSessionId) {
+    await postCollaboration(draft, draft.collaborativeSessionId, card, trigger);
+    return;
+  }
   trigger.disabled = true;
   let withoutCommunity = false;
   for (;;) {

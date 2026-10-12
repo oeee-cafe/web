@@ -396,10 +396,12 @@ pub async fn post_view(
     // Get collaborative session participants if this post is from a collaborative session
     let collaborative_participants: Vec<CollaborativeParticipant> = sqlx::query!(
         r#"
-        SELECT u.login_name, u.display_name
+        SELECT u.login_name AS "login_name?",
+               COALESCE(u.display_name, g.nickname) AS "display_name!"
         FROM collaborative_sessions cs
         JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
-        JOIN users u ON csp.user_id = u.id
+        LEFT JOIN users u ON csp.user_id = u.id
+        LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
         WHERE cs.saved_post_id = $1
         ORDER BY csp.joined_at ASC
         "#,
@@ -410,7 +412,8 @@ pub async fn post_view(
     .unwrap_or_default()
     .into_iter()
     .map(|row| CollaborativeParticipant {
-        login_name: row.login_name,
+        is_guest: row.login_name.is_none(),
+        login_name: row.login_name.unwrap_or_default(),
         display_name: row.display_name,
     })
     .collect();
@@ -787,10 +790,12 @@ pub async fn post_view_by_login_name(
     // Get collaborative session participants if this post is from a collaborative session
     let collaborative_participants: Vec<CollaborativeParticipant> = sqlx::query!(
         r#"
-        SELECT u.login_name, u.display_name
+        SELECT u.login_name AS "login_name?",
+               COALESCE(u.display_name, g.nickname) AS "display_name!"
         FROM collaborative_sessions cs
         JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
-        JOIN users u ON csp.user_id = u.id
+        LEFT JOIN users u ON csp.user_id = u.id
+        LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
         WHERE cs.saved_post_id = $1
         ORDER BY csp.joined_at ASC
         "#,
@@ -801,7 +806,8 @@ pub async fn post_view_by_login_name(
     .unwrap_or_default()
     .into_iter()
     .map(|row| CollaborativeParticipant {
-        login_name: row.login_name,
+        is_guest: row.login_name.is_none(),
+        login_name: row.login_name.unwrap_or_default(),
         display_name: row.display_name,
     })
     .collect();

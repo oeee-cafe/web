@@ -68,7 +68,7 @@ describe("canonical history positions", () => {
     new DataView(wire.buffer).setBigUint64(17, 0x1_8000_0005n, true);
     expect(decodeMessage(wire.buffer)).toMatchObject({ lastSeq: 0x1_8000_0005 });
 
-    const chat = new Uint8Array(29);
+    const chat = new Uint8Array(30);
     chat[0] = MSG_TYPE.CHAT;
     new DataView(chat.buffer).setBigUint64(17, 1758789107717n, true);
     expect(decodeMessage(chat.buffer)).toMatchObject({

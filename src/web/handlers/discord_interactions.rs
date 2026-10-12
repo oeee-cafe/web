@@ -36,7 +36,7 @@ use crate::config::DiscordConfig;
 use crate::locale::LOCALES;
 use crate::models::identity::{find_user_by_identity, Provider};
 use crate::web::handlers::collaborate::{
-    insert_session, CreateSessionRequest, CANVAS_SIZES, DEFAULT_CANVAS_SIZE,
+    guest::Collaborator, insert_session, CreateSessionRequest, CANVAS_SIZES, DEFAULT_CANVAS_SIZE,
 };
 use crate::web::state::AppState;
 
@@ -280,8 +280,11 @@ async fn draw(state: &AppState, interaction: &Interaction) -> Value {
         is_public: false,
         max_participants: asked.seats,
         community_id: None,
+        // Whoever the link is passed to in Discord comes in with a name,
+        // account or not; signing in from the room keeps what they drew.
+        allow_guests: true,
     };
-    let session_id = match insert_session(state, user.id, request).await {
+    let session_id = match insert_session(state, &Collaborator::from_user(&user), request).await {
         Ok(id) => id,
         Err(error) => {
             tracing::error!("/oeee-cafe could not open a room: {error:?}");

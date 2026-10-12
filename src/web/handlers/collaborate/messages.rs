@@ -6,6 +6,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use super::db;
+use super::guest::Collaborator;
 use super::utils::{bytes_to_uuid, read_u64_le};
 
 #[cfg(test)]
@@ -27,6 +28,7 @@ mod chat_framing_tests {
             let original = ChatMessage {
                 user_id: Uuid::from_u128(9),
                 timestamp: 1_700_000_000_123,
+                flags: 0,
                 username: "miro".to_string(),
                 message: message.to_string(),
             };
@@ -43,6 +45,7 @@ mod chat_framing_tests {
         let whole = ChatMessage {
             user_id: Uuid::from_u128(1),
             timestamp: 1,
+            flags: 0,
             username: "umu".to_string(),
             message: "hi".to_string(),
         }
@@ -55,9 +58,27 @@ mod chat_framing_tests {
         wrong_type[0] = 0x16;
         assert!(ChatMessage::parse(&wrong_type).is_none());
     }
+
+    /// The guest flag is read back from where it was written, so the
+    /// recording knows a guest's line from an account's of the same name.
+    #[test]
+    fn a_guest_line_reads_back_as_a_guest_line() {
+        let guest = ChatMessage {
+            user_id: Uuid::from_u128(3),
+            timestamp: 7,
+            flags: crate::web::handlers::collaborate::guest::FLAG_GUEST,
+            username: "miro".to_string(),
+            message: "hi".to_string(),
+        };
+        let held = ChatMessage::parse(&guest.serialize()).expect("parses");
+        assert_eq!(held.flags, guest.flags);
+        assert_eq!(held.username, "miro");
+        assert_eq!(held.message, "hi");
+    }
 }
 
 pub struct EndSessionContext<'a> {
+    /// The sender's participant id.
     pub user_id: Uuid,
     pub user_login_name: &'a str,
     pub room_uuid: Uuid,
@@ -116,23 +137,40 @@ pub enum MessageType {
 }
 
 // Message structures
+//
+// Every frame the server sends about a person carries a flags byte just before
+// their name (`guest::FLAG_GUEST`). The frames a client sends do not: who they
+// are is the server's to say.
 #[derive(Debug, Clone)]
 pub struct JoinMessage {
     pub user_id: Uuid,
     pub timestamp: u64,
+    pub flags: u8,
     pub username: String,
+}
+
+/// One person in a LAYERS frame.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PresentParticipant {
+    /// The participant id: an account's or a guest's.
+    pub id: Uuid,
+    /// The 1-byte id they draw under, 0 when Redis no longer knows it.
+    pub session_id: u8,
+    pub flags: u8,
+    pub name: String,
+    pub joined_at: i64,
 }
 
 #[derive(Debug, Clone)]
 pub struct LayersMessage {
-    // (user_uuid, session_id, login_name, join_timestamp)
-    pub participants: Vec<(Uuid, u8, String, i64)>,
+    pub participants: Vec<PresentParticipant>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ChatMessage {
     pub user_id: Uuid,
     pub timestamp: u64,
+    pub flags: u8,
     pub username: String,
     pub message: String,
 }
@@ -168,6 +206,7 @@ pub struct ResetRequestMessage {
 pub struct LeaveMessage {
     pub user_id: Uuid,
     pub timestamp: u64,
+    pub flags: u8,
     pub username: String,
 }
 
@@ -177,10 +216,11 @@ impl JoinMessage {
         let username_bytes = self.username.as_bytes();
         let username_len = username_bytes.len() as u16;
 
-        let mut buffer = Vec::with_capacity(1 + 16 + 8 + 2 + username_bytes.len());
+        let mut buffer = Vec::with_capacity(1 + 16 + 8 + 1 + 2 + username_bytes.len());
         buffer.push(MessageType::Join as u8);
         buffer.extend_from_slice(self.user_id.as_bytes());
         buffer.extend_from_slice(&self.timestamp.to_le_bytes());
+        buffer.push(self.flags);
         buffer.extend_from_slice(&username_len.to_le_bytes());
         buffer.extend_from_slice(username_bytes);
 
@@ -192,13 +232,13 @@ impl LayersMessage {
     pub fn serialize(&self) -> Vec<u8> {
         let participant_count = self.participants.len() as u16;
 
-        // 1 + 2 + per participant: uuid(16) + session id(1) + name len(2) + name + timestamp(8)
+        // 1 + 2 + per participant: uuid(16) + session id(1) + flags(1) + name len(2) + name + timestamp(8)
         let total_size = 1
             + 2
             + self
                 .participants
                 .iter()
-                .map(|(_, _, name, _)| 16 + 1 + 2 + name.len() + 8)
+                .map(|present| 16 + 1 + 1 + 2 + present.name.len() + 8)
                 .sum::<usize>();
 
         let mut buffer = Vec::with_capacity(total_size);
@@ -206,19 +246,20 @@ impl LayersMessage {
         buffer.push(MessageType::Layers as u8);
         buffer.extend_from_slice(&participant_count.to_le_bytes());
 
-        for (user_uuid, session_id, login_name, join_timestamp) in &self.participants {
-            // Add user UUID (16 bytes) and 1-byte session id
-            buffer.extend_from_slice(user_uuid.as_bytes());
-            buffer.push(*session_id);
+        for present in &self.participants {
+            // Participant id (16 bytes), 1-byte session id, flags
+            buffer.extend_from_slice(present.id.as_bytes());
+            buffer.push(present.session_id);
+            buffer.push(present.flags);
 
-            // Add login name length (2 bytes) + login name
-            let name_bytes = login_name.as_bytes();
+            // Name length (2 bytes) + name
+            let name_bytes = present.name.as_bytes();
             let name_len = name_bytes.len() as u16;
             buffer.extend_from_slice(&name_len.to_le_bytes());
             buffer.extend_from_slice(name_bytes);
 
-            // Add join timestamp (8 bytes)
-            buffer.extend_from_slice(&join_timestamp.to_le_bytes());
+            // Join timestamp (8 bytes)
+            buffer.extend_from_slice(&present.joined_at.to_le_bytes());
         }
 
         buffer
@@ -234,14 +275,15 @@ impl ChatMessage {
     /// one the server built, with the name it authenticated rather than the
     /// one the client claimed.
     pub fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() < 27 || data[0] != MessageType::Chat as u8 {
+        if data.len() < 28 || data[0] != MessageType::Chat as u8 {
             return None;
         }
         let user_id = bytes_to_uuid(&data[1..17]).ok()?;
         let timestamp = read_u64_le(data, 17);
-        let username_len = u16::from_le_bytes([data[25], data[26]]) as usize;
-        let username_end = 27 + username_len;
-        let username = std::str::from_utf8(data.get(27..username_end)?).ok()?;
+        let flags = data[25];
+        let username_len = u16::from_le_bytes([data[26], data[27]]) as usize;
+        let username_end = 28 + username_len;
+        let username = std::str::from_utf8(data.get(28..username_end)?).ok()?;
         let message_len =
             u16::from_le_bytes([*data.get(username_end)?, *data.get(username_end + 1)?]) as usize;
         let message_start = username_end + 2;
@@ -250,6 +292,7 @@ impl ChatMessage {
         Some(Self {
             user_id,
             timestamp,
+            flags,
             username: username.to_string(),
             message: message.to_string(),
         })
@@ -262,10 +305,11 @@ impl ChatMessage {
         let message_len = message_bytes.len() as u16;
 
         let mut buffer =
-            Vec::with_capacity(1 + 16 + 8 + 2 + username_bytes.len() + 2 + message_bytes.len());
+            Vec::with_capacity(1 + 16 + 8 + 1 + 2 + username_bytes.len() + 2 + message_bytes.len());
         buffer.push(MessageType::Chat as u8);
         buffer.extend_from_slice(self.user_id.as_bytes());
         buffer.extend_from_slice(&self.timestamp.to_le_bytes());
+        buffer.push(self.flags);
         buffer.extend_from_slice(&username_len.to_le_bytes());
         buffer.extend_from_slice(username_bytes);
         buffer.extend_from_slice(&message_len.to_le_bytes());
@@ -300,10 +344,11 @@ impl LeaveMessage {
         let username_bytes = self.username.as_bytes();
         let username_len = username_bytes.len() as u16;
 
-        let mut buffer = Vec::with_capacity(1 + 16 + 8 + 2 + username_bytes.len());
+        let mut buffer = Vec::with_capacity(1 + 16 + 8 + 1 + 2 + username_bytes.len());
         buffer.push(MessageType::Leave as u8);
         buffer.extend_from_slice(self.user_id.as_bytes());
         buffer.extend_from_slice(&self.timestamp.to_le_bytes());
+        buffer.push(self.flags);
         buffer.extend_from_slice(&username_len.to_le_bytes());
         buffer.extend_from_slice(username_bytes);
 
@@ -368,12 +413,13 @@ pub fn is_client_message(msg_type: u8) -> bool {
 
 pub async fn handle_join_message(
     data: &[u8],
-    user_id: Uuid,
-    user_login_name: &str,
+    who: &Collaborator,
     room_uuid: Uuid,
     db: &Pool<Postgres>,
     state: &AppState,
 ) -> Option<Message> {
+    let user_id = who.id();
+    let user_login_name = who.name();
     if data.len() < 25 {
         return None;
     }
@@ -397,10 +443,11 @@ pub async fn handle_join_message(
     let join_message = JoinMessage {
         user_id,
         timestamp,
+        flags: who.flags(),
         username: user_login_name.to_string(),
     };
 
-    if let Err(e) = db::track_join_participant(db, room_uuid, user_uuid, timestamp as i64).await {
+    if let Err(e) = db::track_join_participant(db, room_uuid, who, timestamp as i64).await {
         error!("Failed to track JOIN participant: {}", e);
     } else {
         broadcast_layers(db, room_uuid, state, user_id).await;
@@ -409,18 +456,24 @@ pub async fn handle_join_message(
     Some(Message::Binary(join_message.serialize().into()))
 }
 
+/// Who is active in a session, by join time, with the session id left at 0
+/// for the caller to fill in from Redis.
 async fn get_session_participants(
     session_id: Uuid,
     state: &AppState,
-) -> Result<Vec<(Uuid, String, i64)>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<PresentParticipant>, Box<dyn std::error::Error + Send + Sync>> {
     let db = &state.db_pool;
 
     // Query participants from the database, ordered by join time
     let rows = sqlx::query!(
         r#"
-        SELECT csp.user_id, u.login_name, csp.joined_at
+        SELECT csp.participant_id,
+               COALESCE(u.login_name, g.nickname) AS "name!",
+               csp.guest_id IS NOT NULL AS "is_guest!",
+               csp.joined_at
         FROM collaborative_sessions_participants csp
-        JOIN users u ON csp.user_id = u.id
+        LEFT JOIN users u ON csp.user_id = u.id
+        LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
         WHERE csp.session_id = $1 AND csp.is_active = true
         ORDER BY csp.joined_at ASC
         "#,
@@ -429,16 +482,21 @@ async fn get_session_participants(
     .fetch_all(db)
     .await?;
 
-    let participants: Vec<(Uuid, String, i64)> = rows
+    Ok(rows
         .into_iter()
-        .map(|row| {
-            // Convert timestamp to milliseconds since epoch
-            let millis = row.joined_at.and_utc().timestamp_millis();
-            (row.user_id, row.login_name, millis)
+        .map(|row| PresentParticipant {
+            id: row.participant_id,
+            session_id: 0,
+            flags: if row.is_guest {
+                super::guest::FLAG_GUEST
+            } else {
+                0
+            },
+            name: row.name,
+            // Milliseconds since the epoch
+            joined_at: row.joined_at.and_utc().timestamp_millis(),
         })
-        .collect();
-
-    Ok(participants)
+        .collect())
 }
 
 /// Who is in the room and which 1-byte id each of them draws under.
@@ -477,8 +535,9 @@ pub async fn current_layers_message(room_uuid: Uuid, state: &AppState) -> Option
         LayersMessage {
             participants: participants
                 .into_iter()
-                .map(|(uuid, name, ts)| {
-                    (uuid, session_ids.get(&uuid).copied().unwrap_or(0), name, ts)
+                .map(|present| PresentParticipant {
+                    session_id: session_ids.get(&present.id).copied().unwrap_or(0),
+                    ..present
                 })
                 .collect(),
         }
@@ -524,7 +583,9 @@ async fn broadcast_layers(_db: &Pool<Postgres>, room_uuid: Uuid, state: &AppStat
 // JOIN and LEAVE messages are ephemeral (not stored in history)
 // Current participants are communicated via JOIN_RESPONSE messages
 
-pub fn handle_chat_message(data: &[u8], user_id: Uuid, user_login_name: &str) -> Option<Message> {
+pub fn handle_chat_message(data: &[u8], who: &Collaborator) -> Option<Message> {
+    let user_id = who.id();
+    let user_login_name = who.name();
     if data.len() < 27 {
         return None;
     }
@@ -558,6 +619,7 @@ pub fn handle_chat_message(data: &[u8], user_id: Uuid, user_login_name: &str) ->
     let chat_message = ChatMessage {
         user_id,
         timestamp,
+        flags: who.flags(),
         username: user_login_name.to_string(),
         message: chat_text.to_string(),
     };
@@ -566,6 +628,8 @@ pub fn handle_chat_message(data: &[u8], user_id: Uuid, user_login_name: &str) ->
 }
 
 /// The END_SESSION frame the room hears: [0x07][owner uuid:16][len:2][path].
+/// An empty path is a session that ended without becoming a post: a guest
+/// owner kept it on their device (`end_collaborative_session`).
 pub(super) fn end_session_frame(owner: Uuid, post_url: &str) -> Vec<u8> {
     let mut buffer = Vec::with_capacity(19 + post_url.len());
     buffer.push(MessageType::EndSession as u8);
@@ -889,10 +953,11 @@ pub async fn sequence_and_broadcast(
 pub async fn send_leave_message(
     room_uuid: Uuid,
     connection_id: &str,
-    user_id: Uuid,
-    user_login_name: &str,
+    who: &Collaborator,
     state: &AppState,
 ) {
+    let user_id = who.id();
+    let user_login_name = who.name();
     // Check how many connections are in the room via Redis
     let redis_connections = match state.redis_state.get_room_connections(room_uuid).await {
         Ok(connections) => connections,
@@ -920,6 +985,7 @@ pub async fn send_leave_message(
     let leave_message = LeaveMessage {
         user_id,
         timestamp,
+        flags: who.flags(),
         username: user_login_name.to_string(),
     };
 
@@ -1027,13 +1093,18 @@ mod history_admission_tests {
         let join = JoinMessage {
             user_id: owner,
             timestamp: 5,
+            flags: crate::web::handlers::collaborate::guest::FLAG_GUEST,
             username: "ada".into(),
         }
         .serialize();
         assert_eq!(join[0], MessageType::Join as u8);
-        assert_eq!(join.len(), 27 + 3);
-        assert_eq!(u16::from_le_bytes([join[25], join[26]]), 3);
-        assert_eq!(&join[27..], b"ada");
+        assert_eq!(join.len(), 28 + 3);
+        assert_eq!(
+            join[25],
+            crate::web::handlers::collaborate::guest::FLAG_GUEST
+        );
+        assert_eq!(u16::from_le_bytes([join[26], join[27]]), 3);
+        assert_eq!(&join[28..], b"ada");
 
         let end = end_session_frame(owner, "/@ada/post");
         assert_eq!(end[0], MessageType::EndSession as u8);

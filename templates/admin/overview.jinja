@@ -191,7 +191,7 @@
                     <span class="muted">untitled</span>
                   {% endif %}
                 </td>
-                <td><a href="/@{{ session.owner_login_name }}" target="_blank">@{{ session.owner_login_name }}</a></td>
+                <td>{% if session.owner_is_guest %}{{ session.owner_login_name }} (guest){% else %}<a href="/@{{ session.owner_login_name }}" target="_blank">@{{ session.owner_login_name }}</a>{% endif %}</td>
                 <td>{{ session.active_participant_count }} / {{ session.max_participants }}</td>
                 <td>
                   {% if not session.is_public %}

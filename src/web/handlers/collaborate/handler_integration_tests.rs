@@ -27,6 +27,7 @@ use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use uuid::Uuid;
 
+use super::guest::{Collaborator, FLAG_GUEST};
 use super::messages;
 use super::protocol_integration_tests::{redis_pool, start_redis, RedisProcess};
 use super::redis_state::RedisStateManager;
@@ -65,6 +66,8 @@ struct Room {
     state: AppState,
     room: Uuid,
     users: Vec<Uuid>,
+    /// Guests made for the scenario, taken out again with the room.
+    guests: Vec<Uuid>,
     community_id: Option<Uuid>,
 }
 
@@ -91,9 +94,34 @@ impl Room {
         socket
     }
 
+    /// Connects as any participant id -- an account's or a guest's -- as if
+    /// from the address `ip`.
+    async fn connect_as(&self, participant: Uuid, ip: &str) -> Socket {
+        let (socket, _) = connect_async(format!(
+            "{}/ws/{}/{}?ip={}",
+            self.url, self.room, participant, ip
+        ))
+        .await
+        .expect("the handler accepts the upgrade");
+        socket
+    }
+
+    /// A guest called `nickname`, as `POST /collaborate/guest` makes one.
+    async fn add_guest(&mut self, nickname: &str) -> Uuid {
+        let id = sqlx::query_scalar!(
+            "INSERT INTO collaborative_guests (nickname) VALUES ($1) RETURNING id",
+            nickname
+        )
+        .fetch_one(&self.db)
+        .await
+        .expect("insert guest");
+        self.guests.push(id);
+        id
+    }
+
     async fn active_participants(&self) -> Vec<Uuid> {
         sqlx::query_scalar!(
-            "SELECT user_id FROM collaborative_sessions_participants WHERE session_id = $1 AND is_active ORDER BY user_id",
+            "SELECT participant_id FROM collaborative_sessions_participants WHERE session_id = $1 AND is_active ORDER BY participant_id",
             self.room
         )
         .fetch_all(&self.db)
@@ -117,6 +145,20 @@ impl Room {
         .execute(&self.db)
         .await
         .expect("delete session");
+        sqlx::query!(
+            "DELETE FROM collaborative_sessions WHERE owner_guest_id = ANY($1)",
+            &self.guests
+        )
+        .execute(&self.db)
+        .await
+        .expect("delete guests' sessions");
+        sqlx::query!(
+            "DELETE FROM collaborative_guests WHERE id = ANY($1)",
+            &self.guests
+        )
+        .execute(&self.db)
+        .await
+        .expect("delete guests");
         if let Some(community_id) = self.community_id {
             sqlx::query!("DELETE FROM communities WHERE id = $1", community_id)
                 .execute(&self.db)
@@ -130,9 +172,10 @@ impl Room {
     }
 }
 
-/// `websocket_collaborate_handler` without the sign-in: the user comes from
-/// the path instead of the session cookie. Everything after the upgrade is
-/// the real handler.
+/// `websocket_collaborate_handler` without the sign-in: the participant comes
+/// from the path instead of the session cookie -- a guest if the id is one,
+/// an account otherwise -- and the address from `?ip=` instead of Cloudflare.
+/// Everything after the upgrade is the real handler.
 async fn upgrade(
     Path((room, user)): Path<(Uuid, Uuid)>,
     Query(query): Query<HashMap<String, String>>,
@@ -150,8 +193,22 @@ async fn upgrade(
         (Some(history_id), Some(after_seq)) => Some((history_id, after_seq)),
         _ => None,
     };
-    let login_name = format!("tester_{}", &user.to_string()[..8]);
-    ws.on_upgrade(move |socket| handle_socket(socket, room, state, user, login_name, resume))
+    let nickname = sqlx::query_scalar!(
+        "SELECT nickname FROM collaborative_guests WHERE id = $1",
+        user
+    )
+    .fetch_optional(&state.db_pool)
+    .await
+    .expect("look up guest");
+    let who = match nickname {
+        Some(nickname) => Collaborator::Guest { id: user, nickname },
+        None => Collaborator::User {
+            id: user,
+            login_name: format!("tester_{}", &user.to_string()[..8]),
+        },
+    };
+    let ip = query.get("ip").cloned();
+    ws.on_upgrade(move |socket| handle_socket(socket, room, state, who, ip, resume))
 }
 
 fn test_config(db_url: &str, redis_url: &str) -> AppConfig {
@@ -290,6 +347,7 @@ async fn open_room_in(seats: i32, community: Option<&str>) -> Option<Room> {
         state,
         room,
         users,
+        guests: Vec::new(),
         community_id,
     })
 }
@@ -884,6 +942,338 @@ async fn a_room_in_an_unlisted_community_admits_the_link() {
     let outcome = tokio::time::timeout(Duration::from_secs(20), async {
         let mut bob = room.connect(1, None).await;
         opening(&mut bob).await;
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// The name and flags a JOIN or LEAVE carries, as the room hears them:
+/// [type][uuid:16][ts:8][flags][len:2][name].
+fn person_in(frame: &[u8]) -> (Uuid, u8, String) {
+    let len = u16::from_le_bytes([frame[26], frame[27]]) as usize;
+    (
+        Uuid::from_slice(&frame[1..17]).unwrap(),
+        frame[25],
+        String::from_utf8(frame[28..28 + len].to_vec()).unwrap(),
+    )
+}
+
+/// The people in a LAYERS frame: (id, session id, flags, name).
+fn roster_of(frame: &[u8]) -> Vec<(Uuid, u8, u8, String)> {
+    assert_eq!(frame[0], LAYERS);
+    let count = u16::from_le_bytes([frame[1], frame[2]]) as usize;
+    let mut at = 3;
+    let mut people = Vec::new();
+    for _ in 0..count {
+        let id = Uuid::from_slice(&frame[at..at + 16]).unwrap();
+        let session_id = frame[at + 16];
+        let flags = frame[at + 17];
+        let len = u16::from_le_bytes([frame[at + 18], frame[at + 19]]) as usize;
+        let name = String::from_utf8(frame[at + 20..at + 20 + len].to_vec()).unwrap();
+        people.push((id, session_id, flags, name));
+        at += 20 + len + 8;
+    }
+    assert_eq!(at, frame.len(), "the roster is exactly its entries");
+    people
+}
+
+/// Somebody without an account takes a seat like anybody else, and the room
+/// is told, by the flag beside the name, that the name is a guest's.
+#[tokio::test]
+async fn a_guest_is_seated_and_the_room_is_told_it_is_a_guest() {
+    let Some(mut room) = open_room(4).await else {
+        return;
+    };
+    let guest = room.add_guest("miro").await;
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        opening(&mut alice).await;
+
+        let mut miro = room.connect_as(guest, "203.0.113.7").await;
+        let (miro_id, _) = opening(&mut miro).await;
+        send(&mut miro, join_frame(guest)).await;
+
+        let mut joined = None;
+        let mut roster = None;
+        while joined.is_none() || roster.is_none() {
+            let frame = next_frame(&mut alice, "the guest's JOIN and the roster").await;
+            match frame[0] {
+                JOIN => joined = Some(frame),
+                LAYERS if roster_of(&frame).len() == 2 => roster = Some(frame),
+                _ => {}
+            }
+        }
+        assert_eq!(
+            person_in(&joined.unwrap()),
+            (guest, FLAG_GUEST, "miro".to_string())
+        );
+        let roster = roster_of(&roster.unwrap());
+        assert_eq!(roster[0].2, 0, "the owner is an account");
+        assert_eq!(roster[1], (guest, miro_id, FLAG_GUEST, "miro".to_string()));
+
+        let mut active = room.active_participants().await;
+        active.sort();
+        let mut expected = vec![room.users[0], guest];
+        expected.sort();
+        assert_eq!(active, expected);
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// The owner may keep a session for accounts.
+#[tokio::test]
+async fn a_room_that_does_not_allow_guests_turns_one_away() {
+    let Some(mut room) = open_room(4).await else {
+        return;
+    };
+    sqlx::query!(
+        "UPDATE collaborative_sessions SET allow_guests = false WHERE id = $1",
+        room.room
+    )
+    .execute(&room.db)
+    .await
+    .expect("turn guests away");
+    let guest = room.add_guest("miro").await;
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut miro = room.connect_as(guest, "203.0.113.7").await;
+        let goodbye = next_close(&mut miro).await.expect("a close, not a welcome");
+        assert_eq!(u16::from(goodbye.code), 1008);
+        assert!(
+            room.active_participants().await.is_empty(),
+            "no seat was taken"
+        );
+
+        // An account is still let in.
+        let mut bob = room.connect(1, None).await;
+        opening(&mut bob).await;
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// A guest is a member of nothing, so only a public community's session --
+/// or one in no community -- is open to one, whatever the owner allowed.
+#[tokio::test]
+async fn a_guest_comes_in_only_where_the_community_is_public() {
+    for (visibility, admitted) in [("unlisted", false), ("private", false), ("public", true)] {
+        let Some(mut room) = open_room_in(4, Some(visibility)).await else {
+            return;
+        };
+        let guest = room.add_guest("miro").await;
+        let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+            let mut miro = room.connect_as(guest, "203.0.113.7").await;
+            if admitted {
+                opening(&mut miro).await;
+            } else {
+                let goodbye = next_close(&mut miro).await.expect("a close, not a welcome");
+                assert_eq!(u16::from(goodbye.code), 1008, "{visibility}");
+            }
+        })
+        .await;
+        room.teardown().await;
+        outcome.expect("the scenario finished in time");
+    }
+}
+
+/// What the ban endpoint does once it has checked the owner: the ban -- with
+/// the address, for a guest -- then every socket the person has in the room
+/// closed.
+async fn ban(room: &Room, participant: Uuid) {
+    let ip = if room.guests.contains(&participant) {
+        super::websocket::participant_ip(&room.state, room.room, participant).await
+    } else {
+        None
+    };
+    assert!(
+        super::db::ban_participant(&room.db, room.room, participant, ip.as_deref())
+            .await
+            .expect("ban"),
+        "they had been in the room"
+    );
+    super::websocket::remove_from_room(&room.state, room.room, participant).await;
+}
+
+/// The owner sends a guest out: the socket is closed with a reason the client
+/// knows not to come back from, the guest cannot come back, and neither can a
+/// new guest made from the same address -- though an account from it can.
+#[tokio::test]
+async fn a_banned_guest_is_sent_out_and_kept_out() {
+    let Some(mut room) = open_room(8).await else {
+        return;
+    };
+    let guest = room.add_guest("miro").await;
+    let second_guest = room.add_guest("miro again").await;
+    let elsewhere = room.add_guest("someone else").await;
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        opening(&mut alice).await;
+        let mut miro = room.connect_as(guest, "203.0.113.7").await;
+        opening(&mut miro).await;
+
+        ban(&room, guest).await;
+        let goodbye = loop {
+            match next_close(&mut miro).await {
+                Some(goodbye) => break goodbye,
+                None => continue,
+            }
+        };
+        assert_eq!(u16::from(goodbye.code), 1008);
+        assert_eq!(goodbye.reason.as_str(), "removed from session");
+        let left = next_of_type(&mut alice, LEAVE).await;
+        assert_eq!(person_in(&left).0, guest);
+
+        let mut again = room.connect_as(guest, "198.51.100.1").await;
+        let refused = next_close(&mut again)
+            .await
+            .expect("a close, not a welcome");
+        assert_eq!(u16::from(refused.code), 1008, "banned by id");
+
+        let mut cleared_cookies = room.connect_as(second_guest, "203.0.113.7").await;
+        let refused = next_close(&mut cleared_cookies)
+            .await
+            .expect("a close, not a welcome");
+        assert_eq!(u16::from(refused.code), 1008, "banned by address");
+
+        let mut other = room.connect_as(elsewhere, "198.51.100.1").await;
+        opening(&mut other).await;
+        let mut bob = room.connect_as(room.users[1], "203.0.113.7").await;
+        opening(&mut bob).await;
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// An account is banned by its id alone: the household behind its address
+/// is not sent out with it.
+#[tokio::test]
+async fn a_banned_account_is_kept_out_by_its_id() {
+    let Some(mut room) = open_room(8).await else {
+        return;
+    };
+    let guest = room.add_guest("neighbour").await;
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut bob = room.connect_as(room.users[1], "203.0.113.9").await;
+        opening(&mut bob).await;
+        ban(&room, room.users[1]).await;
+        let mut bob = room.connect_as(room.users[1], "203.0.113.9").await;
+        let refused = loop {
+            match next_close(&mut bob).await {
+                Some(goodbye) => break goodbye,
+                None => continue,
+            }
+        };
+        assert_eq!(u16::from(refused.code), 1008);
+        let mut neighbour = room.connect_as(guest, "203.0.113.9").await;
+        opening(&mut neighbour).await;
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// Signing in hands a guest's seats and sessions to the account: a seat the
+/// account did not have becomes its, a seat it had already absorbs the
+/// guest's, a session the guest opened is the account's to save, a ban
+/// follows them, and the seat in Redis moves so their layers stay theirs.
+#[tokio::test]
+async fn signing_in_hands_a_guests_rooms_to_the_account() {
+    let Some(mut room) = open_room(8).await else {
+        return;
+    };
+    let guest = room.add_guest("miro").await;
+    let account = room.users[1];
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut miro = room.connect_as(guest, "203.0.113.7").await;
+        let (seat, _) = opening(&mut miro).await;
+
+        let owned: Uuid = sqlx::query_scalar!(
+            r#"
+            INSERT INTO collaborative_sessions (owner_guest_id, title, width, height, is_public, max_participants)
+            VALUES ($1, 'a guest''s room', 64, 48, false, 4) RETURNING id
+            "#,
+            guest
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("a session the guest opened");
+        let banned: Uuid = sqlx::query_scalar!(
+            r#"
+            INSERT INTO collaborative_sessions (owner_id, title, width, height, is_public, max_participants)
+            VALUES ($1, 'a room the guest was banned from', 64, 48, false, 4) RETURNING id
+            "#,
+            room.users[0]
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("another session");
+        sqlx::query!(
+            "INSERT INTO collaborative_sessions_participants (session_id, guest_id, is_active) VALUES ($1, $2, false)",
+            banned,
+            guest
+        )
+        .execute(&room.db)
+        .await
+        .expect("a seat there");
+        sqlx::query!(
+            "INSERT INTO collaborative_session_bans (session_id, participant_id) VALUES ($1, $2)",
+            banned,
+            guest
+        )
+        .execute(&room.db)
+        .await
+        .expect("the ban");
+
+        let open = super::guest::adopt_guest(&room.db, guest, account)
+            .await
+            .expect("adopted");
+        assert!(open.contains(&room.room) && open.contains(&owned) && open.contains(&banned));
+        for open_room in open {
+            room.state
+                .redis_state
+                .rename_seat(open_room, guest, account)
+                .await
+                .expect("seat moved");
+        }
+
+        assert!(room.active_participants().await.contains(&account));
+        assert!(!room.active_participants().await.contains(&guest));
+        let owner = sqlx::query_scalar!(
+            "SELECT owner_id FROM collaborative_sessions WHERE id = $1",
+            owned
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("owner");
+        assert_eq!(owner, Some(account));
+        let viewer = Collaborator::User {
+            id: account,
+            login_name: "adopted".to_string(),
+        };
+        assert!(
+            !super::db::viewer_may_enter(&room.db, banned, Some(&viewer), None)
+                .await
+                .expect("may enter"),
+            "the ban came with them"
+        );
+        let seats = room.state.redis_state.get_user_ids(room.room).await.expect("seats");
+        assert_eq!(seats.get(&account), Some(&seat), "the same layers");
+        assert_eq!(seats.get(&guest), None);
+
+        // A second claim of the same guest does nothing.
+        assert!(super::guest::adopt_guest(&room.db, guest, room.users[0])
+            .await
+            .expect("no-op")
+            .is_empty());
+
+        sqlx::query!("DELETE FROM collaborative_sessions WHERE id = ANY($1)", &[owned, banned][..])
+            .execute(&room.db)
+            .await
+            .expect("clean up");
     })
     .await;
     room.teardown().await;

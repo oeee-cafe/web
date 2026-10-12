@@ -231,6 +231,8 @@ pub async fn list_achievements(
 }
 
 /// [`award_achievements`] for everyone who drew in a collaborative session.
+/// A guest has nowhere to keep one; theirs is worked out again from the
+/// session when they sign in (`collaborate::guest::adopt`).
 pub async fn award_achievements_for_session(
     tx: &mut Transaction<'_, Postgres>,
     session_id: Uuid,
@@ -238,9 +240,9 @@ pub async fn award_achievements_for_session(
     let drew = query!(
         r#"
         SELECT DISTINCT user_id AS "user_id!" FROM collaborative_sessions_participants
-        WHERE session_id = $1
+        WHERE session_id = $1 AND user_id IS NOT NULL
         UNION
-        SELECT owner_id FROM collaborative_sessions WHERE id = $1
+        SELECT owner_id FROM collaborative_sessions WHERE id = $1 AND owner_id IS NOT NULL
         "#,
         session_id,
     )

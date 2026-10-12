@@ -3,7 +3,7 @@
  */
 
 import { positionAt, type ArchivedChat } from "./archiveLog";
-import { el, profileLink, type InspectorData, type Panel, type Seek } from "./dom";
+import { el, personName, type InspectorData, type Panel, type Seek } from "./dom";
 import { elapsed } from "./logRows";
 
 export function chatPanel(seek: Seek): Panel {
@@ -67,7 +67,7 @@ export function chatPanel(seek: Seek): Panel {
           );
           row.append(
             when,
-            profileLink(line.login_name, "inspect-chat-who"),
+            personName(line.login_name, line.is_guest, "inspect-chat-who"),
             el("span", "inspect-chat-said", line.message),
           );
           row.title = new Date(line.at).toISOString();

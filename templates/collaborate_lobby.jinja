@@ -28,15 +28,10 @@
   <div class="center-wide collaborate-lobby">
     <div class="collaborate-header">
       <h1 class="collaborate-title">{{ ftl_get_message("collaborate-title") }}</h1>
-      {# Signed-out visitors can browse the rooms and the gallery; only
-         starting a session needs an account. #}
-      {% if current_user %}
-        <button type="button" class="ds-button ds-button-primary" onclick="toggleSessionDialog(true)">{{ ftl_get_message("collaborate-create-session") }}</button>
-      {% else %}
-        <a class="ds-button ds-button-primary" href="/login?next=/collaborate">{{ ftl_get_message("collaborate-sign-in-to-create") }}</a>
-      {% endif %}
+      {# Anybody can start a session. Somebody without an account names
+         themselves in the form and opens it as a guest. #}
+      <button type="button" class="ds-button ds-button-primary" onclick="toggleSessionDialog(true)">{{ ftl_get_message("collaborate-create-session") }}</button>
     </div>
-    {% if current_user %}
       <div id="create-session-dialog" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="create-session-title">
         <div class="ds-modal-panel create-session-panel">
           <h2 id="create-session-title" tabindex="-1">{{ ftl_get_message("collaborate-create-session") }}</h2>
@@ -57,6 +52,22 @@
                 hx-disable="find button[type=submit]"
                 data-network-error="{{ ftl_get_message("collaborate-create-network-error") }}"
                 hx-on::error="if (!(event.detail.ctx && event.detail.ctx.response)) dsAlert(this.dataset.networkError)">
+            {% if not current_user %}
+              {# What a guest is called in the room, on their cursor and in
+                 chat, marked as a guest's wherever it shows. #}
+              <label for="guest-nickname">{{ ftl_get_message("collaborate-guest-nickname-label") }}</label>
+              <div class="field">
+                <input type="text"
+                       class="ds-input"
+                       id="guest-nickname"
+                       name="nickname"
+                       required
+                       maxlength="{{ nickname_max_chars }}"
+                       autocomplete="nickname"
+                       value="{{ guest_nickname or "" }}">
+                <p class="field-help">{{ ftl_get_message("collaborate-guest-nickname-hint") }} <a href="/login?next=/collaborate">{{ ftl_get_message("collaborate-sign-in-instead") }}</a></p>
+              </div>
+            {% endif %}
             <label for="canvas-size">{{ ftl_get_message("collaborate-canvas-size-label") }}</label>
             <div class="field">
               <select id="canvas-size" name="canvas-size" class="ds-select" required>
@@ -113,7 +124,7 @@
                   {{ community_options(participated_communities, ftl_get_message("collaborate-community-group-participated"), selected_community_slug) }}
                   {{ community_options(other_communities, ftl_get_message("collaborate-community-group-public"), selected_community_slug) }}
                 </select>
-                <p class="field-help">{{ ftl_get_message("collaborate-community-hint") }}</p>
+                <p class="field-help">{{ ftl_get_message("collaborate-community-hint") }}{% if not current_user %} {{ ftl_get_message("collaborate-guest-community-hint") }}{% endif %}</p>
               </div>
             {% endif %}
 
@@ -125,6 +136,14 @@
               <p class="field-help">{{ ftl_get_message("collaborate-public-session-description") }}</p>
             </div>
 
+            <div class="field field-wide">
+              <label class="checkbox-label" for="allow-guests">
+                <input type="checkbox" id="allow-guests" name="allow_guests" checked>
+                {{ ftl_get_message("collaborate-allow-guests-label") }}
+              </label>
+              <p class="field-help">{{ ftl_get_message("collaborate-allow-guests-description") }}</p>
+            </div>
+
             <div class="field field-wide form-actions session-form-actions">
               <button type="button" class="ds-button" onclick="toggleSessionDialog(false)">{{ ftl_get_message("cancel") }}</button>
               <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("collaborate-create-button") }}</button>
@@ -132,7 +151,6 @@
           </form>
         </div>
       </div>
-    {% endif %}
     {% include "collaborate_sessions_fragment.jinja" %}
     {# Finished collaborative drawings, through the same card template as the
        home grid so they carry the community label and sensitive handling. #}
@@ -148,9 +166,6 @@
       </section>
     {% endif %}
   </div>
-  {# Only ship with the form: getElementById would be null signed out and
-     the TypeError would break any later script on the page. #}
-  {% if current_user %}
   <script>
     function toggleSessionDialog(open) {
       var dialog = document.getElementById("create-session-dialog");
@@ -397,5 +412,4 @@
       }
     })();
   </script>
-  {% endif %}
 {% endblock content %}

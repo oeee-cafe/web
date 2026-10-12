@@ -25,6 +25,18 @@ export function profileLink(login: string, className?: string): HTMLAnchorElemen
 }
 
 /**
+ * A name as the way to that person's profile, or, for a guest, just the name
+ * they gave and that they are one: a guest has no profile, and their name may
+ * be an account's, whose page a link would wrongly send staff to.
+ */
+export function personName(login: string, isGuest: boolean | undefined, className?: string): HTMLElement {
+  if (!isGuest) return profileLink(login, className);
+  const name = el("span", className, `${login} (guest)`);
+  name.title = "No account: a name they chose";
+  return name;
+}
+
+/**
  * Moves the canvas to a position: the index of the last drawing message to
  * apply, -1 for blank. `seq` is the message that was chosen, when that is
  * more exact than the position -- a pointer lifted shares its position with
@@ -38,6 +50,7 @@ export type SessionDetails = {
     id: string;
     title: string | null;
     owner_login_name: string;
+    owner_is_guest?: boolean;
     width: number;
     height: number;
     max_participants: number;
@@ -56,6 +69,7 @@ export type SessionDetails = {
     user_id: string;
     login_name: string;
     display_name: string;
+    is_guest?: boolean;
     joined_at: string;
     left_at: string | null;
     is_active: boolean;

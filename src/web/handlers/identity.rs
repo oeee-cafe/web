@@ -61,6 +61,8 @@ use minijinja::context;
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 
+use crate::web::handlers::collaborate::guest::adopt as adopt_guest;
+
 use crate::app_error::AppError;
 use crate::apple;
 use crate::discord;
@@ -200,6 +202,7 @@ async fn sign_in_with(
                 .login(&linked)
                 .await
                 .map_err(|_| AppError::Unauthorized)?;
+            adopt_guest(state, session, linked.id).await;
             welcome(messages, bundle, &linked);
             Ok(Redirect::to(next.as_deref().unwrap_or("/")).into_response())
         }
@@ -243,6 +246,7 @@ async fn sign_in_with(
                     .login(&user)
                     .await
                     .map_err(|_| AppError::Unauthorized)?;
+                adopt_guest(state, session, user.id).await;
                 messages
                     .clone()
                     .success(say(bundle, "identity-linked", provider));
@@ -1969,6 +1973,7 @@ pub async fn do_identity_welcome(
         .login(&user)
         .await
         .map_err(|_| AppError::Unauthorized)?;
+    adopt_guest(&state, &session, user.id).await;
     welcome(&messages, &bundle, &user);
     Ok(Redirect::to(pending.next.as_deref().unwrap_or("/")).into_response())
 }

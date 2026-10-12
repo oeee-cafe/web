@@ -7,6 +7,10 @@ export interface CollaborationMeta {
   /** The saved post's page; under its community's slug when it has one. */
   savedPostUrl?: string;
   ownerLoginName: string;
+  /** A guest opened it: it is kept on their device rather than posted. */
+  ownerIsGuest?: boolean;
+  /** Whether somebody without an account may come in as a guest. */
+  guestsWelcome?: boolean;
   maxUsers: number;
   currentUserCount: number;
   /** Over, saved or not: no socket to open, only the session-over dialog. */
@@ -16,6 +20,8 @@ export interface CollaborationMeta {
 export interface Participant {
   userId: string;
   username: string;
+  /** No account: a name they chose, shown with a guest badge. */
+  isGuest?: boolean;
   joinedAt: number;
   /**
    * The 1-byte id the canonical stream calls them, absent until the server

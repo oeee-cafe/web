@@ -77,8 +77,12 @@ pub struct ArchiveSpan {
 #[derive(Debug, Serialize)]
 pub struct ArchiveParticipant {
     pub session_id: u8,
+    /// The participant id: an account's, or a guest's.
     pub user_id: Uuid,
+    /// The account's login name, or the name the guest gave.
     pub login_name: String,
+    /// Absent from manifests sealed before guests existed; read as false.
+    pub is_guest: bool,
 }
 
 /// What a stored chunk is called.
@@ -520,8 +524,15 @@ async fn write_manifest(
     let mut participants = Vec::new();
     if !assigned.is_empty() {
         let user_ids: Vec<Uuid> = assigned.keys().copied().collect();
+        // A seat is an account's or a guest's. Both are named, or a guest's
+        // strokes in the recording would belong to nobody.
         let rows = sqlx::query!(
-            "SELECT id, login_name FROM users WHERE id = ANY($1)",
+            r#"
+            SELECT id AS "id!", login_name AS "name!", false AS "is_guest!"
+            FROM users WHERE id = ANY($1)
+            UNION ALL
+            SELECT id, nickname, true FROM collaborative_guests WHERE id = ANY($1)
+            "#,
             &user_ids
         )
         .fetch_all(&state.db_pool)
@@ -531,7 +542,8 @@ async fn write_manifest(
                 participants.push(ArchiveParticipant {
                     session_id: *session_id,
                     user_id: row.id,
-                    login_name: row.login_name,
+                    login_name: row.name,
+                    is_guest: row.is_guest,
                 });
             }
         }

@@ -19,7 +19,11 @@ use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use super::guest::{self, Collaborator};
 use super::{db, messages};
+use crate::web::rate_limit;
+use axum::http::HeaderMap;
+use tower_sessions::Session;
 
 mod connection;
 mod fanout;
@@ -36,7 +40,9 @@ pub(super) use reset::{reset_snapshot_count, valid_reset_payloads};
 
 struct SessionContext<'a> {
     connection_id: &'a str,
+    who: &'a Collaborator,
     user_login_name: &'a str,
+    /// `who`'s participant id.
     user_id: Uuid,
     room_uuid: Uuid,
     is_owner: bool,
@@ -123,25 +129,24 @@ const KEEPALIVE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3
 // messages in total.
 const OUTGOING_QUEUE_LIMIT: usize = 1024;
 
+/// A browser that is neither signed in nor a guest yet is answered 401
+/// before the upgrade: the page asks it for a name first
+/// (`POST /collaborate/guest`).
 pub async fn websocket_collaborate_handler(
     Path(room_uuid): Path<Uuid>,
     auth_session: AuthSession,
+    session: Session,
+    headers: HeaderMap,
     ws: WebSocketUpgrade,
     Query(resume): Query<ResumeQuery>,
     State(state): State<AppState>,
 ) -> Result<Response, AppError> {
-    let user = auth_session
-        .user
-        .ok_or_else(|| anyhow::anyhow!("Authentication required"))?;
+    let who = guest::current(auth_session.user.as_ref(), &session, &state.db_pool)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
+    let ip = rate_limit::client_ip(&headers);
     Ok(ws.on_upgrade(move |socket| {
-        handle_socket(
-            socket,
-            room_uuid,
-            state,
-            user.id,
-            user.login_name.to_string(),
-            resume.position(),
-        )
+        handle_socket(socket, room_uuid, state, who, ip, resume.position())
     }))
 }
 
@@ -149,10 +154,12 @@ pub async fn handle_socket(
     socket: WebSocket,
     room_uuid: Uuid,
     state: AppState,
-    user_id: Uuid,
-    user_login_name: String,
+    who: Collaborator,
+    ip: Option<String>,
     resume_position: Option<(Uuid, u64)>,
 ) {
+    let user_id = who.id();
+    let user_login_name = who.name().to_string();
     let (mut sender, mut receiver) = socket.split();
 
     // Counts this session as live until the handler returns, so a redeploy
@@ -168,50 +175,33 @@ pub async fn handle_socket(
 
     let db = &state.db_pool;
 
-    let (is_owner, session_user_id, connection_info) = match setup_connection(
-        db,
-        room_uuid,
-        user_id,
-        &user_login_name,
-        &connection_id,
-        &state,
-    )
-    .await
-    {
-        Ok(owner_info) => owner_info,
-        Err(failure) => {
-            // Say why with a close frame rather than just dropping the socket.
-            // The code is what the client reads: a policy close means the
-            // session is over, full or out of ids, and no retry will change
-            // that; anything else it comes back from on its own backoff.
-            let (code, reason) = match failure {
-                JoinFailure::Refused => (close_code::POLICY, "cannot join session"),
-                JoinFailure::Unavailable => (close_code::AGAIN, "session unavailable"),
-            };
-            let _ = sender
-                .send(Message::Close(Some(CloseFrame {
-                    code,
-                    reason: reason.into(),
-                })))
-                .await;
-            return;
-        }
-    };
+    let (is_owner, session_user_id, connection_info) =
+        match setup_connection(db, room_uuid, &who, ip.as_deref(), &connection_id, &state).await {
+            Ok(owner_info) => owner_info,
+            Err(failure) => {
+                // Say why with a close frame rather than just dropping the socket.
+                // The code is what the client reads: a policy close means the
+                // session is over, full or out of ids, and no retry will change
+                // that; anything else it comes back from on its own backoff.
+                let (code, reason) = match failure {
+                    JoinFailure::Refused => (close_code::POLICY, "cannot join session"),
+                    JoinFailure::Unavailable => (close_code::AGAIN, "session unavailable"),
+                };
+                let _ = sender
+                    .send(Message::Close(Some(CloseFrame {
+                        code,
+                        reason: reason.into(),
+                    })))
+                    .await;
+                return;
+            }
+        };
 
     // From here on this user is active in Postgres and this connection is in
     // the Redis registry, so every way out of the handler has to go through
     // the cleanup -- a join that fails halfway would otherwise hold a seat
     // until the session ends.
-    let leave = || {
-        cleanup_connection(
-            &connection_id,
-            &user_login_name,
-            user_id,
-            room_uuid,
-            db,
-            &state,
-        )
-    };
+    let leave = || cleanup_connection(&connection_id, &who, room_uuid, db, &state);
 
     // Tell the client its 1-byte session user id before any history arrives;
     // all its drawing messages will carry this id instead of a UUID
@@ -273,12 +263,28 @@ pub async fn handle_socket(
 
     let connection_id_clone = connection_id.clone();
     let overflow_close_tx = close_tx.clone();
+    // Stops the reading side too when the owner removes this connection: a
+    // client that ignored the close frame would otherwise go on drawing.
+    let removed = std::sync::Arc::new(tokio::sync::Notify::new());
+    let removed_for_task = removed.clone();
     let redis_task = tokio::spawn(async move {
         loop {
             match room_listener.receiver.recv().await {
                 Ok(room_msg) => {
                     if !should_forward_to_connection(&room_msg.broadcast, &connection_id_clone) {
                         continue;
+                    }
+                    // The owner sent this person out. Never forwarded: the
+                    // close frame is the whole message, and a client that
+                    // ignored a frame could not ignore the socket closing.
+                    if is_removal(&room_msg.broadcast, &connection_id_clone) {
+                        info!(
+                            "Connection {} removed from its room by the owner",
+                            connection_id_clone
+                        );
+                        send_goodbye(&overflow_close_tx, close_code::POLICY, REMOVED_REASON);
+                        removed_for_task.notify_one();
+                        break;
                     }
                     match redis_tx.try_send(room_msg) {
                         Ok(()) => {}
@@ -439,6 +445,7 @@ pub async fn handle_socket(
         &mut receiver,
         SessionContext {
             connection_id: &connection_id,
+            who: &who,
             user_login_name: &user_login_name,
             user_id,
             room_uuid,
@@ -448,6 +455,7 @@ pub async fn handle_socket(
             state: &state,
         },
         &close_tx,
+        &removed,
     )
     .await;
 
@@ -478,6 +486,81 @@ pub async fn handle_socket(
     outgoing_task.abort();
 }
 
+/// The payload of the broadcast that removes a connection from its room
+/// ([`remove_from_room`]). In the server's range, which `protocol::validate`
+/// refuses from a client, so nobody can send it to anybody else; and only
+/// ever addressed to one connection, never forwarded to it.
+const REMOVAL_MARKER: u8 = 0x11;
+
+/// The close reason a removed client reads, and knows not to come back from.
+pub(super) const REMOVED_REASON: &str = "removed from session";
+
+fn is_removal(broadcast: &super::redis_state::RoomBroadcast, connection_id: &str) -> bool {
+    broadcast.target_connection.as_deref() == Some(connection_id)
+        && broadcast.payload == [REMOVAL_MARKER]
+}
+
+/// Closes every socket `participant_id` has in the room, on whichever server
+/// it is held. Their seat and their ban are the caller's.
+pub async fn remove_from_room(state: &AppState, room_uuid: Uuid, participant_id: Uuid) -> usize {
+    let connections = state
+        .redis_state
+        .get_room_connections(room_uuid)
+        .await
+        .unwrap_or_default();
+    let mut removed = 0;
+    for connection_id in connections {
+        let Ok(Some(info)) = state.redis_state.get_connection_info(&connection_id).await else {
+            continue;
+        };
+        if info.user_id != participant_id {
+            continue;
+        }
+        let broadcast = super::redis_state::RoomBroadcast {
+            from_connection: "system".to_string(),
+            target_connection: Some(connection_id.clone()),
+            seq: None,
+            history_id: None,
+            payload: vec![REMOVAL_MARKER],
+        };
+        match state
+            .redis_state
+            .publish_message(room_uuid, &broadcast)
+            .await
+        {
+            Ok(_) => removed += 1,
+            Err(e) => error!(
+                "Failed to remove connection {} from room {}: {}",
+                connection_id, room_uuid, e
+            ),
+        }
+    }
+    removed
+}
+
+/// The address a participant's live socket came from, if they have one in
+/// the room: what a guest's ban is also kept against.
+pub async fn participant_ip(
+    state: &AppState,
+    room_uuid: Uuid,
+    participant_id: Uuid,
+) -> Option<String> {
+    let connections = state
+        .redis_state
+        .get_room_connections(room_uuid)
+        .await
+        .unwrap_or_default();
+    for connection_id in connections {
+        if let Ok(Some(info)) = state.redis_state.get_connection_info(&connection_id).await
+            && info.user_id == participant_id
+            && info.ip.is_some()
+        {
+            return info.ip;
+        }
+    }
+    None
+}
+
 /// Hands the outgoing task a close frame to send before it stops. Only the
 /// first caller is heard: once the socket is closing, a second reason for it
 /// would be a frame sent after the close.
@@ -500,12 +583,13 @@ fn send_goodbye(
 
 async fn cleanup_connection(
     connection_id: &str,
-    user_login_name: &str,
-    user_id: Uuid,
+    who: &Collaborator,
     room_uuid: Uuid,
     db: &sqlx::Pool<sqlx::Postgres>,
     state: &AppState,
 ) {
+    let user_id = who.id();
+    let user_login_name = who.name();
     info!(
         "Websocket connection {} (user {}) leaving room {}",
         connection_id, user_login_name, room_uuid
@@ -555,8 +639,7 @@ async fn cleanup_connection(
             user_login_name, room_uuid
         );
     } else {
-        messages::send_leave_message(room_uuid, connection_id, user_id, user_login_name, state)
-            .await;
+        messages::send_leave_message(room_uuid, connection_id, who, state).await;
 
         if let Err(e) = db::mark_participant_inactive(db, room_uuid, user_id).await {
             error!("Failed to update participant on disconnect: {}", e);

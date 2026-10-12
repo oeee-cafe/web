@@ -163,6 +163,7 @@ drafts-local-delete-confirm = この絵をこの端末から削除しますか�
 drafts-local-community-denied = このアカウントではそのコミュニティに投稿できません。個人の絵として投稿しますか？
 drafts-local-post-failed = 絵を投稿できませんでした。この端末にはそのまま残っています。
 drafts-local-unavailable = この端末には絵を保存できないため、ログインせずに保存した絵はここに表示されません。
+drafts-local-collaboration-not-yours = 別のアカウントが持つセッションの絵なので、このアカウントでは投稿できません。この端末には残っています。
 
 post-created-at = 絵を描いた時刻
 post-published-at = 発行時刻
@@ -287,6 +288,13 @@ community-draw-together = 一緒に描く
 collaborate-session-created = 作成日時
 collaborate-join-session = セッションに参加
 collaborate-session-preview-alt = 現在のキャンバスの様子
+collaborate-guest-badge = ゲスト
+collaborate-guest-nickname-label = 名前
+collaborate-guest-nickname-hint = ゲストとして描きます。あとでログインすると、描いたものはアカウントに移ります。
+collaborate-sign-in-instead = ログインする
+collaborate-guest-community-hint = ゲストは公開コミュニティだけを選べます。
+collaborate-allow-guests-label = アカウントのない人も参加できるようにする
+collaborate-allow-guests-description = ゲストは自分で名前を決め、名前が表示されるところではゲストと示されます。
 
 welcome = { $name }さん、ようこそ！
 

@@ -2762,6 +2762,20 @@ nav a:visited,
   margin: 0 6px 0 0;
 }
 
+/* Beside a name somebody without an account chose: the lobby card's owner,
+   the post's byline. Not a handle, so not drawn like one. */
+.ds-guest-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  background-color: var(--ds-hover);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-xs);
+  font-weight: normal;
+  line-height: 18px;
+  vertical-align: middle;
+}
+
 /* Data table. Was inline in community_members.jinja; nothing else could use
    it, which is why no other table on the site is styled at all. */
 .members-table {

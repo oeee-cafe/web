@@ -34,9 +34,18 @@ const CONNECTION_TTL: u64 = 30; // 30 seconds (with heartbeat)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionInfo {
     pub connection_id: String,
+    /// The participant id: an account's, or a guest's.
     pub user_id: Uuid,
     pub room_id: Uuid,
     pub user_login_name: String,
+    /// Whether `user_id` is a guest's. Absent from an entry written before
+    /// guests existed, which was an account's.
+    #[serde(default)]
+    pub is_guest: bool,
+    /// The address the socket came from, kept so that banning a guest can
+    /// also refuse that address (`collaborative_session_bans.ip`).
+    #[serde(default)]
+    pub ip: Option<String>,
     pub server_instance: String,
     pub connected_at: u64,
     pub last_heartbeat: u64,
@@ -468,6 +477,31 @@ return 0
             let existing: Option<u16> = conn.hget(&key, &field).await?;
             Ok(existing.and_then(|id| u8::try_from(id).ok()))
         }
+    }
+
+    /// Moves a seat from one participant id to another: a guest who signed in
+    /// keeps drawing on the layers they had. Nothing happens when `to` is
+    /// seated already -- that account's own layers are the ones it keeps -- or
+    /// when `from` never had a seat.
+    pub async fn rename_seat(
+        &self,
+        room_uuid: Uuid,
+        from: Uuid,
+        to: Uuid,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let mut conn = self.pool.get().await?;
+        let key = format!("{}{}", USER_ID_PREFIX, room_uuid);
+        let Some(seat) = conn
+            .hget::<_, _, Option<u16>>(&key, from.to_string())
+            .await?
+        else {
+            return Ok(());
+        };
+        let moved: bool = conn.hset_nx(&key, to.to_string(), seat).await?;
+        if moved {
+            conn.hdel::<_, _, ()>(&key, from.to_string()).await?;
+        }
+        Ok(())
     }
 
     /// Returns the uuid -> session id mapping for all known users of a room.

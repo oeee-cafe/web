@@ -19,13 +19,21 @@ import {
   type PainterCheckpoint,
   type PainterHandle,
 } from "neo-cucumber";
-import { feelInApp, offerPainterToApp } from "../shared/appBridge";
-import { say } from "../shared/siteDialog";
+import { discordKnown, feelInApp, offerPainterToApp } from "../shared/appBridge";
+import {
+  blobToArrayBuffer,
+  GUEST_OWNER,
+  newDraftId,
+  putLocalDraft,
+} from "../shared/localDrafts";
+import { ask, say } from "../shared/siteDialog";
 import "./app.css";
 import { Chat } from "./components/Chat";
 import { SessionExpiredModal } from "./components/SessionExpiredModal";
 import { SessionHeader } from "./components/SessionHeader";
 import { AuthErrorModal } from "./components/modals/AuthErrorModal";
+import { GuestNameModal } from "./components/modals/GuestNameModal";
+import { RemovedModal } from "./components/modals/RemovedModal";
 import { ConnectionStatusModal } from "./components/modals/ConnectionStatusModal";
 import { InitializationErrorModal } from "./components/modals/InitializationErrorModal";
 import { LoadingModal } from "./components/modals/LoadingModal";
@@ -127,9 +135,22 @@ type ChatMessage = {
   type: "join" | "leave" | "user";
   userId: string;
   username: string;
+  isGuest: boolean;
   message: string;
   timestamp: number;
 };
+
+/** What `/api/auth` and `POST /collaborate/guest` answer. */
+interface AuthInfo {
+  /** Null for somebody who is neither signed in nor a guest yet. */
+  user_id: string | null;
+  login_name: string | null;
+  is_guest: boolean;
+  preferred_locale: string;
+}
+
+/** Where signing in from this room comes back to. */
+const signInHref = () => `/login?next=${encodeURIComponent(window.location.pathname)}`;
 
 export default function App() {
   const { t } = useLingui();
@@ -140,6 +161,15 @@ export default function App() {
   const [roomFullError, setRoomFullError] = useState<{ currentUserCount: number; maxUsers: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  /** Over because a guest owner kept it on their device, not by timing out. */
+  const [endedByOwner, setEndedByOwner] = useState(false);
+  /** The owner sent this person out. */
+  const [removed, setRemoved] = useState(false);
+  /**
+   * A room that takes guests, opened by somebody who is not one yet: its
+   * metadata, held while they are asked for a name.
+   */
+  const [awaitingName, setAwaitingName] = useState<CollaborationMeta | null>(null);
   const [sessionEnding, setSessionEnding] = useState(false);
   const [saveConfirmation, setSaveConfirmation] = useState(false);
   const [synchronizationError, setSynchronizationError] = useState<string | null>(null);
@@ -274,10 +304,10 @@ export default function App() {
 
   const clearParticipants = useCallback(() => setParticipants(new Map()), []);
   const addParticipant = useCallback((
-    userId: string, username: string, joinedAt: number, sessionId?: number,
+    userId: string, username: string, joinedAt: number, sessionId?: number, isGuest?: boolean,
   ) => {
     setParticipants((current) =>
-      new Map(current).set(userId, { userId, username, joinedAt, sessionId }));
+      new Map(current).set(userId, { userId, username, joinedAt, sessionId, isGuest }));
   }, []);
 
   const onLocalOperation = useCallback((entry: LocalPainterOperation) => {
@@ -635,9 +665,24 @@ export default function App() {
   }, [diagnosticContext]);
 
   const handleSessionEnded = useCallback((postUrl: string) => {
+    // No post: a guest owner kept the drawing on their device. Everybody
+    // else is told so and may keep a picture of it; the owner, whose own
+    // save sent this, is already on their way to their drafts.
+    if (!postUrl) {
+      if (leavingRef.current) return;
+      setEndedByOwner(true);
+      setSessionExpired(true);
+      painterRef.current?.setInteractionEnabled(false);
+      return;
+    }
     setSessionEnding(true);
     leavingRef.current = true;
     window.location.assign(postUrl);
+  }, []);
+
+  const handleRemoved = useCallback(() => {
+    setRemoved(true);
+    painterRef.current?.setInteractionEnabled(false);
   }, []);
 
   const handleSessionExpired = useCallback(() => {
@@ -795,6 +840,7 @@ export default function App() {
     canResumeCanonicalPosition,
     onSessionEnded: handleSessionEnded,
     onSessionExpired: handleSessionExpired,
+    onRemoved: handleRemoved,
   });
 
   useEffect(() => {
@@ -803,39 +849,57 @@ export default function App() {
     // canvases are up.
     if (!painterReady) return;
     painterRef.current?.setInteractionEnabled(
-      view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired,
+      view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired && !removed,
     );
-  }, [painterReady, view.connection, view.catchingUp, sessionEnding, sessionExpired]);
+  }, [painterReady, view.connection, view.catchingUp, sessionEnding, sessionExpired, removed]);
+
+  /**
+   * Into the room, once it is known who is coming in: straight on to the post
+   * if there is one, turned away if it is full, the session-over dialog if it
+   * is over, and otherwise the canvas.
+   */
+  const enterRoom = useCallback((meta: CollaborationMeta) => {
+    if (meta.savedPostId) {
+      window.location.href = meta.savedPostUrl ?? `/@${meta.ownerLoginName}/${meta.savedPostId}`;
+      return;
+    }
+    if (meta.currentUserCount >= meta.maxUsers && meta.ownerId !== userIdRef.current) {
+      setRoomFullError({ currentUserCount: meta.currentUserCount, maxUsers: meta.maxUsers });
+      return;
+    }
+    document.title = `Oeee Cafe - ${meta.title?.trim() || t`No Title`}`;
+    setCanvasMeta(meta);
+    // Over without a post: the dialog, not a socket the server would
+    // refuse. Nothing to save from here -- the canvas went with the room.
+    if (meta.ended) setSessionExpired(true);
+    // `t`: see initializeApp.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const initializeApp = useCallback(async () => {
     try {
       setInitializationError(null);
       const sessionId = getSessionId();
       const authResponse = await fetch("/api/auth", { credentials: "include" });
-      if (authResponse.status === 401) {
-        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
-        return;
-      }
       if (!authResponse.ok) throw new Error(`Auth failed: ${authResponse.status}`);
-      const auth = await authResponse.json();
-      userIdRef.current = auth.user_id;
+      const auth: AuthInfo = await authResponse.json();
+      userIdRef.current = auth.user_id ?? "";
       localeRef.current = auth.preferred_locale || undefined;
       const response = await fetch(`/collaboration/${sessionId}/meta`, { credentials: "include" });
+      // Somebody with no account, at a room that does not take guests.
+      if (response.status === 401) {
+        window.location.href = signInHref();
+        return;
+      }
       if (!response.ok) throw new Error(`Failed to fetch collaboration meta: ${response.status}`);
       const meta: CollaborationMeta = await response.json();
-      if (meta.savedPostId) {
-        window.location.href = meta.savedPostUrl ?? `/@${meta.ownerLoginName}/${meta.savedPostId}`;
+      // Nobody yet, at a room that takes guests and is still open: a name
+      // first. A room that is over or already a post needs nobody's name.
+      if (!auth.user_id && !meta.ended && !meta.savedPostId) {
+        setAwaitingName(meta);
         return;
       }
-      if (meta.currentUserCount >= meta.maxUsers && meta.ownerId !== auth.user_id) {
-        setRoomFullError({ currentUserCount: meta.currentUserCount, maxUsers: meta.maxUsers });
-        return;
-      }
-      document.title = `Oeee Cafe - ${meta.title?.trim() || t`No Title`}`;
-      setCanvasMeta(meta);
-      // Over without a post: the dialog, not a socket the server would
-      // refuse. Nothing to save from here -- the canvas went with the room.
-      if (meta.ended) setSessionExpired(true);
+      enterRoom(meta);
     } catch (error) {
       setInitializationError(error instanceof Error ? error.message : String(error));
       setAuthError(true);
@@ -851,6 +915,30 @@ export default function App() {
     joinedRef.current = true;
     void initializeApp();
   }, [initializeApp]);
+
+  /** Takes the name a guest gave, and with it, the room. */
+  const becomeGuest = useCallback(async (nickname: string): Promise<string | null> => {
+    const meta = awaitingName;
+    if (!meta) return null;
+    try {
+      const response = await fetch("/collaborate/guest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname }),
+        credentials: "include",
+      });
+      if (response.status === 400) return t`Choose a name of 1 to 30 characters, without hidden characters.`;
+      if (response.status === 429) return t`Too many guests have joined from this network. Try again later, or sign in.`;
+      if (!response.ok) return t`Couldn't join. Please try again.`;
+      const guest: AuthInfo = await response.json();
+      userIdRef.current = guest.user_id ?? "";
+      setAwaitingName(null);
+      enterRoom(meta);
+      return null;
+    } catch {
+      return t`Couldn't join. Please try again.`;
+    }
+  }, [awaitingName, enterRoom, t]);
   // Opens the socket once the session is known. `connect` is stable on
   // purpose: this effect must fire when the session arrives and at no other
   // time, or a render becomes a reconnect. Everything after the first
@@ -916,6 +1004,103 @@ export default function App() {
   }, [drainCanonical, feed, isSaving, link, sessionExpired]);
 
   const isOwner = canvasMeta?.ownerId === userIdRef.current;
+  /**
+   * A guest owner: their drawing cannot become a post until they have an
+   * account, so their save keeps it in this device's drafts instead.
+   */
+  const ownerKeepsOnDevice = isOwner && !!canvasMeta?.ownerIsGuest;
+
+  /**
+   * A guest owner's save. The drawing goes into this browser's drafts, the
+   * session ends for everyone, and the owner is sent to the drafts page,
+   * where it waits for them to sign in and post it -- signing in makes the
+   * session theirs, and posting it saves it the way Save to Gallery would.
+   *
+   * Kept before the session is ended, so a failure to keep it leaves the
+   * room open rather than the drawing nowhere. Where this browser keeps
+   * nothing (a private window in an old Firefox), it is downloaded instead.
+   */
+  const keepOnDevice = useCallback(async () => {
+    if (isSaving || !painterRef.current || !canvasMeta) return;
+    setIsSaving(true);
+    setSessionEnding(true);
+    painterRef.current.setInteractionEnabled(false);
+    try {
+      if (!sessionExpired) {
+        for (let attempt = 0; attempt < 40; attempt++) {
+          await drainCanonical();
+          if (
+            painterRef.current.isSynchronizationSettled() &&
+            feed.applied >= link.lastSeq
+          ) break;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (
+          !painterRef.current.isSynchronizationSettled() ||
+          feed.applied < link.lastSeq
+        ) {
+          throw new Error("The shared drawing is still synchronizing; please try again");
+        }
+      }
+      const png = await painterRef.current.exportPng();
+      const sessionId = getSessionId();
+      let kept = true;
+      try {
+        await putLocalDraft({
+          id: newDraftId(),
+          owner: GUEST_OWNER,
+          savedAt: Date.now(),
+          png: await blobToArrayBuffer(png),
+          replay: new ArrayBuffer(0),
+          width: canvasMeta.width,
+          height: canvasMeta.height,
+          tool: "collaborative",
+          paintDurationMs: 0,
+          strokeCount: 0,
+          communityId: null,
+          communityName: null,
+          parentPostId: null,
+          collaborativeSessionId: sessionId,
+        });
+      } catch (error) {
+        console.error("This browser could not keep the drawing:", error);
+        downloadBlob(png, "collaboration.png");
+        kept = false;
+      }
+      leavingRef.current = true;
+      const response = await fetch(`/collaborate/${sessionId}/end`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(`Failed to end the session: ${response.status}`);
+      feelInApp("success");
+      window.location.assign(kept ? "/posts/drafts" : "/collaborate");
+    } catch (error) {
+      leavingRef.current = false;
+      feelInApp("error");
+      say(error instanceof Error ? error.message : String(error));
+      setIsSaving(false);
+      setSessionEnding(false);
+    }
+  }, [canvasMeta, drainCanonical, feed, isSaving, link, sessionExpired]);
+
+  /** The owner's: sends somebody out of the session and keeps them out. */
+  const removeParticipant = useCallback(async (participant: Participant) => {
+    const confirmed = await ask(
+      t`Remove ${participant.username} from this session? They won't be able to rejoin it.`,
+      t`Remove`,
+    );
+    if (!confirmed) return;
+    try {
+      const response = await fetch(
+        `/collaborate/${getSessionId()}/participants/${encodeURIComponent(participant.userId)}/ban`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!response.ok) throw new Error(String(response.status));
+    } catch {
+      say(t`Couldn't remove ${participant.username}. Please try again.`);
+    }
+  }, [t]);
 
   /**
    * Leaving the room by accident.
@@ -1015,13 +1200,17 @@ export default function App() {
     const proxy = saveProxyRef.current;
     if (!proxy) return;
     proxy.disabled = isSaving;
-    proxy.textContent = isSaving ? t`Saving...` : t`Save to Gallery`;
-  }, [isSaving, t]);
+    proxy.textContent = isSaving
+      ? t`Saving...`
+      : ownerKeepsOnDevice
+        ? t`Keep on This Device`
+        : t`Save to Gallery`;
+  }, [isSaving, ownerKeepsOnDevice, t]);
 
   return <>
     <div className="w-full app-container flex flex-col">
       <InitializationErrorModal isOpen={!!initializationError} errorMessage={initializationError ?? ""} onRetry={reload} />
-      <LoadingModal isOpen={!canvasMeta && !initializationError} />
+      <LoadingModal isOpen={!canvasMeta && !initializationError && !awaitingName} />
       <AuthErrorModal isOpen={authError} onGoToLobby={goToLobby} />
       <RoomFullModal isOpen={!!roomFullError} currentUserCount={roomFullError?.currentUserCount ?? 0} maxUsers={roomFullError?.maxUsers ?? 0} onGoToLobby={goToLobby} onRetry={reload} />
       <div className="relative flex-1 overflow-hidden">
@@ -1057,22 +1246,29 @@ export default function App() {
             {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[11px] leading-[14px]">{canvasMeta.title}</span>}
           </div>
           {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
-          <Chat wsRef={wsRef} userId={userIdRef.current} participants={participants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} />
+          <Chat wsRef={wsRef} userId={userIdRef.current} participants={participants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} onRemove={isOwner ? removeParticipant : undefined} />
           <div ref={chatResizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
             <span className={NEO_RESIZE_GRIP} />
           </div>
         </div>
         <div ref={painterElementRef} className="h-full w-full" />
-        <ConnectionStatusModal isCatchingUp={view.catchingUp} connectionState={view.connection} syncProgress={view.progress} synchronizationError={synchronizationError} onReconnect={reload} onDownloadPNG={downloadPng} />
-        {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => setSaveConfirmation(true)} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : <Trans>Save to Gallery</Trans>}</button>}
+        {/* Removed is not disconnected: there is nothing to reconnect to. */}
+        {!removed && <ConnectionStatusModal isCatchingUp={view.catchingUp} connectionState={view.connection} syncProgress={view.progress} synchronizationError={synchronizationError} onReconnect={reload} onDownloadPNG={downloadPng} />}
+        {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => setSaveConfirmation(true)} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : ownerKeepsOnDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}</button>}
         <SaveConfirmationModal
           isOpen={saveConfirmation}
+          toDevice={ownerKeepsOnDevice}
           onCancel={() => setSaveConfirmation(false)}
-          onConfirm={() => { setSaveConfirmation(false); void saveCollaborativeDrawing(); }}
+          onConfirm={() => {
+            setSaveConfirmation(false);
+            void (ownerKeepsOnDevice ? keepOnDevice() : saveCollaborativeDrawing());
+          }}
         />
         <SessionEndingModal isOpen={sessionEnding} />
       </div>
     </div>
-    <SessionExpiredModal isOpen={sessionExpired} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} hasCanvas={!canvasMeta?.ended} onClose={() => {}} onSaveToGallery={saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
+    <SessionExpiredModal isOpen={sessionExpired && !removed} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} hasCanvas={!canvasMeta?.ended} endedByOwner={endedByOwner} ownerKeepsOnDevice={ownerKeepsOnDevice} onClose={() => {}} onSaveToGallery={ownerKeepsOnDevice ? keepOnDevice : saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
+    <RemovedModal isOpen={removed} onDownloadPNG={downloadPng} onGoToLobby={goToLobby} />
+    <GuestNameModal isOpen={!!awaitingName} suggestion={discordKnown().state?.name ?? undefined} onSubmit={becomeGuest} signInHref={signInHref()} />
   </>;
 }

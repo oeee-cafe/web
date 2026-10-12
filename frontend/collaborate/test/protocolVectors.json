@@ -9,16 +9,17 @@
       }
     },
     "join": {
-      "hex": "010d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d7b68e5cf8b0100000600ec98a4ec9db4",
+      "hex": "010d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d7b68e5cf8b010000000600ec98a4ec9db4",
       "decoded": {
         "type": "join",
         "userId": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d",
         "timestamp": 1700000000123,
-        "username": "오이"
+        "username": "오이",
+        "isGuest": false
       }
     },
     "layers": {
-      "hex": "0602000d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d010600ec98a4ec9db47b68e5cf8b0100005f3e8a102b444c6d9e017a8b9c0d1e2f0204006d69726f8068e5cf8b010000",
+      "hex": "0602000d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d01000600ec98a4ec9db47b68e5cf8b0100005f3e8a102b444c6d9e017a8b9c0d1e2f020104006d69726f8068e5cf8b010000",
       "decoded": {
         "type": "layers",
         "participants": [
@@ -26,34 +27,38 @@
             "userId": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d",
             "sessionId": 1,
             "username": "오이",
-            "joinTimestamp": 1700000000123
+            "joinTimestamp": 1700000000123,
+            "isGuest": false
           },
           {
             "userId": "5f3e8a10-2b44-4c6d-9e01-7a8b9c0d1e2f",
             "sessionId": 2,
             "username": "miro",
-            "joinTimestamp": 1700000000128
+            "joinTimestamp": 1700000000128,
+            "isGuest": true
           }
         ]
       }
     },
     "chat": {
-      "hex": "030d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d7b68e5cf8b0100000600ec98a4ec9db41400eab7b8eba6bc20f09f8ea8207c20612070697065",
+      "hex": "030d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d7b68e5cf8b010000000600ec98a4ec9db41400eab7b8eba6bc20f09f8ea8207c20612070697065",
       "decoded": {
         "type": "chat",
         "userId": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d",
         "timestamp": 1700000000123,
         "username": "오이",
-        "message": "그림 🎨 | a pipe"
+        "message": "그림 🎨 | a pipe",
+        "isGuest": false
       }
     },
     "leave": {
-      "hex": "090d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d7b68e5cf8b0100000600ec98a4ec9db4",
+      "hex": "090d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d7b68e5cf8b010000010600ec98a4ec9db4",
       "decoded": {
         "type": "leave",
         "userId": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d",
         "timestamp": 1700000000123,
-        "username": "오이"
+        "username": "오이",
+        "isGuest": true
       }
     },
     "resetRequestQuery": {
@@ -118,7 +123,7 @@
     }
   },
   "sequenced": {
-    "hex": "0a70cad69702d04f64b7aea91bbbbf34040700000000000000030d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d7b68e5cf8b0100000600ec98a4ec9db41400eab7b8eba6bc20f09f8ea8207c20612070697065",
+    "hex": "0a70cad69702d04f64b7aea91bbbbf34040700000000000000030d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d7b68e5cf8b010000000600ec98a4ec9db41400eab7b8eba6bc20f09f8ea8207c20612070697065",
     "historyId": "70cad697-02d0-4f64-b7ae-a91bbbbf3404",
     "seq": 7,
     "payload": "chat"

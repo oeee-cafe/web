@@ -10,10 +10,11 @@
 use serde_json::Value;
 use uuid::Uuid;
 
+use super::guest::{Collaborator, FLAG_GUEST};
 use super::messages::{
     caught_up_frame, end_session_frame, handle_chat_message, replay_start_frame, reset_point_frame,
-    welcome_frame, ChatMessage, JoinMessage, LayersMessage, LeaveMessage, ResetPhase,
-    ResetRequestMessage,
+    welcome_frame, ChatMessage, JoinMessage, LayersMessage, LeaveMessage, PresentParticipant,
+    ResetPhase, ResetRequestMessage,
 };
 use super::utils::bytes_to_uuid;
 use super::websocket::{reset_snapshot_count, wrap_sequenced};
@@ -43,6 +44,15 @@ fn number(value: &Value) -> u64 {
     value.as_u64().expect("a number")
 }
 
+/// The flags byte a vector's `isGuest` stands for.
+fn flags(value: &Value) -> u8 {
+    if value["isGuest"].as_bool().expect("isGuest") {
+        FLAG_GUEST
+    } else {
+        0
+    }
+}
+
 /// What this server writes for the frame a vector describes, built from the
 /// fields the client is expected to decode out of it.
 fn server_frame(name: &str, d: &Value) -> Vec<u8> {
@@ -51,6 +61,7 @@ fn server_frame(name: &str, d: &Value) -> Vec<u8> {
         "join" => JoinMessage {
             user_id: uuid(&d["userId"]),
             timestamp: number(&d["timestamp"]),
+            flags: flags(d),
             username: text(&d["username"]),
         }
         .serialize(),
@@ -59,13 +70,12 @@ fn server_frame(name: &str, d: &Value) -> Vec<u8> {
                 .as_array()
                 .expect("participants")
                 .iter()
-                .map(|p| {
-                    (
-                        uuid(&p["userId"]),
-                        number(&p["sessionId"]) as u8,
-                        text(&p["username"]),
-                        number(&p["joinTimestamp"]) as i64,
-                    )
+                .map(|p| PresentParticipant {
+                    id: uuid(&p["userId"]),
+                    session_id: number(&p["sessionId"]) as u8,
+                    flags: flags(p),
+                    name: text(&p["username"]),
+                    joined_at: number(&p["joinTimestamp"]) as i64,
                 })
                 .collect(),
         }
@@ -73,6 +83,7 @@ fn server_frame(name: &str, d: &Value) -> Vec<u8> {
         "chat" => ChatMessage {
             user_id: uuid(&d["userId"]),
             timestamp: number(&d["timestamp"]),
+            flags: flags(d),
             username: text(&d["username"]),
             message: text(&d["message"]),
         }
@@ -80,6 +91,7 @@ fn server_frame(name: &str, d: &Value) -> Vec<u8> {
         "leave" => LeaveMessage {
             user_id: uuid(&d["userId"]),
             timestamp: number(&d["timestamp"]),
+            flags: flags(d),
             username: text(&d["username"]),
         }
         .serialize(),
@@ -148,7 +160,11 @@ fn the_server_reads_the_chat_the_client_sends() {
     let fields = &chat["fields"];
     let sender = uuid(&fields["userId"]);
 
-    let relayed = handle_chat_message(&bytes(chat), sender, "oeee").expect("accepted");
+    let guest = Collaborator::Guest {
+        id: sender,
+        nickname: "oeee".to_string(),
+    };
+    let relayed = handle_chat_message(&bytes(chat), &guest).expect("accepted");
     let axum::extract::ws::Message::Binary(relayed) = relayed else {
         panic!("a binary frame");
     };
@@ -157,9 +173,14 @@ fn the_server_reads_the_chat_the_client_sends() {
     assert_eq!(relayed.timestamp, number(&fields["timestamp"]));
     assert_eq!(relayed.message, text(&fields["message"]));
     assert_eq!(relayed.username, "oeee");
+    assert_eq!(relayed.flags, FLAG_GUEST, "the room is told it is a guest");
 
+    let someone_else = Collaborator::User {
+        id: Uuid::from_u128(1),
+        login_name: "someone".to_string(),
+    };
     assert!(
-        handle_chat_message(&bytes(chat), Uuid::from_u128(1), "someone").is_none(),
+        handle_chat_message(&bytes(chat), &someone_else).is_none(),
         "a chat claiming another sender is dropped"
     );
 }

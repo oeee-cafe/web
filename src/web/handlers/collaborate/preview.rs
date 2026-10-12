@@ -35,6 +35,7 @@ use crate::app_error::AppError;
 use crate::models::user::AuthSession;
 use crate::redis::RedisPool;
 use crate::web::state::AppState;
+use tower_sessions::Session;
 
 use super::redis_state::ACTIVITY_TTL;
 
@@ -403,6 +404,7 @@ pub async fn preview_versions(state: &AppState, room_uuids: &[Uuid]) -> Vec<Opti
 async fn viewer_may_watch(
     db: &sqlx::Pool<sqlx::Postgres>,
     room_uuid: Uuid,
+    // A participant id: an account's, or a guest's.
     viewer_user_id: Option<Uuid>,
     viewer_is_admin: bool,
 ) -> Result<bool, sqlx::Error> {
@@ -419,10 +421,10 @@ async fn viewer_may_watch(
               AND cs.ended_at IS NULL
               AND (
                 (cs.is_public AND (cs.community_id IS NULL OR c.visibility = 'public'))
-                OR cs.owner_id = $2
+                OR cs.owner_participant_id = $2
                 OR EXISTS(
                     SELECT 1 FROM collaborative_sessions_participants csp
-                    WHERE csp.session_id = cs.id AND csp.user_id = $2
+                    WHERE csp.session_id = cs.id AND csp.participant_id = $2
                 )
               )
         ) AS "exists!"
@@ -476,10 +478,10 @@ pub async fn viewer_is_participant(
             FROM collaborative_sessions cs
             WHERE cs.id = $1
               AND (
-                cs.owner_id = $2
+                cs.owner_participant_id = $2
                 OR EXISTS(
                     SELECT 1 FROM collaborative_sessions_participants csp
-                    WHERE csp.session_id = cs.id AND csp.user_id = $2
+                    WHERE csp.session_id = cs.id AND csp.participant_id = $2
                 )
               )
         ) AS "exists!"
@@ -505,7 +507,7 @@ async fn viewer_may_upload(
           AND EXISTS(
             SELECT 1 FROM collaborative_sessions_participants csp
             WHERE csp.session_id = cs.id
-              AND csp.user_id = $2
+              AND csp.participant_id = $2
               AND csp.is_active = true
           )
         "#,
@@ -539,11 +541,15 @@ pub struct PreviewClaimResponse {
 pub async fn claim_session_preview(
     Path(room_uuid): Path<Uuid>,
     auth_session: AuthSession,
+    session: Session,
     State(state): State<AppState>,
 ) -> Result<Response, AppError> {
-    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
+    let who = super::guest::current(auth_session.user.as_ref(), &session, &state.db_pool)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
 
-    let Some((width, height)) = viewer_may_upload(&state.db_pool, room_uuid, user.id).await? else {
+    let Some((width, height)) = viewer_may_upload(&state.db_pool, room_uuid, who.id()).await?
+    else {
         return Err(AppError::Forbidden);
     };
 
@@ -572,13 +578,17 @@ pub async fn claim_session_preview(
 pub async fn upload_session_preview(
     Path(room_uuid): Path<Uuid>,
     auth_session: AuthSession,
+    session: Session,
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response, AppError> {
-    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
+    let who = super::guest::current(auth_session.user.as_ref(), &session, &state.db_pool)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
 
-    let Some((width, height)) = viewer_may_upload(&state.db_pool, room_uuid, user.id).await? else {
+    let Some((width, height)) = viewer_may_upload(&state.db_pool, room_uuid, who.id()).await?
+    else {
         return Err(AppError::Forbidden);
     };
 
@@ -666,12 +676,21 @@ const MAX_DIAGNOSTICS_PER_SESSION: i64 = 50;
 pub async fn report_session_diagnostics(
     Path(room_uuid): Path<Uuid>,
     auth_session: AuthSession,
+    session: Session,
     State(state): State<AppState>,
     body: Bytes,
 ) -> Result<Response, AppError> {
-    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
+    let who = super::guest::current(auth_session.user.as_ref(), &session, &state.db_pool)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
+    // What the report is filed under in the bucket. A guest's name is
+    // whatever they typed, which is no part of an object key.
+    let reporter = match &who {
+        super::guest::Collaborator::User { login_name, .. } => login_name.clone(),
+        super::guest::Collaborator::Guest { id, .. } => format!("guest-{id}"),
+    };
 
-    if !viewer_is_participant(&state.db_pool, room_uuid, user.id).await? {
+    if !viewer_is_participant(&state.db_pool, room_uuid, who.id()).await? {
         return Err(AppError::Forbidden);
     }
     if body.len() > super::archive::MAX_DIAGNOSTIC_BYTES {
@@ -684,7 +703,7 @@ pub async fn report_session_diagnostics(
     // under junk with the same prefix.
     let mut redis = state.redis_pool.get().await?;
     let admitted: Option<String> = redis::cmd("SET")
-        .arg(format!("oeee:diagnostic_rate:{room_uuid}:{}", user.id))
+        .arg(format!("oeee:diagnostic_rate:{room_uuid}:{}", who.id()))
         .arg("1")
         .arg("NX")
         .arg("EX")
@@ -699,7 +718,7 @@ pub async fn report_session_diagnostics(
     {
         warn!(
             "Dropping a report from {} for room {}: already holds {}",
-            user.login_name, room_uuid, MAX_DIAGNOSTICS_PER_SESSION
+            reporter, room_uuid, MAX_DIAGNOSTICS_PER_SESSION
         );
         return Ok(StatusCode::NO_CONTENT.into_response());
     }
@@ -712,12 +731,11 @@ pub async fn report_session_diagnostics(
         ));
     }
 
-    match super::archive::store_diagnostic(&state, room_uuid, &user.login_name, body.to_vec()).await
-    {
+    match super::archive::store_diagnostic(&state, room_uuid, &reporter, body.to_vec()).await {
         Ok(Some(key)) => {
             warn!(
                 "Stored a synchronization report from {} for room {} at {}",
-                user.login_name, room_uuid, key
+                reporter, room_uuid, key
             );
             // Counted where the admin list can see it, which is what makes a
             // reported session stand out there.
@@ -744,10 +762,14 @@ pub async fn report_session_diagnostics(
 pub async fn serve_session_preview(
     Path(room_uuid): Path<Uuid>,
     auth_session: AuthSession,
+    session: Session,
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    let viewer_user_id = auth_session.user.as_ref().map(|user| user.id);
+    let viewer_user_id =
+        super::guest::current(auth_session.user.as_ref(), &session, &state.db_pool)
+            .await?
+            .map(|who| who.id());
     let viewer_is_admin = auth_session
         .user
         .as_ref()

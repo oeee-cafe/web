@@ -30,6 +30,7 @@ type AddMessage = (message: {
   type: "join" | "leave" | "user";
   userId: string;
   username: string;
+  isGuest: boolean;
   message: string;
   timestamp: number;
 }) => void;
@@ -65,6 +66,7 @@ async function renderChat() {
       type: "user",
       userId: "2",
       username: "someone",
+      isGuest: false,
       message: "worth copying",
       timestamp: Date.now(),
     });

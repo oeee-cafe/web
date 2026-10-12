@@ -412,6 +412,8 @@ pub struct AdminCollaborativeSession {
     pub id: Uuid,
     pub title: Option<String>,
     pub owner_login_name: String,
+    /// A guest opened it; there is no profile to link.
+    pub owner_is_guest: bool,
     pub width: i32,
     pub height: i32,
     pub max_participants: i32,
@@ -500,7 +502,8 @@ async fn find_collaborative_sessions(
         SELECT
             cs.id,
             cs.title,
-            u.login_name AS owner_login_name,
+            COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
+            cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.width,
             cs.height,
             cs.max_participants,
@@ -512,8 +515,8 @@ async fn find_collaborative_sessions(
             cs.last_activity,
             cs.ended_at,
             cs.saved_post_id,
-            COUNT(csp.user_id) FILTER (WHERE csp.is_active) AS "active_participant_count!",
-            COUNT(csp.user_id) AS "total_participant_count!",
+            COUNT(csp.participant_id) FILTER (WHERE csp.is_active) AS "active_participant_count!",
+            COUNT(csp.participant_id) AS "total_participant_count!",
             r.session_id AS "recorded?",
             r.first_seq AS "first_seq?",
             r.last_seq AS "last_seq?",
@@ -527,7 +530,8 @@ async fn find_collaborative_sessions(
             r.check_note AS "check_note?",
             r.checked_at AS "checked_at?"
         FROM collaborative_sessions cs
-        JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN collaborative_guests g ON cs.owner_guest_id = g.id
         LEFT JOIN communities c ON cs.community_id = c.id
         LEFT JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
         LEFT JOIN collaborative_session_recordings r ON r.session_id = cs.id
@@ -536,7 +540,7 @@ async fn find_collaborative_sessions(
            OR ($1 = 'ended' AND cs.ended_at IS NOT NULL)
            OR ($1 = 'flagged' AND (r.reports > 0 OR r.check_outcome = 'differs')))
           AND ($5::uuid IS NULL OR cs.id = $5)
-        GROUP BY cs.id, u.login_name, c.slug, c.name, c.visibility, r.session_id
+        GROUP BY cs.id, u.login_name, g.nickname, c.slug, c.name, c.visibility, r.session_id
         ORDER BY
             CASE WHEN $2 = 'created' THEN cs.created_at END DESC,
             CASE WHEN $2 = 'name' THEN cs.title END ASC NULLS LAST,
@@ -558,6 +562,7 @@ async fn find_collaborative_sessions(
             id: row.id,
             title: row.title,
             owner_login_name: row.owner_login_name,
+            owner_is_guest: row.owner_is_guest,
             width: row.width,
             height: row.height,
             max_participants: row.max_participants,
@@ -592,9 +597,13 @@ async fn find_collaborative_sessions(
 /// Somebody who has been in a session, as its inspector lists them.
 #[derive(Clone, Debug, Serialize)]
 pub struct AdminSessionParticipant {
+    /// The participant id: an account's, or a guest's.
     pub user_id: Uuid,
+    /// The account's login name, or the name a guest gave.
     pub login_name: String,
     pub display_name: String,
+    /// No account and no profile, only the name.
+    pub is_guest: bool,
     pub joined_at: chrono::NaiveDateTime,
     pub left_at: Option<chrono::NaiveDateTime>,
     pub is_active: bool,
@@ -609,14 +618,16 @@ pub async fn find_collaborative_session_participants(
         AdminSessionParticipant,
         r#"
         SELECT
-            csp.user_id,
-            u.login_name,
-            u.display_name,
+            csp.participant_id AS user_id,
+            COALESCE(u.login_name, g.nickname) AS "login_name!",
+            COALESCE(u.display_name, g.nickname) AS "display_name!",
+            csp.guest_id IS NOT NULL AS "is_guest!",
             csp.joined_at,
             csp.left_at,
             csp.is_active
         FROM collaborative_sessions_participants csp
-        JOIN users u ON csp.user_id = u.id
+        LEFT JOIN users u ON csp.user_id = u.id
+        LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
         WHERE csp.session_id = $1
         ORDER BY csp.joined_at
         "#,

@@ -163,6 +163,7 @@ drafts-local-delete-confirm = 要从此设备上删除这幅画吗？删除后�
 drafts-local-community-denied = 此账号无法在该社区发布。要作为个人画作发布吗？
 drafts-local-post-failed = 无法发布这幅画。它仍保存在此设备上。
 drafts-local-unavailable = 此设备无法保存画作，因此未登录时保存的画作不会显示在这里。
+drafts-local-collaboration-not-yours = 这幅画来自另一个账号拥有的会话，无法用此账号发布。它仍保存在此设备上。
 
 post-created-at = 创作时间
 post-published-at = 发布时间
@@ -287,6 +288,13 @@ community-draw-together = 一起画画
 collaborate-session-created = 创建于
 collaborate-join-session = 加入会话
 collaborate-session-preview-alt = 此画布的当前状态
+collaborate-guest-badge = 访客
+collaborate-guest-nickname-label = 你的名字
+collaborate-guest-nickname-hint = 你将以访客身份绘画。之后登录的话，你画的内容会转到你的账号。
+collaborate-sign-in-instead = 改为登录
+collaborate-guest-community-hint = 访客只能选择公开社区。
+collaborate-allow-guests-label = 允许没有账号的人加入
+collaborate-allow-guests-description = 访客自己取名，名字出现的地方都会标明是访客。
 
 welcome = 欢迎，{ $name }！
 

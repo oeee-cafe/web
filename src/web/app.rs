@@ -22,8 +22,9 @@ use crate::web::handlers::admin::{
 };
 use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, require_login, signup};
 use crate::web::handlers::collaborate::{
-    claim_session_preview, collaborate_lobby, collaborate_sessions_fragment,
-    create_collaborative_session_form, discord_join, get_auth_info, get_collaboration_meta,
+    ban_collaborative_participant, become_collaboration_guest, claim_session_preview,
+    collaborate_lobby, collaborate_sessions_fragment, create_collaborative_session_form,
+    discord_join, end_collaborative_session, get_auth_info, get_collaboration_meta,
     load_more_collaborative_posts, report_session_diagnostics, save_collaborative_session,
     serve_collaborative_app, serve_session_preview, upload_session_preview,
     websocket_collaborate_handler,
@@ -525,6 +526,9 @@ impl App {
             // Static segment, so it wins over /collaborate/:uuid — and no UUID
             // can spell "sessions" anyway.
             .route("/collaborate/sessions", get(collaborate_sessions_fragment))
+            // Becoming a guest, for somebody without an account: a name, kept
+            // in their browser session (collaborate/guest.rs).
+            .route("/collaborate/guest", post(become_collaboration_guest))
             .route("/collaborate/", get(serve_collaborative_app))
             .route(
                 "/collaborate/{uuid}",
@@ -535,6 +539,12 @@ impl App {
                     )),
             )
             .route("/collaborate/{uuid}/ws", get(websocket_collaborate_handler))
+            // The owner's: ending without a post, and sending somebody out.
+            .route("/collaborate/{uuid}/end", post(end_collaborative_session))
+            .route(
+                "/collaborate/{uuid}/participants/{participant_id}/ban",
+                post(ban_collaborative_participant),
+            )
             // What the room's canvas looks like right now, rendered by a
             // participant's browser because the server cannot draw. See
             // handlers/collaborate/preview.rs.

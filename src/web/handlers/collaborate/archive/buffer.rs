@@ -126,8 +126,13 @@ pub struct ArchivedChat {
     /// what the chat frame carries, and the transcript is read against the
     /// recording's timeline rather than used to order anything.
     pub at: u64,
+    /// The participant id: an account's or a guest's.
     pub user_id: Uuid,
+    /// An account's login name, or the name a guest gave.
     pub login_name: String,
+    /// Absent from lines kept before guests could chat, all of which were
+    /// an account's; whatever reads a transcript takes absent as false.
+    pub is_guest: bool,
     pub message: String,
 }
 
@@ -150,6 +155,7 @@ pub async fn record_chat(state: &AppState, room_uuid: Uuid, frame: &[u8]) {
         at: chat.timestamp,
         user_id: chat.user_id,
         login_name: chat.username,
+        is_guest: chat.flags & crate::web::handlers::collaborate::guest::FLAG_GUEST != 0,
         message: chat.message,
     };
     let encoded = match serde_json::to_string(&line) {

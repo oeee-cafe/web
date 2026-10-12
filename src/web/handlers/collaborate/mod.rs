@@ -1,5 +1,6 @@
 pub mod archive;
 pub mod db;
+pub mod guest;
 pub mod http_handlers;
 pub mod messages;
 pub mod preview;

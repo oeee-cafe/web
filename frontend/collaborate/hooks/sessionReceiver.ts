@@ -29,6 +29,8 @@ export interface ChatLine {
   type: "user" | "join" | "leave";
   userId: string;
   username: string;
+  /** Said by somebody without an account, whose name may be anybody's. */
+  isGuest: boolean;
   message: string;
   timestamp: number;
 }
@@ -37,7 +39,13 @@ export interface ReceiverHandlers {
   onSynchronizationError: (error: Error | null) => void;
   createOrUpdateCursor: (userId: string, x: number, y: number, username: string) => void;
   hideCursor: (userId: string) => void;
-  addParticipant: (userId: string, username: string, joinedAt: number, sessionId?: number) => void;
+  addParticipant: (
+    userId: string,
+    username: string,
+    joinedAt: number,
+    sessionId?: number,
+    isGuest?: boolean,
+  ) => void;
   clearParticipants: () => void;
   addChatMessage: (message: ChatLine) => void;
   /**
@@ -487,6 +495,7 @@ export class SessionReceiver {
           type: "join",
           userId: message.userId,
           username: message.username,
+          isGuest: message.isGuest,
           message: `${message.username} joined`,
           timestamp: message.timestamp,
         });
@@ -499,6 +508,7 @@ export class SessionReceiver {
           type: "leave",
           userId: message.userId,
           username: message.username,
+          isGuest: message.isGuest,
           message: `${message.username} left the session`,
           timestamp: message.timestamp,
         });
@@ -514,6 +524,7 @@ export class SessionReceiver {
           type: "user",
           userId: message.userId,
           username: message.username,
+          isGuest: message.isGuest,
           message: message.message,
           timestamp: message.timestamp,
         });
@@ -531,6 +542,7 @@ export class SessionReceiver {
             participant.username,
             participant.joinTimestamp,
             participant.sessionId > 0 ? participant.sessionId : undefined,
+            participant.isGuest,
           );
           if (participant.sessionId > 0) {
             this.idNames.set(participant.sessionId, participant.username);
@@ -553,10 +565,10 @@ export class SessionReceiver {
       }
 
       case "endSession": {
-        if (message.postUrl) {
-          link.shouldConnect = false;
-          handlers.onSessionEnded(message.postUrl);
-        }
+        // An empty URL is a session that ended without a post: a guest owner
+        // kept it on their device. Over all the same.
+        link.shouldConnect = false;
+        handlers.onSessionEnded(message.postUrl);
         break;
       }
 

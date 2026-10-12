@@ -25,7 +25,12 @@ const OWNER_INDEX = "owner";
 /** The owner of a drawing saved while signed out. IndexedDB cannot index null. */
 export const GUEST_OWNER = "";
 
-export type LocalDraftTool = "neo-cucumber-offline" | "cucumber";
+/**
+ * `collaborative` is a session a guest owned and kept here when it ended
+ * (frontend/collaborate/App.tsx): no replay, and posted by saving the session
+ * rather than by an upload.
+ */
+export type LocalDraftTool = "neo-cucumber-offline" | "cucumber" | "collaborative";
 
 export interface LocalDraft {
   /** Sent as `client_draft_id`, so an upload that arrives twice makes one post. */
@@ -47,6 +52,13 @@ export interface LocalDraft {
   communityId: string | null;
   communityName: string | null;
   parentPostId: string | null;
+  /**
+   * The collaborative session this is the canvas of, when it is one. Posting
+   * it saves that session (`POST /collaborate/{id}`), which the account the
+   * guest signed in to now owns. Absent from every other drawing, and from
+   * drafts kept before collaborative ones could be.
+   */
+  collaborativeSessionId?: string;
 }
 
 function request<T>(req: IDBRequest<T>): Promise<T> {

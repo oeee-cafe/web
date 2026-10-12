@@ -5,7 +5,7 @@ import {
   caughtUp, concat, HISTORY_ID, replayBatch, replayStart, sequenced, stroke, u64, uuidBytes,
   welcome,
 } from "../test/frames";
-import { encodeEndSession, encodeMovePointer, encodePointerUp, MSG_TYPE } from "../binaryProtocol";
+import { encodeEndSession, encodeMovePointer, encodePointerUp, FLAG_GUEST, MSG_TYPE } from "../binaryProtocol";
 
 /**
  * The frames of a session, handed to the receiver one at a time, with the
@@ -23,8 +23,8 @@ const OTHER_HISTORY = "1a2b3c4d-0000-4000-8000-000000000001";
 const frame = (bytes: Uint8Array): ArrayBuffer =>
   bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-/** LAYERS with one participant, as the server spells it. */
-const layers = (userId: string, sessionId: number, name: string) => {
+/** LAYERS with one participant, as the server spells it; an account unless `flags` says not. */
+const layers = (userId: string, sessionId: number, name: string, flags = 0) => {
   const nameBytes = new TextEncoder().encode(name);
   const head = new Uint8Array(3);
   head[0] = MSG_TYPE.LAYERS;
@@ -32,7 +32,7 @@ const layers = (userId: string, sessionId: number, name: string) => {
   const nameLength = new Uint8Array(2);
   new DataView(nameLength.buffer).setUint16(0, nameBytes.length, true);
   return concat(
-    head, uuidBytes(userId), Uint8Array.from([sessionId]), nameLength, nameBytes, u64(1000),
+    head, uuidBytes(userId), Uint8Array.from([sessionId, flags]), nameLength, nameBytes, u64(1000),
   );
 };
 
@@ -339,6 +339,13 @@ describe("a live session", () => {
     expect(page.calledWith("onCanvasMessage")).toEqual([]);
   });
 
+  it("ends a session a guest owner kept on their device, which has no post to go to", async () => {
+    const kept = await live();
+    await kept.receive(new Uint8Array(encodeEndSession("c9b8321d-9ae7-4872-959f-4ec6b3881197", "")));
+    expect(kept.calledWith("onSessionEnded")).toEqual(['onSessionEnded("")']);
+    expect(kept.link.shouldConnect).toBe(false);
+  });
+
   it("asks for no more connections once the session has ended or expired", async () => {
     const ended = await live();
     await ended.receive(new Uint8Array(encodeEndSession("c9b8321d-9ae7-4872-959f-4ec6b3881197", "/@oeee/42")));
@@ -352,12 +359,20 @@ describe("a live session", () => {
     expect(expired.link.connection).toBe("disconnected");
   });
 
+  it("tells the page which of the people in LAYERS are guests", async () => {
+    const page = await live();
+    await page.receive(layers("aaaaaaaa-0000-4000-8000-000000000003", 3, "miro", FLAG_GUEST));
+    expect(page.calledWith("addParticipant")).toEqual([
+      'addParticipant("aaaaaaaa-0000-4000-8000-000000000003","miro",1000,3,true)',
+    ]);
+  });
+
   it("puts a remote stroke's cursor where the stroke ended, under the name LAYERS gave", async () => {
     const page = await live();
     await page.receive(layers("aaaaaaaa-0000-4000-8000-000000000002", 2, "bob"));
     expect(page.calledWith("clearParticipants")).toHaveLength(1);
     expect(page.calledWith("addParticipant")).toEqual([
-      'addParticipant("aaaaaaaa-0000-4000-8000-000000000002","bob",1000,2)',
+      'addParticipant("aaaaaaaa-0000-4000-8000-000000000002","bob",1000,2,false)',
     ]);
     await page.receive(sequenced(1, stroke(2, { x: 20, y: 30 })));
     expect(page.calledWith("createOrUpdateCursor")).toEqual(['createOrUpdateCursor("2",23,30,"bob")']);

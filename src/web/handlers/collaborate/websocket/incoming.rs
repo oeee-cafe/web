@@ -17,6 +17,7 @@ pub(super) async fn handle_incoming_messages(
     receiver: &mut futures_util::stream::SplitStream<WebSocket>,
     ctx: SessionContext<'_>,
     close_tx: &std::sync::Arc<std::sync::Mutex<Option<tokio::sync::oneshot::Sender<Goodbye>>>>,
+    removed: &tokio::sync::Notify,
 ) {
     let mut pending_reset: Option<PendingReset> = None;
 
@@ -33,6 +34,8 @@ pub(super) async fn handle_incoming_messages(
                 );
                 break;
             }
+            // The owner removed this connection; nothing more it sends counts.
+            _ = removed.notified() => break,
             msg = receiver.next() => match msg {
                 Some(msg) => msg,
                 None => break,
@@ -241,20 +244,12 @@ async fn process_server_message(
     match msg_type {
         0x01 => {
             // The frame the room hears is the one the handler builds, carrying
-            // the login name this connection authenticated with. The client's
-            // own 25 bytes are the bare join -- uuid and timestamp, no name --
-            // and every client's decoder refuses a JOIN shorter than 27, so
-            // re-broadcasting those meant nobody was ever told who joined.
-            // JOIN is ephemeral: broadcast, never stored.
-            messages::handle_join_message(
-                data,
-                ctx.user_id,
-                ctx.user_login_name,
-                ctx.room_uuid,
-                ctx.db,
-                ctx.state,
-            )
-            .await
+            // the name and flags this connection authenticated with. The
+            // client's own 25 bytes are the bare join -- uuid and timestamp,
+            // no name -- and every client's decoder refuses a JOIN shorter
+            // than 28, so re-broadcasting those meant nobody was ever told who
+            // joined. JOIN is ephemeral: broadcast, never stored.
+            messages::handle_join_message(data, ctx.who, ctx.room_uuid, ctx.db, ctx.state).await
         }
         0x02 => {
             // A snapshot is a layer of a checkpoint, and a checkpoint arrives
@@ -268,7 +263,7 @@ async fn process_server_message(
             );
             None
         }
-        0x03 => messages::handle_chat_message(data, ctx.user_id, ctx.user_login_name),
+        0x03 => messages::handle_chat_message(data, ctx.who),
         0x04 => {
             // An answer to a checkpoint query. It is between this connection
             // and the server; nobody else in the room needs to hear it.

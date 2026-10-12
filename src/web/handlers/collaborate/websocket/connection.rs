@@ -5,6 +5,7 @@ use crate::web::state::AppState;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+use crate::web::handlers::collaborate::guest::Collaborator;
 use crate::web::handlers::collaborate::{db, redis_messages};
 
 use super::HEARTBEAT_INTERVAL;
@@ -77,8 +78,8 @@ pub(super) enum JoinFailure {
 pub(super) async fn setup_connection(
     db: &sqlx::Pool<sqlx::Postgres>,
     room_uuid: Uuid,
-    user_id: Uuid,
-    user_login_name: &str,
+    who: &Collaborator,
+    ip: Option<&str>,
     connection_id: &str,
     state: &AppState,
 ) -> Result<
@@ -101,14 +102,20 @@ pub(super) async fn setup_connection(
         }
     };
 
+    let user_id = who.id();
+    let user_login_name = who.name();
+
     // Before a seat is taken: a session in a private community is for its
-    // members, and a refused join must leave nothing behind.
-    match db::viewer_may_enter(db, room_uuid, user_id).await {
+    // members, one that does not allow guests is for accounts, somebody the
+    // owner banned stays out, and a refused join must leave nothing behind.
+    match db::viewer_may_enter(db, room_uuid, Some(who), ip).await {
         Ok(true) => {}
         Ok(false) => {
             info!(
-                "User {} refused from session {}: not a member of its community",
-                user_login_name, room_uuid
+                "{} {} refused from session {}: not allowed in",
+                if who.is_guest() { "Guest" } else { "User" },
+                user_login_name,
+                room_uuid
             );
             return Err(JoinFailure::Refused);
         }
@@ -122,7 +129,7 @@ pub(super) async fn setup_connection(
     let join_success = match db::track_participant_with_capacity_check(
         db,
         room_uuid,
-        user_id,
+        who,
         session_info.max_participants,
     )
     .await
@@ -166,8 +173,7 @@ pub(super) async fn setup_connection(
 
     // Atomically handle all connection management
     let connection_info =
-        setup_connection_atomically(state, room_uuid, user_id, connection_id, user_login_name)
-            .await;
+        setup_connection_atomically(state, room_uuid, who, ip, connection_id).await;
 
     Ok((
         session_info.owner_id == user_id,
@@ -228,10 +234,11 @@ pub(super) async fn user_has_other_connection(
 async fn setup_connection_atomically(
     state: &AppState,
     room_uuid: Uuid,
-    user_id: Uuid,
+    who: &Collaborator,
+    ip: Option<&str>,
     connection_id: &str,
-    user_login_name: &str,
 ) -> crate::web::handlers::collaborate::redis_state::ConnectionInfo {
+    let user_login_name = who.name();
     // With pure Redis Pub/Sub, we don't need local room tracking
     // Each connection is independent with its own Redis subscriber
 
@@ -243,9 +250,11 @@ async fn setup_connection_atomically(
     // Register connection in Redis
     let connection_info = crate::web::handlers::collaborate::redis_state::ConnectionInfo {
         connection_id: connection_id.to_string(),
-        user_id,
+        user_id: who.id(),
         room_id: room_uuid,
         user_login_name: user_login_name.to_string(),
+        is_guest: who.is_guest(),
+        ip: ip.map(str::to_string),
         server_instance: state.redis_state.get_server_instance_id().to_string(),
         connected_at: now_secs(),
         last_heartbeat: now_secs(),

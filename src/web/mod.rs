@@ -6,6 +6,7 @@ pub mod htmx;
 pub mod i18n;
 pub mod language;
 pub mod presence;
+pub mod rate_limit;
 pub mod responses;
 pub mod session_store;
 pub mod state;

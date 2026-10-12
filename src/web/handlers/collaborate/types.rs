@@ -9,6 +9,9 @@ pub struct CreateSessionRequest {
     pub is_public: bool,
     pub max_participants: i32,
     pub community_id: Option<String>,
+    /// Whether people without an account may come in. On unless the owner
+    /// turned it off.
+    pub allow_guests: bool,
 }
 
 #[derive(Serialize)]
@@ -21,7 +24,10 @@ pub struct SaveSessionResponse {
 #[derive(Serialize)]
 pub struct SessionWithCounts {
     pub id: Uuid,
+    /// The owner's login name, or the name a guest owner gave.
     pub owner_login_name: String,
+    /// A guest owner has no profile for the card to link to.
+    pub owner_is_guest: bool,
     pub title: Option<String>,
     pub width: i32,
     pub height: i32,
@@ -52,10 +58,15 @@ pub struct SessionWithCounts {
     pub preview_version: Option<u64>,
 }
 
+/// Who the collaborative page is talking to. A browser that is neither
+/// signed in nor a guest yet has no `user_id` and is asked for a name.
 #[derive(Serialize)]
 pub struct AuthInfo {
-    pub user_id: String,
-    pub login_name: String,
+    /// The participant id: an account's, or the guest's.
+    pub user_id: Option<String>,
+    /// The account's login name, or the guest's chosen name.
+    pub login_name: Option<String>,
+    pub is_guest: bool,
     pub preferred_locale: String,
 }
 
@@ -74,6 +85,15 @@ pub struct CollaborationMeta {
     pub saved_post_url: Option<String>,
     #[serde(rename = "ownerLoginName")]
     pub owner_login_name: String,
+    /// A guest opened it. Such a session cannot become a post until its owner
+    /// has an account; until then the owner keeps it on their device.
+    #[serde(rename = "ownerIsGuest")]
+    pub owner_is_guest: bool,
+    /// Whether somebody without an account may come in -- the owner's choice
+    /// and the community's visibility together, as `viewer_may_enter` reads
+    /// them.
+    #[serde(rename = "guestsWelcome")]
+    pub guests_welcome: bool,
     #[serde(rename = "maxUsers")]
     pub max_users: i32,
     #[serde(rename = "currentUserCount")]

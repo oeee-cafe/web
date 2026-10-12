@@ -4,6 +4,11 @@ import { ModalWrapper } from "./ModalWrapper";
 
 export interface SaveConfirmationModalProps {
   isOpen: boolean;
+  /**
+   * A guest owner's save: the drawing goes into this device's drafts rather
+   * than the gallery, to be posted once they sign in.
+   */
+  toDevice?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,29 +24,38 @@ export interface SaveConfirmationModalProps {
  */
 export const SaveConfirmationModal = ({
   isOpen,
+  toDevice = false,
   onConfirm,
   onCancel,
 }: SaveConfirmationModalProps) => {
   return (
     <ModalWrapper
       isOpen={isOpen}
-      title={<Trans>Save to Gallery</Trans>}
+      title={toDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}
       className="max-w-md"
       zIndex="z-[99999]"
       onBackdropClick={onCancel}
     >
       <p className="mb-[12px]">
-        <Trans>
-          Save this drawing to the gallery? The session ends for everyone and
-          nobody can keep drawing on it afterwards.
-        </Trans>
+        {toDevice ? (
+          <Trans>
+            Keep this drawing on this device? The session ends for everyone and
+            nobody can keep drawing on it afterwards. Sign in to post it from
+            your drafts.
+          </Trans>
+        ) : (
+          <Trans>
+            Save this drawing to the gallery? The session ends for everyone and
+            nobody can keep drawing on it afterwards.
+          </Trans>
+        )}
       </p>
       <div className="flex justify-center gap-[6px]">
         <button type="button" onClick={onCancel} className={NEO_BUTTON}>
           <Trans>Cancel</Trans>
         </button>
         <button type="button" onClick={onConfirm} className={NEO_BUTTON} data-haptic="medium">
-          <Trans>Save to Gallery</Trans>
+          {toDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}
         </button>
       </div>
     </ModalWrapper>

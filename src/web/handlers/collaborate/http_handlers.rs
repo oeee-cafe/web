@@ -4,15 +4,18 @@ use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
 use crate::web::i18n::{ExtractAcceptLanguage, ExtractFtlLang};
 use crate::web::presence::{joined_room, Activity, Presence};
+use crate::web::rate_limit;
 use crate::web::state::AppState;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Response};
 use minijinja::context;
+use tower_sessions::Session;
 use uuid::Uuid;
 
 use super::db;
+use super::guest::{self, Collaborator};
 use super::preview::preview_versions;
 use super::types::*;
 use super::utils::get_preferred_locale;
@@ -51,46 +54,96 @@ fn canvas_size_options() -> Vec<(String, String, bool)> {
         .collect()
 }
 
+/// Who the collaborative page is: the account, the guest this browser
+/// already is, or nobody yet -- which the page answers by asking for a name.
 pub async fn get_auth_info(
     auth_session: AuthSession,
+    session: Session,
+    State(state): State<AppState>,
     ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
-) -> impl IntoResponse {
-    match auth_session.user {
-        Some(user) => {
-            let preferred_locale =
-                get_preferred_locale(user.preferred_language.clone(), &accept_language);
+) -> Result<Json<AuthInfo>, AppError> {
+    let preferred_language = auth_session
+        .user
+        .as_ref()
+        .and_then(|user| user.preferred_language.clone());
+    let preferred_locale = get_preferred_locale(preferred_language, &accept_language);
+    let who = guest::current(auth_session.user.as_ref(), &session, &state.db_pool).await?;
+    Ok(Json(AuthInfo {
+        user_id: who.as_ref().map(|who| who.id().to_string()),
+        login_name: who.as_ref().map(|who| who.name().to_string()),
+        is_guest: who.as_ref().is_none_or(Collaborator::is_guest),
+        preferred_locale,
+    }))
+}
 
-            (
-                StatusCode::OK,
-                Json(AuthInfo {
-                    user_id: user.id.to_string(),
-                    login_name: user.login_name.to_string(),
-                    preferred_locale,
-                }),
-            )
-                .into_response()
-        }
-        None => (
-            StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({
-                "error": "Authentication required"
-            })),
-        )
-            .into_response(),
+/// How many guests one address may make, or rename, in [`GUEST_WINDOW`].
+/// A person makes one and renames it now and then; a classroom behind one
+/// address makes thirty.
+const GUESTS_PER_WINDOW: i64 = 40;
+const GUEST_WINDOW: u64 = 60 * 60;
+
+#[derive(serde::Deserialize)]
+pub struct GuestForm {
+    nickname: String,
+}
+
+/// POST /collaborate/guest: makes this browser a guest called `nickname`, or
+/// renames the guest it is. Somebody signed in is already somebody.
+pub async fn become_collaboration_guest(
+    auth_session: AuthSession,
+    session: Session,
+    headers: HeaderMap,
+    State(state): State<AppState>,
+    Json(form): Json<GuestForm>,
+) -> Result<Response, AppError> {
+    if auth_session.user.is_some() {
+        return Err(AppError::BadRequest(
+            "signed in already; a guest is for somebody without an account".to_string(),
+        ));
     }
+    if !guest_admitted(&state, &headers).await {
+        return Ok(StatusCode::TOO_MANY_REQUESTS.into_response());
+    }
+    let who = guest::become_guest(&session, &state.db_pool, &form.nickname).await?;
+    Ok(Json(AuthInfo {
+        user_id: Some(who.id().to_string()),
+        login_name: Some(who.name().to_string()),
+        is_guest: true,
+        preferred_locale: String::new(),
+    })
+    .into_response())
+}
+
+/// Whether this address may make another guest or another guest's session.
+async fn guest_admitted(state: &AppState, headers: &HeaderMap) -> bool {
+    let ip = rate_limit::client_ip(headers).unwrap_or_else(|| "unknown".to_string());
+    rate_limit::admitted(
+        &state.redis_pool,
+        &format!("oeee:collaborate-guest-rate:{ip}"),
+        GUESTS_PER_WINDOW,
+        GUEST_WINDOW,
+    )
+    .await
 }
 
 pub async fn get_collaboration_meta(
     Path(session_uuid): Path<Uuid>,
     auth_session: AuthSession,
+    session: Session,
+    headers: HeaderMap,
     State(state): State<AppState>,
 ) -> Result<Json<CollaborationMeta>, AppError> {
-    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
-
     let db = &state.db_pool;
+    let who = guest::current(auth_session.user.as_ref(), &session, db).await?;
+    let ip = rate_limit::client_ip(&headers);
 
-    if !db::viewer_may_enter(db, session_uuid, user.id).await? {
-        return Err(AppError::Forbidden);
+    // Somebody with no name yet is asked whether they could come in as a
+    // guest, which is what they would be.
+    if !db::viewer_may_enter(db, session_uuid, who.as_ref(), ip.as_deref()).await? {
+        return Err(match who {
+            Some(_) => AppError::Forbidden,
+            None => AppError::Unauthorized,
+        });
     }
 
     // Ended sessions answer too. The page opens on this, and for a session
@@ -99,10 +152,15 @@ pub async fn get_collaboration_meta(
     // in the moment before it went, the owner reloading after a save.
     let session = sqlx::query!(
         r#"
-        SELECT cs.title, cs.width, cs.height, cs.owner_id, cs.saved_post_id, cs.max_participants,
-               cs.ended_at, u.login_name as owner_login_name
+        SELECT cs.title, cs.width, cs.height, cs.owner_participant_id, cs.saved_post_id,
+               cs.max_participants, cs.ended_at,
+               COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
+               cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
+               cs.allow_guests AND (c.id IS NULL OR c.visibility = 'public') AS "guests_welcome!"
         FROM collaborative_sessions cs
-        JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN collaborative_guests g ON cs.owner_guest_id = g.id
+        LEFT JOIN communities c ON cs.community_id = c.id
         WHERE cs.id = $1
         "#,
         session_uuid
@@ -111,16 +169,7 @@ pub async fn get_collaboration_meta(
     .await?
     .ok_or_else(|| AppError::NotFound("Session".to_string()))?;
 
-    let user_count = sqlx::query_scalar!(
-        r#"
-        SELECT COUNT(DISTINCT user_id) as "count!"
-        FROM collaborative_sessions_participants
-        WHERE session_id = $1 AND is_active = true
-        "#,
-        session_uuid
-    )
-    .fetch_one(db)
-    .await?;
+    let user_count = db::get_active_user_count(db, session_uuid).await?;
 
     let saved_post_url = db::saved_post_path(db, session_uuid).await?;
 
@@ -130,10 +179,12 @@ pub async fn get_collaboration_meta(
             .unwrap_or_else(|| "Untitled Collaboration".to_string()),
         width: session.width,
         height: session.height,
-        owner_id: session.owner_id.to_string(),
+        owner_id: session.owner_participant_id.to_string(),
         saved_post_id: session.saved_post_id.map(|id| id.to_string()),
         saved_post_url,
         owner_login_name: session.owner_login_name,
+        owner_is_guest: session.owner_is_guest,
+        guests_welcome: session.guests_welcome,
         max_users: session.max_participants,
         current_user_count: user_count,
         ended: session.ended_at.is_some(),
@@ -157,13 +208,14 @@ const SESSION_LIST_LIMIT: i64 = 20;
 /// viewer is already a participant — is exactly the case that vanished.
 async fn find_public_sessions(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    viewer_user_id: Option<Uuid>,
+    viewer_id: Option<Uuid>,
 ) -> Result<Vec<SessionWithCounts>, AppError> {
     let rows = sqlx::query!(
         r#"
         SELECT
             cs.id,
-            u.login_name AS owner_login_name,
+            COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
+            cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.title,
             cs.width,
             cs.height,
@@ -172,23 +224,25 @@ async fn find_public_sessions(
             cs.is_public,
             c.name AS "community_name?",
             c.slug AS "community_slug?",
-            COALESCE(COUNT(DISTINCT csp.user_id) FILTER (WHERE csp.is_active = true), 0) AS "participant_count!",
-            -- COALESCE, not a bare comparison: $1 is NULL for a signed-out
-            -- visitor, and NULL decoded into a non-null bool fails the query.
-            COALESCE(cs.owner_id = $1, false) AS "is_owner!",
-            COUNT(*) FILTER (WHERE csp.user_id = $1 AND csp.is_active = true) > 0 AS "viewer_is_participant!"
+            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true), 0) AS "participant_count!",
+            -- COALESCE, not a bare comparison: $1 is NULL for a visitor who
+            -- is not even a guest, and NULL decoded into a non-null bool
+            -- fails the query.
+            COALESCE(cs.owner_participant_id = $1, false) AS "is_owner!",
+            COUNT(*) FILTER (WHERE csp.participant_id = $1 AND csp.is_active = true) > 0 AS "viewer_is_participant!"
         FROM collaborative_sessions cs
-        JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN collaborative_guests g ON cs.owner_guest_id = g.id
         LEFT JOIN communities c ON cs.community_id = c.id
         LEFT JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
         WHERE cs.is_public = true
           AND cs.ended_at IS NULL
           AND (cs.community_id IS NULL OR c.visibility = 'public')
-        GROUP BY cs.id, u.login_name, c.name, c.slug
+        GROUP BY cs.id, u.login_name, g.nickname, c.name, c.slug
         ORDER BY cs.last_activity DESC
         LIMIT $2
         "#,
-        viewer_user_id,
+        viewer_id,
         SESSION_LIST_LIMIT,
     )
     .fetch_all(&mut **tx)
@@ -200,6 +254,7 @@ async fn find_public_sessions(
             is_full: row.participant_count >= row.max_participants as i64,
             id: row.id,
             owner_login_name: row.owner_login_name,
+            owner_is_guest: row.owner_is_guest,
             title: row.title,
             width: row.width,
             height: row.height,
@@ -223,13 +278,14 @@ async fn find_public_sessions(
 /// stranded the canvas.
 async fn find_viewer_sessions(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    viewer_user_id: Uuid,
+    viewer_id: Uuid,
 ) -> Result<Vec<SessionWithCounts>, AppError> {
     let rows = sqlx::query!(
         r#"
         SELECT
             cs.id,
-            u.login_name AS owner_login_name,
+            COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
+            cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.title,
             cs.width,
             cs.height,
@@ -238,21 +294,22 @@ async fn find_viewer_sessions(
             cs.is_public,
             c.name AS "community_name?",
             c.slug AS "community_slug?",
-            COALESCE(COUNT(DISTINCT csp.user_id) FILTER (WHERE csp.is_active = true), 0) AS "participant_count!",
-            cs.owner_id = $1 AS "is_owner!",
-            COUNT(*) FILTER (WHERE csp.user_id = $1 AND csp.is_active = true) > 0 AS "viewer_is_participant!"
+            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true), 0) AS "participant_count!",
+            cs.owner_participant_id = $1 AS "is_owner!",
+            COUNT(*) FILTER (WHERE csp.participant_id = $1 AND csp.is_active = true) > 0 AS "viewer_is_participant!"
         FROM collaborative_sessions cs
-        JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN collaborative_guests g ON cs.owner_guest_id = g.id
         LEFT JOIN communities c ON cs.community_id = c.id
         LEFT JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
         WHERE cs.ended_at IS NULL
-        GROUP BY cs.id, u.login_name, c.name, c.slug
-        HAVING cs.owner_id = $1
-            OR COUNT(*) FILTER (WHERE csp.user_id = $1 AND csp.is_active = true) > 0
+        GROUP BY cs.id, u.login_name, g.nickname, c.name, c.slug
+        HAVING cs.owner_participant_id = $1
+            OR COUNT(*) FILTER (WHERE csp.participant_id = $1 AND csp.is_active = true) > 0
         ORDER BY cs.last_activity DESC
         LIMIT $2
         "#,
-        viewer_user_id,
+        viewer_id,
         SESSION_LIST_LIMIT,
     )
     .fetch_all(&mut **tx)
@@ -264,6 +321,7 @@ async fn find_viewer_sessions(
             is_full: row.participant_count >= row.max_participants as i64,
             id: row.id,
             owner_login_name: row.owner_login_name,
+            owner_is_guest: row.owner_is_guest,
             title: row.title,
             width: row.width,
             height: row.height,
@@ -295,15 +353,16 @@ async fn attach_preview_versions(state: &AppState, sessions: &mut [&mut SessionW
 
 /// The two lists the lobby shows: the viewer's own sessions, then the public
 /// ones they are not already in. A session in both places is just noise.
+/// `viewer_id` is a participant id, so a guest sees their own sessions too.
 async fn lobby_sessions(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    viewer_user_id: Option<Uuid>,
+    viewer_id: Option<Uuid>,
 ) -> Result<(Vec<SessionWithCounts>, Vec<SessionWithCounts>), AppError> {
-    let viewer_sessions = match viewer_user_id {
-        Some(user_id) => find_viewer_sessions(tx, user_id).await?,
+    let viewer_sessions = match viewer_id {
+        Some(viewer_id) => find_viewer_sessions(tx, viewer_id).await?,
         None => Vec::new(),
     };
-    let mut active_sessions = find_public_sessions(tx, viewer_user_id).await?;
+    let mut active_sessions = find_public_sessions(tx, viewer_id).await?;
     active_sessions.retain(|session| !session.is_owner && !session.viewer_is_participant);
     Ok((viewer_sessions, active_sessions))
 }
@@ -331,14 +390,16 @@ async fn attach_lobby_previews(
 /// that goes stale in seconds.
 pub async fn collaborate_sessions_fragment(
     auth_session: AuthSession,
+    session: Session,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
-    let viewer_user_id = auth_session.user.as_ref().map(|u| u.id);
+    let viewer_id = guest::current(auth_session.user.as_ref(), &session, &state.db_pool)
+        .await?
+        .map(|who| who.id());
 
     let mut tx = state.db_pool.begin().await?;
-    let (mut viewer_sessions, mut active_sessions) =
-        lobby_sessions(&mut tx, viewer_user_id).await?;
+    let (mut viewer_sessions, mut active_sessions) = lobby_sessions(&mut tx, viewer_id).await?;
     tx.commit().await?;
     attach_lobby_previews(&state, &mut viewer_sessions, &mut active_sessions).await;
 
@@ -401,25 +462,32 @@ pub async fn load_more_collaborative_posts(
 
 pub async fn collaborate_lobby(
     auth_session: AuthSession,
+    session: Session,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Query(query): Query<LobbyQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    // Viewable signed out: the lobby doubles as a public gallery. Creating a
-    // session still needs an account, which the template gates.
+    // Viewable signed out: the lobby doubles as a public gallery, and anybody
+    // may open a session from it -- somebody without an account as a guest,
+    // naming themselves in the form.
     let user = auth_session.user;
     let (viewer_user_id, viewer_show_sensitive) = match user.as_ref() {
         Some(user) => (Some(user.id), user.show_sensitive_content),
         None => (None, false),
     };
-
     let db = &state.db_pool;
+    let viewer = guest::current(user.as_ref(), &session, db).await?;
+    let guest_nickname = viewer
+        .as_ref()
+        .filter(|viewer| viewer.is_guest())
+        .map(|viewer| viewer.name().to_string());
+
     let mut tx = db.begin().await?;
 
     let common_ctx = CommonContext::build(&mut tx, user.as_ref(), &ftl_lang).await?;
 
     let (mut viewer_sessions, mut active_sessions) =
-        lobby_sessions(&mut tx, viewer_user_id).await?;
+        lobby_sessions(&mut tx, viewer.as_ref().map(Collaborator::id)).await?;
 
     // Finished collaborative drawings, rendered through the same card template
     // as the home grid and paginated through the same sentinel. Sensitive posts
@@ -443,11 +511,14 @@ pub async fn collaborate_lobby(
     // without scrolling past every public community on the site: communities
     // they belong to, then ones they have posted in, then the rest. A member
     // who has also posted appears only in the first tier.
+    //
+    // Without an account, the public ones: what a guest may open a session in
+    // (`postable_communities`).
     let mut member_communities: Vec<serde_json::Value> = Vec::new();
     let mut participated_communities: Vec<serde_json::Value> = Vec::new();
     let mut other_communities: Vec<serde_json::Value> = Vec::new();
-    if let Some(user_id) = viewer_user_id {
-        for community in crate::models::post::get_movable_communities(&mut tx, user_id).await? {
+    {
+        for community in postable_communities(&mut tx, viewer_user_id).await? {
             let entry = serde_json::json!({
                 "id": community.id.to_string(),
                 "name": community.name,
@@ -499,6 +570,10 @@ pub async fn collaborate_lobby(
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
                 canvas_sizes => canvas_size_options(),
                 participant_choices => MAX_PARTICIPANTS_CHOICES,
+                // The name a guest already goes by, to start the form's name
+                // field on. None for an account, and for somebody new.
+                guest_nickname,
+                nickname_max_chars => guest::NICKNAME_MAX_CHARS,
             },
         )
         .await?;
@@ -516,6 +591,31 @@ pub struct CreateSessionForm {
     is_public: Option<String>,
     max_participants: i32,
     community_id: Option<String>,
+    /// Present when the box is ticked. The form starts it ticked.
+    allow_guests: Option<String>,
+    /// What somebody without an account will be called. Ignored for an
+    /// account.
+    nickname: Option<String>,
+}
+
+/// The communities somebody may open a session in: where the account may
+/// post (`get_movable_communities`), and for anybody else the public ones --
+/// asked as a nil user, who has posted nowhere and is a member of nothing.
+async fn postable_communities(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Option<Uuid>,
+) -> Result<Vec<crate::models::post::PostableCommunity>, AppError> {
+    let communities =
+        crate::models::post::get_movable_communities(tx, user_id.unwrap_or(Uuid::nil())).await?;
+    Ok(match user_id {
+        Some(_) => communities,
+        None => communities
+            .into_iter()
+            .filter(|community| {
+                community.visibility == crate::models::community::CommunityVisibility::Public
+            })
+            .collect(),
+    })
 }
 
 /// POST /collaborate: a session, from the lobby's form. Sent by htmx
@@ -524,11 +624,28 @@ pub struct CreateSessionForm {
 /// is htmx's error banner's to show (web::htmx).
 pub async fn create_collaborative_session_form(
     auth_session: AuthSession,
+    session: Session,
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     axum::Form(form): axum::Form<CreateSessionForm>,
 ) -> Result<Response, AppError> {
-    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
+    // An account opens it as itself. Anybody else opens it as a guest, made
+    // or renamed from the form's name field, and only so often.
+    let who = match auth_session.user.as_ref() {
+        Some(user) => Collaborator::from_user(user),
+        None => {
+            if !guest_admitted(&state, &headers).await {
+                return Ok(StatusCode::TOO_MANY_REQUESTS.into_response());
+            }
+            let nickname = form.nickname.as_deref().unwrap_or_default();
+            match guest::current(None, &session, &state.db_pool).await? {
+                Some(guest) if nickname.trim().is_empty() || nickname.trim() == guest.name() => {
+                    guest
+                }
+                _ => guest::become_guest(&session, &state.db_pool, nickname).await?,
+            }
+        }
+    };
     let (width, height) = form
         .canvas_size
         .split_once('x')
@@ -543,8 +660,9 @@ pub async fn create_collaborative_session_form(
         is_public: form.is_public.is_some(),
         max_participants: form.max_participants,
         community_id: form.community_id,
+        allow_guests: form.allow_guests.is_some(),
     };
-    let session_id = insert_session(&state, user.id, request).await?;
+    let session_id = insert_session(&state, &who, request).await?;
     let url = format!("/collaborate/{}", session_id);
     if headers.get("HX-Request").is_some() {
         Ok(([("HX-Redirect", url)],).into_response())
@@ -558,7 +676,7 @@ pub async fn create_collaborative_session_form(
 /// `/draw` in Discord (discord_interactions.rs).
 pub(crate) async fn insert_session(
     state: &AppState,
-    user_id: Uuid,
+    owner: &Collaborator,
     request: CreateSessionRequest,
 ) -> Result<Uuid, AppError> {
     // A canvas and a seat count this server did not offer are not a matter of
@@ -590,9 +708,9 @@ pub(crate) async fn insert_session(
     // A saved session becomes a post in this community, so the same rule that
     // governs posting has to apply here. Without this any id was accepted,
     // which would put a drawing into a private community the caller is not a
-    // member of.
+    // member of. A guest may open one only in a public community.
     if let Some(community_id) = community_id {
-        let allowed = crate::models::post::get_movable_communities(&mut tx, user_id)
+        let allowed = postable_communities(&mut tx, owner.user_id())
             .await?
             .into_iter()
             .any(|community| community.id == community_id);
@@ -605,17 +723,20 @@ pub(crate) async fn insert_session(
     sqlx::query!(
         r#"
         INSERT INTO collaborative_sessions
-        (id, owner_id, title, width, height, is_public, community_id, max_participants)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        (id, owner_id, owner_guest_id, title, width, height, is_public, community_id,
+         max_participants, allow_guests)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         "#,
         session_id,
-        user_id,
+        owner.user_id(),
+        owner.guest_id(),
         request.title,
         request.width,
         request.height,
         request.is_public,
         community_id,
-        request.max_participants
+        request.max_participants,
+        request.allow_guests,
     )
     .execute(&mut *tx)
     .await?;
@@ -640,11 +761,14 @@ pub async fn save_collaborative_session(
 
     let db = &state.db_pool;
 
+    // A post goes out under an account. A guest owner keeps the drawing on
+    // their device instead (`end_collaborative_session`), and saves it from
+    // there once they have signed in -- which makes the session theirs.
     let session = sqlx::query!(
         r#"
-        SELECT owner_id, saved_post_id, width, height, u.login_name as owner_login_name
+        SELECT owner_id, saved_post_id, width, height, ended_at IS NULL AS "open!"
         FROM collaborative_sessions cs
-        JOIN users u ON cs.owner_id = u.id
+        LEFT JOIN users u ON cs.owner_id = u.id
         WHERE cs.id = $1
         "#,
         session_uuid
@@ -653,9 +777,10 @@ pub async fn save_collaborative_session(
     .await?
     .ok_or_else(|| AppError::NotFound("Session".to_string()))?;
 
-    if session.owner_id != user.id {
+    if session.owner_id != Some(user.id) {
         return Err(AppError::Forbidden);
     }
+    let owner_login_name = user.login_name.to_string();
 
     // Already a post: not an error, and the answer is where it is. A save
     // retried after a lost response used to come back as a failure, with the
@@ -663,13 +788,13 @@ pub async fn save_collaborative_session(
     if let Some(post_id) = session.saved_post_id {
         let post_url = db::saved_post_path(db, session_uuid)
             .await?
-            .unwrap_or_else(|| format!("/@{}/{}", session.owner_login_name, post_id));
+            .unwrap_or_else(|| format!("/@{}/{}", owner_login_name, post_id));
         return Ok((
             StatusCode::CONFLICT,
             Json(SaveSessionResponse {
                 post_id: post_id.to_string(),
                 post_url,
-                owner_login_name: session.owner_login_name,
+                owner_login_name,
             }),
         )
             .into_response());
@@ -707,8 +832,13 @@ pub async fn save_collaborative_session(
         .unwrap_or_else(|| format!("/@{}/{}", owner_login_name, post_id));
 
     // The session is over the moment the post exists, whether or not the
-    // owner's socket is still there to say so.
-    super::messages::finish_session(&state, session_uuid, user.id, &post_url, "system").await;
+    // owner's socket is still there to say so. One that was over already --
+    // timed out, or kept on a guest owner's device and saved from their
+    // drafts since -- was sealed and cleaned up when it ended, and doing that
+    // again would seal an empty room over its recording.
+    if session.open {
+        super::messages::finish_session(&state, session_uuid, user.id, &post_url, "system").await;
+    }
 
     Ok(Json(SaveSessionResponse {
         post_id: post_id.to_string(),
@@ -716,6 +846,101 @@ pub async fn save_collaborative_session(
         post_url,
     })
     .into_response())
+}
+
+/// Who is asking about a room they are in, and whether it is theirs.
+async fn room_owner(
+    state: &AppState,
+    auth_session: &AuthSession,
+    session: &Session,
+    session_uuid: Uuid,
+) -> Result<Collaborator, AppError> {
+    let who = guest::current(auth_session.user.as_ref(), session, &state.db_pool)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
+    let owner = sqlx::query_scalar!(
+        "SELECT owner_participant_id FROM collaborative_sessions WHERE id = $1",
+        session_uuid
+    )
+    .fetch_optional(&state.db_pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Session".to_string()))?;
+    if owner != who.id() {
+        return Err(AppError::Forbidden);
+    }
+    Ok(who)
+}
+
+/// POST /collaborate/{uuid}/end: the owner closes the session without making
+/// a post of it, and everybody in it is told so.
+///
+/// How a guest owner finishes: the drawing goes into the drafts on their
+/// device, the way a guest's `/draw` does, and from the drafts page it is
+/// saved once they have an account (the sign-in makes the session theirs, and
+/// `POST /collaborate/{uuid}` takes a session that has ended). An account may
+/// end one this way too, rather than leave it to time out.
+pub async fn end_collaborative_session(
+    Path(session_uuid): Path<Uuid>,
+    auth_session: AuthSession,
+    session: Session,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let owner = room_owner(&state, &auth_session, &session, session_uuid).await?;
+    let open = sqlx::query_scalar!(
+        "SELECT ended_at IS NULL AS \"open!\" FROM collaborative_sessions WHERE id = $1",
+        session_uuid
+    )
+    .fetch_one(&state.db_pool)
+    .await?;
+    if open {
+        super::messages::finish_session(&state, session_uuid, owner.id(), "", "system").await;
+    }
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+/// POST /collaborate/{uuid}/participants/{participant_id}/ban: the owner
+/// sends somebody out of the session and keeps them out of it. Their sockets
+/// are closed wherever they are held; a guest's address is kept with the ban
+/// while they are still connected to give one up by.
+pub async fn ban_collaborative_participant(
+    Path((session_uuid, participant_id)): Path<(Uuid, Uuid)>,
+    auth_session: AuthSession,
+    session: Session,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let owner = room_owner(&state, &auth_session, &session, session_uuid).await?;
+    if participant_id == owner.id() {
+        return Err(AppError::BadRequest(
+            "the owner cannot ban themselves".to_string(),
+        ));
+    }
+    let is_guest = sqlx::query_scalar!(
+        r#"
+        SELECT guest_id IS NOT NULL AS "is_guest!"
+        FROM collaborative_sessions_participants
+        WHERE session_id = $1 AND participant_id = $2
+        "#,
+        session_uuid,
+        participant_id,
+    )
+    .fetch_optional(&state.db_pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Participant".to_string()))?;
+    let ip = if is_guest {
+        super::websocket::participant_ip(&state, session_uuid, participant_id).await
+    } else {
+        None
+    };
+    db::ban_participant(&state.db_pool, session_uuid, participant_id, ip.as_deref()).await?;
+    let closed = super::websocket::remove_from_room(&state, session_uuid, participant_id).await;
+    tracing::info!(
+        "Owner {} banned {} from session {} ({} sockets closed)",
+        owner.name(),
+        participant_id,
+        session_uuid,
+        closed
+    );
+    Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 #[derive(serde::Deserialize)]
@@ -912,6 +1137,8 @@ mod tests {
             participated_communities => Serde(participated),
             other_communities => Serde(others),
             selected_community_slug => "open",
+            guest_nickname => if signed_in { None } else { Some("miro") },
+            nickname_max_chars => super::guest::NICKNAME_MAX_CHARS,
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",
@@ -933,8 +1160,10 @@ mod tests {
         })
     }
 
+    /// Somebody without an account may open a session as a guest, so the form
+    /// is there for them too -- with a name field an account does not get.
     #[test]
-    fn lobby_renders_signed_out_without_the_create_form() {
+    fn lobby_offers_a_guest_the_create_form_with_a_name() {
         let env = test_support::env();
         let template = env
             .get_template("collaborate_lobby.jinja")
@@ -942,10 +1171,20 @@ mod tests {
         let rendered = template
             .render(lobby_context(false, vec![sample_post()]))
             .expect("renders signed out");
-        assert!(!rendered.contains("create-session-form"));
-        assert!(rendered.contains("collaborate-sign-in-to-create"));
-        // The gallery is the reason signed-out visitors can reach this page.
+        assert!(rendered.contains("create-session-form"));
+        assert!(rendered.contains(r#"name="nickname""#));
+        assert!(
+            rendered.contains(r#"value="miro""#),
+            "the guest's name is kept"
+        );
+        assert!(rendered.contains(r#"name="allow_guests" checked"#));
         assert!(rendered.contains("posts-grid-item"));
+
+        let signed_in = template
+            .render(lobby_context(true, vec![]))
+            .expect("renders signed in");
+        assert!(!signed_in.contains(r#"name="nickname""#));
+        assert!(signed_in.contains(r#"name="allow_guests" checked"#));
     }
 
     #[test]
@@ -1076,13 +1315,14 @@ mod tests {
             .render(lobby_context(true, vec![]))
             .expect("renders signed in");
         assert!(rendered.contains("class=\"session-form\""));
-        assert_eq!(rendered.matches("class=\"field-help\"").count(), 2);
+        assert_eq!(rendered.matches("class=\"field-help\"").count(), 3);
         // Every control still ships — tidying must not drop a field.
         for id in [
             "canvas-size",
             "session-title",
             "max-participants",
             "is-public",
+            "allow-guests",
             "session-community",
         ] {
             assert!(rendered.contains(&format!("id=\"{id}\"")), "{id} missing");
@@ -1166,6 +1406,28 @@ mod tests {
             .expect("renders");
         // The class also appears in the page's <style> block, so match the tag.
         assert!(!rendered.contains("<p class=\"session-community\">"));
+    }
+
+    /// A guest who opened a session has no profile, and the name on the card
+    /// is one they typed: shown as theirs, marked as a guest's, linked nowhere.
+    #[test]
+    fn a_guests_session_card_names_them_without_a_profile_link() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("collaborate_lobby.jinja")
+            .expect("template")
+            .render(lobby_context_with_sessions(
+                false,
+                vec![],
+                vec![sample_session(json!({
+                    "owner_login_name": "a_guest_named_this",
+                    "owner_is_guest": true,
+                }))],
+                vec![],
+            ))
+            .expect("renders");
+        assert!(rendered.contains("a_guest_named_this <span class=\"ds-guest-badge\">"));
+        assert!(!rendered.contains("@a_guest_named_this"));
     }
 
     /// A session nobody has drawn in yet has no preview, and a card that

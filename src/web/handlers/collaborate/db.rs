@@ -8,6 +8,7 @@ use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
 pub struct SessionInfo {
+    /// The owner's participant id: an account's, or the guest's who opened it.
     pub owner_id: Uuid,
     pub width: i32,
     pub height: i32,
@@ -25,7 +26,7 @@ pub async fn get_session_info(
 ) -> Result<Option<SessionInfo>, sqlx::Error> {
     let session = sqlx::query!(
         r#"
-        SELECT owner_id, width, height, title, max_participants,
+        SELECT owner_participant_id, width, height, title, max_participants,
                (EXTRACT(EPOCH FROM created_at::timestamptz) * 1000)::bigint AS "opened_at!"
         FROM collaborative_sessions
         WHERE id = $1 AND ended_at IS NULL
@@ -36,7 +37,7 @@ pub async fn get_session_info(
     .await?;
 
     Ok(session.map(|s| SessionInfo {
-        owner_id: s.owner_id,
+        owner_id: s.owner_participant_id,
         width: s.width,
         height: s.height,
         title: s.title,
@@ -45,7 +46,9 @@ pub async fn get_session_info(
     }))
 }
 
-/// Whether this user may be in the room at all.
+/// Whether this person may be in the room at all. `viewer` is None for
+/// somebody who is not even a guest yet, and is answered as for a guest:
+/// that is what they would become to come in.
 ///
 /// A session in a private community is for that community's members, the
 /// way its posts are: the lobby and the preview already hide it from
@@ -53,11 +56,23 @@ pub async fn get_session_info(
 /// link. The owner is let in regardless, since they had to be a member to
 /// open it there. A public or unlisted community, or none, is open to the
 /// link.
+///
+/// A guest is a member of nothing, so a guest comes in only where the owner
+/// left guests allowed and the community, if any, is public -- the rule
+/// `/draw` keeps for a guest's painter (`draw::may_draw_in`). A guest who
+/// owns the session is let in regardless, like any owner.
+///
+/// Nobody the owner banned comes back: not by their id, and not as a guest
+/// from the address a banned guest was at (`ip`).
 pub async fn viewer_may_enter(
     db: &Pool<Postgres>,
     room_uuid: Uuid,
-    user_id: Uuid,
+    viewer: Option<&super::guest::Collaborator>,
+    ip: Option<&str>,
 ) -> Result<bool, sqlx::Error> {
+    let participant_id = viewer.map(|viewer| viewer.id());
+    let user_id = viewer.and_then(|viewer| viewer.user_id());
+    let as_guest = user_id.is_none();
     sqlx::query_scalar!(
         r#"
         SELECT EXISTS(
@@ -65,44 +80,33 @@ pub async fn viewer_may_enter(
             FROM collaborative_sessions cs
             LEFT JOIN communities c ON cs.community_id = c.id
             WHERE cs.id = $1
-              AND (
+              AND NOT EXISTS(
+                SELECT 1 FROM collaborative_session_bans b
+                WHERE b.session_id = cs.id
+                  AND (b.participant_id = $2 OR ($4 AND b.ip IS NOT NULL AND b.ip = $5))
+              )
+              AND CASE WHEN $4 THEN
+                cs.owner_participant_id = $2
+                OR (cs.allow_guests AND (c.id IS NULL OR c.visibility = 'public'))
+              ELSE
                 c.id IS NULL
                 OR c.visibility <> 'private'
-                OR cs.owner_id = $2
+                OR cs.owner_id = $3
                 OR EXISTS(
                     SELECT 1 FROM community_members cm
-                    WHERE cm.community_id = c.id AND cm.user_id = $2
+                    WHERE cm.community_id = c.id AND cm.user_id = $3
                 )
-              )
+              END
         ) AS "may_enter!"
         "#,
         room_uuid,
+        participant_id,
         user_id,
+        as_guest,
+        ip,
     )
     .fetch_one(db)
     .await
-}
-
-pub async fn check_existing_participant(
-    db: &Pool<Postgres>,
-    room_uuid: Uuid,
-    user_id: Uuid,
-) -> Result<bool, sqlx::Error> {
-    let existing_participant = sqlx::query_scalar!(
-        r#"
-        SELECT EXISTS(
-            SELECT 1 FROM collaborative_sessions_participants 
-            WHERE session_id = $1 AND user_id = $2
-        )
-        "#,
-        room_uuid,
-        user_id
-    )
-    .fetch_one(db)
-    .await?
-    .unwrap_or(false); // Only unwrap the Option<bool>, not the Result
-
-    Ok(existing_participant)
 }
 
 pub async fn get_active_user_count(
@@ -111,7 +115,7 @@ pub async fn get_active_user_count(
 ) -> Result<i64, sqlx::Error> {
     let active_user_count = sqlx::query_scalar!(
         r#"
-        SELECT COUNT(DISTINCT user_id) as "count!"
+        SELECT COUNT(DISTINCT participant_id) as "count!"
         FROM collaborative_sessions_participants
         WHERE session_id = $1 AND is_active = true
         "#,
@@ -123,32 +127,10 @@ pub async fn get_active_user_count(
     Ok(active_user_count)
 }
 
-pub async fn track_participant(
-    db: &Pool<Postgres>,
-    room_uuid: Uuid,
-    user_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        r#"
-        INSERT INTO collaborative_sessions_participants 
-        (session_id, user_id, is_active)
-        VALUES ($1, $2, true)
-        ON CONFLICT (session_id, user_id) 
-        DO UPDATE SET is_active = true, left_at = NULL
-        "#,
-        room_uuid,
-        user_id
-    )
-    .execute(db)
-    .await?;
-
-    Ok(())
-}
-
 pub async fn track_participant_with_capacity_check(
     db: &Pool<Postgres>,
     room_uuid: Uuid,
-    user_id: Uuid,
+    who: &super::guest::Collaborator,
     max_participants: i32,
 ) -> Result<bool, sqlx::Error> {
     let mut tx = db.begin().await?;
@@ -176,12 +158,12 @@ pub async fn track_participant_with_capacity_check(
     let existing_participant = sqlx::query_scalar!(
         r#"
         SELECT EXISTS(
-            SELECT 1 FROM collaborative_sessions_participants 
-            WHERE session_id = $1 AND user_id = $2
+            SELECT 1 FROM collaborative_sessions_participants
+            WHERE session_id = $1 AND participant_id = $2
         )
         "#,
         room_uuid,
-        user_id
+        who.id()
     )
     .fetch_one(&mut *tx)
     .await?
@@ -191,7 +173,7 @@ pub async fn track_participant_with_capacity_check(
         // For new participants, check capacity
         let active_user_count = sqlx::query_scalar!(
             r#"
-            SELECT COUNT(DISTINCT user_id) as "count!"
+            SELECT COUNT(DISTINCT participant_id) as "count!"
             FROM collaborative_sessions_participants
             WHERE session_id = $1 AND is_active = true
             "#,
@@ -209,14 +191,15 @@ pub async fn track_participant_with_capacity_check(
     // Add or reactivate the participant
     sqlx::query!(
         r#"
-        INSERT INTO collaborative_sessions_participants 
-        (session_id, user_id, is_active)
-        VALUES ($1, $2, true)
-        ON CONFLICT (session_id, user_id) 
+        INSERT INTO collaborative_sessions_participants
+        (session_id, user_id, guest_id, is_active)
+        VALUES ($1, $2, $3, true)
+        ON CONFLICT (session_id, participant_id)
         DO UPDATE SET is_active = true, left_at = NULL
         "#,
         room_uuid,
-        user_id
+        who.user_id(),
+        who.guest_id(),
     )
     .execute(&mut *tx)
     .await?;
@@ -234,19 +217,20 @@ pub async fn update_session_activity(state: &AppState, room_uuid: Uuid) {
 pub async fn track_join_participant(
     db: &Pool<Postgres>,
     room_uuid: Uuid,
-    user_uuid: Uuid,
+    who: &super::guest::Collaborator,
     timestamp: i64,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
-        INSERT INTO collaborative_sessions_participants 
-        (session_id, user_id, joined_at, is_active)
-        VALUES ($1, $2, to_timestamp($3::bigint / 1000), true)
-        ON CONFLICT (session_id, user_id) 
+        INSERT INTO collaborative_sessions_participants
+        (session_id, user_id, guest_id, joined_at, is_active)
+        VALUES ($1, $2, $3, to_timestamp($4::bigint / 1000), true)
+        ON CONFLICT (session_id, participant_id)
         DO UPDATE SET is_active = true, left_at = NULL
         "#,
         room_uuid,
-        user_uuid,
+        who.user_id(),
+        who.guest_id(),
         timestamp
     )
     .execute(db)
@@ -255,55 +239,20 @@ pub async fn track_join_participant(
     Ok(())
 }
 
-pub async fn get_active_participants(
-    db: &Pool<Postgres>,
-    room_uuid: Uuid,
-) -> Result<Vec<crate::models::user::User>, sqlx::Error> {
-    let participants = sqlx::query!(
-        r#"
-        SELECT csp.user_id, u.login_name FROM collaborative_sessions_participants csp
-        JOIN users u ON csp.user_id = u.id
-        WHERE csp.session_id = $1 AND csp.is_active = true
-        ORDER BY csp.joined_at ASC
-        "#,
-        room_uuid
-    )
-    .fetch_all(db)
-    .await?;
-
-    Ok(participants
-        .into_iter()
-        .map(|p| crate::models::user::User {
-            id: p.user_id,
-            login_name: p.login_name.into(),
-            password_hash: None,
-            display_name: String::new(),
-            email: None,
-            email_verified_at: None,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-            banner_id: None,
-            preferred_language: None,
-            deleted_at: None,
-            show_sensitive_content: false,
-            role: crate::models::user::UserRole::User,
-        })
-        .collect())
-}
-
 /// Where the session's saved post lives, once it has one: the path the
 /// owner's client is sent to after saving, built here from the same two
-/// columns rather than taken from the client.
+/// columns rather than taken from the client. The post's author is the
+/// account that saved it, which a guest owner has to have become first.
 pub async fn saved_post_path(
     db: &Pool<Postgres>,
     room_uuid: Uuid,
 ) -> Result<Option<String>, sqlx::Error> {
     let row = sqlx::query!(
         r#"
-        SELECT cs.saved_post_id, u.login_name, c.slug AS "community_slug?"
+        SELECT p.id AS post_id, u.login_name, c.slug AS "community_slug?"
         FROM collaborative_sessions cs
-        JOIN users u ON cs.owner_id = u.id
-        LEFT JOIN posts p ON p.id = cs.saved_post_id
+        JOIN posts p ON p.id = cs.saved_post_id
+        JOIN users u ON u.id = p.author_id
         LEFT JOIN communities c ON c.id = p.community_id
         WHERE cs.id = $1
         "#,
@@ -312,14 +261,12 @@ pub async fn saved_post_path(
     .fetch_optional(db)
     .await?;
 
-    Ok(row.and_then(|row| {
-        row.saved_post_id.map(|post_id| {
-            crate::models::post::post_page_path(
-                &row.login_name,
-                row.community_slug.as_deref(),
-                post_id,
-            )
-        })
+    Ok(row.map(|row| {
+        crate::models::post::post_page_path(
+            &row.login_name,
+            row.community_slug.as_deref(),
+            row.post_id,
+        )
     }))
 }
 
@@ -337,21 +284,67 @@ pub async fn end_session(db: &Pool<Postgres>, room_uuid: Uuid) -> Result<(), sql
 pub async fn mark_participant_inactive(
     db: &Pool<Postgres>,
     room_uuid: Uuid,
-    user_id: Uuid,
+    participant_id: Uuid,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
-        UPDATE collaborative_sessions_participants 
+        UPDATE collaborative_sessions_participants
         SET is_active = false, left_at = NOW()
-        WHERE session_id = $1 AND user_id = $2
+        WHERE session_id = $1 AND participant_id = $2
         "#,
         room_uuid,
-        user_id
+        participant_id
     )
     .execute(db)
     .await?;
 
     Ok(())
+}
+
+/// Bans somebody from a room: kept out of it for as long as it lasts, and,
+/// for a guest, every guest arriving from `ip` with them. Their seat is let
+/// go here; their sockets are the caller's to close. Answers whether they had
+/// ever been in the room -- a ban for somebody who never was is the owner
+/// guessing at ids, and is not kept.
+pub async fn ban_participant(
+    db: &Pool<Postgres>,
+    room_uuid: Uuid,
+    participant_id: Uuid,
+    ip: Option<&str>,
+) -> Result<bool, sqlx::Error> {
+    let mut tx = db.begin().await?;
+    let was_here = sqlx::query!(
+        r#"
+        UPDATE collaborative_sessions_participants
+        SET is_active = false, left_at = COALESCE(left_at, NOW())
+        WHERE session_id = $1 AND participant_id = $2
+        "#,
+        room_uuid,
+        participant_id,
+    )
+    .execute(&mut *tx)
+    .await?
+    .rows_affected()
+        > 0;
+    if !was_here {
+        tx.rollback().await?;
+        return Ok(false);
+    }
+    sqlx::query!(
+        r#"
+        INSERT INTO collaborative_session_bans (session_id, participant_id, ip)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (session_id, participant_id)
+        DO UPDATE SET ip = COALESCE(EXCLUDED.ip, collaborative_session_bans.ip)
+        "#,
+        room_uuid,
+        participant_id,
+        ip,
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(true)
 }
 
 pub async fn save_session_to_post(
@@ -421,9 +414,10 @@ pub async fn save_session_to_post(
 
     let participants = sqlx::query!(
         r#"
-        SELECT u.login_name
+        SELECT COALESCE(u.login_name, g.nickname) AS "name!"
         FROM collaborative_sessions_participants csp
-        JOIN users u ON csp.user_id = u.id
+        LEFT JOIN users u ON csp.user_id = u.id
+        LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
         WHERE csp.session_id = $1
         ORDER BY csp.joined_at ASC
         "#,
@@ -432,8 +426,7 @@ pub async fn save_session_to_post(
     .fetch_all(&mut *tx)
     .await?;
 
-    let participant_names: Vec<String> =
-        participants.iter().map(|p| p.login_name.clone()).collect();
+    let participant_names: Vec<String> = participants.iter().map(|p| p.name.clone()).collect();
 
     // The post's body: who drew it. The title is the session's own.
     let description = if participant_names.len() > 1 {

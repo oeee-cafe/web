@@ -163,6 +163,7 @@ drafts-local-delete-confirm = 이 기기에서 그림을 삭제할까요? 되돌
 drafts-local-community-denied = 이 계정으로는 그 커뮤니티에 게시할 수 없습니다. 개인 그림으로 게시할까요?
 drafts-local-post-failed = 그림을 게시하지 못했습니다. 이 기기에는 그대로 남아 있습니다.
 drafts-local-unavailable = 이 기기에는 그림을 보관할 수 없어서, 로그인하지 않고 저장한 그림은 여기 나오지 않습니다.
+drafts-local-collaboration-not-yours = 다른 계정이 가진 세션에서 그린 그림이라 이 계정으로는 올릴 수 없습니다. 이 기기에는 그대로 남아 있습니다.
 
 post-created-at = 그린 시각
 post-published-at = 발행 시각
@@ -287,6 +288,13 @@ community-draw-together = 넷캔
 collaborate-session-created = 생성됨
 collaborate-join-session = 세션 참가
 collaborate-session-preview-alt = 지금 이 캔버스의 모습
+collaborate-guest-badge = 손님
+collaborate-guest-nickname-label = 이름
+collaborate-guest-nickname-hint = 손님으로 그립니다. 나중에 로그인하면 그린 것이 계정으로 옮겨집니다.
+collaborate-sign-in-instead = 로그인하기
+collaborate-guest-community-hint = 손님은 공개 커뮤니티만 고를 수 있습니다.
+collaborate-allow-guests-label = 계정이 없는 사람도 참여할 수 있게 하기
+collaborate-allow-guests-description = 손님은 이름을 직접 정하며, 이름이 보이는 곳마다 손님으로 표시됩니다.
 
 welcome = { $name }님, 환영합니다!
 
