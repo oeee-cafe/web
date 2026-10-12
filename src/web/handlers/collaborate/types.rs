@@ -28,6 +28,10 @@ pub struct SessionWithCounts {
     pub owner_login_name: String,
     /// A guest owner has no profile for the card to link to.
     pub owner_is_guest: bool,
+    /// Whether somebody without an account may come in: the owner allows
+    /// guests and the community, if any, is public. A card that says no
+    /// spares a signed-out visitor a click that ends at the sign-in page.
+    pub guests_welcome: bool,
     pub title: Option<String>,
     pub width: i32,
     pub height: i32,
@@ -94,6 +98,16 @@ pub struct CollaborationMeta {
     /// them.
     #[serde(rename = "guestsWelcome")]
     pub guests_welcome: bool,
+    /// The owner's switch on its own, which they may flip mid-session.
+    #[serde(rename = "allowGuests")]
+    pub allow_guests: bool,
+    /// Whether the community would let guests in at all: none, or a public
+    /// one. Where it would not, the owner's switch changes nothing, and the
+    /// page does not offer it.
+    #[serde(rename = "communityAdmitsGuests")]
+    pub community_admits_guests: bool,
+    /// The owner gave it no title, and `title` is a stand-in.
+    pub untitled: bool,
     #[serde(rename = "maxUsers")]
     pub max_users: i32,
     #[serde(rename = "currentUserCount")]

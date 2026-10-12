@@ -70,7 +70,10 @@
             <a class="profile-chip" href="/@{{ session.community_slug }}">{{ session.community_name }}</a>
           </p>
         {% endif %}
-        {% if session.is_full or (show_visibility and not session.is_public) %}
+        {# Accounts only: said to somebody without one before they click,
+           rather than by the sign-in page after. #}
+        {% set accounts_only = not viewer_has_account and not session.guests_welcome %}
+        {% if session.is_full or (show_visibility and not session.is_public) or accounts_only %}
           <div class="session-badges">
             {% if session.is_full %}
               <span class="community-card-badge session-full">{{ ftl_get_message("collaborate-session-full") }}</span>
@@ -79,6 +82,9 @@
                list is public by definition. #}
             {% if show_visibility and not session.is_public %}
               <span class="community-card-badge session-private">{{ ftl_get_message("collaborate-session-link-only") }}</span>
+            {% endif %}
+            {% if accounts_only %}
+              <span class="community-card-badge session-accounts-only">{{ ftl_get_message("collaborate-session-accounts-only") }}</span>
             {% endif %}
           </div>
         {% endif %}

@@ -60,7 +60,9 @@ pub async fn get_session_info(
 /// A guest is a member of nothing, so a guest comes in only where the owner
 /// left guests allowed and the community, if any, is public -- the rule
 /// `/draw` keeps for a guest's painter (`draw::may_draw_in`). A guest who
-/// owns the session is let in regardless, like any owner.
+/// owns the session is let in regardless, like any owner, and so is one
+/// already in it: the owner can stop letting guests in mid-session, which
+/// shuts the door on new ones and not on somebody whose connection dropped.
 ///
 /// Nobody the owner banned comes back: not by their id, and not as a guest
 /// from the address a banned guest was at (`ip`).
@@ -87,7 +89,16 @@ pub async fn viewer_may_enter(
               )
               AND CASE WHEN $4 THEN
                 cs.owner_participant_id = $2
-                OR (cs.allow_guests AND (c.id IS NULL OR c.visibility = 'public'))
+                OR (
+                  (c.id IS NULL OR c.visibility = 'public')
+                  AND (
+                    cs.allow_guests
+                    OR EXISTS(
+                      SELECT 1 FROM collaborative_sessions_participants csp
+                      WHERE csp.session_id = cs.id AND csp.participant_id = $2
+                    )
+                  )
+                )
               ELSE
                 c.id IS NULL
                 OR c.visibility <> 'private'

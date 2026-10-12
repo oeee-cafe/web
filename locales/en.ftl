@@ -302,6 +302,7 @@ collaborate-active-sessions = Active Public Sessions
 collaborate-your-sessions = Your sessions
 collaborate-session-full = Full
 collaborate-session-link-only = Link only
+collaborate-session-accounts-only = Accounts only
 collaborate-create-network-error = Failed to create session. Please check your connection and try again.
 collaborate-sign-in-to-create = Sign in to start a collaborative drawing
 collaborate-finished-drawings = Finished collaborative drawings

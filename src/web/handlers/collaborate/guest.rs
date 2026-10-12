@@ -24,7 +24,7 @@ use crate::models::user::User;
 use crate::web::state::AppState;
 
 /// Where the browser session keeps its guest's id.
-const GUEST_KEY: &str = "collaborate.guest";
+pub(crate) const GUEST_KEY: &str = "collaborate.guest";
 
 /// The longest name a guest may give. Login names go to fifty, but those are
 /// typed once and shown on a profile; this one is on a cursor label.
@@ -236,6 +236,18 @@ pub async fn adopt(state: &AppState, session: &Session, user_id: Uuid) {
                 if let Err(e) = state.redis_state.rename_seat(room, guest_id, user_id).await {
                     warn!("Could not move guest {guest_id}'s seat in room {room}: {e}");
                 }
+                // A room still open in another tab is talking to it as the
+                // guest, whose id the server no longer answers to: its chat
+                // and its join would be refused as somebody else's. Sent
+                // away, the page comes back as the account, into the seat
+                // just moved to it.
+                super::websocket::send_away(
+                    state,
+                    room,
+                    guest_id,
+                    super::websocket::Departure::SignedIn,
+                )
+                .await;
             }
         }
         Err(e) => error!("Could not hand guest {guest_id} to user {user_id}: {e:#}"),

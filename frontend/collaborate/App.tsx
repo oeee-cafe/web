@@ -693,6 +693,16 @@ export default function App() {
     window.location.assign(postUrl);
   }, []);
 
+  /**
+   * The guest this page was has signed in, in this browser. The page comes
+   * back as the account: who it is, whether it owns the room, the seat the
+   * guest had -- all of which the sign-in moved -- are read again on load.
+   */
+  const handleSignedIn = useCallback(() => {
+    leavingRef.current = true;
+    window.location.reload();
+  }, []);
+
   const handleRemoved = useCallback(() => {
     setRemoved(true);
     painterRef.current?.setInteractionEnabled(false);
@@ -854,6 +864,7 @@ export default function App() {
     onSessionEnded: handleSessionEnded,
     onSessionExpired: handleSessionExpired,
     onRemoved: handleRemoved,
+    onSignedIn: handleSignedIn,
   });
 
   useEffect(() => {
@@ -1082,6 +1093,7 @@ export default function App() {
           communityName: null,
           parentPostId: null,
           collaborativeSessionId: sessionId,
+          title: canvasMeta.untitled ? undefined : canvasMeta.title,
         });
       } catch (error) {
         console.error("This browser could not keep the drawing:", error);
@@ -1104,6 +1116,28 @@ export default function App() {
       setSessionEnding(false);
     }
   }, [canvasMeta, drainCanonical, feed, isSaving, link, sessionExpired]);
+
+  /** Whether people without an account may join, as the owner last set it. */
+  const [guestsAllowed, setGuestsAllowed] = useState<boolean | null>(null);
+  const [guestsBusy, setGuestsBusy] = useState(false);
+  const toggleGuests = useCallback(async () => {
+    const allowed = guestsAllowed ?? canvasMeta?.allowGuests ?? true;
+    setGuestsBusy(true);
+    try {
+      const response = await fetch(`/collaborate/${getSessionId()}/guests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allow: !allowed }),
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      setGuestsAllowed(!allowed);
+    } catch {
+      say(t`Couldn't change who can join. Please try again.`);
+    } finally {
+      setGuestsBusy(false);
+    }
+  }, [canvasMeta, guestsAllowed, t]);
 
   /** The owner's: sends somebody out of the session and keeps them out. */
   const removeParticipant = useCallback(async (participant: Participant) => {
@@ -1266,7 +1300,7 @@ export default function App() {
             <span className={NEO_TITLEBAR_DOT} />
             {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[11px] leading-[14px]">{canvasMeta.title}</span>}
           </div>
-          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
+          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} guests={isOwner && canvasMeta.communityAdmitsGuests ? { allowed: guestsAllowed ?? canvasMeta.allowGuests ?? true, busy: guestsBusy, onToggle: () => void toggleGuests() } : undefined} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
           <Chat wsRef={wsRef} userId={userIdRef.current} participants={presentParticipants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} onRemove={isOwner ? removeParticipant : undefined} />
           <div ref={chatResizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
             <span className={NEO_RESIZE_GRIP} />

@@ -164,7 +164,7 @@ function card(draft: LocalDraft): HTMLElement {
   const image = document.createElement("img");
   image.width = draft.width;
   image.height = draft.height;
-  image.alt = words.untitled || "Untitled";
+  image.alt = draft.title || words.untitled || "Untitled";
   image.decoding = "async";
   image.src = pngUrl;
   frame.append(image);
@@ -173,9 +173,10 @@ function card(draft: LocalDraft): HTMLElement {
   const meta = document.createElement("div");
   meta.className = "post-card-meta";
 
+  // A kept collaborative session carries the title its owner gave it.
   const title = document.createElement("div");
-  title.className = "post-card-title is-untitled";
-  title.textContent = words.untitled || "Untitled";
+  title.className = draft.title ? "post-card-title" : "post-card-title is-untitled";
+  title.textContent = draft.title || words.untitled || "Untitled";
 
   const byline = document.createElement("div");
   byline.className = "post-card-byline";

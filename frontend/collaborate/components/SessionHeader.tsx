@@ -20,8 +20,17 @@ interface CollaborationMeta {
   currentUserCount: number;
 }
 
+/** The owner's guest switch, where guests could come in at all. */
+export interface GuestsSwitch {
+  allowed: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}
+
 export interface SessionHeaderProps {
   canvasMeta: CollaborationMeta;
+  /** Present for the owner, of a session whose community admits guests. */
+  guests?: GuestsSwitch;
   connectionState: "connecting" | "connected" | "disconnected";
   isCatchingUp: boolean;
   /** The highest a window may be dragged, as the chat's own is held. */
@@ -78,6 +87,7 @@ function besideChat(header: HTMLElement | null, ceiling: number): WindowOrigin {
  */
 export const SessionHeader = ({
   canvasMeta,
+  guests,
   connectionState,
   isCatchingUp,
   ceiling = 0,
@@ -171,6 +181,23 @@ export const SessionHeader = ({
         >
           <Icon icon="material-symbols:group-add" width={14} height={14} />
           Steam
+        </button>
+      )}
+      {guests && (
+        <button
+          type="button"
+          onClick={guests.onToggle}
+          disabled={guests.busy}
+          aria-pressed={guests.allowed}
+          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] disabled:cursor-not-allowed ${guests.allowed ? NEO_BUTTON_ON : ""}`}
+          title={
+            guests.allowed
+              ? t`People without an account can join. Click to stop new ones joining.`
+              : t`Only people with an account can join. Click to let guests in.`
+          }
+        >
+          <Icon icon="material-symbols:person" width={14} height={14} />
+          <Trans>Guests</Trans>
         </button>
       )}
       <button

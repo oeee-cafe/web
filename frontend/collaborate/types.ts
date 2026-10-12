@@ -11,6 +11,12 @@ export interface CollaborationMeta {
   ownerIsGuest?: boolean;
   /** Whether somebody without an account may come in as a guest. */
   guestsWelcome?: boolean;
+  /** The owner's guest switch, which they may flip while the session is open. */
+  allowGuests?: boolean;
+  /** No community, or a public one: the only kind a guest may enter. */
+  communityAdmitsGuests?: boolean;
+  /** The owner gave it no title, and `title` is a stand-in. */
+  untitled?: boolean;
   maxUsers: number;
   currentUserCount: number;
   /** Over, saved or not: no socket to open, only the session-over dialog. */

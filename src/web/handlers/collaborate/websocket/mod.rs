@@ -274,15 +274,17 @@ pub async fn handle_socket(
                     if !should_forward_to_connection(&room_msg.broadcast, &connection_id_clone) {
                         continue;
                     }
-                    // The owner sent this person out. Never forwarded: the
-                    // close frame is the whole message, and a client that
-                    // ignored a frame could not ignore the socket closing.
-                    if is_removal(&room_msg.broadcast, &connection_id_clone) {
+                    // Sent away: removed by the owner, or the guest it spoke
+                    // for has signed in. Never forwarded: the close frame is
+                    // the whole message, and a client that ignored a frame
+                    // could not ignore the socket closing.
+                    if let Some(why) = departure_of(&room_msg.broadcast, &connection_id_clone) {
                         info!(
-                            "Connection {} removed from its room by the owner",
-                            connection_id_clone
+                            "Connection {} sent away from its room: {:?}",
+                            connection_id_clone, why
                         );
-                        send_goodbye(&overflow_close_tx, close_code::POLICY, REMOVED_REASON);
+                        let (code, reason) = why.goodbye();
+                        send_goodbye(&overflow_close_tx, code, reason);
                         removed_for_task.notify_one();
                         break;
                     }
@@ -486,23 +488,72 @@ pub async fn handle_socket(
     outgoing_task.abort();
 }
 
-/// The payload of the broadcast that removes a connection from its room
-/// ([`remove_from_room`]). In the server's range, which `protocol::validate`
-/// refuses from a client, so nobody can send it to anybody else; and only
-/// ever addressed to one connection, never forwarded to it.
-const REMOVAL_MARKER: u8 = 0x11;
+/// The first byte of the broadcast that sends a connection away from its
+/// room ([`send_away`]), the second being the [`Departure`]. In the server's
+/// range, which `protocol::validate` refuses from a client, so nobody can
+/// send it to anybody else; and only ever addressed to one connection, never
+/// forwarded to it.
+const DEPARTURE_MARKER: u8 = 0x11;
 
 /// The close reason a removed client reads, and knows not to come back from.
 pub(super) const REMOVED_REASON: &str = "removed from session";
 
-fn is_removal(broadcast: &super::redis_state::RoomBroadcast, connection_id: &str) -> bool {
-    broadcast.target_connection.as_deref() == Some(connection_id)
-        && broadcast.payload == [REMOVAL_MARKER]
+/// The close reason a client reads when the guest it was has signed in, on
+/// this page or another, and should come back as the account.
+pub(super) const SIGNED_IN_REASON: &str = "signed in";
+
+/// The close code that goes with [`SIGNED_IN_REASON`]: one of the range left
+/// to applications, so the client's ordinary reconnect -- which would come
+/// back still calling itself the guest -- never takes it for its own.
+const SIGNED_IN_CODE: u16 = 4001;
+
+/// Why a connection is being sent away.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Departure {
+    /// The owner sent them out; the server will not take them back.
+    Removed = 0,
+    /// The guest they were has become an account. The socket speaks for the
+    /// guest, so it is closed for the page to come back as the account.
+    SignedIn = 1,
+}
+
+impl Departure {
+    fn goodbye(self) -> (u16, &'static str) {
+        match self {
+            Departure::Removed => (close_code::POLICY, REMOVED_REASON),
+            Departure::SignedIn => (SIGNED_IN_CODE, SIGNED_IN_REASON),
+        }
+    }
+}
+
+fn departure_of(
+    broadcast: &super::redis_state::RoomBroadcast,
+    connection_id: &str,
+) -> Option<Departure> {
+    if broadcast.target_connection.as_deref() != Some(connection_id) {
+        return None;
+    }
+    match broadcast.payload.as_slice() {
+        [DEPARTURE_MARKER, 0] => Some(Departure::Removed),
+        [DEPARTURE_MARKER, 1] => Some(Departure::SignedIn),
+        _ => None,
+    }
 }
 
 /// Closes every socket `participant_id` has in the room, on whichever server
 /// it is held. Their seat and their ban are the caller's.
 pub async fn remove_from_room(state: &AppState, room_uuid: Uuid, participant_id: Uuid) -> usize {
+    send_away(state, room_uuid, participant_id, Departure::Removed).await
+}
+
+/// Closes every socket `participant_id` has in the room, saying why.
+pub async fn send_away(
+    state: &AppState,
+    room_uuid: Uuid,
+    participant_id: Uuid,
+    why: Departure,
+) -> usize {
     let connections = state
         .redis_state
         .get_room_connections(room_uuid)
@@ -521,7 +572,7 @@ pub async fn remove_from_room(state: &AppState, room_uuid: Uuid, participant_id:
             target_connection: Some(connection_id.clone()),
             seq: None,
             history_id: None,
-            payload: vec![REMOVAL_MARKER],
+            payload: vec![DEPARTURE_MARKER, why as u8],
         };
         match state
             .redis_state

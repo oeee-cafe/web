@@ -166,7 +166,8 @@ pub async fn get_collaboration_meta(
                cs.max_participants, cs.ended_at,
                COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
                cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
-               cs.allow_guests AND (c.id IS NULL OR c.visibility = 'public') AS "guests_welcome!"
+               cs.allow_guests,
+               (c.id IS NULL OR c.visibility = 'public') AS "community_admits_guests!"
         FROM collaborative_sessions cs
         LEFT JOIN users u ON cs.owner_id = u.id
         LEFT JOIN collaborative_guests g ON cs.owner_guest_id = g.id
@@ -183,10 +184,13 @@ pub async fn get_collaboration_meta(
 
     let saved_post_url = db::saved_post_path(db, session_uuid).await?;
 
+    let title = session
+        .title
+        .map(|title| title.trim().to_string())
+        .filter(|title| !title.is_empty());
     Ok(Json(CollaborationMeta {
-        title: session
-            .title
-            .unwrap_or_else(|| "Untitled Collaboration".to_string()),
+        untitled: title.is_none(),
+        title: title.unwrap_or_else(|| "Untitled Collaboration".to_string()),
         width: session.width,
         height: session.height,
         owner_id: session.owner_participant_id.to_string(),
@@ -194,7 +198,9 @@ pub async fn get_collaboration_meta(
         saved_post_url,
         owner_login_name: session.owner_login_name,
         owner_is_guest: session.owner_is_guest,
-        guests_welcome: session.guests_welcome,
+        guests_welcome: session.allow_guests && session.community_admits_guests,
+        allow_guests: session.allow_guests,
+        community_admits_guests: session.community_admits_guests,
         max_users: session.max_participants,
         current_user_count: user_count,
         ended: session.ended_at.is_some(),
@@ -227,6 +233,7 @@ async fn find_public_sessions(
             cs.id,
             COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
             cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
+            cs.allow_guests AND (cs.community_id IS NULL OR c.visibility = 'public') AS "guests_welcome!",
             cs.title,
             cs.width,
             cs.height,
@@ -249,7 +256,7 @@ async fn find_public_sessions(
         WHERE cs.is_public = true
           AND cs.ended_at IS NULL
           AND (cs.community_id IS NULL OR c.visibility = 'public')
-        GROUP BY cs.id, u.login_name, g.nickname, c.name, c.slug
+        GROUP BY cs.id, u.login_name, g.nickname, c.name, c.slug, c.visibility
         ORDER BY cs.last_activity DESC
         LIMIT $2
         "#,
@@ -266,6 +273,7 @@ async fn find_public_sessions(
             id: row.id,
             owner_login_name: row.owner_login_name,
             owner_is_guest: row.owner_is_guest,
+            guests_welcome: row.guests_welcome,
             title: row.title,
             width: row.width,
             height: row.height,
@@ -297,6 +305,7 @@ async fn find_viewer_sessions(
             cs.id,
             COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
             cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
+            cs.allow_guests AND (cs.community_id IS NULL OR c.visibility = 'public') AS "guests_welcome!",
             cs.title,
             cs.width,
             cs.height,
@@ -314,7 +323,7 @@ async fn find_viewer_sessions(
         LEFT JOIN communities c ON cs.community_id = c.id
         LEFT JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
         WHERE cs.ended_at IS NULL
-        GROUP BY cs.id, u.login_name, g.nickname, c.name, c.slug
+        GROUP BY cs.id, u.login_name, g.nickname, c.name, c.slug, c.visibility
         HAVING cs.owner_participant_id = $1
             OR COUNT(*) FILTER (WHERE csp.participant_id = $1 AND csp.is_active = true) > 0
         ORDER BY cs.last_activity DESC
@@ -333,6 +342,7 @@ async fn find_viewer_sessions(
             id: row.id,
             owner_login_name: row.owner_login_name,
             owner_is_guest: row.owner_is_guest,
+            guests_welcome: row.guests_welcome,
             title: row.title,
             width: row.width,
             height: row.height,
@@ -420,6 +430,7 @@ pub async fn collaborate_sessions_fragment(
             context! {
                 viewer_sessions => Serde(viewer_sessions),
                 active_sessions => Serde(active_sessions),
+                viewer_has_account => auth_session.user.is_some(),
                 ftl_lang,
             },
         )
@@ -560,6 +571,7 @@ pub async fn collaborate_lobby(
             context! {
                 viewer_sessions => Serde(viewer_sessions),
                 active_sessions => Serde(active_sessions),
+                viewer_has_account => user.is_some(),
                 // Shared card fragment contract, sentinel included: the gallery pages
                 // through /api/collaborate/posts the way Home's feeds page through
                 // theirs.
@@ -955,6 +967,36 @@ pub async fn ban_collaborative_participant(
 }
 
 #[derive(serde::Deserialize)]
+pub struct GuestsSwitch {
+    allow: bool,
+}
+
+/// POST /collaborate/{uuid}/guests: the owner lets people without an account
+/// in, or stops letting new ones in, while the session is open. Guests
+/// already in it stay, and may come back after a dropped connection
+/// (`viewer_may_enter`); one the owner wants gone is banned.
+pub async fn set_collaboration_guests(
+    Path(session_uuid): Path<Uuid>,
+    auth_session: AuthSession,
+    session: Session,
+    State(state): State<AppState>,
+    Json(switch): Json<GuestsSwitch>,
+) -> Result<Response, AppError> {
+    room_owner(&state, &auth_session, &session, session_uuid).await?;
+    let changed = sqlx::query!(
+        "UPDATE collaborative_sessions SET allow_guests = $2 WHERE id = $1 AND ended_at IS NULL",
+        session_uuid,
+        switch.allow,
+    )
+    .execute(&state.db_pool)
+    .await?;
+    if changed.rows_affected() == 0 {
+        return Err(AppError::NotFound("Session".to_string()));
+    }
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[derive(serde::Deserialize)]
 pub struct DiscordJoin {
     #[serde(default)]
     secret: String,
@@ -1081,6 +1123,7 @@ mod tests {
             "max_participants": 4,
             "is_full": false,
             "is_public": true,
+            "guests_welcome": true,
             "community_name": "Open Studio",
             "community_slug": "open",
             "is_owner": false,
@@ -1135,6 +1178,7 @@ mod tests {
                 json!(null)
             }),
             active_sessions => Serde(active_sessions),
+            viewer_has_account => signed_in,
             viewer_sessions => Serde(viewer_sessions),
             feed => context! {
                 posts => Serde(posts),
@@ -1417,6 +1461,48 @@ mod tests {
             .expect("renders");
         // The class also appears in the page's <style> block, so match the tag.
         assert!(!rendered.contains("<p class=\"session-community\">"));
+    }
+
+    /// A session a guest cannot enter says so to somebody without an account,
+    /// before they click, and says nothing to somebody signed in.
+    #[test]
+    fn a_session_guests_cannot_enter_is_marked_for_the_signed_out() {
+        let env = test_support::env();
+        let template = env
+            .get_template("collaborate_lobby.jinja")
+            .expect("template");
+        let sessions = || {
+            vec![
+                sample_session(
+                    json!({"id": "00000000-0000-0000-0000-00000000000a", "guests_welcome": false}),
+                ),
+                sample_session(json!({"id": "00000000-0000-0000-0000-00000000000b"})),
+            ]
+        };
+        let signed_out = template
+            .render(lobby_context_with_sessions(
+                false,
+                vec![],
+                sessions(),
+                vec![],
+            ))
+            .expect("renders");
+        assert_eq!(
+            signed_out
+                .matches(r#"<span class="community-card-badge session-accounts-only">"#)
+                .count(),
+            1,
+            "only the one guests cannot enter"
+        );
+        let signed_in = template
+            .render(lobby_context_with_sessions(
+                true,
+                vec![],
+                sessions(),
+                vec![],
+            ))
+            .expect("renders");
+        assert!(!signed_in.contains(r#"<span class="community-card-badge session-accounts-only">"#));
     }
 
     /// A guest who opened a session has no profile, and the name on the card

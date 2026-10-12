@@ -13,11 +13,11 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Plural-Forms: \n"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:143
+#: ../frontend/collaborate/components/SessionHeader.tsx:153
 msgid "(guest)"
 msgstr "(访客)"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:197
+#: ../frontend/collaborate/components/SessionHeader.tsx:224
 msgid "{name} asks to join"
 msgstr "{name} 请求加入"
 
@@ -25,8 +25,8 @@ msgstr "{name} 请求加入"
 msgid "Authentication Failed"
 msgstr "验证失败"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:143
-#: ../frontend/collaborate/components/SessionHeader.tsx:147
+#: ../frontend/collaborate/components/SessionHeader.tsx:153
+#: ../frontend/collaborate/components/SessionHeader.tsx:157
 msgid "by"
 msgstr "作者:"
 
@@ -34,7 +34,7 @@ msgstr "作者:"
 msgid "Cancel"
 msgstr "取消"
 
-#: ../frontend/collaborate/App.tsx:950
+#: ../frontend/collaborate/App.tsx:962
 msgid "Choose a name of 1 to 30 characters, without hidden characters."
 msgstr "请使用1到30个字符且不含隐藏字符的名字。"
 
@@ -50,11 +50,11 @@ msgstr "关联 Discord"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "关联一次 Discord，即可在这里看到好友并邀请他们加入这个会话。"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:118
+#: ../frontend/collaborate/components/SessionHeader.tsx:128
 msgid "Connected"
 msgstr "已连接"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:124
+#: ../frontend/collaborate/components/SessionHeader.tsx:134
 msgid "Connecting"
 msgstr "连接中"
 
@@ -71,22 +71,26 @@ msgstr "连接中..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "连接丢失。您的作品已本地保存。"
 
-#: ../frontend/collaborate/App.tsx:952
-#: ../frontend/collaborate/App.tsx:959
+#: ../frontend/collaborate/App.tsx:1136
+msgid "Couldn't change who can join. Please try again."
+msgstr "无法更改可加入的人，请重试。"
+
+#: ../frontend/collaborate/App.tsx:964
+#: ../frontend/collaborate/App.tsx:971
 msgid "Couldn't join. Please try again."
 msgstr "无法加入，请重试。"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:195
+#: ../frontend/collaborate/components/SessionHeader.tsx:222
 msgid "Couldn’t let {name} in"
 msgstr "未能让 {name} 加入"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1121
+#: ../frontend/collaborate/App.tsx:1156
 msgid "Couldn't remove {0}. Please try again."
 msgstr "无法移出 {0}，请重试。"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:130
+#: ../frontend/collaborate/components/SessionHeader.tsx:140
 msgid "Disconnected"
 msgstr "已断开"
 
@@ -116,8 +120,12 @@ msgstr "去大厅"
 msgid "guest"
 msgstr "访客"
 
-#: ../frontend/collaborate/App.tsx:1186
-#: ../frontend/collaborate/App.tsx:1190
+#: ../frontend/collaborate/components/SessionHeader.tsx:200
+msgid "Guests"
+msgstr "访客"
+
+#: ../frontend/collaborate/App.tsx:1221
+#: ../frontend/collaborate/App.tsx:1225
 msgid "Help"
 msgstr "帮助"
 
@@ -134,17 +142,17 @@ msgid "Initializing collaboration session..."
 msgstr "正在初始化协作会话..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:162
+#: ../frontend/collaborate/components/SessionHeader.tsx:172
 msgid "Invite"
 msgstr "邀请"
 
 #: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:65
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:159
+#: ../frontend/collaborate/components/SessionHeader.tsx:169
 msgid "Invite Discord friends"
 msgstr "邀请 Discord 好友"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:170
+#: ../frontend/collaborate/components/SessionHeader.tsx:180
 msgid "Invite Steam friends"
 msgstr "邀请 Steam 好友"
 
@@ -156,8 +164,8 @@ msgstr "加入"
 msgid "Join as a Guest"
 msgstr "以访客身份加入"
 
-#: ../frontend/collaborate/App.tsx:1226
-#: ../frontend/collaborate/App.tsx:1277
+#: ../frontend/collaborate/App.tsx:1261
+#: ../frontend/collaborate/App.tsx:1312
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
@@ -168,11 +176,11 @@ msgstr "保存在此设备"
 msgid "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
 msgstr "要把这幅画保存在此设备上吗？会话将对所有人结束，之后无人能继续绘画。登录后可从草稿中发布。"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:211
+#: ../frontend/collaborate/components/SessionHeader.tsx:238
 msgid "Let in"
 msgstr "让其加入"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:136
+#: ../frontend/collaborate/components/SessionHeader.tsx:146
 msgid "Loading"
 msgstr "加载中"
 
@@ -197,14 +205,18 @@ msgstr "还没有可以邀请的 Discord 好友。"
 msgid "No friend by that name."
 msgstr "没有叫这个名字的好友。"
 
-#: ../frontend/collaborate/App.tsx:882
+#: ../frontend/collaborate/App.tsx:894
 msgid "No Title"
 msgstr "无标题"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:79
-#: ../frontend/collaborate/components/SessionHeader.tsx:219
+#: ../frontend/collaborate/components/SessionHeader.tsx:246
 msgid "Not now"
 msgstr "以后再说"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:196
+msgid "Only people with an account can join. Click to let guests in."
+msgstr "只有拥有账号的人才能加入。点击可允许访客加入。"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:83
 msgid "Or use + in any Discord chat."
@@ -216,11 +228,15 @@ msgstr "也可以在任意 Discord 聊天里用 + 邀请。"
 msgid "Participants ({0})"
 msgstr "参与者（{0}）"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:195
+msgid "People without an account can join. Click to stop new ones joining."
+msgstr "没有账号的人也可以加入。点击可阻止新的访客加入。"
+
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:76
 msgid "Reconnect"
 msgstr "重新连接"
 
-#: ../frontend/collaborate/App.tsx:1111
+#: ../frontend/collaborate/App.tsx:1146
 msgid "Remove"
 msgstr "移出"
 
@@ -231,7 +247,7 @@ msgid "Remove {0} from this session"
 msgstr "将 {0} 移出此会话"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1110
+#: ../frontend/collaborate/App.tsx:1145
 msgid "Remove {0} from this session? They won't be able to rejoin it."
 msgstr "要将 {0} 移出此会话吗？对方将无法再次加入。"
 
@@ -257,16 +273,16 @@ msgstr "保存为 PNG"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "要把这幅画保存到画廊吗？保存后所有人的协作会话都会结束，谁都无法继续绘制。"
 
-#: ../frontend/collaborate/App.tsx:1227
-#: ../frontend/collaborate/App.tsx:1277
+#: ../frontend/collaborate/App.tsx:1262
+#: ../frontend/collaborate/App.tsx:1312
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
 msgid "Save to Gallery"
 msgstr "保存到画廊"
 
-#: ../frontend/collaborate/App.tsx:1224
-#: ../frontend/collaborate/App.tsx:1277
+#: ../frontend/collaborate/App.tsx:1259
+#: ../frontend/collaborate/App.tsx:1312
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Saving..."
@@ -282,7 +298,7 @@ msgid "Send"
 msgstr "发送"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:133
-#: ../frontend/collaborate/components/SessionHeader.tsx:207
+#: ../frontend/collaborate/components/SessionHeader.tsx:234
 msgid "Sending…"
 msgstr "正在发送…"
 
@@ -302,11 +318,11 @@ msgstr "会话已满"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "会话即将结束。正在保存绘画到画廊..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:183
+#: ../frontend/collaborate/components/SessionHeader.tsx:210
 msgid "Share"
 msgstr "分享"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:180
+#: ../frontend/collaborate/components/SessionHeader.tsx:207
 msgid "Share this session"
 msgstr "分享此会话"
 
@@ -354,12 +370,12 @@ msgstr "此会话已保存。您只能将其下载为 PNG。"
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "此会话已满（{currentUserCount}/{maxUsers} 位用户）。只有前 {maxUsers} 位用户可以加入会话。"
 
-#: ../frontend/collaborate/App.tsx:951
+#: ../frontend/collaborate/App.tsx:963
 msgid "Too many guests have joined from this network. Try again later, or sign in."
 msgstr "来自此网络的访客过多。请稍后再试，或登录。"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:137
-#: ../frontend/collaborate/components/SessionHeader.tsx:209
+#: ../frontend/collaborate/components/SessionHeader.tsx:236
 msgid "Try again"
 msgstr "重试"
 

@@ -63,6 +63,11 @@ const WS_CLOSE_POLICY = 1008;
 // The reason that close carries when the owner sent this person out
 // (`REMOVED_REASON` in websocket/mod.rs).
 export const REMOVED_REASON = "removed from session";
+// The close the server sends a guest's socket once the guest has signed in,
+// here or in another tab (`SIGNED_IN_CODE` in websocket/mod.rs). Coming back
+// on the ordinary reconnect would still call itself the guest, whose id the
+// server no longer answers to, so the page reloads as the account instead.
+const WS_CLOSE_SIGNED_IN = 4001;
 // How long a participant who does not own the session waits before offering to
 // upload a checkpoint, giving the owner the first refusal. Long enough that the
 // owner's answer wins a same-tick race, short enough that nobody notices when
@@ -125,6 +130,8 @@ interface WebSocketHookParams {
   onSessionExpired: () => void;
   /** The owner sent this person out of the session; it will not take them back. */
   onRemoved?: () => void;
+  /** The guest this page was is an account now; the page should become it. */
+  onSignedIn?: () => void;
 }
 
 const OPENING_PROGRESS: SyncProgress = {
@@ -173,11 +180,14 @@ export const useWebSocket = ({
   onSessionEnded,
   onSessionExpired,
   onRemoved,
+  onSignedIn,
 }: WebSocketHookParams) => {
   const wsRef = useRef<WebSocket | null>(null);
   // Read when a socket closes, so a new callback is never a new socket.
   const onRemovedRef = useRef(onRemoved);
   onRemovedRef.current = onRemoved;
+  const onSignedInRef = useRef(onSignedIn);
+  onSignedInRef.current = onSignedIn;
   const [view, setView] = useState<SessionView>({
     connection: "connecting",
     catchingUp: true,
@@ -464,6 +474,13 @@ export const useWebSocket = ({
       // Leaving the session (unmount, or the session ended) - stay closed
       if (!link.shouldConnect) {
         publish({ connection: "disconnected" });
+        return;
+      }
+
+      if (event.code === WS_CLOSE_SIGNED_IN) {
+        link.shouldConnect = false;
+        publish({ connection: "disconnected" });
+        onSignedInRef.current?.();
         return;
       }
 

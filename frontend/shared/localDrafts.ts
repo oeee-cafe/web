@@ -59,6 +59,8 @@ export interface LocalDraft {
    * drafts kept before collaborative ones could be.
    */
   collaborativeSessionId?: string;
+  /** The session's title, for a collaborative drawing that has one. */
+  title?: string;
 }
 
 function request<T>(req: IDBRequest<T>): Promise<T> {

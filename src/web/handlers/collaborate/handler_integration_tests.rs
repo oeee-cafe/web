@@ -1305,3 +1305,82 @@ async fn signing_in_hands_a_guests_rooms_to_the_account() {
     room.teardown().await;
     outcome.expect("the scenario finished in time");
 }
+
+/// A guest who signs in -- in another tab, say -- while their room is open
+/// in this one. The socket still speaks for the guest, whose id the server
+/// no longer answers to, so it is closed with a reason the page answers by
+/// coming back as the account; and back, it is in the guest's seat.
+#[tokio::test]
+async fn signing_in_sends_the_guests_open_room_away_to_come_back_as_the_account() {
+    let Some(mut room) = open_room(8).await else {
+        return;
+    };
+    let guest = room.add_guest("miro").await;
+    let account = room.users[1];
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut miro = room.connect_as(guest, "203.0.113.7").await;
+        let (seat, _) = opening(&mut miro).await;
+
+        let session = tower_sessions::Session::new(
+            None,
+            Arc::new(tower_sessions::MemoryStore::default()),
+            None,
+        );
+        session
+            .insert(super::guest::GUEST_KEY, guest)
+            .await
+            .expect("the browser session holds the guest");
+        super::guest::adopt(&room.state, &session, account).await;
+
+        let goodbye = loop {
+            match next_close(&mut miro).await {
+                Some(goodbye) => break goodbye,
+                None => continue,
+            }
+        };
+        assert_eq!(u16::from(goodbye.code), 4001);
+        assert_eq!(goodbye.reason.as_str(), "signed in");
+
+        let mut back = room.connect_as(account, "203.0.113.7").await;
+        let (back_seat, _) = opening(&mut back).await;
+        assert_eq!(back_seat, seat, "the same layers, under the account");
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// The owner stops letting guests in mid-session: a new guest is turned
+/// away, and one already in the room is not shut out by a dropped
+/// connection.
+#[tokio::test]
+async fn closing_the_door_to_guests_keeps_out_new_ones_only() {
+    let Some(mut room) = open_room(8).await else {
+        return;
+    };
+    let inside = room.add_guest("inside").await;
+    let newcomer = room.add_guest("newcomer").await;
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut first = room.connect_as(inside, "203.0.113.7").await;
+        opening(&mut first).await;
+
+        sqlx::query!(
+            "UPDATE collaborative_sessions SET allow_guests = false WHERE id = $1",
+            room.room
+        )
+        .execute(&room.db)
+        .await
+        .expect("close the door");
+
+        first.close(None).await.expect("close");
+        let mut again = room.connect_as(inside, "203.0.113.7").await;
+        opening(&mut again).await;
+
+        let mut late = room.connect_as(newcomer, "198.51.100.1").await;
+        let refused = next_close(&mut late).await.expect("a close, not a welcome");
+        assert_eq!(u16::from(refused.code), 1008);
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
