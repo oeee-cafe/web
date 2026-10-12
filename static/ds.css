@@ -2834,8 +2834,10 @@ a.ds-handle:active {
    reads as a name's tag rather than more of the sentence. A supporter's is
    filled with the accent and carries their mark (.ds-marked centres it) --
    the one place the site's lime goes on a person, and so a thank-you rather
-   than decoration. A border in both, the supporter's the fill's own colour,
-   so the two are the same size. Inline-flex under .ds-page for the same
+   than decoration. A border in both, so the two are the same size; the
+   supporter's is the accent's line, as the profile's supporter chips have
+   (.supporter-chip), so the lime keeps an edge on a ground near its own
+   lightness. Inline-flex under .ds-page for the same
    reason a mark's holder is: the line box of an inline pill sat a pixel
    lower in one font than the next. */
 .ds-handle {
@@ -2928,7 +2930,7 @@ a.ds-handle:active {
 .ds-handle-supporter,
 a.ds-handle-supporter,
 a.ds-handle-supporter:visited {
-  border-color: var(--ds-accent);
+  border-color: var(--ds-accent-line);
   background-color: var(--ds-accent);
   color: var(--ds-accent-ink);
 }
