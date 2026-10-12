@@ -1,4 +1,5 @@
 {% from "storage_macro.jinja" import stored_url %}
+{% from "person_macro.jinja" import handle %}
 {# The community card, shared by every list on /communities and by the
    infinite-scroll fragment, so a community looks the same however it arrived.
 
@@ -40,7 +41,7 @@
       </span>
       {# The slug is not shown: for three quarters of communities it is a raw
          UUID. #}
-      <span class="community-card-owner">@{{ community.owner_login_name }}</span>
+      <span class="community-card-owner">{{ handle(community.owner_login_name, link=false) }}</span>
       <span class="community-card-stats">
         {{ community.posts_count if community.posts_count else 0 }} {{ ftl_get_message("community-stats-posts") }}
         · {{ community.members_count if community.members_count else 0 }} {{ ftl_get_message("community-stats-contributors") }}

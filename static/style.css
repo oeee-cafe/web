@@ -2367,6 +2367,12 @@ nav a:visited,
   font-size: var(--ds-text-m);
 }
 
+/* The owner's pill (person_macro.jinja), on the top of its line rather than
+   its middle, which grew the line a pixel past the pill. */
+.community-card-owner > .ds-handle {
+  vertical-align: top;
+}
+
 .community-card-stats {
   margin-top: 2px;
   color: var(--ds-faint);

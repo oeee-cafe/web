@@ -27,6 +27,12 @@
    theirs, and opens it in a tab of its own as every link off the site
    does.
 
+   `person_chip()` is a local person as a .profile-chip (style.css) that
+   says `text` -- their display name, say -- for a header that names
+   someone among the chips beside it. It is asked about as a pill is, and
+   a supporter's is the lime .supporter-chip their profile wears, with
+   their mark. The handle is its title.
+
    `handle_text()` is the handle as words, for an attribute: a pill cannot
    go in one, and the render refuses a placeholder that lands there.
 
@@ -69,12 +75,27 @@
   {%- endif -%}
 {%- endmacro %}
 
+{% macro person_chip(login_name, text, href=none) -%}
+  {%- set slot = supporter_slot(login_name, text, href, true) -%}
+  {%- if slot is none -%}
+    {{ pill(none, text, href, true, login_name) }}
+  {%- else -%}
+    {{ slot }}
+  {%- endif -%}
+{%- endmacro %}
+
 {# A local person's pill, with the mark the render found for them, if any,
-   and a link to `href`, if it has one. Called back by web::templates, and
-   by handle() when there is nobody to ask. #}
-{% macro pill(mark, text, href=none) -%}
+   and a link to `href`, if it has one; or, with `chip`, their chip.
+   Called back by web::templates, and by handle() and person_chip() when
+   there is nobody to ask. #}
+{% macro pill(mark, text, href=none, chip=false, login_name=none) -%}
   {%- set tag = "a" if href else "span" -%}
-  {%- if mark -%}
+  {%- if chip -%}
+    <{{ tag }} class="profile-chip{% if mark %} supporter-chip ds-marked{% endif %}"{% if href %} href="{{ href }}"{% endif %} title="@{{ login_name }}">
+      {%- if mark %}{{ supporter_mark(mark) }}{% endif -%}
+      {{- text -}}
+    </{{ tag }}>
+  {%- elif mark -%}
     <{{ tag }} class="ds-handle ds-handle-supporter ds-marked"{% if href %} href="{{ href }}"{% endif %} title="{{ supporter_mark_name(mark) }}">
       {{- supporter_mark(mark) -}}
       {{- text -}}

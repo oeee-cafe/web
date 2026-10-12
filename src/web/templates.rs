@@ -41,13 +41,15 @@ const LOOKUP_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
 const OPEN: char = '\u{E000}';
 const CLOSE: char = '\u{E001}';
 
-/// A handle a render has printed: whose, the text its pill will say, and
-/// where the pill leads, if it is a link.
+/// A handle a render has printed: whose, the text its pill will say,
+/// where the pill leads, if it is a link, and whether it is drawn as a
+/// chip (`person_chip()`) rather than a handle's pill.
 #[derive(Debug)]
 struct Slot {
     login_name: String,
     text: String,
     href: Option<String>,
+    chip: bool,
 }
 
 /// The handles a render has printed, in order. Kept as the render's
@@ -55,8 +57,8 @@ struct Slot {
 #[derive(Debug, Default)]
 struct Printed(Vec<Slot>);
 
-/// `supporter_slot(login_name, text, href)`, for person_macro.jinja's
-/// `handle()`: records the name and returns the placeholder its pill will
+/// `supporter_slot(login_name, text, href, chip)`, for person_macro.jinja's
+/// `handle()` and `person_chip()`: records the name and returns the placeholder its pill will
 /// take. Outside [`Templates`] -- a test rendering a template on its own --
 /// there is nothing to record into, and it returns none, which `handle()`
 /// answers by drawing the pill without a mark.
@@ -65,6 +67,7 @@ pub fn supporter_slot(
     login_name: String,
     text: String,
     href: Option<String>,
+    chip: Option<bool>,
 ) -> Value {
     let Some(nonce) = state.lookup(NONCE) else {
         return Value::from(());
@@ -75,6 +78,7 @@ pub fn supporter_slot(
         login_name,
         text,
         href,
+        chip: chip.unwrap_or(false),
     });
     Value::from_safe_string(format!("{OPEN}{nonce}:{index}{CLOSE}"))
 }
@@ -262,6 +266,8 @@ impl Templates {
                         Value::from(mark),
                         Value::from(slot.text.as_str()),
                         Value::from(slot.href.clone()),
+                        Value::from(slot.chip),
+                        Value::from(slot.login_name.as_str()),
                     ],
                 )
             })
@@ -445,7 +451,7 @@ mod tests {
         let mut env = crate::web::handlers::test_support::env();
         env.add_template_owned(
             "page.jinja",
-            format!(r#"{{% from "person_macro.jinja" import handle, handle_text %}}{page}"#),
+            format!(r#"{{% from "person_macro.jinja" import handle, handle_text, person_chip %}}{page}"#),
         )
         .unwrap();
         Templates::new(env)
@@ -472,6 +478,30 @@ mod tests {
             "{page}"
         );
         assert!(!page.contains(OPEN));
+    }
+
+    /// A person's chip is asked about as a pill is, and a supporter's is
+    /// the lime chip their profile wears, with their mark before its words.
+    #[test]
+    fn a_persons_chip_is_a_supporters_chip_for_a_supporter() {
+        let templates = templates_with(
+            r#"<p>{{ person_chip("fan", "Fan <3", "/@fan") }} {{ person_chip("plain", "Plain") }}</p>"#,
+        );
+        let page = templates
+            .render_with("page.jinja", context! {}, |names| {
+                assert_eq!(names, ["fan", "plain"]);
+                HashMap::from([("fan".to_string(), "steam".to_string())])
+            })
+            .unwrap();
+        assert!(
+            page.contains(r#"<a class="profile-chip supporter-chip ds-marked" href="&#x2f;@fan" title="@fan"><span class="supporter-mark ds-mark" aria-hidden="true">"#),
+            "{page}"
+        );
+        assert!(page.contains("Fan &lt;3</a>"), "{page}");
+        assert!(
+            page.contains(r#"<span class="profile-chip" title="@plain">Plain</span>"#),
+            "{page}"
+        );
     }
 
     #[test]

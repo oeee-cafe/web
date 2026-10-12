@@ -1,6 +1,7 @@
 {% extends "base.jinja" %}
 {% import "pill_macro.jinja" as pill %}
 {% from "comments_aside_macro.jinja" import comments_aside %}
+{% from "person_macro.jinja" import person_chip %}
 {% block title %}
   {{ super() }} | {{ community.name }}
 {% endblock title %}
@@ -69,7 +70,7 @@
           {% if header is defined %}
             <div class="community-header-meta">
               {% if header.owner %}
-                <a class="profile-chip" href="/@{{ header.owner.login_name }}" title="@{{ header.owner.login_name }}">{{ header.owner.display_name }}</a>
+                {{ person_chip(header.owner.login_name, header.owner.display_name, "/@" ~ header.owner.login_name) }}
               {% endif %}
               {# A two-tone community draws in the pair of colours it was
                  made with, which is worth knowing before pressing Draw. #}
