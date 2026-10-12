@@ -308,9 +308,13 @@ export interface PainterHandle {
    * The painter knows every actor that has drawn, because their layers exist,
    * but not who they are: names and colours belong to the host's roster. Any
    * actor left unnamed is listed by its id.
+   *
+   * Everyone named is listed, drawn or not, so somebody who has just arrived
+   * has a row before their first mark. `left` is somebody no longer in the
+   * room: still named on layers they drew, and not listed if they drew none.
    */
   setParticipants(
-    participants: { actorId: string; name: string; color?: string }[],
+    participants: { actorId: string; name: string; color?: string; left?: boolean }[],
   ): void;
 
   /**

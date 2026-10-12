@@ -182,10 +182,13 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
    * who any of them are -- names and colours belong to the host's roster.
    */
   const setParticipants = useCallback(
-    (participants: { actorId: string; name: string; color?: string }[]) => {
+    (participants: { actorId: string; name: string; color?: string; left?: boolean }[]) => {
       setParticipantNames(
         new Map(
-          participants.map(({ actorId, name, color }) => [actorId, { name, color }]),
+          participants.map(({ actorId, name, color, left }) => [
+            actorId,
+            { name, color, left: left ?? false },
+          ]),
         ),
       );
     },
@@ -240,7 +243,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
   const [layerOwners, setLayerOwners] = useState<string[]>([]);
   /** Display names the host knows and the painter does not. */
   const [participantNames, setParticipantNames] = useState<
-    ReadonlyMap<string, { name: string; color?: string }>
+    ReadonlyMap<string, { name: string; color?: string; left: boolean }>
   >(() => new Map());
   /**
    * Whether the opening zoom has been applied.
@@ -326,7 +329,19 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       // just those would leave somebody who has joined and not yet made a
       // mark out of the toolbox -- and they are exactly who you want to be
       // able to see, hide, or draw for.
-      inJoinOrder([...new Set([...layerOwners, ...participantNames.keys()])]).map(
+      //
+      // Somebody who has left is listed only for layers they own: what they
+      // drew stays, and their row is how it is seen or hidden. Somebody who
+      // left without a mark has nothing there, and a row would only say they
+      // were still in the room.
+      inJoinOrder([
+        ...new Set([
+          ...layerOwners,
+          ...[...participantNames]
+            .filter(([, participant]) => !participant.left)
+            .map(([actorId]) => actorId),
+        ]),
+      ]).map(
         (actorId) => ({
           actorId,
           name: participantNames.get(actorId)?.name ?? actorId,

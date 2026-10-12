@@ -526,6 +526,70 @@ describe("public painter lifecycle", () => {
     act(() => painter.unmount());
   });
 
+  it("lists somebody who has left only if they drew", async () => {
+    // Their marks stay on the canvas, and their row is how those are seen or
+    // hidden; without any, a row only says they are still in the room.
+    const element = document.createElement("div");
+    document.body.appendChild(element);
+    let painter!: ReturnType<typeof mount>;
+    act(() => {
+      painter = mount(element, {
+        width: 32, height: 24,
+        mode: { kind: "standard" },
+        controls: { kind: "toolbox" },
+        synchronization: { actorId: "1", onOperation: () => {} },
+      });
+    });
+    await act(async () => painter.ready);
+
+    const rows = () =>
+      Array.from(document.querySelectorAll("button"))
+        .map((button) => button.getAttribute("aria-label") ?? "")
+        .filter((label) => label.startsWith("Draw on "));
+
+    // Carol draws; bob does not.
+    await act(async () => {
+      await painter.applyCanonicalOperation({
+        id: "b1", actorId: "3", sequence: 1, operation: { kind: "undo-boundary" },
+      });
+      await painter.applyCanonicalOperation({
+        id: "s1", actorId: "3", sequence: 2,
+        operation: {
+          kind: "stroke", layer: "foreground", brushSize: 1, brush: "solid",
+          color: { r: 255, g: 0, b: 0, a: 255 }, points: [{ x: 4, y: 4 }],
+          mask: { type: 0, r: 0, g: 0, b: 0 },
+        },
+      });
+    });
+    act(() => {
+      painter.setParticipants([
+        { actorId: "1", name: "alice" },
+        { actorId: "2", name: "bob" },
+        { actorId: "3", name: "carol" },
+      ]);
+    });
+    expect(rows()).toEqual([
+      "Draw on alice's layers",
+      "Draw on bob's layers",
+      "Draw on carol's layers",
+    ]);
+
+    // Both leave.
+    act(() => {
+      painter.setParticipants([
+        { actorId: "1", name: "alice" },
+        { actorId: "2", name: "bob", left: true },
+        { actorId: "3", name: "carol", left: true },
+      ]);
+    });
+    expect(rows(), "carol's marks keep her row, by name").toEqual([
+      "Draw on alice's layers",
+      "Draw on carol's layers",
+    ]);
+
+    act(() => painter.unmount());
+  });
+
   it("applies canonical operations and round-trips public checkpoints", async () => {
     const element = document.createElement("div");
     document.body.appendChild(element);

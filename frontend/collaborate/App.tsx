@@ -285,6 +285,7 @@ export default function App() {
         .map((participant) => ({
           actorId: String(participant.sessionId),
           name: participant.username,
+          left: participant.left,
         })),
     );
   }, [participants]);
