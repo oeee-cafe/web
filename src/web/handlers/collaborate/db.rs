@@ -109,6 +109,35 @@ pub async fn viewer_may_enter(
     .await
 }
 
+/// Whether the owner banned this person from the room: by their id, or --
+/// for a guest, or somebody who would come in as one -- by the address a
+/// banned guest was at. The same test `viewer_may_enter` refuses on, asked
+/// apart so the page can say "you were removed" rather than "not allowed".
+pub async fn viewer_is_banned(
+    db: &Pool<Postgres>,
+    room_uuid: Uuid,
+    viewer: Option<&super::guest::Collaborator>,
+    ip: Option<&str>,
+) -> Result<bool, sqlx::Error> {
+    let participant_id = viewer.map(|viewer| viewer.id());
+    let as_guest = viewer.is_none_or(|viewer| viewer.is_guest());
+    sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM collaborative_session_bans b
+            WHERE b.session_id = $1
+              AND (b.participant_id = $2 OR ($3 AND b.ip IS NOT NULL AND b.ip = $4))
+        ) AS "banned!"
+        "#,
+        room_uuid,
+        participant_id,
+        as_guest,
+        ip,
+    )
+    .fetch_one(db)
+    .await
+}
+
 pub async fn get_active_user_count(
     db: &Pool<Postgres>,
     room_uuid: Uuid,

@@ -903,6 +903,14 @@ export default function App() {
         window.location.href = signInHref();
         return;
       }
+      // Sent out of this room by its owner, and back on a reload or a link.
+      if (response.status === 403) {
+        const refusal = await response.json().catch(() => null);
+        if (refusal?.error === "removed") {
+          setRemoved(true);
+          return;
+        }
+      }
       if (!response.ok) throw new Error(`Failed to fetch collaboration meta: ${response.status}`);
       const meta: CollaborationMeta = await response.json();
       // Nobody yet, at a room that takes guests and is still open: a name
@@ -1222,7 +1230,7 @@ export default function App() {
   return <>
     <div className="w-full app-container flex flex-col">
       <InitializationErrorModal isOpen={!!initializationError} errorMessage={initializationError ?? ""} onRetry={reload} />
-      <LoadingModal isOpen={!canvasMeta && !initializationError && !awaitingName} />
+      <LoadingModal isOpen={!canvasMeta && !initializationError && !awaitingName && !removed} />
       <AuthErrorModal isOpen={authError} onGoToLobby={goToLobby} />
       <RoomFullModal isOpen={!!roomFullError} currentUserCount={roomFullError?.currentUserCount ?? 0} maxUsers={roomFullError?.maxUsers ?? 0} onGoToLobby={goToLobby} onRetry={reload} />
       <div className="relative flex-1 overflow-hidden">
@@ -1280,7 +1288,7 @@ export default function App() {
       </div>
     </div>
     <SessionExpiredModal isOpen={sessionExpired && !removed} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} hasCanvas={!canvasMeta?.ended} endedByOwner={endedByOwner} ownerKeepsOnDevice={ownerKeepsOnDevice} onClose={() => {}} onSaveToGallery={ownerKeepsOnDevice ? keepOnDevice : saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
-    <RemovedModal isOpen={removed} onDownloadPNG={downloadPng} onGoToLobby={goToLobby} />
+    <RemovedModal isOpen={removed} onGoToLobby={goToLobby} />
     <GuestNameModal isOpen={!!awaitingName} suggestion={discordKnown().state?.name ?? undefined} onSubmit={becomeGuest} signInHref={signInHref()} />
   </>;
 }

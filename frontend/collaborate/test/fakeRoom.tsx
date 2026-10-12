@@ -240,7 +240,7 @@ export class FakeServer {
  * Puts the page's surroundings in place: the sign-in, the session's
  * metadata, the room's URL, and a `WebSocket` that is one of ours.
  */
-export function installRoom(options: { ownerId?: string; ended?: boolean } = {}) {
+export function installRoom(options: { ownerId?: string; ended?: boolean; removed?: boolean } = {}) {
   sockets = [];
   RealWebSocket = globalThis.WebSocket;
   realFetch = globalThis.fetch;
@@ -252,6 +252,9 @@ export function installRoom(options: { ownerId?: string; ended?: boolean } = {})
         JSON.stringify({ user_id: "umu-uuid", login_name: "umu", preferred_locale: "en" }),
         { status: 200 },
       );
+    }
+    if (url.includes("/meta") && options.removed) {
+      return new Response(JSON.stringify({ error: "removed" }), { status: 403 });
     }
     if (url.includes("/meta")) {
       return new Response(

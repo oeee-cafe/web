@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
 import { FLAG_GUEST } from "./binaryProtocol";
-import { FakeServer, installRoom, mountSession, settle, settleUntil, uninstallRoom } from "./test/fakeRoom";
+import {
+  FakeServer, installRoom, mountPage, mountSession, settle, settleUntil, uninstallRoom,
+} from "./test/fakeRoom";
 import { layersFrame, leaveFrame } from "./test/frames";
 
 /**
@@ -63,5 +65,18 @@ describe("the participant list", () => {
     );
     await settle();
     expect(count()).toBe("2");
+  });
+});
+
+describe("somebody the owner removed", () => {
+  it("is told so on coming back, rather than that sign-in failed", async () => {
+    uninstallRoom();
+    installRoom({ removed: true });
+    await mountPage();
+    await settleUntil(() => document.body.textContent?.includes("Removed from Session") ?? false);
+    expect(document.body.textContent).not.toContain("Authentication Failed");
+    // The room's canvas is not theirs to take a copy of.
+    expect(document.body.textContent).not.toContain("Save as PNG");
+    expect(document.body.textContent).toContain("Return to Lobby");
   });
 });

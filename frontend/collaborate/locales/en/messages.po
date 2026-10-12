@@ -34,7 +34,7 @@ msgstr "by"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: ../frontend/collaborate/App.tsx:930
+#: ../frontend/collaborate/App.tsx:950
 msgid "Choose a name of 1 to 30 characters, without hidden characters."
 msgstr "Choose a name of 1 to 30 characters, without hidden characters."
 
@@ -71,8 +71,8 @@ msgstr "Connecting..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "Connection lost. Your work is saved locally."
 
-#: ../frontend/collaborate/App.tsx:932
-#: ../frontend/collaborate/App.tsx:939
+#: ../frontend/collaborate/App.tsx:952
+#: ../frontend/collaborate/App.tsx:959
 msgid "Couldn't join. Please try again."
 msgstr "Couldn't join. Please try again."
 
@@ -81,7 +81,7 @@ msgid "Couldn’t let {name} in"
 msgstr "Couldn’t let {name} in"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1101
+#: ../frontend/collaborate/App.tsx:1121
 msgid "Couldn't remove {0}. Please try again."
 msgstr "Couldn't remove {0}. Please try again."
 
@@ -116,8 +116,8 @@ msgstr "Go to Lobby"
 msgid "guest"
 msgstr "guest"
 
-#: ../frontend/collaborate/App.tsx:1166
-#: ../frontend/collaborate/App.tsx:1170
+#: ../frontend/collaborate/App.tsx:1186
+#: ../frontend/collaborate/App.tsx:1190
 msgid "Help"
 msgstr "Help"
 
@@ -156,8 +156,8 @@ msgstr "Join"
 msgid "Join as a Guest"
 msgstr "Join as a Guest"
 
-#: ../frontend/collaborate/App.tsx:1206
-#: ../frontend/collaborate/App.tsx:1256
+#: ../frontend/collaborate/App.tsx:1226
+#: ../frontend/collaborate/App.tsx:1277
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
@@ -197,7 +197,7 @@ msgstr "No Discord friends to invite yet."
 msgid "No friend by that name."
 msgstr "No friend by that name."
 
-#: ../frontend/collaborate/App.tsx:870
+#: ../frontend/collaborate/App.tsx:882
 msgid "No Title"
 msgstr "No Title"
 
@@ -220,7 +220,7 @@ msgstr "Participants ({0})"
 msgid "Reconnect"
 msgstr "Reconnect"
 
-#: ../frontend/collaborate/App.tsx:1091
+#: ../frontend/collaborate/App.tsx:1111
 msgid "Remove"
 msgstr "Remove"
 
@@ -231,7 +231,7 @@ msgid "Remove {0} from this session"
 msgstr "Remove {0} from this session"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1090
+#: ../frontend/collaborate/App.tsx:1110
 msgid "Remove {0} from this session? They won't be able to rejoin it."
 msgstr "Remove {0} from this session? They won't be able to rejoin it."
 
@@ -244,12 +244,11 @@ msgstr "Removed from Session"
 msgid "Retry"
 msgstr "Retry"
 
-#: ../frontend/collaborate/components/modals/RemovedModal.tsx:26
+#: ../frontend/collaborate/components/modals/RemovedModal.tsx:23
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:167
 msgid "Return to Lobby"
 msgstr "Return to Lobby"
 
-#: ../frontend/collaborate/components/modals/RemovedModal.tsx:23
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:159
 msgid "Save as PNG"
 msgstr "Save as PNG"
@@ -258,16 +257,16 @@ msgstr "Save as PNG"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 
-#: ../frontend/collaborate/App.tsx:1207
-#: ../frontend/collaborate/App.tsx:1256
+#: ../frontend/collaborate/App.tsx:1227
+#: ../frontend/collaborate/App.tsx:1277
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
 msgid "Save to Gallery"
 msgstr "Save to Gallery"
 
-#: ../frontend/collaborate/App.tsx:1204
-#: ../frontend/collaborate/App.tsx:1256
+#: ../frontend/collaborate/App.tsx:1224
+#: ../frontend/collaborate/App.tsx:1277
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Saving..."
@@ -355,7 +354,7 @@ msgstr "This session has already been saved. You can only download it as a PNG."
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 
-#: ../frontend/collaborate/App.tsx:931
+#: ../frontend/collaborate/App.tsx:951
 msgid "Too many guests have joined from this network. Try again later, or sign in."
 msgstr "Too many guests have joined from this network. Try again later, or sign in."
 

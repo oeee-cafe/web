@@ -132,10 +132,20 @@ pub async fn get_collaboration_meta(
     session: Session,
     headers: HeaderMap,
     State(state): State<AppState>,
-) -> Result<Json<CollaborationMeta>, AppError> {
+) -> Result<Response, AppError> {
     let db = &state.db_pool;
     let who = guest::current(auth_session.user.as_ref(), &session, db).await?;
     let ip = rate_limit::client_ip(&headers);
+
+    // Sent out by the owner: said as such, so the page tells them they were
+    // removed rather than that something failed.
+    if db::viewer_is_banned(db, session_uuid, who.as_ref(), ip.as_deref()).await? {
+        return Ok((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "removed" })),
+        )
+            .into_response());
+    }
 
     // Somebody with no name yet is asked whether they could come in as a
     // guest, which is what they would be.
@@ -188,7 +198,8 @@ pub async fn get_collaboration_meta(
         max_users: session.max_participants,
         current_user_count: user_count,
         ended: session.ended_at.is_some(),
-    }))
+    })
+    .into_response())
 }
 
 #[derive(serde::Deserialize)]

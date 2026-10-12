@@ -1126,6 +1126,32 @@ async fn a_banned_guest_is_sent_out_and_kept_out() {
         let left = next_of_type(&mut alice, LEAVE).await;
         assert_eq!(person_in(&left).0, guest);
 
+        // What the page asks before it opens a socket: whether to say "you
+        // were removed". The guest, by id; a new guest, by address; never an
+        // account from that address.
+        let banned = |who: Option<Collaborator>, ip: &'static str| {
+            let db = room.db.clone();
+            let room_id = room.room;
+            async move {
+                super::db::viewer_is_banned(&db, room_id, who.as_ref(), Some(ip))
+                    .await
+                    .expect("ban check")
+            }
+        };
+        let as_guest = |id: Uuid| Collaborator::Guest {
+            id,
+            nickname: "x".to_string(),
+        };
+        assert!(banned(Some(as_guest(guest)), "198.51.100.1").await);
+        assert!(banned(Some(as_guest(second_guest)), "203.0.113.7").await);
+        assert!(banned(None, "203.0.113.7").await, "nobody yet, from there");
+        assert!(!banned(Some(as_guest(elsewhere)), "198.51.100.1").await);
+        let account = Collaborator::User {
+            id: room.users[1],
+            login_name: "x".to_string(),
+        };
+        assert!(!banned(Some(account), "203.0.113.7").await);
+
         let mut again = room.connect_as(guest, "198.51.100.1").await;
         let refused = next_close(&mut again)
             .await

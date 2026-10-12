@@ -34,7 +34,7 @@ msgstr "작성자:"
 msgid "Cancel"
 msgstr "취소"
 
-#: ../frontend/collaborate/App.tsx:930
+#: ../frontend/collaborate/App.tsx:950
 msgid "Choose a name of 1 to 30 characters, without hidden characters."
 msgstr "숨은 문자 없이 1~30자로 이름을 정해 주세요."
 
@@ -71,8 +71,8 @@ msgstr "연결 중..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "연결이 끊어졌습니다. 작업이 로컬에 저장되었습니다."
 
-#: ../frontend/collaborate/App.tsx:932
-#: ../frontend/collaborate/App.tsx:939
+#: ../frontend/collaborate/App.tsx:952
+#: ../frontend/collaborate/App.tsx:959
 msgid "Couldn't join. Please try again."
 msgstr "참여하지 못했습니다. 다시 시도해 주세요."
 
@@ -81,7 +81,7 @@ msgid "Couldn’t let {name} in"
 msgstr "{name} 님을 들이지 못했어요"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1101
+#: ../frontend/collaborate/App.tsx:1121
 msgid "Couldn't remove {0}. Please try again."
 msgstr "{0} 님을 내보내지 못했습니다. 다시 시도해 주세요."
 
@@ -116,8 +116,8 @@ msgstr "로비로 가기"
 msgid "guest"
 msgstr "손님"
 
-#: ../frontend/collaborate/App.tsx:1166
-#: ../frontend/collaborate/App.tsx:1170
+#: ../frontend/collaborate/App.tsx:1186
+#: ../frontend/collaborate/App.tsx:1190
 msgid "Help"
 msgstr "도움말"
 
@@ -156,8 +156,8 @@ msgstr "참여"
 msgid "Join as a Guest"
 msgstr "손님으로 참여"
 
-#: ../frontend/collaborate/App.tsx:1206
-#: ../frontend/collaborate/App.tsx:1256
+#: ../frontend/collaborate/App.tsx:1226
+#: ../frontend/collaborate/App.tsx:1277
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
@@ -197,7 +197,7 @@ msgstr "아직 초대할 Discord 친구가 없어요."
 msgid "No friend by that name."
 msgstr "그 이름의 친구가 없어요."
 
-#: ../frontend/collaborate/App.tsx:870
+#: ../frontend/collaborate/App.tsx:882
 msgid "No Title"
 msgstr "제목 없음"
 
@@ -220,7 +220,7 @@ msgstr "참가자 ({0})"
 msgid "Reconnect"
 msgstr "재연결"
 
-#: ../frontend/collaborate/App.tsx:1091
+#: ../frontend/collaborate/App.tsx:1111
 msgid "Remove"
 msgstr "내보내기"
 
@@ -231,7 +231,7 @@ msgid "Remove {0} from this session"
 msgstr "{0} 님을 세션에서 내보내기"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1090
+#: ../frontend/collaborate/App.tsx:1110
 msgid "Remove {0} from this session? They won't be able to rejoin it."
 msgstr "{0} 님을 세션에서 내보낼까요? 이 세션에 다시 들어올 수 없게 됩니다."
 
@@ -244,12 +244,11 @@ msgstr "세션에서 내보내짐"
 msgid "Retry"
 msgstr "다시 시도"
 
-#: ../frontend/collaborate/components/modals/RemovedModal.tsx:26
+#: ../frontend/collaborate/components/modals/RemovedModal.tsx:23
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:167
 msgid "Return to Lobby"
 msgstr "로비로 돌아가기"
 
-#: ../frontend/collaborate/components/modals/RemovedModal.tsx:23
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:159
 msgid "Save as PNG"
 msgstr "PNG로 저장"
@@ -258,16 +257,16 @@ msgstr "PNG로 저장"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "이 그림을 갤러리에 저장할까요? 저장하면 모두의 세션이 끝나고 아무도 이어서 그릴 수 없습니다."
 
-#: ../frontend/collaborate/App.tsx:1207
-#: ../frontend/collaborate/App.tsx:1256
+#: ../frontend/collaborate/App.tsx:1227
+#: ../frontend/collaborate/App.tsx:1277
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
 msgid "Save to Gallery"
 msgstr "갤러리에 저장"
 
-#: ../frontend/collaborate/App.tsx:1204
-#: ../frontend/collaborate/App.tsx:1256
+#: ../frontend/collaborate/App.tsx:1224
+#: ../frontend/collaborate/App.tsx:1277
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Saving..."
@@ -355,7 +354,7 @@ msgstr "이 세션은 이미 저장되었습니다. PNG로만 다운로드할 �
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "이 세션이 가득 찼습니다 ({currentUserCount}/{maxUsers}명). 처음 {maxUsers}명의 사용자만 세션에 참여할 수 있습니다."
 
-#: ../frontend/collaborate/App.tsx:931
+#: ../frontend/collaborate/App.tsx:951
 msgid "Too many guests have joined from this network. Try again later, or sign in."
 msgstr "이 네트워크에서 손님이 너무 많이 참여했습니다. 나중에 다시 시도하거나 로그인해 주세요."
 
