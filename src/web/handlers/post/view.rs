@@ -316,10 +316,10 @@ pub async fn post_view(
                 let parent_result = sqlx::query!(
                     r#"
                 SELECT
-                    posts.id,
+                    posts.id AS "id!",
                     posts.title,
                     posts.content,
-                    posts.author_id,
+                    posts.author_id AS "author_id!",
                     users.login_name AS "login_name?",
                     users.display_name AS "display_name?",
                     actors.handle as "actor_handle?",
@@ -708,10 +708,10 @@ pub async fn post_view_by_login_name(
                 let parent_result = sqlx::query!(
                     r#"
                 SELECT
-                    posts.id,
+                    posts.id AS "id!",
                     posts.title,
                     posts.content,
-                    posts.author_id,
+                    posts.author_id AS "author_id!",
                     users.login_name AS "login_name?",
                     users.display_name AS "display_name?",
                     actors.handle as "actor_handle?",

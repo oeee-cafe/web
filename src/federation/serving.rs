@@ -199,12 +199,12 @@ async fn row_state(
     id: Uuid,
 ) -> anyhow::Result<Option<Option<DateTime<Utc>>>> {
     // `table` is one of the literals below, never input.
-    Ok(
-        sqlx::query_scalar(&format!("SELECT deleted_at FROM {table} WHERE id = $1"))
-            .bind(id)
-            .fetch_optional(&ctx.data().db_pool)
-            .await?,
-    )
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT deleted_at FROM {table} WHERE id = $1"
+    )))
+    .bind(id)
+    .fetch_optional(&ctx.data().db_pool)
+    .await?)
 }
 
 async fn person(ctx: Ctx, user_id: String) -> anyhow::Result<Found<Value>> {

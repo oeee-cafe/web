@@ -30,7 +30,7 @@ pub async fn find_posts_by_community_id(
                 posts.created_at,
                 posts.updated_at
             FROM posts
-            LEFT JOIN images ON posts.image_id = images.id
+            JOIN images ON posts.image_id = images.id
             WHERE community_id = $1
             AND posts.deleted_at IS NULL
         ",

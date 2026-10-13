@@ -73,9 +73,9 @@ pub async fn find_post_by_id(
                 communities.name AS "community_name?",
                 communities.slug AS "community_slug?"
             FROM posts
-            LEFT JOIN images ON posts.image_id = images.id
+            JOIN images ON posts.image_id = images.id
             LEFT JOIN communities ON posts.community_id = communities.id
-            LEFT JOIN users ON posts.author_id = users.id
+            JOIN users ON posts.author_id = users.id
             WHERE posts.id = $1
             AND posts.deleted_at IS NULL
         "#,

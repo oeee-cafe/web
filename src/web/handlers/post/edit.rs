@@ -78,7 +78,7 @@ pub async fn post_edit_community(
         let community_result = sqlx::query!(
             r#"
             SELECT
-                c.id, c.owner_id, c.name, c.slug, c.description,
+                c.id AS "id!", c.owner_id AS "owner_id!", c.name, c.slug, c.description,
                 c.visibility as "visibility: crate::models::community::CommunityVisibility", c.updated_at, c.created_at, c.background_color, c.foreground_color,
                 u.login_name AS "owner_login_name?"
             FROM communities c

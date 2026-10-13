@@ -162,12 +162,15 @@ pub async fn get_collaboration_meta(
     // in the moment before it went, the owner reloading after a save.
     let session = sqlx::query!(
         r#"
-        SELECT cs.title, cs.width, cs.height, cs.owner_participant_id, cs.saved_post_id,
-               cs.max_participants, cs.ended_at,
+        SELECT cs.title, cs.width AS "width!", cs.height AS "height!",
+               -- Generated from owner_id or owner_guest_id, one of which is
+               -- always there.
+               cs.owner_participant_id AS "owner_participant_id!", cs.saved_post_id,
+               cs.max_participants AS "max_participants!", cs.ended_at,
                COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
                cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
-               cs.allow_guests,
-               cs.allow_spectators,
+               cs.allow_guests AS "allow_guests!",
+               cs.allow_spectators AS "allow_spectators!",
                (c.id IS NULL OR c.visibility = 'public') AS "community_admits_guests!"
         FROM collaborative_sessions cs
         LEFT JOIN users u ON cs.owner_id = u.id

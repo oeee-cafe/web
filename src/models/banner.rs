@@ -125,7 +125,7 @@ pub async fn find_banner_by_id(
                 images.replay_filename,
                 banners.created_at
             FROM banners
-            LEFT JOIN images ON banners.image_id = images.id
+            JOIN images ON banners.image_id = images.id
             WHERE banners.id = $1
             AND banners.deleted_at IS NULL
         ",

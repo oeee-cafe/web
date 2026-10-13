@@ -6,4 +6,4 @@ python = "3.13"
 sentry-cli = "3.8.0"
 # For `sqlx migrate add`, matched to the sqlx the server runs migrations with
 # on boot (Cargo.toml).
-"cargo:sqlx-cli" = { version = "0.8.6", features = "postgres", default-features = false }
+"cargo:sqlx-cli" = { version = "0.9.0", features = "postgres", default-features = false }
