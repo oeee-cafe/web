@@ -1578,3 +1578,46 @@ async fn watching_is_the_owners_to_allow_and_has_a_ceiling() {
     room.teardown().await;
     outcome.expect("the scenario finished in time");
 }
+
+/// A connection that talks faster than anybody reads is held to a burst of
+/// five lines and a line a second after it; the room hears no more than that.
+#[tokio::test]
+async fn chat_past_the_allowance_never_reaches_the_room() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        opening(&mut alice).await;
+        let mut bob = room.connect(1, None).await;
+        opening(&mut bob).await;
+
+        for line in 0..12 {
+            send(&mut bob, chat_frame(room.users[1], &format!("line {line}"))).await;
+        }
+        // A pointer after the flood, which is never limited: everything
+        // before it has been handled once it arrives.
+        let mut pointer = vec![MOVE_POINTER, 0];
+        pointer.extend_from_slice(&1i32.to_le_bytes());
+        pointer.extend_from_slice(&1i32.to_le_bytes());
+        send(&mut bob, pointer).await;
+        let mut heard = 0;
+        loop {
+            let frame = next_frame(&mut alice, "the flood and the pointer").await;
+            match frame[0] {
+                0x03 => heard += 1,
+                MOVE_POINTER => break,
+                _ => {}
+            }
+        }
+        assert_eq!(heard, 5, "the burst, and nothing past it");
+
+        tokio::time::sleep(Duration::from_millis(1100)).await;
+        send(&mut bob, chat_frame(room.users[1], "after a breath")).await;
+        let chat = next_of_type(&mut alice, 0x03).await;
+        assert!(chat.ends_with(b"after a breath"));
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}

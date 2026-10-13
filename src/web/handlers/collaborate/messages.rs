@@ -59,6 +59,27 @@ mod chat_framing_tests {
         assert!(ChatMessage::parse(&wrong_type).is_none());
     }
 
+    /// A line longer than the chat box allows was not typed into it.
+    #[test]
+    fn a_line_past_the_chat_box_is_refused() {
+        let who = crate::web::handlers::collaborate::guest::Collaborator::User {
+            id: Uuid::from_u128(4),
+            login_name: "miro".to_string(),
+        };
+        let frame = |message: &str| {
+            let mut frame = vec![0x03];
+            frame.extend_from_slice(who.id().as_bytes());
+            frame.extend_from_slice(&1u64.to_le_bytes());
+            frame.extend_from_slice(&(message.len() as u16).to_le_bytes());
+            frame.extend_from_slice(message.as_bytes());
+            frame
+        };
+        let longest = "가".repeat(super::MAX_CHAT_CHARS);
+        assert!(super::handle_chat_message(&frame(&longest), &who, 0).is_some());
+        let too_long = "가".repeat(super::MAX_CHAT_CHARS + 1);
+        assert!(super::handle_chat_message(&frame(&too_long), &who, 0).is_none());
+    }
+
     /// The guest flag is read back from where it was written, so the
     /// recording knows a guest's line from an account's of the same name.
     #[test]
@@ -618,6 +639,10 @@ pub fn handle_chat_message(data: &[u8], who: &Collaborator, flags: u8) -> Option
         Ok(text) => text,
         Err(_) => return None,
     };
+    // The client holds a line to this; one past it was not sent by the page.
+    if chat_text.chars().count() > MAX_CHAT_CHARS {
+        return None;
+    }
 
     debug!(
         "Chat message from user {} ({}): {}",
@@ -634,6 +659,10 @@ pub fn handle_chat_message(data: &[u8], who: &Collaborator, flags: u8) -> Option
 
     Some(Message::Binary(chat_message.serialize().into()))
 }
+
+/// The longest line of chat, in characters: what the chat box allows
+/// (`maxLength` in frontend/collaborate/components/Chat.tsx).
+pub const MAX_CHAT_CHARS: usize = 500;
 
 /// The END_SESSION frame the room hears: [0x07][owner uuid:16][len:2][path].
 /// An empty path is a session that ended without becoming a post: a guest

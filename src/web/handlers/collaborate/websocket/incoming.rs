@@ -20,6 +20,7 @@ pub(super) async fn handle_incoming_messages(
     removed: &tokio::sync::Notify,
 ) {
     let mut pending_reset: Option<PendingReset> = None;
+    let mut chat_allowance = ChatAllowance::new(std::time::Instant::now());
 
     loop {
         let msg = tokio::select! {
@@ -88,6 +89,19 @@ pub(super) async fn handle_incoming_messages(
             debug!(
                 "Dropping 0x{:02x} from spectator connection {} in room {}",
                 data[0], ctx.connection_id, ctx.room_uuid
+            );
+            continue;
+        }
+
+        // Talking faster than anybody reads is flooding: every line goes to
+        // the whole room, its recent chat and its recording. Past the
+        // allowance a line is dropped, and the sender sees it never echo.
+        if data[0] == messages::MessageType::Chat as u8
+            && !chat_allowance.take(std::time::Instant::now())
+        {
+            debug!(
+                "Dropping chat over the allowance from connection {} in room {}",
+                ctx.connection_id, ctx.room_uuid
             );
             continue;
         }
@@ -318,5 +332,76 @@ async fn process_server_message(
             );
             None
         }
+    }
+}
+
+/// How many lines a connection may say at once before it has to wait.
+/// Enough for somebody typing a few quick replies in a row.
+const CHAT_BURST: f64 = 5.0;
+
+/// How fast the allowance comes back: a line a second, which is faster than
+/// anybody types and reads a conversation, and slow enough that a script
+/// cannot bury the room's chat, its recent history or its recording.
+const CHAT_LINES_PER_SECOND: f64 = 1.0;
+
+/// A connection's chat allowance: a bucket of [`CHAT_BURST`] lines refilling
+/// at [`CHAT_LINES_PER_SECOND`]. Kept with the connection rather than in
+/// Redis, since it is asked on every line and is nobody else's business. A
+/// person with two tabs has two; a socket is cheap to open, but every one
+/// the owner can see and remove.
+struct ChatAllowance {
+    lines: f64,
+    at: std::time::Instant,
+}
+
+impl ChatAllowance {
+    fn new(now: std::time::Instant) -> Self {
+        Self {
+            lines: CHAT_BURST,
+            at: now,
+        }
+    }
+
+    /// Spends a line if there is one.
+    fn take(&mut self, now: std::time::Instant) -> bool {
+        let elapsed = now.saturating_duration_since(self.at).as_secs_f64();
+        self.lines = (self.lines + elapsed * CHAT_LINES_PER_SECOND).min(CHAT_BURST);
+        self.at = now;
+        if self.lines >= 1.0 {
+            self.lines -= 1.0;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[cfg(test)]
+mod chat_allowance_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn a_burst_then_a_line_a_second() {
+        let start = Instant::now();
+        let mut allowance = ChatAllowance::new(start);
+        for line in 0..5 {
+            assert!(allowance.take(start), "line {line} of the burst");
+        }
+        assert!(!allowance.take(start), "the sixth at once");
+        assert!(!allowance.take(start + Duration::from_millis(500)));
+        assert!(allowance.take(start + Duration::from_millis(1000)));
+        assert!(!allowance.take(start + Duration::from_millis(1000)));
+    }
+
+    #[test]
+    fn quiet_time_refills_only_up_to_the_burst() {
+        let start = Instant::now();
+        let mut allowance = ChatAllowance::new(start);
+        let later = start + Duration::from_secs(3600);
+        for line in 0..5 {
+            assert!(allowance.take(later), "line {line}");
+        }
+        assert!(!allowance.take(later));
     }
 }
