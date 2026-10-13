@@ -255,6 +255,7 @@ async fn find_public_sessions(
             cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.allow_guests AND (cs.community_id IS NULL OR c.visibility = 'public') AS "guests_welcome!",
             cs.allow_spectators,
+            cs.paused_at IS NOT NULL AS "paused!",
             cs.title,
             cs.width,
             cs.height,
@@ -277,6 +278,8 @@ async fn find_public_sessions(
         LEFT JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
         WHERE cs.is_public = true
           AND cs.ended_at IS NULL
+          -- Paused: in nobody's way but its own participants'.
+          AND cs.paused_at IS NULL
           AND (cs.community_id IS NULL OR c.visibility = 'public')
         GROUP BY cs.id, u.login_name, g.nickname, c.name, c.slug, c.visibility
         ORDER BY cs.last_activity DESC
@@ -297,6 +300,7 @@ async fn find_public_sessions(
             owner_is_guest: row.owner_is_guest,
             guests_welcome: row.guests_welcome,
             spectators_welcome: row.allow_spectators,
+            paused: row.paused,
             title: row.title,
             width: row.width,
             height: row.height,
@@ -331,6 +335,7 @@ async fn find_viewer_sessions(
             cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.allow_guests AND (cs.community_id IS NULL OR c.visibility = 'public') AS "guests_welcome!",
             cs.allow_spectators,
+            cs.paused_at IS NOT NULL AS "paused!",
             cs.title,
             cs.width,
             cs.height,
@@ -370,6 +375,7 @@ async fn find_viewer_sessions(
             owner_is_guest: row.owner_is_guest,
             guests_welcome: row.guests_welcome,
             spectators_welcome: row.allow_spectators,
+            paused: row.paused,
             title: row.title,
             width: row.width,
             height: row.height,
@@ -1183,6 +1189,7 @@ mod tests {
             "is_public": true,
             "guests_welcome": true,
             "spectators_welcome": true,
+            "paused": false,
             "community_name": "Open Studio",
             "community_slug": "open",
             "is_owner": false,
@@ -1555,6 +1562,25 @@ mod tests {
             watch(true, json!({"guests_welcome": false})),
             "but an account may"
         );
+    }
+
+    /// A paused session in the viewer's own list says so, and is still the
+    /// way back into it.
+    #[test]
+    fn a_paused_session_is_marked_and_still_opens() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("collaborate_lobby.jinja")
+            .expect("template")
+            .render(lobby_context_with_sessions(
+                true,
+                vec![],
+                vec![],
+                vec![sample_session(json!({"paused": true, "is_owner": true}))],
+            ))
+            .expect("renders");
+        assert!(rendered.contains("collaborate-session-paused</span>"));
+        assert!(rendered.contains(r#"href="/collaborate/00000000-0000-0000-0000-000000000009""#));
     }
 
     /// Watchers take no seat, so a card counts them beside the seats, and

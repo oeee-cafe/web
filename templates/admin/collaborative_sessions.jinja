@@ -104,6 +104,8 @@
                 <a href="/@{{ session.community_slug or session.owner_login_name }}/{{ session.saved_post_id }}">saved</a>
               {% elif session.ended_at %}
                 <span class="admin-tag deleted">ended</span>
+              {% elif session.paused_at %}
+                <span class="admin-tag" title="Put away after half an hour without drawing; the next person in picks it back up">paused</span>
               {% else %}
                 live
               {% endif %}

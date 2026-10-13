@@ -3,6 +3,7 @@ pub mod db;
 pub mod guest;
 pub mod http_handlers;
 pub mod messages;
+pub mod pause;
 pub mod preview;
 pub mod protocol;
 pub mod redis_messages;

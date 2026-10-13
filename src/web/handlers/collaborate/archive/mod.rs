@@ -122,7 +122,7 @@ fn bounds_key(room_uuid: Uuid) -> String {
     format!("{}{}", ARCHIVE_BOUNDS_PREFIX, room_uuid)
 }
 
-fn chat_buffer_key(room_uuid: Uuid) -> String {
+pub(crate) fn chat_buffer_key(room_uuid: Uuid) -> String {
     format!("{}{}", ARCHIVE_CHAT_PREFIX, room_uuid)
 }
 

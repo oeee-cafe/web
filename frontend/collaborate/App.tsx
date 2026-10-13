@@ -33,6 +33,7 @@ import { SessionExpiredModal } from "./components/SessionExpiredModal";
 import { SessionHeader } from "./components/SessionHeader";
 import { AuthErrorModal } from "./components/modals/AuthErrorModal";
 import { GuestNameModal } from "./components/modals/GuestNameModal";
+import { PausedModal } from "./components/modals/PausedModal";
 import { RemovedModal } from "./components/modals/RemovedModal";
 import { ConnectionStatusModal } from "./components/modals/ConnectionStatusModal";
 import { InitializationErrorModal } from "./components/modals/InitializationErrorModal";
@@ -188,6 +189,8 @@ export default function App() {
   const [endedByOwner, setEndedByOwner] = useState(false);
   /** The owner sent this person out. */
   const [removed, setRemoved] = useState(false);
+  /** Paused after a while without drawing; coming back resumes it. */
+  const [paused, setPaused] = useState(false);
   /**
    * A room that takes guests, opened by somebody who is not one yet: its
    * metadata, held while they are asked for a name.
@@ -746,6 +749,11 @@ export default function App() {
     window.location.reload();
   }, []);
 
+  const handlePaused = useCallback(() => {
+    setPaused(true);
+    painterRef.current?.setInteractionEnabled(false);
+  }, []);
+
   const handleRemoved = useCallback(() => {
     setRemoved(true);
     painterRef.current?.setInteractionEnabled(false);
@@ -911,6 +919,7 @@ export default function App() {
     onSessionExpired: handleSessionExpired,
     onRemoved: handleRemoved,
     onSignedIn: handleSignedIn,
+    onPaused: handlePaused,
   });
 
   useEffect(() => {
@@ -919,9 +928,9 @@ export default function App() {
     // canvases are up.
     if (!painterReady) return;
     painterRef.current?.setInteractionEnabled(
-      view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired && !removed && !watching,
+      view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired && !removed && !paused && !watching,
     );
-  }, [painterReady, view.connection, view.catchingUp, sessionEnding, sessionExpired, removed, watching]);
+  }, [painterReady, view.connection, view.catchingUp, sessionEnding, sessionExpired, removed, paused, watching]);
 
   /**
    * Into the room, once it is known who is coming in: straight on to the post
@@ -1415,7 +1424,7 @@ export default function App() {
         </div>
         <div ref={painterElementRef} className="h-full w-full" />
         {/* Removed is not disconnected: there is nothing to reconnect to. */}
-        {!removed && <ConnectionStatusModal isCatchingUp={view.catchingUp} connectionState={view.connection} syncProgress={view.progress} synchronizationError={synchronizationError} onReconnect={reload} onDownloadPNG={downloadPng} />}
+        {!removed && !paused && <ConnectionStatusModal isCatchingUp={view.catchingUp} connectionState={view.connection} syncProgress={view.progress} synchronizationError={synchronizationError} onReconnect={reload} onDownloadPNG={downloadPng} />}
         {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => setSaveConfirmation(true)} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : ownerKeepsOnDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}</button>}
         <SaveConfirmationModal
           isOpen={saveConfirmation}
@@ -1431,6 +1440,7 @@ export default function App() {
     </div>
     <SessionExpiredModal isOpen={sessionExpired && !removed} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} hasCanvas={!canvasMeta?.ended} endedByOwner={endedByOwner} ownerKeepsOnDevice={ownerKeepsOnDevice} onClose={() => {}} onSaveToGallery={ownerKeepsOnDevice ? keepOnDevice : saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
     <RemovedModal isOpen={removed} onGoToLobby={goToLobby} />
+    <PausedModal isOpen={paused && !removed} onResume={reload} onGoToLobby={goToLobby} />
     <GuestNameModal isOpen={!!awaitingName} suggestion={discordKnown().state?.name ?? undefined} canWatch={!!awaitingName?.allowSpectators} watchOnly={watching} onSubmit={becomeGuest} signInHref={signInHref()} />
   </>;
 }

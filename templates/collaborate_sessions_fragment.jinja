@@ -88,8 +88,11 @@
         {# Accounts only: said to somebody without one before they click,
            rather than by the sign-in page after. #}
         {% set accounts_only = not viewer_has_account and not session.guests_welcome %}
-        {% if session.is_full or (show_visibility and not session.is_public) or accounts_only %}
+        {% if session.paused or session.is_full or (show_visibility and not session.is_public) or accounts_only %}
           <div class="session-badges">
+            {% if session.paused %}
+              <span class="community-card-badge session-paused" title="{{ ftl_get_message("collaborate-session-paused-hint") }}">{{ ftl_get_message("collaborate-session-paused") }}</span>
+            {% endif %}
             {% if session.is_full %}
               <span class="community-card-badge session-full">{{ ftl_get_message("collaborate-session-full") }}</span>
             {% endif %}

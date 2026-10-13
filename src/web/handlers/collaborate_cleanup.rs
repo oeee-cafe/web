@@ -50,6 +50,13 @@ pub async fn cleanup_collaborative_sessions(state: AppState) {
             error!("Failed to clean up inactive sessions: {}", e);
         }
 
+        // Step 3b: End the rooms that stayed paused past their retention
+        match super::collaborate::pause::end_abandoned(&state).await {
+            Ok(0) => {}
+            Ok(ended) => info!("Ended {} rooms paused past their retention", ended),
+            Err(e) => error!("Failed to end abandoned paused rooms: {}", e),
+        }
+
         // Step 4: Cleanup stale Redis connections
         cleanup_stale_redis_connections(&state).await;
 
@@ -294,7 +301,7 @@ async fn cleanup_inactive_sessions(
     let inactive_sessions = sqlx::query!(
         r#"
         SELECT id FROM collaborative_sessions 
-        WHERE ended_at IS NULL 
+        WHERE ended_at IS NULL AND paused_at IS NULL
         AND last_activity < $1
         "#,
         inactive_cutoff
@@ -314,6 +321,21 @@ async fn cleanup_inactive_sessions(
     // session.
     for session in inactive_sessions {
         let session_id = session.id;
+
+        // A drawing nobody saved is paused, to be picked up again, rather
+        // than ended and lost (`collaborate::pause`). Only a room with
+        // nothing in it ends here.
+        match super::collaborate::pause::pause_idle_room(state, session_id).await {
+            Ok(super::collaborate::pause::Idled::NothingToKeep) => {}
+            Ok(_) => {
+                *inactive_sessions_cleaned += 1;
+                continue;
+            }
+            Err(e) => {
+                error!("Failed to pause idle session {}: {}", session_id, e);
+                continue;
+            }
+        }
 
         // Check if there are active connections in Redis for inactive sessions
         let redis_connections = match state.redis_state.get_room_connections(session_id).await {

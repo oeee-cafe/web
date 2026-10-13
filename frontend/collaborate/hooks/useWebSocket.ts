@@ -68,6 +68,10 @@ export const REMOVED_REASON = "removed from session";
 // on the ordinary reconnect would still call itself the guest, whose id the
 // server no longer answers to, so the page reloads as the account instead.
 const WS_CLOSE_SIGNED_IN = 4001;
+// The close the server sends every socket in a room it has paused after half
+// an hour without drawing (`PAUSED_CODE` in websocket/mod.rs). Not retried:
+// coming back resumes the room, which is the person's to choose.
+const WS_CLOSE_PAUSED = 4002;
 // How long a participant who does not own the session waits before offering to
 // upload a checkpoint, giving the owner the first refusal. Long enough that the
 // owner's answer wins a same-tick race, short enough that nobody notices when
@@ -135,6 +139,8 @@ interface WebSocketHookParams {
   onRemoved?: () => void;
   /** The guest this page was is an account now; the page should become it. */
   onSignedIn?: () => void;
+  /** The room was paused after a while without drawing. */
+  onPaused?: () => void;
 }
 
 const OPENING_PROGRESS: SyncProgress = {
@@ -185,6 +191,7 @@ export const useWebSocket = ({
   onSessionExpired,
   onRemoved,
   onSignedIn,
+  onPaused,
 }: WebSocketHookParams) => {
   const wsRef = useRef<WebSocket | null>(null);
   // Read when a socket closes, so a new callback is never a new socket.
@@ -192,6 +199,8 @@ export const useWebSocket = ({
   onRemovedRef.current = onRemoved;
   const onSignedInRef = useRef(onSignedIn);
   onSignedInRef.current = onSignedIn;
+  const onPausedRef = useRef(onPaused);
+  onPausedRef.current = onPaused;
   const [view, setView] = useState<SessionView>({
     connection: "connecting",
     catchingUp: true,
@@ -481,6 +490,13 @@ export const useWebSocket = ({
       // Leaving the session (unmount, or the session ended) - stay closed
       if (!link.shouldConnect) {
         publish({ connection: "disconnected" });
+        return;
+      }
+
+      if (event.code === WS_CLOSE_PAUSED) {
+        link.shouldConnect = false;
+        publish({ connection: "disconnected" });
+        onPausedRef.current?.();
         return;
       }
 

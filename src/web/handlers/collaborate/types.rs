@@ -38,6 +38,9 @@ pub struct SessionWithCounts {
     /// Whether the session can be watched: what a full card offers instead
     /// of a seat.
     pub spectators_welcome: bool,
+    /// Put away after a while without drawing (`pause`); opening it picks it
+    /// back up. Only ever in the viewer's own list.
+    pub paused: bool,
     pub title: Option<String>,
     pub width: i32,
     pub height: i32,

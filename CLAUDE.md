@@ -120,6 +120,15 @@ in has to call it after `auth_session.login`.
 Chat is held to a burst of five lines and a line a second per connection, and
 500 characters a line.
 
+A room nobody draws in for half an hour is *paused* if it has an unsaved
+drawing (`collaborate/pause.rs`): its Redis keys are `DUMP`ed into one object
+under `paused/` in the private archive bucket and deleted, `paused_at` is set,
+and the next person allowed in `RESTORE`s them before their history is sent --
+the same history id and seats, so the room carries on. After seven days it
+ends. Everything a room keeps in Redis that a pause must carry is listed in
+`redis_messages::room_keys` (and `pause::carried_keys`); a key added anywhere
+else survives a pause only by accident.
+
 ## neo-cucumber (`./neo-cucumber`)
 
 Don't try to run the development server. Just run `pnpm run build` if you need to check if the code compiles.

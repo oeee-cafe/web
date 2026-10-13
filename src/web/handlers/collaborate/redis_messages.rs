@@ -262,6 +262,24 @@ pub enum Sequenced {
     HistoryFull { bytes: u64 },
 }
 
+/// Every key a room's drawing lives in: its history and where it stands, the
+/// seats its marks are stamped with, and its recent chat. What `cleanup_room`
+/// deletes, and what a pause (`collaborate::pause`) carries away and back.
+pub(crate) fn room_keys(room_uuid: Uuid) -> Vec<String> {
+    vec![
+        history_key(room_uuid),
+        seq_key(room_uuid),
+        history_id_key(room_uuid),
+        bytes_key(room_uuid),
+        reset_base_key(room_uuid),
+        chat_history_key(room_uuid),
+        format!("{}{}", super::redis_state::USER_ID_PREFIX, room_uuid),
+    ]
+}
+
+/// How long a room's drawing stays in Redis after its last touch.
+pub(crate) const HISTORY_TTL: u64 = MESSAGE_HISTORY_TTL;
+
 fn chat_history_key(room_uuid: Uuid) -> String {
     format!("{}{}", CHAT_HISTORY_PREFIX, room_uuid)
 }
@@ -741,17 +759,7 @@ return {#kept, checkpoint_bytes}
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut conn = self.pool.get().await?;
 
-        let deleted: usize = conn
-            .del(&[
-                history_key(room_uuid),
-                seq_key(room_uuid),
-                history_id_key(room_uuid),
-                bytes_key(room_uuid),
-                reset_base_key(room_uuid),
-                chat_history_key(room_uuid),
-                format!("{}{}", super::redis_state::USER_ID_PREFIX, room_uuid),
-            ])
-            .await?;
+        let deleted: usize = conn.del(room_keys(room_uuid)).await?;
         if deleted > 0 {
             debug!("Cleaned up Redis message history for room {}", room_uuid);
         }

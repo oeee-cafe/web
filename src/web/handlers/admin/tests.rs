@@ -422,6 +422,7 @@ fn sample_session(overrides: serde_json::Value) -> serde_json::Value {
         "created_at": "2026-01-02T03:04:05",
         "last_activity": "2026-01-02T05:06:07",
         "ended_at": null,
+        "paused_at": null,
         "saved_post_id": null,
         "preview_version": 1_700_000_000_123u64,
     });

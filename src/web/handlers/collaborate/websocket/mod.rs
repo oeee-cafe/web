@@ -544,6 +544,13 @@ pub(super) const REMOVED_REASON: &str = "removed from session";
 /// this page or another, and should come back as the account.
 pub(super) const SIGNED_IN_REASON: &str = "signed in";
 
+/// The close reason a client reads when the room it was in paused after a
+/// while without drawing (`pause`): coming back puts it back.
+pub(super) const PAUSED_REASON: &str = "paused";
+
+/// The close code that goes with [`PAUSED_REASON`].
+const PAUSED_CODE: u16 = 4002;
+
 /// The close code that goes with [`SIGNED_IN_REASON`]: one of the range left
 /// to applications, so the client's ordinary reconnect -- which would come
 /// back still calling itself the guest -- never takes it for its own.
@@ -558,6 +565,9 @@ pub enum Departure {
     /// The guest they were has become an account. The socket speaks for the
     /// guest, so it is closed for the page to come back as the account.
     SignedIn = 1,
+    /// Nobody drew for half an hour and the room was put away until somebody
+    /// comes back (`pause`).
+    Paused = 2,
 }
 
 impl Departure {
@@ -565,6 +575,7 @@ impl Departure {
         match self {
             Departure::Removed => (close_code::POLICY, REMOVED_REASON),
             Departure::SignedIn => (SIGNED_IN_CODE, SIGNED_IN_REASON),
+            Departure::Paused => (PAUSED_CODE, PAUSED_REASON),
         }
     }
 }
@@ -579,6 +590,7 @@ fn departure_of(
     match broadcast.payload.as_slice() {
         [DEPARTURE_MARKER, 0] => Some(Departure::Removed),
         [DEPARTURE_MARKER, 1] => Some(Departure::SignedIn),
+        [DEPARTURE_MARKER, 2] => Some(Departure::Paused),
         _ => None,
     }
 }
@@ -587,6 +599,37 @@ fn departure_of(
 /// it is held. Their seat and their ban are the caller's.
 pub async fn remove_from_room(state: &AppState, room_uuid: Uuid, participant_id: Uuid) -> usize {
     send_away(state, room_uuid, participant_id, Departure::Removed).await
+}
+
+/// Closes every socket in the room, saying why. Returns how many were told.
+pub async fn send_away_everyone(state: &AppState, room_uuid: Uuid, why: Departure) -> usize {
+    let connections = state
+        .redis_state
+        .get_room_connections(room_uuid)
+        .await
+        .unwrap_or_default();
+    let mut told = 0;
+    for connection_id in connections {
+        let broadcast = super::redis_state::RoomBroadcast {
+            from_connection: "system".to_string(),
+            target_connection: Some(connection_id.clone()),
+            seq: None,
+            history_id: None,
+            payload: vec![DEPARTURE_MARKER, why as u8],
+        };
+        match state
+            .redis_state
+            .publish_message(room_uuid, &broadcast)
+            .await
+        {
+            Ok(_) => told += 1,
+            Err(e) => error!(
+                "Failed to send connection {} away from room {}: {}",
+                connection_id, room_uuid, e
+            ),
+        }
+    }
+    told
 }
 
 /// Closes every socket `participant_id` has in the room, saying why.

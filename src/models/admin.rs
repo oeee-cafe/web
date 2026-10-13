@@ -435,6 +435,8 @@ pub struct AdminCollaborativeSession {
     pub last_activity: chrono::NaiveDateTime,
     pub ended_at: Option<DateTime<Utc>>,
     /// Set once the owner saved the canvas as a post.
+    /// Put away after a while without drawing (`collaborate::pause`).
+    pub paused_at: Option<DateTime<Utc>>,
     pub saved_post_id: Option<Uuid>,
     /// Filled in from Redis after the query, the way the lobby fills it: the
     /// previews do not live in this table. See
@@ -518,6 +520,7 @@ async fn find_collaborative_sessions(
             cs.created_at,
             cs.last_activity,
             cs.ended_at,
+            cs.paused_at,
             cs.saved_post_id,
             COUNT(csp.participant_id) FILTER (WHERE csp.is_active AND NOT csp.watching) AS "active_participant_count!",
             COUNT(csp.participant_id) FILTER (WHERE NOT csp.is_spectator) AS "total_participant_count!",
@@ -583,6 +586,7 @@ async fn find_collaborative_sessions(
             created_at: row.created_at,
             last_activity: row.last_activity,
             ended_at: row.ended_at,
+            paused_at: row.paused_at,
             saved_post_id: row.saved_post_id,
             preview_version: None,
             recording: row.recorded.map(|_| AdminSessionRecording {

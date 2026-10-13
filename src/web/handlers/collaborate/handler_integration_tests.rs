@@ -1777,3 +1777,135 @@ async fn a_live_connection_is_marked_back_in_the_room() {
     room.teardown().await;
     outcome.expect("the scenario finished in time");
 }
+
+/// A room nobody draws in pauses rather than ends: a page still open on it
+/// is told so, the drawing leaves Redis for the bucket, and the next person
+/// in puts it back -- the same history, the same seats -- and carries on.
+#[tokio::test]
+async fn an_idle_room_pauses_and_the_next_person_in_picks_it_up() {
+    use super::pause::{pause_idle_room, Idled};
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        let (alice_id, before) = opening(&mut alice).await;
+        send(&mut alice, fill(alice_id, 10)).await;
+        next_of_type(&mut alice, SEQUENCED).await;
+
+        assert_eq!(
+            pause_idle_room(&room.state, room.room)
+                .await
+                .expect("pause"),
+            Idled::Paused
+        );
+        let goodbye = loop {
+            match next_close(&mut alice).await {
+                Some(goodbye) => break goodbye,
+                None => continue,
+            }
+        };
+        assert_eq!(u16::from(goodbye.code), 4002);
+        assert_eq!(goodbye.reason.as_str(), "paused");
+        assert!(super::pause::is_stored(room.room));
+        let store = super::redis_messages::RedisMessageStore::new(room.state.redis_pool.clone());
+        assert_eq!(
+            store.current_sequence(room.room).await.expect("seq"),
+            None,
+            "out of Redis"
+        );
+        let paused = sqlx::query_scalar!(
+            "SELECT paused_at IS NOT NULL AS \"paused!\" FROM collaborative_sessions WHERE id = $1",
+            room.room
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("row");
+        assert!(paused);
+
+        // Back: the same history, the fill in it, and Alice in her own seat.
+        let mut back = room.connect(0, None).await;
+        let (back_id, replay) = opening(&mut back).await;
+        assert_eq!(back_id, alice_id, "the same seat, so the same layers");
+        assert_eq!(replay.history_id, before.history_id, "the same history");
+        assert_eq!(replay.last_seq, 1);
+        assert_eq!(replay.entries.len(), 1);
+        assert_eq!(replay.entries[0].1[0], FILL);
+        assert!(
+            !super::pause::is_stored(room.room),
+            "the stored copy is let go"
+        );
+        let paused = sqlx::query_scalar!(
+            "SELECT paused_at IS NOT NULL AS \"paused!\" FROM collaborative_sessions WHERE id = $1",
+            room.room
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("row");
+        assert!(!paused);
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// A room with nothing drawn in it is not worth keeping: the sweep ends it
+/// as it always did.
+#[tokio::test]
+async fn an_idle_room_with_nothing_drawn_is_not_kept() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let mut alice = room.connect(0, None).await;
+    opening(&mut alice).await;
+    assert_eq!(
+        super::pause::pause_idle_room(&room.state, room.room)
+            .await
+            .expect("decide"),
+        super::pause::Idled::NothingToKeep
+    );
+    assert!(!super::pause::is_stored(room.room));
+    room.teardown().await;
+}
+
+/// A room paused past its retention ends, and its stored copy goes with it.
+#[tokio::test]
+async fn a_room_paused_too_long_ends() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        let (alice_id, _) = opening(&mut alice).await;
+        send(&mut alice, fill(alice_id, 10)).await;
+        next_of_type(&mut alice, SEQUENCED).await;
+        super::pause::pause_idle_room(&room.state, room.room)
+            .await
+            .expect("pause");
+        sqlx::query!(
+            "UPDATE collaborative_sessions SET paused_at = NOW() - INTERVAL '8 days' WHERE id = $1",
+            room.room
+        )
+        .execute(&room.db)
+        .await
+        .expect("age it");
+        assert!(
+            super::pause::end_abandoned(&room.state)
+                .await
+                .expect("sweep")
+                >= 1
+        );
+        let ended = sqlx::query_scalar!(
+            "SELECT ended_at IS NOT NULL AS \"ended!\" FROM collaborative_sessions WHERE id = $1",
+            room.room
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("row");
+        assert!(ended);
+        assert!(!super::pause::is_stored(room.room));
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}

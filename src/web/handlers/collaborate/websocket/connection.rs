@@ -140,6 +140,15 @@ pub(super) async fn setup_connection(
         }
     }
 
+    // A paused room is put back before anybody is let into it. Whoever gets
+    // here first does it; anybody else waits behind the session row.
+    if let Err(e) =
+        crate::web::handlers::collaborate::pause::resume_if_paused(state, room_uuid).await
+    {
+        error!("Failed to resume paused room {}: {}", room_uuid, e);
+        return Err(JoinFailure::Unavailable);
+    }
+
     // Watching: a place among the spectators rather than a seat, and no
     // 1-byte id -- nothing this connection sends will be drawn. The owner
     // never only watches their own room.

@@ -42,7 +42,7 @@ msgstr "by"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: ../frontend/collaborate/App.tsx:1020
+#: ../frontend/collaborate/App.tsx:1026
 msgid "Choose a name of 1 to 30 characters, without hidden characters."
 msgstr "Choose a name of 1 to 30 characters, without hidden characters."
 
@@ -79,16 +79,16 @@ msgstr "Connecting..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "Connection lost. Your work is saved locally."
 
-#: ../frontend/collaborate/App.tsx:1232
+#: ../frontend/collaborate/App.tsx:1238
 msgid "Couldn't change who can join. Please try again."
 msgstr "Couldn't change who can join. Please try again."
 
-#: ../frontend/collaborate/App.tsx:1135
+#: ../frontend/collaborate/App.tsx:1141
 msgid "Couldn't change who can watch. Please try again."
 msgstr "Couldn't change who can watch. Please try again."
 
-#: ../frontend/collaborate/App.tsx:1022
-#: ../frontend/collaborate/App.tsx:1030
+#: ../frontend/collaborate/App.tsx:1028
+#: ../frontend/collaborate/App.tsx:1036
 msgid "Couldn't join. Please try again."
 msgstr "Couldn't join. Please try again."
 
@@ -97,7 +97,7 @@ msgid "Couldn’t let {name} in"
 msgstr "Couldn’t let {name} in"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1252
+#: ../frontend/collaborate/App.tsx:1258
 msgid "Couldn't remove {0}. Please try again."
 msgstr "Couldn't remove {0}. Please try again."
 
@@ -140,8 +140,8 @@ msgstr "Go to Lobby"
 msgid "guest"
 msgstr "guest"
 
-#: ../frontend/collaborate/App.tsx:1317
-#: ../frontend/collaborate/App.tsx:1321
+#: ../frontend/collaborate/App.tsx:1337
+#: ../frontend/collaborate/App.tsx:1341
 msgid "Help"
 msgstr "Help"
 
@@ -189,8 +189,8 @@ msgstr "Join Drawing"
 msgid "Just Watch"
 msgstr "Just Watch"
 
-#: ../frontend/collaborate/App.tsx:1357
-#: ../frontend/collaborate/App.tsx:1408
+#: ../frontend/collaborate/App.tsx:1377
+#: ../frontend/collaborate/App.tsx:1428
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
@@ -230,9 +230,13 @@ msgstr "No Discord friends to invite yet."
 msgid "No friend by that name."
 msgstr "No friend by that name."
 
-#: ../frontend/collaborate/App.tsx:951
+#: ../frontend/collaborate/App.tsx:957
 msgid "No Title"
 msgstr "No Title"
+
+#: ../frontend/collaborate/components/modals/PausedModal.tsx:21
+msgid "Nobody drew for half an hour, so this session was paused. The drawing is kept for 7 days, and anyone in the session can pick it back up."
+msgstr "Nobody drew for half an hour, so this session was paused. The drawing is kept for 7 days, and anyone in the session can pick it back up."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:79
 #: ../frontend/collaborate/components/SessionHeader.tsx:330
@@ -261,7 +265,7 @@ msgstr "People without an account can join. Unticking stops new ones; guests alr
 msgid "Reconnect"
 msgstr "Reconnect"
 
-#: ../frontend/collaborate/App.tsx:1242
+#: ../frontend/collaborate/App.tsx:1248
 msgid "Remove"
 msgstr "Remove"
 
@@ -272,7 +276,7 @@ msgid "Remove {0} from this session"
 msgstr "Remove {0} from this session"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1241
+#: ../frontend/collaborate/App.tsx:1247
 msgid "Remove {0} from this session? They won't be able to rejoin it."
 msgstr "Remove {0} from this session? They won't be able to rejoin it."
 
@@ -280,11 +284,16 @@ msgstr "Remove {0} from this session? They won't be able to rejoin it."
 msgid "Removed from Session"
 msgstr "Removed from Session"
 
+#: ../frontend/collaborate/components/modals/PausedModal.tsx:28
+msgid "Resume"
+msgstr "Resume"
+
 #: ../frontend/collaborate/components/modals/InitializationErrorModal.tsx:20
 #: ../frontend/collaborate/components/modals/RoomFullModal.tsx:40
 msgid "Retry"
 msgstr "Retry"
 
+#: ../frontend/collaborate/components/modals/PausedModal.tsx:31
 #: ../frontend/collaborate/components/modals/RemovedModal.tsx:23
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:167
 msgid "Return to Lobby"
@@ -298,16 +307,16 @@ msgstr "Save as PNG"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 
-#: ../frontend/collaborate/App.tsx:1358
-#: ../frontend/collaborate/App.tsx:1408
+#: ../frontend/collaborate/App.tsx:1378
+#: ../frontend/collaborate/App.tsx:1428
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
 msgid "Save to Gallery"
 msgstr "Save to Gallery"
 
-#: ../frontend/collaborate/App.tsx:1355
-#: ../frontend/collaborate/App.tsx:1408
+#: ../frontend/collaborate/App.tsx:1375
+#: ../frontend/collaborate/App.tsx:1428
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Saving..."
@@ -342,6 +351,10 @@ msgstr "Session Full"
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:18
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "Session is ending. The drawing is being saved to the gallery..."
+
+#: ../frontend/collaborate/components/modals/PausedModal.tsx:19
+msgid "Session Paused"
+msgstr "Session Paused"
 
 #: ../frontend/collaborate/components/SessionHeader.tsx:221
 msgid "Share"
@@ -407,7 +420,7 @@ msgstr "This session has already been saved. You can only download it as a PNG."
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 
-#: ../frontend/collaborate/App.tsx:1021
+#: ../frontend/collaborate/App.tsx:1027
 msgid "Too many guests have joined from this network. Try again later, or sign in."
 msgstr "Too many guests have joined from this network. Try again later, or sign in."
 
