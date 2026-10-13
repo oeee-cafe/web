@@ -316,13 +316,18 @@ export default function App() {
   /**
    * How many are in the room, for the Oeee Cafe app to show beside the
    * invitation it hands Discord (presence_meta.jinja, app_bridge.jinja): the
-   * server's roster of who is seated, less anybody it has since said left.
+   * server's roster of who holds a seat, less anybody it has since said left.
+   * Watchers take no seat, and the party is shown against the seats
+   * (`max_participants`), so counting them could read 7/4.
    */
   useEffect(() => {
     const meta = document.querySelector('meta[name="oeee-presence"][data-join]');
-    const here = [...participants.values()].filter((participant) => !participant.left).length;
-    if (!meta || here === 0) return;
-    meta.setAttribute("data-party", String(here));
+    // No roster yet: nothing to say.
+    if (!meta || participants.size === 0) return;
+    const drawing = [...participants.values()].filter(
+      (participant) => !participant.left && !participant.isSpectator,
+    ).length;
+    meta.setAttribute("data-party", String(drawing));
     document.dispatchEvent(new Event("oeee:presence"));
   }, [participants]);
 

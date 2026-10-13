@@ -264,6 +264,7 @@ async fn find_public_sessions(
             c.name AS "community_name?",
             c.slug AS "community_slug?",
             COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND NOT csp.watching), 0) AS "participant_count!",
+            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND csp.watching), 0) AS "watcher_count!",
             -- COALESCE, not a bare comparison: $1 is NULL for a visitor who
             -- is not even a guest, and NULL decoded into a non-null bool
             -- fails the query.
@@ -301,6 +302,7 @@ async fn find_public_sessions(
             height: row.height,
             created_at: row.created_at,
             participant_count: row.participant_count,
+            watcher_count: row.watcher_count,
             max_participants: row.max_participants,
             is_public: row.is_public,
             community_name: row.community_name,
@@ -338,6 +340,7 @@ async fn find_viewer_sessions(
             c.name AS "community_name?",
             c.slug AS "community_slug?",
             COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND NOT csp.watching), 0) AS "participant_count!",
+            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND csp.watching), 0) AS "watcher_count!",
             cs.owner_participant_id = $1 AS "is_owner!",
             COUNT(*) FILTER (WHERE csp.participant_id = $1 AND csp.is_active = true) > 0 AS "viewer_is_participant!"
         FROM collaborative_sessions cs
@@ -372,6 +375,7 @@ async fn find_viewer_sessions(
             height: row.height,
             created_at: row.created_at,
             participant_count: row.participant_count,
+            watcher_count: row.watcher_count,
             max_participants: row.max_participants,
             is_public: row.is_public,
             community_name: row.community_name,
@@ -1173,6 +1177,7 @@ mod tests {
             "height": 300,
             "created_at": "2026-01-02T03:04:05",
             "participant_count": 2,
+            "watcher_count": 0,
             "max_participants": 4,
             "is_full": false,
             "is_public": true,
@@ -1516,6 +1521,34 @@ mod tests {
             .expect("renders");
         // The class also appears in the page's <style> block, so match the tag.
         assert!(!rendered.contains("<p class=\"session-community\">"));
+    }
+
+    /// Watchers take no seat, so a card counts them beside the seats, and
+    /// only when there are any.
+    #[test]
+    fn a_card_counts_watchers_beside_the_seats() {
+        let env = test_support::env();
+        let template = env
+            .get_template("collaborate_lobby.jinja")
+            .expect("template");
+        let watched = template
+            .render(lobby_context_with_sessions(
+                false,
+                vec![],
+                vec![sample_session(json!({"watcher_count": 5}))],
+                vec![],
+            ))
+            .expect("renders");
+        assert!(watched.contains("2 / 4 collaborate-participants · 5 collaborate-watching"));
+        let unwatched = template
+            .render(lobby_context_with_sessions(
+                false,
+                vec![],
+                vec![sample_session(json!({}))],
+                vec![],
+            ))
+            .expect("renders");
+        assert!(!unwatched.contains("collaborate-watching"));
     }
 
     /// A session a guest cannot enter says so to somebody without an account,

@@ -267,6 +267,7 @@ collaborate-session-title-label = セッション タイトル (任意)
 collaborate-session-title-placeholder = セッションのタイトルを入力してください
 collaborate-max-participants-label = 最大参加者数
 collaborate-participants = 人
+collaborate-watching = 人が見学中
 collaborate-public-session-label = 公開ロビーに表示
 collaborate-public-session-description = チェックを外すとプライベート セッション (リンクのみアクセス) になります
 collaborate-create-button = セッションを作成

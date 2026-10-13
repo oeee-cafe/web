@@ -267,6 +267,7 @@ collaborate-session-title-label = 会话标题 (可选)
 collaborate-session-title-placeholder = 输入会话标题
 collaborate-max-participants-label = 最大参与者数
 collaborate-participants = 人
+collaborate-watching = 人观看中
 collaborate-public-session-label = 显示在公共大厅
 collaborate-public-session-description = 取消选中创建私人会话 (仅链接访问)
 collaborate-create-button = 创建会话

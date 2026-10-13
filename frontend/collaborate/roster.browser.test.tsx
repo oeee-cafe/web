@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
-import { FLAG_GUEST } from "./binaryProtocol";
+import { FLAG_GUEST, FLAG_SPECTATOR } from "./binaryProtocol";
 import {
   FakeServer, installRoom, mountPage, mountSession, settle, settleUntil, uninstallRoom,
 } from "./test/fakeRoom";
@@ -15,6 +15,8 @@ import { layersFrame, leaveFrame } from "./test/frames";
 
 const ME = "aaaaaaaa-0000-4000-8000-000000000001";
 const BOB = "aaaaaaaa-0000-4000-8000-000000000002";
+const CAROL = "aaaaaaaa-0000-4000-8000-000000000003";
+const DAN = "aaaaaaaa-0000-4000-8000-000000000004";
 
 let server: FakeServer;
 
@@ -78,5 +80,35 @@ describe("somebody the owner removed", () => {
     // The room's canvas is not theirs to take a copy of.
     expect(document.body.textContent).not.toContain("Save as PNG");
     expect(document.body.textContent).toContain("Return to Lobby");
+  });
+});
+
+describe("the party the app shows beside a Discord invite", () => {
+  it("counts the people drawing, not the ones watching", async () => {
+    const meta = document.createElement("meta");
+    meta.setAttribute("name", "oeee-presence");
+    meta.setAttribute("data-join", "/collaborate/room");
+    meta.setAttribute("data-seats", "2");
+    document.head.appendChild(meta);
+    try {
+      const socket = await mountSession();
+      await act(async () => server.admit(socket, 3));
+      await act(async () =>
+        socket.deliver(
+          layersFrame([
+            { userId: ME, sessionId: 3, name: "umu" },
+            { userId: BOB, sessionId: 2, name: "bob" },
+            { userId: CAROL, sessionId: 0, name: "carol", flags: FLAG_SPECTATOR },
+            { userId: DAN, sessionId: 0, name: "dan", flags: FLAG_GUEST | FLAG_SPECTATOR },
+          ]),
+        ),
+      );
+      await settleUntil(() => meta.getAttribute("data-party") === "2");
+
+      await act(async () => socket.deliver(leaveFrame(BOB, "bob")));
+      await settleUntil(() => meta.getAttribute("data-party") === "1");
+    } finally {
+      meta.remove();
+    }
   });
 });

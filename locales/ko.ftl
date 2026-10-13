@@ -267,6 +267,7 @@ collaborate-session-title-label = 세션 제목 (선택사항)
 collaborate-session-title-placeholder = 세션 제목을 입력하세요
 collaborate-max-participants-label = 최대 참가자 수
 collaborate-participants = 명
+collaborate-watching = 명 구경 중
 collaborate-public-session-label = 공개 로비에 표시
 collaborate-public-session-description = 체크를 해제하면 비공개 세션 (링크로만 접근)이 됩니다
 collaborate-create-button = 세션 생성

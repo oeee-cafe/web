@@ -43,6 +43,8 @@ pub struct SessionWithCounts {
     pub height: i32,
     pub created_at: chrono::NaiveDateTime,
     pub participant_count: i64,
+    /// Watching now, without a seat: counted beside the seats, not in them.
+    pub watcher_count: i64,
     /// Seats total, so a lobby card can say "2 / 4" rather than a count with
     /// nothing to compare it against.
     pub max_participants: i32,

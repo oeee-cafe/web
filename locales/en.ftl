@@ -295,6 +295,7 @@ collaborate-session-title-label = Session Title (optional)
 collaborate-session-title-placeholder = Enter a title for your session
 collaborate-max-participants-label = Max Participants
 collaborate-participants = participants
+collaborate-watching = watching
 collaborate-public-session-label = Show in public lobby
 collaborate-public-session-description = Uncheck to create a private session (link-only access)
 collaborate-create-button = Create Session

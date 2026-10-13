@@ -76,6 +76,50 @@ the page for a browser and leaves the JSON for everyone else.
 
 When connecting to PostgreSQL via command line, use `psql oeee_cafe`.
 
+### Who is in a collaborative room
+
+Somebody in a room is a `Collaborator` (`src/web/handlers/collaborate/guest.rs`):
+an account, or a guest. A guest is a name they typed and an id their browser
+session holds, with a row in `collaborative_guests` -- never a row in `users`,
+which would give them a profile, an ActivityPub actor and a place in search.
+Either way their id is the `participant_id` on their participant row, the
+16-byte id the wire protocol carries, and the key their Redis seat is under.
+
+Every name the server sends a room (JOIN, CHAT, LEAVE, each LAYERS entry) has a
+flags byte beside it: `FLAG_GUEST`, and `FLAG_SPECTATOR` for somebody watching.
+A guest's name is whatever they typed and may be an account's, so it is never
+drawn as an `@handle`, linked to `/@name`, or used to look up a supporter mark --
+in a template, in the room, or in the staff replay viewer (`personName`).
+
+Three things in a room look alike and are not:
+
+| | What it is | Kept in | Comes and goes |
+|---|---|---|---|
+| **Seat** | The right to draw right now. A room has `max_participants`. | `is_active AND NOT watching` | Held while the person is in the room drawing, in any tab, idle or not; given up when their last drawing tab closes or they switch to watching |
+| **Layer id** | The 1-byte id their marks carry; their place in the stack | Redis `oeee:user_ids:{room}` | Given on first drawing join, never reused (255 per room) |
+| **Credit** | Having drawn: the saved post's byline, the achievement, and being let back into a full room | `NOT is_spectator` | Set by drawing once, never cleared |
+
+`watching` is the role now and `is_spectator` is the history; a drawer who sits
+back to watch has `watching` true and `is_spectator` false. Counting seats with
+the history column is the mistake this table is here to prevent -- it is how a
+watching drawer once kept a seat nobody else could take. Spectators have a
+participant row (so the owner's ban works on them), no seat, no layer id, and
+no more than `MAX_SPECTATORS` at once; the server drops everything they send
+but JOIN and CHAT. A room page watches with `?watch=1`.
+
+The owner's Guests and Spectators switches stop new arrivals only: somebody
+already in the room gets back in after a dropped connection. A ban is by
+`participant_id`, and for a guest also by address (guests only, so a
+household's accounts are not shut out with them).
+
+Every sign-in hands the browser's guest to the account (`guest::adopt`): its
+seats, owned sessions, bans and earned achievements, and its open sockets are
+closed with 4001 for the page to come back as the account. A new way to sign
+in has to call it after `auth_session.login`.
+
+Chat is held to a burst of five lines and a line a second per connection, and
+500 characters a line.
+
 ## neo-cucumber (`./neo-cucumber`)
 
 Don't try to run the development server. Just run `pnpm run build` if you need to check if the code compiles.

@@ -44,7 +44,7 @@
            whether there is room to join. #}
         <span class="session-live">
           <span class="session-live-dot" aria-hidden="true"></span>
-          <span class="participant-count">{{ session.participant_count }} / {{ session.max_participants }} {{ ftl_get_message("collaborate-participants") }}</span>
+          <span class="participant-count">{{ session.participant_count }} / {{ session.max_participants }} {{ ftl_get_message("collaborate-participants") }}{% if session.watcher_count > 0 %} · {{ session.watcher_count }} {{ ftl_get_message("collaborate-watching") }}{% endif %}</span>
         </span>
       </div>
       <div class="session-body">
