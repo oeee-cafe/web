@@ -83,8 +83,8 @@ redis = { version = "1.7.1", features = ["aio", "tokio-comp"] }
 bb8-redis = "0.26.0"
 ammonia = "4.1"
 apns-h2 = "0.11.0"
-google-fcm1 = "6.0.0"
-yup-oauth2 = "11.0"
+google-fcm1 = "7.0.0"
+yup-oauth2 = "12.1"
 hyper = "1.0"
 hyper-util = { version = "0.1", features = ["client", "client-legacy", "http1", "http2"] }
 hyper-rustls = { version = "0.27", features = ["http1", "http2", "ring"] }
