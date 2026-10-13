@@ -251,8 +251,6 @@ export default function App() {
    * object, which remounts the painter, which activates again.
    */
   const joinedRef = useRef(false);
-  /** Whether this visit has sent the room a stroke; see the `beforeunload` below. */
-  const hasDrawnRef = useRef(false);
   /** Set by the page's own ways out, which are not accidents to ask about. */
   const leavingRef = useRef(false);
   /**
@@ -372,7 +370,6 @@ export default function App() {
     // Watching: nothing this page draws is the room's.
     if (spectatingRef.current) return;
     if (!ws || ws.readyState !== WebSocket.OPEN || localId === null || link.catchingUp) return;
-    hasDrawnRef.current = true;
     const encoded = encodePainterOperation(localId, entry.operation);
     pendingEchoesRef.current.record(bytesId(new Uint8Array(encoded)), entry.id);
     ws.send(encoded);
@@ -1254,32 +1251,46 @@ export default function App() {
   }, [t]);
 
   /**
-   * Leaving the room by accident.
+   * Asking before leaving the room, only where leaving loses something.
    *
-   * The site's toolbar sits above the canvas, so a stray tap on it leaves the
-   * session the way it would leave /draw, and /draw asks first. What is drawn
-   * here is already the room's, so what leaving costs is different: a
-   * participant drops out of a drawing they were part of, and the owner walks
-   * away from one only they can save, which the room loses when it expires.
-   * So it asks once this visit has drawn something, or of the owner of a room
-   * with anything in it -- and never on the page's own way out: the save that
-   * ends the session, a reload offered after an error, the lobby from a
-   * session that is already over.
+   * Leaving a room costs nothing that coming back does not restore: every
+   * mark is the server's the moment it is confirmed, and a reconnect replays
+   * the whole canvas. The browser's own wording ("changes you made may not be
+   * saved") was false for nearly everybody it was shown to. Two cases remain:
+   *
+   * - Marks of this tab's the server has not confirmed yet: a stroke made a
+   *   moment before the tab closed, still on its way.
+   * - The owner leaving a room with a drawing in it that is not saved, with
+   *   nobody else drawing in it. Only the owner can save, and a room nobody
+   *   draws in ends after half an hour; somebody else drawing keeps it open
+   *   for the owner to come back to. Somebody watching does not.
+   *
+   * Never on the page's own way out: the save that ends the session, a
+   * reload offered after an error, the lobby from a session already over.
    */
   const sessionOverRef = useRef(false);
   sessionOverRef.current = sessionEnding || sessionExpired;
+  const isOwnerRef = useRef(false);
+  isOwnerRef.current = isOwner;
+  const participantsRef = useRef(participants);
+  participantsRef.current = participants;
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (leavingRef.current || sessionOverRef.current) return;
-      const roomHasDrawing = feed.applied > 0;
-      if (!hasDrawnRef.current && !(isOwner && roomHasDrawing)) return;
+      const unconfirmed = !(painterRef.current?.isSynchronizationSettled() ?? true);
+      const othersDrawing = [...participantsRef.current.values()].some(
+        (participant) =>
+          participant.userId !== userIdRef.current && !participant.isSpectator && !participant.left,
+      );
+      const ownerWalkingAway = isOwnerRef.current && feed.applied > 0 && !othersDrawing;
+      if (!unconfirmed && !ownerWalkingAway) return;
       event.preventDefault();
       // Chrome shows its own wording, but only when returnValue is set.
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [feed, isOwner]);
+  }, [feed]);
 
   const reload = useCallback(() => {
     leavingRef.current = true;
