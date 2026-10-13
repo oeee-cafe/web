@@ -1727,19 +1727,59 @@ nav a:visited,
   margin-top: 6px;
 }
 
-/* Where a kept collaborative room will be posted, chosen above Post. */
+/* Where a kept collaborative room will be posted, chosen above Post: a
+   search box with its choices listed under it (shared/communitySearch.ts). */
 .local-draft-destination-row {
-  display: flex;
-  align-items: center;
   margin-top: 6px;
-  color: var(--ds-faint);
+}
+
+.community-search-input {
+  width: 100%;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.community-search-list {
+  max-height: 9.5em;
+  margin-top: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-s);
+}
+
+.community-search-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.community-search-option > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.local-draft-destination-row .ds-select {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin-left: 6px;
+.community-search-option[aria-selected="true"] {
+  background-color: var(--ds-selected);
+}
+
+.community-search-option[data-active] {
+  outline: 1px solid var(--ds-line-strong);
+  outline-offset: -1px;
+}
+
+.community-search-meta {
+  flex: none;
+  margin-left: 8px;
+  padding: 3px 8px;
+  color: var(--ds-faint);
+}
+
+.community-search-option .community-search-meta {
+  padding: 0;
 }
 
 :root[data-homecols-density="bare"] .draft-item .post-card-meta {

@@ -119,6 +119,10 @@ msgstr "Download PNG"
 msgid "Drawing without an account"
 msgstr "Drawing without an account"
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:42
+msgid "drawn here"
+msgstr "drawn here"
+
 #: ../frontend/collaborate/components/SessionHeader.tsx:254
 msgid "Every seat is taken. You can draw once one frees."
 msgstr "Every seat is taken. You can draw once one frees."
@@ -218,6 +222,10 @@ msgstr "Loading friends…"
 msgid "Loading..."
 msgstr "Loading..."
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:41
+msgid "member"
+msgstr "member"
+
 #: ../frontend/collaborate/components/Chat.tsx:150
 msgid "Message too long (max 500 characters)"
 msgstr "Message too long (max 500 characters)"
@@ -233,6 +241,10 @@ msgstr "No Discord friends to invite yet."
 #: ../frontend/collaborate/components/DiscordInvite.tsx:106
 msgid "No friend by that name."
 msgstr "No friend by that name."
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:43
+msgid "No matching communities"
+msgstr "No matching communities"
 
 #: ../frontend/collaborate/App.tsx:961
 msgid "No Title"
@@ -265,11 +277,11 @@ msgstr "People can watch without drawing. Unticking stops new ones; anybody alre
 msgid "People without an account can join. Unticking stops new ones; guests already here stay."
 msgstr "People without an account can join. Unticking stops new ones; guests already here stay."
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:31
+#: ../frontend/collaborate/components/SaveDestination.tsx:70
 msgid "Post to"
 msgstr "Post to"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:24
+#: ../frontend/collaborate/components/SaveDestination.tsx:63
 msgid "Posts to {name}"
 msgstr "Posts to {name}"
 
@@ -333,6 +345,10 @@ msgstr "Save to Gallery"
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:141
 msgid "Saving..."
 msgstr "Saving..."
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:39
+msgid "Search communities"
+msgstr "Search communities"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:95
 #: ../frontend/collaborate/components/DiscordInvite.tsx:96

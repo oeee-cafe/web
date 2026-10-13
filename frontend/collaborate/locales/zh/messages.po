@@ -119,6 +119,10 @@ msgstr "下载 PNG"
 msgid "Drawing without an account"
 msgstr "未登录账号参与"
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:42
+msgid "drawn here"
+msgstr "画过"
+
 #: ../frontend/collaborate/components/SessionHeader.tsx:254
 msgid "Every seat is taken. You can draw once one frees."
 msgstr "座位已满。有空位时即可绘画。"
@@ -218,6 +222,10 @@ msgstr "正在加载好友…"
 msgid "Loading..."
 msgstr "加载中..."
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:41
+msgid "member"
+msgstr "成员"
+
 #: ../frontend/collaborate/components/Chat.tsx:150
 msgid "Message too long (max 500 characters)"
 msgstr "消息过长（最多 500 个字符）"
@@ -233,6 +241,10 @@ msgstr "还没有可以邀请的 Discord 好友。"
 #: ../frontend/collaborate/components/DiscordInvite.tsx:106
 msgid "No friend by that name."
 msgstr "没有叫这个名字的好友。"
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:43
+msgid "No matching communities"
+msgstr "没有匹配的社区"
 
 #: ../frontend/collaborate/App.tsx:961
 msgid "No Title"
@@ -265,11 +277,11 @@ msgstr "可以只观看不绘画。取消勾选只会阻止新的观看者，已
 msgid "People without an account can join. Unticking stops new ones; guests already here stay."
 msgstr "没有账号的人也可以加入。取消勾选只会阻止新的访客，已在的访客会留下。"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:31
+#: ../frontend/collaborate/components/SaveDestination.tsx:70
 msgid "Post to"
 msgstr "发布到"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:24
+#: ../frontend/collaborate/components/SaveDestination.tsx:63
 msgid "Posts to {name}"
 msgstr "将发布到 {name}"
 
@@ -333,6 +345,10 @@ msgstr "保存到画廊"
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:141
 msgid "Saving..."
 msgstr "保存中..."
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:39
+msgid "Search communities"
+msgstr "搜索社区"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:95
 #: ../frontend/collaborate/components/DiscordInvite.tsx:96

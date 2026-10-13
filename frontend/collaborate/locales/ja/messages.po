@@ -119,6 +119,10 @@ msgstr "PNG をダウンロード"
 msgid "Drawing without an account"
 msgstr "アカウントなしで参加中"
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:42
+msgid "drawn here"
+msgstr "描いた場所"
+
 #: ../frontend/collaborate/components/SessionHeader.tsx:254
 msgid "Every seat is taken. You can draw once one frees."
 msgstr "席がすべて埋まっています。空きが出れば描けます。"
@@ -218,6 +222,10 @@ msgstr "フレンドを読み込み中…"
 msgid "Loading..."
 msgstr "読み込み中..."
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:41
+msgid "member"
+msgstr "メンバー"
+
 #: ../frontend/collaborate/components/Chat.tsx:150
 msgid "Message too long (max 500 characters)"
 msgstr "メッセージが長すぎます（最大500文字）"
@@ -233,6 +241,10 @@ msgstr "招待できるDiscordのフレンドはまだいません。"
 #: ../frontend/collaborate/components/DiscordInvite.tsx:106
 msgid "No friend by that name."
 msgstr "その名前のフレンドはいません。"
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:43
+msgid "No matching communities"
+msgstr "一致するコミュニティがありません"
 
 #: ../frontend/collaborate/App.tsx:961
 msgid "No Title"
@@ -265,11 +277,11 @@ msgstr "描かずに見ることができます。外すと新しく見に来る
 msgid "People without an account can join. Unticking stops new ones; guests already here stay."
 msgstr "アカウントのない人も参加できます。外すと新しいゲストだけを止め、すでにいるゲストは残ります。"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:31
+#: ../frontend/collaborate/components/SaveDestination.tsx:70
 msgid "Post to"
 msgstr "投稿先"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:24
+#: ../frontend/collaborate/components/SaveDestination.tsx:63
 msgid "Posts to {name}"
 msgstr "{name}に投稿されます"
 
@@ -333,6 +345,10 @@ msgstr "ギャラリーに保存"
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:141
 msgid "Saving..."
 msgstr "保存中..."
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:39
+msgid "Search communities"
+msgstr "コミュニティを検索"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:95
 #: ../frontend/collaborate/components/DiscordInvite.tsx:96

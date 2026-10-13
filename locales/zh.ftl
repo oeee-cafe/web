@@ -165,6 +165,10 @@ drafts-local-post-failed = 无法发布这幅画。它仍保存在此设备上�
 drafts-local-unavailable = 此设备无法保存画作，因此未登录时保存的画作不会显示在这里。
 drafts-local-collaboration-not-yours = 这幅画来自另一个账号拥有的会话，无法用此账号发布。它仍保存在此设备上。
 drafts-local-post-to = 发布到
+drafts-local-search-communities = 搜索社区
+drafts-local-community-member = 成员
+drafts-local-community-drawn = 画过
+drafts-local-community-no-matches = 没有匹配的社区
 
 post-created-at = 创作时间
 post-published-at = 发布时间

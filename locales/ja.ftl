@@ -165,6 +165,10 @@ drafts-local-post-failed = 絵を投稿できませんでした。この端末�
 drafts-local-unavailable = この端末には絵を保存できないため、ログインせずに保存した絵はここに表示されません。
 drafts-local-collaboration-not-yours = 別のアカウントが持つセッションの絵なので、このアカウントでは投稿できません。この端末には残っています。
 drafts-local-post-to = 投稿先
+drafts-local-search-communities = コミュニティを検索
+drafts-local-community-member = メンバー
+drafts-local-community-drawn = 描いた場所
+drafts-local-community-no-matches = 一致するコミュニティがありません
 
 post-created-at = 絵を描いた時刻
 post-published-at = 発行時刻

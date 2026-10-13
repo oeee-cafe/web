@@ -1126,7 +1126,7 @@ export default function App() {
       current = false;
     };
   }, [asksWhereToPost]);
-  const saveDestination = { destinations: saveDestinations, value: saveTo, onChange: setSaveTo };
+  const saveDestination = { sessionId: getSessionId(), destinations: saveDestinations, value: saveTo, onChange: setSaveTo };
 
   /**
    * Whether somebody watching may take up drawing: a seat is free, or they

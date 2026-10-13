@@ -660,14 +660,91 @@ pub(super) async fn save_destinations(
         .collect())
 }
 
+/// How many communities one answer of the destination search lists.
+const DESTINATION_LIMIT: i64 = 20;
+
+/// `?q=`, what the owner has typed into the save's community search.
+#[derive(serde::Deserialize, Default)]
+pub struct DestinationQuery {
+    q: Option<String>,
+}
+
+/// Public communities an account may post a lobby room's drawing to (the
+/// rule `save_destinations` holds the save to), those they belong to first
+/// and then those they have drawn in. With nothing to search for, only those
+/// two kinds -- what they most likely mean; with a search, any public
+/// community whose name or handle has it in.
+pub(super) async fn search_save_destinations(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+    query: Option<&str>,
+) -> Result<Vec<serde_json::Value>, AppError> {
+    // Taken literally: a % or _ typed is looked for, not a wildcard.
+    let pattern = query.map(|query| {
+        let escaped = query
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        format!("%{escaped}%")
+    });
+    let rows = sqlx::query!(
+        r#"
+        SELECT c.id, c.name, c.slug,
+            EXISTS(
+                SELECT 1 FROM community_members cm
+                WHERE cm.community_id = c.id AND cm.user_id = $1
+            ) AS "member!",
+            EXISTS(
+                SELECT 1 FROM posts p
+                WHERE p.community_id = c.id AND p.author_id = $1
+            ) AS "drawn!"
+        FROM communities c
+        WHERE c.deleted_at IS NULL
+          AND c.visibility = 'public'
+          AND NOT (c.background_color IS NOT NULL AND c.foreground_color IS NOT NULL)
+          AND CASE WHEN $2::text IS NULL THEN
+                EXISTS(
+                    SELECT 1 FROM community_members cm
+                    WHERE cm.community_id = c.id AND cm.user_id = $1
+                )
+                OR EXISTS(
+                    SELECT 1 FROM posts p
+                    WHERE p.community_id = c.id AND p.author_id = $1
+                )
+              ELSE c.name ILIKE $2 OR c.slug ILIKE $2
+              END
+        ORDER BY 4 DESC, 5 DESC, c.name ASC
+        LIMIT $3
+        "#,
+        user_id,
+        pattern,
+        DESTINATION_LIMIT,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            serde_json::json!({
+                "id": row.id.to_string(),
+                "name": row.name,
+                "slug": row.slug,
+                "member": row.member,
+                "drawn": row.drawn,
+            })
+        })
+        .collect())
+}
+
 /// GET /collaborate/{uuid}/destinations: where the owner's save may post the
 /// drawing. A room opened in a community goes there and nowhere else
 /// (`community`); one opened in none offers the owner's own posts or a
-/// public community (`choices`), the communities they belong to first.
+/// public community, found by `?q=` (`search_save_destinations`).
 pub async fn collaboration_save_destinations(
     Path(session_uuid): Path<Uuid>,
     auth_session: AuthSession,
     State(state): State<AppState>,
+    Query(search): Query<DestinationQuery>,
 ) -> Result<Response, AppError> {
     let user = auth_session.user.ok_or(AppError::Unauthorized)?;
     let mut tx = state.db_pool.begin().await?;
@@ -681,30 +758,26 @@ pub async fn collaboration_save_destinations(
     if session.owner_id != Some(user.id) {
         return Err(AppError::Forbidden);
     }
-    let fixed = match session.community_id {
-        Some(id) => find_community_by_id(&mut tx, id).await?,
-        None => None,
-    };
-    let mut choices = match session.community_id {
-        Some(_) => Vec::new(),
-        None => save_destinations(&mut tx, user.id).await?,
+    let query = search
+        .q
+        .as_deref()
+        .map(str::trim)
+        .filter(|query| !query.is_empty());
+    let (fixed, choices) = match session.community_id {
+        Some(id) => (find_community_by_id(&mut tx, id).await?, Vec::new()),
+        None => (
+            None,
+            search_save_destinations(&mut tx, user.id, query).await?,
+        ),
     };
     tx.commit().await?;
-    // Theirs first, then where they have posted, then the rest by name.
-    choices.sort_by_key(|community| (!community.is_member, !community.has_participated));
-    let entry = |id: Uuid, name: &str, slug: &str| {
-        serde_json::json!({
-            "id": id.to_string(),
-            "name": name,
-            "slug": slug,
-        })
-    };
     Ok(Json(serde_json::json!({
-        "community": fixed.map(|community| entry(community.id, &community.name, &community.slug)),
-        "choices": choices
-            .iter()
-            .map(|community| entry(community.id, &community.name, &community.slug))
-            .collect::<Vec<_>>(),
+        "community": fixed.map(|community| serde_json::json!({
+            "id": community.id.to_string(),
+            "name": community.name,
+            "slug": community.slug,
+        })),
+        "choices": choices,
     }))
     .into_response())
 }

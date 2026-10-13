@@ -1074,6 +1074,54 @@ async fn a_room_in_no_community_is_saved_only_to_a_public_one() {
     }
 }
 
+/// The save's community search: with nothing typed, the communities the
+/// owner belongs to; typed, any public one whose name has it in, matched
+/// literally; never one that is not public.
+#[tokio::test]
+async fn the_save_search_suggests_the_owners_communities_and_finds_public_ones() {
+    let Some(room) = open_room_in(4, Some("public")).await else {
+        return;
+    };
+    let community = room.community_id.expect("a community").to_string();
+    let ids = |found: &[serde_json::Value]| -> Vec<String> {
+        found
+            .iter()
+            .map(|place| place["id"].as_str().unwrap_or_default().to_string())
+            .collect()
+    };
+    let mut tx = room.db.begin().await.expect("tx");
+    // The owner is its member: suggested before anything is typed.
+    let suggested = super::http_handlers::search_save_destinations(&mut tx, room.users[0], None)
+        .await
+        .expect("suggestions");
+    assert!(ids(&suggested).contains(&community));
+    assert_eq!(suggested[0]["member"], true);
+    // Somebody else is suggested nothing of it, and finds it by name.
+    let nothing = super::http_handlers::search_save_destinations(&mut tx, room.users[1], None)
+        .await
+        .expect("suggestions");
+    assert!(!ids(&nothing).contains(&community));
+    let found = super::http_handlers::search_save_destinations(
+        &mut tx,
+        room.users[1],
+        Some("HANDLER TEST"),
+    )
+    .await
+    .expect("search");
+    assert!(ids(&found).contains(&community));
+    // A wildcard typed is a character looked for, not a wildcard.
+    let literal = super::http_handlers::search_save_destinations(
+        &mut tx,
+        room.users[1],
+        Some("handler%test"),
+    )
+    .await
+    .expect("search");
+    assert!(!ids(&literal).contains(&community));
+    tx.rollback().await.expect("rollback");
+    room.teardown().await;
+}
+
 /// The name and flags a JOIN or LEAVE carries, as the room hears them:
 /// [type][uuid:16][ts:8][flags][len:2][name].
 fn person_in(frame: &[u8]) -> (Uuid, u8, String) {

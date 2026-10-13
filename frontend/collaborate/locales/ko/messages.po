@@ -119,6 +119,10 @@ msgstr "PNG 다운로드"
 msgid "Drawing without an account"
 msgstr "계정 없이 그리는 중"
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:42
+msgid "drawn here"
+msgstr "그린 곳"
+
 #: ../frontend/collaborate/components/SessionHeader.tsx:254
 msgid "Every seat is taken. You can draw once one frees."
 msgstr "자리가 모두 찼습니다. 자리가 나면 그릴 수 있습니다."
@@ -218,6 +222,10 @@ msgstr "친구를 불러오는 중…"
 msgid "Loading..."
 msgstr "로딩 중..."
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:41
+msgid "member"
+msgstr "멤버"
+
 #: ../frontend/collaborate/components/Chat.tsx:150
 msgid "Message too long (max 500 characters)"
 msgstr "메시지가 너무 깁니다 (최대 500자)"
@@ -233,6 +241,10 @@ msgstr "아직 초대할 Discord 친구가 없어요."
 #: ../frontend/collaborate/components/DiscordInvite.tsx:106
 msgid "No friend by that name."
 msgstr "그 이름의 친구가 없어요."
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:43
+msgid "No matching communities"
+msgstr "맞는 커뮤니티가 없습니다"
 
 #: ../frontend/collaborate/App.tsx:961
 msgid "No Title"
@@ -265,11 +277,11 @@ msgstr "그리지 않고 구경할 수 있습니다. 해제하면 새로 구경�
 msgid "People without an account can join. Unticking stops new ones; guests already here stay."
 msgstr "계정이 없는 사람도 참여할 수 있습니다. 해제하면 새 손님만 막고, 이미 있는 손님은 남습니다."
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:31
+#: ../frontend/collaborate/components/SaveDestination.tsx:70
 msgid "Post to"
 msgstr "올릴 곳"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:24
+#: ../frontend/collaborate/components/SaveDestination.tsx:63
 msgid "Posts to {name}"
 msgstr "{name}에 올라갑니다"
 
@@ -317,7 +329,7 @@ msgstr "PNG로 저장"
 
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:51
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
-msgstr "이 그림을 갤러리에 저장할까요? 저장하면 모두의 세션이 끝나고 아무도 이어서 그릴 수 없습니다."
+msgstr "이 그림을 갤러리에 저장할까요? 저장하면 이어서 그릴 수 없습니다."
 
 #: ../frontend/collaborate/App.tsx:1399
 #: ../frontend/collaborate/App.tsx:1449
@@ -325,7 +337,7 @@ msgstr "이 그림을 갤러리에 저장할까요? 저장하면 모두의 세�
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Save to Gallery"
-msgstr "갤러리에 저장"
+msgstr "저장"
 
 #: ../frontend/collaborate/App.tsx:1396
 #: ../frontend/collaborate/App.tsx:1449
@@ -333,6 +345,10 @@ msgstr "갤러리에 저장"
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:141
 msgid "Saving..."
 msgstr "저장 중..."
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:39
+msgid "Search communities"
+msgstr "커뮤니티 검색"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:95
 #: ../frontend/collaborate/components/DiscordInvite.tsx:96

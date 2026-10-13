@@ -165,6 +165,10 @@ drafts-local-post-failed = 그림을 게시하지 못했습니다. 이 기기에
 drafts-local-unavailable = 이 기기에는 그림을 보관할 수 없어서, 로그인하지 않고 저장한 그림은 여기 나오지 않습니다.
 drafts-local-collaboration-not-yours = 다른 계정이 가진 세션에서 그린 그림이라 이 계정으로는 올릴 수 없습니다. 이 기기에는 그대로 남아 있습니다.
 drafts-local-post-to = 올릴 곳
+drafts-local-search-communities = 커뮤니티 검색
+drafts-local-community-member = 멤버
+drafts-local-community-drawn = 그린 곳
+drafts-local-community-no-matches = 맞는 커뮤니티가 없습니다
 
 post-created-at = 그린 시각
 post-published-at = 발행 시각

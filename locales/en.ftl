@@ -189,6 +189,10 @@ drafts-local-post-failed = Couldn't post this drawing. It's still kept on this d
 drafts-local-unavailable = Drawings can't be kept on this device, so any drawing saved while signed out isn't shown here.
 drafts-local-collaboration-not-yours = This drawing is from a session another account owns, so it can't be posted from this one. It's still kept on this device.
 drafts-local-post-to = Post to
+drafts-local-search-communities = Search communities
+drafts-local-community-member = member
+drafts-local-community-drawn = drawn here
+drafts-local-community-no-matches = No matching communities
 
 post-created-at = Created
 post-published-at = Published

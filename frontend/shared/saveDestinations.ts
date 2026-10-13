@@ -9,6 +9,10 @@ export interface Place {
   id: string;
   name: string;
   slug: string;
+  /** The owner belongs to it. Only on a choice, not a room's own community. */
+  member?: boolean;
+  /** The owner has posted a drawing there. */
+  drawn?: boolean;
 }
 
 /**
@@ -22,8 +26,14 @@ export interface SaveDestinations {
   choices: Place[];
 }
 
-export async function fetchSaveDestinations(sessionId: string): Promise<SaveDestinations> {
-  const response = await fetch(`/collaborate/${encodeURIComponent(sessionId)}/destinations`, {
+/**
+ * With no `query`, the owner's suggestions: the public communities they
+ * belong to or have drawn in. With one, any public community whose name or
+ * handle has it in, theirs first.
+ */
+export async function fetchSaveDestinations(sessionId: string, query = ""): Promise<SaveDestinations> {
+  const search = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
+  const response = await fetch(`/collaborate/${encodeURIComponent(sessionId)}/destinations${search}`, {
     credentials: "include",
   });
   if (!response.ok) throw new Error(`destinations ${response.status}`);

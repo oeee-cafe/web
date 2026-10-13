@@ -16,6 +16,7 @@ import {
 } from "../shared/localDrafts";
 import { feelInApp } from "../shared/appBridge";
 import { downloadPng, UploadError, uploadLocalDraft } from "../shared/drawingUpload";
+import { mountCommunitySearch } from "../shared/communitySearch";
 import { fetchSaveDestinations, saveUrl } from "../shared/saveDestinations";
 import { ask, say } from "../shared/siteDialog";
 
@@ -32,6 +33,10 @@ interface DraftsWords {
   unavailable: string;
   collaborationNotYours: string;
   postTo: string;
+  searchCommunities: string;
+  member: string;
+  drawn: string;
+  noMatches: string;
 }
 
 const section = document.getElementById("local-drafts");
@@ -81,8 +86,9 @@ async function postCollaboration(
   trigger: HTMLButtonElement,
 ): Promise<void> {
   trigger.disabled = true;
-  // The community chosen on the card, for a room opened in none.
-  const community = card.querySelector<HTMLSelectElement>(".local-draft-destination")?.value ?? "";
+  // The community chosen on the card (offerDestinations), for a room opened
+  // in none.
+  const community = card.dataset.community ?? "";
   try {
     const response = await fetch(saveUrl(sessionId, community), {
       method: "POST",
@@ -122,30 +128,46 @@ async function postCollaboration(
  * account's; if it cannot say, the card stays as it was and the post goes to
  * their own.
  */
-function offerDestinations(sessionId: string, who: HTMLElement, actions: HTMLElement): void {
+function offerDestinations(sessionId: string, card: HTMLElement, who: HTMLElement, actions: HTMLElement): void {
   fetchSaveDestinations(sessionId)
     .then((destinations) => {
       if (destinations.community) {
         who.textContent = destinations.community.name;
         return;
       }
-      if (!destinations.choices.length) return;
-      const select = document.createElement("select");
-      select.className = "ds-select local-draft-destination";
-      const own = document.createElement("option");
-      own.value = "";
-      own.textContent = words.personal || "Personal post";
-      select.append(own);
-      for (const place of destinations.choices) {
-        const option = document.createElement("option");
-        option.value = place.id;
-        option.textContent = place.name;
-        select.append(option);
-      }
-      const row = document.createElement("label");
+      const row = document.createElement("div");
       row.className = "local-draft-destination-row";
-      row.append(words.postTo || "Post to", select);
+      const label = document.createElement("label");
+      label.className = "ds-label";
+      const id = `local-draft-destination-${sessionId}`;
+      label.htmlFor = id;
+      label.textContent = words.postTo || "Post to";
+      row.append(label);
       actions.before(row);
+      card.dataset.community = "";
+      mountCommunitySearch(row, {
+        sessionId,
+        suggestions: destinations.choices,
+        value: "",
+        onChange: (community) => {
+          card.dataset.community = community;
+        },
+        id,
+        words: {
+          search: words.searchCommunities || "Search communities",
+          ownPosts: words.personal || "Personal post",
+          member: words.member || "member",
+          drawn: words.drawn || "drawn here",
+          noMatches: words.noMatches || "No matching communities",
+        },
+        classes: {
+          root: "community-search",
+          input: "ds-input community-search-input",
+          list: "community-search-list",
+          option: "community-search-option",
+          meta: "community-search-meta",
+        },
+      });
     })
     .catch(console.error);
 }
@@ -255,7 +277,7 @@ function card(draft: LocalDraft): HTMLElement {
 
   meta.append(title, byline, actions);
   if (draft.collaborativeSessionId && userId) {
-    offerDestinations(draft.collaborativeSessionId, who, actions);
+    offerDestinations(draft.collaborativeSessionId, item, who, actions);
   }
   item.append(frame, meta);
   return item;

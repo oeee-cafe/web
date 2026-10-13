@@ -41,6 +41,10 @@
       "unavailable": ftl_get_message("drafts-local-unavailable"),
       "collaborationNotYours": ftl_get_message("drafts-local-collaboration-not-yours"),
       "postTo": ftl_get_message("drafts-local-post-to"),
+      "searchCommunities": ftl_get_message("drafts-local-search-communities"),
+      "member": ftl_get_message("drafts-local-community-member"),
+      "drawn": ftl_get_message("drafts-local-community-drawn"),
+      "noMatches": ftl_get_message("drafts-local-community-no-matches"),
     }|tojson }}</script>
     <script type="module" src="{{ '/static/neo-cucumber/drafts.js' | cachebuster | safe }}"></script>
     {% if current_user %}
