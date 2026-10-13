@@ -759,7 +759,12 @@ return {#kept, checkpoint_bytes}
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut conn = self.pool.get().await?;
 
-        let deleted: usize = conn.del(room_keys(room_uuid)).await?;
+        // UNLINK, not DEL: a history can be large, and DEL frees it on the
+        // one thread every other client of this shared Redis is waiting on.
+        let deleted: usize = redis::cmd("UNLINK")
+            .arg(room_keys(room_uuid))
+            .query_async(&mut *conn)
+            .await?;
         if deleted > 0 {
             debug!("Cleaned up Redis message history for room {}", room_uuid);
         }

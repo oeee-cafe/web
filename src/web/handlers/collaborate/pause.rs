@@ -4,9 +4,9 @@
 //! last connection: a room that ran out of activity before its owner saved it
 //! used to lose the drawing for good, with only the owner able to have saved
 //! it. Now an idle room with an unsaved drawing is *paused*: its keys are
-//! taken out of Redis whole (`DUMP`), stored as one object in the private
-//! bucket, and the session stays open. The first person allowed in puts them
-//! back (`RESTORE`) before they are sent the history, and the room carries on
+//! copied out of Redis, stored as one object in the private bucket, and the
+//! session stays open. The first person allowed in puts them back before they
+//! are sent the history, and the room carries on
 //! from exactly where it stood -- the same history id, so a page that was open
 //! when it paused resumes rather than replays.
 //!
@@ -23,9 +23,21 @@
 //! commits: deleted after, a join waiting on the lock would restore them and
 //! then watch them be deleted.
 //!
-//! `DUMP` is in Redis's own serialisation, which a Redis can always read from
-//! itself or an older version; a paused room would not survive a downgrade of
-//! Redis inside its retention, which nobody does.
+//! ## Sharing Redis
+//!
+//! Redis is shared with other apps on the host and runs one command at a
+//! time, so nothing here is one large command. A history is copied out in
+//! slices of [`LIST_BATCH`] entries and put back the same way, where `DUMP`
+//! and `RESTORE` would each have serialised a whole history -- up to the
+//! history ceiling, for a room whose checkpoints had been failing -- with
+//! every other client waiting. Keys are let go with `UNLINK`, which frees
+//! their memory off the main thread. And the copy is in a format of our own
+//! rather than `DUMP`'s, which a Redis older than the one that wrote it
+//! cannot read.
+//!
+//! The copy is not one atomic read, and need not be: nobody is in a pausing
+//! room (its page was sent away first) or a resuming one (joins wait on the
+//! session row), so its keys do not change underneath.
 
 use std::io::{Read, Write};
 use std::time::Duration;
@@ -43,8 +55,27 @@ use crate::web::state::AppState;
 /// How long a paused room waits for somebody to come back to it.
 pub const PAUSED_RETENTION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
-/// What a stored pause begins with, and its layout version.
-const MAGIC: &[u8] = b"OEEEPAUSE\x01";
+/// What a stored pause begins with, and its layout version: 2 holds each key
+/// by its contents. 1, written for a few minutes before it, held `DUMP`s, and
+/// is still read in case a room was paused then.
+const MAGIC: &[u8] = b"OEEEPAUSE\x02";
+const MAGIC_DUMPS: &[u8] = b"OEEEPAUSE\x01";
+
+/// Entries read or written per command, for a list: small enough that no
+/// command keeps Redis from its other clients for long, whatever the entries
+/// hold (a checkpoint's snapshots are the largest, at a few megabytes).
+const LIST_BATCH: isize = 256;
+
+/// A key's contents, by the type it has. A room keeps no other kind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Value {
+    String(Vec<u8>),
+    List(Vec<Vec<u8>>),
+    Hash(Vec<(Vec<u8>, Vec<u8>)>),
+}
+
+/// What a stored pause holds: each key, and what was in it.
+type Kept = Vec<(String, Value)>;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -61,43 +92,184 @@ fn carried_keys(room_uuid: Uuid) -> Vec<String> {
     keys
 }
 
-/// `[magic][count:2]` then each key `[name len:2][name][dump len:4][dump]`,
-/// the whole compressed. Keys that do not exist are not written.
-fn encode(dumps: &[(String, Vec<u8>)]) -> Result<Vec<u8>, Error> {
+fn put_bytes(raw: &mut Vec<u8>, bytes: &[u8]) {
+    raw.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+    raw.extend_from_slice(bytes);
+}
+
+/// `[magic][count:2]`, then each key `[name len:2][name][kind:1]` and its
+/// contents: a string `[len:4][bytes]`, a list `[count:4]` of those, a hash
+/// `[count:4]` of field-value pairs of them. The whole compressed.
+fn encode(kept: &Kept) -> Result<Vec<u8>, Error> {
     let mut raw = Vec::from(MAGIC);
-    raw.extend_from_slice(&(dumps.len() as u16).to_le_bytes());
-    for (name, dump) in dumps {
+    raw.extend_from_slice(&(kept.len() as u16).to_le_bytes());
+    for (name, value) in kept {
         raw.extend_from_slice(&(name.len() as u16).to_le_bytes());
         raw.extend_from_slice(name.as_bytes());
-        raw.extend_from_slice(&(dump.len() as u32).to_le_bytes());
-        raw.extend_from_slice(dump);
+        match value {
+            Value::String(bytes) => {
+                raw.push(0);
+                put_bytes(&mut raw, bytes);
+            }
+            Value::List(entries) => {
+                raw.push(1);
+                raw.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+                for entry in entries {
+                    put_bytes(&mut raw, entry);
+                }
+            }
+            Value::Hash(pairs) => {
+                raw.push(2);
+                raw.extend_from_slice(&(pairs.len() as u32).to_le_bytes());
+                for (field, value) in pairs {
+                    put_bytes(&mut raw, field);
+                    put_bytes(&mut raw, value);
+                }
+            }
+        }
     }
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(&raw)?;
     Ok(encoder.finish()?)
 }
 
-fn decode(stored: &[u8]) -> Result<Vec<(String, Vec<u8>)>, Error> {
+/// A stored pause read back: what it kept, or, from the first layout, the
+/// `DUMP`s it kept.
+enum Stored {
+    Kept(Kept),
+    Dumps(Vec<(String, Vec<u8>)>),
+}
+
+struct Reader<'a> {
+    raw: &'a [u8],
+    at: usize,
+}
+
+impl Reader<'_> {
+    fn take(&mut self, len: usize) -> Result<&[u8], Error> {
+        let slice = self
+            .raw
+            .get(self.at..self.at + len)
+            .ok_or("a paused room cut short")?;
+        self.at += len;
+        Ok(slice)
+    }
+    fn u16(&mut self) -> Result<usize, Error> {
+        Ok(u16::from_le_bytes(self.take(2)?.try_into()?) as usize)
+    }
+    fn u32(&mut self) -> Result<usize, Error> {
+        Ok(u32::from_le_bytes(self.take(4)?.try_into()?) as usize)
+    }
+    fn bytes(&mut self) -> Result<Vec<u8>, Error> {
+        let len = self.u32()?;
+        Ok(self.take(len)?.to_vec())
+    }
+    fn name(&mut self) -> Result<String, Error> {
+        let len = self.u16()?;
+        Ok(String::from_utf8(self.take(len)?.to_vec())?)
+    }
+}
+
+fn decode(stored: &[u8]) -> Result<Stored, Error> {
     let mut raw = Vec::new();
     ZlibDecoder::new(stored).read_to_end(&mut raw)?;
-    let mut at = MAGIC.len();
-    if !raw.starts_with(MAGIC) || raw.len() < at + 2 {
+    let dumps = raw.starts_with(MAGIC_DUMPS);
+    if !dumps && !raw.starts_with(MAGIC) {
         return Err("not a paused room".into());
     }
-    let take = |at: &mut usize, len: usize| -> Result<&[u8], Error> {
-        let slice = raw.get(*at..*at + len).ok_or("a paused room cut short")?;
-        *at += len;
-        Ok(slice)
+    let mut reader = Reader {
+        raw: &raw,
+        at: MAGIC.len(),
     };
-    let count = u16::from_le_bytes(take(&mut at, 2)?.try_into()?) as usize;
-    let mut dumps = Vec::with_capacity(count);
-    for _ in 0..count {
-        let name_len = u16::from_le_bytes(take(&mut at, 2)?.try_into()?) as usize;
-        let name = String::from_utf8(take(&mut at, name_len)?.to_vec())?;
-        let dump_len = u32::from_le_bytes(take(&mut at, 4)?.try_into()?) as usize;
-        dumps.push((name, take(&mut at, dump_len)?.to_vec()));
+    let count = reader.u16()?;
+    if dumps {
+        let mut kept = Vec::with_capacity(count);
+        for _ in 0..count {
+            kept.push((reader.name()?, reader.bytes()?));
+        }
+        return Ok(Stored::Dumps(kept));
     }
-    Ok(dumps)
+    let mut kept = Vec::with_capacity(count);
+    for _ in 0..count {
+        let name = reader.name()?;
+        let value = match reader.take(1)?[0] {
+            0 => Value::String(reader.bytes()?),
+            1 => {
+                let len = reader.u32()?;
+                let mut entries = Vec::with_capacity(len);
+                for _ in 0..len {
+                    entries.push(reader.bytes()?);
+                }
+                Value::List(entries)
+            }
+            2 => {
+                let len = reader.u32()?;
+                let mut pairs = Vec::with_capacity(len);
+                for _ in 0..len {
+                    pairs.push((reader.bytes()?, reader.bytes()?));
+                }
+                Value::Hash(pairs)
+            }
+            kind => return Err(format!("a paused key of unknown kind {kind}").into()),
+        };
+        kept.push((name, value));
+    }
+    Ok(Stored::Kept(kept))
+}
+
+/// Copies the keys out, a slice at a time. Keys that do not exist are left
+/// out; a kind a room never keeps is an error, not a key silently dropped.
+async fn copy_out(state: &AppState, keys: &[String]) -> Result<Kept, Error> {
+    let mut conn = state.redis_pool.get().await?;
+    let mut kept = Vec::new();
+    for key in keys {
+        let kind: String = redis::cmd("TYPE").arg(key).query_async(&mut *conn).await?;
+        let value = match kind.as_str() {
+            "none" => continue,
+            "string" => Value::String(redis::cmd("GET").arg(key).query_async(&mut *conn).await?),
+            "hash" => Value::Hash(
+                redis::cmd("HGETALL")
+                    .arg(key)
+                    .query_async(&mut *conn)
+                    .await?,
+            ),
+            "list" => {
+                let mut entries: Vec<Vec<u8>> = Vec::new();
+                loop {
+                    let start = entries.len() as isize;
+                    let slice: Vec<Vec<u8>> = redis::cmd("LRANGE")
+                        .arg(key)
+                        .arg(start)
+                        .arg(start + LIST_BATCH - 1)
+                        .query_async(&mut *conn)
+                        .await?;
+                    let done = (slice.len() as isize) < LIST_BATCH;
+                    entries.extend(slice);
+                    if done {
+                        break;
+                    }
+                }
+                Value::List(entries)
+            }
+            other => {
+                return Err(
+                    format!("room key {key} is a {other}, which a pause does not carry").into(),
+                )
+            }
+        };
+        kept.push((key.clone(), value));
+    }
+    Ok(kept)
+}
+
+/// Lets keys go without freeing them on Redis's one thread.
+async fn unlink(state: &AppState, keys: &[String]) -> Result<(), Error> {
+    let mut conn = state.redis_pool.get().await?;
+    let _: () = redis::cmd("UNLINK")
+        .arg(keys)
+        .query_async(&mut *conn)
+        .await?;
+    Ok(())
 }
 
 // Where the object goes. The private bucket in a deployment; in the tests,
@@ -234,20 +406,12 @@ pub async fn pause_idle_room(state: &AppState, room_uuid: Uuid) -> Result<Idled,
     super::archive::flush_room(state, room_uuid).await;
 
     let keys = carried_keys(room_uuid);
-    let mut conn = state.redis_pool.get().await?;
-    let mut dumps = Vec::new();
-    for key in &keys {
-        let dump: Option<Vec<u8>> = redis::cmd("DUMP").arg(key).query_async(&mut *conn).await?;
-        if let Some(dump) = dump {
-            dumps.push((key.clone(), dump));
-        }
-    }
-    let body = encode(&dumps)?;
+    let kept = copy_out(state, &keys).await?;
+    let body = encode(&kept)?;
     let size = body.len();
     put_object(state, &object_key(room_uuid), body).await?;
 
-    let _: () = redis::cmd("DEL").arg(&keys).query_async(&mut *conn).await?;
-    drop(conn);
+    unlink(state, &keys).await?;
     for cleaned in [
         state.redis_state.cleanup_room_state(room_uuid).await,
         super::preview::PreviewStore::new(state.redis_pool.clone())
@@ -286,7 +450,7 @@ pub async fn pause_idle_room(state: &AppState, room_uuid: Uuid) -> Result<Idled,
             // The drawing is out of Redis and the room is not marked paused:
             // put it back, so the room is as it was.
             drop(tx);
-            if let Err(restore) = restore(state, room_uuid, &dumps).await {
+            if let Err(restore) = restore(state, room_uuid, Stored::Kept(kept)).await {
                 error!(
                     "Room {room_uuid} could not be marked paused ({e}) nor put back ({restore}); its drawing is in the bucket at {}",
                     object_key(room_uuid)
@@ -295,29 +459,74 @@ pub async fn pause_idle_room(state: &AppState, room_uuid: Uuid) -> Result<Idled,
             return Err(e.into());
         }
     }
-    info!(
-        "Paused room {room_uuid}: {} keys, {size} bytes",
-        dumps.len()
-    );
+    info!("Paused room {room_uuid}: {} keys, {size} bytes", kept.len());
     Ok(Idled::Paused)
 }
 
-/// Puts the keys back, alive for as long as a room's history is.
-async fn restore(
-    state: &AppState,
-    room_uuid: Uuid,
-    dumps: &[(String, Vec<u8>)],
-) -> Result<(), Error> {
+/// Puts the keys back, a slice at a time, alive for as long as a room's
+/// history is.
+async fn restore(state: &AppState, room_uuid: Uuid, stored: Stored) -> Result<(), Error> {
     let mut conn = state.redis_pool.get().await?;
-    for (key, dump) in dumps {
-        let _: () = redis::cmd("RESTORE")
-            .arg(key)
-            .arg(HISTORY_TTL * 1000)
-            .arg(dump)
-            .arg("REPLACE")
-            .query_async(&mut *conn)
-            .await?;
+    let ttl = HISTORY_TTL as i64;
+    match stored {
+        Stored::Kept(kept) => {
+            let names: Vec<String> = kept.iter().map(|(name, _)| name.clone()).collect();
+            if !names.is_empty() {
+                let _: () = redis::cmd("UNLINK")
+                    .arg(&names)
+                    .query_async(&mut *conn)
+                    .await?;
+            }
+            for (key, value) in kept {
+                match value {
+                    Value::String(bytes) => {
+                        let _: () = redis::cmd("SET")
+                            .arg(&key)
+                            .arg(bytes)
+                            .query_async(&mut *conn)
+                            .await?;
+                    }
+                    Value::List(entries) => {
+                        for slice in entries.chunks(LIST_BATCH as usize) {
+                            let _: () = redis::cmd("RPUSH")
+                                .arg(&key)
+                                .arg(slice)
+                                .query_async(&mut *conn)
+                                .await?;
+                        }
+                    }
+                    Value::Hash(pairs) => {
+                        for slice in pairs.chunks(LIST_BATCH as usize) {
+                            let mut command = redis::cmd("HSET");
+                            command.arg(&key);
+                            for (field, value) in slice {
+                                command.arg(field).arg(value);
+                            }
+                            let _: () = command.query_async(&mut *conn).await?;
+                        }
+                    }
+                }
+                let _: () = redis::cmd("EXPIRE")
+                    .arg(&key)
+                    .arg(ttl)
+                    .query_async(&mut *conn)
+                    .await?;
+            }
+        }
+        // The first layout's, kept for a room paused under it.
+        Stored::Dumps(dumps) => {
+            for (key, dump) in dumps {
+                let _: () = redis::cmd("RESTORE")
+                    .arg(&key)
+                    .arg(HISTORY_TTL * 1000)
+                    .arg(dump)
+                    .arg("REPLACE")
+                    .query_async(&mut *conn)
+                    .await?;
+            }
+        }
     }
+    drop(conn);
     state
         .redis_state
         .update_room_activity(room_uuid)
@@ -344,7 +553,7 @@ pub async fn resume_if_paused(state: &AppState, room_uuid: Uuid) -> Result<(), E
         return Ok(());
     }
     let stored = get_object(state, &object_key(room_uuid)).await?;
-    restore(state, room_uuid, &decode(&stored)?).await?;
+    restore(state, room_uuid, decode(&stored)?).await?;
     // Fresh activity, or the next sweep would find it idle and pause it
     // again under the person who just came back.
     sqlx::query!(
@@ -389,14 +598,47 @@ pub async fn end_abandoned(state: &AppState) -> Result<usize, Error> {
 mod tests {
     use super::*;
 
+    fn stored_kept(stored: Stored) -> Kept {
+        match stored {
+            Stored::Kept(kept) => kept,
+            Stored::Dumps(_) => panic!("read as the first layout"),
+        }
+    }
+
     #[test]
     fn a_stored_pause_reads_back_as_written() {
-        let dumps = vec![
-            ("oeee:a".to_string(), vec![1, 2, 3]),
-            ("oeee:b".to_string(), vec![]),
-            ("오이".to_string(), vec![0; 70_000]),
+        let kept: Kept = vec![
+            ("oeee:seq".to_string(), Value::String(b"42".to_vec())),
+            (
+                "oeee:history".to_string(),
+                Value::List(vec![vec![1, 2, 3], vec![], vec![0; 70_000]]),
+            ),
+            (
+                "오이:seats".to_string(),
+                Value::Hash(vec![
+                    (b"__next".to_vec(), b"3".to_vec()),
+                    (b"a".to_vec(), b"1".to_vec()),
+                ]),
+            ),
+            ("oeee:empty".to_string(), Value::List(vec![])),
         ];
-        assert_eq!(decode(&encode(&dumps).unwrap()).unwrap(), dumps);
+        assert_eq!(stored_kept(decode(&encode(&kept).unwrap()).unwrap()), kept);
+    }
+
+    #[test]
+    fn the_first_layout_is_still_read() {
+        let mut raw = Vec::from(MAGIC_DUMPS);
+        raw.extend_from_slice(&1u16.to_le_bytes());
+        raw.extend_from_slice(&1u16.to_le_bytes());
+        raw.push(b'k');
+        raw.extend_from_slice(&3u32.to_le_bytes());
+        raw.extend_from_slice(&[7, 8, 9]);
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&raw).unwrap();
+        match decode(&encoder.finish().unwrap()).unwrap() {
+            Stored::Dumps(dumps) => assert_eq!(dumps, vec![("k".to_string(), vec![7, 8, 9])]),
+            Stored::Kept(_) => panic!("read as the second layout"),
+        }
     }
 
     #[test]
@@ -404,7 +646,7 @@ mod tests {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(b"OEEELOG\x02 nothing like it").unwrap();
         assert!(decode(&encoder.finish().unwrap()).is_err());
-        let whole = encode(&[("k".to_string(), vec![9; 40])]).unwrap();
+        let whole = encode(&vec![("k".to_string(), Value::List(vec![vec![9; 40]]))]).unwrap();
         let mut raw = Vec::new();
         ZlibDecoder::new(&whole[..]).read_to_end(&mut raw).unwrap();
         raw.truncate(raw.len() - 5);

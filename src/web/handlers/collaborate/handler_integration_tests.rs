@@ -1909,3 +1909,42 @@ async fn a_room_paused_too_long_ends() {
     room.teardown().await;
     outcome.expect("the scenario finished in time");
 }
+
+/// A history longer than one slice is carried out and put back whole and in
+/// order: the copy goes a few hundred entries at a time, so that no single
+/// command keeps the shared Redis from its other clients.
+#[tokio::test]
+async fn a_long_history_survives_a_pause_whole_and_in_order() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(30), async {
+        let mut alice = room.connect(0, None).await;
+        let (alice_id, before) = opening(&mut alice).await;
+        const STROKES: i16 = 600;
+        for x in 0..STROKES {
+            send(&mut alice, fill(alice_id, x)).await;
+        }
+        let mut last = 0;
+        while last < STROKES as u64 {
+            let frame = next_of_type(&mut alice, SEQUENCED).await;
+            last = sequenced(&frame).1;
+        }
+
+        assert_eq!(
+            super::pause::pause_idle_room(&room.state, room.room).await.expect("pause"),
+            super::pause::Idled::Paused
+        );
+        let mut back = room.connect(0, None).await;
+        let (_, replay) = opening(&mut back).await;
+        assert_eq!(replay.history_id, before.history_id);
+        assert_eq!(replay.entries.len(), STROKES as usize);
+        for (index, (seq, payload)) in replay.entries.iter().enumerate() {
+            assert_eq!(*seq, index as u64 + 1, "in order");
+            assert_eq!(i16::from_le_bytes([payload[4], payload[5]]), index as i16, "the stroke it was");
+        }
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}

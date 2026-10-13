@@ -121,11 +121,13 @@ Chat is held to a burst of five lines and a line a second per connection, and
 500 characters a line.
 
 A room nobody draws in for half an hour is *paused* if it has an unsaved
-drawing (`collaborate/pause.rs`): its Redis keys are `DUMP`ed into one object
-under `paused/` in the private archive bucket and deleted, `paused_at` is set,
-and the next person allowed in `RESTORE`s them before their history is sent --
-the same history id and seats, so the room carries on. After seven days it
-ends. Everything a room keeps in Redis that a pause must carry is listed in
+drawing (`collaborate/pause.rs`): its Redis keys are copied into one object
+under `paused/` in the private archive bucket and unlinked, `paused_at` is set,
+and the next person allowed in copies them back before their history is sent
+-- the same history id and seats, so the room carries on. After seven days it
+ends. Redis is shared with other apps and runs one command at a time, so the
+copy goes a few hundred entries a command rather than as one `DUMP`, and large
+keys are let go with `UNLINK`, never `DEL`. Everything a room keeps in Redis that a pause must carry is listed in
 `redis_messages::room_keys` (and `pause::carried_keys`); a key added anywhere
 else survives a pause only by accident.
 
