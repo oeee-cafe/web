@@ -1932,7 +1932,9 @@ async fn a_long_history_survives_a_pause_whole_and_in_order() {
         }
 
         assert_eq!(
-            super::pause::pause_idle_room(&room.state, room.room).await.expect("pause"),
+            super::pause::pause_idle_room(&room.state, room.room)
+                .await
+                .expect("pause"),
             super::pause::Idled::Paused
         );
         let mut back = room.connect(0, None).await;
@@ -1941,7 +1943,11 @@ async fn a_long_history_survives_a_pause_whole_and_in_order() {
         assert_eq!(replay.entries.len(), STROKES as usize);
         for (index, (seq, payload)) in replay.entries.iter().enumerate() {
             assert_eq!(*seq, index as u64 + 1, "in order");
-            assert_eq!(i16::from_le_bytes([payload[4], payload[5]]), index as i16, "the stroke it was");
+            assert_eq!(
+                i16::from_le_bytes([payload[4], payload[5]]),
+                index as i16,
+                "the stroke it was"
+            );
         }
     })
     .await;
