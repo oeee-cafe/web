@@ -255,7 +255,7 @@ async fn find_public_sessions(
             cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.allow_guests AND (cs.community_id IS NULL OR c.visibility = 'public') AS "guests_welcome!",
             cs.allow_spectators,
-            cs.paused_at IS NOT NULL AS "paused!",
+            cs.paused_at,
             cs.title,
             cs.width,
             cs.height,
@@ -300,7 +300,7 @@ async fn find_public_sessions(
             owner_is_guest: row.owner_is_guest,
             guests_welcome: row.guests_welcome,
             spectators_welcome: row.allow_spectators,
-            paused: row.paused,
+            paused_until: row.paused_at.map(super::pause::ends_at),
             title: row.title,
             width: row.width,
             height: row.height,
@@ -335,7 +335,7 @@ async fn find_viewer_sessions(
             cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.allow_guests AND (cs.community_id IS NULL OR c.visibility = 'public') AS "guests_welcome!",
             cs.allow_spectators,
-            cs.paused_at IS NOT NULL AS "paused!",
+            cs.paused_at,
             cs.title,
             cs.width,
             cs.height,
@@ -375,7 +375,7 @@ async fn find_viewer_sessions(
             owner_is_guest: row.owner_is_guest,
             guests_welcome: row.guests_welcome,
             spectators_welcome: row.allow_spectators,
-            paused: row.paused,
+            paused_until: row.paused_at.map(super::pause::ends_at),
             title: row.title,
             width: row.width,
             height: row.height,
@@ -1189,7 +1189,7 @@ mod tests {
             "is_public": true,
             "guests_welcome": true,
             "spectators_welcome": true,
-            "paused": false,
+            "paused_until": null,
             "community_name": "Open Studio",
             "community_slug": "open",
             "is_owner": false,
@@ -1576,10 +1576,13 @@ mod tests {
                 true,
                 vec![],
                 vec![],
-                vec![sample_session(json!({"paused": true, "is_owner": true}))],
+                vec![sample_session(json!({
+                    "paused_until": "2026-10-20T03:04:05Z",
+                    "is_owner": true,
+                }))],
             ))
             .expect("renders");
-        assert!(rendered.contains("collaborate-session-paused</span>"));
+        assert!(rendered.contains("collaborate-session-paused-until(date=2026-10-20)</span>"));
         assert!(rendered.contains(r#"href="/collaborate/00000000-0000-0000-0000-000000000009""#));
     }
 

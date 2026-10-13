@@ -106,6 +106,7 @@
                 <span class="admin-tag deleted">ended</span>
               {% elif session.paused_at %}
                 <span class="admin-tag" title="Put away after half an hour without drawing; the next person in picks it back up">paused</span>
+                <div class="muted" title="Paused {{ session.paused_at|datetimeformat(format="short", tz="Asia/Seoul") }}">ends {{ session.paused_until|datetimeformat(format="short", tz="Asia/Seoul") }}</div>
               {% else %}
                 live
               {% endif %}

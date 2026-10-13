@@ -437,6 +437,8 @@ pub struct AdminCollaborativeSession {
     /// Set once the owner saved the canvas as a post.
     /// Put away after a while without drawing (`collaborate::pause`).
     pub paused_at: Option<DateTime<Utc>>,
+    /// When a paused session ends if nobody comes back to it.
+    pub paused_until: Option<DateTime<Utc>>,
     pub saved_post_id: Option<Uuid>,
     /// Filled in from Redis after the query, the way the lobby fills it: the
     /// previews do not live in this table. See
@@ -587,6 +589,9 @@ async fn find_collaborative_sessions(
             last_activity: row.last_activity,
             ended_at: row.ended_at,
             paused_at: row.paused_at,
+            paused_until: row
+                .paused_at
+                .map(crate::web::handlers::collaborate::pause::ends_at),
             saved_post_id: row.saved_post_id,
             preview_version: None,
             recording: row.recorded.map(|_| AdminSessionRecording {

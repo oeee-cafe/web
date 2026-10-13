@@ -55,6 +55,12 @@ use crate::web::state::AppState;
 /// How long a paused room waits for somebody to come back to it.
 pub const PAUSED_RETENTION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
+/// When a room paused at `paused_at` ends if nobody comes back, give or take
+/// the sweep that ends it: what the lobby and the staff list tell people.
+pub fn ends_at(paused_at: chrono::DateTime<chrono::Utc>) -> chrono::DateTime<chrono::Utc> {
+    paused_at + chrono::Duration::from_std(PAUSED_RETENTION).expect("a week fits")
+}
+
 /// What a stored pause begins with, and its layout version: 2 holds each key
 /// by its contents. 1, written for a few minutes before it, held `DUMP`s, and
 /// is still read in case a room was paused then.

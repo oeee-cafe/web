@@ -423,6 +423,7 @@ fn sample_session(overrides: serde_json::Value) -> serde_json::Value {
         "last_activity": "2026-01-02T05:06:07",
         "ended_at": null,
         "paused_at": null,
+        "paused_until": null,
         "saved_post_id": null,
         "preview_version": 1_700_000_000_123u64,
     });
@@ -515,6 +516,17 @@ fn session_list_omits_the_canvas_once_a_session_is_over() {
     assert!(!rendered.contains("/preview?v="));
     // The canvas is a post by then, and that is where it is reachable.
     assert!(rendered.contains("/@someone/00000000-0000-0000-0000-00000000000b"));
+}
+
+/// A paused session says when it will end if nobody comes back to it.
+#[test]
+fn session_list_says_when_a_paused_session_ends() {
+    let rendered = render_sessions(vec![sample_session(json!({
+        "paused_at": "2026-10-13T03:04:05Z",
+        "paused_until": "2026-10-20T03:04:05Z",
+    }))]);
+    assert!(rendered.contains(">paused</span>"));
+    assert!(rendered.contains("ends 2026-10-20"));
 }
 
 /// Joining a room takes a seat and puts a layer in the drawing, so the
