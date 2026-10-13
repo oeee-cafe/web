@@ -58,4 +58,11 @@ describe("watching a room", () => {
     expect(new URL(sockets[0].url).searchParams.get("spectate")).toBe("1");
     expect(window.location.search).toBe("?watch=1");
   });
+
+  it("lets somebody who has drawn here back to draw in a full room", async () => {
+    installRoom({ full: true, hasDrawn: true });
+    const socket = await mountSession();
+    expect(text()).not.toContain("Session Full");
+    expect(new URL(socket.url).searchParams.get("spectate")).toBeNull();
+  });
 });

@@ -182,6 +182,23 @@ pub async fn get_collaboration_meta(
     .ok_or_else(|| AppError::NotFound("Session".to_string()))?;
 
     let user_count = db::get_active_user_count(db, session_uuid).await?;
+    let viewer_has_drawn = match who.as_ref() {
+        Some(who) => {
+            sqlx::query_scalar!(
+                r#"
+            SELECT EXISTS(
+                SELECT 1 FROM collaborative_sessions_participants
+                WHERE session_id = $1 AND participant_id = $2 AND NOT is_spectator
+            ) AS "drawn!"
+            "#,
+                session_uuid,
+                who.id()
+            )
+            .fetch_one(db)
+            .await?
+        }
+        None => false,
+    };
 
     let saved_post_url = db::saved_post_path(db, session_uuid).await?;
 
@@ -191,6 +208,7 @@ pub async fn get_collaboration_meta(
         .filter(|title| !title.is_empty());
     Ok(Json(CollaborationMeta {
         untitled: title.is_none(),
+        viewer_has_drawn,
         title: title.unwrap_or_else(|| "Untitled Collaboration".to_string()),
         width: session.width,
         height: session.height,
@@ -245,7 +263,7 @@ async fn find_public_sessions(
             cs.is_public,
             c.name AS "community_name?",
             c.slug AS "community_slug?",
-            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND NOT csp.is_spectator), 0) AS "participant_count!",
+            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND NOT csp.watching), 0) AS "participant_count!",
             -- COALESCE, not a bare comparison: $1 is NULL for a visitor who
             -- is not even a guest, and NULL decoded into a non-null bool
             -- fails the query.
@@ -319,7 +337,7 @@ async fn find_viewer_sessions(
             cs.is_public,
             c.name AS "community_name?",
             c.slug AS "community_slug?",
-            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND NOT csp.is_spectator), 0) AS "participant_count!",
+            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND NOT csp.watching), 0) AS "participant_count!",
             cs.owner_participant_id = $1 AS "is_owner!",
             COUNT(*) FILTER (WHERE csp.participant_id = $1 AND csp.is_active = true) > 0 AS "viewer_is_participant!"
         FROM collaborative_sessions cs

@@ -1424,7 +1424,7 @@ async fn a_spectator_watches_a_full_room_and_talks_but_cannot_draw() {
         assert_eq!(bob_id, 0, "no id to draw under");
         assert_eq!(
             sqlx::query_scalar!(
-                "SELECT COUNT(*) AS \"n!\" FROM collaborative_sessions_participants WHERE session_id = $1 AND is_active AND NOT is_spectator",
+                "SELECT COUNT(*) AS \"n!\" FROM collaborative_sessions_participants WHERE session_id = $1 AND is_active AND NOT watching",
                 room.room
             )
             .fetch_one(&room.db)
@@ -1562,7 +1562,7 @@ async fn watching_is_the_owners_to_allow_and_has_a_ceiling() {
         }
         for filler in &fillers {
             sqlx::query!(
-                "INSERT INTO collaborative_sessions_participants (session_id, guest_id, is_active, is_spectator) VALUES ($1, $2, true, true)",
+                "INSERT INTO collaborative_sessions_participants (session_id, guest_id, is_active, is_spectator, watching) VALUES ($1, $2, true, true, true)",
                 room.room,
                 filler
             )
@@ -1616,6 +1616,162 @@ async fn chat_past_the_allowance_never_reaches_the_room() {
         send(&mut bob, chat_frame(room.users[1], "after a breath")).await;
         let chat = next_of_type(&mut alice, 0x03).await;
         assert!(chat.ends_with(b"after a breath"));
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// Whether `participant` holds a seat right now: in the room and drawing.
+async fn seated(room: &Room, participant: Uuid) -> bool {
+    sqlx::query_scalar!(
+        r#"SELECT is_active AND NOT watching AS "seated!" FROM collaborative_sessions_participants WHERE session_id = $1 AND participant_id = $2"#,
+        room.room,
+        participant
+    )
+    .fetch_optional(&room.db)
+    .await
+    .expect("row")
+    .unwrap_or(false)
+}
+
+/// Waits for the server to finish with a socket that has just closed.
+async fn until(mut condition: impl AsyncFnMut() -> bool) {
+    for _ in 0..60 {
+        if condition().await {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("the condition never held");
+}
+
+/// A seat is the right to draw right now. A drawer who sits back to watch
+/// gives theirs up -- somebody new can take it -- and keeps their credit:
+/// they are let back to draw even into the full room.
+#[tokio::test]
+async fn a_drawer_who_watches_gives_up_their_seat_and_keeps_their_credit() {
+    let Some(mut room) = open_room(2).await else {
+        return;
+    };
+    let newcomer = room.add_guest("newcomer").await;
+    let bob = room.users[1];
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        opening(&mut alice).await;
+        let mut drawing = room.connect_as(bob, "203.0.113.7").await;
+        opening(&mut drawing).await;
+
+        let mut refused = room.connect_as(newcomer, "198.51.100.1").await;
+        assert_eq!(u16::from(next_close(&mut refused).await.expect("a close").code), 1008);
+
+        drawing.close(None).await.expect("close");
+        until(async || !seated(&room, bob).await).await;
+        let mut watching = room.watch_as(bob, "203.0.113.7").await;
+        opening(&mut watching).await;
+        assert!(!seated(&room, bob).await, "watching holds no seat");
+
+        let mut seat = room.connect_as(newcomer, "198.51.100.1").await;
+        opening(&mut seat).await;
+
+        // Full again, and Bob has drawn: he is let back to draw.
+        watching.close(None).await.expect("close");
+        until(async || !room.active_participants().await.contains(&bob)).await;
+        let mut back = room.connect_as(bob, "203.0.113.7").await;
+        opening(&mut back).await;
+        assert!(seated(&room, bob).await);
+        let credited = sqlx::query_scalar!(
+            "SELECT NOT is_spectator AS \"credited!\" FROM collaborative_sessions_participants WHERE session_id = $1 AND participant_id = $2",
+            room.room,
+            bob
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("row");
+        assert!(credited);
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// A seat is a person's, not a tab's: watching in a second tab does not give
+/// up the seat the first is drawing in, and closing the drawing tab does.
+#[tokio::test]
+async fn a_seat_is_a_persons_across_their_tabs() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let bob = room.users[1];
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut drawing = room.connect_as(bob, "203.0.113.7").await;
+        opening(&mut drawing).await;
+        let mut watching = room.watch_as(bob, "203.0.113.7").await;
+        opening(&mut watching).await;
+        assert!(seated(&room, bob).await, "still drawing in the other tab");
+
+        drawing.close(None).await.expect("close");
+        until(async || !seated(&room, bob).await).await;
+        assert!(
+            room.active_participants().await.contains(&bob),
+            "still in the room, watching"
+        );
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// The heartbeat's repair for a reconnect that overlapped its old socket's
+/// cleanup: a connection whose participant was marked gone under it is
+/// marked back -- unless they were banned, or the session is over.
+#[tokio::test]
+async fn a_live_connection_is_marked_back_in_the_room() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let bob = room.users[1];
+    let mark_gone = || async {
+        sqlx::query!(
+            "UPDATE collaborative_sessions_participants SET is_active = false WHERE session_id = $1 AND participant_id = $2",
+            room.room,
+            bob
+        )
+        .execute(&room.db)
+        .await
+        .expect("mark gone");
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut drawing = room.connect_as(bob, "203.0.113.7").await;
+        opening(&mut drawing).await;
+
+        mark_gone().await;
+        assert!(
+            super::db::reassert_participant_active(&room.db, room.room, bob)
+                .await
+                .expect("repair")
+        );
+        assert!(seated(&room, bob).await);
+        assert!(
+            !super::db::reassert_participant_active(&room.db, room.room, bob)
+                .await
+                .expect("nothing to repair")
+        );
+
+        mark_gone().await;
+        sqlx::query!(
+            "INSERT INTO collaborative_session_bans (session_id, participant_id) VALUES ($1, $2)",
+            room.room,
+            bob
+        )
+        .execute(&room.db)
+        .await
+        .expect("ban");
+        assert!(
+            !super::db::reassert_participant_active(&room.db, room.room, bob)
+                .await
+                .expect("banned")
+        );
     })
     .await;
     room.teardown().await;

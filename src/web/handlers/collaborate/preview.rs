@@ -509,7 +509,7 @@ async fn viewer_may_upload(
             WHERE csp.session_id = cs.id
               AND csp.participant_id = $2
               AND csp.is_active = true
-              AND NOT csp.is_spectator
+              AND NOT csp.watching
           )
         "#,
         room_uuid,

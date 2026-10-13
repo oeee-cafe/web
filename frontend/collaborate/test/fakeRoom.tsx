@@ -247,6 +247,8 @@ export function installRoom(
     removed?: boolean;
     /** Every seat taken. */
     full?: boolean;
+    /** The viewer has drawn here before. */
+    hasDrawn?: boolean;
   } = {},
 ) {
   sockets = [];
@@ -271,6 +273,7 @@ export function installRoom(
           ownerId: options.ownerId ?? "oeee-uuid", ownerLoginName: "oeee",
           savedPostId: null, maxUsers: 8, currentUserCount: options.full ? 8 : 1,
           allowSpectators: true,
+          viewerHasDrawn: options.hasDrawn ?? false,
           ended: options.ended ?? false,
         }),
         { status: 200 },

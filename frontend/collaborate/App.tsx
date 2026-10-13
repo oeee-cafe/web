@@ -927,8 +927,9 @@ export default function App() {
     spectatingRef.current = watchingNow;
     setWatching(watchingNow);
     if (watchingNow) window.history.replaceState(null, "", roomHref(true));
-    // A full room is no bar to watching it; the server counts watchers apart.
-    if (!watchingNow && meta.currentUserCount >= meta.maxUsers && !owner) {
+    // A full room is no bar to watching it, nor to somebody who has drawn in
+    // it coming back to draw; the server counts both apart.
+    if (!watchingNow && meta.currentUserCount >= meta.maxUsers && !owner && !meta.viewerHasDrawn) {
       setRoomFullError({ currentUserCount: meta.currentUserCount, maxUsers: meta.maxUsers, meta });
       return;
     }
@@ -1083,11 +1084,15 @@ export default function App() {
    */
   const ownerKeepsOnDevice = isOwner && !!canvasMeta?.ownerIsGuest;
 
-  /** Whether a drawing seat is free, for somebody watching to take. */
+  /**
+   * Whether somebody watching may take up drawing: a seat is free, or they
+   * have drawn here before, which lets them back into a full room.
+   */
   const seatFree =
     !!canvasMeta &&
-    [...participants.values()].filter((participant) => !participant.isSpectator && !participant.left)
-      .length < canvasMeta.maxUsers;
+    (!!canvasMeta.viewerHasDrawn ||
+      [...participants.values()].filter((participant) => !participant.isSpectator && !participant.left)
+        .length < canvasMeta.maxUsers);
   /** Watching to drawing, or back: the page comes back in the other mode. */
   const switchMode = useCallback(() => {
     leavingRef.current = true;

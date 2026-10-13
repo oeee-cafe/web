@@ -494,7 +494,7 @@ async fn get_session_participants(
         SELECT csp.participant_id,
                COALESCE(u.login_name, g.nickname) AS "name!",
                csp.guest_id IS NOT NULL AS "is_guest!",
-               csp.is_spectator,
+               csp.watching,
                csp.joined_at
         FROM collaborative_sessions_participants csp
         LEFT JOIN users u ON csp.user_id = u.id
@@ -516,7 +516,7 @@ async fn get_session_participants(
                 super::guest::FLAG_GUEST
             } else {
                 0
-            } | if row.is_spectator {
+            } | if row.watching {
                 super::guest::FLAG_SPECTATOR
             } else {
                 0

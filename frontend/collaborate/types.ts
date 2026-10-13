@@ -19,6 +19,8 @@ export interface CollaborationMeta {
   communityAdmitsGuests?: boolean;
   /** The owner gave it no title, and `title` is a stand-in. */
   untitled?: boolean;
+  /** This viewer has drawn here, so is let back to draw into a full room. */
+  viewerHasDrawn?: boolean;
   maxUsers: number;
   currentUserCount: number;
   /** Over, saved or not: no socket to open, only the session-over dialog. */

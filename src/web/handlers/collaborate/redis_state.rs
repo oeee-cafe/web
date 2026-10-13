@@ -46,6 +46,10 @@ pub struct ConnectionInfo {
     /// also refuse that address (`collaborative_session_bans.ip`).
     #[serde(default)]
     pub ip: Option<String>,
+    /// Watching rather than drawing. Absent from an entry written before
+    /// anybody could watch, which was drawing.
+    #[serde(default)]
+    pub spectating: bool,
     pub server_instance: String,
     pub connected_at: u64,
     pub last_heartbeat: u64,

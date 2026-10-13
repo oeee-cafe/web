@@ -30,7 +30,9 @@ mod fanout;
 mod history;
 mod incoming;
 mod reset;
-use connection::{heartbeat_loop, setup_connection, user_has_other_connection, JoinFailure};
+use connection::{
+    heartbeat_loop, setup_connection, user_draws_elsewhere, user_has_other_connection, JoinFailure,
+};
 use fanout::should_forward_to_connection;
 pub(super) use fanout::wrap_sequenced;
 use history::{send_history_to_new_connection, send_recent_chat_to_new_connection};
@@ -730,6 +732,15 @@ async fn cleanup_connection(
             "User {} still has another connection in room {}",
             user_login_name, room_uuid
         );
+        // Their last drawing tab has gone and they still watch in another:
+        // the seat goes, and they stay, watching.
+        let was_drawing = flags & super::guest::FLAG_SPECTATOR == 0;
+        if was_drawing
+            && !user_draws_elsewhere(state, &room_connections, user_id, connection_id).await
+            && let Err(e) = db::mark_participant_watching(db, room_uuid, user_id).await
+        {
+            error!("Failed to give up a seat on disconnect: {}", e);
+        }
     } else {
         messages::send_leave_message(room_uuid, connection_id, who, flags, state).await;
 

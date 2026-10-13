@@ -49,6 +49,20 @@ pub(super) async fn heartbeat_loop(
                 info.connection_id, e
             ),
         }
+        // Still here, so still in the room. A reconnect whose old socket was
+        // cleaned up after it arrived can have marked this person gone under
+        // it; this puts that right within a beat.
+        match db::reassert_participant_active(&state.db_pool, info.room_id, info.user_id).await {
+            Ok(true) => warn!(
+                "Connection {} found its participant marked gone in room {}; marked active again",
+                info.connection_id, info.room_id
+            ),
+            Ok(false) => {}
+            Err(e) => error!(
+                "Failed to check connection {}'s participant: {}",
+                info.connection_id, e
+            ),
+        }
         let store = redis_messages::RedisMessageStore::new(state.redis_pool.clone());
         if let Err(e) = store.touch_history(info.room_id).await {
             error!(
@@ -131,7 +145,15 @@ pub(super) async fn setup_connection(
     // never only watches their own room.
     let is_owner = session_info.owner_id == user_id;
     if spectate && !is_owner {
-        match db::track_spectator(db, room_uuid, who).await {
+        // A seat is a person's: drawing in another tab, they keep it.
+        let room_connections = state
+            .redis_state
+            .get_room_connections(room_uuid)
+            .await
+            .unwrap_or_default();
+        let drawing_elsewhere =
+            user_draws_elsewhere(state, &room_connections, user_id, connection_id).await;
+        match db::track_spectator(db, room_uuid, who, drawing_elsewhere).await {
             Ok(true) => {}
             Ok(false) => {
                 info!(
@@ -147,7 +169,7 @@ pub(super) async fn setup_connection(
         }
         db::update_session_activity(state, room_uuid).await;
         let connection_info =
-            setup_connection_atomically(state, room_uuid, who, ip, connection_id).await;
+            setup_connection_atomically(state, room_uuid, who, ip, true, connection_id).await;
         return Ok((false, 0, connection_info));
     }
 
@@ -199,7 +221,7 @@ pub(super) async fn setup_connection(
 
     // Atomically handle all connection management
     let connection_info =
-        setup_connection_atomically(state, room_uuid, who, ip, connection_id).await;
+        setup_connection_atomically(state, room_uuid, who, ip, false, connection_id).await;
 
     Ok((
         session_info.owner_id == user_id,
@@ -257,11 +279,34 @@ pub(super) async fn user_has_other_connection(
     false
 }
 
+/// Whether this user is drawing in the room through some other socket: what
+/// keeps their seat theirs while this one watches, or after it goes.
+pub(super) async fn user_draws_elsewhere(
+    state: &AppState,
+    room_connections: &[String],
+    user_id: Uuid,
+    connection_id: &str,
+) -> bool {
+    for conn_id in room_connections {
+        if conn_id == connection_id {
+            continue;
+        }
+        if let Ok(Some(conn_info)) = state.redis_state.get_connection_info(conn_id).await
+            && conn_info.user_id == user_id
+            && !conn_info.spectating
+        {
+            return true;
+        }
+    }
+    false
+}
+
 async fn setup_connection_atomically(
     state: &AppState,
     room_uuid: Uuid,
     who: &Collaborator,
     ip: Option<&str>,
+    spectating: bool,
     connection_id: &str,
 ) -> crate::web::handlers::collaborate::redis_state::ConnectionInfo {
     let user_login_name = who.name();
@@ -281,6 +326,7 @@ async fn setup_connection_atomically(
         user_login_name: user_login_name.to_string(),
         is_guest: who.is_guest(),
         ip: ip.map(str::to_string),
+        spectating,
         server_instance: state.redis_state.get_server_instance_id().to_string(),
         connected_at: now_secs(),
         last_heartbeat: now_secs(),

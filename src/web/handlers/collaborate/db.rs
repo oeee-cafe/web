@@ -157,7 +157,7 @@ pub async fn get_active_user_count(
         r#"
         SELECT COUNT(DISTINCT participant_id) as "count!"
         FROM collaborative_sessions_participants
-        WHERE session_id = $1 AND is_active = true AND NOT is_spectator
+        WHERE session_id = $1 AND is_active = true AND NOT watching
         "#,
         room_uuid
     )
@@ -216,7 +216,7 @@ pub async fn track_participant_with_capacity_check(
             r#"
             SELECT COUNT(DISTINCT participant_id) as "count!"
             FROM collaborative_sessions_participants
-            WHERE session_id = $1 AND is_active = true AND NOT is_spectator
+            WHERE session_id = $1 AND is_active = true AND NOT watching
             "#,
             room_uuid
         )
@@ -234,10 +234,10 @@ pub async fn track_participant_with_capacity_check(
     sqlx::query!(
         r#"
         INSERT INTO collaborative_sessions_participants
-        (session_id, user_id, guest_id, is_active, is_spectator)
-        VALUES ($1, $2, $3, true, false)
+        (session_id, user_id, guest_id, is_active, is_spectator, watching)
+        VALUES ($1, $2, $3, true, false, false)
         ON CONFLICT (session_id, participant_id)
-        DO UPDATE SET is_active = true, left_at = NULL, is_spectator = false
+        DO UPDATE SET is_active = true, left_at = NULL, is_spectator = false, watching = false
         "#,
         room_uuid,
         who.user_id(),
@@ -261,12 +261,17 @@ pub const MAX_SPECTATORS: i64 = 50;
 /// -- watching, or a drawer who has a seat -- is let back without asking
 /// either, the way the guest switch lets back a guest already inside: the
 /// owner closing the door shuts out new people, not somebody whose
-/// connection dropped. A drawer who watches keeps their seat and their row
-/// as a drawer's.
+/// connection dropped.
+///
+/// A drawer who sits back to watch gives up their seat and keeps their
+/// credit (`is_spectator` stays false), so they are let back to draw even
+/// into a full room. Unless they are still drawing in another tab
+/// (`drawing_elsewhere`): a seat is a person's, not a tab's.
 pub async fn track_spectator(
     db: &Pool<Postgres>,
     room_uuid: Uuid,
     who: &super::guest::Collaborator,
+    drawing_elsewhere: bool,
 ) -> Result<bool, sqlx::Error> {
     let mut tx = db.begin().await?;
 
@@ -308,7 +313,7 @@ pub async fn track_spectator(
             r#"
             SELECT COUNT(*) AS "count!"
             FROM collaborative_sessions_participants
-            WHERE session_id = $1 AND is_active AND is_spectator
+            WHERE session_id = $1 AND is_active AND watching
             "#,
             room_uuid
         )
@@ -323,20 +328,75 @@ pub async fn track_spectator(
     sqlx::query!(
         r#"
         INSERT INTO collaborative_sessions_participants
-        (session_id, user_id, guest_id, is_active, is_spectator)
-        VALUES ($1, $2, $3, true, true)
+        (session_id, user_id, guest_id, is_active, is_spectator, watching)
+        VALUES ($1, $2, $3, true, true, true)
         ON CONFLICT (session_id, participant_id)
-        DO UPDATE SET is_active = true, left_at = NULL
+        DO UPDATE SET is_active = true, left_at = NULL,
+                      watching = collaborative_sessions_participants.watching OR NOT $4
         "#,
         room_uuid,
         who.user_id(),
         who.guest_id(),
+        drawing_elsewhere,
     )
     .execute(&mut *tx)
     .await?;
 
     tx.commit().await?;
     Ok(true)
+}
+
+/// Somebody's last drawing tab has gone while they still watch in another:
+/// they give up their seat and keep watching.
+pub async fn mark_participant_watching(
+    db: &Pool<Postgres>,
+    room_uuid: Uuid,
+    participant_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        UPDATE collaborative_sessions_participants SET watching = true
+        WHERE session_id = $1 AND participant_id = $2
+        "#,
+        room_uuid,
+        participant_id
+    )
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// Puts back an active mark a connection's own row lost while the
+/// connection is open: the heartbeat's answer to a reconnect that overlapped
+/// the old socket's cleanup, which marks the person gone under their new
+/// connection. Their seat stays theirs; the counts are right again within a
+/// beat.
+pub async fn reassert_participant_active(
+    db: &Pool<Postgres>,
+    room_uuid: Uuid,
+    participant_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query!(
+        r#"
+        UPDATE collaborative_sessions_participants
+        SET is_active = true, left_at = NULL
+        WHERE session_id = $1 AND participant_id = $2 AND NOT is_active
+          AND EXISTS(
+            SELECT 1 FROM collaborative_sessions cs
+            WHERE cs.id = $1 AND cs.ended_at IS NULL
+          )
+          AND NOT EXISTS(
+            SELECT 1 FROM collaborative_session_bans b
+            WHERE b.session_id = $1 AND b.participant_id = $2
+          )
+        "#,
+        room_uuid,
+        participant_id
+    )
+    .execute(db)
+    .await?
+    .rows_affected()
+        > 0)
 }
 
 pub async fn update_session_activity(state: &AppState, room_uuid: Uuid) {

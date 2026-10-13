@@ -1,0 +1,1 @@
+ALTER TABLE collaborative_sessions_participants DROP COLUMN watching;

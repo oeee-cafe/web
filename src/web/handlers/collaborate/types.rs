@@ -117,6 +117,10 @@ pub struct CollaborationMeta {
     pub community_admits_guests: bool,
     /// The owner gave it no title, and `title` is a stand-in.
     pub untitled: bool,
+    /// The viewer has drawn in it: let back to draw even when every seat is
+    /// taken.
+    #[serde(rename = "viewerHasDrawn")]
+    pub viewer_has_drawn: bool,
     #[serde(rename = "maxUsers")]
     pub max_users: i32,
     #[serde(rename = "currentUserCount")]
