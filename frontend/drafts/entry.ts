@@ -165,6 +165,8 @@ function offerDestinations(sessionId: string, card: HTMLElement, who: HTMLElemen
           input: "ds-input community-search-input",
           list: "community-search-list",
           option: "community-search-option",
+          check: "community-search-check",
+          name: "community-search-name",
           meta: "community-search-meta",
         },
       });

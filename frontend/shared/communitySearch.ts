@@ -30,6 +30,10 @@ export interface CommunitySearchClasses {
   list: string;
   /** Each choice. It carries aria-selected and, under the keyboard, data-active. */
   option: string;
+  /** The checkbox at the start of each choice, ticked on the chosen one. */
+  check: string;
+  /** The choice's name, which gives way first when the row is narrow. */
+  name: string;
   /** The note beside a community's name, and the no-matches line. */
   meta: string;
 }
@@ -99,9 +103,20 @@ export function mountCommunitySearch(container: HTMLElement, options: CommunityS
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String((place?.id ?? "") === value));
       if (index === active) option.setAttribute("data-active", "");
+      // Which one is chosen, said the way a form says it: a ticked box. A
+      // highlighted row read as the keyboard's place as much as the choice.
+      // The option is what is clicked and what a screen reader hears, so the
+      // box is only drawn.
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = classes.check;
+      check.checked = (place?.id ?? "") === value;
+      check.tabIndex = -1;
+      check.setAttribute("aria-hidden", "true");
       const name = document.createElement("span");
+      name.className = classes.name;
       name.textContent = place ? place.name : words.ownPosts;
-      option.append(name);
+      option.append(check, name);
       const note = place?.member ? words.member : place?.drawn ? words.drawn : "";
       if (note) {
         const meta = document.createElement("span");
@@ -113,6 +128,9 @@ export function mountCommunitySearch(container: HTMLElement, options: CommunityS
       // keyboard's place in the list.
       option.addEventListener("mousedown", (event) => {
         event.preventDefault();
+        // The keyboard's outline is for the keyboard; a click's choice is
+        // the ticked box alone.
+        active = -1;
         choose(index);
       });
       list.append(option);
@@ -132,7 +150,6 @@ export function mountCommunitySearch(container: HTMLElement, options: CommunityS
     if (place === undefined) return;
     value = place?.id ?? "";
     chosen = place;
-    active = index;
     options.onChange(value);
     render();
   }

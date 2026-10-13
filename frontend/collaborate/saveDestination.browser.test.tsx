@@ -57,7 +57,15 @@ async function render(destinations: SaveDestinations | null, toDevice = false) {
 
 const options = () =>
   [...document.querySelectorAll<HTMLElement>('[role="option"]')].map((option) => option.textContent);
-const selected = () => document.querySelector('[role="option"][aria-selected="true"]')?.textContent;
+/** The chosen row, which must also be the one row whose box is ticked. */
+const selected = () => {
+  const ticked = [...document.querySelectorAll<HTMLInputElement>('[role="option"] input[type="checkbox"]')]
+    .filter((box) => box.checked)
+    .map((box) => box.closest('[role="option"]'));
+  const chosen = document.querySelector('[role="option"][aria-selected="true"]');
+  expect(ticked).toEqual([chosen]);
+  return chosen?.textContent;
+};
 
 afterEach(() => {
   act(() => root?.unmount());

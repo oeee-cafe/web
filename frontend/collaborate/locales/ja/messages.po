@@ -38,7 +38,7 @@ msgstr "認証に失敗しました"
 msgid "by"
 msgstr "作成者:"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:60
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:59
 msgid "Cancel"
 msgstr "キャンセル"
 
@@ -196,14 +196,14 @@ msgstr "見るだけ"
 #: ../frontend/collaborate/App.tsx:1398
 #: ../frontend/collaborate/App.tsx:1449
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:62
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Keep on This Device"
 msgstr "この端末に保存"
 
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:45
-msgid "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
-msgstr "この絵をこの端末に保存しますか？全員のセッションが終了し、以後は誰も続きを描けません。ログインすると下書きから投稿できます。"
+msgid "Keep this drawing on this device? Once kept, it can't be drawn on any further. Sign in to post it from your drafts."
+msgstr "この絵をこの端末に保管しますか？保管すると続きを描けません。ログインすると下書きから投稿できます。"
 
 #: ../frontend/collaborate/components/SessionHeader.tsx:322
 msgid "Let in"
@@ -277,11 +277,11 @@ msgstr "描かずに見ることができます。外すと新しく見に来る
 msgid "People without an account can join. Unticking stops new ones; guests already here stay."
 msgstr "アカウントのない人も参加できます。外すと新しいゲストだけを止め、すでにいるゲストは残ります。"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:70
+#: ../frontend/collaborate/components/SaveDestination.tsx:71
 msgid "Post to"
 msgstr "投稿先"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:63
+#: ../frontend/collaborate/components/SaveDestination.tsx:64
 msgid "Posts to {name}"
 msgstr "{name}に投稿されます"
 
@@ -326,7 +326,7 @@ msgstr "ロビーに戻る"
 #: ../frontend/collaborate/App.tsx:1399
 #: ../frontend/collaborate/App.tsx:1449
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:62
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Save"
 msgstr "保存"
@@ -335,9 +335,9 @@ msgstr "保存"
 msgid "Save as PNG"
 msgstr "PNG として保存"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:51
-msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
-msgstr "この絵をギャラリーに保存しますか？保存すると全員のセッションが終了し、誰も続きを描けなくなります。"
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:50
+msgid "Save this drawing to the gallery? Once saved, it can't be drawn on any further."
+msgstr "この絵をギャラリーに保存しますか？保存すると続きを描けません。"
 
 #: ../frontend/collaborate/App.tsx:1396
 #: ../frontend/collaborate/App.tsx:1449

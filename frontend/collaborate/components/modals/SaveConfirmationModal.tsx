@@ -43,14 +43,13 @@ export const SaveConfirmationModal = ({
       <p className="mb-[12px]">
         {toDevice ? (
           <Trans>
-            Keep this drawing on this device? The session ends for everyone and
-            nobody can keep drawing on it afterwards. Sign in to post it from
-            your drafts.
+            Keep this drawing on this device? Once kept, it can't be drawn on
+            any further. Sign in to post it from your drafts.
           </Trans>
         ) : (
           <Trans>
-            Save this drawing to the gallery? The session ends for everyone and
-            nobody can keep drawing on it afterwards.
+            Save this drawing to the gallery? Once saved, it can't be drawn on
+            any further.
           </Trans>
         )}
       </p>

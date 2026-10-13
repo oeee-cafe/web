@@ -38,7 +38,7 @@ msgstr "인증 실패"
 msgid "by"
 msgstr "작성자:"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:60
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:59
 msgid "Cancel"
 msgstr "취소"
 
@@ -196,14 +196,14 @@ msgstr "구경만 하기"
 #: ../frontend/collaborate/App.tsx:1398
 #: ../frontend/collaborate/App.tsx:1449
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:62
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Keep on This Device"
 msgstr "이 기기에 보관"
 
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:45
-msgid "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
-msgstr "이 그림을 이 기기에 보관할까요? 모두의 세션이 끝나고 이후에는 아무도 이어서 그릴 수 없습니다. 로그인한 뒤 임시 저장함에서 올릴 수 있습니다."
+msgid "Keep this drawing on this device? Once kept, it can't be drawn on any further. Sign in to post it from your drafts."
+msgstr "이 그림을 이 기기에 보관할까요? 보관하면 이어서 그릴 수 없습니다. 로그인한 뒤 임시 저장함에서 올릴 수 있습니다."
 
 #: ../frontend/collaborate/components/SessionHeader.tsx:322
 msgid "Let in"
@@ -277,11 +277,11 @@ msgstr "그리지 않고 구경할 수 있습니다. 해제하면 새로 구경�
 msgid "People without an account can join. Unticking stops new ones; guests already here stay."
 msgstr "계정이 없는 사람도 참여할 수 있습니다. 해제하면 새 손님만 막고, 이미 있는 손님은 남습니다."
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:70
+#: ../frontend/collaborate/components/SaveDestination.tsx:71
 msgid "Post to"
 msgstr "올릴 곳"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:63
+#: ../frontend/collaborate/components/SaveDestination.tsx:64
 msgid "Posts to {name}"
 msgstr "{name}에 올라갑니다"
 
@@ -326,7 +326,7 @@ msgstr "로비로 돌아가기"
 #: ../frontend/collaborate/App.tsx:1399
 #: ../frontend/collaborate/App.tsx:1449
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:62
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Save"
 msgstr "저장"
@@ -335,8 +335,8 @@ msgstr "저장"
 msgid "Save as PNG"
 msgstr "PNG로 저장"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:51
-msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:50
+msgid "Save this drawing to the gallery? Once saved, it can't be drawn on any further."
 msgstr "이 그림을 갤러리에 저장할까요? 저장하면 이어서 그릴 수 없습니다."
 
 #: ../frontend/collaborate/App.tsx:1396

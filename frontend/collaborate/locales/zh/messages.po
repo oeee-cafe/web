@@ -38,7 +38,7 @@ msgstr "验证失败"
 msgid "by"
 msgstr "作者:"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:60
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:59
 msgid "Cancel"
 msgstr "取消"
 
@@ -196,14 +196,14 @@ msgstr "只观看"
 #: ../frontend/collaborate/App.tsx:1398
 #: ../frontend/collaborate/App.tsx:1449
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:62
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Keep on This Device"
 msgstr "保存在此设备"
 
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:45
-msgid "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
-msgstr "要把这幅画保存在此设备上吗？会话将对所有人结束，之后无人能继续绘画。登录后可从草稿中发布。"
+msgid "Keep this drawing on this device? Once kept, it can't be drawn on any further. Sign in to post it from your drafts."
+msgstr "要将这幅画保存在此设备上吗？保存后将无法继续绘画。登录后可从草稿中发布。"
 
 #: ../frontend/collaborate/components/SessionHeader.tsx:322
 msgid "Let in"
@@ -277,11 +277,11 @@ msgstr "可以只观看不绘画。取消勾选只会阻止新的观看者，已
 msgid "People without an account can join. Unticking stops new ones; guests already here stay."
 msgstr "没有账号的人也可以加入。取消勾选只会阻止新的访客，已在的访客会留下。"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:70
+#: ../frontend/collaborate/components/SaveDestination.tsx:71
 msgid "Post to"
 msgstr "发布到"
 
-#: ../frontend/collaborate/components/SaveDestination.tsx:63
+#: ../frontend/collaborate/components/SaveDestination.tsx:64
 msgid "Posts to {name}"
 msgstr "将发布到 {name}"
 
@@ -326,7 +326,7 @@ msgstr "返回大厅"
 #: ../frontend/collaborate/App.tsx:1399
 #: ../frontend/collaborate/App.tsx:1449
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:62
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Save"
 msgstr "保存"
@@ -335,9 +335,9 @@ msgstr "保存"
 msgid "Save as PNG"
 msgstr "保存为 PNG"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:51
-msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
-msgstr "要把这幅画保存到画廊吗？保存后所有人的协作会话都会结束，谁都无法继续绘制。"
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:50
+msgid "Save this drawing to the gallery? Once saved, it can't be drawn on any further."
+msgstr "要将这幅画保存到画廊吗？保存后将无法继续绘画。"
 
 #: ../frontend/collaborate/App.tsx:1396
 #: ../frontend/collaborate/App.tsx:1449

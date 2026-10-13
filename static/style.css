@@ -1749,21 +1749,24 @@ nav a:visited,
 
 .community-search-option {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   padding: 3px 8px;
   cursor: pointer;
 }
 
-.community-search-option > span:first-child {
+/* Drawn only: the option is what is clicked (shared/communitySearch.ts). */
+.community-search-check {
+  flex: none;
+  margin: 0 8px 0 0;
+  pointer-events: none;
+}
+
+.community-search-name {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.community-search-option[aria-selected="true"] {
-  background-color: var(--ds-selected);
 }
 
 .community-search-option[data-active] {

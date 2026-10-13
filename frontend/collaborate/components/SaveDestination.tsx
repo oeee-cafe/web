@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { NEO_FIELD, NEO_WELL } from "neo-cucumber";
+import { NEO_CHECKBOX, NEO_FIELD, NEO_WELL } from "neo-cucumber";
 import type { SaveDestinations } from "../../shared/saveDestinations";
 import { mountCommunitySearch } from "../../shared/communitySearch";
 
@@ -47,9 +47,10 @@ export const SaveDestination = ({ sessionId, destinations, value, onChange }: Sa
         input: `${NEO_FIELD} w-full px-[4px] py-[3px] text-[12px]`,
         list: `${NEO_WELL} max-h-[132px] overflow-y-auto py-[2px]`,
         option:
-          "flex cursor-pointer items-baseline justify-between gap-[6px] px-[4px] py-[2px] " +
-          "aria-selected:bg-(--neo-text) aria-selected:text-(--neo-bk) " +
+          "flex cursor-pointer items-center gap-[6px] px-[4px] py-[2px] " +
           "data-active:outline-1 data-active:-outline-offset-1 data-active:outline-(--neo-icon-select)",
+        check: `${NEO_CHECKBOX} pointer-events-none`,
+        name: "min-w-0 flex-1 truncate",
         meta: "shrink-0 px-[4px] text-[11px] opacity-70",
       },
     });
