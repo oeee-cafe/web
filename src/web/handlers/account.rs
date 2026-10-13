@@ -31,7 +31,7 @@ use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use lettre::{Message, SmtpTransport, Transport};
 use minijinja::context;
 use minijinja::value::Serde;
-use rand::{thread_rng, Rng};
+use rand::RngExt;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -533,9 +533,9 @@ async fn create_and_send_verification_email(
 
     // Generate 6-digit token
     let token = {
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         (0..6)
-            .map(|_| rng.gen_range(0..10).to_string())
+            .map(|_| rng.random_range(0..10).to_string())
             .collect::<Vec<String>>()
             .join("")
     };

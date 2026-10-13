@@ -1,7 +1,5 @@
 use anyhow::Result;
-use argon2::password_hash::{
-    rand_core::OsRng, PasswordHashString, PasswordHasher, PasswordVerifier, SaltString,
-};
+use argon2::password_hash::{phc::PasswordHash, PasswordHasher, PasswordVerifier};
 use argon2::Argon2;
 use axum_login::{AuthUser, AuthnBackend, UserId};
 use chrono::{DateTime, Utc};
@@ -27,12 +25,7 @@ impl UserDraft {
             return Err(anyhow::anyhow!("비밀번호는 8자 이상이어야 합니다"));
         }
 
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        let password_hash = argon2
-            .hash_password(password.as_bytes(), &salt)?
-            .serialize()
-            .to_string();
+        let password_hash = hash_password(&password)?;
 
         Ok(Self {
             login_name,
@@ -95,12 +88,9 @@ impl User {
         // to match, so nothing does.
         let hash = match self.password_hash.as_deref() {
             Some(hash) if !hash.is_empty() => hash,
-            _ => return Err(argon2::password_hash::Error::Password),
+            _ => return Err(argon2::password_hash::Error::PasswordInvalid),
         };
-        let argon2 = Argon2::default();
-        let pwstr = PasswordHashString::new(hash)?;
-        let password_hash = pwstr.password_hash();
-        argon2.verify_password(password.as_bytes(), &password_hash)
+        check_password(hash, password)
     }
 
     /// Whether the account can be signed into with a password. One made by
@@ -298,17 +288,26 @@ pub async fn update_user_email_verified_at(
     })
 }
 
+/// A password as it is stored: Argon2id with the crate's defaults and a
+/// fresh random salt, in the PHC string format.
+fn hash_password(password: &str) -> Result<String> {
+    let hash: PasswordHash = Argon2::default().hash_password(password.as_bytes())?;
+    Ok(hash.to_string())
+}
+
+/// Whether `password` is the one `hash` was made from. The hash says which
+/// parameters it was made with, so one made with older defaults still
+/// checks out.
+fn check_password(hash: &str, password: &str) -> Result<(), argon2::password_hash::Error> {
+    Argon2::default().verify_password(password.as_bytes(), hash)
+}
+
 pub async fn update_password(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
     new_password: String,
 ) -> Result<User> {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    let password_hash = argon2
-        .hash_password(new_password.as_bytes(), &salt)?
-        .serialize()
-        .to_string();
+    let password_hash = hash_password(&new_password)?;
 
     let q = query_as!(
         User,
@@ -877,3 +876,27 @@ impl AuthnBackend for Backend {
 }
 
 pub type AuthSession = axum_login::AuthSession<Backend>;
+
+#[cfg(test)]
+mod password_tests {
+    use super::{check_password, hash_password};
+
+    /// Made by argon2 0.5, which hashed every password stored before 0.6:
+    /// upgrading the crate must not sign everybody out of their account.
+    const FROM_ARGON2_0_5: &str = "$argon2id$v=19$m=19456,t=2,p=1$becV094+RpC0sFmPNIC21A$IHRgn3M8/x116RHArS4+H/FR+3alTAgaTzqRVIHMiTE";
+
+    #[test]
+    fn a_password_stored_before_the_upgrade_still_signs_in() {
+        assert!(check_password(FROM_ARGON2_0_5, "an old password").is_ok());
+        assert!(check_password(FROM_ARGON2_0_5, "another password").is_err());
+    }
+
+    #[test]
+    fn a_new_hash_checks_out_and_is_salted() {
+        let first = hash_password("a new password").expect("hash");
+        assert!(first.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"));
+        assert!(check_password(&first, "a new password").is_ok());
+        assert!(check_password(&first, "a wrong password").is_err());
+        assert_ne!(first, hash_password("a new password").expect("hash"));
+    }
+}
