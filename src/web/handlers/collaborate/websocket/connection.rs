@@ -80,6 +80,7 @@ pub(super) async fn setup_connection(
     room_uuid: Uuid,
     who: &Collaborator,
     ip: Option<&str>,
+    spectate: bool,
     connection_id: &str,
     state: &AppState,
 ) -> Result<
@@ -123,6 +124,31 @@ pub(super) async fn setup_connection(
             error!("Failed to check who may enter session {}: {}", room_uuid, e);
             return Err(JoinFailure::Unavailable);
         }
+    }
+
+    // Watching: a place among the spectators rather than a seat, and no
+    // 1-byte id -- nothing this connection sends will be drawn. The owner
+    // never only watches their own room.
+    let is_owner = session_info.owner_id == user_id;
+    if spectate && !is_owner {
+        match db::track_spectator(db, room_uuid, who).await {
+            Ok(true) => {}
+            Ok(false) => {
+                info!(
+                    "{} refused a place watching session {}",
+                    user_login_name, room_uuid
+                );
+                return Err(JoinFailure::Refused);
+            }
+            Err(e) => {
+                error!("Failed to track spectator: {}", e);
+                return Err(JoinFailure::Unavailable);
+            }
+        }
+        db::update_session_activity(state, room_uuid).await;
+        let connection_info =
+            setup_connection_atomically(state, room_uuid, who, ip, connection_id).await;
+        return Ok((false, 0, connection_info));
     }
 
     // Use atomic capacity check and participant tracking to prevent race conditions

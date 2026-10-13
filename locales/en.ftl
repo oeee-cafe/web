@@ -324,6 +324,9 @@ collaborate-sign-in-instead = Sign in instead
 collaborate-guest-community-hint = As a guest, you can only choose a public community.
 collaborate-allow-guests-label = Let people without an account join
 collaborate-allow-guests-description = They choose a name, and it is marked as a guest wherever it appears.
+collaborate-watch-session = Watch
+collaborate-allow-spectators-label = Let people watch without drawing
+collaborate-allow-spectators-description = They see the drawing as it happens and can chat, without taking a seat. You can remove anyone watching.
 
 welcome = Welcome, { $name }!
 

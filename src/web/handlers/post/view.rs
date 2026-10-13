@@ -402,7 +402,7 @@ pub async fn post_view(
         JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
         LEFT JOIN users u ON csp.user_id = u.id
         LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
-        WHERE cs.saved_post_id = $1
+        WHERE cs.saved_post_id = $1 AND NOT csp.is_spectator
         ORDER BY csp.joined_at ASC
         "#,
         uuid
@@ -796,7 +796,7 @@ pub async fn post_view_by_login_name(
         JOIN collaborative_sessions_participants csp ON cs.id = csp.session_id
         LEFT JOIN users u ON csp.user_id = u.id
         LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
-        WHERE cs.saved_post_id = $1
+        WHERE cs.saved_post_id = $1 AND NOT csp.is_spectator
         ORDER BY csp.joined_at ASC
         "#,
         uuid

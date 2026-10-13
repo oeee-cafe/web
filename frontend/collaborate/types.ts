@@ -13,6 +13,8 @@ export interface CollaborationMeta {
   guestsWelcome?: boolean;
   /** The owner's guest switch, which they may flip while the session is open. */
   allowGuests?: boolean;
+  /** The owner's switch for watching without drawing. */
+  allowSpectators?: boolean;
   /** No community, or a public one: the only kind a guest may enter. */
   communityAdmitsGuests?: boolean;
   /** The owner gave it no title, and `title` is a stand-in. */
@@ -28,6 +30,8 @@ export interface Participant {
   username: string;
   /** No account: a name they chose, shown with a guest badge. */
   isGuest?: boolean;
+  /** Watching, not drawing: no seat and no layers. */
+  isSpectator?: boolean;
   /**
    * Gone from the room since the last roster: left, or sent out. Still named
    * on their layers, which stay; no longer listed as here.

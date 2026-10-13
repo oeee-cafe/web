@@ -31,6 +31,7 @@ type AddMessage = (message: {
   userId: string;
   username: string;
   isGuest: boolean;
+  isSpectator: boolean;
   message: string;
   timestamp: number;
 }) => void;
@@ -67,6 +68,7 @@ async function renderChat() {
       userId: "2",
       username: "someone",
       isGuest: false,
+      isSpectator: false,
       message: "worth copying",
       timestamp: Date.now(),
     });

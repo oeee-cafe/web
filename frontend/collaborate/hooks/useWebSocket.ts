@@ -80,6 +80,8 @@ interface WebSocketHookParams {
   canvasMeta: CollaborationMeta | null;
   /** The signed-in user, as the server knows them. */
   userIdRef: React.RefObject<string | null>;
+  /** Watching rather than drawing: read as each socket opens. */
+  spectatingRef?: React.RefObject<boolean>;
   onSynchronizationError: (error: Error | null) => void;
   createOrUpdateCursor: (userId: string, x: number, y: number, username: string) => void;
   hideCursor: (userId: string) => void;
@@ -89,6 +91,7 @@ interface WebSocketHookParams {
     joinedAt: number,
     sessionId?: number,
     isGuest?: boolean,
+    isSpectator?: boolean,
   ) => void;
   clearParticipants: () => void;
   markParticipantLeft: (userId: string) => void;
@@ -159,6 +162,7 @@ export const useWebSocket = ({
   link,
   canvasMeta,
   userIdRef,
+  spectatingRef,
   onSynchronizationError,
   createOrUpdateCursor,
   hideCursor,
@@ -303,6 +307,9 @@ export const useWebSocket = ({
         ? `ws://localhost:3000/collaborate/${sessionId}/ws`
         : `${scheme}://${window.location.host}/collaborate/${sessionId}/ws`,
     );
+    // Watching: a place among the spectators, with no seat and no id to
+    // draw under. The server keeps to it whatever this page then sends.
+    if (spectatingRef?.current) url.searchParams.set("spectate", "1");
     // Resume only what the painter can carry on from: a settled fork at the
     // applied position. Anything else is a full replay.
     const resume = receiver.resumeFrom(
@@ -313,7 +320,7 @@ export const useWebSocket = ({
       url.searchParams.set("after_seq", String(resume.afterSeq));
     }
     return url.toString();
-  }, [appliedCanonicalPosition, canResumeCanonicalPosition, receiver]);
+  }, [appliedCanonicalPosition, canResumeCanonicalPosition, receiver, spectatingRef]);
 
   // Set after connectWebSocket is defined; lets the close handler retry
   // without depending on the callback identity.

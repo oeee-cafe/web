@@ -13,11 +13,11 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Plural-Forms: \n"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
+#: ../frontend/collaborate/components/SessionHeader.tsx:175
 msgid "(guest)"
 msgstr "(ゲスト)"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:224
+#: ../frontend/collaborate/components/SessionHeader.tsx:280
 msgid "{name} asks to join"
 msgstr "{name}さんが参加をリクエストしています"
 
@@ -25,8 +25,8 @@ msgstr "{name}さんが参加をリクエストしています"
 msgid "Authentication Failed"
 msgstr "認証に失敗しました"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
-#: ../frontend/collaborate/components/SessionHeader.tsx:157
+#: ../frontend/collaborate/components/SessionHeader.tsx:175
+#: ../frontend/collaborate/components/SessionHeader.tsx:179
 msgid "by"
 msgstr "作成者:"
 
@@ -34,7 +34,7 @@ msgstr "作成者:"
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: ../frontend/collaborate/App.tsx:962
+#: ../frontend/collaborate/App.tsx:1003
 msgid "Choose a name of 1 to 30 characters, without hidden characters."
 msgstr "隠し文字を含まない1〜30文字の名前にしてください。"
 
@@ -50,11 +50,11 @@ msgstr "Discordを連携"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "Discordを一度連携すると、ここでフレンドを見てこのセッションに招待できます。"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:128
+#: ../frontend/collaborate/components/SessionHeader.tsx:144
 msgid "Connected"
 msgstr "接続済み"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:134
+#: ../frontend/collaborate/components/SessionHeader.tsx:156
 msgid "Connecting"
 msgstr "接続中"
 
@@ -71,26 +71,30 @@ msgstr "接続中..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "接続が失われました。作業はローカルに保存されました。"
 
-#: ../frontend/collaborate/App.tsx:1136
+#: ../frontend/collaborate/App.tsx:1210
 msgid "Couldn't change who can join. Please try again."
 msgstr "参加できる人を変更できませんでした。もう一度お試しください。"
 
-#: ../frontend/collaborate/App.tsx:964
-#: ../frontend/collaborate/App.tsx:971
+#: ../frontend/collaborate/App.tsx:1113
+msgid "Couldn't change who can watch. Please try again."
+msgstr "見られる人を変更できませんでした。もう一度お試しください。"
+
+#: ../frontend/collaborate/App.tsx:1005
+#: ../frontend/collaborate/App.tsx:1012
 msgid "Couldn't join. Please try again."
 msgstr "参加できませんでした。もう一度お試しください。"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:222
+#: ../frontend/collaborate/components/SessionHeader.tsx:278
 msgid "Couldn’t let {name} in"
 msgstr "{name}さんを入れられませんでした"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1156
+#: ../frontend/collaborate/App.tsx:1230
 msgid "Couldn't remove {0}. Please try again."
 msgstr "{0} さんを退出させられませんでした。もう一度お試しください。"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:140
+#: ../frontend/collaborate/components/SessionHeader.tsx:162
 msgid "Disconnected"
 msgstr "切断済み"
 
@@ -103,29 +107,37 @@ msgstr "Discordのフレンド"
 msgid "Download PNG"
 msgstr "PNG をダウンロード"
 
-#: ../frontend/collaborate/components/Chat.tsx:41
+#: ../frontend/collaborate/components/Chat.tsx:50
 msgid "Drawing without an account"
 msgstr "アカウントなしで参加中"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:252
+msgid "Every seat is taken. You can draw once one frees."
+msgstr "席がすべて埋まっています。空きが出れば描けます。"
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:69
 msgid "Failed to save session. Please try downloading as PNG instead."
 msgstr "セッションの保存に失敗しました。代わりに PNG としてダウンロードしてください。"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:253
+msgid "Give up your seat and watch"
+msgstr "席を空けて見るだけにする"
+
 #: ../frontend/collaborate/components/modals/AuthErrorModal.tsx:23
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:34
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:37
 msgid "Go to Lobby"
 msgstr "ロビーに戻る"
 
-#: ../frontend/collaborate/components/Chat.tsx:42
+#: ../frontend/collaborate/components/Chat.tsx:51
 msgid "guest"
 msgstr "ゲスト"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:200
+#: ../frontend/collaborate/components/SessionHeader.tsx:222
 msgid "Guests"
 msgstr "ゲスト"
 
-#: ../frontend/collaborate/App.tsx:1221
-#: ../frontend/collaborate/App.tsx:1225
+#: ../frontend/collaborate/App.tsx:1295
+#: ../frontend/collaborate/App.tsx:1299
 msgid "Help"
 msgstr "ヘルプ"
 
@@ -142,30 +154,39 @@ msgid "Initializing collaboration session..."
 msgstr "コラボレーションセッションを初期化中..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:172
+#: ../frontend/collaborate/components/SessionHeader.tsx:194
 msgid "Invite"
 msgstr "招待"
 
 #: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:65
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:169
+#: ../frontend/collaborate/components/SessionHeader.tsx:191
 msgid "Invite Discord friends"
 msgstr "Discordのフレンドを招待"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:180
+#: ../frontend/collaborate/components/SessionHeader.tsx:202
 msgid "Invite Steam friends"
 msgstr "Steamのフレンドを招待"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:73
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:97
 msgid "Join"
 msgstr "参加"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:41
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:55
 msgid "Join as a Guest"
 msgstr "ゲストとして参加"
 
-#: ../frontend/collaborate/App.tsx:1261
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/components/SessionHeader.tsx:256
+msgid "Join Drawing"
+msgstr "描くのに参加"
+
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:93
+#: ../frontend/collaborate/components/SessionHeader.tsx:256
+msgid "Just Watch"
+msgstr "見るだけ"
+
+#: ../frontend/collaborate/App.tsx:1335
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
@@ -176,11 +197,11 @@ msgstr "この端末に保存"
 msgid "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
 msgstr "この絵をこの端末に保存しますか？全員のセッションが終了し、以後は誰も続きを描けません。ログインすると下書きから投稿できます。"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:238
+#: ../frontend/collaborate/components/SessionHeader.tsx:294
 msgid "Let in"
 msgstr "入れる"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:146
+#: ../frontend/collaborate/components/SessionHeader.tsx:168
 msgid "Loading"
 msgstr "読み込み中"
 
@@ -193,7 +214,7 @@ msgstr "フレンドを読み込み中…"
 msgid "Loading..."
 msgstr "読み込み中..."
 
-#: ../frontend/collaborate/components/Chat.tsx:140
+#: ../frontend/collaborate/components/Chat.tsx:150
 msgid "Message too long (max 500 characters)"
 msgstr "メッセージが長すぎます（最大500文字）"
 
@@ -205,16 +226,20 @@ msgstr "招待できるDiscordのフレンドはまだいません。"
 msgid "No friend by that name."
 msgstr "その名前のフレンドはいません。"
 
-#: ../frontend/collaborate/App.tsx:894
+#: ../frontend/collaborate/App.tsx:935
 msgid "No Title"
 msgstr "無題"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:235
+msgid "Nobody new can watch. Click to let people watch."
+msgstr "新しく見に来ることはできません。クリックすると見られるようにします。"
+
 #: ../frontend/collaborate/components/DiscordInvite.tsx:79
-#: ../frontend/collaborate/components/SessionHeader.tsx:246
+#: ../frontend/collaborate/components/SessionHeader.tsx:302
 msgid "Not now"
 msgstr "あとで"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:196
+#: ../frontend/collaborate/components/SessionHeader.tsx:218
 msgid "Only people with an account can join. Click to let guests in."
 msgstr "アカウントのある人だけが参加できます。クリックするとゲストも参加できます。"
 
@@ -223,12 +248,16 @@ msgid "Or use + in any Discord chat."
 msgstr "Discordのチャットの＋からも招待できます。"
 
 #. placeholder {0}: participants.size
-#: ../frontend/collaborate/components/Chat.tsx:229
-#: ../frontend/collaborate/components/Chat.tsx:230
+#: ../frontend/collaborate/components/Chat.tsx:239
+#: ../frontend/collaborate/components/Chat.tsx:240
 msgid "Participants ({0})"
 msgstr "参加者（{0}）"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:195
+#: ../frontend/collaborate/components/SessionHeader.tsx:234
+msgid "People can watch without drawing. Click to stop new ones watching."
+msgstr "描かずに見ることができます。クリックすると新しく見に来る人を止めます。"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:217
 msgid "People without an account can join. Click to stop new ones joining."
 msgstr "アカウントのない人も参加できます。クリックすると新しいゲストの参加を止めます。"
 
@@ -236,18 +265,18 @@ msgstr "アカウントのない人も参加できます。クリックすると
 msgid "Reconnect"
 msgstr "再接続"
 
-#: ../frontend/collaborate/App.tsx:1146
+#: ../frontend/collaborate/App.tsx:1220
 msgid "Remove"
 msgstr "退出させる"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/components/Chat.tsx:249
-#: ../frontend/collaborate/components/Chat.tsx:250
+#: ../frontend/collaborate/components/Chat.tsx:260
+#: ../frontend/collaborate/components/Chat.tsx:261
 msgid "Remove {0} from this session"
 msgstr "{0} さんをセッションから退出させる"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1145
+#: ../frontend/collaborate/App.tsx:1219
 msgid "Remove {0} from this session? They won't be able to rejoin it."
 msgstr "{0} さんをセッションから退出させますか？このセッションには再参加できなくなります。"
 
@@ -256,7 +285,7 @@ msgid "Removed from Session"
 msgstr "セッションから退出"
 
 #: ../frontend/collaborate/components/modals/InitializationErrorModal.tsx:20
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:37
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:40
 msgid "Retry"
 msgstr "再試行"
 
@@ -273,16 +302,16 @@ msgstr "PNG として保存"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "この絵をギャラリーに保存しますか？保存すると全員のセッションが終了し、誰も続きを描けなくなります。"
 
-#: ../frontend/collaborate/App.tsx:1262
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/App.tsx:1336
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
 msgid "Save to Gallery"
 msgstr "ギャラリーに保存"
 
-#: ../frontend/collaborate/App.tsx:1259
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/App.tsx:1333
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Saving..."
@@ -293,12 +322,12 @@ msgstr "保存中..."
 msgid "Search friends"
 msgstr "フレンドを検索"
 
-#: ../frontend/collaborate/components/Chat.tsx:325
+#: ../frontend/collaborate/components/Chat.tsx:339
 msgid "Send"
 msgstr "送信"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:133
-#: ../frontend/collaborate/components/SessionHeader.tsx:234
+#: ../frontend/collaborate/components/SessionHeader.tsx:290
 msgid "Sending…"
 msgstr "送信中…"
 
@@ -310,7 +339,7 @@ msgstr "送信済み"
 msgid "Session Expired"
 msgstr "セッションが期限切れです"
 
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:23
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:26
 msgid "Session Full"
 msgstr "セッション満員"
 
@@ -318,17 +347,25 @@ msgstr "セッション満員"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "セッションが終了します。描画をギャラリーに保存中..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:210
+#: ../frontend/collaborate/components/SessionHeader.tsx:266
 msgid "Share"
 msgstr "共有"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:207
+#: ../frontend/collaborate/components/SessionHeader.tsx:263
 msgid "Share this session"
 msgstr "このセッションを共有"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:70
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:84
 msgid "Sign In Instead"
 msgstr "ログインする"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:239
+msgid "Spectators"
+msgstr "見学"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:251
+msgid "Take a seat and draw"
+msgstr "席について描く"
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
 msgid "The owner ended this session. You can save your work locally as a PNG before leaving."
@@ -366,20 +403,20 @@ msgstr "共同お絵かきセッションは終了しました。絵はギャラ
 msgid "This session has already been saved. You can only download it as a PNG."
 msgstr "このセッションはすでに保存されています。PNG としてのみダウンロードできます。"
 
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:27
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:30
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "このセッションは満員です（{currentUserCount}/{maxUsers}ユーザー）。最初の{maxUsers}ユーザーのみがセッションに参加できます。"
 
-#: ../frontend/collaborate/App.tsx:963
+#: ../frontend/collaborate/App.tsx:1004
 msgid "Too many guests have joined from this network. Try again later, or sign in."
 msgstr "このネットワークから参加したゲストが多すぎます。しばらくしてから再度お試しいただくか、ログインしてください。"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:137
-#: ../frontend/collaborate/components/SessionHeader.tsx:236
+#: ../frontend/collaborate/components/SessionHeader.tsx:292
 msgid "Try again"
 msgstr "もう一度"
 
-#: ../frontend/collaborate/components/Chat.tsx:316
+#: ../frontend/collaborate/components/Chat.tsx:330
 msgid "Type a message..."
 msgstr "メッセージを入力..."
 
@@ -387,7 +424,20 @@ msgstr "メッセージを入力..."
 msgid "Unable to authenticate your session. Either the session doesn't exist, or it has expired. Please return to the lobby."
 msgstr "セッションを認証できません。セッションが存在しないか、期限切れです。ロビーに戻ってください。"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:44
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:97
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:44
+msgid "Watch"
+msgstr "見る"
+
+#: ../frontend/collaborate/components/Chat.tsx:39
+msgid "watching"
+msgstr "見学中"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:150
+msgid "Watching"
+msgstr "見学中"
+
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:58
 msgid "What should the others call you?"
 msgstr "みんなに何と呼ばれたいですか？"
 
@@ -395,10 +445,10 @@ msgstr "みんなに何と呼ばれたいですか？"
 msgid "You'll be redirected to the post page shortly."
 msgstr "まもなく投稿ページにリダイレクトされます。"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:59
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:73
 msgid "You'll be shown as a guest. If you sign in later, what you drew moves to your account."
 msgstr "ゲストとして表示されます。あとでログインすると、描いたものはアカウントに移ります。"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:55
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:69
 msgid "Your name"
 msgstr "名前"

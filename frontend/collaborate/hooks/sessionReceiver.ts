@@ -31,6 +31,8 @@ export interface ChatLine {
   username: string;
   /** Said by somebody without an account, whose name may be anybody's. */
   isGuest: boolean;
+  /** Said by somebody watching rather than drawing. */
+  isSpectator: boolean;
   message: string;
   timestamp: number;
 }
@@ -45,6 +47,7 @@ export interface ReceiverHandlers {
     joinedAt: number,
     sessionId?: number,
     isGuest?: boolean,
+    isSpectator?: boolean,
   ) => void;
   clearParticipants: () => void;
   /**
@@ -501,6 +504,7 @@ export class SessionReceiver {
           userId: message.userId,
           username: message.username,
           isGuest: message.isGuest,
+          isSpectator: message.isSpectator,
           message: `${message.username} joined`,
           timestamp: message.timestamp,
         });
@@ -514,6 +518,7 @@ export class SessionReceiver {
           userId: message.userId,
           username: message.username,
           isGuest: message.isGuest,
+          isSpectator: message.isSpectator,
           message: `${message.username} left the session`,
           timestamp: message.timestamp,
         });
@@ -533,6 +538,7 @@ export class SessionReceiver {
           userId: message.userId,
           username: message.username,
           isGuest: message.isGuest,
+          isSpectator: message.isSpectator,
           message: message.message,
           timestamp: message.timestamp,
         });
@@ -551,6 +557,7 @@ export class SessionReceiver {
             participant.joinTimestamp,
             participant.sessionId > 0 ? participant.sessionId : undefined,
             participant.isGuest,
+            participant.isSpectator,
           );
           if (participant.sessionId > 0) {
             this.idNames.set(participant.sessionId, participant.username);

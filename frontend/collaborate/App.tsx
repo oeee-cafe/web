@@ -136,6 +136,7 @@ type ChatMessage = {
   userId: string;
   username: string;
   isGuest: boolean;
+  isSpectator: boolean;
   message: string;
   timestamp: number;
 };
@@ -150,7 +151,20 @@ interface AuthInfo {
 }
 
 /** Where signing in from this room comes back to. */
-const signInHref = () => `/login?next=${encodeURIComponent(window.location.pathname)}`;
+const signInHref = () =>
+  `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+
+/**
+ * Whether this visit asked to watch rather than draw: `?watch=1`, from a
+ * full room's lobby card, or set here when somebody chooses to watch.
+ * Switching between watching and drawing is a reload with or without it --
+ * the socket, the seat and the painter all follow from it as the page opens.
+ */
+const askedToWatch = () => new URLSearchParams(window.location.search).has("watch");
+
+/** This room, watching or drawing. */
+const roomHref = (watch: boolean) =>
+  window.location.pathname + (watch ? "?watch=1" : "");
 
 export default function App() {
   const { t } = useLingui();
@@ -158,7 +172,8 @@ export default function App() {
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [authError, setAuthError] = useState(false);
-  const [roomFullError, setRoomFullError] = useState<{ currentUserCount: number; maxUsers: number } | null>(null);
+  /** A full room, and the metadata to watch it with instead. */
+  const [roomFullError, setRoomFullError] = useState<{ currentUserCount: number; maxUsers: number; meta: CollaborationMeta } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   /** Over because a guest owner kept it on their device, not by timing out. */
@@ -170,6 +185,14 @@ export default function App() {
    * metadata, held while they are asked for a name.
    */
   const [awaitingName, setAwaitingName] = useState<CollaborationMeta | null>(null);
+  /**
+   * Watching rather than drawing. Never true of the owner, whose room it is
+   * (the server seats them whatever they ask). The ref is what the socket
+   * reads as it opens.
+   */
+  const [watching, setWatching] = useState(askedToWatch);
+  const spectatingRef = useRef(watching);
+  spectatingRef.current = watching;
   const [sessionEnding, setSessionEnding] = useState(false);
   const [saveConfirmation, setSaveConfirmation] = useState(false);
   const [synchronizationError, setSynchronizationError] = useState<string | null>(null);
@@ -317,15 +340,22 @@ export default function App() {
     [participants],
   );
   const addParticipant = useCallback((
-    userId: string, username: string, joinedAt: number, sessionId?: number, isGuest?: boolean,
+    userId: string,
+    username: string,
+    joinedAt: number,
+    sessionId?: number,
+    isGuest?: boolean,
+    isSpectator?: boolean,
   ) => {
     setParticipants((current) =>
-      new Map(current).set(userId, { userId, username, joinedAt, sessionId, isGuest }));
+      new Map(current).set(userId, { userId, username, joinedAt, sessionId, isGuest, isSpectator }));
   }, []);
 
   const onLocalOperation = useCallback((entry: LocalPainterOperation) => {
     const ws = wsRef.current;
     const localId = link.localId;
+    // Watching: nothing this page draws is the room's.
+    if (spectatingRef.current) return;
     if (!ws || ws.readyState !== WebSocket.OPEN || localId === null || link.catchingUp) return;
     hasDrawnRef.current = true;
     const encoded = encodePainterOperation(localId, entry.operation);
@@ -338,7 +368,7 @@ export default function App() {
   const onLocalPointerUp = useCallback(() => {
     const ws = wsRef.current;
     const localId = link.localId;
-    if (!ws || ws.readyState !== WebSocket.OPEN || localId === null) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN || localId === null || spectatingRef.current) return;
     ws.send(encodePointerUp(localId));
   // wsRef is created by the WebSocket hook below and is stable for its lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -360,7 +390,8 @@ export default function App() {
       const point = pendingPointerRef.current;
       const ws = wsRef.current;
       const localId = link.localId;
-      if (!point || ws?.readyState !== WebSocket.OPEN || localId === null) return;
+      // Watching: no cursor of ours on anybody's canvas.
+      if (!point || ws?.readyState !== WebSocket.OPEN || localId === null || spectatingRef.current) return;
       // A frame is the display's rate, not a useful rate for somebody else's
       // cursor: on a 120Hz screen this fired twice as often as on a 60Hz one,
       // and every one of those is a message the whole room decodes. This
@@ -724,7 +755,8 @@ export default function App() {
    */
   const canUploadCheckpoint = useCallback((): boolean => {
     const painter = painterRef.current;
-    if (!painter || link.localId === null) return false;
+    // Somebody watching cannot offer one: the server drops it.
+    if (!painter || link.localId === null || spectatingRef.current) return false;
     return (
       painter.isSynchronizationSettled() &&
       feed.applied >= link.lastSeq
@@ -812,6 +844,8 @@ export default function App() {
     // history is streaming is the replay's own cursor rather than its target.
     // Every tick mid-replay therefore looks caught up, and the lobby would get
     // whatever fraction of the drawing had arrived by then.
+    // `canUploadCheckpoint` also says no to somebody watching, who may not
+    // upload a preview either.
     if (link.catchingUp || !canUploadCheckpoint()) return;
     // Nothing has moved since this client last uploaded, so whatever is on the
     // lobby is already current. Other clients keep their own count and will
@@ -849,7 +883,7 @@ export default function App() {
   }, [canvasMeta, sessionEnding, refreshPreview]);
 
   const { wsRef, connect, disconnect, view } = useWebSocket({
-    link, canvasMeta, userIdRef,
+    link, canvasMeta, userIdRef, spectatingRef,
     onSynchronizationError: handleSynchronizationError,
     createOrUpdateCursor, hideCursor,
     addParticipant, clearParticipants, markParticipantLeft,
@@ -873,22 +907,29 @@ export default function App() {
     // canvases are up.
     if (!painterReady) return;
     painterRef.current?.setInteractionEnabled(
-      view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired && !removed,
+      view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired && !removed && !watching,
     );
-  }, [painterReady, view.connection, view.catchingUp, sessionEnding, sessionExpired, removed]);
+  }, [painterReady, view.connection, view.catchingUp, sessionEnding, sessionExpired, removed, watching]);
 
   /**
    * Into the room, once it is known who is coming in: straight on to the post
    * if there is one, turned away if it is full, the session-over dialog if it
    * is over, and otherwise the canvas.
    */
-  const enterRoom = useCallback((meta: CollaborationMeta) => {
+  const enterRoom = useCallback((meta: CollaborationMeta, watch = spectatingRef.current) => {
     if (meta.savedPostId) {
       window.location.href = meta.savedPostUrl ?? `/@${meta.ownerLoginName}/${meta.savedPostId}`;
       return;
     }
-    if (meta.currentUserCount >= meta.maxUsers && meta.ownerId !== userIdRef.current) {
-      setRoomFullError({ currentUserCount: meta.currentUserCount, maxUsers: meta.maxUsers });
+    // The owner draws in their own room, whatever the link said.
+    const owner = meta.ownerId === userIdRef.current;
+    const watchingNow = watch && !owner;
+    spectatingRef.current = watchingNow;
+    setWatching(watchingNow);
+    if (watchingNow) window.history.replaceState(null, "", roomHref(true));
+    // A full room is no bar to watching it; the server counts watchers apart.
+    if (!watchingNow && meta.currentUserCount >= meta.maxUsers && !owner) {
+      setRoomFullError({ currentUserCount: meta.currentUserCount, maxUsers: meta.maxUsers, meta });
       return;
     }
     document.title = `Oeee Cafe - ${meta.title?.trim() || t`No Title`}`;
@@ -949,7 +990,7 @@ export default function App() {
   }, [initializeApp]);
 
   /** Takes the name a guest gave, and with it, the room. */
-  const becomeGuest = useCallback(async (nickname: string): Promise<string | null> => {
+  const becomeGuest = useCallback(async (nickname: string, watch: boolean): Promise<string | null> => {
     const meta = awaitingName;
     if (!meta) return null;
     try {
@@ -965,7 +1006,7 @@ export default function App() {
       const guest: AuthInfo = await response.json();
       userIdRef.current = guest.user_id ?? "";
       setAwaitingName(null);
-      enterRoom(meta);
+      enterRoom(meta, watch || spectatingRef.current);
       return null;
     } catch {
       return t`Couldn't join. Please try again.`;
@@ -1041,6 +1082,39 @@ export default function App() {
    * account, so their save keeps it in this device's drafts instead.
    */
   const ownerKeepsOnDevice = isOwner && !!canvasMeta?.ownerIsGuest;
+
+  /** Whether a drawing seat is free, for somebody watching to take. */
+  const seatFree =
+    !!canvasMeta &&
+    [...participants.values()].filter((participant) => !participant.isSpectator && !participant.left)
+      .length < canvasMeta.maxUsers;
+  /** Watching to drawing, or back: the page comes back in the other mode. */
+  const switchMode = useCallback(() => {
+    leavingRef.current = true;
+    window.location.assign(roomHref(!watching));
+  }, [watching]);
+
+  /** Whether people may watch, as the owner last set it. */
+  const [spectatorsAllowed, setSpectatorsAllowed] = useState<boolean | null>(null);
+  const [spectatorsBusy, setSpectatorsBusy] = useState(false);
+  const toggleSpectators = useCallback(async () => {
+    const allowed = spectatorsAllowed ?? canvasMeta?.allowSpectators ?? true;
+    setSpectatorsBusy(true);
+    try {
+      const response = await fetch(`/collaborate/${getSessionId()}/spectators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allow: !allowed }),
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      setSpectatorsAllowed(!allowed);
+    } catch {
+      say(t`Couldn't change who can watch. Please try again.`);
+    } finally {
+      setSpectatorsBusy(false);
+    }
+  }, [canvasMeta, spectatorsAllowed, t]);
 
   /**
    * A guest owner's save. The drawing goes into this browser's drafts, the
@@ -1267,7 +1341,7 @@ export default function App() {
       <InitializationErrorModal isOpen={!!initializationError} errorMessage={initializationError ?? ""} onRetry={reload} />
       <LoadingModal isOpen={!canvasMeta && !initializationError && !awaitingName && !removed} />
       <AuthErrorModal isOpen={authError} onGoToLobby={goToLobby} />
-      <RoomFullModal isOpen={!!roomFullError} currentUserCount={roomFullError?.currentUserCount ?? 0} maxUsers={roomFullError?.maxUsers ?? 0} onGoToLobby={goToLobby} onRetry={reload} />
+      <RoomFullModal isOpen={!!roomFullError} currentUserCount={roomFullError?.currentUserCount ?? 0} maxUsers={roomFullError?.maxUsers ?? 0} onGoToLobby={goToLobby} onRetry={reload} onWatch={roomFullError?.meta.allowSpectators ? () => { const meta = roomFullError.meta; setRoomFullError(null); enterRoom(meta, true); } : undefined} />
       <div className="relative flex-1 overflow-hidden">
         {/*
           The chat is the toolbox's neighbour, so it is one of the painter's
@@ -1300,7 +1374,7 @@ export default function App() {
             <span className={NEO_TITLEBAR_DOT} />
             {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[11px] leading-[14px]">{canvasMeta.title}</span>}
           </div>
-          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} guests={isOwner && canvasMeta.communityAdmitsGuests ? { allowed: guestsAllowed ?? canvasMeta.allowGuests ?? true, busy: guestsBusy, onToggle: () => void toggleGuests() } : undefined} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
+          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} guests={isOwner && canvasMeta.communityAdmitsGuests ? { allowed: guestsAllowed ?? canvasMeta.allowGuests ?? true, busy: guestsBusy, onToggle: () => void toggleGuests() } : undefined} spectators={isOwner ? { allowed: spectatorsAllowed ?? canvasMeta.allowSpectators ?? true, busy: spectatorsBusy, onToggle: () => void toggleSpectators() } : undefined} mode={isOwner || canvasMeta.ended ? undefined : { watching, seatFree, canWatch: canvasMeta.allowSpectators ?? true, onSwitch: switchMode }} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
           <Chat wsRef={wsRef} userId={userIdRef.current} participants={presentParticipants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} onRemove={isOwner ? removeParticipant : undefined} />
           <div ref={chatResizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
             <span className={NEO_RESIZE_GRIP} />
@@ -1324,6 +1398,6 @@ export default function App() {
     </div>
     <SessionExpiredModal isOpen={sessionExpired && !removed} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} hasCanvas={!canvasMeta?.ended} endedByOwner={endedByOwner} ownerKeepsOnDevice={ownerKeepsOnDevice} onClose={() => {}} onSaveToGallery={ownerKeepsOnDevice ? keepOnDevice : saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
     <RemovedModal isOpen={removed} onGoToLobby={goToLobby} />
-    <GuestNameModal isOpen={!!awaitingName} suggestion={discordKnown().state?.name ?? undefined} onSubmit={becomeGuest} signInHref={signInHref()} />
+    <GuestNameModal isOpen={!!awaitingName} suggestion={discordKnown().state?.name ?? undefined} canWatch={!!awaitingName?.allowSpectators} watchOnly={watching} onSubmit={becomeGuest} signInHref={signInHref()} />
   </>;
 }

@@ -38,6 +38,11 @@ pub const NICKNAME_MAX_CHARS: usize = 30;
 /// apart from the account all the same.
 pub const FLAG_GUEST: u8 = 0b0000_0001;
 
+/// Beside FLAG_GUEST in the same byte: this person is watching the session,
+/// not drawing in it. A role, not an identity, so it is the connection's to
+/// add (`SessionContext::flags`) rather than a [`Collaborator`]'s.
+pub const FLAG_SPECTATOR: u8 = 0b0000_0010;
+
 /// Somebody in a room: an account, or a guest.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Collaborator {

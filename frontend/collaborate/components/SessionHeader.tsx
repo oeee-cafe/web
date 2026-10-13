@@ -27,10 +27,24 @@ export interface GuestsSwitch {
   onToggle: () => void;
 }
 
+/** Watching or drawing, for somebody who is not the owner. */
+export interface ModeSwitch {
+  watching: boolean;
+  /** A drawing seat is free, for somebody watching to take. */
+  seatFree: boolean;
+  /** The owner lets people watch, for somebody drawing to sit back. */
+  canWatch: boolean;
+  onSwitch: () => void;
+}
+
 export interface SessionHeaderProps {
   canvasMeta: CollaborationMeta;
   /** Present for the owner, of a session whose community admits guests. */
   guests?: GuestsSwitch;
+  /** Present for the owner: whether people may watch. */
+  spectators?: GuestsSwitch;
+  /** Present for everybody else. */
+  mode?: ModeSwitch;
   connectionState: "connecting" | "connected" | "disconnected";
   isCatchingUp: boolean;
   /** The highest a window may be dragged, as the chat's own is held. */
@@ -88,6 +102,8 @@ function besideChat(header: HTMLElement | null, ceiling: number): WindowOrigin {
 export const SessionHeader = ({
   canvasMeta,
   guests,
+  spectators,
+  mode,
   connectionState,
   isCatchingUp,
   ceiling = 0,
@@ -126,6 +142,12 @@ export const SessionHeader = ({
         <div className="flex shrink-0 items-center gap-[3px] opacity-80">
           <div className="h-[6px] w-[6px] bg-green-500 rounded-full"></div>
           <Trans>Connected</Trans>
+        </div>
+      )}
+      {mode?.watching && (
+        <div className="flex shrink-0 items-center gap-[3px] opacity-80">
+          <Icon icon="material-symbols:visibility" width={12} height={12} />
+          <Trans>Watching</Trans>
         </div>
       )}
       {connectionState === "connecting" && (
@@ -198,6 +220,40 @@ export const SessionHeader = ({
         >
           <Icon icon="material-symbols:person" width={14} height={14} />
           <Trans>Guests</Trans>
+        </button>
+      )}
+      {spectators && (
+        <button
+          type="button"
+          onClick={spectators.onToggle}
+          disabled={spectators.busy}
+          aria-pressed={spectators.allowed}
+          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] disabled:cursor-not-allowed ${spectators.allowed ? NEO_BUTTON_ON : ""}`}
+          title={
+            spectators.allowed
+              ? t`People can watch without drawing. Click to stop new ones watching.`
+              : t`Nobody new can watch. Click to let people watch.`
+          }
+        >
+          <Icon icon="material-symbols:visibility" width={14} height={14} />
+          <Trans>Spectators</Trans>
+        </button>
+      )}
+      {mode && (mode.watching || mode.canWatch) && (
+        <button
+          type="button"
+          onClick={mode.onSwitch}
+          disabled={mode.watching && !mode.seatFree}
+          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] disabled:cursor-not-allowed`}
+          title={
+            mode.watching
+              ? mode.seatFree
+                ? t`Take a seat and draw`
+                : t`Every seat is taken. You can draw once one frees.`
+              : t`Give up your seat and watch`
+          }
+        >
+          {mode.watching ? <Trans>Join Drawing</Trans> : <Trans>Just Watch</Trans>}
         </button>
       )}
       <button

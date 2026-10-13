@@ -41,6 +41,12 @@ pub(super) use reset::{reset_snapshot_count, valid_reset_payloads};
 struct SessionContext<'a> {
     connection_id: &'a str,
     who: &'a Collaborator,
+    /// Watching, not drawing: everything but its join and its chat is
+    /// dropped.
+    spectating: bool,
+    /// What the room is told about this person beside their name: who they
+    /// are (`Collaborator::flags`) and whether they are only watching.
+    flags: u8,
     user_login_name: &'a str,
     /// `who`'s participant id.
     user_id: Uuid,
@@ -66,11 +72,17 @@ struct Goodbye {
 pub struct ResumeQuery {
     history_id: Option<Uuid>,
     after_seq: Option<u64>,
+    /// `?spectate=1`: watch the room rather than draw in it.
+    spectate: Option<u8>,
 }
 
 impl ResumeQuery {
     fn position(self) -> Option<(Uuid, u64)> {
         self.history_id.zip(self.after_seq)
+    }
+
+    fn spectate(self) -> bool {
+        self.spectate.is_some_and(|spectate| spectate != 0)
     }
 }
 
@@ -146,7 +158,15 @@ pub async fn websocket_collaborate_handler(
         .ok_or(AppError::Unauthorized)?;
     let ip = rate_limit::client_ip(&headers);
     Ok(ws.on_upgrade(move |socket| {
-        handle_socket(socket, room_uuid, state, who, ip, resume.position())
+        handle_socket(
+            socket,
+            room_uuid,
+            state,
+            who,
+            ip,
+            resume.spectate(),
+            resume.position(),
+        )
     }))
 }
 
@@ -156,6 +176,7 @@ pub async fn handle_socket(
     state: AppState,
     who: Collaborator,
     ip: Option<String>,
+    spectate: bool,
     resume_position: Option<(Uuid, u64)>,
 ) {
     let user_id = who.id();
@@ -175,33 +196,50 @@ pub async fn handle_socket(
 
     let db = &state.db_pool;
 
-    let (is_owner, session_user_id, connection_info) =
-        match setup_connection(db, room_uuid, &who, ip.as_deref(), &connection_id, &state).await {
-            Ok(owner_info) => owner_info,
-            Err(failure) => {
-                // Say why with a close frame rather than just dropping the socket.
-                // The code is what the client reads: a policy close means the
-                // session is over, full or out of ids, and no retry will change
-                // that; anything else it comes back from on its own backoff.
-                let (code, reason) = match failure {
-                    JoinFailure::Refused => (close_code::POLICY, "cannot join session"),
-                    JoinFailure::Unavailable => (close_code::AGAIN, "session unavailable"),
-                };
-                let _ = sender
-                    .send(Message::Close(Some(CloseFrame {
-                        code,
-                        reason: reason.into(),
-                    })))
-                    .await;
-                return;
-            }
-        };
+    let (is_owner, session_user_id, connection_info) = match setup_connection(
+        db,
+        room_uuid,
+        &who,
+        ip.as_deref(),
+        spectate,
+        &connection_id,
+        &state,
+    )
+    .await
+    {
+        Ok(owner_info) => owner_info,
+        Err(failure) => {
+            // Say why with a close frame rather than just dropping the socket.
+            // The code is what the client reads: a policy close means the
+            // session is over, full or out of ids, and no retry will change
+            // that; anything else it comes back from on its own backoff.
+            let (code, reason) = match failure {
+                JoinFailure::Refused => (close_code::POLICY, "cannot join session"),
+                JoinFailure::Unavailable => (close_code::AGAIN, "session unavailable"),
+            };
+            let _ = sender
+                .send(Message::Close(Some(CloseFrame {
+                    code,
+                    reason: reason.into(),
+                })))
+                .await;
+            return;
+        }
+    };
 
     // From here on this user is active in Postgres and this connection is in
     // the Redis registry, so every way out of the handler has to go through
     // the cleanup -- a join that fails halfway would otherwise hold a seat
     // until the session ends.
-    let leave = || cleanup_connection(&connection_id, &who, room_uuid, db, &state);
+    // The owner never only watches their own room (`setup_connection`).
+    let spectating = spectate && !is_owner;
+    let flags = who.flags()
+        | if spectating {
+            super::guest::FLAG_SPECTATOR
+        } else {
+            0
+        };
+    let leave = || cleanup_connection(&connection_id, &who, flags, room_uuid, db, &state);
 
     // Tell the client its 1-byte session user id before any history arrives;
     // all its drawing messages will carry this id instead of a UUID
@@ -448,6 +486,8 @@ pub async fn handle_socket(
         SessionContext {
             connection_id: &connection_id,
             who: &who,
+            spectating,
+            flags,
             user_login_name: &user_login_name,
             user_id,
             room_uuid,
@@ -635,6 +675,7 @@ fn send_goodbye(
 async fn cleanup_connection(
     connection_id: &str,
     who: &Collaborator,
+    flags: u8,
     room_uuid: Uuid,
     db: &sqlx::Pool<sqlx::Postgres>,
     state: &AppState,
@@ -690,7 +731,7 @@ async fn cleanup_connection(
             user_login_name, room_uuid
         );
     } else {
-        messages::send_leave_message(room_uuid, connection_id, who, state).await;
+        messages::send_leave_message(room_uuid, connection_id, who, flags, state).await;
 
         if let Err(e) = db::mark_participant_inactive(db, room_uuid, user_id).await {
             error!("Failed to update participant on disconnect: {}", e);

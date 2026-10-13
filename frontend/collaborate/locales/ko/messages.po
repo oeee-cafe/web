@@ -13,11 +13,11 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Plural-Forms: \n"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
+#: ../frontend/collaborate/components/SessionHeader.tsx:175
 msgid "(guest)"
 msgstr "(손님)"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:224
+#: ../frontend/collaborate/components/SessionHeader.tsx:280
 msgid "{name} asks to join"
 msgstr "{name} 님이 참여를 요청했어요"
 
@@ -25,8 +25,8 @@ msgstr "{name} 님이 참여를 요청했어요"
 msgid "Authentication Failed"
 msgstr "인증 실패"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
-#: ../frontend/collaborate/components/SessionHeader.tsx:157
+#: ../frontend/collaborate/components/SessionHeader.tsx:175
+#: ../frontend/collaborate/components/SessionHeader.tsx:179
 msgid "by"
 msgstr "작성자:"
 
@@ -34,7 +34,7 @@ msgstr "작성자:"
 msgid "Cancel"
 msgstr "취소"
 
-#: ../frontend/collaborate/App.tsx:962
+#: ../frontend/collaborate/App.tsx:1003
 msgid "Choose a name of 1 to 30 characters, without hidden characters."
 msgstr "숨은 문자 없이 1~30자로 이름을 정해 주세요."
 
@@ -50,11 +50,11 @@ msgstr "Discord 연결"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "Discord를 한 번 연결하면 여기서 친구를 보고 이 세션으로 초대할 수 있어요."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:128
+#: ../frontend/collaborate/components/SessionHeader.tsx:144
 msgid "Connected"
 msgstr "연결됨"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:134
+#: ../frontend/collaborate/components/SessionHeader.tsx:156
 msgid "Connecting"
 msgstr "연결 중"
 
@@ -71,26 +71,30 @@ msgstr "연결 중..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "연결이 끊어졌습니다. 작업이 로컬에 저장되었습니다."
 
-#: ../frontend/collaborate/App.tsx:1136
+#: ../frontend/collaborate/App.tsx:1210
 msgid "Couldn't change who can join. Please try again."
 msgstr "참여 가능 대상을 바꾸지 못했습니다. 다시 시도해 주세요."
 
-#: ../frontend/collaborate/App.tsx:964
-#: ../frontend/collaborate/App.tsx:971
+#: ../frontend/collaborate/App.tsx:1113
+msgid "Couldn't change who can watch. Please try again."
+msgstr "구경할 수 있는 대상을 바꾸지 못했습니다. 다시 시도해 주세요."
+
+#: ../frontend/collaborate/App.tsx:1005
+#: ../frontend/collaborate/App.tsx:1012
 msgid "Couldn't join. Please try again."
 msgstr "참여하지 못했습니다. 다시 시도해 주세요."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:222
+#: ../frontend/collaborate/components/SessionHeader.tsx:278
 msgid "Couldn’t let {name} in"
 msgstr "{name} 님을 들이지 못했어요"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1156
+#: ../frontend/collaborate/App.tsx:1230
 msgid "Couldn't remove {0}. Please try again."
 msgstr "{0} 님을 내보내지 못했습니다. 다시 시도해 주세요."
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:140
+#: ../frontend/collaborate/components/SessionHeader.tsx:162
 msgid "Disconnected"
 msgstr "연결 끊어짐"
 
@@ -103,29 +107,37 @@ msgstr "Discord 친구"
 msgid "Download PNG"
 msgstr "PNG 다운로드"
 
-#: ../frontend/collaborate/components/Chat.tsx:41
+#: ../frontend/collaborate/components/Chat.tsx:50
 msgid "Drawing without an account"
 msgstr "계정 없이 그리는 중"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:252
+msgid "Every seat is taken. You can draw once one frees."
+msgstr "자리가 모두 찼습니다. 자리가 나면 그릴 수 있습니다."
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:69
 msgid "Failed to save session. Please try downloading as PNG instead."
 msgstr "세션 저장에 실패했습니다. 대신 PNG로 다운로드해 보세요."
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:253
+msgid "Give up your seat and watch"
+msgstr "자리를 비우고 구경하기"
+
 #: ../frontend/collaborate/components/modals/AuthErrorModal.tsx:23
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:34
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:37
 msgid "Go to Lobby"
 msgstr "로비로 가기"
 
-#: ../frontend/collaborate/components/Chat.tsx:42
+#: ../frontend/collaborate/components/Chat.tsx:51
 msgid "guest"
 msgstr "손님"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:200
+#: ../frontend/collaborate/components/SessionHeader.tsx:222
 msgid "Guests"
 msgstr "손님"
 
-#: ../frontend/collaborate/App.tsx:1221
-#: ../frontend/collaborate/App.tsx:1225
+#: ../frontend/collaborate/App.tsx:1295
+#: ../frontend/collaborate/App.tsx:1299
 msgid "Help"
 msgstr "도움말"
 
@@ -142,30 +154,39 @@ msgid "Initializing collaboration session..."
 msgstr "협업 세션 초기화 중..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:172
+#: ../frontend/collaborate/components/SessionHeader.tsx:194
 msgid "Invite"
 msgstr "초대"
 
 #: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:65
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:169
+#: ../frontend/collaborate/components/SessionHeader.tsx:191
 msgid "Invite Discord friends"
 msgstr "Discord 친구 초대"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:180
+#: ../frontend/collaborate/components/SessionHeader.tsx:202
 msgid "Invite Steam friends"
 msgstr "Steam 친구 초대"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:73
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:97
 msgid "Join"
 msgstr "참여"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:41
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:55
 msgid "Join as a Guest"
 msgstr "손님으로 참여"
 
-#: ../frontend/collaborate/App.tsx:1261
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/components/SessionHeader.tsx:256
+msgid "Join Drawing"
+msgstr "그리기 참여"
+
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:93
+#: ../frontend/collaborate/components/SessionHeader.tsx:256
+msgid "Just Watch"
+msgstr "구경만 하기"
+
+#: ../frontend/collaborate/App.tsx:1335
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
@@ -176,11 +197,11 @@ msgstr "이 기기에 보관"
 msgid "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
 msgstr "이 그림을 이 기기에 보관할까요? 모두의 세션이 끝나고 이후에는 아무도 이어서 그릴 수 없습니다. 로그인한 뒤 임시 저장함에서 올릴 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:238
+#: ../frontend/collaborate/components/SessionHeader.tsx:294
 msgid "Let in"
 msgstr "들이기"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:146
+#: ../frontend/collaborate/components/SessionHeader.tsx:168
 msgid "Loading"
 msgstr "로딩 중"
 
@@ -193,7 +214,7 @@ msgstr "친구를 불러오는 중…"
 msgid "Loading..."
 msgstr "로딩 중..."
 
-#: ../frontend/collaborate/components/Chat.tsx:140
+#: ../frontend/collaborate/components/Chat.tsx:150
 msgid "Message too long (max 500 characters)"
 msgstr "메시지가 너무 깁니다 (최대 500자)"
 
@@ -205,16 +226,20 @@ msgstr "아직 초대할 Discord 친구가 없어요."
 msgid "No friend by that name."
 msgstr "그 이름의 친구가 없어요."
 
-#: ../frontend/collaborate/App.tsx:894
+#: ../frontend/collaborate/App.tsx:935
 msgid "No Title"
 msgstr "제목 없음"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:235
+msgid "Nobody new can watch. Click to let people watch."
+msgstr "새로 구경할 수 없습니다. 누르면 구경을 허용합니다."
+
 #: ../frontend/collaborate/components/DiscordInvite.tsx:79
-#: ../frontend/collaborate/components/SessionHeader.tsx:246
+#: ../frontend/collaborate/components/SessionHeader.tsx:302
 msgid "Not now"
 msgstr "나중에"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:196
+#: ../frontend/collaborate/components/SessionHeader.tsx:218
 msgid "Only people with an account can join. Click to let guests in."
 msgstr "계정이 있는 사람만 참여할 수 있습니다. 누르면 손님도 들어올 수 있습니다."
 
@@ -223,12 +248,16 @@ msgid "Or use + in any Discord chat."
 msgstr "Discord 채팅의 + 버튼으로도 초대할 수 있어요."
 
 #. placeholder {0}: participants.size
-#: ../frontend/collaborate/components/Chat.tsx:229
-#: ../frontend/collaborate/components/Chat.tsx:230
+#: ../frontend/collaborate/components/Chat.tsx:239
+#: ../frontend/collaborate/components/Chat.tsx:240
 msgid "Participants ({0})"
 msgstr "참가자 ({0})"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:195
+#: ../frontend/collaborate/components/SessionHeader.tsx:234
+msgid "People can watch without drawing. Click to stop new ones watching."
+msgstr "그리지 않고 구경할 수 있습니다. 누르면 새로 구경하는 사람을 막습니다."
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:217
 msgid "People without an account can join. Click to stop new ones joining."
 msgstr "계정이 없는 사람도 참여할 수 있습니다. 누르면 새로 들어오는 손님을 막습니다."
 
@@ -236,18 +265,18 @@ msgstr "계정이 없는 사람도 참여할 수 있습니다. 누르면 새로 
 msgid "Reconnect"
 msgstr "재연결"
 
-#: ../frontend/collaborate/App.tsx:1146
+#: ../frontend/collaborate/App.tsx:1220
 msgid "Remove"
 msgstr "내보내기"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/components/Chat.tsx:249
-#: ../frontend/collaborate/components/Chat.tsx:250
+#: ../frontend/collaborate/components/Chat.tsx:260
+#: ../frontend/collaborate/components/Chat.tsx:261
 msgid "Remove {0} from this session"
 msgstr "{0} 님을 세션에서 내보내기"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1145
+#: ../frontend/collaborate/App.tsx:1219
 msgid "Remove {0} from this session? They won't be able to rejoin it."
 msgstr "{0} 님을 세션에서 내보낼까요? 이 세션에 다시 들어올 수 없게 됩니다."
 
@@ -256,7 +285,7 @@ msgid "Removed from Session"
 msgstr "세션에서 내보내짐"
 
 #: ../frontend/collaborate/components/modals/InitializationErrorModal.tsx:20
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:37
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:40
 msgid "Retry"
 msgstr "다시 시도"
 
@@ -273,16 +302,16 @@ msgstr "PNG로 저장"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "이 그림을 갤러리에 저장할까요? 저장하면 모두의 세션이 끝나고 아무도 이어서 그릴 수 없습니다."
 
-#: ../frontend/collaborate/App.tsx:1262
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/App.tsx:1336
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
 msgid "Save to Gallery"
 msgstr "갤러리에 저장"
 
-#: ../frontend/collaborate/App.tsx:1259
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/App.tsx:1333
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Saving..."
@@ -293,12 +322,12 @@ msgstr "저장 중..."
 msgid "Search friends"
 msgstr "친구 검색"
 
-#: ../frontend/collaborate/components/Chat.tsx:325
+#: ../frontend/collaborate/components/Chat.tsx:339
 msgid "Send"
 msgstr "전송"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:133
-#: ../frontend/collaborate/components/SessionHeader.tsx:234
+#: ../frontend/collaborate/components/SessionHeader.tsx:290
 msgid "Sending…"
 msgstr "보내는 중…"
 
@@ -310,7 +339,7 @@ msgstr "보냄"
 msgid "Session Expired"
 msgstr "세션 만료"
 
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:23
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:26
 msgid "Session Full"
 msgstr "세션 만석"
 
@@ -318,17 +347,25 @@ msgstr "세션 만석"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "세션이 종료됩니다. 그림을 갤러리에 저장 중..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:210
+#: ../frontend/collaborate/components/SessionHeader.tsx:266
 msgid "Share"
 msgstr "공유"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:207
+#: ../frontend/collaborate/components/SessionHeader.tsx:263
 msgid "Share this session"
 msgstr "이 세션 공유"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:70
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:84
 msgid "Sign In Instead"
 msgstr "로그인하기"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:239
+msgid "Spectators"
+msgstr "구경꾼"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:251
+msgid "Take a seat and draw"
+msgstr "자리에 앉아 그리기"
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
 msgid "The owner ended this session. You can save your work locally as a PNG before leaving."
@@ -366,20 +403,20 @@ msgstr "공동 그리기 세션이 끝났습니다. 그림은 갤러리에 저�
 msgid "This session has already been saved. You can only download it as a PNG."
 msgstr "이 세션은 이미 저장되었습니다. PNG로만 다운로드할 수 있습니다."
 
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:27
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:30
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "이 세션이 가득 찼습니다 ({currentUserCount}/{maxUsers}명). 처음 {maxUsers}명의 사용자만 세션에 참여할 수 있습니다."
 
-#: ../frontend/collaborate/App.tsx:963
+#: ../frontend/collaborate/App.tsx:1004
 msgid "Too many guests have joined from this network. Try again later, or sign in."
 msgstr "이 네트워크에서 손님이 너무 많이 참여했습니다. 나중에 다시 시도하거나 로그인해 주세요."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:137
-#: ../frontend/collaborate/components/SessionHeader.tsx:236
+#: ../frontend/collaborate/components/SessionHeader.tsx:292
 msgid "Try again"
 msgstr "다시 시도"
 
-#: ../frontend/collaborate/components/Chat.tsx:316
+#: ../frontend/collaborate/components/Chat.tsx:330
 msgid "Type a message..."
 msgstr "메시지 입력..."
 
@@ -387,7 +424,20 @@ msgstr "메시지 입력..."
 msgid "Unable to authenticate your session. Either the session doesn't exist, or it has expired. Please return to the lobby."
 msgstr "세션을 인증할 수 없습니다. 세션이 존재하지 않거나 만료되었습니다. 로비로 돌아가 주세요."
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:44
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:97
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:44
+msgid "Watch"
+msgstr "구경하기"
+
+#: ../frontend/collaborate/components/Chat.tsx:39
+msgid "watching"
+msgstr "구경 중"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:150
+msgid "Watching"
+msgstr "구경 중"
+
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:58
 msgid "What should the others call you?"
 msgstr "다른 사람들에게 뭐라고 불릴까요?"
 
@@ -395,10 +445,10 @@ msgstr "다른 사람들에게 뭐라고 불릴까요?"
 msgid "You'll be redirected to the post page shortly."
 msgstr "곧 게시물 페이지로 리디렉션됩니다."
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:59
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:73
 msgid "You'll be shown as a guest. If you sign in later, what you drew moves to your account."
 msgstr "손님으로 표시됩니다. 나중에 로그인하면 그린 것이 계정으로 옮겨집니다."
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:55
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:69
 msgid "Your name"
 msgstr "이름"

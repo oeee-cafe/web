@@ -157,7 +157,7 @@ pub async fn get_active_user_count(
         r#"
         SELECT COUNT(DISTINCT participant_id) as "count!"
         FROM collaborative_sessions_participants
-        WHERE session_id = $1 AND is_active = true
+        WHERE session_id = $1 AND is_active = true AND NOT is_spectator
         "#,
         room_uuid
     )
@@ -194,12 +194,13 @@ pub async fn track_participant_with_capacity_check(
         return Ok(false);
     }
 
-    // Check if user is already a participant (existing participants can always rejoin)
+    // Check if user is already a participant (existing participants can always
+    // rejoin). Somebody who has only watched holds no seat to come back to.
     let existing_participant = sqlx::query_scalar!(
         r#"
         SELECT EXISTS(
             SELECT 1 FROM collaborative_sessions_participants
-            WHERE session_id = $1 AND participant_id = $2
+            WHERE session_id = $1 AND participant_id = $2 AND NOT is_spectator
         )
         "#,
         room_uuid,
@@ -215,7 +216,7 @@ pub async fn track_participant_with_capacity_check(
             r#"
             SELECT COUNT(DISTINCT participant_id) as "count!"
             FROM collaborative_sessions_participants
-            WHERE session_id = $1 AND is_active = true
+            WHERE session_id = $1 AND is_active = true AND NOT is_spectator
             "#,
             room_uuid
         )
@@ -228,12 +229,102 @@ pub async fn track_participant_with_capacity_check(
         }
     }
 
-    // Add or reactivate the participant
+    // Add or reactivate the participant. Somebody who was watching moves up
+    // to drawing, for good: a drawer is credited on the post.
     sqlx::query!(
         r#"
         INSERT INTO collaborative_sessions_participants
-        (session_id, user_id, guest_id, is_active)
-        VALUES ($1, $2, $3, true)
+        (session_id, user_id, guest_id, is_active, is_spectator)
+        VALUES ($1, $2, $3, true, false)
+        ON CONFLICT (session_id, participant_id)
+        DO UPDATE SET is_active = true, left_at = NULL, is_spectator = false
+        "#,
+        room_uuid,
+        who.user_id(),
+        who.guest_id(),
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(true)
+}
+
+/// How many may watch a session at once. Watchers take no drawing seat, but
+/// each is a socket the room's every stroke is written to, so there is a
+/// number past which a popular room would cost the server more than it
+/// should for people who are only looking.
+pub const MAX_SPECTATORS: i64 = 50;
+
+/// Takes a place watching the room, where the owner allows watching and
+/// fewer than [`MAX_SPECTATORS`] already are. Somebody already in the room
+/// -- watching, or a drawer who has a seat -- is let back without asking
+/// either, the way the guest switch lets back a guest already inside: the
+/// owner closing the door shuts out new people, not somebody whose
+/// connection dropped. A drawer who watches keeps their seat and their row
+/// as a drawer's.
+pub async fn track_spectator(
+    db: &Pool<Postgres>,
+    room_uuid: Uuid,
+    who: &super::guest::Collaborator,
+) -> Result<bool, sqlx::Error> {
+    let mut tx = db.begin().await?;
+
+    let Some(session) = sqlx::query!(
+        r#"
+        SELECT allow_spectators
+        FROM collaborative_sessions
+        WHERE id = $1 AND ended_at IS NULL
+        FOR UPDATE
+        "#,
+        room_uuid
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    else {
+        tx.rollback().await?;
+        return Ok(false);
+    };
+
+    let already_in = sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM collaborative_sessions_participants
+            WHERE session_id = $1 AND participant_id = $2
+        ) AS "already_in!"
+        "#,
+        room_uuid,
+        who.id()
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+
+    if !already_in {
+        if !session.allow_spectators {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+        let watching = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) AS "count!"
+            FROM collaborative_sessions_participants
+            WHERE session_id = $1 AND is_active AND is_spectator
+            "#,
+            room_uuid
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if watching >= MAX_SPECTATORS {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+    }
+
+    sqlx::query!(
+        r#"
+        INSERT INTO collaborative_sessions_participants
+        (session_id, user_id, guest_id, is_active, is_spectator)
+        VALUES ($1, $2, $3, true, true)
         ON CONFLICT (session_id, participant_id)
         DO UPDATE SET is_active = true, left_at = NULL
         "#,
@@ -458,7 +549,7 @@ pub async fn save_session_to_post(
         FROM collaborative_sessions_participants csp
         LEFT JOIN users u ON csp.user_id = u.id
         LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
-        WHERE csp.session_id = $1
+        WHERE csp.session_id = $1 AND NOT csp.is_spectator
         ORDER BY csp.joined_at ASC
         "#,
         session_id

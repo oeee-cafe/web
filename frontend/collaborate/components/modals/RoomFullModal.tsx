@@ -8,6 +8,8 @@ export interface RoomFullModalProps {
   maxUsers: number;
   onGoToLobby: () => void;
   onRetry: () => void;
+  /** Watch instead, where the owner allows it. */
+  onWatch?: () => void;
 }
 
 export const RoomFullModal = ({
@@ -16,6 +18,7 @@ export const RoomFullModal = ({
   maxUsers,
   onGoToLobby,
   onRetry,
+  onWatch,
 }: RoomFullModalProps) => {
   return (
     <ModalWrapper
@@ -36,6 +39,11 @@ export const RoomFullModal = ({
         <button onClick={onRetry} className={NEO_BUTTON}>
           <Trans>Retry</Trans>
         </button>
+        {onWatch && (
+          <button onClick={onWatch} className={NEO_BUTTON}>
+            <Trans>Watch</Trans>
+          </button>
+        )}
       </div>
     </ModalWrapper>
   );

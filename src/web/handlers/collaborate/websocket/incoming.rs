@@ -81,6 +81,17 @@ pub(super) async fn handle_incoming_messages(
             }
         }
 
+        // Somebody watching says who they are and talks, and that is all: a
+        // mark, a cursor, a checkpoint or its offer from them is dropped
+        // before anything reads it.
+        if ctx.spectating && !matches!(data[0], 0x01 | 0x03) {
+            debug!(
+                "Dropping 0x{:02x} from spectator connection {} in room {}",
+                data[0], ctx.connection_id, ctx.room_uuid
+            );
+            continue;
+        }
+
         // The author of a mark is the server's to decide, not the sender's.
         if let Some(claimed) = protocol::enforce_origin(&mut data, ctx.session_user_id) {
             warn!(
@@ -249,7 +260,15 @@ async fn process_server_message(
             // no name -- and every client's decoder refuses a JOIN shorter
             // than 28, so re-broadcasting those meant nobody was ever told who
             // joined. JOIN is ephemeral: broadcast, never stored.
-            messages::handle_join_message(data, ctx.who, ctx.room_uuid, ctx.db, ctx.state).await
+            messages::handle_join_message(
+                data,
+                ctx.who,
+                ctx.flags,
+                ctx.room_uuid,
+                ctx.db,
+                ctx.state,
+            )
+            .await
         }
         0x02 => {
             // A snapshot is a layer of a checkpoint, and a checkpoint arrives
@@ -263,7 +282,7 @@ async fn process_server_message(
             );
             None
         }
-        0x03 => messages::handle_chat_message(data, ctx.who),
+        0x03 => messages::handle_chat_message(data, ctx.who, ctx.flags),
         0x04 => {
             // An answer to a checkpoint query. It is between this connection
             // and the server; nobody else in the room needs to hear it.

@@ -20,6 +20,7 @@ interface ChatMessage {
   userId: string;
   username: string;
   isGuest?: boolean;
+  isSpectator?: boolean;
   message: string;
   timestamp: number;
 }
@@ -28,8 +29,16 @@ interface Participant {
   userId: string;
   username: string;
   isGuest?: boolean;
+  isSpectator?: boolean;
   joinedAt: number;
 }
+
+/** Beside the name of somebody watching rather than drawing. */
+const WatchingBadge = () => (
+  <span className="ml-[2px] text-[9px] font-normal opacity-80">
+    <Trans>watching</Trans>
+  </span>
+);
 
 /**
  * Beside a name somebody without an account chose. The name may be anything,
@@ -57,6 +66,7 @@ interface ChatProps {
       userId: string;
       username: string;
       isGuest: boolean;
+      isSpectator: boolean;
       message: string;
       timestamp: number;
     }) => void
@@ -242,6 +252,7 @@ export const Chat = ({
                 >
                   {participant.username}
                   {participant.isGuest && <GuestBadge />}
+                  {participant.isSpectator && <WatchingBadge />}
                   {onRemove && participant.userId !== userId && (
                     <button
                       type="button"
@@ -275,7 +286,9 @@ export const Chat = ({
                   msg.type === "leave" ? (
                     <div className="text-[11px] leading-[14px] italic opacity-80">
                       {msg.type === "join"
-                        ? `${msg.username} joined`
+                        ? msg.isSpectator
+                          ? `${msg.username} is watching`
+                          : `${msg.username} joined`
                         : msg.type === "leave"
                         ? `${msg.username} left the session`
                         : msg.message}
@@ -285,6 +298,7 @@ export const Chat = ({
                       <span className="shrink-0" style={getUserStyle(msg.username)}>
                         {msg.username}
                         {msg.isGuest && <GuestBadge />}
+                        {msg.isSpectator && <WatchingBadge />}
                       </span>
                       <span className="shrink-0 text-[10px] leading-[12px] opacity-70">
                         {formatTime(msg.timestamp)}

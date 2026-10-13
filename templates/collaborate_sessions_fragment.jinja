@@ -19,6 +19,9 @@
        one, for everyone but the people already in it: the capacity check lets
        them back in, and turns anyone else away at the socket. #}
     {% set joinable = not (session.is_full and not session.viewer_is_participant and not session.is_owner) %}
+    {# Full, and open to watching: the card's way in is a place watching,
+       and the room offers a seat once one frees. #}
+    {% set watchable = not joinable and session.spectators_welcome %}
     <div class="session-card{% if not joinable %} is-full{% endif %}">
       {# What the canvas looks like right now, uploaded by whoever is drawing
          in it -- the server cannot render one. Until the first stroke brings
@@ -48,6 +51,8 @@
         <div class="session-title">
           {% if joinable %}
             <a class="session-card-link" href="/collaborate/{{ session.id }}" title="{{ ftl_get_message("collaborate-join-session") }}">{{ session.title or ftl_get_message("post-no-title") }}</a>
+          {% elif watchable %}
+            <a class="session-card-link" href="/collaborate/{{ session.id }}?watch=1" title="{{ ftl_get_message("collaborate-watch-session") }}">{{ session.title or ftl_get_message("post-no-title") }}</a>
           {% else %}
             <span>{{ session.title or ftl_get_message("post-no-title") }}</span>
           {% endif %}
@@ -76,7 +81,7 @@
         {% if session.is_full or (show_visibility and not session.is_public) or accounts_only %}
           <div class="session-badges">
             {% if session.is_full %}
-              <span class="community-card-badge session-full">{{ ftl_get_message("collaborate-session-full") }}</span>
+              <span class="community-card-badge session-full">{{ ftl_get_message("collaborate-session-full") }}{% if watchable %} · {{ ftl_get_message("collaborate-watch-session") }}{% endif %}</span>
             {% endif %}
             {# Only the owner's own list needs this: everything in the public
                list is public by definition. #}

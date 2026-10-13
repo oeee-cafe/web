@@ -364,7 +364,7 @@ describe("a live session", () => {
     const page = await live();
     await page.receive(layers("aaaaaaaa-0000-4000-8000-000000000003", 3, "miro", FLAG_GUEST));
     expect(page.calledWith("addParticipant")).toEqual([
-      'addParticipant("aaaaaaaa-0000-4000-8000-000000000003","miro",1000,3,true)',
+      'addParticipant("aaaaaaaa-0000-4000-8000-000000000003","miro",1000,3,true,false)',
     ]);
   });
 
@@ -373,7 +373,7 @@ describe("a live session", () => {
     await page.receive(layers("aaaaaaaa-0000-4000-8000-000000000002", 2, "bob"));
     expect(page.calledWith("clearParticipants")).toHaveLength(1);
     expect(page.calledWith("addParticipant")).toEqual([
-      'addParticipant("aaaaaaaa-0000-4000-8000-000000000002","bob",1000,2,false)',
+      'addParticipant("aaaaaaaa-0000-4000-8000-000000000002","bob",1000,2,false,false)',
     ]);
     await page.receive(sequenced(1, stroke(2, { x: 20, y: 30 })));
     expect(page.calledWith("createOrUpdateCursor")).toEqual(['createOrUpdateCursor("2",23,30,"bob")']);

@@ -515,8 +515,8 @@ async fn find_collaborative_sessions(
             cs.last_activity,
             cs.ended_at,
             cs.saved_post_id,
-            COUNT(csp.participant_id) FILTER (WHERE csp.is_active) AS "active_participant_count!",
-            COUNT(csp.participant_id) AS "total_participant_count!",
+            COUNT(csp.participant_id) FILTER (WHERE csp.is_active AND NOT csp.is_spectator) AS "active_participant_count!",
+            COUNT(csp.participant_id) FILTER (WHERE NOT csp.is_spectator) AS "total_participant_count!",
             r.session_id AS "recorded?",
             r.first_seq AS "first_seq?",
             r.last_seq AS "last_seq?",
@@ -604,6 +604,8 @@ pub struct AdminSessionParticipant {
     pub display_name: String,
     /// No account and no profile, only the name.
     pub is_guest: bool,
+    /// Only ever watched; drew nothing.
+    pub is_spectator: bool,
     pub joined_at: chrono::NaiveDateTime,
     pub left_at: Option<chrono::NaiveDateTime>,
     pub is_active: bool,
@@ -622,6 +624,7 @@ pub async fn find_collaborative_session_participants(
             COALESCE(u.login_name, g.nickname) AS "login_name!",
             COALESCE(u.display_name, g.nickname) AS "display_name!",
             csp.guest_id IS NOT NULL AS "is_guest!",
+            csp.is_spectator,
             csp.joined_at,
             csp.left_at,
             csp.is_active

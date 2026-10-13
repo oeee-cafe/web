@@ -167,6 +167,7 @@ pub async fn get_collaboration_meta(
                COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
                cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
                cs.allow_guests,
+               cs.allow_spectators,
                (c.id IS NULL OR c.visibility = 'public') AS "community_admits_guests!"
         FROM collaborative_sessions cs
         LEFT JOIN users u ON cs.owner_id = u.id
@@ -200,6 +201,7 @@ pub async fn get_collaboration_meta(
         owner_is_guest: session.owner_is_guest,
         guests_welcome: session.allow_guests && session.community_admits_guests,
         allow_guests: session.allow_guests,
+        allow_spectators: session.allow_spectators,
         community_admits_guests: session.community_admits_guests,
         max_users: session.max_participants,
         current_user_count: user_count,
@@ -234,6 +236,7 @@ async fn find_public_sessions(
             COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
             cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.allow_guests AND (cs.community_id IS NULL OR c.visibility = 'public') AS "guests_welcome!",
+            cs.allow_spectators,
             cs.title,
             cs.width,
             cs.height,
@@ -242,7 +245,7 @@ async fn find_public_sessions(
             cs.is_public,
             c.name AS "community_name?",
             c.slug AS "community_slug?",
-            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true), 0) AS "participant_count!",
+            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND NOT csp.is_spectator), 0) AS "participant_count!",
             -- COALESCE, not a bare comparison: $1 is NULL for a visitor who
             -- is not even a guest, and NULL decoded into a non-null bool
             -- fails the query.
@@ -274,6 +277,7 @@ async fn find_public_sessions(
             owner_login_name: row.owner_login_name,
             owner_is_guest: row.owner_is_guest,
             guests_welcome: row.guests_welcome,
+            spectators_welcome: row.allow_spectators,
             title: row.title,
             width: row.width,
             height: row.height,
@@ -306,6 +310,7 @@ async fn find_viewer_sessions(
             COALESCE(u.login_name, g.nickname) AS "owner_login_name!",
             cs.owner_guest_id IS NOT NULL AS "owner_is_guest!",
             cs.allow_guests AND (cs.community_id IS NULL OR c.visibility = 'public') AS "guests_welcome!",
+            cs.allow_spectators,
             cs.title,
             cs.width,
             cs.height,
@@ -314,7 +319,7 @@ async fn find_viewer_sessions(
             cs.is_public,
             c.name AS "community_name?",
             c.slug AS "community_slug?",
-            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true), 0) AS "participant_count!",
+            COALESCE(COUNT(DISTINCT csp.participant_id) FILTER (WHERE csp.is_active = true AND NOT csp.is_spectator), 0) AS "participant_count!",
             cs.owner_participant_id = $1 AS "is_owner!",
             COUNT(*) FILTER (WHERE csp.participant_id = $1 AND csp.is_active = true) > 0 AS "viewer_is_participant!"
         FROM collaborative_sessions cs
@@ -343,6 +348,7 @@ async fn find_viewer_sessions(
             owner_login_name: row.owner_login_name,
             owner_is_guest: row.owner_is_guest,
             guests_welcome: row.guests_welcome,
+            spectators_welcome: row.allow_spectators,
             title: row.title,
             width: row.width,
             height: row.height,
@@ -616,6 +622,8 @@ pub struct CreateSessionForm {
     community_id: Option<String>,
     /// Present when the box is ticked. The form starts it ticked.
     allow_guests: Option<String>,
+    /// Present when the box is ticked. The form starts it ticked.
+    allow_spectators: Option<String>,
     /// What somebody without an account will be called. Ignored for an
     /// account.
     nickname: Option<String>,
@@ -684,6 +692,7 @@ pub async fn create_collaborative_session_form(
         max_participants: form.max_participants,
         community_id: form.community_id,
         allow_guests: form.allow_guests.is_some(),
+        allow_spectators: form.allow_spectators.is_some(),
     };
     let session_id = insert_session(&state, &who, request).await?;
     let url = format!("/collaborate/{}", session_id);
@@ -747,8 +756,8 @@ pub(crate) async fn insert_session(
         r#"
         INSERT INTO collaborative_sessions
         (id, owner_id, owner_guest_id, title, width, height, is_public, community_id,
-         max_participants, allow_guests)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         max_participants, allow_guests, allow_spectators)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         "#,
         session_id,
         owner.user_id(),
@@ -760,6 +769,7 @@ pub(crate) async fn insert_session(
         community_id,
         request.max_participants,
         request.allow_guests,
+        request.allow_spectators,
     )
     .execute(&mut *tx)
     .await?;
@@ -996,6 +1006,31 @@ pub async fn set_collaboration_guests(
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
+/// POST /collaborate/{uuid}/spectators: the owner lets people watch, or stops
+/// letting new ones, while the session is open. Somebody already watching
+/// stays, and may come back after a dropped connection (`track_spectator`);
+/// one the owner wants gone is banned.
+pub async fn set_collaboration_spectators(
+    Path(session_uuid): Path<Uuid>,
+    auth_session: AuthSession,
+    session: Session,
+    State(state): State<AppState>,
+    Json(switch): Json<GuestsSwitch>,
+) -> Result<Response, AppError> {
+    room_owner(&state, &auth_session, &session, session_uuid).await?;
+    let changed = sqlx::query!(
+        "UPDATE collaborative_sessions SET allow_spectators = $2 WHERE id = $1 AND ended_at IS NULL",
+        session_uuid,
+        switch.allow,
+    )
+    .execute(&state.db_pool)
+    .await?;
+    if changed.rows_affected() == 0 {
+        return Err(AppError::NotFound("Session".to_string()));
+    }
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
 #[derive(serde::Deserialize)]
 pub struct DiscordJoin {
     #[serde(default)]
@@ -1124,6 +1159,7 @@ mod tests {
             "is_full": false,
             "is_public": true,
             "guests_welcome": true,
+            "spectators_welcome": true,
             "community_name": "Open Studio",
             "community_slug": "open",
             "is_owner": false,
@@ -1370,7 +1406,7 @@ mod tests {
             .render(lobby_context(true, vec![]))
             .expect("renders signed in");
         assert!(rendered.contains("class=\"session-form\""));
-        assert_eq!(rendered.matches("class=\"field-help\"").count(), 3);
+        assert_eq!(rendered.matches("class=\"field-help\"").count(), 4);
         // Every control still ships — tidying must not drop a field.
         for id in [
             "canvas-size",
@@ -1378,6 +1414,7 @@ mod tests {
             "max-participants",
             "is-public",
             "allow-guests",
+            "allow-spectators",
             "session-community",
         ] {
             assert!(rendered.contains(&format!("id=\"{id}\"")), "{id} missing");
@@ -1587,6 +1624,7 @@ mod tests {
                 vec![sample_session(json!({
                     "participant_count": 4,
                     "is_full": true,
+                    "spectators_welcome": false,
                 }))],
                 vec![],
             ))
@@ -1594,6 +1632,30 @@ mod tests {
         assert!(rendered.contains("4 / 4"));
         assert!(rendered.contains("collaborate-session-full"));
         assert!(!rendered.contains("/collaborate/00000000-0000-0000-0000-000000000009"));
+    }
+
+    /// A full room that can be watched is still a way in: to watch, with a
+    /// seat offered once one frees.
+    #[test]
+    fn a_full_session_that_can_be_watched_links_to_watching() {
+        let env = test_support::env();
+        let template = env
+            .get_template("collaborate_lobby.jinja")
+            .expect("template loads");
+        let rendered = template
+            .render(lobby_context_with_sessions(
+                false,
+                vec![],
+                vec![sample_session(json!({
+                    "participant_count": 4,
+                    "is_full": true,
+                }))],
+                vec![],
+            ))
+            .expect("renders");
+        assert!(rendered
+            .contains(r#"href="/collaborate/00000000-0000-0000-0000-000000000009?watch=1""#));
+        assert!(rendered.contains("collaborate-session-full · collaborate-watch-session"));
     }
 
     #[test]

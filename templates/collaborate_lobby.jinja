@@ -144,6 +144,14 @@
               <p class="field-help">{{ ftl_get_message("collaborate-allow-guests-description") }}</p>
             </div>
 
+            <div class="field field-wide">
+              <label class="checkbox-label" for="allow-spectators">
+                <input type="checkbox" id="allow-spectators" name="allow_spectators" checked>
+                {{ ftl_get_message("collaborate-allow-spectators-label") }}
+              </label>
+              <p class="field-help">{{ ftl_get_message("collaborate-allow-spectators-description") }}</p>
+            </div>
+
             <div class="field field-wide form-actions session-form-actions">
               <button type="button" class="ds-button" onclick="toggleSessionDialog(false)">{{ ftl_get_message("cancel") }}</button>
               <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("collaborate-create-button") }}</button>

@@ -296,6 +296,9 @@ collaborate-sign-in-instead = 改为登录
 collaborate-guest-community-hint = 访客只能选择公开社区。
 collaborate-allow-guests-label = 允许没有账号的人加入
 collaborate-allow-guests-description = 访客自己取名，名字出现的地方都会标明是访客。
+collaborate-watch-session = 观看
+collaborate-allow-spectators-label = 允许只观看不绘画
+collaborate-allow-spectators-description = 他们不占座位，可以实时观看绘画并聊天。你可以随时移出观看者。
 
 welcome = 欢迎，{ $name }！
 

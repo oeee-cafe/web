@@ -27,7 +27,7 @@ use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use uuid::Uuid;
 
-use super::guest::{Collaborator, FLAG_GUEST};
+use super::guest::{Collaborator, FLAG_GUEST, FLAG_SPECTATOR};
 use super::messages;
 use super::protocol_integration_tests::{redis_pool, start_redis, RedisProcess};
 use super::redis_state::RedisStateManager;
@@ -99,6 +99,17 @@ impl Room {
     async fn connect_as(&self, participant: Uuid, ip: &str) -> Socket {
         let (socket, _) = connect_async(format!(
             "{}/ws/{}/{}?ip={}",
+            self.url, self.room, participant, ip
+        ))
+        .await
+        .expect("the handler accepts the upgrade");
+        socket
+    }
+
+    /// Watches the room as `participant`, as `?spectate=1` asks to.
+    async fn watch_as(&self, participant: Uuid, ip: &str) -> Socket {
+        let (socket, _) = connect_async(format!(
+            "{}/ws/{}/{}?ip={}&spectate=1",
             self.url, self.room, participant, ip
         ))
         .await
@@ -208,7 +219,8 @@ async fn upgrade(
         },
     };
     let ip = query.get("ip").cloned();
-    ws.on_upgrade(move |socket| handle_socket(socket, room, state, who, ip, resume))
+    let spectate = query.get("spectate").is_some_and(|value| value == "1");
+    ws.on_upgrade(move |socket| handle_socket(socket, room, state, who, ip, spectate, resume))
 }
 
 fn test_config(db_url: &str, redis_url: &str) -> AppConfig {
@@ -1379,6 +1391,180 @@ async fn closing_the_door_to_guests_keeps_out_new_ones_only() {
         let mut late = room.connect_as(newcomer, "198.51.100.1").await;
         let refused = next_close(&mut late).await.expect("a close, not a welcome");
         assert_eq!(u16::from(refused.code), 1008);
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+fn chat_frame(sender: Uuid, message: &str) -> Vec<u8> {
+    let mut frame = vec![0x03];
+    frame.extend_from_slice(sender.as_bytes());
+    frame.extend_from_slice(&1_700_000_000_000u64.to_le_bytes());
+    frame.extend_from_slice(&(message.len() as u16).to_le_bytes());
+    frame.extend_from_slice(message.as_bytes());
+    frame
+}
+
+/// Somebody watches a room with no seat left: no seat taken and no id to
+/// draw under, their drawing dropped before anybody sees it, their chat
+/// heard and marked as a spectator's, and the roster saying they watch.
+#[tokio::test]
+async fn a_spectator_watches_a_full_room_and_talks_but_cannot_draw() {
+    let Some(room) = open_room(1).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        opening(&mut alice).await;
+
+        let watcher = room.users[1];
+        let mut bob = room.watch_as(watcher, "203.0.113.7").await;
+        let (bob_id, _) = opening(&mut bob).await;
+        assert_eq!(bob_id, 0, "no id to draw under");
+        assert_eq!(
+            sqlx::query_scalar!(
+                "SELECT COUNT(*) AS \"n!\" FROM collaborative_sessions_participants WHERE session_id = $1 AND is_active AND NOT is_spectator",
+                room.room
+            )
+            .fetch_one(&room.db)
+            .await
+            .expect("count"),
+            1,
+            "the one seat is still Alice's"
+        );
+
+        send(&mut bob, join_frame(watcher)).await;
+        let mut joined = None;
+        let mut roster = None;
+        while joined.is_none() || roster.is_none() {
+            let frame = next_frame(&mut alice, "the spectator's JOIN and the roster").await;
+            match frame[0] {
+                JOIN => joined = Some(frame),
+                LAYERS if roster_of(&frame).len() == 2 => roster = Some(frame),
+                _ => {}
+            }
+        }
+        assert_eq!(person_in(&joined.unwrap()).1, FLAG_SPECTATOR);
+        let roster = roster_of(&roster.unwrap());
+        assert_eq!((roster[1].0, roster[1].1, roster[1].2), (watcher, 0, FLAG_SPECTATOR));
+
+        // A fill from the spectator never reaches history; a chat does.
+        send(&mut bob, fill(0, 10)).await;
+        send(&mut bob, chat_frame(watcher, "lovely")).await;
+        let chat = next_of_type(&mut alice, 0x03).await;
+        assert_eq!(chat[25], FLAG_SPECTATOR);
+        send(&mut alice, fill(1, 12)).await;
+        let (_, seq, _) = {
+            let frame = next_of_type(&mut alice, SEQUENCED).await;
+            let (history, seq, payload) = sequenced(&frame);
+            (history, seq, payload.to_vec())
+        };
+        assert_eq!(seq, 1, "the spectator's fill took no place in history");
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// A spectator moves up to drawing once a seat frees, and the room counts
+/// them as a drawer from then on.
+#[tokio::test]
+async fn a_spectator_takes_a_seat_once_one_frees() {
+    let Some(room) = open_room(1).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        opening(&mut alice).await;
+        let watcher = room.users[1];
+        let mut bob = room.watch_as(watcher, "203.0.113.7").await;
+        opening(&mut bob).await;
+
+        // Full: asking to draw is refused.
+        let mut drawing = room.connect(1, None).await;
+        let refused = next_close(&mut drawing).await.expect("a close, not a welcome");
+        assert_eq!(u16::from(refused.code), 1008);
+
+        alice.close(None).await.expect("close");
+        for _ in 0..50 {
+            if room.active_participants().await == vec![watcher] {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        bob.close(None).await.expect("close");
+        let mut drawing = room.connect(1, None).await;
+        let (seat, _) = opening(&mut drawing).await;
+        assert_ne!(seat, 0, "a seat, and an id to draw under");
+        let is_spectator = sqlx::query_scalar!(
+            "SELECT is_spectator FROM collaborative_sessions_participants WHERE session_id = $1 AND participant_id = $2",
+            room.room,
+            watcher
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("row");
+        assert!(!is_spectator, "a drawer now, credited as one");
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// The owner's switch: new spectators are turned away, somebody already
+/// watching is not shut out by a dropped connection, and a full set of
+/// spectators turns the next one away as well.
+#[tokio::test]
+async fn watching_is_the_owners_to_allow_and_has_a_ceiling() {
+    let Some(mut room) = open_room(4).await else {
+        return;
+    };
+    let early = room.add_guest("early").await;
+    let late = room.add_guest("late").await;
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut first = room.watch_as(early, "203.0.113.7").await;
+        opening(&mut first).await;
+
+        sqlx::query!(
+            "UPDATE collaborative_sessions SET allow_spectators = false WHERE id = $1",
+            room.room
+        )
+        .execute(&room.db)
+        .await
+        .expect("stop watching");
+        first.close(None).await.expect("close");
+        let mut again = room.watch_as(early, "203.0.113.7").await;
+        opening(&mut again).await;
+        let mut refused = room.watch_as(late, "198.51.100.1").await;
+        let goodbye = next_close(&mut refused).await.expect("a close, not a welcome");
+        assert_eq!(u16::from(goodbye.code), 1008);
+
+        // Open again, but every place taken.
+        sqlx::query!(
+            "UPDATE collaborative_sessions SET allow_spectators = true WHERE id = $1",
+            room.room
+        )
+        .execute(&room.db)
+        .await
+        .expect("allow watching");
+        let mut fillers = Vec::new();
+        for i in 0..super::db::MAX_SPECTATORS - 1 {
+            fillers.push(room.add_guest(&format!("watcher {i}")).await);
+        }
+        for filler in &fillers {
+            sqlx::query!(
+                "INSERT INTO collaborative_sessions_participants (session_id, guest_id, is_active, is_spectator) VALUES ($1, $2, true, true)",
+                room.room,
+                filler
+            )
+            .execute(&room.db)
+            .await
+            .expect("a watcher");
+        }
+        let mut one_too_many = room.watch_as(late, "198.51.100.1").await;
+        let goodbye = next_close(&mut one_too_many).await.expect("a close, not a welcome");
+        assert_eq!(u16::from(goodbye.code), 1008);
     })
     .await;
     room.teardown().await;

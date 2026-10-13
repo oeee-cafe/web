@@ -411,9 +411,12 @@ pub fn is_client_message(msg_type: u8) -> bool {
 
 // bytes_to_uuid is already available from utils module via import
 
+/// `flags` is the joiner's: their identity's and their role's
+/// (`SessionContext::flags`).
 pub async fn handle_join_message(
     data: &[u8],
     who: &Collaborator,
+    flags: u8,
     room_uuid: Uuid,
     db: &Pool<Postgres>,
     state: &AppState,
@@ -443,7 +446,7 @@ pub async fn handle_join_message(
     let join_message = JoinMessage {
         user_id,
         timestamp,
-        flags: who.flags(),
+        flags,
         username: user_login_name.to_string(),
     };
 
@@ -470,6 +473,7 @@ async fn get_session_participants(
         SELECT csp.participant_id,
                COALESCE(u.login_name, g.nickname) AS "name!",
                csp.guest_id IS NOT NULL AS "is_guest!",
+               csp.is_spectator,
                csp.joined_at
         FROM collaborative_sessions_participants csp
         LEFT JOIN users u ON csp.user_id = u.id
@@ -489,6 +493,10 @@ async fn get_session_participants(
             session_id: 0,
             flags: if row.is_guest {
                 super::guest::FLAG_GUEST
+            } else {
+                0
+            } | if row.is_spectator {
+                super::guest::FLAG_SPECTATOR
             } else {
                 0
             },
@@ -583,7 +591,7 @@ async fn broadcast_layers(_db: &Pool<Postgres>, room_uuid: Uuid, state: &AppStat
 // JOIN and LEAVE messages are ephemeral (not stored in history)
 // Current participants are communicated via JOIN_RESPONSE messages
 
-pub fn handle_chat_message(data: &[u8], who: &Collaborator) -> Option<Message> {
+pub fn handle_chat_message(data: &[u8], who: &Collaborator, flags: u8) -> Option<Message> {
     let user_id = who.id();
     let user_login_name = who.name();
     if data.len() < 27 {
@@ -619,7 +627,7 @@ pub fn handle_chat_message(data: &[u8], who: &Collaborator) -> Option<Message> {
     let chat_message = ChatMessage {
         user_id,
         timestamp,
-        flags: who.flags(),
+        flags,
         username: user_login_name.to_string(),
         message: chat_text.to_string(),
     };
@@ -954,6 +962,7 @@ pub async fn send_leave_message(
     room_uuid: Uuid,
     connection_id: &str,
     who: &Collaborator,
+    flags: u8,
     state: &AppState,
 ) {
     let user_id = who.id();
@@ -985,7 +994,7 @@ pub async fn send_leave_message(
     let leave_message = LeaveMessage {
         user_id,
         timestamp,
-        flags: who.flags(),
+        flags,
         username: user_login_name.to_string(),
     };
 

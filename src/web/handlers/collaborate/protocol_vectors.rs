@@ -10,7 +10,7 @@
 use serde_json::Value;
 use uuid::Uuid;
 
-use super::guest::{Collaborator, FLAG_GUEST};
+use super::guest::{Collaborator, FLAG_GUEST, FLAG_SPECTATOR};
 use super::messages::{
     caught_up_frame, end_session_frame, handle_chat_message, replay_start_frame, reset_point_frame,
     welcome_frame, ChatMessage, JoinMessage, LayersMessage, LeaveMessage, PresentParticipant,
@@ -44,13 +44,16 @@ fn number(value: &Value) -> u64 {
     value.as_u64().expect("a number")
 }
 
-/// The flags byte a vector's `isGuest` stands for.
+/// The flags byte a vector's `isGuest` and `isSpectator` stand for.
 fn flags(value: &Value) -> u8 {
-    if value["isGuest"].as_bool().expect("isGuest") {
-        FLAG_GUEST
-    } else {
-        0
-    }
+    let bit = |field: &str, flag: u8| {
+        if value[field].as_bool().expect(field) {
+            flag
+        } else {
+            0
+        }
+    };
+    bit("isGuest", FLAG_GUEST) | bit("isSpectator", FLAG_SPECTATOR)
 }
 
 /// What this server writes for the frame a vector describes, built from the
@@ -164,7 +167,7 @@ fn the_server_reads_the_chat_the_client_sends() {
         id: sender,
         nickname: "oeee".to_string(),
     };
-    let relayed = handle_chat_message(&bytes(chat), &guest).expect("accepted");
+    let relayed = handle_chat_message(&bytes(chat), &guest, guest.flags()).expect("accepted");
     let axum::extract::ws::Message::Binary(relayed) = relayed else {
         panic!("a binary frame");
     };
@@ -180,7 +183,7 @@ fn the_server_reads_the_chat_the_client_sends() {
         login_name: "someone".to_string(),
     };
     assert!(
-        handle_chat_message(&bytes(chat), &someone_else).is_none(),
+        handle_chat_message(&bytes(chat), &someone_else, someone_else.flags()).is_none(),
         "a chat claiming another sender is dropped"
     );
 }

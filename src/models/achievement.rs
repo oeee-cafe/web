@@ -68,6 +68,7 @@ pub async fn award_achievements(tx: &mut Transaction<'_, Postgres>, user_id: Uui
                         SELECT 1 FROM collaborative_sessions_participants participants
                         WHERE participants.session_id = sessions.id
                           AND participants.user_id = $1
+                          AND NOT participants.is_spectator
                     )
                   )
             )
@@ -240,7 +241,7 @@ pub async fn award_achievements_for_session(
     let drew = query!(
         r#"
         SELECT DISTINCT user_id AS "user_id!" FROM collaborative_sessions_participants
-        WHERE session_id = $1 AND user_id IS NOT NULL
+        WHERE session_id = $1 AND user_id IS NOT NULL AND NOT is_spectator
         UNION
         SELECT owner_id FROM collaborative_sessions WHERE id = $1 AND owner_id IS NOT NULL
         "#,

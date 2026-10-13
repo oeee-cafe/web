@@ -12,6 +12,9 @@ pub struct CreateSessionRequest {
     /// Whether people without an account may come in. On unless the owner
     /// turned it off.
     pub allow_guests: bool,
+    /// Whether people may watch without drawing. On unless the owner turned
+    /// it off.
+    pub allow_spectators: bool,
 }
 
 #[derive(Serialize)]
@@ -32,6 +35,9 @@ pub struct SessionWithCounts {
     /// guests and the community, if any, is public. A card that says no
     /// spares a signed-out visitor a click that ends at the sign-in page.
     pub guests_welcome: bool,
+    /// Whether the session can be watched: what a full card offers instead
+    /// of a seat.
+    pub spectators_welcome: bool,
     pub title: Option<String>,
     pub width: i32,
     pub height: i32,
@@ -101,6 +107,9 @@ pub struct CollaborationMeta {
     /// The owner's switch on its own, which they may flip mid-session.
     #[serde(rename = "allowGuests")]
     pub allow_guests: bool,
+    /// The owner's switch for watching without drawing.
+    #[serde(rename = "allowSpectators")]
+    pub allow_spectators: bool,
     /// Whether the community would let guests in at all: none, or a public
     /// one. Where it would not, the owner's switch changes nothing, and the
     /// page does not offer it.

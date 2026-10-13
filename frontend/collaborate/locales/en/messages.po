@@ -13,11 +13,11 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
+#: ../frontend/collaborate/components/SessionHeader.tsx:175
 msgid "(guest)"
 msgstr "(guest)"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:224
+#: ../frontend/collaborate/components/SessionHeader.tsx:280
 msgid "{name} asks to join"
 msgstr "{name} asks to join"
 
@@ -25,8 +25,8 @@ msgstr "{name} asks to join"
 msgid "Authentication Failed"
 msgstr "Authentication Failed"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:153
-#: ../frontend/collaborate/components/SessionHeader.tsx:157
+#: ../frontend/collaborate/components/SessionHeader.tsx:175
+#: ../frontend/collaborate/components/SessionHeader.tsx:179
 msgid "by"
 msgstr "by"
 
@@ -34,7 +34,7 @@ msgstr "by"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: ../frontend/collaborate/App.tsx:962
+#: ../frontend/collaborate/App.tsx:1003
 msgid "Choose a name of 1 to 30 characters, without hidden characters."
 msgstr "Choose a name of 1 to 30 characters, without hidden characters."
 
@@ -50,11 +50,11 @@ msgstr "Connect Discord"
 msgid "Connect Discord once to see your friends here and invite them to this session."
 msgstr "Connect Discord once to see your friends here and invite them to this session."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:128
+#: ../frontend/collaborate/components/SessionHeader.tsx:144
 msgid "Connected"
 msgstr "Connected"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:134
+#: ../frontend/collaborate/components/SessionHeader.tsx:156
 msgid "Connecting"
 msgstr "Connecting"
 
@@ -71,26 +71,30 @@ msgstr "Connecting..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "Connection lost. Your work is saved locally."
 
-#: ../frontend/collaborate/App.tsx:1136
+#: ../frontend/collaborate/App.tsx:1210
 msgid "Couldn't change who can join. Please try again."
 msgstr "Couldn't change who can join. Please try again."
 
-#: ../frontend/collaborate/App.tsx:964
-#: ../frontend/collaborate/App.tsx:971
+#: ../frontend/collaborate/App.tsx:1113
+msgid "Couldn't change who can watch. Please try again."
+msgstr "Couldn't change who can watch. Please try again."
+
+#: ../frontend/collaborate/App.tsx:1005
+#: ../frontend/collaborate/App.tsx:1012
 msgid "Couldn't join. Please try again."
 msgstr "Couldn't join. Please try again."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:222
+#: ../frontend/collaborate/components/SessionHeader.tsx:278
 msgid "Couldn’t let {name} in"
 msgstr "Couldn’t let {name} in"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1156
+#: ../frontend/collaborate/App.tsx:1230
 msgid "Couldn't remove {0}. Please try again."
 msgstr "Couldn't remove {0}. Please try again."
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:64
-#: ../frontend/collaborate/components/SessionHeader.tsx:140
+#: ../frontend/collaborate/components/SessionHeader.tsx:162
 msgid "Disconnected"
 msgstr "Disconnected"
 
@@ -103,29 +107,37 @@ msgstr "Discord friends"
 msgid "Download PNG"
 msgstr "Download PNG"
 
-#: ../frontend/collaborate/components/Chat.tsx:41
+#: ../frontend/collaborate/components/Chat.tsx:50
 msgid "Drawing without an account"
 msgstr "Drawing without an account"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:252
+msgid "Every seat is taken. You can draw once one frees."
+msgstr "Every seat is taken. You can draw once one frees."
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:69
 msgid "Failed to save session. Please try downloading as PNG instead."
 msgstr "Failed to save session. Please try downloading as PNG instead."
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:253
+msgid "Give up your seat and watch"
+msgstr "Give up your seat and watch"
+
 #: ../frontend/collaborate/components/modals/AuthErrorModal.tsx:23
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:34
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:37
 msgid "Go to Lobby"
 msgstr "Go to Lobby"
 
-#: ../frontend/collaborate/components/Chat.tsx:42
+#: ../frontend/collaborate/components/Chat.tsx:51
 msgid "guest"
 msgstr "guest"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:200
+#: ../frontend/collaborate/components/SessionHeader.tsx:222
 msgid "Guests"
 msgstr "Guests"
 
-#: ../frontend/collaborate/App.tsx:1221
-#: ../frontend/collaborate/App.tsx:1225
+#: ../frontend/collaborate/App.tsx:1295
+#: ../frontend/collaborate/App.tsx:1299
 msgid "Help"
 msgstr "Help"
 
@@ -142,30 +154,39 @@ msgid "Initializing collaboration session..."
 msgstr "Initializing collaboration session..."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:139
-#: ../frontend/collaborate/components/SessionHeader.tsx:172
+#: ../frontend/collaborate/components/SessionHeader.tsx:194
 msgid "Invite"
 msgstr "Invite"
 
 #: ../frontend/collaborate/components/DiscordFriendsWindow.tsx:65
 #: ../frontend/collaborate/components/DiscordInvite.tsx:57
-#: ../frontend/collaborate/components/SessionHeader.tsx:169
+#: ../frontend/collaborate/components/SessionHeader.tsx:191
 msgid "Invite Discord friends"
 msgstr "Invite Discord friends"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:180
+#: ../frontend/collaborate/components/SessionHeader.tsx:202
 msgid "Invite Steam friends"
 msgstr "Invite Steam friends"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:73
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:97
 msgid "Join"
 msgstr "Join"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:41
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:55
 msgid "Join as a Guest"
 msgstr "Join as a Guest"
 
-#: ../frontend/collaborate/App.tsx:1261
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/components/SessionHeader.tsx:256
+msgid "Join Drawing"
+msgstr "Join Drawing"
+
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:93
+#: ../frontend/collaborate/components/SessionHeader.tsx:256
+msgid "Just Watch"
+msgstr "Just Watch"
+
+#: ../frontend/collaborate/App.tsx:1335
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
@@ -176,11 +197,11 @@ msgstr "Keep on This Device"
 msgid "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
 msgstr "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:238
+#: ../frontend/collaborate/components/SessionHeader.tsx:294
 msgid "Let in"
 msgstr "Let in"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:146
+#: ../frontend/collaborate/components/SessionHeader.tsx:168
 msgid "Loading"
 msgstr "Loading"
 
@@ -193,7 +214,7 @@ msgstr "Loading friends…"
 msgid "Loading..."
 msgstr "Loading..."
 
-#: ../frontend/collaborate/components/Chat.tsx:140
+#: ../frontend/collaborate/components/Chat.tsx:150
 msgid "Message too long (max 500 characters)"
 msgstr "Message too long (max 500 characters)"
 
@@ -205,16 +226,20 @@ msgstr "No Discord friends to invite yet."
 msgid "No friend by that name."
 msgstr "No friend by that name."
 
-#: ../frontend/collaborate/App.tsx:894
+#: ../frontend/collaborate/App.tsx:935
 msgid "No Title"
 msgstr "No Title"
 
+#: ../frontend/collaborate/components/SessionHeader.tsx:235
+msgid "Nobody new can watch. Click to let people watch."
+msgstr "Nobody new can watch. Click to let people watch."
+
 #: ../frontend/collaborate/components/DiscordInvite.tsx:79
-#: ../frontend/collaborate/components/SessionHeader.tsx:246
+#: ../frontend/collaborate/components/SessionHeader.tsx:302
 msgid "Not now"
 msgstr "Not now"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:196
+#: ../frontend/collaborate/components/SessionHeader.tsx:218
 msgid "Only people with an account can join. Click to let guests in."
 msgstr "Only people with an account can join. Click to let guests in."
 
@@ -223,12 +248,16 @@ msgid "Or use + in any Discord chat."
 msgstr "Or use + in any Discord chat."
 
 #. placeholder {0}: participants.size
-#: ../frontend/collaborate/components/Chat.tsx:229
-#: ../frontend/collaborate/components/Chat.tsx:230
+#: ../frontend/collaborate/components/Chat.tsx:239
+#: ../frontend/collaborate/components/Chat.tsx:240
 msgid "Participants ({0})"
 msgstr "Participants ({0})"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:195
+#: ../frontend/collaborate/components/SessionHeader.tsx:234
+msgid "People can watch without drawing. Click to stop new ones watching."
+msgstr "People can watch without drawing. Click to stop new ones watching."
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:217
 msgid "People without an account can join. Click to stop new ones joining."
 msgstr "People without an account can join. Click to stop new ones joining."
 
@@ -236,18 +265,18 @@ msgstr "People without an account can join. Click to stop new ones joining."
 msgid "Reconnect"
 msgstr "Reconnect"
 
-#: ../frontend/collaborate/App.tsx:1146
+#: ../frontend/collaborate/App.tsx:1220
 msgid "Remove"
 msgstr "Remove"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/components/Chat.tsx:249
-#: ../frontend/collaborate/components/Chat.tsx:250
+#: ../frontend/collaborate/components/Chat.tsx:260
+#: ../frontend/collaborate/components/Chat.tsx:261
 msgid "Remove {0} from this session"
 msgstr "Remove {0} from this session"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1145
+#: ../frontend/collaborate/App.tsx:1219
 msgid "Remove {0} from this session? They won't be able to rejoin it."
 msgstr "Remove {0} from this session? They won't be able to rejoin it."
 
@@ -256,7 +285,7 @@ msgid "Removed from Session"
 msgstr "Removed from Session"
 
 #: ../frontend/collaborate/components/modals/InitializationErrorModal.tsx:20
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:37
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:40
 msgid "Retry"
 msgstr "Retry"
 
@@ -273,16 +302,16 @@ msgstr "Save as PNG"
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 
-#: ../frontend/collaborate/App.tsx:1262
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/App.tsx:1336
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
 msgid "Save to Gallery"
 msgstr "Save to Gallery"
 
-#: ../frontend/collaborate/App.tsx:1259
-#: ../frontend/collaborate/App.tsx:1312
+#: ../frontend/collaborate/App.tsx:1333
+#: ../frontend/collaborate/App.tsx:1386
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
 msgid "Saving..."
@@ -293,12 +322,12 @@ msgstr "Saving..."
 msgid "Search friends"
 msgstr "Search friends"
 
-#: ../frontend/collaborate/components/Chat.tsx:325
+#: ../frontend/collaborate/components/Chat.tsx:339
 msgid "Send"
 msgstr "Send"
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:133
-#: ../frontend/collaborate/components/SessionHeader.tsx:234
+#: ../frontend/collaborate/components/SessionHeader.tsx:290
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -310,7 +339,7 @@ msgstr "Sent"
 msgid "Session Expired"
 msgstr "Session Expired"
 
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:23
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:26
 msgid "Session Full"
 msgstr "Session Full"
 
@@ -318,17 +347,25 @@ msgstr "Session Full"
 msgid "Session is ending. The drawing is being saved to the gallery..."
 msgstr "Session is ending. The drawing is being saved to the gallery..."
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:210
+#: ../frontend/collaborate/components/SessionHeader.tsx:266
 msgid "Share"
 msgstr "Share"
 
-#: ../frontend/collaborate/components/SessionHeader.tsx:207
+#: ../frontend/collaborate/components/SessionHeader.tsx:263
 msgid "Share this session"
 msgstr "Share this session"
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:70
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:84
 msgid "Sign In Instead"
 msgstr "Sign In Instead"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:239
+msgid "Spectators"
+msgstr "Spectators"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:251
+msgid "Take a seat and draw"
+msgstr "Take a seat and draw"
 
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
 msgid "The owner ended this session. You can save your work locally as a PNG before leaving."
@@ -366,20 +403,20 @@ msgstr "This collaborative session has ended. Its drawing was not saved to the g
 msgid "This session has already been saved. You can only download it as a PNG."
 msgstr "This session has already been saved. You can only download it as a PNG."
 
-#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:27
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:30
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 
-#: ../frontend/collaborate/App.tsx:963
+#: ../frontend/collaborate/App.tsx:1004
 msgid "Too many guests have joined from this network. Try again later, or sign in."
 msgstr "Too many guests have joined from this network. Try again later, or sign in."
 
 #: ../frontend/collaborate/components/DiscordInvite.tsx:137
-#: ../frontend/collaborate/components/SessionHeader.tsx:236
+#: ../frontend/collaborate/components/SessionHeader.tsx:292
 msgid "Try again"
 msgstr "Try again"
 
-#: ../frontend/collaborate/components/Chat.tsx:316
+#: ../frontend/collaborate/components/Chat.tsx:330
 msgid "Type a message..."
 msgstr "Type a message..."
 
@@ -387,7 +424,20 @@ msgstr "Type a message..."
 msgid "Unable to authenticate your session. Either the session doesn't exist, or it has expired. Please return to the lobby."
 msgstr "Unable to authenticate your session. Either the session doesn't exist, or it has expired. Please return to the lobby."
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:44
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:97
+#: ../frontend/collaborate/components/modals/RoomFullModal.tsx:44
+msgid "Watch"
+msgstr "Watch"
+
+#: ../frontend/collaborate/components/Chat.tsx:39
+msgid "watching"
+msgstr "watching"
+
+#: ../frontend/collaborate/components/SessionHeader.tsx:150
+msgid "Watching"
+msgstr "Watching"
+
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:58
 msgid "What should the others call you?"
 msgstr "What should the others call you?"
 
@@ -395,10 +445,10 @@ msgstr "What should the others call you?"
 msgid "You'll be redirected to the post page shortly."
 msgstr "You'll be redirected to the post page shortly."
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:59
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:73
 msgid "You'll be shown as a guest. If you sign in later, what you drew moves to your account."
 msgstr "You'll be shown as a guest. If you sign in later, what you drew moves to your account."
 
-#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:55
+#: ../frontend/collaborate/components/modals/GuestNameModal.tsx:69
 msgid "Your name"
 msgstr "Your name"

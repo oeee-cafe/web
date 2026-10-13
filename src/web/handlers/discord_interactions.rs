@@ -283,6 +283,7 @@ async fn draw(state: &AppState, interaction: &Interaction) -> Value {
         // Whoever the link is passed to in Discord comes in with a name,
         // account or not; signing in from the room keeps what they drew.
         allow_guests: true,
+        allow_spectators: true,
     };
     let session_id = match insert_session(state, &Collaborator::from_user(&user), request).await {
         Ok(id) => id,

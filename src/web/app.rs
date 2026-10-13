@@ -27,7 +27,7 @@ use crate::web::handlers::collaborate::{
     discord_join, end_collaborative_session, get_auth_info, get_collaboration_meta,
     load_more_collaborative_posts, report_session_diagnostics, save_collaborative_session,
     serve_collaborative_app, serve_session_preview, set_collaboration_guests,
-    upload_session_preview, websocket_collaborate_handler,
+    set_collaboration_spectators, upload_session_preview, websocket_collaborate_handler,
 };
 use crate::web::handlers::collaborate_cleanup::cleanup_collaborative_sessions;
 use crate::web::handlers::community::{
@@ -542,6 +542,10 @@ impl App {
             // The owner's: ending without a post, and sending somebody out.
             .route("/collaborate/{uuid}/end", post(end_collaborative_session))
             .route("/collaborate/{uuid}/guests", post(set_collaboration_guests))
+            .route(
+                "/collaborate/{uuid}/spectators",
+                post(set_collaboration_spectators),
+            )
             .route(
                 "/collaborate/{uuid}/participants/{participant_id}/ban",
                 post(ban_collaborative_participant),

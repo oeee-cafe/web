@@ -240,7 +240,15 @@ export class FakeServer {
  * Puts the page's surroundings in place: the sign-in, the session's
  * metadata, the room's URL, and a `WebSocket` that is one of ours.
  */
-export function installRoom(options: { ownerId?: string; ended?: boolean; removed?: boolean } = {}) {
+export function installRoom(
+  options: {
+    ownerId?: string;
+    ended?: boolean;
+    removed?: boolean;
+    /** Every seat taken. */
+    full?: boolean;
+  } = {},
+) {
   sockets = [];
   RealWebSocket = globalThis.WebSocket;
   realFetch = globalThis.fetch;
@@ -261,7 +269,8 @@ export function installRoom(options: { ownerId?: string; ended?: boolean; remove
         JSON.stringify({
           title: "", width: WIDTH, height: HEIGHT,
           ownerId: options.ownerId ?? "oeee-uuid", ownerLoginName: "oeee",
-          savedPostId: null, maxUsers: 8, currentUserCount: 1,
+          savedPostId: null, maxUsers: 8, currentUserCount: options.full ? 8 : 1,
+          allowSpectators: true,
           ended: options.ended ?? false,
         }),
         { status: 200 },

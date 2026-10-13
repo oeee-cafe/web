@@ -15,11 +15,12 @@
         "userId": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d",
         "timestamp": 1700000000123,
         "username": "오이",
-        "isGuest": false
+        "isGuest": false,
+        "isSpectator": false
       }
     },
     "layers": {
-      "hex": "0602000d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d01000600ec98a4ec9db47b68e5cf8b0100005f3e8a102b444c6d9e017a8b9c0d1e2f020104006d69726f8068e5cf8b010000",
+      "hex": "0602000d2a2b4c7e8f4a1b8c9d1e2f3a4b5c6d01000600ec98a4ec9db47b68e5cf8b0100005f3e8a102b444c6d9e017a8b9c0d1e2f020304006d69726f8068e5cf8b010000",
       "decoded": {
         "type": "layers",
         "participants": [
@@ -28,14 +29,16 @@
             "sessionId": 1,
             "username": "오이",
             "joinTimestamp": 1700000000123,
-            "isGuest": false
+            "isGuest": false,
+            "isSpectator": false
           },
           {
             "userId": "5f3e8a10-2b44-4c6d-9e01-7a8b9c0d1e2f",
             "sessionId": 2,
             "username": "miro",
             "joinTimestamp": 1700000000128,
-            "isGuest": true
+            "isGuest": true,
+            "isSpectator": true
           }
         ]
       }
@@ -48,7 +51,8 @@
         "timestamp": 1700000000123,
         "username": "오이",
         "message": "그림 🎨 | a pipe",
-        "isGuest": false
+        "isGuest": false,
+        "isSpectator": false
       }
     },
     "leave": {
@@ -58,7 +62,8 @@
         "userId": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d",
         "timestamp": 1700000000123,
         "username": "오이",
-        "isGuest": true
+        "isGuest": true,
+        "isSpectator": false
       }
     },
     "resetRequestQuery": {

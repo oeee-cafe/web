@@ -805,12 +805,15 @@ export function encodeText(
  * shown with a guest badge and never as an account's handle.
  */
 export const FLAG_GUEST = 0b0000_0001;
+/** Beside FLAG_GUEST: this person is watching the session, not drawing in it. */
+export const FLAG_SPECTATOR = 0b0000_0010;
 
 export interface JoinMessage {
   type: "join";
   userId: string;
   username: string;
   isGuest: boolean;
+  isSpectator: boolean;
   timestamp: number;
 }
 
@@ -821,6 +824,7 @@ export interface LayersMessage {
     sessionId: number;
     username: string;
     isGuest: boolean;
+    isSpectator: boolean;
     joinTimestamp: number;
   }>;
 }
@@ -948,6 +952,7 @@ export interface ChatMessage {
   userId: string;
   username: string;
   isGuest: boolean;
+  isSpectator: boolean;
   timestamp: number;
   message: string;
 }
@@ -1039,6 +1044,7 @@ export interface LeaveMessage {
   userId: string;
   username: string;
   isGuest: boolean;
+  isSpectator: boolean;
   timestamp: number;
 }
 
@@ -1188,6 +1194,7 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
         userId: bytesToUuid(buffer.slice(1, 17)),
         timestamp: readUint64LE(buffer, 17),
         isGuest: (buffer[25] & FLAG_GUEST) !== 0,
+        isSpectator: (buffer[25] & FLAG_SPECTATOR) !== 0,
         username: joinDecoder.decode(buffer.slice(28, 28 + joinUsernameLength)),
       };
     }
@@ -1210,6 +1217,7 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
         offset += 1;
 
         const isGuest = (buffer[offset] & FLAG_GUEST) !== 0;
+        const isSpectator = (buffer[offset] & FLAG_SPECTATOR) !== 0;
         offset += 1;
 
         const nameLength = readUint16LE(buffer, offset);
@@ -1223,7 +1231,7 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
         const joinTimestamp = readUint64LE(buffer, offset);
         offset += 8;
 
-        participants.push({ userId, sessionId, username, isGuest, joinTimestamp });
+        participants.push({ userId, sessionId, username, isGuest, isSpectator, joinTimestamp });
       }
 
       return {
@@ -1255,6 +1263,7 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
         userId: bytesToUuid(buffer.slice(1, 17)),
         timestamp: readUint64LE(buffer, 17),
         isGuest: (buffer[25] & FLAG_GUEST) !== 0,
+        isSpectator: (buffer[25] & FLAG_SPECTATOR) !== 0,
         username: decoder.decode(buffer.slice(28, 28 + usernameLength)),
         message: decoder.decode(
           buffer.slice(30 + usernameLength, 30 + usernameLength + msgLength)
@@ -1435,6 +1444,7 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
         userId: bytesToUuid(buffer.slice(1, 17)),
         timestamp: readUint64LE(buffer, 17),
         isGuest: (buffer[25] & FLAG_GUEST) !== 0,
+        isSpectator: (buffer[25] & FLAG_SPECTATOR) !== 0,
         username: leaveDecoder.decode(
           buffer.slice(28, 28 + leaveUsernameLength)
         ),

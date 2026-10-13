@@ -296,6 +296,9 @@ collaborate-sign-in-instead = ログインする
 collaborate-guest-community-hint = ゲストは公開コミュニティだけを選べます。
 collaborate-allow-guests-label = アカウントのない人も参加できるようにする
 collaborate-allow-guests-description = ゲストは自分で名前を決め、名前が表示されるところではゲストと示されます。
+collaborate-watch-session = 見る
+collaborate-allow-spectators-label = 描かずに見るだけの参加を許可する
+collaborate-allow-spectators-description = 席を使わずに描いている様子をリアルタイムで見てチャットできます。見ている人はいつでも退出させられます。
 
 welcome = { $name }さん、ようこそ！
 

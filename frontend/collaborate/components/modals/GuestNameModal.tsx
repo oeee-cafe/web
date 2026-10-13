@@ -10,8 +10,15 @@ export interface GuestNameModalProps {
   isOpen: boolean;
   /** What to start the field on: a Discord name the app knows, say. */
   suggestion?: string;
-  /** Answers with an error to show, or null once the name is taken. */
-  onSubmit: (nickname: string) => Promise<string | null>;
+  /** Whether the room may be watched, which this dialog then offers. */
+  canWatch: boolean;
+  /** The visit already asked to watch (`?watch=1`): only that is offered. */
+  watchOnly: boolean;
+  /**
+   * Answers with an error to show, or null once the name is taken. `watch`
+   * is whether they chose to watch rather than draw.
+   */
+  onSubmit: (nickname: string, watch: boolean) => Promise<string | null>;
   /** Where signing in returns to: this room. */
   signInHref: string;
 }
@@ -22,18 +29,25 @@ export interface GuestNameModalProps {
  * chat, marked as a guest's. Signing in instead is one link away, and signing
  * in later keeps whatever they drew as a guest.
  */
-export const GuestNameModal = ({ isOpen, suggestion, onSubmit, signInHref }: GuestNameModalProps) => {
+export const GuestNameModal = ({
+  isOpen,
+  suggestion,
+  canWatch,
+  watchOnly,
+  onSubmit,
+  signInHref,
+}: GuestNameModalProps) => {
   const { t } = useLingui();
   const [nickname, setNickname] = useState(suggestion ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const submit = async (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent, watch = watchOnly) => {
     event.preventDefault();
     const name = nickname.trim();
     if (!name || submitting) return;
     setSubmitting(true);
-    setError(await onSubmit(name));
+    setError(await onSubmit(name, watch));
     setSubmitting(false);
   };
 
@@ -69,8 +83,18 @@ export const GuestNameModal = ({ isOpen, suggestion, onSubmit, signInHref }: Gue
           <a href={signInHref} className={NEO_BUTTON}>
             <Trans>Sign In Instead</Trans>
           </a>
+          {canWatch && !watchOnly && (
+            <button
+              type="button"
+              onClick={(event) => void submit(event, true)}
+              disabled={submitting || !nickname.trim()}
+              className={`${NEO_BUTTON} disabled:cursor-not-allowed`}
+            >
+              <Trans>Just Watch</Trans>
+            </button>
+          )}
           <button type="submit" disabled={submitting || !nickname.trim()} className={`${NEO_BUTTON} disabled:cursor-not-allowed`}>
-            <Trans>Join</Trans>
+            {watchOnly ? <Trans>Watch</Trans> : <Trans>Join</Trans>}
           </button>
         </div>
       </form>

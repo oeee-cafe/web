@@ -296,6 +296,9 @@ collaborate-sign-in-instead = 로그인하기
 collaborate-guest-community-hint = 손님은 공개 커뮤니티만 고를 수 있습니다.
 collaborate-allow-guests-label = 계정이 없는 사람도 참여할 수 있게 하기
 collaborate-allow-guests-description = 손님은 이름을 직접 정하며, 이름이 보이는 곳마다 손님으로 표시됩니다.
+collaborate-watch-session = 구경하기
+collaborate-allow-spectators-label = 그리지 않고 구경만 할 수 있게 하기
+collaborate-allow-spectators-description = 자리를 차지하지 않고 그리는 모습을 실시간으로 보며 채팅할 수 있습니다. 구경하는 사람은 언제든 내보낼 수 있습니다.
 
 welcome = { $name }님, 환영합니다!
 
