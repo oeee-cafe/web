@@ -81,7 +81,7 @@ export const GuestNameModal = ({
         )}
         <div className="flex flex-wrap items-center justify-center gap-[6px]">
           <a href={signInHref} className={NEO_BUTTON}>
-            <Trans>Sign In Instead</Trans>
+            <Trans>Sign In or Sign Up</Trans>
           </a>
           {canWatch && !watchOnly && (
             <button

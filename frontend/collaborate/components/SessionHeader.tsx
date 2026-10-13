@@ -45,6 +45,11 @@ export interface SessionHeaderProps {
   spectators?: GuestsSwitch;
   /** Present for everybody else. */
   mode?: ModeSwitch;
+  /**
+   * Present for a guest: where signing up from this room goes, and what to
+   * do as they go -- it is a way out the room meant, not an accident.
+   */
+  signUp?: { href: string; onFollow: () => void };
   connectionState: "connecting" | "connected" | "disconnected";
   isCatchingUp: boolean;
   /** The highest a window may be dragged, as the chat's own is held. */
@@ -104,6 +109,7 @@ export const SessionHeader = ({
   guests,
   spectators,
   mode,
+  signUp,
   connectionState,
   isCatchingUp,
   ceiling = 0,
@@ -218,6 +224,23 @@ export const SessionHeader = ({
     {/* Watching or drawing: a row of its own, as the owner's permissions
         are. Beside Invite, Steam and Share it was the fourth button in a
         row the window opens too narrow for, and broke onto two lines. */}
+    {signUp && (
+      // A guest's way to an account without leaving the room for good: the
+      // sign-up comes back here, and what they drew comes with them.
+      <div
+        className="min-w-0 truncate"
+        title={t`Sign up and come back here: what you drew moves to your new account.`}
+      >
+        <Trans>You're a guest.</Trans>{" "}
+        <a
+          href={signUp.href}
+          className="text-(--neo-text) underline"
+          onClick={signUp.onFollow}
+        >
+          <Trans>Sign up</Trans>
+        </a>
+      </div>
+    )}
     {mode && (mode.watching || mode.canWatch) && (
       <button
         type="button"

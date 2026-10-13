@@ -249,6 +249,8 @@ export function installRoom(
     full?: boolean;
     /** The viewer has drawn here before. */
     hasDrawn?: boolean;
+    /** The viewer is a guest, not an account. */
+    guest?: boolean;
   } = {},
 ) {
   sockets = [];
@@ -259,7 +261,12 @@ export function installRoom(
     const url = String(input);
     if (url.startsWith("/api/auth")) {
       return new Response(
-        JSON.stringify({ user_id: "umu-uuid", login_name: "umu", preferred_locale: "en" }),
+        JSON.stringify({
+          user_id: "umu-uuid",
+          login_name: "umu",
+          is_guest: options.guest ?? false,
+          preferred_locale: "en",
+        }),
         { status: 200 },
       );
     }

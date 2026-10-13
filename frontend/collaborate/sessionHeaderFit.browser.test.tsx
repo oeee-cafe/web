@@ -63,6 +63,7 @@ async function render(locale: string, owner: boolean) {
           guests={owner ? toggle : undefined}
           spectators={owner ? toggle : undefined}
           mode={owner ? undefined : { watching: false, seatFree: true, canWatch: true, onSwitch: () => {} }}
+          signUp={owner ? undefined : { href: "/signup?next=%2Fcollaborate%2Froom", onFollow: () => {} }}
           connectionState="connected"
           isCatchingUp={false}
         />

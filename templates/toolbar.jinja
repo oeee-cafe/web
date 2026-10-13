@@ -309,6 +309,24 @@
       };
       window.oeeeMarkCurrent(location.pathname);
 
+      // Signing in from here comes back here. Templates are not handed the
+      // request path, so the link learns it from the page -- as it is when
+      // the link is followed, since a page can change its own address after
+      // it loads (a collaborative room adds ?watch=1). Without script it is
+      // plain /login. The sign-in pages are nowhere to come back to.
+      var signIn = document.querySelector(".toolbar-sign-in");
+      var comeBack = function () {
+        if (/^\/(login|signup|auth)(\/|$)/.test(location.pathname)) return;
+        signIn.setAttribute(
+          "href",
+          "/login?next=" + encodeURIComponent(location.pathname + location.search)
+        );
+      };
+      if (signIn) {
+        comeBack();
+        signIn.addEventListener("click", comeBack);
+      }
+
       // One row, or two: try the name, the sections and the account on one
       // line, and if the account or the sections wrapped below the name --
       // or would sit closer than 16px to the sections -- give the sections a

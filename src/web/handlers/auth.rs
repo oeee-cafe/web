@@ -4,6 +4,7 @@ use crate::models::user::{
     create_user, update_user_preferred_language, AuthSession, Credentials, UserDraft,
 };
 use crate::web::handlers::collaborate::guest::adopt as adopt_guest;
+use crate::web::handlers::identity::local_next;
 use crate::web::handlers::identity::{link_pending_identity, pending_provider_name};
 use crate::web::i18n::{
     detect_preferred_language, get_bundle, safe_format_message, safe_get_message, ExtractFtlLang,
@@ -124,10 +125,11 @@ pub async fn do_signup(
     args.set("name", FluentValue::from(user.display_name.clone()));
     messages.success(safe_format_message(&bundle, "welcome", Some(&args)));
 
-    if let Some(ref next) = form.next {
-        Ok(Redirect::to(next).into_response())
-    } else {
-        Ok(Redirect::to("/").into_response())
+    // Somewhere on this site, never wherever the link said: `next` arrives
+    // in a URL anybody can write.
+    match local_next(form.next.as_deref()) {
+        Some(next) => Ok(Redirect::to(&next).into_response()),
+        None => Ok(Redirect::to("/").into_response()),
     }
 }
 
@@ -219,10 +221,10 @@ pub async fn do_login(
     args.set("name", FluentValue::from(user.display_name.clone()));
     messages.success(safe_format_message(&bundle, "welcome", Some(&args)));
 
-    if let Some(ref next) = creds.next {
-        Redirect::to(next)
-    } else {
-        Redirect::to("/")
+    // As for a sign-up: on this site, or home.
+    match local_next(creds.next.as_deref()) {
+        Some(next) => Redirect::to(&next),
+        None => Redirect::to("/"),
     }
     .into_response()
 }

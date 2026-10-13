@@ -121,7 +121,7 @@ pub async fn pending_provider_name(session: &Session) -> Option<&'static str> {
 
 /// A place on this site to go on to, and nowhere else: a path, not a URL, and
 /// not `//host`, which a browser reads as one.
-fn local_next(next: Option<&str>) -> Option<String> {
+pub(crate) fn local_next(next: Option<&str>) -> Option<String> {
     let next = next?.trim();
     let local = next.starts_with('/')
         && !next.starts_with("//")

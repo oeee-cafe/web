@@ -150,6 +150,14 @@ interface AuthInfo {
   preferred_locale: string;
 }
 
+/**
+ * Signing up from this room, and coming back to it. The sign-up hands the
+ * guest's seat, layers and sessions to the new account before it sends them
+ * here (`collaborate::guest::adopt`), so they come back as themselves.
+ */
+const signUpHref = () =>
+  `/signup?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+
 /** Where signing in from this room comes back to. */
 const signInHref = () =>
   `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
@@ -191,6 +199,8 @@ export default function App() {
    * reads as it opens.
    */
   const [watching, setWatching] = useState(askedToWatch);
+  /** In the room without an account, and so offered one. */
+  const [isGuest, setIsGuest] = useState(false);
   const spectatingRef = useRef(watching);
   spectatingRef.current = watching;
   const [sessionEnding, setSessionEnding] = useState(false);
@@ -955,6 +965,7 @@ export default function App() {
       if (!authResponse.ok) throw new Error(`Auth failed: ${authResponse.status}`);
       const auth: AuthInfo = await authResponse.json();
       userIdRef.current = auth.user_id ?? "";
+      setIsGuest(!!auth.user_id && auth.is_guest);
       localeRef.current = auth.preferred_locale || undefined;
       const response = await fetch(`/collaboration/${sessionId}/meta`, { credentials: "include" });
       // Somebody with no account, at a room that does not take guests.
@@ -1011,6 +1022,7 @@ export default function App() {
       if (!response.ok) return t`Couldn't join. Please try again.`;
       const guest: AuthInfo = await response.json();
       userIdRef.current = guest.user_id ?? "";
+      setIsGuest(true);
       setAwaitingName(null);
       enterRoom(meta, watch || spectatingRef.current);
       return null;
@@ -1384,7 +1396,7 @@ export default function App() {
             <span className={NEO_TITLEBAR_DOT} />
             {canvasMeta && <span className="ml-[4px] min-w-0 truncate text-[11px] leading-[14px]">{canvasMeta.title}</span>}
           </div>
-          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} guests={isOwner && canvasMeta.communityAdmitsGuests ? { allowed: guestsAllowed ?? canvasMeta.allowGuests ?? true, busy: guestsBusy, onToggle: () => void toggleGuests() } : undefined} spectators={isOwner ? { allowed: spectatorsAllowed ?? canvasMeta.allowSpectators ?? true, busy: spectatorsBusy, onToggle: () => void toggleSpectators() } : undefined} mode={isOwner || canvasMeta.ended ? undefined : { watching, seatFree, canWatch: canvasMeta.allowSpectators ?? true, onSwitch: switchMode }} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
+          {canvasMeta && <SessionHeader canvasMeta={canvasMeta} guests={isOwner && canvasMeta.communityAdmitsGuests ? { allowed: guestsAllowed ?? canvasMeta.allowGuests ?? true, busy: guestsBusy, onToggle: () => void toggleGuests() } : undefined} spectators={isOwner ? { allowed: spectatorsAllowed ?? canvasMeta.allowSpectators ?? true, busy: spectatorsBusy, onToggle: () => void toggleSpectators() } : undefined} mode={isOwner || canvasMeta.ended ? undefined : { watching, seatFree, canWatch: canvasMeta.allowSpectators ?? true, onSwitch: switchMode }} signUp={isGuest && !canvasMeta.ended ? { href: signUpHref(), onFollow: () => { leavingRef.current = true; } } : undefined} connectionState={view.connection} isCatchingUp={view.catchingUp} ceiling={chatCeiling} />}
           <Chat wsRef={wsRef} userId={userIdRef.current} participants={presentParticipants} connectionState={view.connection} onChatMessage={noopChatMessage} onAddMessage={holdChatAddMessage} onRemove={isOwner ? removeParticipant : undefined} />
           <div ref={chatResizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
             <span className={NEO_RESIZE_GRIP} />

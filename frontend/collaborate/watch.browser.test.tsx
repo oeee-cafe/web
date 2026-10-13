@@ -65,4 +65,27 @@ describe("watching a room", () => {
     expect(text()).not.toContain("Session Full");
     expect(new URL(socket.url).searchParams.get("spectate")).toBeNull();
   });
+
+});
+
+describe("a guest in the room", () => {
+  it("is offered an account, and the sign-up comes back to this room", async () => {
+    installRoom({ guest: true });
+    window.history.replaceState(null, "", `${window.location.pathname}?watch=1`);
+    const socket = await mountSession();
+    await act(async () => server.admit(socket, 0));
+    await settle();
+    const link = [...document.querySelectorAll("a")].find((a) => a.textContent === "Sign up");
+    expect(link, "a Sign up link in the header").toBeTruthy();
+    const next = new URL(link!.href).searchParams.get("next");
+    expect(next).toBe(`${window.location.pathname}?watch=1`);
+  });
+
+  it("is not offered one when signed in", async () => {
+    installRoom();
+    const socket = await mountSession();
+    await act(async () => server.admit(socket, 3));
+    await settle();
+    expect([...document.querySelectorAll("a")].some((a) => a.textContent === "Sign up")).toBe(false);
+  });
 });
