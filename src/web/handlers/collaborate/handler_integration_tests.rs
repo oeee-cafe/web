@@ -2011,6 +2011,58 @@ async fn an_idle_room_pauses_and_the_next_person_in_picks_it_up() {
     outcome.expect("the scenario finished in time");
 }
 
+/// A pause flushes the room's recording while it holds the session row, and
+/// the flush writes through the pool. The first recording row for a room
+/// checks its foreign key against that row; under `FOR UPDATE` it waited on
+/// the pause while the pause waited on it, and the room, and the sweep, hung
+/// for good. The tests have no bucket, so the pause itself never flushes here:
+/// this is the write it makes, made while its lock is held.
+#[tokio::test]
+async fn a_recording_is_written_while_a_pause_or_resume_holds_the_room() {
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let (db, id) = (&room.db, room.room);
+    let held = move |label: &'static str| async move {
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            crate::models::collaborative_recording::note_span(db, id, Some(1), Some(1), 1, false),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("{label}: the recording waited on the room's lock"))
+        .expect("note the span");
+    };
+
+    let mut pause = room.db.begin().await.expect("begin");
+    assert!(super::pause::lock_open_room(&mut *pause, room.room)
+        .await
+        .expect("lock"));
+    held("pause").await;
+    pause.rollback().await.expect("rollback");
+
+    sqlx::query!(
+        "DELETE FROM collaborative_session_recordings WHERE session_id = $1",
+        room.room
+    )
+    .execute(&room.db)
+    .await
+    .expect("no recording yet");
+    sqlx::query!(
+        "UPDATE collaborative_sessions SET paused_at = NOW() WHERE id = $1",
+        room.room
+    )
+    .execute(&room.db)
+    .await
+    .expect("paused");
+    let mut resume = room.db.begin().await.expect("begin");
+    assert!(super::pause::lock_paused_room(&mut *resume, room.room)
+        .await
+        .expect("lock"));
+    held("resume").await;
+    resume.rollback().await.expect("rollback");
+    room.teardown().await;
+}
+
 /// A room with nothing drawn in it is not worth keeping: the sweep ends it
 /// as it always did.
 #[tokio::test]

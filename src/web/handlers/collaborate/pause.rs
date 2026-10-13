@@ -15,13 +15,24 @@
 //!
 //! ## Ordering
 //!
-//! Pausing and resuming both hold the session row `FOR UPDATE`, which is what
-//! every join takes too (`track_participant_with_capacity_check`). So nobody
+//! Pausing and resuming both lock the session row, which every join locks
+//! too (`track_participant_with_capacity_check`, `FOR UPDATE`). So nobody
 //! joins a room halfway through being paused, and the first to arrive at a
 //! paused one puts it back while the others wait their turn behind the lock
 //! and find it already back. The Redis keys are deleted before the pause
 //! commits: deleted after, a join waiting on the lock would restore them and
 //! then watch them be deleted.
+//!
+//! The lock is `FOR NO KEY UPDATE`, not `FOR UPDATE`. A pause flushes the
+//! room's recording while it holds the row, and that write goes through the
+//! pool, on a connection of its own: a first upsert into
+//! `collaborative_session_recordings` checks its foreign key with `FOR KEY
+//! SHARE` on this same row, which `FOR UPDATE` blocks. The pause then waited
+//! on the flush and the flush on the pause, a cycle Postgres cannot see
+//! because half of it is in this process -- and every join to the room, and
+//! the sweep behind it, queued up after them for good. `FOR NO KEY UPDATE`
+//! lets a foreign key check through and still excludes every join
+//! (`FOR UPDATE`) and every other pause or resume.
 //!
 //! ## Sharing Redis
 //!
@@ -368,6 +379,44 @@ pub enum Idled {
     LeftAlone,
 }
 
+/// Takes an open, unpaused room's row for a pause; false when it is not one.
+///
+/// `FOR NO KEY UPDATE`, never `FOR UPDATE`: see "Ordering" above.
+pub(crate) async fn lock_open_room(
+    tx: &mut sqlx::PgConnection,
+    room_uuid: Uuid,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query_scalar!(
+        r#"
+        SELECT id FROM collaborative_sessions
+        WHERE id = $1 AND ended_at IS NULL AND paused_at IS NULL
+        FOR NO KEY UPDATE
+        "#,
+        room_uuid
+    )
+    .fetch_optional(tx)
+    .await?
+    .is_some())
+}
+
+/// Takes an open room's row for a resume; true when it is paused.
+pub(crate) async fn lock_paused_room(
+    tx: &mut sqlx::PgConnection,
+    room_uuid: Uuid,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query_scalar!(
+        r#"
+        SELECT paused_at IS NOT NULL AS "paused!" FROM collaborative_sessions
+        WHERE id = $1 AND ended_at IS NULL
+        FOR NO KEY UPDATE
+        "#,
+        room_uuid
+    )
+    .fetch_optional(tx)
+    .await?
+        == Some(true))
+}
+
 /// Pauses an idle room with a drawing in it.
 ///
 /// Anybody still connected is told it paused (close code 4002) -- an idle
@@ -387,17 +436,7 @@ pub async fn pause_idle_room(state: &AppState, room_uuid: Uuid) -> Result<Idled,
     }
 
     let mut tx = state.db_pool.begin().await?;
-    let open = sqlx::query_scalar!(
-        r#"
-        SELECT id FROM collaborative_sessions
-        WHERE id = $1 AND ended_at IS NULL AND paused_at IS NULL
-        FOR UPDATE
-        "#,
-        room_uuid
-    )
-    .fetch_optional(&mut *tx)
-    .await?;
-    if open.is_none() {
+    if !lock_open_room(&mut *tx, room_uuid).await? {
         return Ok(Idled::LeftAlone);
     }
 
@@ -545,17 +584,7 @@ async fn restore(state: &AppState, room_uuid: Uuid, stored: Stored) -> Result<()
 /// that is not paused. Waits behind a pause or a resume already under way.
 pub async fn resume_if_paused(state: &AppState, room_uuid: Uuid) -> Result<(), Error> {
     let mut tx = state.db_pool.begin().await?;
-    let paused = sqlx::query_scalar!(
-        r#"
-        SELECT paused_at IS NOT NULL AS "paused!" FROM collaborative_sessions
-        WHERE id = $1 AND ended_at IS NULL
-        FOR UPDATE
-        "#,
-        room_uuid
-    )
-    .fetch_optional(&mut *tx)
-    .await?;
-    if paused != Some(true) {
+    if !lock_paused_room(&mut *tx, room_uuid).await? {
         return Ok(());
     }
     let stored = get_object(state, &object_key(room_uuid)).await?;
