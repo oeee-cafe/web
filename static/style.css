@@ -2740,9 +2740,15 @@ nav a:visited,
 
 .session-owner,
 .session-owner:visited,
-.session-community a {
+.session-community a,
+.session-watch {
   position: relative;
   z-index: 1;
+}
+
+/* Watching instead of drawing, offered on every card that allows it. */
+.session-actions {
+  margin: 8px 0 0;
 }
 
 .session-owner,

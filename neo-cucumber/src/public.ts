@@ -26,6 +26,7 @@ import type { PalettePreset } from "./constants/palettePresets";
 export {
   NEO_BUTTON,
   NEO_BUTTON_ON,
+  NEO_CHECKBOX,
   NEO_FIELD,
   NEO_ICON_BUTTON,
   NEO_KBD,

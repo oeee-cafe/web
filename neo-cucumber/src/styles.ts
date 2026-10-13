@@ -44,6 +44,8 @@ export {
   NEO_FIELD,
   /** A sunken surface for content that scrolls. */
   NEO_WELL,
+  /** A checkbox, sunken like a field; put it on a native `<input type="checkbox">`. */
+  NEO_CHECKBOX,
   /** A key cap, as in the toolbox's shortcut list. */
   NEO_KBD,
   /** The corner a window is resized by; pair it with `attachWindowResize`. */

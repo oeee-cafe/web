@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Icon, NEO_BUTTON, NEO_BUTTON_ON, PANEL_MARGIN } from "neo-cucumber";
+import { Icon, NEO_BUTTON, NEO_BUTTON_ON, NEO_CHECKBOX, PANEL_MARGIN } from "neo-cucumber";
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -205,57 +205,6 @@ export const SessionHeader = ({
           Steam
         </button>
       )}
-      {guests && (
-        <button
-          type="button"
-          onClick={guests.onToggle}
-          disabled={guests.busy}
-          aria-pressed={guests.allowed}
-          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] disabled:cursor-not-allowed ${guests.allowed ? NEO_BUTTON_ON : ""}`}
-          title={
-            guests.allowed
-              ? t`People without an account can join. Click to stop new ones joining.`
-              : t`Only people with an account can join. Click to let guests in.`
-          }
-        >
-          <Icon icon="material-symbols:person" width={14} height={14} />
-          <Trans>Guests</Trans>
-        </button>
-      )}
-      {spectators && (
-        <button
-          type="button"
-          onClick={spectators.onToggle}
-          disabled={spectators.busy}
-          aria-pressed={spectators.allowed}
-          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] disabled:cursor-not-allowed ${spectators.allowed ? NEO_BUTTON_ON : ""}`}
-          title={
-            spectators.allowed
-              ? t`People can watch without drawing. Click to stop new ones watching.`
-              : t`Nobody new can watch. Click to let people watch.`
-          }
-        >
-          <Icon icon="material-symbols:visibility" width={14} height={14} />
-          <Trans>Spectators</Trans>
-        </button>
-      )}
-      {mode && (mode.watching || mode.canWatch) && (
-        <button
-          type="button"
-          onClick={mode.onSwitch}
-          disabled={mode.watching && !mode.seatFree}
-          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] disabled:cursor-not-allowed`}
-          title={
-            mode.watching
-              ? mode.seatFree
-                ? t`Take a seat and draw`
-                : t`Every seat is taken. You can draw once one frees.`
-              : t`Give up your seat and watch`
-          }
-        >
-          {mode.watching ? <Trans>Join Drawing</Trans> : <Trans>Just Watch</Trans>}
-        </button>
-      )}
       <button
         type="button"
         onClick={handleShare}
@@ -266,6 +215,62 @@ export const SessionHeader = ({
         <Trans>Share</Trans>
       </button>
     </div>
+    {/* Watching or drawing: a row of its own, as the owner's permissions
+        are. Beside Invite, Steam and Share it was the fourth button in a
+        row the window opens too narrow for, and broke onto two lines. */}
+    {mode && (mode.watching || mode.canWatch) && (
+      <button
+        type="button"
+        onClick={mode.onSwitch}
+        disabled={mode.watching && !mode.seatFree}
+        className={`${NEO_BUTTON} flex w-full items-center justify-center gap-[4px] disabled:cursor-not-allowed`}
+        title={
+          mode.watching
+            ? mode.seatFree
+              ? t`Take a seat and draw`
+              : t`Every seat is taken. You can draw once one frees.`
+            : t`Give up your seat and watch`
+        }
+      >
+        {mode.watching ? <Trans>Join Drawing</Trans> : <Trans>Just Watch</Trans>}
+      </button>
+    )}
+    {(guests || spectators) && (
+      // The owner's: who may come in, from here on. Unticking stops new
+      // arrivals only; somebody already in the room stays.
+      <div className="flex flex-wrap items-center gap-x-[8px] gap-y-[2px]">
+        {guests && (
+          <label
+            className="flex items-center gap-[3px]"
+            title={t`People without an account can join. Unticking stops new ones; guests already here stay.`}
+          >
+            <input
+              type="checkbox"
+              checked={guests.allowed}
+              disabled={guests.busy}
+              onChange={guests.onToggle}
+              className={NEO_CHECKBOX}
+            />
+            <Trans>Allow guests</Trans>
+          </label>
+        )}
+        {spectators && (
+          <label
+            className="flex items-center gap-[3px]"
+            title={t`People can watch without drawing. Unticking stops new ones; anybody already watching stays.`}
+          >
+            <input
+              type="checkbox"
+              checked={spectators.allowed}
+              disabled={spectators.busy}
+              onChange={spectators.onToggle}
+              className={NEO_CHECKBOX}
+            />
+            <Trans>Allow spectators</Trans>
+          </label>
+        )}
+      </div>
+    )}
     {canInvite &&
       discord.requests.map((request) => {
         const fate = discord.invitations[request.id];

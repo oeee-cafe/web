@@ -22,6 +22,11 @@
     {# Full, and open to watching: the card's way in is a place watching,
        and the room offers a seat once one frees. #}
     {% set watchable = not joinable and session.spectators_welcome %}
+    {# Anybody who could come in may come in to watch instead, full or not:
+       the owner allows it, it is not their own room, and they are let in at
+       all -- somebody without an account is not, where guests are not. #}
+    {% set offers_watching = session.spectators_welcome and not session.is_owner
+       and (viewer_has_account or session.guests_welcome) %}
     <div class="session-card{% if not joinable %} is-full{% endif %}">
       {# What the canvas looks like right now, uploaded by whoever is drawing
          in it -- the server cannot render one. Until the first stroke brings
@@ -68,6 +73,11 @@
           <span class="canvas-size">{{ session.width }}×{{ session.height }}</span>
           <span class="session-time" title="{{ session.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ session.created_at|ago }}</span>
         </div>
+        {% if offers_watching %}
+          <p class="session-actions">
+            <a class="ds-button ds-button-small session-watch" href="/collaborate/{{ session.id }}?watch=1">{{ ftl_get_message("collaborate-watch-session") }}</a>
+          </p>
+        {% endif %}
         {# Where the finished drawing will be posted. Worth knowing before
            joining, and it is the same choice the create form makes. #}
         {% if session.community_slug %}
@@ -81,7 +91,7 @@
         {% if session.is_full or (show_visibility and not session.is_public) or accounts_only %}
           <div class="session-badges">
             {% if session.is_full %}
-              <span class="community-card-badge session-full">{{ ftl_get_message("collaborate-session-full") }}{% if watchable %} · {{ ftl_get_message("collaborate-watch-session") }}{% endif %}</span>
+              <span class="community-card-badge session-full">{{ ftl_get_message("collaborate-session-full") }}</span>
             {% endif %}
             {# Only the owner's own list needs this: everything in the public
                list is public by definition. #}

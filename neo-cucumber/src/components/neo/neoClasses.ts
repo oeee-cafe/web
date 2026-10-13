@@ -263,6 +263,30 @@ export const NEO_FIELD =
 export const NEO_WELL = SUNKEN + " bg-(--neo-bk) text-(--neo-text)";
 
 /**
+ * A checkbox: a small square cut into the panel like a field, filled with the
+ * ink inside a ring of the field's own colour when it is ticked.
+ *
+ * NEO has no checkbox -- every setting it has is a button that stays pressed
+ * -- so this is built from the same parts as NEO_FIELD rather than copied from
+ * anything: the sunken bevel, the field ground, the panel's ink. A browser's
+ * own box, rounded and blue or grey depending on the system, is the one
+ * control on a NEO panel that would read as somebody else's.
+ *
+ * The mark is a filled square rather than a tick: a tick needs an image, and
+ * an image cannot take the theme's colours, where a fill and an inset ring
+ * are both just the palette. `appearance` is spelled out prefixed because the
+ * unprefixed property is Firefox 80, and without it Firefox 56 would draw its
+ * own box underneath.
+ */
+export const NEO_CHECKBOX =
+  "m-0 h-[11px] w-[11px] shrink-0 cursor-pointer rounded-none p-0 " +
+  "[-moz-appearance:none] [-webkit-appearance:none] appearance-none " +
+  SUNKEN +
+  " bg-(--neo-bk) checked:bg-(--neo-text) checked:shadow-[inset_0_0_0_2px_var(--neo-bk)] " +
+  "focus:outline-1 focus:outline-offset-1 focus:outline-(--neo-icon-select) " +
+  "disabled:cursor-not-allowed disabled:opacity-60";
+
+/**
  * A control carrying nothing but an icon.
  *
  * It has no horizontal padding on purpose. A flex item will not shrink below

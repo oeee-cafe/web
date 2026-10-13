@@ -1523,6 +1523,40 @@ mod tests {
         assert!(!rendered.contains("<p class=\"session-community\">"));
     }
 
+    /// Every card that can be watched offers to, full or not -- but not the
+    /// owner's own, not where the owner turned watching off, and not to
+    /// somebody without an account where guests may not come in at all.
+    #[test]
+    fn a_card_offers_watching_to_whoever_could_come_in() {
+        let env = test_support::env();
+        let template = env
+            .get_template("collaborate_lobby.jinja")
+            .expect("template");
+        let watch = |signed_in: bool, session: serde_json::Value| {
+            template
+                .render(lobby_context_with_sessions(
+                    signed_in,
+                    vec![],
+                    vec![sample_session(session)],
+                    vec![],
+                ))
+                .expect("renders")
+                .contains(r#"/collaborate/00000000-0000-0000-0000-000000000009?watch=1""#)
+        };
+        assert!(watch(false, json!({})), "seats free, and watching allowed");
+        assert!(watch(true, json!({})));
+        assert!(!watch(true, json!({"is_owner": true})), "the owner's own");
+        assert!(!watch(true, json!({"spectators_welcome": false})));
+        assert!(
+            !watch(false, json!({"guests_welcome": false})),
+            "no way in without an account"
+        );
+        assert!(
+            watch(true, json!({"guests_welcome": false})),
+            "but an account may"
+        );
+    }
+
     /// Watchers take no seat, so a card counts them beside the seats, and
     /// only when there are any.
     #[test]
@@ -1706,7 +1740,7 @@ mod tests {
             .expect("renders");
         assert!(rendered
             .contains(r#"href="/collaborate/00000000-0000-0000-0000-000000000009?watch=1""#));
-        assert!(rendered.contains("collaborate-session-full · collaborate-watch-session"));
+        assert!(rendered.contains(r#"class="ds-button ds-button-small session-watch""#));
     }
 
     #[test]
