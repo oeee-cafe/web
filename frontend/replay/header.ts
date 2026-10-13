@@ -89,6 +89,18 @@ export function header(sessionId: string): Header {
               : ""),
         ),
       );
+      // Watchers take no seat, so they are counted apart.
+      const watching = session.active_spectator_count ?? 0;
+      const everWatched = session.total_spectator_count ?? 0;
+      if (everWatched > 0) {
+        parts.push(
+          el(
+            "span",
+            undefined,
+            `${watching} watching` + (everWatched > watching ? ` (${everWatched} ever)` : ""),
+          ),
+        );
+      }
       parts.push(el("span", undefined, `created ${stamp(session.created_at)}`));
       if (session.ended_at) {
         parts.push(el("span", undefined, `ended ${new Date(session.ended_at).toISOString().slice(0, 16).replace("T", " ")} UTC`));

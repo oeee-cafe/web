@@ -422,6 +422,10 @@ pub struct AdminCollaborativeSession {
     /// Everyone who has ever joined, which is the one that says whether a quiet
     /// room was quiet all along or emptied out.
     pub total_participant_count: i64,
+    /// Watching now, without a seat. Not in the seat counts above.
+    pub active_spectator_count: i64,
+    /// Everybody who has only ever watched.
+    pub total_spectator_count: i64,
     /// False means link-only: it never appears in the public lobby.
     pub is_public: bool,
     pub community_slug: Option<String>,
@@ -517,6 +521,8 @@ async fn find_collaborative_sessions(
             cs.saved_post_id,
             COUNT(csp.participant_id) FILTER (WHERE csp.is_active AND NOT csp.is_spectator) AS "active_participant_count!",
             COUNT(csp.participant_id) FILTER (WHERE NOT csp.is_spectator) AS "total_participant_count!",
+            COUNT(csp.participant_id) FILTER (WHERE csp.is_active AND csp.is_spectator) AS "active_spectator_count!",
+            COUNT(csp.participant_id) FILTER (WHERE csp.is_spectator) AS "total_spectator_count!",
             r.session_id AS "recorded?",
             r.first_seq AS "first_seq?",
             r.last_seq AS "last_seq?",
@@ -568,6 +574,8 @@ async fn find_collaborative_sessions(
             max_participants: row.max_participants,
             active_participant_count: row.active_participant_count,
             total_participant_count: row.total_participant_count,
+            active_spectator_count: row.active_spectator_count,
+            total_spectator_count: row.total_spectator_count,
             is_public: row.is_public,
             community_slug: row.community_slug,
             community_name: row.community_name,

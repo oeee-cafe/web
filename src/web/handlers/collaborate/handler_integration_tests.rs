@@ -1533,7 +1533,15 @@ async fn watching_is_the_owners_to_allow_and_has_a_ceiling() {
         .execute(&room.db)
         .await
         .expect("stop watching");
+        // Gone first, as a dropped connection is: a reconnect that overlaps
+        // the old socket's cleanup is a different race, not this one.
         first.close(None).await.expect("close");
+        for _ in 0..50 {
+            if !room.active_participants().await.contains(&early) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
         let mut again = room.watch_as(early, "203.0.113.7").await;
         opening(&mut again).await;
         let mut refused = room.watch_as(late, "198.51.100.1").await;

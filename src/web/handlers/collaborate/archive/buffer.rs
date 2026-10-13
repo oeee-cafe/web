@@ -133,6 +133,9 @@ pub struct ArchivedChat {
     /// Absent from lines kept before guests could chat, all of which were
     /// an account's; whatever reads a transcript takes absent as false.
     pub is_guest: bool,
+    /// Said by somebody watching rather than drawing. Absent, like
+    /// `is_guest`, from lines kept before anybody could only watch.
+    pub is_spectator: bool,
     pub message: String,
 }
 
@@ -156,6 +159,7 @@ pub async fn record_chat(state: &AppState, room_uuid: Uuid, frame: &[u8]) {
         user_id: chat.user_id,
         login_name: chat.username,
         is_guest: chat.flags & crate::web::handlers::collaborate::guest::FLAG_GUEST != 0,
+        is_spectator: chat.flags & crate::web::handlers::collaborate::guest::FLAG_SPECTATOR != 0,
         message: chat.message,
     };
     let encoded = match serde_json::to_string(&line) {

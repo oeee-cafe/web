@@ -16,6 +16,8 @@ type Person = {
   sessionId: number | null;
   login: string;
   isGuest: boolean;
+  /** Only ever watched. */
+  isSpectator: boolean;
   displayName: string | null;
   joinedAt: string | null;
   leftAt: string | null;
@@ -48,6 +50,7 @@ function people(data: InspectorData): Person[] {
         sessionId: id,
         login,
         isGuest: row?.is_guest ?? false,
+        isSpectator: row?.is_spectator ?? false,
         displayName: row?.display_name ?? null,
         joinedAt: row?.joined_at ?? null,
         leftAt: row?.left_at ?? null,
@@ -64,6 +67,7 @@ function people(data: InspectorData): Person[] {
       sessionId: null,
       login: row.login_name,
       isGuest: row.is_guest ?? false,
+      isSpectator: row.is_spectator ?? false,
       displayName: row.display_name,
       joinedAt: row.joined_at,
       leftAt: row.left_at,
@@ -151,6 +155,11 @@ export function peoplePanel(onHidden: (actorIds: string[]) => void): Panel & { h
         head.appendChild(el("span", "inspect-muted", person.displayName));
       }
       if (id !== null) head.appendChild(el("span", "admin-tag", `#${id}`));
+      if (person.isSpectator) {
+        const tag = el("span", "admin-tag", "watching");
+        tag.title = "Only ever watched: no seat, and nothing of theirs is in the drawing";
+        head.appendChild(tag);
+      }
       if (person.inRoom) head.appendChild(el("span", "admin-tag inspect-tag-live", "in the room"));
       if (id !== null && seated.length > 1) {
         const only = el("button", "ds-button ds-button-small", "Only");

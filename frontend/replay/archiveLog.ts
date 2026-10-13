@@ -171,6 +171,8 @@ export type ArchivedChat = {
   login_name: string;
   /** Absent from lines kept before guests could chat. */
   is_guest?: boolean;
+  /** Said by somebody watching. Absent from lines kept before anybody could. */
+  is_spectator?: boolean;
   message: string;
 };
 

@@ -76,6 +76,9 @@
               {% if session.total_participant_count > session.active_participant_count %}
                 <span class="muted">({{ session.total_participant_count }} ever)</span>
               {% endif %}
+              {% if session.total_spectator_count > 0 %}
+                <span class="muted">· {{ session.active_spectator_count }} watching{% if session.total_spectator_count > session.active_spectator_count %} ({{ session.total_spectator_count }} ever){% endif %}</span>
+              {% endif %}
             </td>
             <td>
               {% if session.is_public %}

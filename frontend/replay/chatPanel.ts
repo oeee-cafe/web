@@ -68,6 +68,7 @@ export function chatPanel(seek: Seek): Panel {
           row.append(
             when,
             personName(line.login_name, line.is_guest, "inspect-chat-who"),
+            ...(line.is_spectator ? [el("span", "admin-tag", "watching")] : []),
             el("span", "inspect-chat-said", line.message),
           );
           row.title = new Date(line.at).toISOString();

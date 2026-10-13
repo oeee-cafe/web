@@ -56,6 +56,8 @@ export type SessionDetails = {
     max_participants: number;
     active_participant_count: number;
     total_participant_count: number;
+    active_spectator_count?: number;
+    total_spectator_count?: number;
     is_public: boolean;
     community_slug: string | null;
     community_name: string | null;
@@ -70,6 +72,8 @@ export type SessionDetails = {
     login_name: string;
     display_name: string;
     is_guest?: boolean;
+    /** Only ever watched: no seat, no layers, nothing drawn. */
+    is_spectator?: boolean;
     joined_at: string;
     left_at: string | null;
     is_active: boolean;

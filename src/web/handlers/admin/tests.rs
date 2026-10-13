@@ -413,6 +413,8 @@ fn sample_session(overrides: serde_json::Value) -> serde_json::Value {
         "max_participants": 4,
         "active_participant_count": 2,
         "total_participant_count": 5,
+        "active_spectator_count": 0,
+        "total_spectator_count": 0,
         "is_public": false,
         "community_slug": null,
         "community_name": null,
@@ -449,6 +451,20 @@ fn render_sessions(sessions: Vec<serde_json::Value>) -> String {
         .expect("template loads")
         .render(sessions_context(sessions))
         .expect("collaborative_sessions.jinja renders")
+}
+
+/// Watchers take no seat, so they are counted beside the seats rather than
+/// in them, and only where there have been any.
+#[test]
+fn session_list_counts_watchers_apart_from_seats() {
+    let watched = render_sessions(vec![sample_session(json!({
+        "active_spectator_count": 3,
+        "total_spectator_count": 7,
+    }))]);
+    assert!(watched.contains("2 / 4"));
+    assert!(watched.contains("· 3 watching (7 ever)"));
+    let unwatched = render_sessions(vec![sample_session(json!({}))]);
+    assert!(!unwatched.contains(" watching"));
 }
 
 /// The owner is a way to their profile, without leaving the list.
