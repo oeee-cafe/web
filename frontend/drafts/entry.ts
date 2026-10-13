@@ -16,6 +16,7 @@ import {
 } from "../shared/localDrafts";
 import { feelInApp } from "../shared/appBridge";
 import { downloadPng, UploadError, uploadLocalDraft } from "../shared/drawingUpload";
+import { fetchSaveDestinations, saveUrl } from "../shared/saveDestinations";
 import { ask, say } from "../shared/siteDialog";
 
 interface DraftsWords {
@@ -30,6 +31,7 @@ interface DraftsWords {
   postFailed: string;
   unavailable: string;
   collaborationNotYours: string;
+  postTo: string;
 }
 
 const section = document.getElementById("local-drafts");
@@ -79,8 +81,10 @@ async function postCollaboration(
   trigger: HTMLButtonElement,
 ): Promise<void> {
   trigger.disabled = true;
+  // The community chosen on the card, for a room opened in none.
+  const community = card.querySelector<HTMLSelectElement>(".local-draft-destination")?.value ?? "";
   try {
-    const response = await fetch(`/collaborate/${encodeURIComponent(sessionId)}`, {
+    const response = await fetch(saveUrl(sessionId, community), {
       method: "POST",
       body: draftPng(draft),
       headers: { "Content-Type": "image/png" },
@@ -108,6 +112,42 @@ async function postCollaboration(
     say(words.postFailed || "Couldn't post this drawing.");
     trigger.disabled = false;
   }
+}
+
+/**
+ * Where a kept collaborative room will be posted: the community it was
+ * opened in, named in the byline, or for one opened from the lobby a choice
+ * of the account's own posts or a public community, on a line above the
+ * buttons. Asked of the server, since signing in is what made the room this
+ * account's; if it cannot say, the card stays as it was and the post goes to
+ * their own.
+ */
+function offerDestinations(sessionId: string, who: HTMLElement, actions: HTMLElement): void {
+  fetchSaveDestinations(sessionId)
+    .then((destinations) => {
+      if (destinations.community) {
+        who.textContent = destinations.community.name;
+        return;
+      }
+      if (!destinations.choices.length) return;
+      const select = document.createElement("select");
+      select.className = "ds-select local-draft-destination";
+      const own = document.createElement("option");
+      own.value = "";
+      own.textContent = words.personal || "Personal post";
+      select.append(own);
+      for (const place of destinations.choices) {
+        const option = document.createElement("option");
+        option.value = place.id;
+        option.textContent = place.name;
+        select.append(option);
+      }
+      const row = document.createElement("label");
+      row.className = "local-draft-destination-row";
+      row.append(words.postTo || "Post to", select);
+      actions.before(row);
+    })
+    .catch(console.error);
 }
 
 async function post(draft: LocalDraft, card: HTMLElement, trigger: HTMLButtonElement): Promise<void> {
@@ -214,6 +254,9 @@ function card(draft: LocalDraft): HTMLElement {
   actions.append(downloadButton, deleteButton);
 
   meta.append(title, byline, actions);
+  if (draft.collaborativeSessionId && userId) {
+    offerDestinations(draft.collaborativeSessionId, who, actions);
+  }
   item.append(frame, meta);
   return item;
 }

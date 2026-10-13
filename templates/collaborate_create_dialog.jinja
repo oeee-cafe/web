@@ -1,0 +1,126 @@
+{# The new-session dialog, on the lobby and on a community page, opened by
+   toggleSessionDialog(true). Its context is `create_session`
+   (collaborate::create_session_context): on the lobby a room in no community,
+   whose drawing's community is chosen when it is saved; on a community page a
+   room in that community, fixed. #}
+{% set create_community = create_session.community %}
+{% set sign_in_next = "/@" ~ create_community.slug if create_community else "/collaborate" %}
+<div id="create-session-dialog" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="create-session-title">
+  <div class="ds-modal-panel create-session-panel">
+    <h2 id="create-session-title" tabindex="-1">{{ ftl_get_message("collaborate-create-session") }}</h2>
+    {# Sent by htmx: the server answers with where the new session is
+       (HX-Redirect), and a refusal goes to the page's error banner
+       (web::htmx). Only a request that got no answer at all is ours to say,
+       which the banner cannot. Without script it is an ordinary form,
+       redirected there. A label column and a control column, so the eye
+       follows one edge down. #}
+    <form id="create-session-form"
+          class="session-form"
+          method="post"
+          action="/collaborate"
+          hx-post="/collaborate"
+          hx-disable="find button[type=submit]"
+          data-network-error="{{ ftl_get_message("collaborate-create-network-error") }}"
+          hx-on::error="if (!(event.detail.ctx && event.detail.ctx.response)) dsAlert(this.dataset.networkError)">
+      {% if create_community %}
+        <input type="hidden" name="community_id" value="{{ create_community.id }}">
+      {% endif %}
+      {% if not current_user %}
+        {# What a guest is called in the room, on their cursor and in chat,
+           marked as a guest's wherever it shows. #}
+        <label for="guest-nickname">{{ ftl_get_message("collaborate-guest-nickname-label") }}</label>
+        <div class="field">
+          <input type="text"
+                 class="ds-input"
+                 id="guest-nickname"
+                 name="nickname"
+                 required
+                 maxlength="{{ create_session.nickname_max_chars }}"
+                 autocomplete="nickname"
+                 value="{{ create_session.guest_nickname or "" }}">
+          <p class="field-help">{{ ftl_get_message("collaborate-guest-nickname-hint") }} <a href="/login?next={{ sign_in_next|urlencode }}">{{ ftl_get_message("collaborate-sign-in-instead") }}</a></p>
+        </div>
+      {% endif %}
+      <label for="canvas-size">{{ ftl_get_message("collaborate-canvas-size-label") }}</label>
+      <div class="field">
+        <select id="canvas-size" name="canvas-size" class="ds-select" required>
+          {% for size_value, size_label, chosen in create_session.canvas_sizes %}<option value="{{ size_value }}"{% if chosen %} selected{% endif %}>{{ size_label }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <label for="session-title">{{ ftl_get_message("collaborate-session-title-label") }}</label>
+      <div class="field">
+        <input type="text"
+               class="ds-input"
+               id="session-title"
+               name="title"
+               maxlength="100"
+               placeholder="{{ ftl_get_message("collaborate-session-title-placeholder") }}">
+      </div>
+
+      <label for="max-participants">{{ ftl_get_message("collaborate-max-participants-label") }}</label>
+      <div class="field">
+        <select id="max-participants" name="max_participants" class="ds-select" required>
+          {% for seats in create_session.participant_choices %}<option value="{{ seats }}" {% if seats == 4 %}selected{% endif %}>{{ seats }} {{ ftl_get_message("collaborate-participants") }}</option>{% endfor %}
+        </select>
+      </div>
+
+      {# Unlisted and private communities' rooms are never listed in the
+         lobby and never let guests in (collaborate::db::viewer_may_enter),
+         so neither is offered there. #}
+      {% if not create_community or create_community.is_public %}
+        <div class="field field-wide">
+          <label class="checkbox-label" for="is-public">
+            <input type="checkbox" id="is-public" name="is_public" checked>
+            {{ ftl_get_message("collaborate-public-session-label") }}
+          </label>
+          <p class="field-help">{{ ftl_get_message("collaborate-public-session-description") }}</p>
+        </div>
+
+        <div class="field field-wide">
+          <label class="checkbox-label" for="allow-guests">
+            <input type="checkbox" id="allow-guests" name="allow_guests" checked>
+            {{ ftl_get_message("collaborate-allow-guests-label") }}
+          </label>
+          <p class="field-help">{{ ftl_get_message("collaborate-allow-guests-description") }}</p>
+        </div>
+      {% endif %}
+
+      <div class="field field-wide">
+        <label class="checkbox-label" for="allow-spectators">
+          <input type="checkbox" id="allow-spectators" name="allow_spectators" checked>
+          {{ ftl_get_message("collaborate-allow-spectators-label") }}
+        </label>
+        <p class="field-help">{{ ftl_get_message("collaborate-allow-spectators-description") }}</p>
+      </div>
+
+      {# Where the drawing goes: this community, or on the lobby, chosen
+         when it is saved. #}
+      <p class="field field-wide field-help">{% if create_community %}{{ ftl_format_pattern("collaborate-create-posts-to", {"community": create_community.name}) }}{% else %}{{ ftl_get_message("collaborate-create-posts-later") }}{% endif %}</p>
+
+      <div class="field field-wide form-actions session-form-actions">
+        <button type="button" class="ds-button" onclick="toggleSessionDialog(false)">{{ ftl_get_message("cancel") }}</button>
+        <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("collaborate-create-button") }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  function toggleSessionDialog(open) {
+    var dialog = document.getElementById("create-session-dialog");
+    dialog.style.display = open ? "flex" : "none";
+    // Focus the heading, not the first field: on iOS a focused <select>
+    // opens its picker and a focused input raises the keyboard, so
+    // New session would arrive with the canvas-size wheel already up.
+    if (open) document.getElementById("create-session-title").focus();
+  }
+  (function () {
+    var dialog = document.getElementById("create-session-dialog");
+    dialog.addEventListener("click", function (e) {
+      if (e.target === dialog) toggleSessionDialog(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && dialog.style.display !== "none") toggleSessionDialog(false);
+    });
+  })();
+</script>

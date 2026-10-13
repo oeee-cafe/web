@@ -23,11 +23,12 @@ use crate::web::handlers::admin::{
 use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, require_login, signup};
 use crate::web::handlers::collaborate::{
     ban_collaborative_participant, become_collaboration_guest, claim_session_preview,
-    collaborate_lobby, collaborate_sessions_fragment, create_collaborative_session_form,
-    discord_join, end_collaborative_session, get_auth_info, get_collaboration_meta,
-    load_more_collaborative_posts, report_session_diagnostics, save_collaborative_session,
-    serve_collaborative_app, serve_session_preview, set_collaboration_guests,
-    set_collaboration_spectators, upload_session_preview, websocket_collaborate_handler,
+    collaborate_lobby, collaborate_sessions_fragment, collaboration_save_destinations,
+    create_collaborative_session_form, discord_join, end_collaborative_session, get_auth_info,
+    get_collaboration_meta, load_more_collaborative_posts, report_session_diagnostics,
+    save_collaborative_session, serve_collaborative_app, serve_session_preview,
+    set_collaboration_guests, set_collaboration_spectators, upload_session_preview,
+    websocket_collaborate_handler,
 };
 use crate::web::handlers::collaborate_cleanup::cleanup_collaborative_sessions;
 use crate::web::handlers::community::{
@@ -542,6 +543,10 @@ impl App {
             // The owner's: ending without a post, and sending somebody out.
             .route("/collaborate/{uuid}/end", post(end_collaborative_session))
             .route("/collaborate/{uuid}/guests", post(set_collaboration_guests))
+            .route(
+                "/collaborate/{uuid}/destinations",
+                get(collaboration_save_destinations),
+            )
             .route(
                 "/collaborate/{uuid}/spectators",
                 post(set_collaboration_spectators),

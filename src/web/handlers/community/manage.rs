@@ -280,7 +280,12 @@ pub async fn hx_do_edit_community(
                     .unwrap_or_else(|| "en".to_string())
                     .to_string();
                 let mut header_tx = state.db_pool.begin().await?;
-                let header = community_header_context(&mut header_tx, &updated_community).await?;
+                let header = community_header_context(
+                    &mut header_tx,
+                    &updated_community,
+                    auth_session.user.as_ref().map(|u| u.id),
+                )
+                .await?;
                 header_tx.commit().await?;
                 let rendered = state
                     .render_block(

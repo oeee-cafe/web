@@ -38,11 +38,11 @@ msgstr "인증 실패"
 msgid "by"
 msgstr "작성자:"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:55
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:60
 msgid "Cancel"
 msgstr "취소"
 
-#: ../frontend/collaborate/App.tsx:1026
+#: ../frontend/collaborate/App.tsx:1030
 msgid "Choose a name of 1 to 30 characters, without hidden characters."
 msgstr "숨은 문자 없이 1~30자로 이름을 정해 주세요."
 
@@ -79,16 +79,16 @@ msgstr "연결 중..."
 msgid "Connection lost. Your work is saved locally."
 msgstr "연결이 끊어졌습니다. 작업이 로컬에 저장되었습니다."
 
-#: ../frontend/collaborate/App.tsx:1238
+#: ../frontend/collaborate/App.tsx:1259
 msgid "Couldn't change who can join. Please try again."
 msgstr "참여 가능 대상을 바꾸지 못했습니다. 다시 시도해 주세요."
 
-#: ../frontend/collaborate/App.tsx:1141
+#: ../frontend/collaborate/App.tsx:1162
 msgid "Couldn't change who can watch. Please try again."
 msgstr "구경할 수 있는 대상을 바꾸지 못했습니다. 다시 시도해 주세요."
 
-#: ../frontend/collaborate/App.tsx:1028
-#: ../frontend/collaborate/App.tsx:1036
+#: ../frontend/collaborate/App.tsx:1032
+#: ../frontend/collaborate/App.tsx:1040
 msgid "Couldn't join. Please try again."
 msgstr "참여하지 못했습니다. 다시 시도해 주세요."
 
@@ -97,7 +97,7 @@ msgid "Couldn’t let {name} in"
 msgstr "{name} 님을 들이지 못했어요"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1258
+#: ../frontend/collaborate/App.tsx:1279
 msgid "Couldn't remove {0}. Please try again."
 msgstr "{0} 님을 내보내지 못했습니다. 다시 시도해 주세요."
 
@@ -111,7 +111,7 @@ msgid "Discord friends"
 msgstr "Discord 친구"
 
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:79
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:149
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:157
 msgid "Download PNG"
 msgstr "PNG 다운로드"
 
@@ -123,7 +123,7 @@ msgstr "계정 없이 그리는 중"
 msgid "Every seat is taken. You can draw once one frees."
 msgstr "자리가 모두 찼습니다. 자리가 나면 그릴 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:69
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:73
 msgid "Failed to save session. Please try downloading as PNG instead."
 msgstr "세션 저장에 실패했습니다. 대신 PNG로 다운로드해 보세요."
 
@@ -140,8 +140,8 @@ msgstr "로비로 가기"
 msgid "guest"
 msgstr "손님"
 
-#: ../frontend/collaborate/App.tsx:1337
-#: ../frontend/collaborate/App.tsx:1341
+#: ../frontend/collaborate/App.tsx:1358
+#: ../frontend/collaborate/App.tsx:1362
 msgid "Help"
 msgstr "도움말"
 
@@ -189,15 +189,15 @@ msgstr "그리기 참여"
 msgid "Just Watch"
 msgstr "구경만 하기"
 
-#: ../frontend/collaborate/App.tsx:1377
-#: ../frontend/collaborate/App.tsx:1428
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
+#: ../frontend/collaborate/App.tsx:1398
+#: ../frontend/collaborate/App.tsx:1449
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Keep on This Device"
 msgstr "이 기기에 보관"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:41
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:45
 msgid "Keep this drawing on this device? The session ends for everyone and nobody can keep drawing on it afterwards. Sign in to post it from your drafts."
 msgstr "이 그림을 이 기기에 보관할까요? 모두의 세션이 끝나고 이후에는 아무도 이어서 그릴 수 없습니다. 로그인한 뒤 임시 저장함에서 올릴 수 있습니다."
 
@@ -222,6 +222,10 @@ msgstr "로딩 중..."
 msgid "Message too long (max 500 characters)"
 msgstr "메시지가 너무 깁니다 (최대 500자)"
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:40
+msgid "My own posts"
+msgstr "내 게시물"
+
 #: ../frontend/collaborate/components/DiscordInvite.tsx:106
 msgid "No Discord friends to invite yet."
 msgstr "아직 초대할 Discord 친구가 없어요."
@@ -230,7 +234,7 @@ msgstr "아직 초대할 Discord 친구가 없어요."
 msgid "No friend by that name."
 msgstr "그 이름의 친구가 없어요."
 
-#: ../frontend/collaborate/App.tsx:957
+#: ../frontend/collaborate/App.tsx:961
 msgid "No Title"
 msgstr "제목 없음"
 
@@ -261,11 +265,19 @@ msgstr "그리지 않고 구경할 수 있습니다. 해제하면 새로 구경�
 msgid "People without an account can join. Unticking stops new ones; guests already here stay."
 msgstr "계정이 없는 사람도 참여할 수 있습니다. 해제하면 새 손님만 막고, 이미 있는 손님은 남습니다."
 
+#: ../frontend/collaborate/components/SaveDestination.tsx:31
+msgid "Post to"
+msgstr "올릴 곳"
+
+#: ../frontend/collaborate/components/SaveDestination.tsx:24
+msgid "Posts to {name}"
+msgstr "{name}에 올라갑니다"
+
 #: ../frontend/collaborate/components/modals/ConnectionStatusModal.tsx:76
 msgid "Reconnect"
 msgstr "재연결"
 
-#: ../frontend/collaborate/App.tsx:1248
+#: ../frontend/collaborate/App.tsx:1269
 msgid "Remove"
 msgstr "내보내기"
 
@@ -276,7 +288,7 @@ msgid "Remove {0} from this session"
 msgstr "{0} 님을 세션에서 내보내기"
 
 #. placeholder {0}: participant.username
-#: ../frontend/collaborate/App.tsx:1247
+#: ../frontend/collaborate/App.tsx:1268
 msgid "Remove {0} from this session? They won't be able to rejoin it."
 msgstr "{0} 님을 세션에서 내보낼까요? 이 세션에 다시 들어올 수 없게 됩니다."
 
@@ -295,30 +307,30 @@ msgstr "다시 시도"
 
 #: ../frontend/collaborate/components/modals/PausedModal.tsx:31
 #: ../frontend/collaborate/components/modals/RemovedModal.tsx:23
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:167
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:175
 msgid "Return to Lobby"
 msgstr "로비로 돌아가기"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:159
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:167
 msgid "Save as PNG"
 msgstr "PNG로 저장"
 
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:47
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:51
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "이 그림을 갤러리에 저장할까요? 저장하면 모두의 세션이 끝나고 아무도 이어서 그릴 수 없습니다."
 
-#: ../frontend/collaborate/App.tsx:1378
-#: ../frontend/collaborate/App.tsx:1428
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:34
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:58
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:138
+#: ../frontend/collaborate/App.tsx:1399
+#: ../frontend/collaborate/App.tsx:1449
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
 msgid "Save to Gallery"
 msgstr "갤러리에 저장"
 
-#: ../frontend/collaborate/App.tsx:1375
-#: ../frontend/collaborate/App.tsx:1428
+#: ../frontend/collaborate/App.tsx:1396
+#: ../frontend/collaborate/App.tsx:1449
 #: ../frontend/collaborate/components/modals/SessionEndingModal.tsx:12
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:133
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:141
 msgid "Saving..."
 msgstr "저장 중..."
 
@@ -340,7 +352,7 @@ msgstr "보내는 중…"
 msgid "Sent"
 msgstr "보냄"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:90
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:94
 msgid "Session Expired"
 msgstr "세션 만료"
 
@@ -380,7 +392,7 @@ msgstr "회원가입하고 이곳으로 돌아옵니다. 그린 것은 새 계�
 msgid "Take a seat and draw"
 msgstr "자리에 앉아 그리기"
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:105
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:109
 msgid "The owner ended this session. You can save your work locally as a PNG before leaving."
 msgstr "세션 주인이 세션을 끝냈습니다. 나가기 전에 PNG로 저장할 수 있습니다."
 
@@ -392,27 +404,27 @@ msgstr "세션 주인이 당신을 내보냈습니다. 이 세션에는 다시 �
 msgid "The shared drawing could not be synchronized safely. Your current canvas is still available to download."
 msgstr "공유 그림을 안전하게 동기화하지 못했습니다. 현재 캔버스는 계속 내려받을 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:111
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:115
 msgid "This collaborative session has ended due to inactivity. As the owner, you can save it to the gallery or download it as a PNG."
 msgstr "비활성으로 인해 이 협업 세션이 종료되었습니다. 소유자로서 갤러리에 저장하거나 PNG로 다운로드할 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:110
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:114
 msgid "This collaborative session has ended due to inactivity. The session has already been saved to the gallery, but you can download it as a PNG."
 msgstr "비활성으로 인해 이 협업 세션이 종료되었습니다. 세션이 이미 갤러리에 저장되었지만 PNG로 다운로드할 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:107
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:111
 msgid "This collaborative session has ended due to inactivity. You can keep it on this device and post it after signing in, or download it as a PNG."
 msgstr "활동이 없어 공동 그리기 세션이 끝났습니다. 이 기기에 보관했다가 로그인 후 올리거나, PNG로 내려받을 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:112
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:116
 msgid "This collaborative session has ended due to inactivity. You can save your work locally as a PNG before leaving."
 msgstr "비활성으로 인해 이 협업 세션이 종료되었습니다. 떠나기 전에 작업을 PNG로 로컬에 저장할 수 있습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:103
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:107
 msgid "This collaborative session has ended. Its drawing was not saved to the gallery and is no longer available."
 msgstr "공동 그리기 세션이 끝났습니다. 그림은 갤러리에 저장되지 않았고 더는 볼 수 없습니다."
 
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:65
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:69
 msgid "This session has already been saved. You can only download it as a PNG."
 msgstr "이 세션은 이미 저장되었습니다. PNG로만 다운로드할 수 있습니다."
 
@@ -420,7 +432,7 @@ msgstr "이 세션은 이미 저장되었습니다. PNG로만 다운로드할 �
 msgid "This session is full ({currentUserCount}/{maxUsers} users). Only the first {maxUsers} users can join a session."
 msgstr "이 세션이 가득 찼습니다 ({currentUserCount}/{maxUsers}명). 처음 {maxUsers}명의 사용자만 세션에 참여할 수 있습니다."
 
-#: ../frontend/collaborate/App.tsx:1027
+#: ../frontend/collaborate/App.tsx:1031
 msgid "Too many guests have joined from this network. Try again later, or sign in."
 msgstr "이 네트워크에서 손님이 너무 많이 참여했습니다. 나중에 다시 시도하거나 로그인해 주세요."
 

@@ -170,6 +170,14 @@ impl Room {
         .execute(&self.db)
         .await
         .expect("delete guests");
+        // Rooms a test opened besides this one, through `insert_session`.
+        sqlx::query!(
+            "DELETE FROM collaborative_sessions WHERE owner_id = ANY($1)",
+            &self.users
+        )
+        .execute(&self.db)
+        .await
+        .expect("delete the users' other sessions");
         if let Some(community_id) = self.community_id {
             sqlx::query!("DELETE FROM communities WHERE id = $1", community_id)
                 .execute(&self.db)
@@ -958,6 +966,112 @@ async fn a_room_in_an_unlisted_community_admits_the_link() {
     .await;
     room.teardown().await;
     outcome.expect("the scenario finished in time");
+}
+
+/// What the new-session form sends, for a room in `community`.
+fn new_room_in(community: Option<Uuid>) -> super::types::CreateSessionRequest {
+    super::types::CreateSessionRequest {
+        title: None,
+        width: 1024,
+        height: 768,
+        is_public: true,
+        max_participants: 4,
+        community_id: community.map(|id| id.to_string()),
+        allow_guests: true,
+        allow_spectators: true,
+    }
+}
+
+/// A room is opened in a community by the rule its New drawing follows: in
+/// a private one, by a member.
+#[tokio::test]
+async fn a_room_in_a_private_community_is_opened_by_a_member() {
+    let Some(room) = open_room_in(4, Some("private")).await else {
+        return;
+    };
+    let community = room.community_id;
+    let owner = Collaborator::User {
+        id: room.users[0],
+        login_name: "owner".to_string(),
+    };
+    let stranger = Collaborator::User {
+        id: room.users[1],
+        login_name: "stranger".to_string(),
+    };
+    super::http_handlers::insert_session(&room.state, &owner, new_room_in(community))
+        .await
+        .expect("a member opens one");
+    let refused =
+        super::http_handlers::insert_session(&room.state, &stranger, new_room_in(community)).await;
+    assert!(matches!(
+        refused,
+        Err(crate::app_error::AppError::Forbidden)
+    ));
+    room.teardown().await;
+}
+
+/// In an unlisted community any account opens one -- having posted there or
+/// not -- and it is never listed in the lobby, whatever the form said. A
+/// guest opens none.
+#[tokio::test]
+async fn a_room_in_an_unlisted_community_is_link_only_and_for_accounts() {
+    let Some(mut room) = open_room_in(4, Some("unlisted")).await else {
+        return;
+    };
+    let community = room.community_id;
+    let stranger = Collaborator::User {
+        id: room.users[1],
+        login_name: "stranger".to_string(),
+    };
+    let opened =
+        super::http_handlers::insert_session(&room.state, &stranger, new_room_in(community))
+            .await
+            .expect("an account opens one");
+    let listed = sqlx::query_scalar!(
+        "SELECT is_public FROM collaborative_sessions WHERE id = $1",
+        opened
+    )
+    .fetch_one(&room.db)
+    .await
+    .expect("the room");
+    assert!(!listed, "an unlisted community's room is not in the lobby");
+
+    let guest = room.add_guest("visitor").await;
+    let guest = Collaborator::Guest {
+        id: guest,
+        nickname: "visitor".to_string(),
+    };
+    let refused =
+        super::http_handlers::insert_session(&room.state, &guest, new_room_in(community)).await;
+    assert!(matches!(
+        refused,
+        Err(crate::app_error::AppError::Forbidden)
+    ));
+    room.teardown().await;
+}
+
+/// A room opened in no community may be saved to a public community, which
+/// would have let in the same people, and to no other.
+#[tokio::test]
+async fn a_room_in_no_community_is_saved_only_to_a_public_one() {
+    for (visibility, offered) in [("public", true), ("unlisted", false), ("private", false)] {
+        let Some(room) = open_room_in(4, Some(visibility)).await else {
+            return;
+        };
+        let community = room.community_id.expect("a community");
+        let mut tx = room.db.begin().await.expect("tx");
+        // The community's owner and member: belonging is not enough.
+        let destinations = super::http_handlers::save_destinations(&mut tx, room.users[0])
+            .await
+            .expect("destinations");
+        tx.rollback().await.expect("rollback");
+        assert_eq!(
+            destinations.iter().any(|c| c.id == community),
+            offered,
+            "{visibility}"
+        );
+        room.teardown().await;
+    }
 }
 
 /// The name and flags a JOIN or LEAVE carries, as the room hears them:

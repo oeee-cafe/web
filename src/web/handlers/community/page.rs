@@ -19,6 +19,7 @@ use axum::http::{uri::Uri, HeaderMap, HeaderValue};
 use axum::response::{IntoResponse, Redirect};
 use axum::{extract::State, response::Html};
 use minijinja::context;
+use tower_sessions::Session;
 
 use crate::web::context::CommonContext;
 use crate::web::i18n::ExtractFtlLang;
@@ -30,6 +31,7 @@ pub async fn redirect_community_to_unified(Path(slug): Path<String>) -> Redirect
 
 pub async fn community(
     auth_session: AuthSession,
+    session: Session,
     headers: HeaderMap,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
@@ -68,6 +70,7 @@ pub async fn community(
         &mut tx,
         &state,
         &auth_session,
+        &session,
         &headers,
         ftl_lang,
         community,
@@ -79,13 +82,22 @@ pub async fn community(
 /// Who keeps a community and how much has been drawn in it, for the header's
 /// meta line. Every render of the header needs it -- the page, cancelling an
 /// edit and saving one -- or the line would vanish after an edit.
+///
+/// `viewer` is the account looking, None for anybody else: whether they may
+/// open a collaborative room here decides whether Draw together is offered.
 pub(super) async fn community_header_context(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     community: &Community,
+    viewer: Option<uuid::Uuid>,
 ) -> Result<minijinja::Value, AppError> {
     let owner = find_user_by_id(tx, community.owner_id).await?;
     let stats = get_community_stats(tx, community.id).await?;
+    // The rule a room opened here is held to (`collaborate::insert_session`).
+    let two_tone = community.background_color.is_some() && community.foreground_color.is_some();
+    let draw_together =
+        !two_tone && crate::web::handlers::draw::may_draw_in_as(tx, viewer, community).await?;
     Ok(context! {
+        draw_together,
         owner => owner.map(|u| context! {
             login_name => Serde(u.login_name),
             display_name => u.display_name,
@@ -101,10 +113,12 @@ pub(super) async fn community_header_context(
 /// Shared by `/communities/:id` and the unified `/@:slug` route, which had a
 /// copy each and were only kept in step by hand. They differ solely in how the
 /// community was looked up, so everything past that point lives here.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn render_community_page(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     state: &AppState,
     auth_session: &AuthSession,
+    session: &Session,
     headers: &HeaderMap,
     ftl_lang: String,
     community: Community,
@@ -153,7 +167,8 @@ pub(crate) async fn render_community_page(
     // a hovered pill before that header is set -- so hovering Drawings and
     // then clicking it swapped the header alone in for the whole content
     // area, and the page went blank below the toolbar.
-    let header = community_header_context(tx, &community).await?;
+    let header =
+        community_header_context(tx, &community, auth_session.user.as_ref().map(|u| u.id)).await?;
     let wants_header_only = headers.get("HX-Request") == Some(&HeaderValue::from_static("true"))
         && headers.get("Oeee-Part") == Some(&HeaderValue::from_static("header"));
     if wants_header_only {
@@ -197,6 +212,7 @@ pub(crate) async fn render_community_page(
     )
     .await?;
     let common_ctx = CommonContext::build(tx, auth_session.user.as_ref(), &ftl_lang).await?;
+    let create_session = create_session_context(state, auth_session, session, &community).await?;
 
     let rendered = state
         .render_page(
@@ -205,6 +221,7 @@ pub(crate) async fn render_community_page(
             context! {
                 community => Serde(Some(&community)),
                 header => header,
+                create_session,
                 community_id => community_uuid.to_string(),
                 domain => state.config.domain.clone(),
                 feed => feed_context(posts, &community_posts_path(&community.slug), 0, None),
@@ -213,6 +230,27 @@ pub(crate) async fn render_community_page(
         )
         .await?;
     Ok(Html(rendered).into_response())
+}
+
+/// The new-session dialog Draw together opens, with this community fixed:
+/// a room is opened in a community from its page, and the lobby opens rooms
+/// in none.
+async fn create_session_context(
+    state: &AppState,
+    auth_session: &AuthSession,
+    session: &Session,
+    community: &Community,
+) -> Result<minijinja::Value, AppError> {
+    let guest_nickname = match auth_session.user {
+        Some(_) => None,
+        None => crate::web::handlers::collaborate::guest::current(None, session, &state.db_pool)
+            .await?
+            .map(|guest| guest.name().to_string()),
+    };
+    Ok(crate::web::handlers::collaborate::create_session_context(
+        Some(community),
+        guest_nickname,
+    ))
 }
 
 /// The load-more endpoint a community feed's sentinel points at. One function
@@ -432,6 +470,7 @@ pub async fn community_iframe(
 
 pub async fn community_comments(
     auth_session: AuthSession,
+    session: Session,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -507,7 +546,14 @@ pub async fn community_comments(
         None,
     )
     .await?;
-    let header = community_header_context(&mut tx, &community).await?;
+    let header = community_header_context(
+        &mut tx,
+        &community,
+        auth_session.user.as_ref().map(|u| u.id),
+    )
+    .await?;
+    let create_session =
+        create_session_context(&state, &auth_session, &session, &community).await?;
     let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let template = "community_comments.jinja";
@@ -518,6 +564,7 @@ pub async fn community_comments(
             context! {
                 community => Serde(&community),
                 header => header,
+                create_session,
                 community_id => community_uuid.to_string(),
                 comments => comments_context(comments, &community_comments_path(&community.slug)),
                 domain => state.config.domain.clone(),

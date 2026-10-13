@@ -144,6 +144,9 @@ fn the_header_credits_the_owner_and_drawing_opens_a_dialog() {
         })
     };
     let render = |community: serde_json::Value| {
+        // What community/page.rs works out: never a room in a two-tone
+        // community.
+        let draw_together = community["background_color"].is_null();
         env.get_template("community.jinja")
             .expect("community template loads")
             .render(context! {
@@ -156,6 +159,18 @@ fn the_header_credits_the_owner_and_drawing_opens_a_dialog() {
                     "owner": {"login_name": "keeper", "display_name": "The Keeper"},
                     "posts_count": 12,
                     "contributors_count": 4,
+                    "draw_together": draw_together,
+                })),
+                create_session => Serde(json!({
+                    "community": {
+                        "id": "00000000-0000-0000-0000-000000000001",
+                        "name": "Open",
+                        "slug": "open",
+                        "is_public": true,
+                    },
+                    "canvas_sizes": [["300x300", "300×300", true]],
+                    "participant_choices": [4],
+                    "nickname_max_chars": 30,
                 })),
                 community_id => "00000000-0000-0000-0000-000000000001",
                 domain => "oeee.test",
@@ -173,14 +188,21 @@ fn the_header_credits_the_owner_and_drawing_opens_a_dialog() {
         .expect("the drawing dialog");
     let size = rendered.find("community-draw-size").expect("size choice");
     assert!(size > dialog, "the drawing form is back on the page");
-    assert!(rendered.contains("/collaborate?community=open"));
+    // Draw together opens the new-session dialog here, with this community
+    // fixed, rather than going to the lobby.
+    assert!(rendered.contains(r#"onclick="toggleSessionDialog(true)""#));
+    assert!(rendered.contains(
+        r#"<input type="hidden" name="community_id" value="00000000-0000-0000-0000-000000000001">"#
+    ));
+    assert!(!rendered.contains("/collaborate?community="));
 
     // Two-tone: the dialog asks for an orientation, and there is no
     // drawing together to offer.
     let rendered = render(community(json!("#ffffff")));
     assert!(rendered.contains("name=\"orientation\""));
     assert!(rendered.contains("community-colors"));
-    assert!(!rendered.contains("/collaborate?community=open"));
+    assert!(!rendered.contains("toggleSessionDialog(true)"));
+    assert!(!rendered.contains("create-session-form"));
 }
 
 /// Cancel and Save swap the edit card back out for the header. The

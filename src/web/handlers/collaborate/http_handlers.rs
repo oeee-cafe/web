@@ -230,9 +230,36 @@ pub async fn get_collaboration_meta(
 
 #[derive(serde::Deserialize)]
 pub struct LobbyQuery {
-    /// Slug to preselect, so a community page can link straight into the
-    /// create form with its own community chosen.
+    /// A community page's old Draw together link, which is sent back to that
+    /// page: rooms in a community are opened there.
     pub community: Option<String>,
+}
+
+/// What the new-session dialog (`collaborate_create_dialog.jinja`) needs, on
+/// the lobby and on a community page. `community` is the community a room
+/// opened from its page belongs to, fixed: None on the lobby.
+pub(crate) fn create_session_context(
+    community: Option<&crate::models::community::Community>,
+    guest_nickname: Option<String>,
+) -> minijinja::Value {
+    use crate::models::community::CommunityVisibility;
+    context! {
+        community => community.map(|community| context! {
+            id => community.id.to_string(),
+            name => community.name.clone(),
+            slug => community.slug.clone(),
+            // Only a public community's rooms are listed in the lobby or
+            // admit guests (`viewer_may_enter`), so only there are those
+            // choices offered.
+            is_public => community.visibility == CommunityVisibility::Public,
+        }),
+        canvas_sizes => canvas_size_options(),
+        participant_choices => MAX_PARTICIPANTS_CHOICES,
+        // The name a guest already goes by, to start the form's name field
+        // on. None for an account, and for somebody new.
+        guest_nickname,
+        nickname_max_chars => guest::NICKNAME_MAX_CHARS,
+    }
 }
 
 /// How many lobby cards either session list shows.
@@ -523,9 +550,16 @@ pub async fn collaborate_lobby(
     State(state): State<AppState>,
     Query(query): Query<LobbyQuery>,
 ) -> Result<impl IntoResponse, AppError> {
+    // The community page's Draw together used to come here with its
+    // community chosen. A room is opened in a community from that page now,
+    // so an old link goes back to it.
+    if let Some(slug) = query.community.filter(|slug| !slug.is_empty()) {
+        return Ok(axum::response::Redirect::to(&format!("/@{slug}")).into_response());
+    }
     // Viewable signed out: the lobby doubles as a public gallery, and anybody
     // may open a session from it -- somebody without an account as a guest,
-    // naming themselves in the form.
+    // naming themselves in the form. A room opened here is in no community:
+    // where its drawing is posted is chosen when it is saved.
     let user = auth_session.user;
     let (viewer_user_id, viewer_show_sensitive) = match user.as_ref() {
         Some(user) => (Some(user.id), user.show_sensitive_content),
@@ -557,42 +591,6 @@ pub async fn collaborate_lobby(
     )
     .await?;
 
-    // Communities this user may post into. Reuses the rule the "move post"
-    // feature already applies — public, unlisted where they have posted,
-    // private where they are a member — rather than inventing a second one, so
-    // what the picker offers is exactly what create_collaborative_session
-    // accepts.
-    //
-    // Split into three tiers so the ones a user actually draws in are reachable
-    // without scrolling past every public community on the site: communities
-    // they belong to, then ones they have posted in, then the rest. A member
-    // who has also posted appears only in the first tier.
-    //
-    // Without an account, the public ones: what a guest may open a session in
-    // (`postable_communities`).
-    let mut member_communities: Vec<serde_json::Value> = Vec::new();
-    let mut participated_communities: Vec<serde_json::Value> = Vec::new();
-    let mut other_communities: Vec<serde_json::Value> = Vec::new();
-    {
-        for community in postable_communities(&mut tx, viewer_user_id).await? {
-            let entry = serde_json::json!({
-                "id": community.id.to_string(),
-                "name": community.name,
-                "slug": community.slug,
-                "description": community.description,
-                "owner_login_name": community.owner_login_name,
-                "visibility": community.visibility,
-            });
-            if community.is_member {
-                member_communities.push(entry);
-            } else if community.has_participated {
-                participated_communities.push(entry);
-            } else {
-                other_communities.push(entry);
-            }
-        }
-    }
-
     tx.commit().await?;
     attach_lobby_previews(&state, &mut viewer_sessions, &mut active_sessions).await;
 
@@ -615,22 +613,8 @@ pub async fn collaborate_lobby(
                     0,
                     None,
                 ),
-                // Three tiers rather than one flat list; the template renders them as
-                // optgroups in that order.
-                has_postable_communities => !member_communities.is_empty()
-                    || !participated_communities.is_empty()
-                    || !other_communities.is_empty(),
-                member_communities => Serde(member_communities),
-                participated_communities => Serde(participated_communities),
-                other_communities => Serde(other_communities),
-                selected_community_slug => query.community,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-                canvas_sizes => canvas_size_options(),
-                participant_choices => MAX_PARTICIPANTS_CHOICES,
-                // The name a guest already goes by, to start the form's name
-                // field on. None for an account, and for somebody new.
-                guest_nickname,
-                nickname_max_chars => guest::NICKNAME_MAX_CHARS,
+                create_session => create_session_context(None, guest_nickname),
             },
         )
         .await?;
@@ -657,24 +641,79 @@ pub struct CreateSessionForm {
     nickname: Option<String>,
 }
 
-/// The communities somebody may open a session in: where the account may
-/// post (`get_movable_communities`), and for anybody else the public ones --
-/// asked as a nil user, who has posted nowhere and is a member of nothing.
-async fn postable_communities(
+/// Where an account may post a room opened in no community: its own posts,
+/// or a public community (`get_movable_communities`, which leaves out two-tone
+/// ones). Only public, because such a room let in whoever a public
+/// community's room would have -- guests, and anybody with the link -- and an
+/// unlisted or private community's drawing is drawn by the people its own
+/// rules let in, from a room opened on its page.
+pub(super) async fn save_destinations(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    user_id: Option<Uuid>,
+    user_id: Uuid,
 ) -> Result<Vec<crate::models::post::PostableCommunity>, AppError> {
-    let communities =
-        crate::models::post::get_movable_communities(tx, user_id.unwrap_or(Uuid::nil())).await?;
-    Ok(match user_id {
-        Some(_) => communities,
-        None => communities
-            .into_iter()
-            .filter(|community| {
-                community.visibility == crate::models::community::CommunityVisibility::Public
-            })
-            .collect(),
-    })
+    Ok(crate::models::post::get_movable_communities(tx, user_id)
+        .await?
+        .into_iter()
+        .filter(|community| {
+            community.visibility == crate::models::community::CommunityVisibility::Public
+        })
+        .collect())
+}
+
+/// GET /collaborate/{uuid}/destinations: where the owner's save may post the
+/// drawing. A room opened in a community goes there and nowhere else
+/// (`community`); one opened in none offers the owner's own posts or a
+/// public community (`choices`), the communities they belong to first.
+pub async fn collaboration_save_destinations(
+    Path(session_uuid): Path<Uuid>,
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let user = auth_session.user.ok_or(AppError::Unauthorized)?;
+    let mut tx = state.db_pool.begin().await?;
+    let session = sqlx::query!(
+        "SELECT owner_id, community_id FROM collaborative_sessions WHERE id = $1",
+        session_uuid
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Session".to_string()))?;
+    if session.owner_id != Some(user.id) {
+        return Err(AppError::Forbidden);
+    }
+    let fixed = match session.community_id {
+        Some(id) => find_community_by_id(&mut tx, id).await?,
+        None => None,
+    };
+    let mut choices = match session.community_id {
+        Some(_) => Vec::new(),
+        None => save_destinations(&mut tx, user.id).await?,
+    };
+    tx.commit().await?;
+    // Theirs first, then where they have posted, then the rest by name.
+    choices.sort_by_key(|community| (!community.is_member, !community.has_participated));
+    let entry = |id: Uuid, name: &str, slug: &str| {
+        serde_json::json!({
+            "id": id.to_string(),
+            "name": name,
+            "slug": slug,
+        })
+    };
+    Ok(Json(serde_json::json!({
+        "community": fixed.map(|community| entry(community.id, &community.name, &community.slug)),
+        "choices": choices
+            .iter()
+            .map(|community| entry(community.id, &community.name, &community.slug))
+            .collect::<Vec<_>>(),
+    }))
+    .into_response())
+}
+
+/// Where a save posts the drawing: `?community=<id>`, for a room opened in no
+/// community. Absent, or for a room in a community, it is ignored.
+#[derive(serde::Deserialize, Default)]
+pub struct SaveQuery {
+    community: Option<String>,
 }
 
 /// POST /collaborate: a session, from the lobby's form. Sent by htmx
@@ -765,17 +804,27 @@ pub(crate) async fn insert_session(
         .filter(|id| !id.is_empty())
         .and_then(|id| id.parse::<Uuid>().ok());
 
-    // A saved session becomes a post in this community, so the same rule that
-    // governs posting has to apply here. Without this any id was accepted,
-    // which would put a drawing into a private community the caller is not a
-    // member of. A guest may open one only in a public community.
+    // A room in a community is opened from that community's page, by the
+    // rule its New drawing follows (`draw::may_draw_in_as`): a guest in a
+    // public one, an account in an unlisted one, a member in a private one.
+    // Never a two-tone community, whose palette the room cannot hold. Its
+    // drawing is posted there, and who may come in follows the community
+    // (`db::viewer_may_enter`): only a public community's room is listed in
+    // the lobby.
+    let mut is_public = request.is_public;
     if let Some(community_id) = community_id {
-        let allowed = postable_communities(&mut tx, owner.user_id())
+        let community = find_community_by_id(&mut tx, community_id)
             .await?
-            .into_iter()
-            .any(|community| community.id == community_id);
-        if !allowed {
+            .ok_or(AppError::Forbidden)?;
+        let two_tone = community.background_color.is_some() && community.foreground_color.is_some();
+        if two_tone
+            || !crate::web::handlers::draw::may_draw_in_as(&mut tx, owner.user_id(), &community)
+                .await?
+        {
             return Err(AppError::Forbidden);
+        }
+        if community.visibility != crate::models::community::CommunityVisibility::Public {
+            is_public = false;
         }
     }
 
@@ -793,7 +842,7 @@ pub(crate) async fn insert_session(
         request.title,
         request.width,
         request.height,
-        request.is_public,
+        is_public,
         community_id,
         request.max_participants,
         request.allow_guests,
@@ -816,6 +865,7 @@ pub async fn save_collaborative_session(
     Path(session_uuid): Path<Uuid>,
     auth_session: AuthSession,
     State(state): State<AppState>,
+    Query(choice): Query<SaveQuery>,
     body: Bytes,
 ) -> Result<Response, AppError> {
     let user = auth_session.user.ok_or(AppError::Unauthorized)?;
@@ -827,7 +877,8 @@ pub async fn save_collaborative_session(
     // there once they have signed in -- which makes the session theirs.
     let session = sqlx::query!(
         r#"
-        SELECT owner_id, saved_post_id, width, height, ended_at IS NULL AS "open!"
+        SELECT owner_id, saved_post_id, width, height, community_id,
+               ended_at IS NULL AS "open!"
         FROM collaborative_sessions cs
         LEFT JOIN users u ON cs.owner_id = u.id
         WHERE cs.id = $1
@@ -877,10 +928,35 @@ pub async fn save_collaborative_session(
         }
     }
 
+    // A room opened in a community posts there. One opened in none posts
+    // where the owner chose, if that is somewhere they may.
+    let chosen = match (
+        session.community_id,
+        choice.community.filter(|id| !id.is_empty()),
+    ) {
+        (Some(_), _) | (None, None) => None,
+        (None, Some(id)) => {
+            let id = id
+                .parse::<Uuid>()
+                .map_err(|_| AppError::BadRequest("community is not an id".to_string()))?;
+            let mut tx = db.begin().await?;
+            let allowed = save_destinations(&mut tx, user.id)
+                .await?
+                .iter()
+                .any(|community| community.id == id);
+            tx.commit().await?;
+            if !allowed {
+                return Err(AppError::Forbidden);
+            }
+            Some(id)
+        }
+    };
+
     let (post_id, owner_login_name) = db::save_session_to_post(
         db.clone(),
         session_uuid,
         user.id,
+        chosen,
         body.to_vec(),
         state.clone(),
     )
@@ -1155,22 +1231,12 @@ fn with_site_chrome(html: &str, head: &str, toolbar: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{canvas_size_options, MAX_PARTICIPANTS_CHOICES};
+    use super::create_session_context;
     use crate::web::handlers::test_support;
     use minijinja::context;
     use minijinja::value::Serde;
     use serde_json::json;
-
-    fn sample_community(id: &str, name: &str, slug: &str, visibility: &str) -> serde_json::Value {
-        json!({
-            "id": id,
-            "name": name,
-            "slug": slug,
-            "description": "",
-            "owner_login_name": "owner",
-            "visibility": visibility,
-        })
-    }
+    use uuid::Uuid;
 
     /// A lobby session card's context. Defaults describe an open, public,
     /// half-full session in a community; tests override the field under test.
@@ -1212,31 +1278,6 @@ mod tests {
         active_sessions: Vec<serde_json::Value>,
         viewer_sessions: Vec<serde_json::Value>,
     ) -> minijinja::Value {
-        let community = |id, name, slug, visibility| {
-            if signed_in {
-                vec![sample_community(id, name, slug, visibility)]
-            } else {
-                vec![]
-            }
-        };
-        let members = community(
-            "00000000-0000-0000-0000-000000000003",
-            "Private Club",
-            "club",
-            "private",
-        );
-        let participated = community(
-            "00000000-0000-0000-0000-000000000004",
-            "Open Studio",
-            "open",
-            "public",
-        );
-        let others = community(
-            "00000000-0000-0000-0000-000000000005",
-            "Somewhere Else",
-            "elsewhere",
-            "public",
-        );
         context! {
             current_user => Serde(if signed_in {
                 json!({"login_name": "someone", "email_verified_at": "2026-01-01T00:00:00Z"})
@@ -1251,15 +1292,10 @@ mod tests {
                 has_more => false,
                 next_url => "",
             },
-            canvas_sizes => canvas_size_options(),
-            participant_choices => MAX_PARTICIPANTS_CHOICES,
-            has_postable_communities => signed_in,
-            member_communities => Serde(members),
-            participated_communities => Serde(participated),
-            other_communities => Serde(others),
-            selected_community_slug => "open",
-            guest_nickname => if signed_in { None } else { Some("miro") },
-            nickname_max_chars => super::guest::NICKNAME_MAX_CHARS,
+            create_session => create_session_context(
+                None,
+                (!signed_in).then(|| "miro".to_string()),
+            ),
             draft_post_count => 0,
             unread_notification_count => 0,
             ftl_lang => "en",
@@ -1308,24 +1344,73 @@ mod tests {
         assert!(signed_in.contains(r#"name="allow_guests" checked"#));
     }
 
+    /// A room opened from the lobby is in no community: the form has no
+    /// community to send, and says the choice comes when it is saved.
     #[test]
-    fn create_form_preselects_the_linked_community() {
-        // A community page links here with ?community=<slug>; the option for
-        // that community must come back selected, or the saved drawing would
-        // land nowhere.
+    fn the_lobby_opens_a_room_in_no_community() {
         let env = test_support::env();
-        let template = env
+        let rendered = env
             .get_template("collaborate_lobby.jinja")
-            .expect("template loads");
-        let rendered = template
+            .expect("template loads")
             .render(lobby_context(true, vec![]))
             .expect("renders signed in");
-        assert!(rendered.contains("name=\"community_id\""));
-        assert!(rendered.contains("collaborate-community-none"));
-        assert!(
-            rendered.contains("selected"),
-            "linked community was not preselected"
-        );
+        assert!(!rendered.contains(r#"name="community_id""#));
+        assert!(rendered.contains("collaborate-create-posts-later"));
+        assert!(rendered.contains(r#"name="is_public" checked"#));
+    }
+
+    fn sample_community_model(
+        visibility: crate::models::community::CommunityVisibility,
+    ) -> crate::models::community::Community {
+        crate::models::community::Community {
+            id: Uuid::from_u128(3),
+            owner_id: Uuid::from_u128(4),
+            name: "Back Room".to_string(),
+            slug: "back".to_string(),
+            description: String::new(),
+            visibility,
+            updated_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            background_color: None,
+            foreground_color: None,
+        }
+    }
+
+    fn render_create_dialog(community: &crate::models::community::Community) -> String {
+        test_support::env()
+            .get_template("collaborate_create_dialog.jinja")
+            .expect("template loads")
+            .render(context! {
+                current_user => Serde(json!({"login_name": "someone"})),
+                create_session => create_session_context(Some(community), None),
+            })
+            .expect("renders")
+    }
+
+    /// Opened from a community's page, the room is in that community, fixed,
+    /// and the form says where its drawing goes.
+    #[test]
+    fn a_community_pages_dialog_opens_the_room_there() {
+        use crate::models::community::CommunityVisibility;
+        let rendered = render_create_dialog(&sample_community_model(CommunityVisibility::Public));
+        assert!(rendered.contains(r#"<input type="hidden" name="community_id" value="00000000-0000-0000-0000-000000000003">"#));
+        assert!(rendered.contains("collaborate-create-posts-to(community=Back Room)"));
+        assert!(rendered.contains(r#"name="is_public" checked"#));
+        assert!(rendered.contains(r#"name="allow_guests" checked"#));
+    }
+
+    /// An unlisted or private community's room is never in the lobby and
+    /// never lets a guest in, so the form offers neither.
+    #[test]
+    fn a_closed_communitys_dialog_offers_neither_the_lobby_nor_guests() {
+        use crate::models::community::CommunityVisibility;
+        for visibility in [CommunityVisibility::Unlisted, CommunityVisibility::Private] {
+            let rendered = render_create_dialog(&sample_community_model(visibility));
+            assert!(rendered.contains(r#"name="community_id""#));
+            assert!(!rendered.contains(r#"name="is_public""#));
+            assert!(!rendered.contains(r#"name="allow_guests""#));
+            assert!(rendered.contains(r#"name="allow_spectators" checked"#));
+        }
     }
 
     #[test]
@@ -1374,56 +1459,6 @@ mod tests {
     }
 
     #[test]
-    fn community_picker_ranks_membership_above_participation() {
-        // The whole point of the tiers: a user with a hundred public
-        // communities in the list still finds their own without scrolling.
-        let env = test_support::env();
-        let template = env
-            .get_template("collaborate_lobby.jinja")
-            .expect("template loads");
-        let rendered = template
-            .render(lobby_context(true, vec![]))
-            .expect("renders signed in");
-        let yours = rendered
-            .find("collaborate-community-group-yours")
-            .expect("member group rendered");
-        let participated = rendered
-            .find("collaborate-community-group-participated")
-            .expect("participated group rendered");
-        let public = rendered
-            .find("collaborate-community-group-public")
-            .expect("public group rendered");
-        assert!(
-            yours < participated && participated < public,
-            "tiers out of order"
-        );
-        // Non-public tiers say so in the option text, because a saved drawing
-        // landing somewhere nobody can see it is a surprise worth preventing.
-        assert!(rendered.contains("community-badge-private"));
-    }
-
-    #[test]
-    fn community_picker_is_one_combobox_over_the_select() {
-        // Regression: the picker used to be a search box plus a separate
-        // dropdown — two controls for one decision, where typing never got you
-        // closer to picking. The select stays as the value holder so there is
-        // exactly one community_id and no-JS still works.
-        let env = test_support::env();
-        let template = env
-            .get_template("collaborate_lobby.jinja")
-            .expect("template loads");
-        let rendered = template
-            .render(lobby_context(true, vec![]))
-            .expect("renders signed in");
-        assert!(rendered.contains("role=\"combobox\""));
-        assert!(rendered.contains("id=\"community-listbox\""));
-        assert!(!rendered.contains("id=\"community-filter\""));
-        assert_eq!(rendered.matches("name=\"community_id\"").count(), 1);
-        // Owner handle and slug are matchable, not just the display name.
-        assert!(rendered.contains("data-search=\"open studio open @owner"));
-    }
-
-    #[test]
     fn create_form_lays_labels_and_controls_out_in_one_grid() {
         // The clutter was four differently-shaped rows and two loose hint
         // paragraphs; every field now sits in the label/control grid and each
@@ -1436,7 +1471,7 @@ mod tests {
             .render(lobby_context(true, vec![]))
             .expect("renders signed in");
         assert!(rendered.contains("class=\"session-form\""));
-        assert_eq!(rendered.matches("class=\"field-help\"").count(), 4);
+        assert_eq!(rendered.matches("class=\"field-help\"").count(), 3);
         // Every control still ships — tidying must not drop a field.
         for id in [
             "canvas-size",
@@ -1445,7 +1480,6 @@ mod tests {
             "is-public",
             "allow-guests",
             "allow-spectators",
-            "session-community",
         ] {
             assert!(rendered.contains(&format!("id=\"{id}\"")), "{id} missing");
         }
@@ -1862,10 +1896,7 @@ mod tests {
                     0,
                     None,
                 ),
-                canvas_sizes => canvas_size_options(),
-            participant_choices => MAX_PARTICIPANTS_CHOICES,
-                has_postable_communities => false,
-                selected_community_slug => Serde(json!(null)),
+                create_session => create_session_context(None, None),
                 draft_post_count => 0,
                 unread_notification_count => 0,
                 ftl_lang => "en",

@@ -542,6 +542,7 @@ pub async fn save_session_to_post(
     db: Pool<Postgres>,
     session_id: Uuid,
     owner_id: Uuid,
+    chosen_community: Option<Uuid>,
     png_data: Vec<u8>,
     state: AppState,
 ) -> Result<(Uuid, String), Box<dyn std::error::Error + Send + Sync>> {
@@ -636,7 +637,9 @@ pub async fn save_session_to_post(
         .filter(|title| !title.is_empty())
         .map(str::to_string);
 
-    let community_id = session.community_id;
+    // The room's own community, or for a room opened in none, where its owner
+    // chose to post it (checked by the caller).
+    let community_id = session.community_id.or(chosen_community);
 
     let now = chrono::Utc::now();
     let created_at_utc = session.created_at.and_utc();
@@ -686,9 +689,10 @@ pub async fn save_session_to_post(
     .await?;
 
     sqlx::query!(
-        "UPDATE collaborative_sessions SET saved_post_id = $1 WHERE id = $2",
+        "UPDATE collaborative_sessions SET saved_post_id = $1, community_id = $3 WHERE id = $2",
         post_id,
-        session_id
+        session_id,
+        community_id
     )
     .execute(&mut *tx)
     .await?;

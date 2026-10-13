@@ -1,6 +1,7 @@
 import { Trans } from "@lingui/react/macro";
 import { NEO_BUTTON } from "neo-cucumber";
 import { ModalWrapper } from "./ModalWrapper";
+import { SaveDestination, type SaveDestinationProps } from "../SaveDestination";
 
 export interface SaveConfirmationModalProps {
   isOpen: boolean;
@@ -9,6 +10,8 @@ export interface SaveConfirmationModalProps {
    * than the gallery, to be posted once they sign in.
    */
   toDevice?: boolean;
+  /** Where the gallery save posts, and the owner's choice of it. */
+  destination?: SaveDestinationProps;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -25,6 +28,7 @@ export interface SaveConfirmationModalProps {
 export const SaveConfirmationModal = ({
   isOpen,
   toDevice = false,
+  destination,
   onConfirm,
   onCancel,
 }: SaveConfirmationModalProps) => {
@@ -50,6 +54,7 @@ export const SaveConfirmationModal = ({
           </Trans>
         )}
       </p>
+      {!toDevice && destination && <SaveDestination {...destination} />}
       <div className="flex justify-center gap-[6px]">
         <button type="button" onClick={onCancel} className={NEO_BUTTON}>
           <Trans>Cancel</Trans>

@@ -62,11 +62,23 @@ async fn may_draw_in(
     user: Option<&User>,
     community: &Community,
 ) -> Result<bool, AppError> {
-    Ok(match (user, community.visibility) {
+    may_draw_in_as(tx, user.map(|user| user.id), community).await
+}
+
+/// [`may_draw_in`], for whoever `user_id` is (None: somebody without an
+/// account). A collaborative room in a community is opened by the same rule
+/// (`collaborate::http_handlers::insert_session`), so the community page
+/// offers both kinds of drawing to the same people.
+pub(crate) async fn may_draw_in_as(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Option<uuid::Uuid>,
+    community: &Community,
+) -> Result<bool, AppError> {
+    Ok(match (user_id, community.visibility) {
         (None, CommunityVisibility::Public) => true,
         (None, _) => false,
-        (Some(user), CommunityVisibility::Private) => {
-            is_user_member(tx, user.id, community.id).await?
+        (Some(user_id), CommunityVisibility::Private) => {
+            is_user_member(tx, user_id, community.id).await?
         }
         (Some(_), _) => true,
     })

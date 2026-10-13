@@ -107,6 +107,14 @@ participant row (so the owner's ban works on them), no seat, no layer id, and
 no more than `MAX_SPECTATORS` at once; the server drops everything they send
 but JOIN and CHAT. A room page watches with `?watch=1`.
 
+A room's community is fixed when it opens, because it decides who may come
+in (`viewer_may_enter`: a private community's members, an unlisted one's
+accounts, no guests in either). So a room in a community is opened from that
+community's page, by the rule its New drawing follows (`draw::may_draw_in_as`),
+and a room opened from the lobby is in none; its owner picks where to post
+when saving, from their own posts and the public communities
+(`save_destinations`), which let in the same people it did.
+
 The owner's Guests and Spectators switches stop new arrivals only: somebody
 already in the room gets back in after a dropped connection. A ban is by
 `participant_id`, and for a guest also by address (guests only, so a

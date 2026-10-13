@@ -535,6 +535,7 @@ pub async fn profile_private(
 
 pub async fn profile_or_community(
     auth_session: AuthSession,
+    session: tower_sessions::Session,
     headers: HeaderMap,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
@@ -563,6 +564,7 @@ pub async fn profile_or_community(
             &mut tx,
             &state,
             &auth_session,
+            &session,
             &headers,
             ftl_lang,
             community,

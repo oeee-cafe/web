@@ -94,18 +94,12 @@
           {% if current_user or community.visibility == "public" %}
             <button type="button" class="ds-button ds-button-primary" onclick="showCommunityDrawModal()">{{ ftl_get_message("community-drawing-new") }}</button>
           {% endif %}
-          {% if current_user %}
-            {# Opens the lobby with this community preselected, so the
-               session's saved drawing lands here. Goes through the lobby
-               rather than creating a session outright so the canvas size,
-               title and participant limit can still be chosen.
-
-               Not for two-tone communities: they are excluded from the
-               postable set, so the option would not exist to be preselected
-               and the session would silently save with no community. #}
-            {% if not community.background_color %}
-              <a href="/collaborate?community={{ community.slug }}" class="ds-button">{{ ftl_get_message("community-draw-together") }}</a>
-            {% endif %}
+          {# A room in this community: its dialog is on this page, with the
+             community fixed. Offered to whoever may open one here
+             (header.draw_together, the rule collaborate::insert_session
+             holds it to) -- never in a two-tone community. #}
+          {% if header is defined and header.draw_together %}
+            <button type="button" class="ds-button" onclick="toggleSessionDialog(true)">{{ ftl_get_message("community-draw-together") }}</button>
           {% endif %}
           {% if current_user and community.visibility == "private" %}
             <a href="/communities/@{{ community.slug }}/members" class="ds-button">{{ ftl_get_message("community-members") }}</a>
@@ -143,6 +137,9 @@
     {% endblock community_body %}
   </div>
 
+  {% if create_session is defined and header is defined and header.draw_together %}
+    {% include "collaborate_create_dialog.jinja" %}
+  {% endif %}
   {% if current_user or community.visibility == "public" %}
     {# New drawing: the painter's choices, asked for when they are needed. #}
     <div id="community-draw-modal" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="community-draw-title">

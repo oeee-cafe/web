@@ -1727,6 +1727,21 @@ nav a:visited,
   margin-top: 6px;
 }
 
+/* Where a kept collaborative room will be posted, chosen above Post. */
+.local-draft-destination-row {
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--ds-faint);
+  white-space: nowrap;
+}
+
+.local-draft-destination-row .ds-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 6px;
+}
+
 :root[data-homecols-density="bare"] .draft-item .post-card-meta {
   display: block;
 }

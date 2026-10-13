@@ -31,6 +31,7 @@ import "./app.css";
 import { Chat } from "./components/Chat";
 import { SessionExpiredModal } from "./components/SessionExpiredModal";
 import { SessionHeader } from "./components/SessionHeader";
+import { fetchSaveDestinations, saveUrl, type SaveDestinations } from "../shared/saveDestinations";
 import { AuthErrorModal } from "./components/modals/AuthErrorModal";
 import { GuestNameModal } from "./components/modals/GuestNameModal";
 import { PausedModal } from "./components/modals/PausedModal";
@@ -184,6 +185,9 @@ export default function App() {
   /** A full room, and the metadata to watch it with instead. */
   const [roomFullError, setRoomFullError] = useState<{ currentUserCount: number; maxUsers: number; meta: CollaborationMeta } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  /** Where the owner's save may post, once asked; and where they chose. */
+  const [saveDestinations, setSaveDestinations] = useState<SaveDestinations | null>(null);
+  const [saveTo, setSaveTo] = useState("");
   const [sessionExpired, setSessionExpired] = useState(false);
   /** Over because a guest owner kept it on their device, not by timing out. */
   const [endedByOwner, setEndedByOwner] = useState(false);
@@ -1077,7 +1081,7 @@ export default function App() {
         }
       }
       const png = await painterRef.current.exportPng();
-      const response = await fetch(`/collaborate/${getSessionId()}`, {
+      const response = await fetch(saveUrl(getSessionId(), saveTo), {
         method: "POST", body: png, headers: { "Content-Type": "image/png" }, credentials: "include",
       });
       // 409 is "already a post", with the post: a retry after a lost
@@ -1098,7 +1102,7 @@ export default function App() {
       setIsSaving(false);
       setSessionEnding(false);
     }
-  }, [drainCanonical, feed, isSaving, link, sessionExpired]);
+  }, [drainCanonical, feed, isSaving, link, saveTo, sessionExpired]);
 
   const isOwner = canvasMeta?.ownerId === userIdRef.current;
   /**
@@ -1106,6 +1110,23 @@ export default function App() {
    * account, so their save keeps it in this device's drafts instead.
    */
   const ownerKeepsOnDevice = isOwner && !!canvasMeta?.ownerIsGuest;
+
+  // Where an account owner's save may post: asked once the room is known to
+  // be theirs. A guest owner keeps the drawing on the device instead.
+  const asksWhereToPost = isOwner && !ownerKeepsOnDevice && !canvasMeta?.savedPostId;
+  useEffect(() => {
+    if (!asksWhereToPost) return;
+    let current = true;
+    fetchSaveDestinations(getSessionId())
+      .then((destinations) => {
+        if (current) setSaveDestinations(destinations);
+      })
+      .catch(console.error);
+    return () => {
+      current = false;
+    };
+  }, [asksWhereToPost]);
+  const saveDestination = { destinations: saveDestinations, value: saveTo, onChange: setSaveTo };
 
   /**
    * Whether somebody watching may take up drawing: a seat is free, or they
@@ -1429,6 +1450,7 @@ export default function App() {
         <SaveConfirmationModal
           isOpen={saveConfirmation}
           toDevice={ownerKeepsOnDevice}
+          destination={saveDestination}
           onCancel={() => setSaveConfirmation(false)}
           onConfirm={() => {
             setSaveConfirmation(false);
@@ -1438,7 +1460,7 @@ export default function App() {
         <SessionEndingModal isOpen={sessionEnding} />
       </div>
     </div>
-    <SessionExpiredModal isOpen={sessionExpired && !removed} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} hasCanvas={!canvasMeta?.ended} endedByOwner={endedByOwner} ownerKeepsOnDevice={ownerKeepsOnDevice} onClose={() => {}} onSaveToGallery={ownerKeepsOnDevice ? keepOnDevice : saveCollaborativeDrawing} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
+    <SessionExpiredModal isOpen={sessionExpired && !removed} isOwner={!!isOwner} canvasMeta={canvasMeta} isSaving={isSaving} hasCanvas={!canvasMeta?.ended} endedByOwner={endedByOwner} ownerKeepsOnDevice={ownerKeepsOnDevice} onClose={() => {}} onSaveToGallery={ownerKeepsOnDevice ? keepOnDevice : saveCollaborativeDrawing} destination={saveDestination} onDownloadPNG={downloadPng} onReturnToLobby={goToLobby} />
     <RemovedModal isOpen={removed} onGoToLobby={goToLobby} />
     <PausedModal isOpen={paused && !removed} onResume={reload} onGoToLobby={goToLobby} />
     <GuestNameModal isOpen={!!awaitingName} suggestion={discordKnown().state?.name ?? undefined} canWatch={!!awaitingName?.allowSpectators} watchOnly={watching} onSubmit={becomeGuest} signInHref={signInHref()} />

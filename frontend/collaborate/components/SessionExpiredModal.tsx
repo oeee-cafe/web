@@ -1,6 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Icon, NEO_BUTTON } from "neo-cucumber";
 import { ModalWrapper } from "./modals/ModalWrapper";
+import { SaveDestination, type SaveDestinationProps } from "./SaveDestination";
 import { say } from "../../shared/siteDialog";
 
 export interface SessionExpiredModalProps {
@@ -29,6 +30,8 @@ export interface SessionExpiredModalProps {
   ownerKeepsOnDevice?: boolean;
   onClose: () => void;
   onSaveToGallery: () => Promise<void>;
+  /** Where the gallery save posts, and the owner's choice of it. */
+  destination?: SaveDestinationProps;
   onDownloadPNG: () => void;
   onReturnToLobby: () => void;
 }
@@ -43,6 +46,7 @@ export const SessionExpiredModal = ({
   ownerKeepsOnDevice = false,
   onClose,
   onSaveToGallery,
+  destination,
   onDownloadPNG,
   onReturnToLobby,
 }: SessionExpiredModalProps) => {
@@ -111,6 +115,10 @@ export const SessionExpiredModal = ({
             : t`This collaborative session has ended due to inactivity. As the owner, you can save it to the gallery or download it as a PNG.`
           : t`This collaborative session has ended due to inactivity. You can save your work locally as a PNG before leaving.`}
       </div>
+      {/* Only where the owner is offered the gallery save. */}
+      {hasCanvas && isOwner && !endedByOwner && !ownerKeepsOnDevice && !canvasMeta?.savedPostId && destination && (
+        <SaveDestination {...destination} />
+      )}
       <div className="flex flex-wrap justify-center gap-[6px]">
         {!hasCanvas ? null : isOwner && !endedByOwner ? (
           <>
