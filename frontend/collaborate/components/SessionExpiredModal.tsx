@@ -143,7 +143,7 @@ export const SessionExpiredModal = ({
                 ) : (
                   <>
                     <Icon icon="material-symbols:save" width={14} height={14} />
-                    {ownerKeepsOnDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}
+                    {ownerKeepsOnDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save</Trans>}
                   </>
                 )}
               </button>

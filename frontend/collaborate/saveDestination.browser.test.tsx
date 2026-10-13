@@ -9,7 +9,7 @@ import { saveUrl, type SaveDestinations } from "../shared/saveDestinations";
 import { setupI18n } from "./i18n";
 
 /**
- * Where Save to Gallery posts. A room opened from the lobby is in no
+ * Where Save posts. A room opened from the lobby is in no
  * community, and its owner picks one in a search box: their own communities
  * before anything is typed, any public one the server finds after. A room
  * opened on a community's page goes there, and the dialog only says so.

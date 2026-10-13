@@ -1169,7 +1169,7 @@ export default function App() {
    * A guest owner's save. The drawing goes into this browser's drafts, the
    * session ends for everyone, and the owner is sent to the drafts page,
    * where it waits for them to sign in and post it -- signing in makes the
-   * session theirs, and posting it saves it the way Save to Gallery would.
+   * session theirs, and posting it saves it the way Save would.
    *
    * Kept before the session is ended, so a failure to keep it leaves the
    * room open rather than the drawing nowhere. Where this browser keeps
@@ -1396,7 +1396,7 @@ export default function App() {
       ? t`Saving...`
       : ownerKeepsOnDevice
         ? t`Keep on This Device`
-        : t`Save to Gallery`;
+        : t`Save`;
   }, [isSaving, ownerKeepsOnDevice, t]);
 
   return <>
@@ -1446,7 +1446,7 @@ export default function App() {
         <div ref={painterElementRef} className="h-full w-full" />
         {/* Removed is not disconnected: there is nothing to reconnect to. */}
         {!removed && !paused && <ConnectionStatusModal isCatchingUp={view.catchingUp} connectionState={view.connection} syncProgress={view.progress} synchronizationError={synchronizationError} onReconnect={reload} onDownloadPNG={downloadPng} />}
-        {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => setSaveConfirmation(true)} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : ownerKeepsOnDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}</button>}
+        {isOwner && <button ref={saveButtonRef} type="button" disabled={isSaving} onClick={() => setSaveConfirmation(true)} className={`${NEO_BUTTON} absolute bottom-4 right-12 z-50`}>{isSaving ? <Trans>Saving...</Trans> : ownerKeepsOnDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save</Trans>}</button>}
         <SaveConfirmationModal
           isOpen={saveConfirmation}
           toDevice={ownerKeepsOnDevice}

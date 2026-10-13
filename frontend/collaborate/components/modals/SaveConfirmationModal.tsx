@@ -35,7 +35,7 @@ export const SaveConfirmationModal = ({
   return (
     <ModalWrapper
       isOpen={isOpen}
-      title={toDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}
+      title={toDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save</Trans>}
       className="max-w-md"
       zIndex="z-[99999]"
       onBackdropClick={onCancel}
@@ -60,7 +60,7 @@ export const SaveConfirmationModal = ({
           <Trans>Cancel</Trans>
         </button>
         <button type="button" onClick={onConfirm} className={NEO_BUTTON} data-haptic="medium">
-          {toDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save to Gallery</Trans>}
+          {toDevice ? <Trans>Keep on This Device</Trans> : <Trans>Save</Trans>}
         </button>
       </div>
     </ModalWrapper>

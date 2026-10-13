@@ -13,7 +13,7 @@ export interface SaveDestinationProps {
 }
 
 /**
- * Where Save to Gallery will post: said, for a room in a community, and
+ * Where Save will post: said, for a room in a community, and
  * chosen here for one opened from the lobby, with the search box the drafts
  * page uses too (shared/communitySearch.ts). Until the suggestions arrive,
  * and if they never do, the save posts to the owner's own posts.

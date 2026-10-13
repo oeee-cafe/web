@@ -323,6 +323,14 @@ msgstr "Retry"
 msgid "Return to Lobby"
 msgstr "Return to Lobby"
 
+#: ../frontend/collaborate/App.tsx:1399
+#: ../frontend/collaborate/App.tsx:1449
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
+msgid "Save"
+msgstr "Save"
+
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:167
 msgid "Save as PNG"
 msgstr "Save as PNG"
@@ -330,14 +338,6 @@ msgstr "Save as PNG"
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:51
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
-
-#: ../frontend/collaborate/App.tsx:1399
-#: ../frontend/collaborate/App.tsx:1449
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
-msgid "Save to Gallery"
-msgstr "Save to Gallery"
 
 #: ../frontend/collaborate/App.tsx:1396
 #: ../frontend/collaborate/App.tsx:1449

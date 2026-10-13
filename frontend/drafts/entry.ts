@@ -74,7 +74,7 @@ function removeCard(card: HTMLElement): void {
 
 /**
  * Posts a collaborative session a guest kept here: the session is saved, as
- * its owner's Save to Gallery would have, and becomes a post at once.
+ * its owner's Save would have, and becomes a post at once.
  *
  * Signing in made the session this account's (`collaborate::guest::adopt`).
  * Signed in as some other account, it is not theirs to save, and is left here.

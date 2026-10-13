@@ -1,6 +1,6 @@
 /**
  * Where the owner of a collaborative room may post its drawing: asked by the
- * room's Save to Gallery (frontend/collaborate) and by the drafts page, which
+ * room's Save (frontend/collaborate) and by the drafts page, which
  * posts a room a guest owner kept on the device.
  */
 

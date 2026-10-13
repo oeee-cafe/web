@@ -323,6 +323,14 @@ msgstr "重试"
 msgid "Return to Lobby"
 msgstr "返回大厅"
 
+#: ../frontend/collaborate/App.tsx:1399
+#: ../frontend/collaborate/App.tsx:1449
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
+msgid "Save"
+msgstr "保存"
+
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:167
 msgid "Save as PNG"
 msgstr "保存为 PNG"
@@ -330,14 +338,6 @@ msgstr "保存为 PNG"
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:51
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "要把这幅画保存到画廊吗？保存后所有人的协作会话都会结束，谁都无法继续绘制。"
-
-#: ../frontend/collaborate/App.tsx:1399
-#: ../frontend/collaborate/App.tsx:1449
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
-msgid "Save to Gallery"
-msgstr "保存到画廊"
 
 #: ../frontend/collaborate/App.tsx:1396
 #: ../frontend/collaborate/App.tsx:1449

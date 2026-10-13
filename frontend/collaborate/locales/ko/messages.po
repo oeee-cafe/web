@@ -323,6 +323,14 @@ msgstr "다시 시도"
 msgid "Return to Lobby"
 msgstr "로비로 돌아가기"
 
+#: ../frontend/collaborate/App.tsx:1399
+#: ../frontend/collaborate/App.tsx:1449
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
+#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
+#: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
+msgid "Save"
+msgstr "저장"
+
 #: ../frontend/collaborate/components/SessionExpiredModal.tsx:167
 msgid "Save as PNG"
 msgstr "PNG로 저장"
@@ -330,14 +338,6 @@ msgstr "PNG로 저장"
 #: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:51
 msgid "Save this drawing to the gallery? The session ends for everyone and nobody can keep drawing on it afterwards."
 msgstr "이 그림을 갤러리에 저장할까요? 저장하면 이어서 그릴 수 없습니다."
-
-#: ../frontend/collaborate/App.tsx:1399
-#: ../frontend/collaborate/App.tsx:1449
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:38
-#: ../frontend/collaborate/components/modals/SaveConfirmationModal.tsx:63
-#: ../frontend/collaborate/components/SessionExpiredModal.tsx:146
-msgid "Save to Gallery"
-msgstr "저장"
 
 #: ../frontend/collaborate/App.tsx:1396
 #: ../frontend/collaborate/App.tsx:1449
