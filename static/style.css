@@ -2867,16 +2867,6 @@ nav a:visited,
   box-shadow: 0 0 0 0.5px var(--ds-line-strong), var(--ds-shadow-raise);
 }
 
-@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
-  .session-card:not(.is-full):hover {
-    box-shadow: 0 0 0 1px var(--ds-frame), var(--ds-shadow-raise);
-  }
-}
-
-.session-card:not(.is-full):active {
-  filter: brightness(0.94);
-}
-
 .session-card.is-full {
   opacity: 0.7;
 }
@@ -2956,21 +2946,6 @@ nav a:visited,
   font-weight: 600;
 }
 
-.session-title a,
-.session-title a:visited {
-  color: var(--ds-ink);
-}
-
-/* The whole card is the way in; the links inside it sit above the stretch. */
-.session-card-link::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-}
-
 .session-meta {
   display: flex;
   flex-wrap: wrap;
@@ -2985,17 +2960,16 @@ nav a:visited,
   color: var(--ds-faint);
 }
 
-.session-owner,
-.session-owner:visited,
-.session-community a,
-.session-watch {
-  position: relative;
-  z-index: 1;
+/* Join and Watch, side by side. A sibling margin rather than gap, which
+   Firefox 56 does not have for flexbox and this file is served as written. */
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 8px 0 0;
 }
 
-/* Watching instead of drawing, offered on every card that allows it. */
-.session-actions {
-  margin: 8px 0 0;
+.session-actions > * + * {
+  margin-left: 6px;
 }
 
 .session-owner,

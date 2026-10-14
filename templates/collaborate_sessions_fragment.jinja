@@ -14,19 +14,20 @@
      hx-swap="outerMorph">
   {% macro session_card(session, show_visibility) %}
     {# A room you can walk into: the canvas as it is now, who is in it, and
-       the whole card is the way in -- one stretched link, so the owner and
-       community links inside it still work. A full room is listed without
-       one, for everyone but the people already in it: the capacity check lets
-       them back in, and turns anyone else away at the socket. #}
+       a button for each way in. The card itself is not a link: joining takes
+       a seat and a layer id that is never given back, so it is a button
+       somebody means to press, not wherever a tap near Watch happens to land.
+       A full room offers no Join, for everyone but the people already in it:
+       the capacity check lets them back in, and turns anyone else away at
+       the socket. #}
     {% set joinable = not (session.is_full and not session.viewer_is_participant and not session.is_owner) %}
-    {# Full, and open to watching: the card's way in is a place watching,
-       and the room offers a seat once one frees. #}
-    {% set watchable = not joinable and session.spectators_welcome %}
     {# Anybody who could come in may come in to watch instead, full or not:
        the owner allows it, it is not their own room, and they are let in at
-       all -- somebody without an account is not, where guests are not. #}
+       all -- somebody without an account is not, where guests are not. A
+       full room open to watching offers it regardless, since watching is
+       then the only way in, and the room offers a seat once one frees. #}
     {% set offers_watching = session.spectators_welcome and not session.is_owner
-       and (viewer_has_account or session.guests_welcome) %}
+       and (viewer_has_account or session.guests_welcome or not joinable) %}
     <div class="session-card{% if not joinable %} is-full{% endif %}">
       {# What the canvas looks like right now, uploaded by whoever is drawing
          in it -- the server cannot render one. Until the first stroke brings
@@ -54,13 +55,7 @@
       </div>
       <div class="session-body">
         <div class="session-title">
-          {% if joinable %}
-            <a class="session-card-link" href="/collaborate/{{ session.id }}" title="{{ ftl_get_message("collaborate-join-session") }}">{{ session.title or ftl_get_message("post-no-title") }}</a>
-          {% elif watchable %}
-            <a class="session-card-link" href="/collaborate/{{ session.id }}?watch=1" title="{{ ftl_get_message("collaborate-watch-session") }}">{{ session.title or ftl_get_message("post-no-title") }}</a>
-          {% else %}
-            <span>{{ session.title or ftl_get_message("post-no-title") }}</span>
-          {% endif %}
+          {{ session.title or ftl_get_message("post-no-title") }}
         </div>
         <div class="session-meta">
           {% if session.owner_is_guest %}
@@ -73,9 +68,14 @@
           <span class="canvas-size">{{ session.width }}×{{ session.height }}</span>
           <span class="session-time" title="{{ session.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ session.created_at|ago }}</span>
         </div>
-        {% if offers_watching %}
+        {% if joinable or offers_watching %}
           <p class="session-actions">
-            <a class="ds-button ds-button-small session-watch" href="/collaborate/{{ session.id }}?watch=1">{{ ftl_get_message("collaborate-watch-session") }}</a>
+            {% if joinable %}
+              <a class="ds-button ds-button-small ds-button-primary session-join" href="/collaborate/{{ session.id }}">{{ ftl_get_message("collaborate-join-session") }}</a>
+            {% endif %}
+            {% if offers_watching %}
+              <a class="ds-button ds-button-small session-watch" href="/collaborate/{{ session.id }}?watch=1">{{ ftl_get_message("collaborate-watch-session") }}</a>
+            {% endif %}
           </p>
         {% endif %}
         {# Where the finished drawing will be posted. Worth knowing before

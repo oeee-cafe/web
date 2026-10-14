@@ -1880,6 +1880,30 @@ mod tests {
         assert!(rendered
             .contains(r#"href="/collaborate/00000000-0000-0000-0000-000000000009?watch=1""#));
         assert!(rendered.contains(r#"class="ds-button ds-button-small session-watch""#));
+        assert!(!rendered.contains("session-join"));
+    }
+
+    /// Joining takes a seat and a layer id, so it is a button of its own
+    /// beside Watch rather than a click anywhere on the card.
+    #[test]
+    fn an_open_session_offers_join_and_watch_as_buttons() {
+        let env = test_support::env();
+        let rendered = env
+            .get_template("collaborate_lobby.jinja")
+            .expect("template loads")
+            .render(lobby_context_with_sessions(
+                true,
+                vec![],
+                vec![sample_session(json!({}))],
+                vec![],
+            ))
+            .expect("renders");
+        assert!(rendered.contains(
+            r#"class="ds-button ds-button-small ds-button-primary session-join" href="/collaborate/00000000-0000-0000-0000-000000000009""#
+        ));
+        assert!(rendered
+            .contains(r#"href="/collaborate/00000000-0000-0000-0000-000000000009?watch=1""#));
+        assert!(!rendered.contains("session-card-link"));
     }
 
     #[test]
