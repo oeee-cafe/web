@@ -1393,10 +1393,28 @@ nav a:visited,
     padding-top: 0;
   }
 
+  /* Under the drawing, as wide as it is shown (--post-shown, set with
+     the stage's size). */
   .post-side {
     width: auto;
     max-width: 640px;
+    max-width: var(--post-shown, 640px);
     margin: var(--ds-space-4) auto 0;
+  }
+}
+
+/* On a phone the drawing runs the width of the window, past the page's own
+   margin (main, above), as a photo does in a phone's own apps. */
+@media (max-width: 600px) {
+  .post-page .post-stage {
+    margin-right: calc(-1 * var(--space-3));
+    margin-left: calc(-1 * var(--space-3));
+  }
+
+  /* Only the drawing: a replay's controls keep the margin. */
+  .post-page .post-stage-replay .neo-cucumber-replay-controls {
+    padding-right: var(--space-3);
+    padding-left: var(--space-3);
   }
 }
 

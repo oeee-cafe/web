@@ -101,7 +101,7 @@
 {% endblock head %}
 {% block content %}
   {# Publishing a drawing, laid out as the post it will become: the drawing on
-     the ground at the left, at the same whole-step zoom as the post page, and
+     the ground at the left, as large as on the post page, and
      beside it one card -- what the drawing is so far, what it will be called
      and said about it, the three switches as a grouped list, and the button
      that publishes it. Deleting is set apart at the card's foot. #}
@@ -206,17 +206,16 @@
   </div>
   <script>
     (function () {
-      // The post page's stage: whole steps up to what fits.
+      // The post page's stage: as large as fits.
       var stageBox = document.querySelector("[data-post-stage]");
       function fitStage() {
         var width = parseInt(stageBox.getAttribute("data-width"), 10);
         var height = parseInt(stageBox.getAttribute("data-height"), 10);
         var room = stageBox.parentNode.parentNode.clientWidth;
         var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 190, height) : Infinity;
-        var zoom = Math.max(1, Math.min(Math.floor(room / width), Math.floor(tall / height), 4));
-        if (width * zoom > room) zoom = 1;
-        if (zoom > 1) stageBox.style.setProperty("--post-stage-shown", (width * zoom) + "px");
-        else stageBox.style.removeProperty("--post-stage-shown");
+        var shown = Math.min(room, width * 4, (width * tall) / height);
+        stageBox.style.setProperty("--post-stage-shown", shown + "px");
+        document.querySelector(".post-page").style.setProperty("--post-shown", shown + "px");
         // Drawn hard unless it is shown smaller than its own size.
         stageBox.classList.toggle("is-crisp", width <= room);
       }

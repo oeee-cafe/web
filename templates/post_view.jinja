@@ -83,9 +83,9 @@
   <div class="post-page">
     <div class="post-stage">
       <div class="post-stage-column">
-        {# Shown at a whole multiple of its own size that fits, as the painter
-           zooms -- a fractional step would make some pixels wider than
-           others. Larger than the stage, it is scaled down smoothly.
+        {# Shown as large as fits, up to four times its own size; on a phone
+           as wide as the window. Larger than its own size its pixels are
+           drawn hard (is-crisp); smaller, it is scaled down smoothly.
 
            A NEO drawing whose replay may be watched carries the replay's
            controls under it from the start, disabled until the viewer
@@ -376,8 +376,7 @@
 
   <script>
     (function () {
-      // Whole steps up to what fits, as the painter zooms; smaller than
-      // one step, the browser scales it down to fit (max-width). The size
+      // As large as fits, on a phone the width of the window. The size
       // is a custom property on the stage, so the image, the replay's poster
       // and its canvas all take it.
       var stageBox = document.querySelector("[data-post-stage]");
@@ -389,12 +388,16 @@
         // The stage's height is the window's, less the toolbar, on a wide
         // screen; a phone scrolls, so only the width counts there.
         var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 190, height) : Infinity;
-        var zoom = Math.max(1, Math.min(Math.floor(room / width), Math.floor(tall / height), 4));
-        if (width * zoom > room) zoom = 1;
+        // As large as fits, up to four times its own size, and smoothly so:
+        // whole steps only, it fell from twice its size to its own the moment
+        // twice stopped fitting beside the inspector.
+        var shown = Math.min(room, width * 4, (width * tall) / height);
         // Always a length, never auto: an auto-sized replay box takes the
         // width of its controls, which stretched a 300px drawing to ~400
         // and resized it again whenever Play became Pause.
-        stageBox.style.setProperty("--post-stage-shown", (width * zoom) + "px");
+        stageBox.style.setProperty("--post-stage-shown", shown + "px");
+        // In one column the details and comments under it are as wide.
+        document.querySelector(".post-page").style.setProperty("--post-shown", shown + "px");
       }
       fitStage();
       window.addEventListener("resize", fitStage);
