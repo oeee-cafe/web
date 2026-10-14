@@ -48,7 +48,16 @@
           {% endif %}
         </div>
       {% endif %}
-      <div class="post-card-title" title="{{ post.title }}">{{ title }}</div>
+      {# A jar before the title of a drawing somebody gave a pickle: one jar
+         however many, since a grid of counts reads as a ranking, and before
+         the title rather than on the drawing, which it would cover. Its
+         tooltip says what it is. #}
+      <div class="post-card-title" title="{{ post.title }}">
+        {%- if post.pickled and not admin -%}
+          <span class="post-card-pickled" role="img" aria-label="{{ ftl_get_message('post-card-pickled') }}" title="{{ ftl_get_message('post-card-pickled') }}">{% include "pickle_icon.jinja" %}</span>
+        {%- endif -%}
+        {{ title }}
+      </div>
       {# One line for who, where and when. When is how long ago -- "3h",
          "2d" -- since the only question it answers here is how recent;
          the full date is its tooltip. Admin keeps the full date on a line

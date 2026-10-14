@@ -91,7 +91,8 @@ pub async fn find_published_posts_by_community_id(
                 communities.name AS community_name,
                 posts.published_at,
                 posts.created_at,
-                posts.updated_at
+                posts.updated_at,
+                EXISTS (SELECT 1 FROM pickles WHERE pickles.post_id = posts.id) AS \"pickled!\"
             FROM posts
             LEFT JOIN images ON posts.image_id = images.id
             LEFT JOIN users ON posts.author_id = users.id
@@ -130,6 +131,7 @@ pub async fn find_published_posts_by_community_id(
             published_at: row.published_at,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            pickled: row.pickled,
         })
         .collect())
 }
@@ -243,7 +245,8 @@ pub async fn find_public_posts(
                 communities.name AS \"community_name?\",
                 posts.published_at,
                 posts.created_at,
-                posts.updated_at
+                posts.updated_at,
+                EXISTS (SELECT 1 FROM pickles WHERE pickles.post_id = posts.id) AS \"pickled!\"
             FROM posts
             LEFT JOIN images ON posts.image_id = images.id
             LEFT JOIN communities ON posts.community_id = communities.id
@@ -286,6 +289,7 @@ pub async fn find_public_posts(
             published_at: row.published_at,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            pickled: row.pickled,
         })
         .collect())
 }
@@ -320,7 +324,8 @@ pub async fn find_member_community_posts(
                 communities.name AS \"community_name?\",
                 posts.published_at,
                 posts.created_at,
-                posts.updated_at
+                posts.updated_at,
+                EXISTS (SELECT 1 FROM pickles WHERE pickles.post_id = posts.id) AS \"pickled!\"
             FROM posts
             JOIN community_members
                 ON community_members.community_id = posts.community_id
@@ -365,6 +370,7 @@ pub async fn find_member_community_posts(
             published_at: row.published_at,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            pickled: row.pickled,
         })
         .collect())
 }
@@ -398,7 +404,8 @@ pub async fn find_collaborative_posts(
             c.name AS "community_name?",
             p.published_at,
             p.created_at,
-            p.updated_at
+            p.updated_at,
+            EXISTS (SELECT 1 FROM pickles WHERE pickles.post_id = p.id) AS "pickled!"
         FROM collaborative_sessions cs
         JOIN posts p ON cs.saved_post_id = p.id
         JOIN users u ON p.author_id = u.id
@@ -442,6 +449,7 @@ pub async fn find_collaborative_posts(
             published_at: row.published_at,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            pickled: row.pickled,
         })
         .collect())
 }
@@ -475,7 +483,8 @@ pub async fn find_following_posts_by_user_id(
                 communities.name AS \"community_name?\",
                 posts.published_at,
                 posts.created_at,
-                posts.updated_at
+                posts.updated_at,
+                EXISTS (SELECT 1 FROM pickles WHERE pickles.post_id = posts.id) AS \"pickled!\"
             FROM posts
             LEFT JOIN images ON posts.image_id = images.id
             LEFT JOIN users ON posts.author_id = users.id
@@ -517,6 +526,7 @@ pub async fn find_following_posts_by_user_id(
             published_at: row.published_at,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            pickled: row.pickled,
         })
         .collect())
 }

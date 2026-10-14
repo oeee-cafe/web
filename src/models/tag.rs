@@ -264,6 +264,7 @@ pub async fn find_posts_by_tag(
             posts.published_at,
             posts.created_at,
             posts.updated_at,
+            EXISTS (SELECT 1 FROM pickles WHERE pickles.post_id = posts.id) AS "pickled!",
             count(*) OVER () AS "total!"
         FROM posts
         JOIN post_tags ph ON posts.id = ph.post_id
@@ -310,6 +311,7 @@ pub async fn find_posts_by_tag(
                 published_at: row.published_at,
                 created_at: row.created_at,
                 updated_at: row.updated_at,
+                pickled: row.pickled,
             })
             .collect(),
         total,

@@ -219,6 +219,7 @@ post-reaction-custom = ほかの絵文字でリアクション
 post-reaction-custom-hint = 絵文字1つ
 post-reaction-custom-submit = リアクション
 post-pickles = ピクルス
+post-card-pickled = ピクルスを贈られた絵
 post-pickle-count = ピクルス{ $count }個
 post-pickle-give = 今週のピクルスを贈る
 post-pickle-give-confirm = 今週のピクルスをこの絵に贈りますか？ピクルスは週にひとつだけで、贈ったら取り消せません。お名前が絵に表示されます。

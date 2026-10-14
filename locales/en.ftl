@@ -243,6 +243,7 @@ post-reaction-custom = Add another emoji
 post-reaction-custom-hint = One emoji
 post-reaction-custom-submit = React
 post-pickles = pickles
+post-card-pickled = Given a pickle
 post-pickle-count =
     { $count ->
         [one] { $count } pickle

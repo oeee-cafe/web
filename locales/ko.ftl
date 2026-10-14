@@ -219,6 +219,7 @@ post-reaction-custom = 다른 이모지로 반응
 post-reaction-custom-hint = 이모지 하나
 post-reaction-custom-submit = 반응
 post-pickles = 피클
+post-card-pickled = 피클을 받은 그림
 post-pickle-count = 피클 { $count }개
 post-pickle-give = 이번 주 피클 주기
 post-pickle-give-confirm = 이번 주 피클을 이 그림에 줄까요? 피클은 일주일에 하나뿐이며, 준 피클은 되돌릴 수 없고, 그림에 내 이름이 함께 표시됩니다.

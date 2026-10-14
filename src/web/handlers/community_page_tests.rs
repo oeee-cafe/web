@@ -396,6 +396,7 @@ fn the_grid_continues_from_the_communitys_own_endpoint() {
             published_at: Some(chrono::Utc::now()),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            pickled: false,
         })
         .collect();
 

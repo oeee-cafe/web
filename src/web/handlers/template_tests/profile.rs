@@ -91,6 +91,7 @@ fn a_profiles_drawings_are_the_shared_grid() {
             published_at: Some(now),
             created_at: now,
             updated_at: now,
+            pickled: false,
         })
         .collect();
     let empty = json!({"posts": [], "headings": [], "has_more": false, "next_url": ""});

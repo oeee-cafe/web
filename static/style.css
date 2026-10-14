@@ -422,6 +422,13 @@ nav a:visited,
 
 /* Who never shrinks away, when never at all; where gives up its room
    first, so a long community name costs its own ending and nothing else. */
+.post-card-pickled .pickle-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+
 .post-card-byline {
   display: flex;
   min-width: 0;

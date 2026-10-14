@@ -675,3 +675,47 @@ fn a_guest_on_a_collaborative_byline_is_named_but_not_linked() {
     assert!(!rendered.contains(r#"href="/@""#), "a guest is not linked");
     assert!(!rendered.contains("@impostor"), "nor given a handle");
 }
+
+/// A card in a feed whose drawing was given a pickle has a jar before its
+/// title, named in its tooltip and to a screen reader; one without has
+/// none, and nor does the admin grid.
+#[test]
+fn a_pickled_drawing_has_a_jar_on_its_card() {
+    let mut env = test_support::env();
+    env.add_template_owned(
+        "card_test.jinja",
+        r#"{% import "post_card.jinja" as card %}{{ card.post_card(post, "https://example.test", admin) }}"#
+            .to_string(),
+    )
+    .unwrap();
+    let render = |pickled: bool, admin: bool| {
+        env.get_template("card_test.jinja")
+            .unwrap()
+            .render(context! {
+                post => Serde(json!({
+                    "id": "p",
+                    "title": "Cat",
+                    "user_login_name": "artist",
+                    "image_filename": "ab/cat.png",
+                    "image_width": 300,
+                    "image_height": 300,
+                    "is_sensitive": false,
+                    "published_at": "2026-10-14T03:00:00Z",
+                    "pickled": pickled,
+                })),
+                admin => admin,
+                ftl_lang => "en",
+            })
+            .expect("the card renders")
+    };
+    let pickled = render(true, false);
+    assert!(
+        pickled.contains(r#"aria-label="post-card-pickled""#),
+        "{pickled}"
+    );
+    assert!(pickled.contains("pickle-icon"));
+    // Before the title, inside its line.
+    assert!(pickled.contains("</svg></span>Cat"), "{pickled}");
+    assert!(!render(false, false).contains("post-card-pickled"));
+    assert!(!render(true, true).contains("post-card-pickled"));
+}

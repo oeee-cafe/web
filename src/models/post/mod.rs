@@ -105,6 +105,10 @@ pub struct SerializablePostForHome {
     pub published_at: Option<DateTime<Utc>>,
     pub updated_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+    /// Whether anyone has given it a pickle (models::pickle): the jar
+    /// before its title on a card. Never how many -- a grid of counts
+    /// reads as a ranking -- which is the post's own page to say.
+    pub pickled: bool,
 }
 
 #[derive(Serialize)]

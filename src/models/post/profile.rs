@@ -111,7 +111,8 @@ pub async fn find_profile_posts(
                 communities.name AS \"community_name?\",
                 posts.published_at,
                 posts.created_at,
-                posts.updated_at
+                posts.updated_at,
+                EXISTS (SELECT 1 FROM pickles WHERE pickles.post_id = posts.id) AS \"pickled!\"
             FROM posts
             JOIN images ON posts.image_id = images.id
             JOIN users ON posts.author_id = users.id
@@ -156,6 +157,7 @@ pub async fn find_profile_posts(
             published_at: row.published_at,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            pickled: row.pickled,
         })
         .collect())
 }

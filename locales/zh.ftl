@@ -219,6 +219,7 @@ post-reaction-custom = 用其他表情回应
 post-reaction-custom-hint = 一个表情
 post-reaction-custom-submit = 回应
 post-pickles = 腌黄瓜
+post-card-pickled = 收到过腌黄瓜的画
 post-pickle-count = { $count }根腌黄瓜
 post-pickle-give = 送出本周的腌黄瓜
 post-pickle-give-confirm = 要把本周的腌黄瓜送给这幅画吗？每周只有一根，送出后无法收回，你的名字会显示在画上。
