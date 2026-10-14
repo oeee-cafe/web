@@ -48,6 +48,8 @@ export interface ReceiverHandlers {
     sessionId?: number,
     isGuest?: boolean,
     isSpectator?: boolean,
+    /** Gone from the room, and listed for the layers they left behind. */
+    left?: boolean,
   ) => void;
   clearParticipants: () => void;
   /**
@@ -558,6 +560,7 @@ export class SessionReceiver {
             participant.sessionId > 0 ? participant.sessionId : undefined,
             participant.isGuest,
             participant.isSpectator,
+            participant.isLeft,
           );
           if (participant.sessionId > 0) {
             this.idNames.set(participant.sessionId, participant.username);

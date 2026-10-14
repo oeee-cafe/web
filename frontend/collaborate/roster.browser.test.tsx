@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
-import { FLAG_GUEST, FLAG_SPECTATOR } from "./binaryProtocol";
+import { FLAG_GUEST, FLAG_LEFT, FLAG_SPECTATOR } from "./binaryProtocol";
 import {
   FakeServer, installRoom, mountPage, mountSession, settle, settleUntil, uninstallRoom,
 } from "./test/fakeRoom";
-import { layersFrame, leaveFrame } from "./test/frames";
+import { layersFrame, leaveFrame, stroke } from "./test/frames";
 
 /**
  * Who the room says is here. Somebody who left, or whom the owner sent out,
@@ -67,6 +67,26 @@ describe("the participant list", () => {
     );
     await settle();
     expect(count()).toBe("2");
+  });
+
+  // The roster used to list only who was here, so a page that came in or
+  // reconnected after somebody left knew their layers by id alone.
+  it("names the layers of somebody who has left, without counting them", async () => {
+    server.sequence(stroke(2, { x: 10, y: 10 }));
+    const socket = await mountSession();
+    await act(async () => server.admit(socket, 3));
+    await act(async () =>
+      socket.deliver(
+        layersFrame([
+          { userId: BOB, sessionId: 2, name: "bob", flags: FLAG_GUEST | FLAG_LEFT },
+          { userId: ME, sessionId: 3, name: "umu" },
+        ]),
+      ),
+    );
+    await settleUntil(() => count() === "1");
+    expect(listed("bob"), "not among who is here").toBe(false);
+    await settleUntil(() => document.querySelector("button[aria-label=\"Draw on bob's layers\"]") !== null);
+    expect(document.querySelector("button[aria-label=\"Draw on 2's layers\"]")).toBeNull();
   });
 });
 

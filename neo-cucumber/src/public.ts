@@ -304,6 +304,17 @@ export interface PainterHandle {
   setLocalActorId(actorId: string): void;
 
   /**
+   * Say that this connection only watches: it has no layers of its own.
+   *
+   * The engine keeps a pair for whoever is at the keyboard from the moment it
+   * mounts, before a host can know whether they will draw. Somebody watching
+   * never draws into it, and the server gives them no id to name it by, so
+   * listed in the layer toolbox it was a blank row under a placeholder name.
+   * Spectating, the toolbox leaves it out.
+   */
+  setSpectating(spectating: boolean): void;
+
+  /**
    * Name the participants for the layer toolbox.
    *
    * The painter knows every actor that has drawn, because their layers exist,

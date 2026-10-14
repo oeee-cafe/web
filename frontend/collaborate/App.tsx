@@ -366,9 +366,10 @@ export default function App() {
     sessionId?: number,
     isGuest?: boolean,
     isSpectator?: boolean,
+    left?: boolean,
   ) => {
     setParticipants((current) =>
-      new Map(current).set(userId, { userId, username, joinedAt, sessionId, isGuest, isSpectator }));
+      new Map(current).set(userId, { userId, username, joinedAt, sessionId, isGuest, isSpectator, left }));
   }, []);
 
   const onLocalOperation = useCallback((entry: LocalPainterOperation) => {
@@ -712,6 +713,9 @@ export default function App() {
    * null, so no local operation carries the placeholder identity.
    */
   const handleWelcome = useCallback((sessionId: number) => {
+    // 0 is no id: a spectator draws under none, and renaming this screen's
+    // layers to "0" listed them as a layer of that name (`setSpectating`).
+    if (sessionId === 0) return;
     painterRef.current?.setLocalActorId(String(sessionId));
   }, []);
 
@@ -935,6 +939,12 @@ export default function App() {
       view.connection === "connected" && !view.catchingUp && !sessionEnding && !sessionExpired && !removed && !paused && !watching,
     );
   }, [painterReady, view.connection, view.catchingUp, sessionEnding, sessionExpired, removed, paused, watching]);
+
+  // Watching, this screen has no layers in the room, and the toolbox says so.
+  useEffect(() => {
+    if (!painterReady) return;
+    painterRef.current?.setSpectating(watching);
+  }, [painterReady, watching]);
 
   /**
    * Into the room, once it is known who is coming in: straight on to the post

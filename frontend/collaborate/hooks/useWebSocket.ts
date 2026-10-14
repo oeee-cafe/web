@@ -96,6 +96,8 @@ interface WebSocketHookParams {
     sessionId?: number,
     isGuest?: boolean,
     isSpectator?: boolean,
+    /** Gone from the room, and listed for the layers they left behind. */
+    left?: boolean,
   ) => void;
   clearParticipants: () => void;
   markParticipantLeft: (userId: string) => void;

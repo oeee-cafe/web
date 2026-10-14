@@ -43,6 +43,12 @@ pub const FLAG_GUEST: u8 = 0b0000_0001;
 /// add (`SessionContext::flags`) rather than a [`Collaborator`]'s.
 pub const FLAG_SPECTATOR: u8 = 0b0000_0010;
 
+/// On a LAYERS entry only: this person has left the room. Listed all the same
+/// because their layers stay in the drawing, and the room has no other way to
+/// learn whose they are -- a client that arrives after them, or reconnects,
+/// would otherwise know them only by their layer id.
+pub const FLAG_LEFT: u8 = 0b0000_0100;
+
 /// Somebody in a room: an account, or a guest.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Collaborator {

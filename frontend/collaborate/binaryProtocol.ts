@@ -807,6 +807,11 @@ export function encodeText(
 export const FLAG_GUEST = 0b0000_0001;
 /** Beside FLAG_GUEST: this person is watching the session, not drawing in it. */
 export const FLAG_SPECTATOR = 0b0000_0010;
+/**
+ * On a LAYERS entry only: this person has left, and is listed because their
+ * layers are still in the drawing; `guest::FLAG_LEFT` on the server.
+ */
+export const FLAG_LEFT = 0b0000_0100;
 
 export interface JoinMessage {
   type: "join";
@@ -825,6 +830,7 @@ export interface LayersMessage {
     username: string;
     isGuest: boolean;
     isSpectator: boolean;
+    isLeft: boolean;
     joinTimestamp: number;
   }>;
 }
@@ -1218,6 +1224,7 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
 
         const isGuest = (buffer[offset] & FLAG_GUEST) !== 0;
         const isSpectator = (buffer[offset] & FLAG_SPECTATOR) !== 0;
+        const isLeft = (buffer[offset] & FLAG_LEFT) !== 0;
         offset += 1;
 
         const nameLength = readUint16LE(buffer, offset);
@@ -1231,7 +1238,7 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
         const joinTimestamp = readUint64LE(buffer, offset);
         offset += 8;
 
-        participants.push({ userId, sessionId, username, isGuest, isSpectator, joinTimestamp });
+        participants.push({ userId, sessionId, username, isGuest, isSpectator, isLeft, joinTimestamp });
       }
 
       return {

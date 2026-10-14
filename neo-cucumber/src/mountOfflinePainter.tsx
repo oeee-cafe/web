@@ -53,6 +53,8 @@ export function mountOfflinePainter(
    * re-states it to whatever controller it ends up with.
    */
   let pendingActorId: string | null = null;
+  /** Whether the host said this connection only watches; kept the same way. */
+  let pendingSpectating = false;
   let resolveReady = () => {};
   let rejectReady: (reason?: unknown) => void = () => {};
   const ready = new Promise<void>((resolve, reject) => {
@@ -93,6 +95,7 @@ export function mountOfflinePainter(
             controller = value;
             if (value) {
               if (pendingActorId !== null) value.setLocalActorId(pendingActorId);
+              if (pendingSpectating) value.setSpectating(true);
               void value.ready.then(resolveReady, rejectReady);
             }
           }}
@@ -141,6 +144,11 @@ export function mountOfflinePainter(
       if (!mounted) throw unmountedError();
       pendingActorId = actorId;
       controller?.setLocalActorId(actorId);
+    },
+    setSpectating(spectating: boolean) {
+      if (!mounted) throw unmountedError();
+      pendingSpectating = spectating;
+      controller?.setSpectating(spectating);
     },
     setParticipants(participants) {
       if (!mounted) throw unmountedError();

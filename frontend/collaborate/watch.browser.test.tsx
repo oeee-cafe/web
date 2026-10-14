@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
-import { decodeMessage } from "./binaryProtocol";
+import { decodeMessage, FLAG_SPECTATOR } from "./binaryProtocol";
 import {
   FakeServer, type FakeSocket, installRoom, mountPage, mountSession, pointer, settle,
   settleUntil, sockets, uninstallRoom,
 } from "./test/fakeRoom";
+import { layersFrame, stroke } from "./test/frames";
 
 /**
  * Watching a room rather than drawing in it: asked for with `?watch=1`, or
@@ -27,6 +28,12 @@ const sentKinds = (socket: FakeSocket) =>
 
 const text = () => document.body.textContent ?? "";
 
+/** Whose layers the toolbox lists, by the names on its rows. */
+const layerRows = () =>
+  Array.from(document.querySelectorAll("button[aria-label^='Draw on ']")).map((row) =>
+    (row.getAttribute("aria-label") ?? "").replace(/^Draw on (.*)'s layers$/, "$1"),
+  );
+
 describe("watching a room", () => {
   it("asks the server for a place watching, and draws nothing", async () => {
     installRoom();
@@ -42,6 +49,29 @@ describe("watching a room", () => {
     await pointer().drag({ x: 10, y: 10 }, { x: 30, y: 10 });
     await settle();
     expect(sentKinds(socket).filter((kind) => kind !== "join")).toEqual([]);
+  });
+
+  // The engine keeps a pair for whoever is at the keyboard, and a spectator's
+  // was listed as a blank layer named "0", the id they do not have.
+  it("lists the room's layers and none of its own", async () => {
+    installRoom();
+    window.history.replaceState(null, "", `${window.location.pathname}?watch=1`);
+    server.sequence(stroke(1, { x: 10, y: 10 }));
+    server.sequence(stroke(2, { x: 20, y: 20 }));
+    const socket = await mountSession();
+    await act(async () => server.admit(socket, 0));
+    await act(async () =>
+      socket.deliver(
+        layersFrame([
+          { userId: "aaaaaaaa-0000-4000-8000-000000000001", sessionId: 1, name: "alice" },
+          { userId: "aaaaaaaa-0000-4000-8000-000000000002", sessionId: 2, name: "bob" },
+          { userId: "aaaaaaaa-0000-4000-8000-000000000003", sessionId: 0, name: "umu", flags: FLAG_SPECTATOR },
+        ]),
+      ),
+    );
+    await settleUntil(() => layerRows().length > 0);
+    await settle();
+    expect(layerRows().sort()).toEqual(["alice", "bob"]);
   });
 
   it("offers to watch a full room, and watches it", async () => {

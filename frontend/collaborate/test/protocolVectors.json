@@ -30,7 +30,8 @@
             "username": "오이",
             "joinTimestamp": 1700000000123,
             "isGuest": false,
-            "isSpectator": false
+            "isSpectator": false,
+            "isLeft": false
           },
           {
             "userId": "5f3e8a10-2b44-4c6d-9e01-7a8b9c0d1e2f",
@@ -38,7 +39,8 @@
             "username": "miro",
             "joinTimestamp": 1700000000128,
             "isGuest": true,
-            "isSpectator": true
+            "isSpectator": true,
+            "isLeft": false
           }
         ]
       }

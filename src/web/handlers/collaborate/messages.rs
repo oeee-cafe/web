@@ -480,8 +480,11 @@ pub async fn handle_join_message(
     Some(Message::Binary(join_message.serialize().into()))
 }
 
-/// Who is active in a session, by join time, with the session id left at 0
-/// for the caller to fill in from Redis.
+/// Who is in a session, by join time, with the session id left at 0 for the
+/// caller to fill in from Redis: everybody here, and everybody who has drawn
+/// here and gone, flagged `FLAG_LEFT`. What somebody drew stays when they
+/// leave, and this is the only place the room learns whose it is; leaving
+/// them out named a departed drawer's layers by their 1-byte id.
 async fn get_session_participants(
     session_id: Uuid,
     state: &AppState,
@@ -495,11 +498,12 @@ async fn get_session_participants(
                COALESCE(u.login_name, g.nickname) AS "name!",
                csp.guest_id IS NOT NULL AS "is_guest!",
                csp.watching,
+               csp.is_active,
                csp.joined_at
         FROM collaborative_sessions_participants csp
         LEFT JOIN users u ON csp.user_id = u.id
         LEFT JOIN collaborative_guests g ON csp.guest_id = g.id
-        WHERE csp.session_id = $1 AND csp.is_active = true
+        WHERE csp.session_id = $1 AND (csp.is_active OR NOT csp.is_spectator)
         ORDER BY csp.joined_at ASC
         "#,
         session_id
@@ -520,6 +524,10 @@ async fn get_session_participants(
                 super::guest::FLAG_SPECTATOR
             } else {
                 0
+            } | if row.is_active {
+                0
+            } else {
+                super::guest::FLAG_LEFT
             },
             name: row.name,
             // Milliseconds since the epoch

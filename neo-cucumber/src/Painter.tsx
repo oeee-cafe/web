@@ -317,6 +317,8 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     };
   }, [synchronization]);
   const targetOwnerRef = useRef<string | null>(null);
+  /** Watching only: the pair kept for this screen is nobody's to list. */
+  const [spectating, setSpectating] = useState(false);
 
   /**
    * The participants the layer toolbox lists, top of the stack first, so the
@@ -334,9 +336,13 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       // drew stays, and their row is how it is seen or hidden. Somebody who
       // left without a mark has nothing there, and a row would only say they
       // were still in the room.
+      //
+      // Somebody watching has a pair all the same -- the engine makes one
+      // for whoever is at the keyboard before anyone knows they will not
+      // draw -- but nothing will ever be in it, and nobody will name it.
       inJoinOrder([
         ...new Set([
-          ...layerOwners,
+          ...layerOwners.filter((actorId) => !(spectating && actorId === localActorId)),
           ...[...participantNames]
             .filter(([, participant]) => !participant.left)
             .map(([actorId]) => actorId),
@@ -348,7 +354,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
           color: participantNames.get(actorId)?.color,
         }),
       ),
-    [layerOwners, participantNames],
+    [layerOwners, participantNames, spectating, localActorId],
   );
 
   /**
@@ -1058,6 +1064,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       preferPen,
       setInteractionEnabled,
       setLocalActorId,
+      setSpectating,
       setParticipants,
       setHiddenParticipants,
       setLayersOrigin,

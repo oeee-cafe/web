@@ -10,7 +10,7 @@
 use serde_json::Value;
 use uuid::Uuid;
 
-use super::guest::{Collaborator, FLAG_GUEST, FLAG_SPECTATOR};
+use super::guest::{Collaborator, FLAG_GUEST, FLAG_LEFT, FLAG_SPECTATOR};
 use super::messages::{
     caught_up_frame, end_session_frame, handle_chat_message, replay_start_frame, reset_point_frame,
     welcome_frame, ChatMessage, JoinMessage, LayersMessage, LeaveMessage, PresentParticipant,
@@ -76,7 +76,12 @@ fn server_frame(name: &str, d: &Value) -> Vec<u8> {
                 .map(|p| PresentParticipant {
                     id: uuid(&p["userId"]),
                     session_id: number(&p["sessionId"]) as u8,
-                    flags: flags(p),
+                    flags: flags(p)
+                        | if p["isLeft"].as_bool().expect("isLeft") {
+                            FLAG_LEFT
+                        } else {
+                            0
+                        },
                     name: text(&p["username"]),
                     joined_at: number(&p["joinTimestamp"]) as i64,
                 })
