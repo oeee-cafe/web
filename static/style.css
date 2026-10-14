@@ -1462,6 +1462,20 @@ nav a:visited,
   margin: 0 0 6px;
 }
 
+.pickle-givers-label {
+  color: var(--ds-muted);
+}
+
+.pickle-givers {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.pickle-givers > * {
+  margin: 0 6px 6px 0;
+}
+
 .pickle-about-title {
   font-weight: 600;
 }

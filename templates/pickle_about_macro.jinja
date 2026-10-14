@@ -6,13 +6,26 @@
    The chip's own content is the call block: jars and a count on a post,
    one jar and "받은 피클 7개" on a profile. `chip_class` is its classes,
    `title` its tooltip, and `note` a line of the panel's own for this
-   viewer, such as that they gave one. #}
-{% macro pickle_about(chip_class, title, note=none) -%}
+   viewer, such as that they gave one.
+
+   On a post, `pickles` is its PickleState, and the panel says who gave
+   them: each giver by name, as the credits on /about name them and by the
+   same choice, and the ones who chose not to be named as a count. A
+   profile passes none, its total being many drawings'. #}
+{% from "person_macro.jinja" import person_chip %}
+{% macro pickle_about(chip_class, title, note=none, pickles=none) -%}
   <details class="pickle-about">
     <summary class="{{ chip_class }}" title="{{ title }}">{{ caller() }}</summary>
     <div class="pickle-about-panel">
       <p class="pickle-about-title">{% include "pickle_icon.jinja" %} {{ ftl_get_message("post-pickle-about-title") }}</p>
       <p>{{ ftl_get_message("post-pickle-about") }}</p>
+      {% if pickles and pickles.count %}
+        <p class="pickle-givers-label">{{ ftl_get_message("post-pickle-given-by") }}</p>
+        <div class="pickle-givers">
+          {%- for giver in pickles.givers %}{{ person_chip(giver.login_name, giver.display_name, "/@" ~ giver.login_name) }}{% endfor -%}
+          {%- if pickles.unnamed %}<span class="profile-chip">{{ ftl_format_pattern("post-pickle-unnamed", {"count": pickles.unnamed}) }}</span>{% endif -%}
+        </div>
+      {% endif %}
       {% if note %}<p>{{ note }}</p>{% endif %}
       <a href="/supporter">{{ ftl_get_message("post-pickle-about-supporter") }}</a>
     </div>

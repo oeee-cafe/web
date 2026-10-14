@@ -45,6 +45,20 @@ pub struct PickleState {
     /// Whether the viewer has this week's pickle still to give. False for
     /// anyone who is not a supporter this year.
     pub weekly_available: bool,
+    /// Who gave it one, the latest first: a supporter is named here as they
+    /// are in the credits on /about, and by the same choice.
+    pub givers: Vec<Giver>,
+    /// The rest of `count`: pickles from somebody who asked to be left out
+    /// of the credits (`users.show_in_credits`), or from an account since
+    /// closed. Counted, never named.
+    pub unnamed: i64,
+}
+
+/// Somebody named as having given a post a pickle.
+#[derive(Clone, Debug, Serialize)]
+pub struct Giver {
+    pub login_name: String,
+    pub display_name: String,
 }
 
 /// Whether `user_id` has given this week's pickle already.
@@ -115,10 +129,32 @@ pub async fn state_for(
         Some(viewer_id) if is_supporter => !weekly_given(tx, viewer_id).await?,
         _ => false,
     };
+    let givers = query!(
+        r#"
+        SELECT users.login_name, users.display_name
+        FROM pickles
+        JOIN users ON users.id = pickles.giver_id
+        WHERE pickles.post_id = $1
+          AND users.show_in_credits
+          AND users.deleted_at IS NULL
+        ORDER BY pickles.created_at DESC
+        "#,
+        post_id,
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .map(|row| Giver {
+        login_name: row.login_name.to_string(),
+        display_name: row.display_name,
+    })
+    .collect::<Vec<_>>();
     Ok(PickleState {
         count: row.count,
         given_by_viewer: row.given_by_viewer,
         weekly_available,
+        unnamed: row.count - givers.len() as i64,
+        givers,
     })
 }
 

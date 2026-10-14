@@ -249,13 +249,19 @@ post-pickle-count =
        *[other] { $count } pickles
     }
 post-pickle-give = Give this week's pickle
-post-pickle-give-confirm = Give this drawing your pickle for the week? You get one a week, and it can't be taken back.
+post-pickle-give-confirm = Give this drawing your pickle for the week? You get one a week, it can't be taken back, and your name is shown with it.
 post-pickle-give-action = Give pickle
 post-pickle-given = You gave this a pickle
 post-pickle-supporters = Supporters can give one pickle a week
 post-pickle-about-title = Pickles
 post-pickle-about = A Supporter Pack holder gets one pickle a week to give to a drawing they love. It is the rarest thank-you on Oeee Cafe.
 post-pickle-about-supporter = About the Supporter Pack
+post-pickle-given-by = Given by
+post-pickle-unnamed =
+    { $count ->
+        [one] { $count } supporter
+       *[other] { $count } supporters
+    }
 post-share = Share
 post-share-copied = Link copied to clipboard!
 post-report = Report

@@ -588,6 +588,54 @@ fn a_pickle_is_offered_only_to_a_supporter_who_still_has_one() {
     );
 }
 
+/// The panel under a post's pickles says who gave them: each named giver
+/// as a chip leading to their profile, the latest first, and the ones who
+/// asked not to be named (as in the credits) as a count.
+#[test]
+fn a_posts_pickles_name_who_gave_them() {
+    let env = test_support::env();
+    let template = env
+        .get_template("post_pickles.jinja")
+        .unwrap_or_else(|e| panic!("post_pickles.jinja loads: {e:#}"));
+    let render = |givers: serde_json::Value, unnamed: i64| {
+        template
+            .render(context! {
+                current_user => context! { id => "viewer" },
+                pickles => Serde(json!({
+                    "count": givers.as_array().unwrap().len() as i64 + unnamed,
+                    "given_by_viewer": false,
+                    "weekly_available": false,
+                    "givers": givers,
+                    "unnamed": unnamed,
+                })),
+                post_id => "p",
+                post_author_id => "author",
+                ftl_lang => "en",
+            })
+            .expect("pickles render")
+    };
+
+    let both = render(
+        json!([
+            {"login_name": "mina", "display_name": "미나"},
+            {"login_name": "jun", "display_name": "준"},
+        ]),
+        1,
+    );
+    assert!(both.contains("post-pickle-given-by"));
+    let mina = both.find(r#"href="&#x2f;@mina""#).expect("mina is named");
+    let jun = both.find(r#"href="&#x2f;@jun""#).expect("jun is named");
+    assert!(mina < jun, "in the order given, the latest first");
+    assert!(both.contains("post-pickle-unnamed(count=1)"));
+
+    let named = render(json!([{"login_name": "mina", "display_name": "미나"}]), 0);
+    assert!(!named.contains("post-pickle-unnamed"));
+
+    let nobody_named = render(json!([]), 2);
+    assert!(nobody_named.contains("post-pickle-unnamed(count=2)"));
+    assert!(!nobody_named.contains(r#"href="&#x2f;@"#));
+}
+
 /// A guest who drew in the session is on the byline by the name they gave,
 /// marked as a guest, with no profile link and no handle -- the name is
 /// whatever they typed, and could be an account's.

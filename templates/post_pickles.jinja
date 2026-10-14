@@ -45,7 +45,7 @@
     </button>
   {% elif pickles.count > 0 %}
     {% call pickle_about("pickle-chip" ~ (" given" if pickles.given_by_viewer else ""), pickle_title,
-                         ftl_get_message("post-pickle-given") if pickles.given_by_viewer else none) %}
+                         ftl_get_message("post-pickle-given") if pickles.given_by_viewer else none, pickles) %}
       {{- jars(pickles.count) }}<span class="pickle-label">{{ ftl_format_pattern("post-pickle-count", {"count": pickles.count}) }}</span>
     {%- endcall %}
   {% endif -%}
