@@ -649,6 +649,8 @@ profile-tab-comments = 댓글
 profile-more = 더 보기
 profile-private-community-posts-note = 비공개 커뮤니티에서 그린 그림은 공개 프로필에 보이지 않습니다.
 profile-member-since = { $year }년 { $month }월 가입
+profile-pickles-received = 받은 피클 { $count }개
+profile-pickles-received-help = 후원자들이 이 사람의 그림에 준 피클입니다. 후원자는 일주일에 피클 하나를 줄 수 있습니다.
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = 이 페이지를 떠날까요?

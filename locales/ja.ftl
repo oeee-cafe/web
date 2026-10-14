@@ -649,6 +649,8 @@ profile-tab-comments = コメント
 profile-more = その他
 profile-private-community-posts-note = プライベートコミュニティで描いた絵は公開プロフィールに表示されません。
 profile-member-since = { $year }年{ $month }月から参加
+profile-pickles-received = もらったピクルス{ $count }個
+profile-pickles-received-help = サポーターがこの人の絵に贈ったピクルスです。サポーターは週にひとつ贈れます。
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = このページを離れますか？

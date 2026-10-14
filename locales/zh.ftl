@@ -649,6 +649,8 @@ profile-tab-comments = 评论
 profile-more = 更多
 profile-private-community-posts-note = 私密社区的作品不会显示在你的公开个人资料中。
 profile-member-since = { $year }年{ $month }月加入
+profile-pickles-received = 收到{ $count }根腌黄瓜
+profile-pickles-received-help = 支持者送给此人画作的腌黄瓜。每位支持者每周可以送出一根。
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = 要离开此页面吗？

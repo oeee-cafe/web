@@ -3295,6 +3295,23 @@ nav a:visited,
   }
 }
 
+/* Pickles received: on the pickles' own tint, as on a post. */
+.profile-chip.pickle-received-chip {
+  border-color: var(--ds-accent-line);
+  background-color: var(--ds-success-surface);
+  color: var(--ds-success-text);
+}
+
+.pickle-received-chip .pickle-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+
+.pickle-received-chip .pickle-label {
+  margin-left: 4px;
+}
+
 /* The Supporter Pack's own page and the heart that leads to it.
    The heart is always there -- it leads to a page, not to a payment, and
    somebody reading in a browser is how they find out the pack exists at

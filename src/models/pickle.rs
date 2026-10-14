@@ -122,6 +122,24 @@ pub async fn state_for(
     })
 }
 
+/// How many pickles `user_id`'s drawings have been given, from every source
+/// alike: the number on their profile. A drawing they deleted takes its
+/// pickles with it.
+pub async fn received_by(tx: &mut Transaction<'_, Postgres>, user_id: Uuid) -> Result<i64> {
+    let count = query_scalar!(
+        r#"
+        SELECT count(*) AS "count!"
+        FROM pickles
+        JOIN posts ON posts.id = pickles.post_id
+        WHERE posts.author_id = $1 AND posts.deleted_at IS NULL
+        "#,
+        user_id,
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -18,6 +18,7 @@ use crate::models::notification::{
     create_notification, get_badge_count, get_notification_by_id, retract_follow_notifications,
     send_push_for_notification, BadgeFalls, CreateNotificationParams, NotificationType,
 };
+use crate::models::pickle;
 use crate::models::post::{
     count_profile_posts, find_profile_posts, find_published_public_posts_by_author_id,
     ProfileDrawings,
@@ -409,6 +410,7 @@ async fn render_profile(
 
     let achievements = list_achievements(tx, user.id).await?;
     let supporter_standings = standings(tx, user.id).await?;
+    let pickles_received = pickle::received_by(tx, user.id).await?;
     let links = find_links_by_user_id(tx, user.id).await?;
     let links = links
         .iter()
@@ -449,6 +451,7 @@ async fn render_profile(
                 tab => tab.name(),
                 achievements => Serde(achievements),
                 supporter_standings => Serde(supporter_standings),
+                pickles_received,
                 user => Serde(Some(user)),
                 domain => state.config.domain.clone(),
                 public_count,

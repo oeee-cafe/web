@@ -359,6 +359,46 @@ fn a_supporters_profile_says_so_first() {
     assert!(!render(json!([])).contains("supporter-chip"));
 }
 
+/// The pickles someone's drawings have been given, as a chip that says so
+/// in words, after the years they supported; nothing for someone who has
+/// none.
+#[test]
+fn a_profile_counts_the_pickles_its_drawings_were_given() {
+    let env = test_support::env();
+    let render = |pickles_received: i64| {
+        env.get_template("profile.jinja")
+            .expect("profile loads")
+            .render(context! {
+                user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(Vec::<serde_json::Value>::new()),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
+                supporter_standings => Serde(json!([
+                    {"store": "steam", "year": 2026, "since": "2026-09-22T00:00:00Z"},
+                ])),
+                pickles_received,
+                public_count => 0,
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
+                private_count => 0,
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
+                domain => "oeee.cafe",
+                is_following => false,
+                ..chrome()
+            })
+            .expect("profile renders")
+    };
+    let given = render(7);
+    let chip = given.find("pickle-received-chip").expect("a pickle chip");
+    assert!(
+        given.find("supporter-chip").unwrap() < chip,
+        "after the years"
+    );
+    assert!(given.contains("profile-pickles-received(count=7)"));
+    assert!(given.contains(r#"title="profile-pickles-received-help""#));
+    assert!(!render(0).contains("pickle-received-chip"));
+}
+
 /// Following, in its own section under the card with its count:
 /// everyone the same shape, a banner where they have drawn one and a
 /// frame of the same size holding their name where they have not. No

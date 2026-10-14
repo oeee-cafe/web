@@ -694,6 +694,12 @@ profile-member-since = Member since { $month ->
         [11] November
        *[12] December
     } { $year }
+profile-pickles-received =
+    { $count ->
+        [one] { $count } pickle received
+       *[other] { $count } pickles received
+    }
+profile-pickles-received-help = Pickles supporters have given their drawings. Each supporter has one a week to give.
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = Leave this page?
