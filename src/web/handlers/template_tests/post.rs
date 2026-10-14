@@ -541,8 +541,18 @@ fn a_pickle_is_offered_only_to_a_supporter_who_still_has_one() {
     // Two jars for the two it has, and the faded one the giver's will be.
     assert_eq!(offered.matches("<svg").count(), 3);
     assert!(offered.contains("pickle-slot"));
-    assert!(!offered.contains("pickle-count"));
+    assert!(!offered.contains(r#"class="pickle-count""#));
+    assert!(offered.contains(r#"aria-label="post-pickle-give, post-pickle-count(count=2)""#));
+    // With none yet, the button is named for what it does and nothing else.
+    let first = render(Some("supporter"), 0, false, true);
+    assert!(
+        first.contains(r#"aria-label="post-pickle-give""#),
+        "{first}"
+    );
     assert!(offered.contains(r#"title="post-pickle-give""#));
+    // Its confirmation names what yes does, and is not the red, destructive one.
+    assert!(offered.contains(r#"data-confirm-action="post-pickle-give-action""#));
+    assert!(offered.contains(r#"data-confirm-tone="plain""#));
 
     let own = render(Some("author"), 2, false, true);
     assert!(!own.contains("hx-post"), "nobody pickles their own post");

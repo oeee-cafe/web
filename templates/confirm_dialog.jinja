@@ -8,6 +8,9 @@
    it back. The action button is named for what it does -- the control's
    own words, "Delete" or "Remove member" -- rather than OK, and Cancel is
    the one that has focus, so Return never destroys anything by itself.
+   A control with no words of its own, or whose yes destroys nothing, says
+   so: `data-confirm-action` names the button, and `data-confirm-tone="plain"`
+   makes it the primary one rather than the red one, without the warning.
 
    Written for Firefox 56, which reads this script as written: no arrow
    functions, no `let`. #}
@@ -67,13 +70,14 @@
         else detail.dropRequest();
       };
       opener = document.activeElement;
+      var plain = event.target.getAttribute("data-confirm-tone") === "plain";
       message.textContent = detail.ctx.confirm;
-      ok.textContent = labelFor(event.target);
-      ok.classList.add("ds-button-danger");
-      ok.classList.remove("ds-button-primary");
+      ok.textContent = event.target.getAttribute("data-confirm-action") || labelFor(event.target);
+      ok.classList.toggle("ds-button-danger", !plain);
+      ok.classList.toggle("ds-button-primary", plain);
       dialog.style.display = "flex";
       cancel.focus();
-      warn();
+      if (!plain) warn();
     });
 
     // The same question from a script of the site's own, in place of the

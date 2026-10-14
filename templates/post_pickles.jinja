@@ -36,13 +36,16 @@
             hx-target="#post-pickles-{{ post_id }}"
             hx-swap="outerHTML"
             hx-confirm="{{ ftl_get_message('post-pickle-give-confirm') }}"
+            data-confirm-action="{{ ftl_get_message('post-pickle-give-action') }}"
+            data-confirm-tone="plain"
             hx-disabled-elt="this"
-            title="{{ pickle_title }}" aria-label="{{ pickle_title }} ({{ pickles.count }})">
+            title="{{ pickle_title }}"
+            aria-label="{{ pickle_title }}{% if pickles.count > 0 %}, {{ ftl_format_pattern('post-pickle-count', {'count': pickles.count}) }}{% endif %}">
       {{ jars(pickles.count) }}<span class="pickle-slot">{% include "pickle_icon.jinja" %}</span>
     </button>
   {% elif pickles.count > 0 %}
     <span class="pickle-chip {% if pickles.given_by_viewer %}given{% endif %}"
-          title="{{ pickle_title }}" aria-label="{{ pickles.count }} {{ ftl_get_message('post-pickles') }}">
+          title="{{ pickle_title }}" aria-label="{{ ftl_format_pattern('post-pickle-count', {'count': pickles.count}) }}">
       {{ jars(pickles.count) }}
     </span>
   {% endif -%}

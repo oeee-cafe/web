@@ -243,8 +243,14 @@ post-reaction-custom = Add another emoji
 post-reaction-custom-hint = One emoji
 post-reaction-custom-submit = React
 post-pickles = pickles
+post-pickle-count =
+    { $count ->
+        [one] { $count } pickle
+       *[other] { $count } pickles
+    }
 post-pickle-give = Give this week's pickle
 post-pickle-give-confirm = Give this drawing your pickle for the week? You get one a week, and it can't be taken back.
+post-pickle-give-action = Give pickle
 post-pickle-given = You gave this a pickle
 post-pickle-supporters = Supporters can give one pickle a week
 post-share = Share
