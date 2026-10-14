@@ -102,11 +102,18 @@
                data-poster="{{ image_url }}"
                data-lang="{{ ftl_lang }}"
              {% endif %}>
-          <img class="post-stage-image{% if inline_replay %} neo-cucumber-replay-poster{% endif %}" data-oeee-drawing
-               width="{{ post.image_width }}"
-               height="{{ post.image_height }}"
-               alt="{{ post.title }}"
-               src="{{ image_url }}" />
+          {# Pinched closer inside this frame and no further (post_zoom.js).
+             The viewer swaps the poster for its canvas in place, so the
+             canvas is moved and clipped as the drawing was. #}
+          <div class="post-stage-view" data-post-zoom>
+            <div class="post-stage-zoom">
+              <img class="post-stage-image{% if inline_replay %} neo-cucumber-replay-poster{% endif %}" data-oeee-drawing
+                   width="{{ post.image_width }}"
+                   height="{{ post.image_height }}"
+                   alt="{{ post.title }}"
+                   src="{{ image_url }}" />
+            </div>
+          </div>
           {% if inline_replay %}{% include "replay_controls.jinja" %}{% endif %}
         </div>
       </div>
@@ -388,7 +395,6 @@
         // width of its controls, which stretched a 300px drawing to ~400
         // and resized it again whenever Play became Pause.
         stageBox.style.setProperty("--post-stage-shown", (width * zoom) + "px");
-        stageBox.classList.toggle("is-zoomed", zoom > 1);
       }
       fitStage();
       window.addEventListener("resize", fitStage);
@@ -420,6 +426,11 @@
       };
       document.head.appendChild(script);
     })();
+  </script>
+  {# After the stage is fitted, so a new size of window is fitted first and
+     zoomed from after. #}
+  <script src="{{ '/static/post_zoom.js' | cachebuster | safe }}"></script>
+  <script>
 
     function modalToggle(id, open) {
       var modal = document.getElementById(id);

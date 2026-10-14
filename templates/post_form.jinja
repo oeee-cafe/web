@@ -217,7 +217,8 @@
         if (width * zoom > room) zoom = 1;
         if (zoom > 1) stageBox.style.setProperty("--post-stage-shown", (width * zoom) + "px");
         else stageBox.style.removeProperty("--post-stage-shown");
-        stageBox.classList.toggle("is-zoomed", zoom > 1);
+        // Drawn hard unless it is shown smaller than its own size.
+        stageBox.classList.toggle("is-crisp", width <= room);
       }
       fitStage();
       window.addEventListener("resize", fitStage);

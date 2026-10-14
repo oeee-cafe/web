@@ -1132,11 +1132,50 @@ nav a:visited,
   height: auto;
 }
 
-.is-zoomed .post-stage-image,
-.is-zoomed .neo-cucumber-replay-poster,
-.is-zoomed .neo-cucumber-replay-canvas {
+/* Hard pixels whenever a pixel of the drawing is at least a pixel of the
+   page -- at its own size too, which a high-density screen still scales up
+   -- as the replay's canvas always is. Only a drawing shown smaller than
+   its own size is smoothed. */
+.is-crisp .post-stage-image,
+.is-crisp .neo-cucumber-replay-poster,
+.is-crisp .neo-cucumber-replay-canvas {
   image-rendering: -moz-crisp-edges;
   image-rendering: pixelated;
+}
+
+/* The frame a pinch zooms inside (post_zoom.js): the drawing grows within
+   it and is clipped to it. Two fingers on it are the drawing's pinch and
+   not the page's; one still scrolls the page until the drawing is closer,
+   when it moves the drawing instead. */
+.post-stage-view {
+  position: relative;
+  overflow: hidden;
+  line-height: 0;
+  touch-action: pan-x pan-y;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+.post-stage-view.is-closer {
+  touch-action: none;
+  cursor: -webkit-grab;
+  cursor: grab;
+}
+
+.post-stage-view.is-dragging {
+  cursor: -webkit-grabbing;
+  cursor: grabbing;
+}
+
+.post-stage-zoom {
+  -webkit-transform-origin: 0 0;
+  transform-origin: 0 0;
+}
+
+.post-stage-view.is-settling .post-stage-zoom {
+  -webkit-transition: -webkit-transform 0.12s ease-out;
+  transition: transform 0.12s ease-out;
 }
 
 .post-side {
@@ -3991,6 +4030,12 @@ html[data-store] .supporter-elsewhere {
   max-width: 100%;
   height: auto !important;
   border: 0;
+  background-color: #ffffff;
+}
+
+/* The frame is drawn round the box the drawing is clipped to, so a pinch
+   does not clip it away. */
+.post-stage-replay .post-stage-view {
   background-color: #ffffff;
   box-shadow: 0 0 0 1px var(--ds-frame), 0 8px 24px rgba(40, 40, 90, 0.18);
 }
