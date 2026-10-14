@@ -1,7 +1,7 @@
 use crate::app_error::AppError;
 use axum::{
     extract::{Path, Query, State},
-    response::{Html, IntoResponse, Json, Redirect},
+    response::{Html, IntoResponse, Redirect},
 };
 use axum_messages::Messages;
 use chrono::{DateTime, Utc};
@@ -19,10 +19,7 @@ use crate::{
         },
         user::AuthSession,
     },
-    web::{
-        context::CommonContext, i18n::ExtractFtlLang, responses::UnreadCountResponse,
-        state::AppState,
-    },
+    web::{context::CommonContext, i18n::ExtractFtlLang, state::AppState},
 };
 use minijinja::value::Serde;
 
@@ -272,28 +269,6 @@ pub async fn mark_notifications_seen(
     state.push_service.badges_fell(falls);
     let badge = nav_notification_badge(&state, user.id, &ftl_lang).await?;
     Ok(Html(badge))
-}
-
-/// The number on the bell for the current user: unread notifications and
-/// pending invitations together (`get_badge_count`).
-pub async fn get_unread_notification_count(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-) -> Result<Json<UnreadCountResponse>, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let user = auth_session
-        .user
-        .as_ref()
-        .ok_or(AppError::Unauthorized)?
-        .clone();
-
-    let count = get_badge_count(&mut tx, user.id).await?;
-
-    tx.commit().await?;
-
-    Ok(Json(UnreadCountResponse { count }))
 }
 
 /// Delete a specific notification

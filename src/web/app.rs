@@ -34,9 +34,9 @@ use crate::web::handlers::collaborate_cleanup::cleanup_collaborative_sessions;
 use crate::web::handlers::community::{
     communities, communities_fragment, community, community_comments, community_iframe,
     create_community_form, do_accept_invitation, do_create_community, do_leave_community,
-    do_reject_invitation, get_members, hx_delete_community, hx_do_edit_community,
-    hx_edit_community, invite_user, load_more_community_comments, load_more_community_posts,
-    members_page, redirect_community_to_unified, remove_member, retract_invitation,
+    do_reject_invitation, hx_delete_community, hx_do_edit_community, hx_edit_community,
+    invite_user, load_more_community_comments, load_more_community_posts, members_page,
+    redirect_community_to_unified, remove_member, retract_invitation,
 };
 use crate::web::handlers::devices::register_device_handler;
 use crate::web::handlers::draw::{
@@ -56,8 +56,8 @@ use crate::web::handlers::identity::{
     steam_sign_in,
 };
 use crate::web::handlers::notifications::{
-    delete_notification_handler, get_unread_notification_count, list_notifications,
-    mark_notifications_seen, notifications_fragment, open_notification,
+    delete_notification_handler, list_notifications, mark_notifications_seen,
+    notifications_fragment, open_notification,
 };
 use crate::web::handlers::password_reset::{
     password_reset_request, password_reset_request_page, password_reset_verify,
@@ -244,10 +244,6 @@ impl App {
             .route("/api/joined/comments", get(load_more_joined_comments))
             .route("/notifications", get(list_notifications))
             .route("/api/notifications/items", get(notifications_fragment))
-            .route(
-                "/notifications/unread-count",
-                get(get_unread_notification_count),
-            )
             .route("/notifications/seen", post(mark_notifications_seen))
             .route(
                 "/notifications/{notification_id}/open",
@@ -294,7 +290,6 @@ impl App {
                 "/communities/@{slug}/invitations/{invitation_id}",
                 delete(retract_invitation),
             )
-            .route("/communities/{id}/members", get(get_members))
             .route("/communities/{id}/invite", post(invite_user))
             .route("/communities/{id}/members/{user_id}", delete(remove_member))
             .route("/invitations/{id}/accept", post(do_accept_invitation))

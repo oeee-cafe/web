@@ -28,58 +28,6 @@ use minijinja::value::Serde;
 
 // ========== Member Management Endpoints ==========
 
-/// List community members
-pub async fn get_members(
-    auth_session: AuthSession,
-    State(state): State<AppState>,
-    Path(slug): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
-
-    let community =
-        find_community_by_slug(&mut tx, slug.strip_prefix('@').unwrap_or(&slug).to_string())
-            .await?;
-
-    if community.is_none() {
-        return Err(AppError::NotFound("Community".to_string()));
-    }
-
-    let community = community.ok_or_else(|| AppError::NotFound("Community".to_string()))?;
-
-    // Only members can view member list
-    let user = match auth_session.user {
-        Some(user) => user,
-        None => return Err(AppError::Unauthorized),
-    };
-
-    let is_member = is_user_member(&mut tx, user.id, community.id).await?;
-    if !is_member {
-        return Err(AppError::Forbidden);
-    }
-
-    // Fetch members with user details in a single query (no N+1)
-    let members = get_community_members_with_details(&mut tx, community.id).await?;
-
-    let members_with_details: Vec<serde_json::Value> = members
-        .into_iter()
-        .map(|member| {
-            serde_json::json!({
-                "id": member.id,
-                "user_id": member.user_id,
-                "login_name": member.login_name,
-                "display_name": member.display_name,
-                "role": member.role,
-                "joined_at": member.joined_at,
-            })
-        })
-        .collect();
-
-    tx.commit().await?;
-
-    Ok(axum::Json(members_with_details).into_response())
-}
-
 /// Invite a user to a community
 #[derive(Deserialize)]
 pub struct InviteUserForm {

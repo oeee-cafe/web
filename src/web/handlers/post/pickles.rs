@@ -15,20 +15,16 @@ use crate::models::user::AuthSession;
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::{Path, State};
-use axum::http::HeaderMap;
-use axum::response::{Html, IntoResponse, Response};
-use axum::Json;
+use axum::response::Html;
 use minijinja::context;
 use minijinja::value::Serde;
 use uuid::Uuid;
 
-/// Gives the post this week's pickle, and answers with its pickles as the
-/// giver now sees them. Having given this week's already, or having given
-/// this post one before, leaves everything as it was and answers the same
-/// way, as a second press of a reaction does; the answer says which.
-///
-/// htmx is answered with the post page's pickle chip (`post_pickles.jinja`),
-/// and everyone else with the state as JSON.
+/// Gives the post this week's pickle, and answers with the post page's
+/// pickle chip (`post_pickles.jinja`) as the giver now sees it, for htmx to
+/// swap in. Having given this week's already, or having given this post one
+/// before, leaves everything as it was and answers the same way, as a second
+/// press of a reaction does; the chip says which.
 ///
 /// Only a supporter has a weekly pickle, and nobody may give one to their
 /// own post.
@@ -36,9 +32,8 @@ pub async fn give_pickle(
     auth_session: AuthSession,
     State(state): State<AppState>,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
-    headers: HeaderMap,
     Path(post_id): Path<Uuid>,
-) -> Result<Response, AppError> {
+) -> Result<Html<String>, AppError> {
     let user_id = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id;
     let mut tx = state.db_pool.begin().await?;
 
@@ -97,9 +92,6 @@ pub async fn give_pickle(
     tx.commit().await?;
     push_later(&state.push_service, &state.db_pool, notifications);
 
-    if headers.get("HX-Request").is_none() {
-        return Ok(Json(pickles).into_response());
-    }
     let rendered = state
         .render(
             "post_pickles.jinja",
@@ -112,5 +104,5 @@ pub async fn give_pickle(
             },
         )
         .await?;
-    Ok(Html(rendered).into_response())
+    Ok(Html(rendered))
 }
