@@ -65,9 +65,9 @@ use crate::web::handlers::password_reset::{
 };
 use crate::web::handlers::policy::policy;
 use crate::web::handlers::post::{
-    add_reaction, do_create_comment, do_post_edit_community, draft_posts, hx_delete_post,
-    hx_do_edit_post, hx_edit_post, post_edit_community, post_publish, post_publish_form,
-    post_reactions_detail, post_relay_view, post_relay_view_by_login_name,
+    add_reaction, do_create_comment, do_post_edit_community, draft_posts, give_pickle,
+    hx_delete_post, hx_do_edit_post, hx_edit_post, post_edit_community, post_publish,
+    post_publish_form, post_reactions_detail, post_relay_view, post_relay_view_by_login_name,
     post_replay_view_by_login_name, post_view_by_login_name, redirect_post_to_login_name,
     remove_reaction,
 };
@@ -282,6 +282,7 @@ impl App {
             .route("/comments", post(do_create_comment))
             .route("/posts/{post_id}/reactions/add", post(add_reaction))
             .route("/posts/{post_id}/reactions/remove", post(remove_reaction))
+            .route("/posts/{post_id}/pickles", post(give_pickle))
             .route("/communities/new", get(create_community_form))
             .route("/communities/@{slug}/members", get(members_page))
             .route(

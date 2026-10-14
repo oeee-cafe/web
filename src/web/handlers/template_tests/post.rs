@@ -75,6 +75,7 @@ fn a_post_in_a_community_is_linked_under_the_community() {
             comments => Serde(Vec::<serde_json::Value>::new()),
             collaborative_participants => Serde(Vec::<serde_json::Value>::new()),
             reaction_counts => Serde(Vec::<serde_json::Value>::new()),
+            pickles => context! { count => 0, given_by_viewer => false, weekly_available => false },
             tags => Serde(Vec::<serde_json::Value>::new()),
             child_posts => Serde(vec![
                 reply("00000000-0000-0000-0000-00000000000a", json!("club")),
@@ -375,6 +376,7 @@ fn supporters_wear_their_platforms_mark_on_a_post_page() {
                 {"login_name": "friend", "display_name": "Friend"},
             ])),
             reaction_counts => Serde(Vec::<serde_json::Value>::new()),
+            pickles => context! { count => 0, given_by_viewer => false, weekly_available => false },
             tags => Serde(Vec::<serde_json::Value>::new()),
             child_posts => Serde(Vec::<serde_json::Value>::new()),
             post_community => Serde(json!(null)),
@@ -509,6 +511,64 @@ fn reactions_offer_any_emoji_and_quote_the_ones_they_show() {
     assert!(!signed_out.contains("reaction-custom-form"));
 }
 
+/// The pickle chip, as the handler swaps it in. A supporter with this
+/// week's to give gets a button; anyone else sees a count, or nothing at all
+/// on a post with none; and nobody is offered their own post.
+#[test]
+fn a_pickle_is_offered_only_to_a_supporter_who_still_has_one() {
+    let env = test_support::env();
+    let template = env
+        .get_template("post_pickles.jinja")
+        .unwrap_or_else(|e| panic!("post_pickles.jinja loads: {e:#}"));
+    let render = |viewer: Option<&str>, count: i64, given: bool, available: bool| {
+        template
+            .render(context! {
+                current_user => viewer.map(|id| context! { id => id }),
+                pickles => context! {
+                    count => count,
+                    given_by_viewer => given,
+                    weekly_available => available,
+                },
+                post_id => "p",
+                post_author_id => "author",
+                ftl_lang => "en",
+            })
+            .expect("pickles render")
+    };
+
+    let offered = render(Some("supporter"), 2, false, true);
+    assert!(offered.contains(r#"hx-post="/posts/p/pickles""#));
+    // Two jars for the two it has, and the faded one the giver's will be.
+    assert_eq!(offered.matches("<svg").count(), 3);
+    assert!(offered.contains("pickle-slot"));
+    assert!(!offered.contains("pickle-count"));
+    assert!(offered.contains(r#"title="post-pickle-give""#));
+
+    let own = render(Some("author"), 2, false, true);
+    assert!(!own.contains("hx-post"), "nobody pickles their own post");
+    assert!(own.contains("pickle-chip"));
+
+    let given = render(Some("supporter"), 3, true, false);
+    assert!(!given.contains("hx-post"));
+    assert!(given.contains("pickle-chip given"));
+    assert!(given.contains(r#"title="post-pickle-given""#));
+    assert_eq!(given.matches("<svg").count(), 3);
+    // Past five, one jar and the number.
+    let many = render(Some("supporter"), 12, true, false);
+    assert_eq!(many.matches("<svg").count(), 1);
+    assert!(many.contains(r#"<span class="pickle-count">× 12</span>"#));
+    // A pickle given to another post this week leaves this one to look at.
+    let spent = render(Some("supporter"), 1, false, false);
+    assert!(!spent.contains("hx-post"));
+
+    let nothing = render(None, 0, false, false);
+    // Empty to CSS's :empty, whitespace and all, so it takes no room.
+    assert!(
+        nothing.contains(r#"class="post-pickles"></div>"#),
+        "{nothing}"
+    );
+}
+
 /// A guest who drew in the session is on the byline by the name they gave,
 /// marked as a guest, with no profile link and no handle -- the name is
 /// whatever they typed, and could be an account's.
@@ -531,6 +591,7 @@ fn a_guest_on_a_collaborative_byline_is_named_but_not_linked() {
                 {"login_name": "", "display_name": "impostor", "is_guest": true},
             ])),
             reaction_counts => Serde(Vec::<serde_json::Value>::new()),
+            pickles => context! { count => 0, given_by_viewer => false, weekly_available => false },
             tags => Serde(Vec::<serde_json::Value>::new()),
             child_posts => Serde(Vec::<serde_json::Value>::new()),
             post_community => Serde(json!(null)),

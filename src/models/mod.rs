@@ -17,6 +17,7 @@ pub mod link;
 pub mod nodeinfo;
 pub mod notification;
 pub mod password_reset_challenge;
+pub mod pickle;
 pub mod post;
 pub mod reaction;
 pub mod sitemap;

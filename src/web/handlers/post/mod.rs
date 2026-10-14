@@ -19,6 +19,8 @@ mod comment;
 pub use comment::*;
 mod edit;
 pub use edit::*;
+mod pickles;
+pub use pickles::*;
 mod reactions;
 pub use reactions::*;
 

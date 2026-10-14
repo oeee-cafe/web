@@ -132,6 +132,7 @@ fn render_post_page(allow_replay: &str, author_id: &str, viewer: serde_json::Val
             comments => Serde(Vec::<serde_json::Value>::new()),
             collaborative_participants => Serde(Vec::<serde_json::Value>::new()),
             reaction_counts => Serde(Vec::<serde_json::Value>::new()),
+            pickles => context! { count => 0, given_by_viewer => false, weekly_available => false },
             tags => Serde(Vec::<serde_json::Value>::new()),
             child_posts => Serde(Vec::<serde_json::Value>::new()),
             post_community => Serde(json!(null)),

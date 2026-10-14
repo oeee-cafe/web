@@ -4,10 +4,12 @@ use crate::app_error::AppError;
 use crate::models::actor::Actor;
 use crate::models::comment::build_comment_thread_tree;
 use crate::models::community::{find_community_by_id, get_user_role_in_community};
+use crate::models::pickle;
 use crate::models::post::{
     build_thread_tree, find_post_by_id, increment_post_viewer_count, SerializableThreadedPost,
 };
 use crate::models::reaction::get_reaction_counts;
+use crate::models::supporter;
 use crate::models::tag::get_tags_for_post;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
@@ -431,6 +433,17 @@ pub async fn post_view(
     let reaction_counts = get_reaction_counts(&mut tx, uuid, user_actor_id)
         .await
         .unwrap_or_default();
+    let is_supporter = match auth_session.user.as_ref() {
+        Some(user) => supporter::mark_for(&mut tx, user.id).await?.is_some(),
+        None => false,
+    };
+    let pickles = pickle::state_for(
+        &mut tx,
+        uuid,
+        auth_session.user.as_ref().map(|user| user.id),
+        is_supporter,
+    )
+    .await?;
 
     // Get tags for this post
     let tags = get_tags_for_post(&mut tx, uuid).await.unwrap_or_default();
@@ -485,6 +498,7 @@ pub async fn post_view(
                     comments => Serde(comments),
                     collaborative_participants => Serde(collaborative_participants),
                     reaction_counts => Serde(reaction_counts),
+                    pickles => Serde(pickles),
                     tags => Serde(tags),
                     child_posts => Serde(child_posts),
                     post_community => Serde(post_community),
@@ -825,6 +839,17 @@ pub async fn post_view_by_login_name(
     let reaction_counts = get_reaction_counts(&mut tx, uuid, user_actor_id)
         .await
         .unwrap_or_default();
+    let is_supporter = match auth_session.user.as_ref() {
+        Some(user) => supporter::mark_for(&mut tx, user.id).await?.is_some(),
+        None => false,
+    };
+    let pickles = pickle::state_for(
+        &mut tx,
+        uuid,
+        auth_session.user.as_ref().map(|user| user.id),
+        is_supporter,
+    )
+    .await?;
 
     // Get tags for this post
     let tags = get_tags_for_post(&mut tx, uuid).await.unwrap_or_default();
@@ -879,6 +904,7 @@ pub async fn post_view_by_login_name(
                     comments => Serde(comments),
                     collaborative_participants => Serde(collaborative_participants),
                     reaction_counts => Serde(reaction_counts),
+                    pickles => Serde(pickles),
                     tags => Serde(tags),
                     child_posts => Serde(child_posts),
                     post_community => Serde(post_community),

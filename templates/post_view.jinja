@@ -197,7 +197,11 @@
           <dd>{{ post.viewer_count }}</dd>
         </dl>
 
-        <div class="post-reactions-container">{% include "post_reactions.jinja" %}</div>
+        <div class="post-reactions-container">
+          {% set post_author_id = post.author_id %}
+          {% include "post_pickles.jinja" %}
+          {% include "post_reactions.jinja" %}
+        </div>
 
         <div class="post-inspector-actions">
           {% if current_user %}

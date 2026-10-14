@@ -1371,6 +1371,76 @@ nav a:visited,
   margin: 0 6px 6px 0;
 }
 
+/* Pickles (post_pickles.jinja): a line of their own above the reactions,
+   and not a chip among them, since a pickle is a supporter's one a week and
+   🥒 is a reaction anyone may leave. */
+.post-pickles {
+  margin-bottom: 6px;
+}
+
+.post-pickles:empty {
+  display: none;
+}
+
+.pickle-button,
+.pickle-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--ds-accent-line);
+  border-radius: 14px;
+  background-color: var(--ds-success-surface);
+  color: var(--ds-success-text);
+  font: inherit;
+  font-size: var(--ds-text-m);
+  font-weight: 600;
+  line-height: calc(20px * var(--ds-text-scale, 1));
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
+.pickle-button {
+  border-style: dashed;
+  cursor: pointer;
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .pickle-button:hover {
+    border-style: solid;
+  }
+}
+
+/* Outlined in the pickle's own ink rather than filled in the cucumber, which
+   is what a 🥒 you reacted with looks like. */
+.pickle-chip.given {
+  border-color: var(--ds-success-text);
+  box-shadow: inset 0 0 0 1px var(--ds-success-text);
+}
+
+.pickle-icon {
+  vertical-align: -4px;
+}
+
+.pickle-count {
+  margin-left: 4px;
+}
+
+.pickle-icon + .pickle-icon,
+.pickle-icon + .pickle-slot,
+.pickle-count + .pickle-slot {
+  margin-left: 2px;
+}
+
+/* Where the giver's pickle will go: the jar, faded. */
+.pickle-slot .pickle-icon {
+  opacity: 0.4;
+}
+
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .pickle-button:hover .pickle-slot .pickle-icon {
+    opacity: 1;
+  }
+}
+
 .reaction-total {
   margin-right: 10px;
   font-size: var(--ds-text-m);
