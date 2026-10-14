@@ -1420,13 +1420,54 @@ nav a:visited,
   vertical-align: -4px;
 }
 
-.pickle-count {
-  margin-left: 4px;
+.pickle-label {
+  margin-left: 6px;
+}
+
+/* Pressing the chip says what a pickle is: a panel under it, as the
+   reactions' "+" opens one. */
+.pickle-about {
+  position: relative;
+  display: inline-block;
+}
+
+.pickle-about > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.pickle-about > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pickle-about-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  color: var(--ds-ink);
+  box-shadow: var(--ds-shadow-menu);
+  font-size: var(--ds-text-base);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.pickle-about-panel p {
+  margin: 0 0 6px;
+}
+
+.pickle-about-title {
+  font-weight: 600;
 }
 
 .pickle-icon + .pickle-icon,
-.pickle-icon + .pickle-slot,
-.pickle-count + .pickle-slot {
+.pickle-icon + .pickle-slot {
   margin-left: 2px;
 }
 

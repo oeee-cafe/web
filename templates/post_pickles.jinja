@@ -7,16 +7,14 @@
    one. `post_author_id` is whose post it is, since nobody gives their own
    a pickle.
 
-   A jar for each pickle, up to five; past that one jar and the number, since
-   a row of twelve is harder to count than "× 12" and would push the
-   reactions off a phone's line. The give button adds an empty-looking jar
-   after them, the place the giver's own will go. #}
+   A jar for each pickle, up to five; past that, one jar, since a row of
+   twelve would push the reactions off a phone's line. Either way the chip
+   says it in words too ("2 pickles"): a jar on its own is a picture nobody
+   has been taught, and pressing the chip says what a pickle is and how
+   anyone comes to have one. The give button adds a faded jar after the
+   others, the place the giver's own will go, and says "Give pickle". #}
 {% macro jars(count) -%}
-  {%- if count > 5 -%}
-    {% include "pickle_icon.jinja" %}<span class="pickle-count">× {{ count }}</span>
-  {%- else -%}
-    {%- for _ in range(count) %}{% include "pickle_icon.jinja" %}{% endfor -%}
-  {%- endif -%}
+  {%- for _ in range(count if count <= 5 else 1) %}{% include "pickle_icon.jinja" %}{% endfor -%}
 {%- endmacro %}
 {% set own_post = current_user and current_user.id == post_author_id %}
 {% set can_give = pickles.weekly_available and not pickles.given_by_viewer and not own_post %}
@@ -39,14 +37,22 @@
             data-confirm-action="{{ ftl_get_message('post-pickle-give-action') }}"
             data-confirm-tone="plain"
             hx-disabled-elt="this"
-            title="{{ pickle_title }}"
-            aria-label="{{ pickle_title }}{% if pickles.count > 0 %}, {{ ftl_format_pattern('post-pickle-count', {'count': pickles.count}) }}{% endif %}">
+            title="{{ pickle_title }}">
       {{ jars(pickles.count) }}<span class="pickle-slot">{% include "pickle_icon.jinja" %}</span>
+      <span class="pickle-label">{{ ftl_get_message("post-pickle-give-action") }}</span>
+      {%- if pickles.count > 0 %}<span class="sr-only">, {{ ftl_format_pattern("post-pickle-count", {"count": pickles.count}) }}</span>{% endif %}
     </button>
   {% elif pickles.count > 0 %}
-    <span class="pickle-chip {% if pickles.given_by_viewer %}given{% endif %}"
-          title="{{ pickle_title }}" aria-label="{{ ftl_format_pattern('post-pickle-count', {'count': pickles.count}) }}">
-      {{ jars(pickles.count) }}
-    </span>
+    <details class="pickle-about">
+      <summary class="pickle-chip {% if pickles.given_by_viewer %}given{% endif %}" title="{{ pickle_title }}">
+        {{ jars(pickles.count) }}<span class="pickle-label">{{ ftl_format_pattern("post-pickle-count", {"count": pickles.count}) }}</span>
+      </summary>
+      <div class="pickle-about-panel">
+        <p class="pickle-about-title">{% include "pickle_icon.jinja" %} {{ ftl_get_message("post-pickle-about-title") }}</p>
+        <p>{{ ftl_get_message("post-pickle-about") }}</p>
+        {% if pickles.given_by_viewer %}<p>{{ ftl_get_message("post-pickle-given") }}</p>{% endif %}
+        <a href="/supporter">{{ ftl_get_message("post-pickle-about-supporter") }}</a>
+      </div>
+    </details>
   {% endif -%}
 </div>

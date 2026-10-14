@@ -541,14 +541,11 @@ fn a_pickle_is_offered_only_to_a_supporter_who_still_has_one() {
     // Two jars for the two it has, and the faded one the giver's will be.
     assert_eq!(offered.matches("<svg").count(), 3);
     assert!(offered.contains("pickle-slot"));
-    assert!(!offered.contains(r#"class="pickle-count""#));
-    assert!(offered.contains(r#"aria-label="post-pickle-give, post-pickle-count(count=2)""#));
-    // With none yet, the button is named for what it does and nothing else.
+    // It says what it does in words, and tells a screen reader the count.
+    assert!(offered.contains(r#"<span class="pickle-label">post-pickle-give-action</span>"#));
+    assert!(offered.contains(r#"<span class="sr-only">, post-pickle-count(count=2)</span>"#));
     let first = render(Some("supporter"), 0, false, true);
-    assert!(
-        first.contains(r#"aria-label="post-pickle-give""#),
-        "{first}"
-    );
+    assert!(!first.contains("sr-only"), "{first}");
     assert!(offered.contains(r#"title="post-pickle-give""#));
     // Its confirmation names what yes does, and is not the red, destructive one.
     assert!(offered.contains(r#"data-confirm-action="post-pickle-give-action""#));
@@ -557,16 +554,28 @@ fn a_pickle_is_offered_only_to_a_supporter_who_still_has_one() {
     let own = render(Some("author"), 2, false, true);
     assert!(!own.contains("hx-post"), "nobody pickles their own post");
     assert!(own.contains("pickle-chip"));
+    // The chip names itself, and pressing it says what a pickle is.
+    assert!(own.contains(r#"<span class="pickle-label">post-pickle-count(count=2)</span>"#));
+    assert!(own.contains("post-pickle-about"));
+    assert!(own.contains(r#"href="/supporter""#));
 
     let given = render(Some("supporter"), 3, true, false);
     assert!(!given.contains("hx-post"));
     assert!(given.contains("pickle-chip given"));
     assert!(given.contains(r#"title="post-pickle-given""#));
-    assert_eq!(given.matches("<svg").count(), 3);
+    // The jars on the chip are the summary's; the panel has one of its own.
+    let summary = |html: &str| {
+        html.split("</summary>")
+            .next()
+            .unwrap()
+            .matches("<svg")
+            .count()
+    };
+    assert_eq!(summary(&given), 3);
     // Past five, one jar and the number.
     let many = render(Some("supporter"), 12, true, false);
-    assert_eq!(many.matches("<svg").count(), 1);
-    assert!(many.contains(r#"<span class="pickle-count">× 12</span>"#));
+    assert_eq!(summary(&many), 1);
+    assert!(many.contains("post-pickle-count(count=12)"));
     // A pickle given to another post this week leaves this one to look at.
     let spent = render(Some("supporter"), 1, false, false);
     assert!(!spent.contains("hx-post"));
