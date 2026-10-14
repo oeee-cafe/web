@@ -1,0 +1,20 @@
+{# A pickle chip that says, when pressed, what a pickle is: a panel under it
+   naming pickles, who gives them and how often, and where the Supporter
+   Pack is. The post's chip (post_pickles.jinja) and the profile's
+   (profile.jinja) are this one, so the two never explain it differently.
+
+   The chip's own content is the call block: jars and a count on a post,
+   one jar and "받은 피클 7개" on a profile. `chip_class` is its classes,
+   `title` its tooltip, and `note` a line of the panel's own for this
+   viewer, such as that they gave one. #}
+{% macro pickle_about(chip_class, title, note=none) -%}
+  <details class="pickle-about">
+    <summary class="{{ chip_class }}" title="{{ title }}">{{ caller() }}</summary>
+    <div class="pickle-about-panel">
+      <p class="pickle-about-title">{% include "pickle_icon.jinja" %} {{ ftl_get_message("post-pickle-about-title") }}</p>
+      <p>{{ ftl_get_message("post-pickle-about") }}</p>
+      {% if note %}<p>{{ note }}</p>{% endif %}
+      <a href="/supporter">{{ ftl_get_message("post-pickle-about-supporter") }}</a>
+    </div>
+  </details>
+{%- endmacro %}

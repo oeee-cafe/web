@@ -13,6 +13,7 @@
    has been taught, and pressing the chip says what a pickle is and how
    anyone comes to have one. The give button adds a faded jar after the
    others, the place the giver's own will go, and says "Give pickle". #}
+{% from "pickle_about_macro.jinja" import pickle_about %}
 {% macro jars(count) -%}
   {%- for _ in range(count if count <= 5 else 1) %}{% include "pickle_icon.jinja" %}{% endfor -%}
 {%- endmacro %}
@@ -43,16 +44,9 @@
       {%- if pickles.count > 0 %}<span class="sr-only">, {{ ftl_format_pattern("post-pickle-count", {"count": pickles.count}) }}</span>{% endif %}
     </button>
   {% elif pickles.count > 0 %}
-    <details class="pickle-about">
-      <summary class="pickle-chip {% if pickles.given_by_viewer %}given{% endif %}" title="{{ pickle_title }}">
-        {{ jars(pickles.count) }}<span class="pickle-label">{{ ftl_format_pattern("post-pickle-count", {"count": pickles.count}) }}</span>
-      </summary>
-      <div class="pickle-about-panel">
-        <p class="pickle-about-title">{% include "pickle_icon.jinja" %} {{ ftl_get_message("post-pickle-about-title") }}</p>
-        <p>{{ ftl_get_message("post-pickle-about") }}</p>
-        {% if pickles.given_by_viewer %}<p>{{ ftl_get_message("post-pickle-given") }}</p>{% endif %}
-        <a href="/supporter">{{ ftl_get_message("post-pickle-about-supporter") }}</a>
-      </div>
-    </details>
+    {% call pickle_about("pickle-chip" ~ (" given" if pickles.given_by_viewer else ""), pickle_title,
+                         ftl_get_message("post-pickle-given") if pickles.given_by_viewer else none) %}
+      {{- jars(pickles.count) }}<span class="pickle-label">{{ ftl_format_pattern("post-pickle-count", {"count": pickles.count}) }}</span>
+    {%- endcall %}
   {% endif -%}
 </div>

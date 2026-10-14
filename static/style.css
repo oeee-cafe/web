@@ -3302,6 +3302,16 @@ nav a:visited,
   color: var(--ds-success-text);
 }
 
+/* Partway along a row of chips, a panel opened from the chip's own edge
+   would run off a phone's screen; it opens from the row's instead. */
+.profile-chips {
+  position: relative;
+}
+
+.profile-chips .pickle-about {
+  position: static;
+}
+
 .pickle-received-chip .pickle-icon {
   width: 16px;
   height: 16px;

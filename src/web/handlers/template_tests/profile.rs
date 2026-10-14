@@ -396,6 +396,13 @@ fn a_profile_counts_the_pickles_its_drawings_were_given() {
     );
     assert!(given.contains("profile-pickles-received(count=7)"));
     assert!(given.contains(r#"title="profile-pickles-received-help""#));
+    // Pressing it explains, in the post's words: the panel is the same one.
+    assert!(
+        given.contains(r#"<details class="pickle-about">"#),
+        "{given}"
+    );
+    assert!(given.contains("post-pickle-about"));
+    assert!(given.contains(r#"href="/supporter""#));
     assert!(!render(0).contains("pickle-received-chip"));
 }
 

@@ -85,13 +85,14 @@
               {# The pickles their drawings have been given (models::pickle),
                  after the years they gave and before what they link to: a
                  thank-you too, received rather than given. Its jar is the
-                 one on the posts, and it says in words what it is. #}
+                 one on the posts, it says in words what it is, and pressing
+                 it explains, as a post's chip does. #}
               {% if pickles_received %}
-                <span class="profile-chip pickle-received-chip"
-                      title="{{ ftl_get_message('profile-pickles-received-help') }}">
+                {% from "pickle_about_macro.jinja" import pickle_about %}
+                {% call pickle_about("profile-chip pickle-received-chip", ftl_get_message("profile-pickles-received-help")) %}
                   {%- include "pickle_icon.jinja" -%}
                   <span class="pickle-label">{{ ftl_format_pattern("profile-pickles-received", {"count": pickles_received}) }}</span>
-                </span>
+                {%- endcall %}
               {% endif %}
               {% for link, target in links %}
                 <a class="profile-chip" href="{{ link.url }}" target="{{ target }}" rel="noopener">{{ link.description }}<span class="profile-chip-out" aria-hidden="true">↗</span></a>
