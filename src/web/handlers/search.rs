@@ -1,5 +1,6 @@
 use crate::app_error::AppError;
 use crate::models::handle::LoginName;
+use crate::models::post::SerializablePostForHome;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
 use crate::web::i18n::ExtractFtlLang;
@@ -7,15 +8,13 @@ use crate::web::state::AppState;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::response::{Html, IntoResponse};
-use chrono::{DateTime, Utc};
 use minijinja::context;
 use minijinja::value::Serde;
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
-/// Matches of each kind shown on `/search`, which has no load-more: the most
-/// the JSON endpoint will hand out in one go.
+/// Matches of each kind shown on `/search`, which has no load-more.
 const SEARCH_PAGE_LIMIT: i64 = 50;
 
 /// People shown over the drawings. A handle is one person, but the match
@@ -73,50 +72,43 @@ pub struct SearchPageQuery {
     q: Option<String>,
 }
 
-/// A matching post, with what `post_card.jinja` needs to draw it as well as
-/// the few fields the JSON endpoint returns.
-#[derive(Serialize)]
-pub struct SearchPostRow {
-    pub id: Uuid,
-    pub title: Option<String>,
-    pub user_login_name: LoginName,
-    pub image_filename: Option<String>,
-    pub image_width: Option<i32>,
-    pub image_height: Option<i32>,
-    pub is_sensitive: bool,
-    pub community_slug: Option<String>,
-    pub community_name: Option<String>,
-    pub published_at: Option<DateTime<Utc>>,
-}
-
-/// Posts by title or content, as the viewer is allowed to see them.
+/// Posts by title or content, as the viewer is allowed to see them: the
+/// same rows every feed draws its cards from, so a card here is a card
+/// anywhere, jar and all.
 pub async fn search(
     tx: &mut Transaction<'_, Postgres>,
     q: &str,
     limit: i64,
     viewer_user_id: Option<Uuid>,
     viewer_show_sensitive: bool,
-) -> Result<Vec<SearchPostRow>, AppError> {
+) -> Result<Vec<SerializablePostForHome>, AppError> {
     let search_term = format!("%{}%", q);
 
     // Only posts from public communities, or from none.
-    let posts = sqlx::query_as!(
-        SearchPostRow,
+    let rows = sqlx::query!(
         r#"
         SELECT
             posts.id,
             posts.title,
-            users.login_name AS user_login_name,
-            images.image_filename AS "image_filename?",
-            images.width AS "image_width?",
-            images.height AS "image_height?",
+            posts.author_id,
+            users.login_name,
+            images.paint_duration,
+            images.stroke_count,
+            images.image_filename,
+            images.width,
+            images.height,
+            images.replay_filename,
+            posts.viewer_count,
             (posts.is_sensitive OR posts.is_explicit) AS "is_sensitive!",
             communities.slug AS "community_slug?",
             communities.name AS "community_name?",
-            posts.published_at
+            posts.published_at,
+            posts.created_at,
+            posts.updated_at,
+            EXISTS (SELECT 1 FROM pickles WHERE pickles.post_id = posts.id) AS "pickled!"
         FROM posts
-        LEFT JOIN users ON posts.author_id = users.id
-        LEFT JOIN images ON posts.image_id = images.id
+        JOIN users ON posts.author_id = users.id
+        JOIN images ON posts.image_id = images.id
         LEFT JOIN communities ON posts.community_id = communities.id
         WHERE (posts.title ILIKE $1 OR posts.content ILIKE $1)
           AND posts.published_at IS NOT NULL
@@ -134,7 +126,29 @@ pub async fn search(
     .fetch_all(&mut **tx)
     .await?;
 
-    Ok(posts)
+    Ok(rows
+        .into_iter()
+        .map(|row| SerializablePostForHome {
+            id: row.id,
+            title: row.title,
+            author_id: row.author_id,
+            user_login_name: row.login_name.into(),
+            paint_duration: row.paint_duration.microseconds.to_string(),
+            stroke_count: row.stroke_count,
+            image_filename: row.image_filename,
+            image_width: row.width,
+            image_height: row.height,
+            replay_filename: row.replay_filename,
+            is_sensitive: row.is_sensitive,
+            community_slug: row.community_slug,
+            community_name: row.community_name,
+            viewer_count: row.viewer_count,
+            published_at: row.published_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            pickled: row.pickled,
+        })
+        .collect())
 }
 
 fn viewer(auth_session: &AuthSession) -> (Option<Uuid>, bool) {
@@ -171,19 +185,14 @@ pub async fn search_page(
     let posts = match search_query {
         Some(ref q) => {
             let (viewer_user_id, viewer_show_sensitive) = viewer(&auth_session);
-            let posts = search(
+            search(
                 &mut tx,
                 q,
                 SEARCH_PAGE_LIMIT,
                 viewer_user_id,
                 viewer_show_sensitive,
             )
-            .await?;
-            // A card is a picture; a post without one has nothing to show.
-            posts
-                .into_iter()
-                .filter(|post| post.image_filename.is_some())
-                .collect()
+            .await?
         }
         None => Vec::new(),
     };

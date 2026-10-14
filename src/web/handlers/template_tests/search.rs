@@ -10,7 +10,7 @@ use super::chrome;
 /// from what `search_page` actually hands the template.
 fn render_search(
     search_query: Option<&str>,
-    posts: Vec<crate::web::handlers::search::SearchPostRow>,
+    posts: Vec<crate::models::post::SerializablePostForHome>,
 ) -> String {
     render_search_with_people(search_query, Vec::new(), posts)
 }
@@ -18,7 +18,7 @@ fn render_search(
 fn render_search_with_people(
     search_query: Option<&str>,
     people: Vec<crate::web::handlers::search::SearchPersonRow>,
-    posts: Vec<crate::web::handlers::search::SearchPostRow>,
+    posts: Vec<crate::models::post::SerializablePostForHome>,
 ) -> String {
     test_support::env()
         .get_template("search.jinja")
@@ -34,7 +34,7 @@ fn render_search_with_people(
 
 #[test]
 fn search_page_renders_form_empty_state_and_results() {
-    use crate::web::handlers::search::SearchPostRow;
+    use crate::models::post::SerializablePostForHome;
 
     // Nothing asked yet: the form alone. Asserted on the page's own
     // form, `communities-filters` -- the toolbar in every page has a
@@ -51,17 +51,25 @@ fn search_page_renders_form_empty_state_and_results() {
 
     let found = render_search(
         Some("그림"),
-        vec![SearchPostRow {
+        vec![SerializablePostForHome {
             id: uuid::Uuid::nil(),
             title: Some("그림".into()),
+            author_id: uuid::Uuid::nil(),
             user_login_name: "someone".into(),
-            image_filename: Some("abcdef0123.png".into()),
-            image_width: Some(640),
-            image_height: Some(480),
+            paint_duration: "0".into(),
+            stroke_count: 0,
+            viewer_count: 0,
+            image_filename: "abcdef0123.png".into(),
+            image_width: 640,
+            image_height: 480,
+            replay_filename: None,
             is_sensitive: false,
             community_slug: None,
             community_name: None,
             published_at: Some(chrono::Utc::now()),
+            updated_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            pickled: true,
         }],
     );
     assert!(
@@ -70,6 +78,8 @@ fn search_page_renders_form_empty_state_and_results() {
     );
     assert!(found.contains(r#"href="/@someone/00000000-0000-0000-0000-000000000000""#));
     assert!(found.contains("/image/ab/abcdef0123.png"));
+    // The feeds' own card, jar and all.
+    assert!(found.contains("post-card-pickled"));
     assert!(!found.contains("search-no-results"));
 }
 
