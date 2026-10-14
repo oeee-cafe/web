@@ -24,8 +24,8 @@ use crate::models::comment::{
 };
 use crate::models::follow;
 use crate::models::notification::{
-    create_notification, get_badge_count, get_notification_by_id, retract_follow_notifications,
-    send_push_for_notification, CreateNotificationParams, NotificationType,
+    create_notification, push_later, retract_follow_notifications, CreateNotificationParams,
+    NotificationType,
 };
 use crate::models::post::find_post_by_id;
 use crate::models::reaction::{create_reaction_from_activitypub, delete_remote_reaction};
@@ -95,34 +95,6 @@ pub async fn resolve_actor(state: &AppState, iri: &Url) -> Result<Actor, AppErro
 /// `https://domain/@name/{id}` or `https://domain/ap/posts/{id}`.
 fn local_post_id(ctx: &Ctx, iri: &str) -> Option<Uuid> {
     Uuid::parse_str(&ctx.parse_object("note", iri)?["post_id"]).ok()
-}
-
-/// Push the notifications `notifications` names, after the transaction that
-/// made them.
-fn push_later(state: &AppState, notifications: Vec<(Uuid, Uuid)>) {
-    if notifications.is_empty() {
-        return;
-    }
-    let push_service = state.push_service.clone();
-    let db_pool = state.db_pool.clone();
-    tokio::spawn(async move {
-        for (notification_id, recipient_id) in notifications {
-            let Ok(mut tx) = db_pool.begin().await else {
-                continue;
-            };
-            if let Ok(Some(notification)) =
-                get_notification_by_id(&mut tx, notification_id, recipient_id).await
-            {
-                let badge_count = get_badge_count(&mut tx, recipient_id)
-                    .await
-                    .ok()
-                    .and_then(|count| u32::try_from(count).ok());
-                send_push_for_notification(&push_service, &db_pool, &notification, badge_count)
-                    .await;
-            }
-            let _ = tx.commit().await;
-        }
-    });
 }
 
 /// Someone follows a person or community of this site's, and is accepted.
@@ -313,7 +285,7 @@ async fn on_create(ctx: Ctx, received: Received<Create>) -> Result<(), AppError>
     state
         .live
         .publish(LiveEvent::Comments { post_id, by: None });
-    push_later(state, notifications);
+    push_later(&state.push_service, &state.db_pool, notifications);
     Ok(())
 }
 
@@ -440,7 +412,7 @@ async fn react(
         notifications.push((notification.id, author_id));
     }
     tx.commit().await?;
-    push_later(state, notifications);
+    push_later(&state.push_service, &state.db_pool, notifications);
     Ok(())
 }
 

@@ -1,8 +1,12 @@
 //! Giving a post a pickle (`models::pickle`).
 
 use crate::app_error::AppError;
+use crate::models::actor::Actor;
 use crate::models::community::{
     find_community_by_id, get_user_role_in_community, CommunityVisibility,
+};
+use crate::models::notification::{
+    create_notification, push_later, CreateNotificationParams, NotificationType,
 };
 use crate::models::pickle::{give_weekly, state_for};
 use crate::models::post::find_post_by_id;
@@ -64,9 +68,34 @@ pub async fn give_pickle(
         return Err(AppError::Forbidden);
     }
 
-    give_weekly(&mut tx, user_id, post_id).await?;
+    let given = give_weekly(&mut tx, user_id, post_id).await?;
+
+    // The artist hears of it, by name: a pickle is one person's one for the
+    // week, so unlike a reaction it is never folded in with others.
+    let mut notifications = Vec::new();
+    if given
+        && let Some(author_id) = author_id
+        && let Some(actor) = Actor::find_by_user_id(&mut tx, user_id).await?
+    {
+        let notification = create_notification(
+            &mut tx,
+            CreateNotificationParams {
+                recipient_id: author_id,
+                actor_id: actor.id,
+                notification_type: NotificationType::Pickle,
+                post_id: Some(post_id),
+                comment_id: None,
+                reaction_iri: None,
+                guestbook_entry_id: None,
+            },
+        )
+        .await?;
+        notifications.push((notification.id, author_id));
+    }
+
     let pickles = state_for(&mut tx, post_id, Some(user_id), true).await?;
     tx.commit().await?;
+    push_later(&state.push_service, &state.db_pool, notifications);
 
     if headers.get("HX-Request").is_none() {
         return Ok(Json(pickles).into_response());

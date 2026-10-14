@@ -29,6 +29,8 @@ pub enum NotificationType {
     CommentReply,
     #[sqlx(rename = "community_post")]
     CommunityPost,
+    /// Somebody gave the recipient's post a pickle (`models::pickle`).
+    Pickle,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -618,7 +620,7 @@ pub fn notification_url(
 ) -> String {
     use NotificationType::*;
     match notification.notification_type {
-        Comment | Reaction | Mention | PostReply | CommentReply | CommunityPost => {
+        Comment | Reaction | Mention | PostReply | CommentReply | CommunityPost | Pickle => {
             match (notification.post_id, &notification.post_author_login_name) {
                 (Some(post_id), Some(author)) => crate::models::post::post_page_path(
                     author,
@@ -643,6 +645,39 @@ pub fn notification_url(
             None => "/notifications".to_string(),
         },
     }
+}
+
+/// Push the notifications `notifications` names, by id and recipient, once
+/// the transaction that made them has committed: in a task of its own, so
+/// the request that made them does not wait on the push services.
+pub fn push_later(
+    push_service: &std::sync::Arc<crate::push::PushService>,
+    db_pool: &sqlx::PgPool,
+    notifications: Vec<(Uuid, Uuid)>,
+) {
+    if notifications.is_empty() {
+        return;
+    }
+    let push_service = push_service.clone();
+    let db_pool = db_pool.clone();
+    tokio::spawn(async move {
+        for (notification_id, recipient_id) in notifications {
+            let Ok(mut tx) = db_pool.begin().await else {
+                continue;
+            };
+            if let Ok(Some(notification)) =
+                get_notification_by_id(&mut tx, notification_id, recipient_id).await
+            {
+                let badge_count = get_badge_count(&mut tx, recipient_id)
+                    .await
+                    .ok()
+                    .and_then(|count| u32::try_from(count).ok());
+                send_push_for_notification(&push_service, &db_pool, &notification, badge_count)
+                    .await;
+            }
+            let _ = tx.commit().await;
+        }
+    });
 }
 
 /// Send push notification for a newly created notification
@@ -876,6 +911,22 @@ fn format_notification_message(
                 content.clone()
             } else {
                 get_localized_message(&bundle, "push-notification-comment-reply-body", Some(&args))
+            };
+            (title, body)
+        }
+        NotificationType::Pickle => {
+            let title =
+                get_localized_message(&bundle, "push-notification-pickle-title", Some(&args));
+            let body = match &notification.post_title {
+                Some(post_title) if !post_title.is_empty() => {
+                    args.set("title", post_title.clone());
+                    get_localized_message(
+                        &bundle,
+                        "push-notification-pickle-body-with-title",
+                        Some(&args),
+                    )
+                }
+                _ => get_localized_message(&bundle, "push-notification-pickle-body", Some(&args)),
             };
             (title, body)
         }

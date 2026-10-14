@@ -417,3 +417,46 @@ fn the_notification_chrome_renders_standalone() {
         "the partial targets this id, so it has to survive its own swap"
     );
 }
+
+#[test]
+fn a_pickle_notification_names_the_giver_and_the_drawing() {
+    // One row a pickle, never grouped: it names the giver, says which
+    // drawing their week's pickle went to, and wears the jar as its kind.
+    let env = test_support::env();
+    let item = env
+        .get_template("notification_item.jinja")
+        .unwrap_or_else(|e| panic!("notification_item.jinja loads: {e:#}"));
+    let rendered = item
+        .render(context! {
+            notification => context! {
+                id => "n",
+                notification_type => "Pickle",
+                actor_name => "Giver",
+                handle => context! { login_name => "giver" },
+                actor_count => 1,
+                post_id => "p",
+                post_title => "Cat",
+                post_author_login_name => "artist",
+                post_image_filename => "ab/cat.png",
+                post_image_width => 300,
+                post_image_height => 300,
+                created_at => "2026-10-14T03:00:00Z",
+                unread => true,
+            },
+            ftl_lang => "en",
+        })
+        .expect("a pickle notification renders");
+    assert!(rendered.contains(r#"href="/@giver""#), "{rendered}");
+    assert!(
+        rendered.contains("notification-action-gave-pickle(postTitle=Cat)"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(r#"href="&#x2f;@artist&#x2f;p""#),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("notification-kind"),
+        "the jar badge is drawn"
+    );
+}

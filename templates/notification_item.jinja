@@ -26,6 +26,7 @@
   "Reaction": '<path d="M12 19.5s-7.5-4.4-7.5-9.6A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.5c0 5.2-7.5 9.6-7.5 9.6z"/>',
   "PostReply": '<path d="M16.5 3.5a2 2 0 0 1 2.9 2.9L9.5 16.3l-3.8.9.9-3.8z"/>',
   "CommunityPost": '<rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/>',
+  "Pickle": '<path d="M6.5 7h11c1.4.8 2 1.8 2 3.3v8.4a2.3 2.3 0 0 1-2.3 2.3H6.8a2.3 2.3 0 0 1-2.3-2.3v-8.4c0-1.5.6-2.5 2-3.3z"/><path d="M6.5 3h11v4h-11z"/><path d="M12 10.5c1.6 1.3 1.6 6.2 0 8M10.6 13h.01M13.4 15.5h.01"/>',
   "Follow": '<circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.5 6.5-5.5s5.8 2.1 6.5 5.5"/><path d="M18.5 8v6M15.5 11h6"/>',
   "GuestbookEntry": '<path d="M5 4.5h11.5a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z"/><path d="M5 17.5a2 2 0 0 1 2-2h11.5"/>',
   "GuestbookReply": '<path d="M5 4.5h11.5a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z"/><path d="M5 17.5a2 2 0 0 1 2-2h11.5"/>',
@@ -123,6 +124,8 @@
             {{ ftl_get_message("notification-action-posted-in-community") }}
           {%- endif -%}
         </a>
+      {% elif notification.notification_type == "Pickle" %}
+        <a href="{{ post_url }}" class="notification-action">{{ ftl_format_pattern("notification-action-gave-pickle", {"postTitle": title}) }}</a>
       {% elif notification.notification_type == "Follow" %}
         <span class="notification-action">{{ ftl_get_message("notification-action-followed-you") }}</span>
       {% elif notification.notification_type == "GuestbookEntry" %}
