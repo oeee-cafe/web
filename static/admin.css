@@ -128,6 +128,33 @@
 }
 
 /* A replay check that came out as what was saved. */
+/* A linked sign-in, in its provider's colours, as its sign-in button has
+   them (style.css). Apple's black-or-white follows the theme as its
+   button does, by drawing in the ink on the surface reversed. */
+.admin-tag.admin-provider-steam {
+  border-color: #171a21;
+  background-color: #171a21;
+  color: #fff;
+}
+
+.admin-tag.admin-provider-apple {
+  border-color: var(--ds-ink);
+  background-color: var(--ds-ink);
+  color: var(--ds-surface);
+}
+
+.admin-tag.admin-provider-google {
+  border-color: #747775;
+  background-color: #fff;
+  color: #1f1f1f;
+}
+
+.admin-tag.admin-provider-discord {
+  border-color: #5865f2;
+  background-color: #5865f2;
+  color: #fff;
+}
+
 .admin-tag.ok {
   border-color: var(--ds-accent-line);
   background-color: var(--ds-success-surface);

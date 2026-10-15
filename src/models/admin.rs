@@ -787,6 +787,9 @@ pub struct AdminUserSummary {
     /// "last contributed" rather than "last signed in" — there is no session
     /// timestamp on `users` to derive the latter from.
     pub last_active_at: Option<DateTime<Utc>>,
+    /// The sign-ins linked to it (`user_identities.provider`), in the
+    /// order they were linked.
+    pub providers: Vec<String>,
 }
 
 /// A stretch of time to count in, as instants: from `start`, up to but not
@@ -909,6 +912,7 @@ pub async fn find_all_users(
             deleted_at,
             post_count AS "post_count!",
             last_active_at,
+            providers AS "providers!",
             COUNT(*) OVER () AS "matching!"
         FROM (
             SELECT
@@ -942,7 +946,13 @@ pub async fn find_all_users(
                         FROM guestbook_entries g
                         WHERE g.author_id = u.id
                     )
-                ) AS last_active_at
+                ) AS last_active_at,
+                ARRAY(
+                    SELECT i.provider
+                    FROM user_identities i
+                    WHERE i.user_id = u.id
+                    ORDER BY i.created_at
+                ) AS providers
             FROM users u
             CROSS JOIN (
                 SELECT
@@ -1028,6 +1038,7 @@ pub async fn find_all_users(
             created_at: row.created_at,
             deleted_at: row.deleted_at,
             last_active_at: row.last_active_at,
+            providers: row.providers,
         })
         .collect();
     Ok((users, matching))

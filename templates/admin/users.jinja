@@ -29,6 +29,7 @@
         <tr>
           <th>{{ sort_link("name", "Login name") }}</th>
           <th>Display name</th>
+          <th>Sign-in</th>
           <th>Role</th>
           <th>Posts</th>
           <th>{{ sort_link("active", "Last active") }}</th>
@@ -42,6 +43,11 @@
           <tr>
             <td><a href="/admin/users/{{ user.login_name }}">@{{ user.login_name }}</a></td>
             <td>{{ user.display_name }}</td>
+            {# The sign-ins linked to it, by name; a password is on its
+               own page, since it is not a provider. #}
+            <td><span class="admin-tags">
+              {%- for provider in user.providers %}<span class="admin-tag admin-provider-{{ provider }}">{{ {"steam": "Steam", "apple": "Apple", "google": "Google", "discord": "Discord"}[provider] or provider }}</span>{% endfor -%}
+            </span></td>
             <td>
               {% if user.role != "user" %}<strong>{{ user.role }}</strong>{% else %}{{ user.role }}{% endif %}
             </td>

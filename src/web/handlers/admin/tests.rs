@@ -657,6 +657,7 @@ fn renders_users_list() {
                 "created_at": "2026-01-01T00:00:00Z",
                 "deleted_at": null,
                 "last_active_at": "2026-04-01T00:00:00Z",
+                "providers": ["steam", "discord"],
             }])),
             filter_query => "",
             page => 1,
@@ -667,8 +668,12 @@ fn renders_users_list() {
             ftl_lang => "en",
         })
         .expect("users.jinja renders");
-    // The handle is the way to what they have posted.
+    // The handle is the way to their staff page.
     assert!(rendered.contains("<a href=\"/admin/users/someone\">@someone</a>"));
+    // Each linked sign-in by name, in the order it was linked.
+    assert!(rendered.contains(
+        r#"<span class="admin-tag admin-provider-steam">Steam</span><span class="admin-tag admin-provider-discord">Discord</span>"#
+    ));
 }
 
 #[test]
