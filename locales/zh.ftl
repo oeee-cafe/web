@@ -539,6 +539,7 @@ app-store-badge = 在 App Store 下载
 google-play-badge = 下载应用，请到 Google Play
 about-elsewhere = 其他平台
 about-discord-app = Discord 应用
+about-discord-server = Discord 社区服务器
 about-documents = 文档
 about-design = 设计系统
 about-version = 版本

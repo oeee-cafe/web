@@ -539,6 +539,7 @@ app-store-badge = App Store에서 다운로드하기
 google-play-badge = Google Play에서 받으세요
 about-elsewhere = 다른 곳에서
 about-discord-app = Discord 앱
+about-discord-server = Discord 커뮤니티 서버
 about-documents = 문서
 about-design = 디자인 시스템
 about-version = 버전

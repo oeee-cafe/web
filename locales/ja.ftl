@@ -539,6 +539,7 @@ app-store-badge = App Storeからダウンロード
 google-play-badge = Google Play で手に入れよう
 about-elsewhere = ほかの場所で
 about-discord-app = Discordアプリ
+about-discord-server = Discordコミュニティサーバー
 about-documents = ドキュメント
 about-design = デザインシステム
 about-version = バージョン

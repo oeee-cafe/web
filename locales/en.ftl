@@ -575,6 +575,7 @@ app-store-badge = Download on the App Store
 google-play-badge = Get it on Google Play
 about-elsewhere = Elsewhere
 about-discord-app = Discord app
+about-discord-server = Discord community server
 about-documents = Documents
 about-design = Design System
 about-version = Version
