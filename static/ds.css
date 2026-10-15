@@ -423,6 +423,12 @@ html[data-app] .ds-page a {
   cursor: default;
 }
 
+/* Who drew it and where are links you follow, under the drawing, and keep
+   the hand every link has. */
+.ds-page .posts-grid .post-card-byline a {
+  cursor: pointer;
+}
+
 /* In the desktop app on Windows, WebView2 draws Edge's classic grey
    scrollbars, the one part of the window that still looks like a browser.
    There they are the design system's: a thin rounded thumb in the frame
