@@ -38,9 +38,10 @@
           <p class="supporter-thanks ds-marked-block">
             {{ supporter_mark(worn_mark) }}{{ ftl_format_pattern("supporter-pack-have", {"year": this_year}) }}
           </p>
-        {% else %}
-          <p>{{ ftl_get_message("supporter-pack-what") }}</p>
         {% endif %}
+        {# What the pack gives, to everyone: a supporter reads it as what
+           they have, and as what a pack from another store would add. #}
+        <p>{{ ftl_get_message("supporter-pack-what") }}</p>
 
         {% if not current_user %}
           <p class="ds-help">{{ ftl_get_message("supporter-pack-sign-in") }}</p>
