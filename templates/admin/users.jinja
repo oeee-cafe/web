@@ -1,4 +1,5 @@
 {% extends "admin/base.jinja" %}
+{% from "person_macro.jinja" import handle %}
 {% set admin_section = "users" %}
 {% macro sort_link(key, label) %}
   <a href="?sort={{ key }}{{ filter_query }}" {% if sort == key %}class="admin-sort-active"{% endif %}>
@@ -41,7 +42,9 @@
       <tbody>
         {% for user in users %}
           <tr>
-            <td><a href="/admin/users/{{ user.login_name }}">@{{ user.login_name }}</a></td>
+            {# The handle as the site draws it, supporter's mark and all,
+               leading to the account's staff page. #}
+            <td>{{ handle(user.login_name, "/admin/users/" ~ user.login_name) }}</td>
             <td>{{ user.display_name }}</td>
             {# The sign-ins linked to it, by name; a password is on its
                own page, since it is not a provider. #}

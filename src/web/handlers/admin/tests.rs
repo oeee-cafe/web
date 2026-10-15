@@ -669,7 +669,9 @@ fn renders_users_list() {
         })
         .expect("users.jinja renders");
     // The handle is the way to their staff page.
-    assert!(rendered.contains("<a href=\"/admin/users/someone\">@someone</a>"));
+    assert!(rendered.contains(
+        r#"<a class="ds-handle" href="&#x2f;admin&#x2f;users&#x2f;someone">@someone</a>"#
+    ));
     // Each linked sign-in by name, in the order it was linked.
     assert!(rendered.contains(
         r#"<span class="admin-tag admin-provider-steam">Steam</span><span class="admin-tag admin-provider-discord">Discord</span>"#
