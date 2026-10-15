@@ -28,13 +28,13 @@
       <thead>
         <tr>
           <th>{{ sort_link("name", "Login name") }}</th>
-          <th>Display name</th>
+          <th>{{ sort_link("display", "Display name") }}</th>
           <th>Sign-in</th>
-          <th>Role</th>
-          <th>Posts</th>
+          <th>{{ sort_link("role", "Role") }}</th>
+          <th>{{ sort_link("posts", "Posts") }}</th>
           <th>{{ sort_link("active", "Last active") }}</th>
           <th>{{ sort_link("created", "Joined") }}</th>
-          <th>Status</th>
+          <th>{{ sort_link("status", "Status") }}</th>
           <th></th>
         </tr>
       </thead>

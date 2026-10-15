@@ -248,6 +248,13 @@ pub enum AdminSort {
     Active,
     Created,
     Name,
+    /// The user list only: most posts first, by display name rather than
+    /// login name, staff before everyone else, and deleted accounts first,
+    /// latest deletion first. Elsewhere they fall back to last-active.
+    Posts,
+    Display,
+    Role,
+    Status,
 }
 
 impl AdminSort {
@@ -256,6 +263,10 @@ impl AdminSort {
             AdminSort::Active => "active",
             AdminSort::Created => "created",
             AdminSort::Name => "name",
+            AdminSort::Posts => "posts",
+            AdminSort::Display => "display",
+            AdminSort::Role => "role",
+            AdminSort::Status => "status",
         }
     }
 }
@@ -1010,7 +1021,13 @@ pub async fn find_all_users(
         ORDER BY
             CASE WHEN $1 = 'created' THEN u.created_at END DESC,
             CASE WHEN $1 = 'name' THEN u.login_name END ASC,
-            u.last_active_at DESC NULLS LAST
+            CASE WHEN $1 = 'posts' THEN u.post_count END DESC,
+            CASE WHEN $1 = 'display' THEN lower(u.display_name) END ASC,
+            CASE WHEN $1 = 'role' THEN u.role <> 'user' END DESC,
+            CASE WHEN $1 = 'role' THEN u.role::text END ASC,
+            CASE WHEN $1 = 'status' THEN u.deleted_at END DESC NULLS LAST,
+            u.last_active_at DESC NULLS LAST,
+            u.login_name ASC
         LIMIT $2 OFFSET $3
         "#,
         sort.as_sql(),
