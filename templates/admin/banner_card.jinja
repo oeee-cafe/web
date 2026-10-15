@@ -21,13 +21,13 @@
       {% endif %}
     </div>
     <div>
-      <a href="/admin/users/{{ banner.author_login_name }}/posts">@{{ banner.author_login_name }}</a>
+      <a href="/admin/users/{{ banner.author_login_name }}">@{{ banner.author_login_name }}</a>
       <span class="muted">· {{ banner.created_at|dateformat(format="short", tz="Asia/Seoul") }}</span>
     </div>
     {% if banner.is_explicit and banner.flagged_at %}
       <div class="muted">
         flagged {{ banner.flagged_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-        {% if banner.flagged_by_login_name %}by <a href="/admin/users/{{ banner.flagged_by_login_name }}/posts">@{{ banner.flagged_by_login_name }}</a>{% endif %}
+        {% if banner.flagged_by_login_name %}by <a href="/admin/users/{{ banner.flagged_by_login_name }}">@{{ banner.flagged_by_login_name }}</a>{% endif %}
       </div>
     {% endif %}
   </div>

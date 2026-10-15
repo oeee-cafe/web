@@ -191,7 +191,7 @@
                     <span class="muted">untitled</span>
                   {% endif %}
                 </td>
-                <td>{% if session.owner_is_guest %}{{ session.owner_login_name }} (guest){% else %}<a href="/@{{ session.owner_login_name }}" target="_blank">@{{ session.owner_login_name }}</a>{% endif %}</td>
+                <td>{% if session.owner_is_guest %}{{ session.owner_login_name }} (guest){% else %}<a href="/admin/users/{{ session.owner_login_name }}">@{{ session.owner_login_name }}</a>{% endif %}</td>
                 <td>{{ session.active_participant_count }} / {{ session.max_participants }}{% if session.active_spectator_count > 0 %} <span class="muted">· {{ session.active_spectator_count }} watching</span>{% endif %}</td>
                 <td>
                   {% if not session.is_public %}
@@ -237,7 +237,7 @@
           {% for user in signups %}
             <tr>
               <td>
-                <a href="/admin/users/{{ user.login_name }}/posts">@{{ user.login_name }}</a>
+                <a href="/admin/users/{{ user.login_name }}">@{{ user.login_name }}</a>
                 {% if user.deleted_at %}<span class="admin-tag deleted">deleted</span>{% endif %}
               </td>
               <td>{{ user.display_name }}</td>

@@ -3,14 +3,16 @@
 use super::range::DateRange;
 use crate::app_error::AppError;
 use crate::models::admin::{
-    find_all_communities_with_activity, find_all_users, AdminSort, AdminUserFilter, AdminUserStat,
+    find_all_communities_with_activity, find_all_users, find_user_achievements, find_user_detail,
+    find_user_devices, find_user_identities, find_user_pickles_given,
+    find_user_supporter_purchases, AdminSort, AdminUserFilter, AdminUserStat,
 };
 use crate::models::identity::Provider;
 use crate::web::context::CommonContext;
 use crate::web::handlers::AdminUser;
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::response::Html;
 use minijinja::context;
 use minijinja::value::Serde;
@@ -123,6 +125,46 @@ pub async fn admin_users(
                 page => page,
                 sort => Serde(query.sort),
                 has_next => has_next,
+            },
+        )
+        .await?;
+
+    Ok(Html(rendered))
+}
+
+/// GET /admin/users/:login_name — one account, deleted or not: its row,
+/// its sign-ins, the Supporter Packs it bought, the pickles it gave, its
+/// achievements and the devices it is pushed to. Every username on the
+/// admin pages leads here; its posts are a link away.
+pub async fn admin_user_detail(
+    admin: AdminUser,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+) -> Result<Html<String>, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let user = find_user_detail(&mut tx, &login_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+    let identities = find_user_identities(&mut tx, user.id).await?;
+    let purchases = find_user_supporter_purchases(&mut tx, user.id).await?;
+    let pickles_given = find_user_pickles_given(&mut tx, user.id).await?;
+    let achievements = find_user_achievements(&mut tx, user.id).await?;
+    let devices = find_user_devices(&mut tx, user.id).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
+    tx.commit().await?;
+
+    let rendered = state
+        .render_page(
+            "admin/user_detail.jinja",
+            common_ctx,
+            context! {
+                user => Serde(user),
+                identities => Serde(identities),
+                purchases => Serde(purchases),
+                pickles_given => Serde(pickles_given),
+                achievements => Serde(achievements),
+                devices => Serde(devices),
             },
         )
         .await?;

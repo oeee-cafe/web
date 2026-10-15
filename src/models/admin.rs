@@ -1294,6 +1294,246 @@ pub async fn find_sign_in_methods(
     Ok(methods)
 }
 
+/// One account, deleted or not, as its staff page shows it: everything on
+/// its `users` row but the password, and what is counted about it.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminUserDetail {
+    pub id: Uuid,
+    pub login_name: String,
+    pub display_name: String,
+    pub email: Option<String>,
+    pub email_verified_at: Option<DateTime<Utc>>,
+    pub has_password: bool,
+    pub role: UserRole,
+    pub preferred_language: Option<String>,
+    pub show_sensitive_content: bool,
+    pub show_in_credits: bool,
+    pub supporter_mark: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    /// Posts, drafts and removed ones apart.
+    pub published_count: i64,
+    pub draft_count: i64,
+    pub deleted_count: i64,
+    pub comment_count: i64,
+    pub pickles_received: i64,
+    /// As on the user list: the latest post, comment or guestbook entry.
+    pub last_active_at: Option<DateTime<Utc>>,
+}
+
+pub async fn find_user_detail(
+    tx: &mut Transaction<'_, Postgres>,
+    login_name: &str,
+) -> Result<Option<AdminUserDetail>> {
+    let row = query_as!(
+        AdminUserDetail,
+        r#"
+        SELECT
+            u.id,
+            u.login_name,
+            u.display_name,
+            u.email,
+            u.email_verified_at,
+            u.password_hash IS NOT NULL AS "has_password!",
+            u.role AS "role: UserRole",
+            u.preferred_language::text AS preferred_language,
+            u.show_sensitive_content,
+            u.show_in_credits,
+            u.supporter_mark,
+            u.created_at,
+            u.updated_at,
+            u.deleted_at,
+            (SELECT COUNT(*) FROM posts p
+              WHERE p.author_id = u.id AND p.deleted_at IS NULL AND p.published_at IS NOT NULL
+            ) AS "published_count!",
+            (SELECT COUNT(*) FROM posts p
+              WHERE p.author_id = u.id AND p.deleted_at IS NULL AND p.published_at IS NULL
+            ) AS "draft_count!",
+            (SELECT COUNT(*) FROM posts p
+              WHERE p.author_id = u.id AND p.deleted_at IS NOT NULL
+            ) AS "deleted_count!",
+            (SELECT COUNT(*) FROM comments c JOIN actors a ON c.actor_id = a.id
+              WHERE a.user_id = u.id AND c.deleted_at IS NULL
+            ) AS "comment_count!",
+            (SELECT COUNT(*) FROM pickles k JOIN posts p ON p.id = k.post_id
+              WHERE p.author_id = u.id
+            ) AS "pickles_received!",
+            GREATEST(
+                (SELECT MAX(COALESCE(p.published_at, p.created_at)) FROM posts p
+                  WHERE p.author_id = u.id AND p.deleted_at IS NULL),
+                (SELECT MAX(c.created_at) FROM comments c JOIN actors a ON c.actor_id = a.id
+                  WHERE a.user_id = u.id AND c.deleted_at IS NULL),
+                (SELECT MAX(g.created_at) FROM guestbook_entries g WHERE g.author_id = u.id)
+            ) AS last_active_at
+        FROM users u
+        WHERE u.login_name = $1
+        "#,
+        login_name,
+    );
+    Ok(row.fetch_optional(&mut **tx).await?)
+}
+
+/// A sign-in the account has linked: Steam, Apple, Google, Discord.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminUserIdentity {
+    pub provider: String,
+    pub subject: String,
+    pub display_hint: Option<String>,
+    pub email: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: DateTime<Utc>,
+    pub supporter_checked_at: Option<DateTime<Utc>>,
+}
+
+pub async fn find_user_identities(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+) -> Result<Vec<AdminUserIdentity>> {
+    let rows = query_as!(
+        AdminUserIdentity,
+        r#"
+        SELECT provider, subject, display_hint, email, created_at, last_used_at,
+               supporter_checked_at
+        FROM user_identities
+        WHERE user_id = $1
+        ORDER BY created_at
+        "#,
+        user_id,
+    );
+    Ok(rows.fetch_all(&mut **tx).await?)
+}
+
+/// A Supporter Pack bought in a store, revoked ones included: `owner` is
+/// the store's own name for the buyer or the purchase (a SteamID, an
+/// original transaction id, a purchase token), which is what to quote to
+/// the store about it.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminSupporterPurchase {
+    pub store: String,
+    pub product: String,
+    pub year: i32,
+    pub owner: String,
+    pub purchased_at: DateTime<Utc>,
+    pub checked_at: DateTime<Utc>,
+    pub revoked_at: Option<DateTime<Utc>>,
+}
+
+pub async fn find_user_supporter_purchases(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+) -> Result<Vec<AdminSupporterPurchase>> {
+    let rows = query_as!(
+        AdminSupporterPurchase,
+        r#"
+        SELECT store, product, year, owner, purchased_at, checked_at, revoked_at
+        FROM supporter_purchases
+        WHERE user_id = $1
+        ORDER BY year DESC, purchased_at DESC
+        "#,
+        user_id,
+    );
+    Ok(rows.fetch_all(&mut **tx).await?)
+}
+
+/// A pickle the account gave, and the drawing it went to.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminPickleGiven {
+    pub week: Option<chrono::NaiveDate>,
+    pub created_at: DateTime<Utc>,
+    pub post_id: Uuid,
+    pub post_title: Option<String>,
+    pub post_deleted_at: Option<DateTime<Utc>>,
+    pub author_login_name: String,
+}
+
+pub async fn find_user_pickles_given(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+) -> Result<Vec<AdminPickleGiven>> {
+    let rows = query_as!(
+        AdminPickleGiven,
+        r#"
+        SELECT
+            k.week,
+            k.created_at,
+            p.id AS post_id,
+            p.title AS post_title,
+            p.deleted_at AS post_deleted_at,
+            author.login_name AS author_login_name
+        FROM pickles k
+        JOIN posts p ON p.id = k.post_id
+        JOIN users author ON author.id = p.author_id
+        WHERE k.giver_id = $1
+        ORDER BY k.created_at DESC
+        "#,
+        user_id,
+    );
+    Ok(rows.fetch_all(&mut **tx).await?)
+}
+
+/// An achievement the account has earned, and where Steam stands on it.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminAchievement {
+    pub achievement: String,
+    pub earned_at: DateTime<Utc>,
+    pub revoked_at: Option<DateTime<Utc>>,
+    pub steam_synced_at: Option<DateTime<Utc>>,
+}
+
+pub async fn find_user_achievements(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+) -> Result<Vec<AdminAchievement>> {
+    let rows = query_as!(
+        AdminAchievement,
+        r#"
+        SELECT achievement, earned_at, revoked_at, steam_synced_at
+        FROM user_achievements
+        WHERE user_id = $1
+        ORDER BY earned_at
+        "#,
+        user_id,
+    );
+    Ok(rows.fetch_all(&mut **tx).await?)
+}
+
+/// A device the account's notifications are pushed to. The token is what
+/// APNs or FCM is handed, and as good as an address for pushing to it, so
+/// the page shows its ends only.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminDevice {
+    pub platform: String,
+    pub token_head: String,
+    pub token_tail: String,
+    pub token_length: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+pub async fn find_user_devices(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+) -> Result<Vec<AdminDevice>> {
+    let rows = query_as!(
+        AdminDevice,
+        r#"
+        SELECT
+            platform::text AS "platform!",
+            left(device_token, 8) AS "token_head!",
+            right(device_token, 6) AS "token_tail!",
+            length(device_token) AS "token_length!",
+            created_at,
+            updated_at
+        FROM devices
+        WHERE user_id = $1
+        ORDER BY updated_at DESC
+        "#,
+        user_id,
+    );
+    Ok(rows.fetch_all(&mut **tx).await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

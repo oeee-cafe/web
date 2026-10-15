@@ -155,11 +155,11 @@ describe("pressing things while the inspector plays", () => {
 });
 
 describe("the line under the canvas", () => {
-  it("links everyone who drew to their profile", async () => {
+  it("links everyone who drew to their staff page", async () => {
     const { host } = await inspector();
     const profile = host.querySelector<HTMLAnchorElement>(".replay-status a")!;
     expect(profile.textContent).toBe("miro");
-    expect(profile.getAttribute("href")).toBe("/@miro");
+    expect(profile.getAttribute("href")).toBe("/admin/users/miro");
     expect(host.querySelector(".replay-status")!.textContent).toContain("64×48  ·  miro (1)");
   });
 });
@@ -174,7 +174,7 @@ describe("a chat line", () => {
     const readout = () => host.querySelector(".replay-readout")!.textContent;
     const row = host.querySelector<HTMLElement>(".inspect-chat-line")!;
     const name = row.querySelector<HTMLAnchorElement>("a.inspect-chat-who")!;
-    expect(name.getAttribute("href")).toBe("/@miro");
+    expect(name.getAttribute("href")).toBe("/admin/users/miro");
 
     const before = readout();
     name.addEventListener("click", (event) => event.preventDefault());

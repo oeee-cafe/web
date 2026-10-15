@@ -40,7 +40,7 @@
       <tbody>
         {% for user in users %}
           <tr>
-            <td><a href="/admin/users/{{ user.login_name }}/posts">@{{ user.login_name }}</a></td>
+            <td><a href="/admin/users/{{ user.login_name }}">@{{ user.login_name }}</a></td>
             <td>{{ user.display_name }}</td>
             <td>
               {% if user.role != "user" %}<strong>{{ user.role }}</strong>{% else %}{{ user.role }}{% endif %}

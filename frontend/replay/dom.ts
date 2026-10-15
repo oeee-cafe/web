@@ -15,19 +15,19 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-/** A login name as the way to that person's profile, in a tab of its own so
- * the inspector stays where it was. */
+/** A login name as the way to that person's staff page, in a tab of its own
+ * so the inspector stays where it was. */
 export function profileLink(login: string, className?: string): HTMLAnchorElement {
   const link = el("a", className, login);
-  link.href = `/@${encodeURIComponent(login)}`;
+  link.href = `/admin/users/${encodeURIComponent(login)}`;
   link.target = "_blank";
   return link;
 }
 
 /**
- * A name as the way to that person's profile, or, for a guest, just the name
- * they gave and that they are one: a guest has no profile, and their name may
- * be an account's, whose page a link would wrongly send staff to.
+ * A name as the way to that person's staff page, or, for a guest, just the
+ * name they gave and that they are one: a guest has no account, and their
+ * name may be an account's, whose page a link would wrongly send staff to.
  */
 export function personName(login: string, isGuest: boolean | undefined, className?: string): HTMLElement {
   if (!isGuest) return profileLink(login, className);

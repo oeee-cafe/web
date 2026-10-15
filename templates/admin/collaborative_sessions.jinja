@@ -66,7 +66,7 @@
                 <span class="muted">untitled</span>
               {% endif %}
             </td>
-            <td>{% if session.owner_is_guest %}{{ session.owner_login_name }} (guest){% else %}<a href="/@{{ session.owner_login_name }}" target="_blank">@{{ session.owner_login_name }}</a>{% endif %}</td>
+            <td>{% if session.owner_is_guest %}{{ session.owner_login_name }} (guest){% else %}<a href="/admin/users/{{ session.owner_login_name }}">@{{ session.owner_login_name }}</a>{% endif %}</td>
             <td>{{ session.width }}×{{ session.height }}</td>
             {# Seats held out of seats offered, then everyone who has ever been
                in the room — which is what says whether a quiet session was quiet

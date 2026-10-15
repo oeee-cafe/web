@@ -1,0 +1,200 @@
+{% extends "admin/base.jinja" %}
+{% set admin_section = "users" %}
+{% macro when(at) %}{% if at %}{{ at|datetimeformat(format="short", tz="Asia/Seoul") }}{% else %}<span class="muted">never</span>{% endif %}{% endmacro %}
+{% block admin_content %}
+  {# One account, deleted or not (handlers/admin/lists.rs): its row, and
+     what hangs off it. Every username on the admin pages leads here. #}
+  <div class="admin-head">
+    <h1 class="admin-title">@{{ user.login_name }}</h1>
+    <p class="admin-tags">
+      {% if user.role != "user" %}<span class="admin-tag">{{ user.role }}</span>{% endif %}
+      {% if user.deleted_at %}<span class="admin-tag deleted">deleted</span>{% endif %}
+      {% if user.supporter_mark %}<span class="admin-tag ok">supporter mark: {{ user.supporter_mark }}</span>{% endif %}
+    </p>
+  </div>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <h2 class="profile-section-label">Account</h2>
+      <span>
+        {% if not user.deleted_at %}<a href="/@{{ user.login_name }}" target="_blank">profile ↗</a> · {% endif %}
+        <a href="/admin/users/{{ user.login_name }}/posts">posts →</a>
+      </span>
+    </div>
+    <div class="admin-table-scroll">
+      <table>
+        <tr><th scope="row">User ID</th><td><code>{{ user.id }}</code></td></tr>
+        <tr><th scope="row">Display name</th><td>{{ user.display_name }}</td></tr>
+        <tr>
+          <th scope="row">Email</th>
+          <td>
+            {% if user.email %}
+              {{ user.email }}
+              {% if user.email_verified_at %}<span class="muted">· verified {{ when(user.email_verified_at) }}</span>{% else %}<span class="muted">· not verified</span>{% endif %}
+            {% else %}
+              <span class="muted">none</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr><th scope="row">Password</th><td>{% if user.has_password %}set{% else %}<span class="muted">none</span>{% endif %}</td></tr>
+        <tr><th scope="row">Language</th><td>{{ user.preferred_language or "from the browser" }}</td></tr>
+        <tr><th scope="row">Shows sensitive</th><td>{{ "yes" if user.show_sensitive_content else "no" }}</td></tr>
+        <tr><th scope="row">In credits</th><td>{{ "yes" if user.show_in_credits else "no" }}</td></tr>
+        <tr><th scope="row">Joined</th><td>{{ when(user.created_at) }}</td></tr>
+        <tr><th scope="row">Updated</th><td>{{ when(user.updated_at) }}</td></tr>
+        <tr><th scope="row">Last active</th><td>{{ when(user.last_active_at) }}</td></tr>
+        {% if user.deleted_at %}<tr><th scope="row">Deleted</th><td>{{ when(user.deleted_at) }}</td></tr>{% endif %}
+        <tr>
+          <th scope="row">Posts</th>
+          <td>{{ user.published_count }} published · {{ user.draft_count }} draft{% if user.draft_count != 1 %}s{% endif %} · {{ user.deleted_count }} removed</td>
+        </tr>
+        <tr><th scope="row">Comments</th><td>{{ user.comment_count }}</td></tr>
+        <tr><th scope="row">Pickles received</th><td>{{ user.pickles_received }}</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Supporter Packs</h2>
+    {% if purchases %}
+      {# `owner` is the store's own name for the purchase or its buyer, the
+         thing to quote to the store about it. #}
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr><th>Year</th><th>Store</th><th>Product</th><th>Store owner</th><th>Bought</th><th>Last checked</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for purchase in purchases %}
+              <tr>
+                <td>{{ purchase.year }}</td>
+                <td>{{ purchase.store }}</td>
+                <td><code>{{ purchase.product }}</code></td>
+                <td><code>{{ purchase.owner }}</code></td>
+                <td>{{ when(purchase.purchased_at) }}</td>
+                <td>{{ when(purchase.checked_at) }}</td>
+                <td>
+                  {% if purchase.revoked_at %}
+                    <span class="admin-tag deleted">revoked {{ when(purchase.revoked_at) }}</span>
+                  {% else %}
+                    <span class="admin-tag ok">live</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">No Supporter Pack bought.</p>
+    {% endif %}
+  </section>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Pickles given</h2>
+    {% if pickles_given %}
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr><th>Week</th><th>Given</th><th>Drawing</th><th>By</th></tr>
+          </thead>
+          <tbody>
+            {% for pickle in pickles_given %}
+              <tr>
+                <td>{{ pickle.week or "" }}</td>
+                <td>{{ when(pickle.created_at) }}</td>
+                <td>
+                  <a href="/admin/posts/{{ pickle.post_id }}">{{ pickle.post_title or "(untitled)" }}</a>
+                  {% if pickle.post_deleted_at %}<span class="admin-tag deleted">deleted</span>{% endif %}
+                </td>
+                <td><a href="/admin/users/{{ pickle.author_login_name }}">@{{ pickle.author_login_name }}</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">No pickles given.</p>
+    {% endif %}
+  </section>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Linked sign-ins</h2>
+    {% if identities %}
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr><th>Provider</th><th>Subject</th><th>Name</th><th>Email</th><th>Linked</th><th>Last used</th><th>Pack checked</th></tr>
+          </thead>
+          <tbody>
+            {% for identity in identities %}
+              <tr>
+                <td>{{ identity.provider }}</td>
+                <td><code>{{ identity.subject }}</code></td>
+                <td>{{ identity.display_hint or "" }}</td>
+                <td>{{ identity.email or "" }}</td>
+                <td>{{ when(identity.created_at) }}</td>
+                <td>{{ when(identity.last_used_at) }}</td>
+                <td>{% if identity.supporter_checked_at %}{{ when(identity.supporter_checked_at) }}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">No sign-in linked.</p>
+    {% endif %}
+  </section>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Push devices</h2>
+    {% if devices %}
+      {# A token is as good as an address to push to, so only its ends are
+         shown: enough to match it against a log line. #}
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr><th>Platform</th><th>Token</th><th>Registered</th><th>Updated</th></tr>
+          </thead>
+          <tbody>
+            {% for device in devices %}
+              <tr>
+                <td>{{ device.platform }}</td>
+                <td><code>{{ device.token_head }}…{{ device.token_tail }}</code> <span class="muted">({{ device.token_length }} chars)</span></td>
+                <td>{{ when(device.created_at) }}</td>
+                <td>{{ when(device.updated_at) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">No device registered for push.</p>
+    {% endif %}
+  </section>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Achievements</h2>
+    {% if achievements %}
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr><th>Achievement</th><th>Earned</th><th>Synced to Steam</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for achievement in achievements %}
+              <tr>
+                <td><code>{{ achievement.achievement }}</code></td>
+                <td>{{ when(achievement.earned_at) }}</td>
+                <td>{{ when(achievement.steam_synced_at) }}</td>
+                <td>{% if achievement.revoked_at %}<span class="admin-tag deleted">revoked {{ when(achievement.revoked_at) }}</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">No achievements.</p>
+    {% endif %}
+  </section>
+{% endblock admin_content %}

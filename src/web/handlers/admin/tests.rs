@@ -323,7 +323,7 @@ fn post_flag_panel_renders_standalone_for_htmx_swap() {
     assert!(rendered.contains("flagged explicit by staff"));
     assert!(rendered.contains("Remove explicit flag"));
     // Whoever flagged it is a way to their posts.
-    assert!(rendered.contains("href=\"/admin/users/admin/posts\""));
+    assert!(rendered.contains("href=\"/admin/users/admin\""));
     // Flipping back must post the opposite state, not a blind toggle.
     assert!(rendered.contains("value=\"false\""));
 
@@ -396,7 +396,7 @@ fn banner_card_renders_standalone_for_htmx_swap() {
         .expect("banner_card.jinja renders standalone");
     assert!(rendered.contains("hidden from /about"));
     // Whoever flagged it is a way to their posts.
-    assert!(rendered.contains("by <a href=\"/admin/users/admin/posts\">@admin</a>"));
+    assert!(rendered.contains("by <a href=\"/admin/users/admin\">@admin</a>"));
     // Flipping back must post the opposite state, not a blind toggle.
     assert!(rendered.contains("value=\"false\""));
 }
@@ -473,7 +473,7 @@ fn session_list_counts_watchers_apart_from_seats() {
 #[test]
 fn session_list_links_the_owner() {
     let rendered = render_sessions(vec![sample_session(json!({}))]);
-    assert!(rendered.contains("<a href=\"/@someone\" target=\"_blank\">@someone</a>"));
+    assert!(rendered.contains("<a href=\"/admin/users/someone\">@someone</a>"));
 }
 
 /// The reason this page exists: a room the lobby will not list for
@@ -668,7 +668,7 @@ fn renders_users_list() {
         })
         .expect("users.jinja renders");
     // The handle is the way to what they have posted.
-    assert!(rendered.contains("<a href=\"/admin/users/someone/posts\">@someone</a>"));
+    assert!(rendered.contains("<a href=\"/admin/users/someone\">@someone</a>"));
 }
 
 #[test]
@@ -1049,4 +1049,106 @@ fn a_filtered_user_list_says_which_figure() {
     ));
     assert!(rendered
         .contains("&stat=provider-signup&provider=steam&from=2026-10-05&to=2026-10-11&page=2"));
+}
+
+/// A user's staff page, from the structs its handler hands it, with a row
+/// in every section: a revoked pack beside a live one, a pickle given to a
+/// removed drawing, a push token shown by its ends only.
+#[test]
+fn renders_user_detail() {
+    use crate::models::admin::{
+        AdminAchievement, AdminDevice, AdminPickleGiven, AdminSupporterPurchase, AdminUserDetail,
+        AdminUserIdentity,
+    };
+    use crate::models::user::UserRole;
+    use chrono::{NaiveDate, TimeZone, Utc};
+    use uuid::Uuid;
+
+    let at = Utc.with_ymd_and_hms(2026, 10, 12, 3, 4, 5).unwrap();
+    let user = AdminUserDetail {
+        id: Uuid::nil(),
+        login_name: "fan".to_string(),
+        display_name: "Fan <3".to_string(),
+        email: Some("fan@example.test".to_string()),
+        email_verified_at: Some(at),
+        has_password: false,
+        role: UserRole::User,
+        preferred_language: Some("ko".to_string()),
+        show_sensitive_content: false,
+        show_in_credits: true,
+        supporter_mark: Some("steam".to_string()),
+        created_at: at,
+        updated_at: at,
+        deleted_at: None,
+        published_count: 3,
+        draft_count: 1,
+        deleted_count: 0,
+        comment_count: 4,
+        pickles_received: 2,
+        last_active_at: None,
+    };
+    let purchase = |store: &str, revoked: bool| AdminSupporterPurchase {
+        store: store.to_string(),
+        product: "supporter_2026".to_string(),
+        year: 2026,
+        owner: format!("{store}-owner"),
+        purchased_at: at,
+        checked_at: at,
+        revoked_at: revoked.then_some(at),
+    };
+    let env = test_env();
+    let rendered = env
+        .get_template("admin/user_detail.jinja")
+        .expect("template loads")
+        .render(context! {
+            current_user => Serde(current_user()),
+            draft_post_count => 0,
+            unread_notification_count => 0,
+            ftl_lang => "en",
+            user => Serde(user),
+            identities => Serde(vec![AdminUserIdentity {
+                provider: "steam".to_string(),
+                subject: "76561198000000000".to_string(),
+                display_hint: Some("fanatic".to_string()),
+                email: None,
+                created_at: at,
+                last_used_at: at,
+                supporter_checked_at: Some(at),
+            }]),
+            purchases => Serde(vec![purchase("steam", false), purchase("apple", true)]),
+            pickles_given => Serde(vec![AdminPickleGiven {
+                week: NaiveDate::from_ymd_opt(2026, 10, 12),
+                created_at: at,
+                post_id: Uuid::nil(),
+                post_title: None,
+                post_deleted_at: Some(at),
+                author_login_name: "painter".to_string(),
+            }]),
+            achievements => Serde(vec![AdminAchievement {
+                achievement: "STEAM_SUPPORTER".to_string(),
+                earned_at: at,
+                revoked_at: None,
+                steam_synced_at: None,
+            }]),
+            devices => Serde(vec![AdminDevice {
+                platform: "ios".to_string(),
+                token_head: "abcdef01".to_string(),
+                token_tail: "789xyz".to_string(),
+                token_length: 64,
+                created_at: at,
+                updated_at: at,
+            }]),
+        })
+        .expect("user_detail.jinja renders");
+    assert!(rendered.contains("@fan"), "{rendered}");
+    assert!(rendered.contains("Fan &lt;3"), "{rendered}");
+    assert!(rendered.contains("<code>steam-owner</code>"), "{rendered}");
+    assert!(rendered.contains(">live<"), "{rendered}");
+    assert!(rendered.contains("revoked"), "{rendered}");
+    assert!(
+        rendered.contains(r#"href="/admin/users/painter">@painter"#),
+        "{rendered}"
+    );
+    assert!(rendered.contains("2026-10-12"), "{rendered}");
+    assert!(rendered.contains("abcdef01…789xyz"), "{rendered}");
 }

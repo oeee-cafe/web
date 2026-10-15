@@ -59,7 +59,7 @@ export function header(sessionId: string): Header {
         document.createTextNode("by "),
         session.owner_is_guest
           ? el("span", undefined, `${session.owner_login_name} (guest)`)
-          : link(`@${session.owner_login_name}`, `/@${session.owner_login_name}`),
+          : link(`@${session.owner_login_name}`, `/admin/users/${encodeURIComponent(session.owner_login_name)}`),
       );
       parts.push(owner);
       if (session.community_slug) {
