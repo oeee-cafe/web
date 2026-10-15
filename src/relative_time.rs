@@ -1,8 +1,8 @@
-//! How long ago, in the few characters a post card has room for: "3h",
-//! "2d", "3w". A card's caption shares one line between the artist, the
+//! How long ago, in the few characters a post card has room for: "3h ago",
+//! "2d ago", "3w ago" -- "3시간 전", "3時間前", "3小时前". A card's caption shares one line between the artist, the
 //! community and this, so it cannot spend a whole date on something whose
 //! only question is "recent or not". Past a month it gives the date itself,
-//! because "40w" answers nothing a reader is asking.
+//! because "40w ago" answers nothing a reader is asking.
 
 use chrono::{DateTime, Utc};
 use chrono_tz::Asia::Seoul;
@@ -13,6 +13,9 @@ struct Units {
     hour: &'static str,
     day: &'static str,
     week: &'static str,
+    /// After the count and its unit: without it "7시간" reads as a
+    /// duration, seven hours long, rather than as seven hours back.
+    ago: &'static str,
 }
 
 fn units(lang: &str) -> Units {
@@ -23,6 +26,7 @@ fn units(lang: &str) -> Units {
             hour: "시간",
             day: "일",
             week: "주",
+            ago: " 전",
         },
         Some("ja") => Units {
             now: "たった今",
@@ -30,6 +34,7 @@ fn units(lang: &str) -> Units {
             hour: "時間",
             day: "日",
             week: "週",
+            ago: "前",
         },
         Some("zh") => Units {
             now: "刚刚",
@@ -37,6 +42,7 @@ fn units(lang: &str) -> Units {
             hour: "小时",
             day: "天",
             week: "周",
+            ago: "前",
         },
         _ => Units {
             now: "now",
@@ -44,6 +50,7 @@ fn units(lang: &str) -> Units {
             hour: "h",
             day: "d",
             week: "w",
+            ago: " ago",
         },
     }
 }
@@ -57,18 +64,18 @@ pub fn ago(then: DateTime<Utc>, now: DateTime<Utc>, lang: &str) -> String {
         return u.now.to_string();
     }
     if minutes < 60 {
-        return format!("{minutes}{}", u.minute);
+        return format!("{minutes}{}{}", u.minute, u.ago);
     }
     let hours = minutes / 60;
     if hours < 24 {
-        return format!("{hours}{}", u.hour);
+        return format!("{hours}{}{}", u.hour, u.ago);
     }
     let days = hours / 24;
     if days < 7 {
-        return format!("{days}{}", u.day);
+        return format!("{days}{}{}", u.day, u.ago);
     }
     if days < 35 {
-        return format!("{}{}", days / 7, u.week);
+        return format!("{}{}{}", days / 7, u.week, u.ago);
     }
     // The site's dates are Seoul's, as everywhere else it prints one.
     then.with_timezone(&Seoul).format("%Y-%m-%d").to_string()
@@ -112,10 +119,10 @@ mod tests {
     fn each_range_in_its_unit() {
         let n = now();
         assert_eq!(ago(n - Duration::seconds(20), n, "en"), "now");
-        assert_eq!(ago(n - Duration::minutes(5), n, "en"), "5m");
-        assert_eq!(ago(n - Duration::hours(3), n, "en"), "3h");
-        assert_eq!(ago(n - Duration::days(2), n, "en"), "2d");
-        assert_eq!(ago(n - Duration::days(15), n, "en"), "2w");
+        assert_eq!(ago(n - Duration::minutes(5), n, "en"), "5m ago");
+        assert_eq!(ago(n - Duration::hours(3), n, "en"), "3h ago");
+        assert_eq!(ago(n - Duration::days(2), n, "en"), "2d ago");
+        assert_eq!(ago(n - Duration::days(15), n, "en"), "2w ago");
     }
 
     #[test]
@@ -129,9 +136,10 @@ mod tests {
     #[test]
     fn in_the_pages_language() {
         let n = now();
-        assert_eq!(ago(n - Duration::hours(3), n, "ko"), "3시간");
-        assert_eq!(ago(n - Duration::days(2), n, "ja"), "2日");
-        assert_eq!(ago(n - Duration::days(14), n, "zh-CN"), "2周");
+        assert_eq!(ago(n - Duration::hours(7), n, "ko"), "7시간 전");
+        assert_eq!(ago(n - Duration::minutes(5), n, "ko"), "5분 전");
+        assert_eq!(ago(n - Duration::days(2), n, "ja"), "2日前");
+        assert_eq!(ago(n - Duration::days(14), n, "zh-CN"), "2周前");
     }
 
     #[test]

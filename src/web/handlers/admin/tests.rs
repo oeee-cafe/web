@@ -176,7 +176,7 @@ fn shared_card_switches_targets_for_admin() {
 
     // Admin targets, not public ones.
     assert!(rendered.contains("/admin/posts/"));
-    assert!(rendered.contains("/admin/users/someone/posts"));
+    assert!(rendered.contains("href=\"/admin/users/someone\""));
     assert!(rendered.contains("/admin/communities/secret/posts"));
     assert!(!rendered.contains("/communities/@secret"));
     // Moderation tags are admin-only.
