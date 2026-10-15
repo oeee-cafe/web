@@ -1,4 +1,5 @@
 {% extends "admin/base.jinja" %}
+{% from "person_macro.jinja" import handle %}
 {% from "per_row_macro.jinja" import per_row %}
 {% set admin_section = "posts" %}
 {% block admin_content %}
@@ -17,7 +18,7 @@
   <div class="admin-head">
     <h1 class="admin-title">
       All posts
-      {%- if filter_author %} by <a href="/admin/users/{{ filter_author }}">@{{ filter_author }}</a>{% endif -%}
+      {%- if filter_author %} by {{ handle(filter_author, "/admin/users/" ~ filter_author) }}{% endif -%}
       {%- if filter_community %} in @{{ filter_community }}{% endif %}
     </h1>
     <p class="ds-help">{{ total }} post(s) across every user and community.</p>

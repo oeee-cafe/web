@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {# Explicit-flag control. Rendered inside post_detail.jinja and returned
    standalone by the flag endpoint, which swaps it via hx-swap="outerHTML". #}
 <section id="post-flag-panel" class="ds-card ds-stack admin-flag-panel">
@@ -8,7 +9,7 @@
         <span class="muted">
           {{ post.explicit_flagged_at|datetimeformat(format="short", tz="Asia/Seoul") }}
           {% if post.explicit_flagged_by_login_name %}
-            by <a href="/admin/users/{{ post.explicit_flagged_by_login_name }}">@{{ post.explicit_flagged_by_login_name }}</a>
+            by {{ handle(post.explicit_flagged_by_login_name, "/admin/users/" ~ post.explicit_flagged_by_login_name) }}
           {% endif %}
         </span>
       {% endif %}

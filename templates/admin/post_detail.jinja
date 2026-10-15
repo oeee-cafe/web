@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {% from "post_url_macro.jinja" import post_url %}
 {% from "storage_macro.jinja" import stored_url %}
 {% extends "admin/base.jinja" %}
@@ -59,7 +60,7 @@
         <tr>
           <th scope="row">Author</th>
           <td>
-            <a href="/admin/users/{{ post.author_login_name }}">@{{ post.author_login_name }}</a>
+            {{ handle(post.author_login_name, "/admin/users/" ~ post.author_login_name) }}
             ({{ post.author_display_name }})
           </td>
         </tr>

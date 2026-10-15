@@ -1,3 +1,4 @@
+{% from "person_macro.jinja" import handle %}
 {% from "storage_macro.jinja" import stored_url %}
 {# One banner card. Rendered inside the queue and returned standalone by the
    flag endpoint, which swaps it in place via hx-swap="outerHTML". #}
@@ -21,13 +22,13 @@
       {% endif %}
     </div>
     <div>
-      <a href="/admin/users/{{ banner.author_login_name }}">@{{ banner.author_login_name }}</a>
+      {{ handle(banner.author_login_name, "/admin/users/" ~ banner.author_login_name) }}
       <span class="muted">· {{ banner.created_at|dateformat(format="short", tz="Asia/Seoul") }}</span>
     </div>
     {% if banner.is_explicit and banner.flagged_at %}
       <div class="muted">
         flagged {{ banner.flagged_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-        {% if banner.flagged_by_login_name %}by <a href="/admin/users/{{ banner.flagged_by_login_name }}">@{{ banner.flagged_by_login_name }}</a>{% endif %}
+        {% if banner.flagged_by_login_name %}by {{ handle(banner.flagged_by_login_name, "/admin/users/" ~ banner.flagged_by_login_name) }}{% endif %}
       </div>
     {% endif %}
   </div>

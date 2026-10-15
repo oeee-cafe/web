@@ -1,11 +1,12 @@
 {% extends "admin/base.jinja" %}
+{% from "person_macro.jinja" import handle %}
 {% set admin_section = "users" %}
 {% macro when(at) %}{% if at %}{{ at|datetimeformat(format="short", tz="Asia/Seoul") }}{% else %}<span class="muted">never</span>{% endif %}{% endmacro %}
 {% block admin_content %}
   {# One account, deleted or not (handlers/admin/lists.rs): its row, and
      what hangs off it. Every username on the admin pages leads here. #}
   <div class="admin-head">
-    <h1 class="admin-title">@{{ user.login_name }}</h1>
+    <h1 class="admin-title">{{ user.display_name }} {{ handle(user.login_name, false) }}</h1>
     <p class="admin-tags">
       {% if user.role != "user" %}<span class="admin-tag">{{ user.role }}</span>{% endif %}
       {% if user.deleted_at %}<span class="admin-tag deleted">deleted</span>{% endif %}
@@ -107,7 +108,7 @@
                   <a href="/admin/posts/{{ pickle.post_id }}">{{ pickle.post_title or "(untitled)" }}</a>
                   {% if pickle.post_deleted_at %}<span class="admin-tag deleted">deleted</span>{% endif %}
                 </td>
-                <td><a href="/admin/users/{{ pickle.author_login_name }}">@{{ pickle.author_login_name }}</a></td>
+                <td>{{ handle(pickle.author_login_name, "/admin/users/" ~ pickle.author_login_name) }}</td>
               </tr>
             {% endfor %}
           </tbody>

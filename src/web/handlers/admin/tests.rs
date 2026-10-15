@@ -323,7 +323,8 @@ fn post_flag_panel_renders_standalone_for_htmx_swap() {
     assert!(rendered.contains("flagged explicit by staff"));
     assert!(rendered.contains("Remove explicit flag"));
     // Whoever flagged it is a way to their posts.
-    assert!(rendered.contains("href=\"/admin/users/admin\""));
+    assert!(rendered
+        .contains(r#"<a class="ds-handle" href="&#x2f;admin&#x2f;users&#x2f;admin">@admin</a>"#));
     // Flipping back must post the opposite state, not a blind toggle.
     assert!(rendered.contains("value=\"false\""));
 
@@ -396,7 +397,10 @@ fn banner_card_renders_standalone_for_htmx_swap() {
         .expect("banner_card.jinja renders standalone");
     assert!(rendered.contains("hidden from /about"));
     // Whoever flagged it is a way to their posts.
-    assert!(rendered.contains("by <a href=\"/admin/users/admin\">@admin</a>"));
+    assert!(rendered.contains(concat!(
+        "by ",
+        r#"<a class="ds-handle" href="&#x2f;admin&#x2f;users&#x2f;admin">@admin</a>"#
+    )));
     // Flipping back must post the opposite state, not a blind toggle.
     assert!(rendered.contains("value=\"false\""));
 }
@@ -473,7 +477,9 @@ fn session_list_counts_watchers_apart_from_seats() {
 #[test]
 fn session_list_links_the_owner() {
     let rendered = render_sessions(vec![sample_session(json!({}))]);
-    assert!(rendered.contains("<a href=\"/admin/users/someone\">@someone</a>"));
+    assert!(rendered.contains(
+        r#"<a class="ds-handle" href="&#x2f;admin&#x2f;users&#x2f;someone">@someone</a>"#
+    ));
 }
 
 /// The reason this page exists: a room the lobby will not list for
@@ -1147,13 +1153,18 @@ fn renders_user_detail() {
             }]),
         })
         .expect("user_detail.jinja renders");
-    assert!(rendered.contains("@fan"), "{rendered}");
+    assert!(
+        rendered.contains(r#"<h1 class="admin-title">Fan &lt;3 <span class="ds-handle">@fan</span>"#),
+        "{rendered}"
+    );
     assert!(rendered.contains("Fan &lt;3"), "{rendered}");
     assert!(rendered.contains("<code>steam-owner</code>"), "{rendered}");
     assert!(rendered.contains(">live<"), "{rendered}");
     assert!(rendered.contains("revoked"), "{rendered}");
     assert!(
-        rendered.contains(r#"href="/admin/users/painter">@painter"#),
+        rendered.contains(
+            r#"<a class="ds-handle" href="&#x2f;admin&#x2f;users&#x2f;painter">@painter</a>"#
+        ),
         "{rendered}"
     );
     assert!(rendered.contains("2026-10-12"), "{rendered}");
