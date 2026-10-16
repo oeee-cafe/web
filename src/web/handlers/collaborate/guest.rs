@@ -56,6 +56,17 @@ pub enum Collaborator {
     Guest { id: Uuid, nickname: String },
 }
 
+/// A guest is a name they typed, which staff are told as a guest's and
+/// never as a handle.
+impl From<&Collaborator> for crate::staff_webhook::Who {
+    fn from(who: &Collaborator) -> Self {
+        match who {
+            Collaborator::User { login_name, .. } => Self::Account(login_name.clone()),
+            Collaborator::Guest { nickname, .. } => Self::Guest(nickname.clone()),
+        }
+    }
+}
+
 impl Collaborator {
     pub fn from_user(user: &User) -> Self {
         Collaborator::User {

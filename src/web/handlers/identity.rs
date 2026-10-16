@@ -1966,6 +1966,10 @@ pub async fn do_identity_welcome(
         return Ok(Redirect::to("/login").into_response());
     }
     tx.commit().await?;
+    crate::staff_webhook::notify(crate::staff_webhook::Event::Signup {
+        login_name: user.login_name.to_string(),
+        provider: Some(identity.provider.display_name()),
+    });
 
     let _ = session.remove::<PendingIdentity>(PENDING_KEY).await;
     auth_session

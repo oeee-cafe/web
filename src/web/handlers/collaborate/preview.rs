@@ -740,6 +740,10 @@ pub async fn report_session_diagnostics(
             );
             // Counted where the admin list can see it, which is what makes a
             // reported session stand out there.
+            crate::staff_webhook::notify(crate::staff_webhook::Event::SyncReport {
+                room: room_uuid,
+                reporter: (&who).into(),
+            });
             if let Err(e) =
                 crate::models::collaborative_recording::note_report(&state.db_pool, room_uuid).await
             {

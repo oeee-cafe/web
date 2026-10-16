@@ -296,6 +296,11 @@ pub async fn admin_flag_post(
         .await?
         .ok_or_else(|| AppError::NotFound("Post".to_string()))?;
     tx.commit().await?;
+    crate::staff_webhook::notify(crate::staff_webhook::Event::PostFlagged {
+        post_id,
+        by: admin.0.login_name.to_string(),
+        explicit: form.is_explicit,
+    });
 
     let rendered = state
         .render(

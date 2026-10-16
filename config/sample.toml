@@ -17,6 +17,11 @@ redis_max_connections = 10
 
 official_account_login_name = ""
 
+# A Discord webhook URL staff are told of events through: Supporter Packs
+# bought and refunded, reports, rooms opened and lost, signups. A secret --
+# anybody holding it can post to the channel. Leave it out to tell nobody.
+# staff_webhook_url = ""
+
 aws_access_key_id = "aws_access_key_id"
 aws_secret_access_key = "aws_secret_access_key"
 aws_region = "aws_region"

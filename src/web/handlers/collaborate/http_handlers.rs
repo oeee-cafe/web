@@ -888,6 +888,7 @@ pub(crate) async fn insert_session(
     // (`db::viewer_may_enter`): only a public community's room is listed in
     // the lobby.
     let mut is_public = request.is_public;
+    let mut community_name = None;
     if let Some(community_id) = community_id {
         let community = find_community_by_id(&mut tx, community_id)
             .await?
@@ -902,6 +903,7 @@ pub(crate) async fn insert_session(
         if community.visibility != crate::models::community::CommunityVisibility::Public {
             is_public = false;
         }
+        community_name = Some(community.name);
     }
 
     let session_id = Uuid::new_v4();
@@ -928,6 +930,14 @@ pub(crate) async fn insert_session(
     .await?;
 
     tx.commit().await?;
+    crate::staff_webhook::notify(crate::staff_webhook::Event::RoomOpened {
+        room: session_id,
+        owner: owner.into(),
+        title: request.title,
+        width: request.width,
+        height: request.height,
+        community: community_name,
+    });
     Ok(session_id)
 }
 

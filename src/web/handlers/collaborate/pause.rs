@@ -625,6 +625,9 @@ pub async fn end_abandoned(state: &AppState) -> Result<usize, Error> {
             warn!("Failed to remove abandoned room {room_uuid}'s stored pause: {e}");
         }
         info!("Ended room {room_uuid}: paused for longer than its retention");
+        crate::staff_webhook::notify(crate::staff_webhook::Event::RoomAbandoned {
+            room: *room_uuid,
+        });
     }
     Ok(ended.len())
 }

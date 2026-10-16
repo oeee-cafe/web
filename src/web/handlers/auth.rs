@@ -114,6 +114,10 @@ pub async fn do_signup(
     }
 
     tx.commit().await?;
+    crate::staff_webhook::notify(crate::staff_webhook::Event::Signup {
+        login_name: user.login_name.to_string(),
+        provider: None,
+    });
 
     if auth_session.login(&user).await.is_err() {
         return Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response());

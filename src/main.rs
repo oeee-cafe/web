@@ -100,6 +100,7 @@ fn main() {
         .expect("Failed to build tokio runtime")
         .block_on(async {
             tracing::debug!("config: {:?}", cfg);
+            oeee_cafe::staff_webhook::start(&cfg);
 
             let template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates");
             let mut env = Environment::new();

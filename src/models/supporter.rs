@@ -208,6 +208,19 @@ pub async fn record_owned_products(
         record_purchase(tx, user_id, store, owner, pack, true).await?;
     }
     let kept: Vec<String> = owned.iter().map(|pack| pack.product.clone()).collect();
+    let revoked = query!(
+        r#"
+        SELECT supporter_purchases.product, supporter_purchases.year, users.login_name
+        FROM supporter_purchases JOIN users ON users.id = supporter_purchases.user_id
+        WHERE store = $1 AND owner = $2 AND product <> ALL($3) AND revoked_at IS NULL
+        FOR UPDATE OF supporter_purchases
+        "#,
+        store.as_str(),
+        owner,
+        &kept,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
     query!(
         r#"
         UPDATE supporter_purchases
@@ -220,6 +233,9 @@ pub async fn record_owned_products(
     )
     .execute(&mut **tx)
     .await?;
+    for pack in revoked {
+        announce(pack.login_name, store, pack.product, pack.year, false);
+    }
     match store.identity() {
         Some(provider) => touch_identity_check(tx, provider, owner).await,
         None => Ok(()),
@@ -240,6 +256,19 @@ pub async fn record_purchase(
     pack: &OwnedProduct,
     owned: bool,
 ) -> Result<()> {
+    let was_owned = query_scalar!(
+        r#"
+        SELECT revoked_at IS NULL AS "owned!" FROM supporter_purchases
+        WHERE store = $1 AND owner = $2 AND product = $3
+        FOR UPDATE
+        "#,
+        store.as_str(),
+        owner,
+        pack.product,
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .unwrap_or(false);
     query!(
         r#"
         INSERT INTO supporter_purchases (user_id, store, owner, product, year, revoked_at)
@@ -268,6 +297,12 @@ pub async fn record_purchase(
     )
     .execute(&mut **tx)
     .await?;
+    if owned != was_owned {
+        let login_name = query_scalar!("SELECT login_name FROM users WHERE id = $1", user_id)
+            .fetch_one(&mut **tx)
+            .await?;
+        announce(login_name, store, pack.product.clone(), pack.year, owned);
+    }
     Ok(())
 }
 
@@ -280,6 +315,20 @@ pub async fn record_recheck(
     product: &str,
     owned: bool,
 ) -> Result<()> {
+    let before = query!(
+        r#"
+        SELECT supporter_purchases.revoked_at IS NULL AS "owned!",
+               supporter_purchases.year, users.login_name
+        FROM supporter_purchases JOIN users ON users.id = supporter_purchases.user_id
+        WHERE store = $1 AND owner = $2 AND product = $3
+        FOR UPDATE OF supporter_purchases
+        "#,
+        store.as_str(),
+        owner,
+        product,
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
     query!(
         r#"
         UPDATE supporter_purchases
@@ -301,7 +350,39 @@ pub async fn record_recheck(
     )
     .execute(&mut **tx)
     .await?;
+    if let Some(before) = before.filter(|before| before.owned != owned) {
+        announce(
+            before.login_name,
+            store,
+            product.to_string(),
+            before.year,
+            owned,
+        );
+    }
     Ok(())
+}
+
+/// Tells staff a pack is owned that was not, or is not that was
+/// (`crate::staff_webhook`). Called from inside the transaction that records
+/// it, which is the only place the change is seen.
+fn announce(login_name: String, store: Store, product: String, year: i32, owned: bool) {
+    use crate::staff_webhook::{notify, Event};
+    let store = store.as_str();
+    notify(if owned {
+        Event::SupporterPurchased {
+            login_name,
+            store,
+            product,
+            year,
+        }
+    } else {
+        Event::SupporterRevoked {
+            login_name,
+            store,
+            product,
+            year,
+        }
+    });
 }
 
 /// The clock the Steam recheck works through, kept on the identity where

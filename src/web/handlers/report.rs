@@ -1,14 +1,13 @@
 use crate::app_error::AppError;
 use crate::models::post::find_post_by_id;
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession};
-use crate::web::i18n::{get_bundle, safe_get_message, ExtractAcceptLanguage, ExtractFtlLang};
+use crate::staff_webhook::{self, Event};
+use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::{Path, State};
 use axum::response::Html;
 use axum::response::IntoResponse;
 use axum::Form;
-use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
-use lettre::{Message, SmtpTransport, Transport};
 use minijinja::context;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -18,44 +17,32 @@ pub struct ReportPostRequest {
     pub description: String,
 }
 
-/// Mails abuse@ about a post, from the reporter's account.
+/// Tells staff about a post, in their Discord channel (`crate::staff_webhook`).
 async fn send_post_report(
     auth_session: AuthSession,
-    accept_language: &axum::http::HeaderValue,
     state: &AppState,
     post_id: Uuid,
     request: ReportPostRequest,
 ) -> Result<(), AppError> {
-    // Ensure user is authenticated
     let user = auth_session.user.ok_or(AppError::Unauthorized)?;
 
-    // Validate description
     if request.description.trim().is_empty() {
         return Err(AppError::BadRequest(
             "Report description is required".to_string(),
         ));
     }
 
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
+    let mut tx = state.db_pool.begin().await?;
+    let post = find_post_by_id(&mut tx, post_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
-    // Fetch post details
-    let post = find_post_by_id(&mut tx, post_id).await?;
-
-    if post.is_none() {
-        return Err(AppError::NotFound("Post".to_string()));
-    }
-
-    let post = post.unwrap();
-
-    // Check if post is deleted
     if post.get("deleted_at").and_then(|v| v.as_ref()).is_some() {
         return Err(AppError::BadRequest(
             "Cannot report deleted post".to_string(),
         ));
     }
 
-    // Get post author ID and check if user is trying to report their own post
     let post_author_id = post
         .get("author_id")
         .and_then(|v| v.as_ref())
@@ -68,231 +55,64 @@ async fn send_post_report(
         ));
     }
 
-    // Fetch post author details
     let post_author = find_user_by_id(&mut tx, post_author_id)
         .await?
         .ok_or_else(|| AppError::Anyhow(anyhow::anyhow!("Post author not found")))?;
-
     tx.commit().await?;
 
-    // Prepare email content
-    let post_url = crate::models::post::post_page_url(
-        &state.config.domain,
-        &post_author.login_name,
-        post.get("community_slug").and_then(|v| v.as_deref()),
+    deliver(Event::PostReported {
+        reporter: user.login_name.to_string(),
+        author: post_author.login_name.to_string(),
         post_id,
-    );
-    let reporter_profile_url = format!("https://{}/@{}", state.config.domain, user.login_name);
-    let post_author_profile_url = format!(
-        "https://{}/@{}",
-        state.config.domain, post_author.login_name
-    );
-
-    let post_title = post
-        .get("title")
-        .and_then(|v| v.as_ref())
-        .map(|s| s.as_str())
-        .unwrap_or("[No title]");
-
-    let post_content = post
-        .get("content")
-        .and_then(|v| v.as_ref())
-        .map(|s| s.as_str())
-        .unwrap_or("[No content]");
-
-    let email_body = format!(
-        "A post has been reported on oeee.cafe
-
-Reporter Information:
-- Username: {} (@{})
-- User ID: {}
-- Profile: {}
-
-Reported Post:
-- Post ID: {}
-- Title: {}
-- Content: {}
-- URL: {}
-
-Post Author:
-- Username: {} (@{})
-- User ID: {}
-- Profile: {}
-
-Report Reason:
-{}
-
----
-This is an automated report notification from oeee.cafe",
-        user.display_name,
-        user.login_name,
-        user.id,
-        reporter_profile_url,
-        post_id,
-        post_title,
-        post_content,
-        post_url,
-        post_author.display_name,
-        post_author.login_name,
-        post_author.id,
-        post_author_profile_url,
-        request.description
-    );
-
-    // Get bundle for localized from address
-    let bundle = get_bundle(accept_language, None);
-    let from_address = safe_get_message(&bundle, "email-from-address");
-
-    // Send email to abuse@oeee.cafe
-    let email_message = Message::builder()
-        .from(
-            from_address
-                .parse()
-                .map_err(|e: lettre::address::AddressError| {
-                    AppError::Anyhow(anyhow::anyhow!("Invalid from address: {}", e))
-                })?,
-        )
-        .to("abuse@oeee.cafe"
-            .parse()
-            .map_err(|e: lettre::address::AddressError| {
-                AppError::Anyhow(anyhow::anyhow!("Invalid to address: {}", e))
-            })?)
-        .subject(format!(
-            "Post Report: {} (Post ID: {})",
-            post_title, post_id
-        ))
-        .body(email_body)
-        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to build email: {}", e)))?;
-
-    let mailer = SmtpTransport::relay(&state.config.smtp_host)
-        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to create SMTP transport: {}", e)))?
-        .credentials(SmtpCredentials::new(
-            state.config.smtp_user.clone(),
-            state.config.smtp_password.clone(),
-        ))
-        .build();
-
-    mailer
-        .send(&email_message)
-        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to send email: {}", e)))?;
-
-    Ok(())
+        title: post.get("title").cloned().flatten(),
+        reason: request.description,
+    })
 }
 
-/// Mails abuse@ about a profile, from the reporter's account.
+/// Tells staff about a profile, in their Discord channel.
 async fn send_profile_report(
     auth_session: AuthSession,
-    accept_language: &axum::http::HeaderValue,
     state: &AppState,
     login_name: String,
     request: ReportPostRequest,
 ) -> Result<(), AppError> {
-    // Ensure user is authenticated
     let user = auth_session.user.ok_or(AppError::Unauthorized)?;
 
-    // Validate description
     if request.description.trim().is_empty() {
         return Err(AppError::BadRequest(
             "Report description is required".to_string(),
         ));
     }
 
-    let db = &state.db_pool;
-    let mut tx = db.begin().await?;
+    let mut tx = state.db_pool.begin().await?;
+    let reported_user = find_user_by_login_name(&mut tx, &login_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Profile".to_string()))?;
 
-    // Fetch profile details
-    let reported_user = find_user_by_login_name(&mut tx, &login_name).await?;
-
-    if reported_user.is_none() {
-        return Err(AppError::NotFound("Profile".to_string()));
-    }
-
-    let reported_user = reported_user.unwrap();
-
-    // Check if user is trying to report their own profile
     if reported_user.id == user.id {
         return Err(AppError::BadRequest(
             "You cannot report your own profile".to_string(),
         ));
     }
-
     tx.commit().await?;
 
-    // Prepare email content
-    let profile_url = format!(
-        "https://{}/@{}",
-        state.config.domain, reported_user.login_name
-    );
-    let reporter_profile_url = format!("https://{}/@{}", state.config.domain, user.login_name);
+    deliver(Event::ProfileReported {
+        reporter: user.login_name.to_string(),
+        reported: reported_user.login_name.to_string(),
+        reason: request.description,
+    })
+}
 
-    let email_body = format!(
-        "A user profile has been reported on oeee.cafe
-
-Reporter Information:
-- Username: {} (@{})
-- User ID: {}
-- Profile: {}
-
-Reported Profile:
-- Username: {} (@{})
-- User ID: {}
-- Profile: {}
-- Display Name: {}
-
-Report Reason:
-{}
-
----
-This is an automated report notification from oeee.cafe",
-        user.display_name,
-        user.login_name,
-        user.id,
-        reporter_profile_url,
-        reported_user.display_name,
-        reported_user.login_name,
-        reported_user.id,
-        profile_url,
-        reported_user.display_name,
-        request.description
-    );
-
-    // Get bundle for localized from address
-    let bundle = get_bundle(accept_language, None);
-    let from_address = safe_get_message(&bundle, "email-from-address");
-
-    // Send email to abuse@oeee.cafe
-    let email_message = Message::builder()
-        .from(
-            from_address
-                .parse()
-                .map_err(|e: lettre::address::AddressError| {
-                    AppError::Anyhow(anyhow::anyhow!("Invalid from address: {}", e))
-                })?,
-        )
-        .to("abuse@oeee.cafe"
-            .parse()
-            .map_err(|e: lettre::address::AddressError| {
-                AppError::Anyhow(anyhow::anyhow!("Invalid to address: {}", e))
-            })?)
-        .subject(format!(
-            "Profile Report: {} (@{})",
-            reported_user.display_name, reported_user.login_name
-        ))
-        .body(email_body)
-        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to build email: {}", e)))?;
-
-    let mailer = SmtpTransport::relay(&state.config.smtp_host)
-        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to create SMTP transport: {}", e)))?
-        .credentials(SmtpCredentials::new(
-            state.config.smtp_user.clone(),
-            state.config.smtp_password.clone(),
-        ))
-        .build();
-
-    mailer
-        .send(&email_message)
-        .map_err(|e| AppError::Anyhow(anyhow::anyhow!("Failed to send email: {}", e)))?;
-
+/// Hands a report to the staff webhook. A deployment without one has
+/// nowhere to send it, and the reporter is told it did not go through
+/// rather than thanked for a report nobody will read.
+fn deliver(event: Event) -> Result<(), AppError> {
+    if !staff_webhook::is_on() {
+        return Err(AppError::Anyhow(anyhow::anyhow!(
+            "staff_webhook_url is not configured, so reports go nowhere"
+        )));
+    }
+    staff_webhook::notify(event);
     Ok(())
 }
 
@@ -320,13 +140,12 @@ async fn render_report_result(
 /// POST /posts/:post_id/report
 pub async fn hx_report_post(
     auth_session: AuthSession,
-    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(post_id): Path<Uuid>,
     Form(form): Form<ReportPostRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let outcome = send_post_report(auth_session, &accept_language, &state, post_id, form).await;
+    let outcome = send_post_report(auth_session, &state, post_id, form).await;
 
     let key = match outcome {
         Ok(_) => "post-report-success",
@@ -341,14 +160,12 @@ pub async fn hx_report_post(
 /// POST /@:login_name/report
 pub async fn hx_report_profile(
     auth_session: AuthSession,
-    ExtractAcceptLanguage(accept_language): ExtractAcceptLanguage,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path(login_name): Path<String>,
     Form(form): Form<ReportPostRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let outcome =
-        send_profile_report(auth_session, &accept_language, &state, login_name, form).await;
+    let outcome = send_profile_report(auth_session, &state, login_name, form).await;
 
     let key = match outcome {
         Ok(_) => "profile-report-success",

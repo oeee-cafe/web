@@ -121,6 +121,30 @@ pub struct AppConfig {
     /// does not offer it.
     #[serde(default)]
     pub discord: Option<DiscordConfig>,
+
+    /// A Discord webhook staff are told of events through
+    /// (`crate::staff_webhook`): Supporter Packs bought and refunded,
+    /// reports, rooms, signups. Unset or empty tells nobody.
+    #[serde(default)]
+    pub staff_webhook_url: Option<SecretString>,
+}
+
+/// A secret kept as text, which a config's `Debug` never prints: configs
+/// are logged, and a webhook's URL is all it takes to post to it.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SecretString(String);
+
+impl SecretString {
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for SecretString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(redacted(&self.0))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

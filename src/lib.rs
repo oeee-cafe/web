@@ -21,6 +21,7 @@ pub mod push;
 pub mod redis;
 pub mod relative_time;
 pub mod sanitized_html;
+pub mod staff_webhook;
 pub mod steam;
 pub mod web;
 
