@@ -8,11 +8,11 @@ use super::chrome;
 use minijinja::value::Serde;
 
 /// The heart in the toolbar is there when this deployment sells a pack
-/// at all *and* the reader is signed in -- the pack is bought against an
-/// account. Which store they are in front of hides or shows it before
+/// at all, signed in or out -- /supporter asks a reader without an account
+/// to sign in. Which store they are in front of hides or shows it before
 /// paint, and is not the template's business.
 #[test]
-fn the_toolbar_has_a_heart_only_for_a_signed_in_reader_where_a_pack_is_sold() {
+fn the_toolbar_has_a_heart_wherever_a_pack_is_sold() {
     let env = test_support::env();
     let render = |on_sale: serde_json::Value, current_user: serde_json::Value| {
         env.get_template("toolbar.jinja")
@@ -34,9 +34,11 @@ fn the_toolbar_has_a_heart_only_for_a_signed_in_reader_where_a_pack_is_sold() {
     assert!(!render(json!(false), reader.clone()).contains("toolbar-supporter"));
     assert!(!render(json!(null), reader).contains("toolbar-supporter"));
 
-    // Selling, but nobody to sell to yet: /supporter is still there to
-    // read, it is just not in the bar.
-    assert!(!render(json!(true), json!(null)).contains("toolbar-supporter"));
+    // Selling, and nobody signed in: the heart is there, an outline.
+    let signed_out = render(json!(true), json!(null));
+    assert!(signed_out
+        .contains(r#"class="toolbar-square toolbar-button toolbar-supporter" href="/supporter""#));
+    assert!(!signed_out.contains("toolbar-supporter-thanked"));
 }
 
 /// A reader with this year's pack has the heart filled in, rose; anyone

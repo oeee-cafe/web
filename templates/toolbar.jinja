@@ -126,10 +126,9 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
       </a>
       {# The Supporter Pack: a heart, after search, leading to /supporter.
-         For someone signed in only: the pack is bought against an account,
-         and the bar signed out is already asking for something else.
-         Someone reading without one meets it after joining, on the page
-         rather than in the bar. Which store can take the money is the
+         Signed out too: the pack is bought against an account, and
+         /supporter asks a reader without one to sign in first, so the
+         heart is where they learn there is a pack at all. Which store can take the money is the
          page's business (style.css). Left out of the markup entirely when
          this deployment has no pack for sale.
 
@@ -139,7 +138,7 @@
          in: the bar's thanks, and the one thing buying it changes here.
          Draw's filled weight is a fill of the button; this is a fill of
          the mark, on an unfilled button. #}
-      {% if supporter_packs_on_sale and current_user %}
+      {% if supporter_packs_on_sale %}
         <a class="toolbar-square toolbar-button toolbar-supporter{% if current_user_is_supporter %} toolbar-supporter-thanked{% endif %}" href="/supporter"
            aria-label="{{ ftl_get_message("supporter-pack") }}" title="{{ ftl_get_message("supporter-pack") }}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if current_user_is_supporter %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3 5.2 13.5a4.5 4.5 0 0 1 6.8-5.9 4.5 4.5 0 0 1 6.8 5.9z"/></svg>
