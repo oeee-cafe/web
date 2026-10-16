@@ -4,10 +4,12 @@ use sqlx::{Postgres, Transaction};
 use crate::app_error::AppError;
 use crate::models::notification::get_badge_count;
 use crate::models::post::get_draft_post_count;
+use crate::models::supporter::mark_for;
 use crate::models::user::User;
 
 /// What the site's chrome around every page reads from its context: who is
-/// signed in, the toolbar's two counts, and the page's language.
+/// signed in, the toolbar's two counts, whether they have this year's
+/// Supporter Pack, and the page's language.
 ///
 /// Built inside the handler's transaction, after anything the handler wrote,
 /// so a page drawn after publishing a draft counts one draft fewer.
@@ -17,6 +19,9 @@ pub struct CommonContext {
     pub current_user: Option<User>,
     pub draft_post_count: i64,
     pub unread_notification_count: i64,
+    /// Whether the reader bought this year's pack, which fills the toolbar's
+    /// heart in: the bar's thanks, where everyone else has an outline.
+    pub current_user_is_supporter: bool,
     pub ftl_lang: String,
 }
 
@@ -31,18 +36,21 @@ impl CommonContext {
         user: Option<&User>,
         ftl_lang: &str,
     ) -> Result<Self, AppError> {
-        let (draft_post_count, unread_notification_count) = match user {
+        let (draft_post_count, unread_notification_count, current_user_is_supporter) = match user
+        {
             Some(user) => (
                 get_draft_post_count(tx, user.id).await?,
                 get_badge_count(tx, user.id).await?,
+                mark_for(tx, user.id).await?.is_some(),
             ),
-            None => (0, 0),
+            None => (0, 0, false),
         };
 
         Ok(CommonContext {
             current_user: user.cloned(),
             draft_post_count,
             unread_notification_count,
+            current_user_is_supporter,
             ftl_lang: ftl_lang.to_string(),
         })
     }
@@ -60,6 +68,7 @@ impl CommonContext {
             current_user: None,
             draft_post_count: 0,
             unread_notification_count: 0,
+            current_user_is_supporter: false,
             ftl_lang: ftl_lang.to_string(),
         }
     }
@@ -100,6 +109,7 @@ mod tests {
             current_user: Some(user()),
             draft_post_count: 3,
             unread_notification_count: 0,
+            current_user_is_supporter: false,
             ftl_lang: "ja".to_string(),
         };
         let rendered = test_support::env()

@@ -39,6 +39,32 @@ fn the_toolbar_has_a_heart_only_for_a_signed_in_reader_where_a_pack_is_sold() {
     assert!(!render(json!(true), json!(null)).contains("toolbar-supporter"));
 }
 
+/// A reader with this year's pack has the heart filled in, rose; anyone
+/// else has the outline, which only turns rose under the pointer.
+#[test]
+fn the_toolbar_heart_is_filled_in_for_this_years_supporters() {
+    let env = test_support::env();
+    let render = |supporter: bool| {
+        env.get_template("toolbar.jinja")
+            .expect("toolbar loads")
+            .render(context! {
+                supporter_packs_on_sale => true,
+                current_user => Serde(json!({"login_name": "oeee", "display_name": "오이"})),
+                current_user_is_supporter => supporter,
+                ..chrome()
+            })
+            .expect("toolbar renders")
+    };
+
+    let thanked = render(true);
+    assert!(thanked.contains("toolbar-supporter toolbar-supporter-thanked"));
+    assert!(thanked.contains(r#"fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3"#));
+
+    let asked = render(false);
+    assert!(!asked.contains("toolbar-supporter-thanked"));
+    assert!(asked.contains(r#"fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3"#));
+}
+
 /// Search in the bar is a button for the quick switcher (jump.jinja),
 /// the one Ctrl+K opens, and no longer a field of its own. It is a link
 /// to /search underneath, which is where it goes with no script.

@@ -123,6 +123,8 @@
   --ds-accent-line: rgba(60, 103, 18, 0.35);
   /* Signals. */
   --ds-badge: #ef842d;
+  /* The supporter heart's rose (toolbar.jinja): only ever on the heart. */
+  --ds-heart: #c2416c;
   --ds-danger: #dc2626;
   --ds-danger-hover: #b91c1c;
   --ds-danger-ink: #ffffff;
@@ -163,6 +165,7 @@
     --ds-press: rgba(255, 255, 255, 0.1);
     --ds-focus: #c4ee62;
     --ds-badge: #ff8c00;
+    --ds-heart: #ed93b1;
     --ds-danger: #ef4444;
     --ds-danger-hover: #dc2626;
     --ds-success-surface: #26361c;
@@ -197,6 +200,7 @@
   --ds-press: rgba(255, 255, 255, 0.1);
   --ds-focus: #c4ee62;
   --ds-badge: #ff8c00;
+  --ds-heart: #ed93b1;
   --ds-danger: #ef4444;
   --ds-danger-hover: #dc2626;
   --ds-success-surface: #26361c;
@@ -1049,6 +1053,22 @@ html:not([data-app="windows"]):has(> body.ds-page) {
 
 .toolbar-end .toolbar-button:visited {
   color: var(--ds-ink);
+}
+
+/* The supporter heart: an outline in ink like its neighbours, warming to
+   rose under the pointer. Someone who has bought this year's pack has it
+   rose and filled in, which is the bar saying thank you rather than asking
+   again -- the rose is not red, which here means danger, and not the
+   lime that means "do this". */
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .toolbar-end .toolbar-supporter:hover {
+    color: var(--ds-heart);
+  }
+}
+
+.toolbar-end .toolbar-supporter-thanked,
+.toolbar-end .toolbar-supporter-thanked:visited {
+  color: var(--ds-heart);
 }
 
 /* Unread lights the button the way Draw is lit, the accent's lime with its

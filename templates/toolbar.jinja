@@ -134,13 +134,15 @@
          this deployment has no pack for sale.
 
          Drawn as its neighbours are: no fill, a 2px round stroke, 16px in
-         a 30px square (ds.css, .toolbar-square). The filled weight in
-         this bar is the Draw button's, and belongs to the one control that
-         is filled in. #}
+         a 30px square (ds.css, .toolbar-square), turning rose under the
+         pointer. Someone who has this year's pack has it rose and filled
+         in: the bar's thanks, and the one thing buying it changes here.
+         Draw's filled weight is a fill of the button; this is a fill of
+         the mark, on an unfilled button. #}
       {% if supporter_packs_on_sale and current_user %}
-        <a class="toolbar-square toolbar-button toolbar-supporter" href="/supporter"
+        <a class="toolbar-square toolbar-button toolbar-supporter{% if current_user_is_supporter %} toolbar-supporter-thanked{% endif %}" href="/supporter"
            aria-label="{{ ftl_get_message("supporter-pack") }}" title="{{ ftl_get_message("supporter-pack") }}">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3 5.2 13.5a4.5 4.5 0 0 1 6.8-5.9 4.5 4.5 0 0 1 6.8 5.9z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if current_user_is_supporter %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.3 5.2 13.5a4.5 4.5 0 0 1 6.8-5.9 4.5 4.5 0 0 1 6.8 5.9z"/></svg>
         </a>
       {% endif %}
       {% if current_user %}
