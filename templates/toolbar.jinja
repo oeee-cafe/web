@@ -364,38 +364,120 @@
         nav.classList.add("is-bare");
       };
       window.oeeeFitToolbar();
-      // The content area scrolls, not the window, and browsers only restore
-      // the window's own scroll when you go back -- so where you were is
-      // kept here, per page, and put back on a full load that came from the
-      // history. Going back within the site is htmx's history cache
-      // (base.jinja), which keeps every scrolled element's place itself.
+      // On a wide screen the content area scrolls, not the window, and
+      // browsers only restore the window's own scroll when you go back -- so
+      // where you were is kept here, per page, and put back on a full load
+      // that came from the history or a reload. Going back within the site
+      // is htmx's history cache (base.jinja), which keeps every scrolled
+      // element's place itself.
       // And the content area takes the keyboard's focus when
       // nothing else has it, so Page Down scrolls it without a click first.
       // The toolbar comes before <main> in the page, so on a full load this
       // waits for it; after a boosted swap it is already there.
+      // What scrolls: the content area on a wide screen, the window on a
+      // phone and in the handheld apps (ds.css, "The content area").
+      function scrollerOf(content) {
+        var overflow = window.getComputedStyle(content).overflowY;
+        return overflow === "auto" || overflow === "scroll"
+          ? content : (document.scrollingElement || document.documentElement);
+      }
+      function scrollKey() {
+        return "oeee-scroll:" + location.pathname + location.search;
+      }
+      // An infinite list's sentinel that pulls more of the page itself, not
+      // one at the foot of a list that scrolls on its own inside it (the
+      // comments beside a feed, comments_fragment.jinja).
+      function pageSentinel(content) {
+        var sentinels = content.querySelectorAll(".infinite-scroll-sentinel[hx-get]");
+        outer: for (var i = sentinels.length - 1; i >= 0; i--) {
+          for (var up = sentinels[i].parentElement; up && up !== content; up = up.parentElement) {
+            var overflow = window.getComputedStyle(up).overflowY;
+            if (overflow === "auto" || overflow === "scroll") continue outer;
+          }
+          return sentinels[i];
+        }
+        return null;
+      }
+      // A full load of an infinitely scrolling page has only its first batch,
+      // too short to scroll to where the reader was, and putting it back
+      // there clamps it to the foot of that batch. So the batches
+      // they had seen are fetched again, one after another as the sentinel
+      // would have, until the page is long enough -- and the place put back
+      // then. Given up the moment the reader scrolls for themselves.
+      function returnTo(content, top) {
+        var scroller = scrollerOf(content);
+        var stopped = false;
+        var batches = 0;
+        var events = ["wheel", "touchstart", "keydown", "mousedown"];
+        function stop() {
+          stopped = true;
+          for (var e = 0; e < events.length; e++) window.removeEventListener(events[e], stop, true);
+        }
+        for (var e = 0; e < events.length; e++) window.addEventListener(events[e], stop, true);
+        function step() {
+          if (stopped) return;
+          var sentinel = pageSentinel(content);
+          if (scroller.scrollHeight - scroller.clientHeight >= top || !sentinel || !window.htmx || batches++ >= 50) {
+            scroller.scrollTop = top;
+            stop();
+            return;
+          }
+          // The sentinel may already be on its way, revealed by the reader
+          // or by htmx; then this only waits for it.
+          if (!sentinel.classList.contains("htmx-request")) {
+            window.htmx.ajax("GET", sentinel.getAttribute("hx-get"), {
+              source: sentinel,
+              target: sentinel,
+              swap: "outerHTML"
+            });
+          }
+          var waited = 0;
+          (function wait() {
+            if (stopped) return;
+            if (!sentinel.isConnected) return step();
+            if ((waited += 50) > 10000) return stop();
+            setTimeout(wait, 50);
+          })();
+        }
+        // The browser's own restore would clamp the window to the foot of
+        // the first batch, reveal the sentinel and send it for the batch
+        // asked for here a second time. This page puts its place back itself.
+        try {
+          history.scrollRestoration = "manual";
+        } catch (error) {}
+        step();
+      }
       function settleContent() {
         var content = document.querySelector("main.ds-content");
         if (!content) return;
-        var key = "oeee-scroll:" + location.pathname + location.search;
         var entry = window.performance && performance.getEntriesByType
           ? performance.getEntriesByType("navigation")[0] : null;
-        var returning = !window.oeeeSettledOnce && entry && entry.type === "back_forward";
+        var returning = !window.oeeeSettledOnce && entry &&
+          (entry.type === "back_forward" || entry.type === "reload");
         window.oeeeSettledOnce = true;
         if (returning) {
+          var top = 0;
           try {
-            var top = parseInt(sessionStorage.getItem(key), 10);
-            if (top > 0) content.scrollTop = top;
+            top = parseInt(sessionStorage.getItem(scrollKey()), 10);
           } catch (error) {}
+          if (top > 0) returnTo(content, top);
         }
         var pending;
-        content.addEventListener("scroll", function () {
+        function remember() {
           clearTimeout(pending);
           pending = setTimeout(function () {
+            var scroller = document.querySelector("main.ds-content");
+            if (!scroller) return;
             try {
-              sessionStorage.setItem(key, String(content.scrollTop));
+              sessionStorage.setItem(scrollKey(), String(scrollerOf(scroller).scrollTop));
             } catch (error) {}
           }, 100);
-        });
+        }
+        content.addEventListener("scroll", remember);
+        if (!window.oeeeRemembersWindowScroll) {
+          window.oeeeRemembersWindowScroll = true;
+          window.addEventListener("scroll", remember);
+        }
         // In the handheld apps (data-form) the page scrolls, not the content
         // area (ds.css), so there is nothing for the keyboard to scroll, and the content area
         // is not focusable at all: a tap inside it would focus it, and WebKit
