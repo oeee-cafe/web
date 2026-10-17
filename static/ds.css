@@ -2986,9 +2986,11 @@ a.ds-handle-supporter:active {
    are the browser's, 1em apiece, and `.ds-help` sets only the top one, so a
    card that opened or closed on one had a lopsided inside -- tighter above
    than below by whatever the text size made an em.
-   Only the elements that bring the browser's margins are trimmed: a row
-   written with a margin of its own -- a negative one that takes back what
-   its wrapped items carry below them, say -- keeps it. */
+   Only the elements that bring the browser's margins are trimmed, but the
+   trim outranks a class: a <p> or <ul> written with a margin of its own
+   loses it too at the card's edge. That is the point for a positive margin,
+   which would only add to the padding. A strip that reaches past the
+   padding to the card's edges is `.ds-card-foot`, below, which wins. */
 .ds-card > p:first-child,
 .ds-card > h2:first-child,
 .ds-card > h3:first-child,
@@ -3003,6 +3005,24 @@ a.ds-handle-supporter:active {
 .ds-card > ul:last-child,
 .ds-card > ol:last-child {
   margin-bottom: 0;
+}
+
+/* A strip along the foot of a card, edge to edge under a rule: it takes
+   back the card's padding at its sides and below, and pads its own sides
+   to match, so its contents line up with the rest of the card. What it
+   leaves above and below its contents is its own to say. The bottom is
+   taken back by a rule that outranks the trim above, whatever element the
+   strip is; without it a <ul> foot stood the card's padding off the edge,
+   and its contents sat further from the edge than from the rule. */
+.ds-card-foot {
+  margin: var(--ds-space-3) calc(-1 * var(--ds-space-4)) 0;
+  padding-right: var(--ds-space-4);
+  padding-left: var(--ds-space-4);
+  border-top: 1px solid var(--ds-line);
+}
+
+.ds-card > .ds-card-foot:last-child {
+  margin-bottom: calc(-1 * var(--ds-space-4));
 }
 
 /* Things one under another, one gap between each: the children's own
