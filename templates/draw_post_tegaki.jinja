@@ -77,6 +77,13 @@
           var top = Math.round(bar.getBoundingClientRect().bottom);
           tegaki.style.top = top + "px";
           tegaki.style.height = "calc(100% - " + top + "px)";
+          // Tegaki keeps the canvas's place on screen to turn a pointer
+          // into a pixel, and measured it before this moved it -- on
+          // open, and on a resize, whose own handler runs before this
+          // one. Unmeasured, every stroke lands a toolbar's height away
+          // from the pen.
+          Tegaki.updatePosOffset();
+          TegakiCursor.updateCanvasSize();
         }
 
         function onDone() {
@@ -126,6 +133,8 @@
         });
         fitUnderToolbar();
         window.addEventListener("resize", fitUnderToolbar);
+        // The bar can grow once its font arrives.
+        window.addEventListener("load", fitUnderToolbar);
 
         document.getElementById("tegaki").addEventListener("pointerdown", function () {
           securityCount++;
