@@ -1,0 +1,3 @@
+-- Nothing to undo: the rows added and the dates corrected are what
+-- award_achievements would say, and a row added here cannot be told from
+-- one it adds afterwards.
