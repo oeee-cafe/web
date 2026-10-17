@@ -478,12 +478,15 @@
           window.oeeeRemembersWindowScroll = true;
           window.addEventListener("scroll", remember);
         }
-        // In the handheld apps (data-form) the page scrolls, not the content
-        // area (ds.css), so there is nothing for the keyboard to scroll, and the content area
-        // is not focusable at all: a tap inside it would focus it, and WebKit
-        // scrolls a focused element back into view when the page comes back
-        // from the back/forward cache -- to its top, over where the reader was.
-        if (document.documentElement.getAttribute("data-form") === "handheld") {
+        // Where the page scrolls, not the content area -- a phone's browser
+        // and the handheld apps (ds.css) -- there is nothing for the keyboard
+        // to scroll, and the content area is not focusable at all: a tap
+        // inside it would focus it, and WebKit scrolls a focused element back
+        // into view when the page comes back from the back/forward cache --
+        // to its top, over where the reader was. Safari on an iPhone has no
+        // data-form, and going back to a feed there landed at its head.
+        if (document.documentElement.getAttribute("data-form") === "handheld" ||
+            scrollerOf(content) !== content) {
           content.removeAttribute("tabindex");
         } else if (!document.activeElement || document.activeElement === document.body) {
           try {
