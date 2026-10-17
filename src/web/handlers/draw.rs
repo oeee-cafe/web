@@ -142,8 +142,6 @@ pub async fn start_draw(
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Form(input): Form<Input>,
 ) -> Result<Response, AppError> {
-    let template_filename = "draw_post_cucumber.jinja";
-
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
 
@@ -190,6 +188,19 @@ pub async fn start_draw(
             Some(_) => AppError::Forbidden.into_response(),
         });
     }
+
+    // Tegaki, when an account asks for it on a plain canvas. It uploads when
+    // it is done and keeps nothing on the device, so it is no painter for a
+    // guest, and it knows nothing of a two-tone community's colours. Anyone
+    // else who asks for it -- by a stale form, or by hand -- gets Neo
+    // Cucumber, as every other tool name does.
+    let two_tone = community
+        .as_ref()
+        .is_some_and(|c| c.background_color.is_some() && c.foreground_color.is_some());
+    let template_filename = match input.tool.as_deref() {
+        Some("tegaki") if user.is_some() && !two_tone => "draw_post_tegaki.jinja",
+        _ => "draw_post_cucumber.jinja",
+    };
 
     let painter_config = serde_json::to_string(&post_painter_config(
         input.width.parse::<u32>()?,
@@ -392,11 +403,14 @@ pub async fn draw_finish(
     let paint_duration_ms = paint_duration_ms
         .ok_or_else(|| AppError::BadRequest("paint_duration_ms is required".to_string()))?;
 
-    // Every painter left records a NEO replay. Tegaki's .tgkr is still
-    // played for the posts that have one, but nothing can make a new one.
-    if !(tool == "neo" || tool == "cucumber" || tool == "neo-cucumber-offline") {
-        return Ok(StatusCode::BAD_REQUEST.into_response());
-    }
+    // Tegaki records its own format; every other painter records NEO's.
+    let (tool_enum, replay_extension, replay_content_type) = match tool.as_str() {
+        "neo" => (Tool::Neo, "pch", image_store::PCH),
+        "cucumber" => (Tool::Cucumber, "pch", image_store::PCH),
+        "neo-cucumber-offline" => (Tool::NeoCucumber, "pch", image_store::PCH),
+        "tegaki" => (Tool::Tegaki, "tgkr", image_store::TGKR),
+        _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
+    };
 
     let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
     let db = &state.db_pool;
@@ -419,13 +433,16 @@ pub async fn draw_finish(
         &client,
         &state.config.aws_s3_bucket,
         replay_data,
-        &format!("replay/{}/{}.pch", replay_prefix, replay_sha256),
+        &format!(
+            "replay/{}/{}.{}",
+            replay_prefix, replay_sha256, replay_extension
+        ),
         &BASE64.encode(&safe_decode_hash(&replay_sha256)?),
-        image_store::PCH,
+        replay_content_type,
     )
     .await?;
 
-    let replay_filename = format!("{}.pch", replay_sha256);
+    let replay_filename = format!("{}.{}", replay_sha256, replay_extension);
 
     // If creating a reply but community_id is not provided, inherit from parent post
 
@@ -438,12 +455,6 @@ pub async fn draw_finish(
         community_id = Uuid::parse_str(parent_community_id_str).ok();
     }
 
-    let tool_enum: Tool = match tool.as_str() {
-        "neo" => Tool::Neo,
-        "cucumber" => Tool::Cucumber,
-        "neo-cucumber-offline" => Tool::NeoCucumber,
-        _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
-    };
     if let Some(cid) = community_id {
         let allowed = match find_community_by_id(&mut tx, cid).await? {
             Some(community) => may_draw_in(&mut tx, Some(current_user), &community).await?,

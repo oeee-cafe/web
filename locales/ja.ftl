@@ -388,6 +388,7 @@ invitation-accepted = 招待を承諾しました
 invitation-rejected = 招待を拒否しました
 invitation-sent-at = 送信日時
 
+community-drawing-other-painters = その他のツール
 community-drawing-width = 幅
 community-drawing-height = 高さ
 community-drawing-new = 新しい絵を描く

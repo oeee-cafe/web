@@ -19,6 +19,8 @@ pub const PNG: &str = "image/png";
 /// A replay, as `replay/<ab>/<sha256>.pch`: NEO's own format, with no
 /// registered type of its own.
 pub const PCH: &str = "application/octet-stream";
+/// A Tegaki replay, as `replay/<ab>/<sha256>.tgkr`: likewise its own.
+pub const TGKR: &str = "application/octet-stream";
 
 /// Where the drawings are.
 const IMAGES: &str = "image/";

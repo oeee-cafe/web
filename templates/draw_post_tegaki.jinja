@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="{{ ftl_lang }}">
+  <head>
+    <meta charset="UTF-8">
+    {% include "theme_head.jinja" %}
+    {% include "presence_meta.jinja" %}
+    <title>
+      {% if parent_post %}Re: {{ parent_post.title }}{% else %}{{ ftl_get_message("community-drawing-new") }}{% endif %}
+      {% if community_name %} @ {{ community_name }}{% endif %}
+    </title>
+    <link rel="stylesheet"
+          href="{{ '/static/tegaki/css/tegaki.css' | cachebuster | safe }}" />
+    {# After Tegaki's own, so the toolbar is not restyled by it. #}
+    <link rel="stylesheet"
+          href="{{ '/static/ds.css' | cachebuster | safe }}" />
+    <style>
+      body { margin: 0; }
+      /* Tegaki's home and gallery links, which lead off to its own site. */
+      #tegaki-menu-bar > span:nth-child(1),
+      #tegaki-menu-bar > span:nth-child(2) {
+        display: none;
+      }
+    </style>
+    <script src="{{ '/static/tegaki/js/strings/en.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/tool.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/brush.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/pencil.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/pen.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/airbrush.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/blur.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/bucket.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/eraser.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/pipette.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/tools/tone.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/$T.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/cursor.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/history.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/layers.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/keybinds.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/palettes.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/ui.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/pressure.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/replayevents.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/replayrecorder.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/binary.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/js/main.js' | cachebuster | safe }}"></script>
+    <script src="{{ '/static/tegaki/lib/UZIP/UZIP.js' | cachebuster | safe }}"></script>
+  </head>
+  <body>
+    {# Only an account is sent here (`draw::start_draw`): Tegaki uploads when
+       it is done and keeps nothing on the device. #}
+    {% include "toolbar.jinja" %}
+    {% include "draw_dialog.jinja" %}
+    <script type="text/javascript">
+      (function () {
+        var securityCount = 0;
+
+        // Tegaki keeps nothing on the device, so leaving -- by the toolbar,
+        // say -- loses the drawing, and Tegaki asks first. It asks even of
+        // an empty canvas; this asks only once there is something on the
+        // undo stack, as the painter answers the apps' wouldLoseWork()
+        // (app_bridge.jinja). Set before open(), which hooks it up; Tegaki
+        // unhooks it itself when Finish or Cancel takes the page away.
+        Tegaki.onTabClose = function (event) {
+          if (TegakiHistory.undoStack.length === 0) return;
+          event.preventDefault();
+          event.returnValue = "";
+        };
+
+        // Tegaki fills the viewport from the top. It starts under the
+        // toolbar instead, so the page has the same bar as every other;
+        // measured, since the bar is taller under a notch.
+        function fitUnderToolbar() {
+          var bar = document.querySelector(".nav-bar");
+          var tegaki = document.getElementById("tegaki");
+          if (!bar || !tegaki) return;
+          var top = Math.round(bar.getBoundingClientRect().bottom);
+          tegaki.style.top = top + "px";
+          tegaki.style.height = "calc(100% - " + top + "px)";
+        }
+
+        function onDone() {
+          Tegaki.replayRecorder.stop();
+          var image = Tegaki.flatten();
+          var animation = Tegaki.replayRecorder.toBlob();
+
+          var form = new FormData();
+          form.append("image", image.toDataURL("image/png"));
+          form.append("animation", animation, "blob");
+          form.append("community_id", {{ (community_id or "") | tojson }});
+          form.append("paint_duration_ms", String(Math.max(0, Date.now() - Tegaki.startTimeStamp)));
+          form.append("security_count", String(securityCount));
+          form.append("width", String(image.width));
+          form.append("height", String(image.height));
+          form.append("tool", "tegaki");
+{% if parent_post_id %}
+          form.append("parent_post_id", {{ parent_post_id | tojson }});
+{% endif %}
+
+          fetch("/draw/finish", { method: "POST", body: form, credentials: "same-origin" })
+            .then(function (response) {
+              if (!response.ok) throw new Error("HTTP " + response.status);
+              return response.json();
+            })
+            .then(function (data) {
+              location.href = "/posts/" + data.post_id + "/publish";
+            })
+            .catch(function () {
+              alert({{ ftl_get_message("community-drawing-post-error") | tojson }});
+              // Done hid the painter; give the drawing back to keep at.
+              Tegaki.resume();
+              fitUnderToolbar();
+            });
+        }
+
+        function onCancel() {
+          location.href = {{ (("/posts/" ~ parent_post_id) if parent_post_id else (("/communities/@" ~ community_slug) if community_slug else "/")) | tojson }};
+        }
+
+        Tegaki.open({
+          saveReplay: true,
+          onDone: onDone,
+          onCancel: onCancel,
+          width: {{ width }},
+          height: {{ height }}
+        });
+        fitUnderToolbar();
+        window.addEventListener("resize", fitUnderToolbar);
+
+        document.getElementById("tegaki").addEventListener("pointerdown", function () {
+          securityCount++;
+        });
+      })();
+    </script>
+  </body>
+</html>

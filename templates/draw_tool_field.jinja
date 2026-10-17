@@ -1,0 +1,23 @@
+{# Which painter a plain canvas opens in, for the three dialogs that ask for
+   one: the toolbar's (draw_dialog.jinja), a community's and a reply's. Neo
+   Cucumber is the painter; Tegaki is kept for whoever wants it, behind a
+   disclosure that starts closed. A closed <details> still submits what is in
+   it, so the form says tool=neo unless Tegaki was picked.
+
+   A two-tone community's dialogs do not include this: Tegaki knows nothing of
+   the community's two colours. And Tegaki is offered to an account only: it
+   uploads when it is done and keeps nothing on the device, so a guest's
+   drawing would have nowhere to go. #}
+{% if current_user %}
+  <details class="community-draw-more">
+    <summary>{{ ftl_get_message('community-drawing-other-painters') }}</summary>
+    <label class="community-draw-choice">
+      <input type="radio" name="tool" value="neo" checked /> Neo Cucumber
+    </label>
+    <label class="community-draw-choice">
+      <input type="radio" name="tool" value="tegaki" /> Tegaki
+    </label>
+  </details>
+{% else %}
+  <input type="hidden" name="tool" value="neo" />
+{% endif %}

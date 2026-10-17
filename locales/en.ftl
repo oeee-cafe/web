@@ -424,6 +424,7 @@ invitation-accepted = Invitation accepted
 invitation-rejected = Invitation rejected
 invitation-sent-at = Sent
 
+community-drawing-other-painters = Other painters
 community-drawing-width = Width
 community-drawing-height = Height
 community-drawing-new = New post

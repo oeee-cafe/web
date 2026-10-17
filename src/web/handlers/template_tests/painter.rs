@@ -280,3 +280,80 @@ fn a_guest_can_start_a_drawing_and_find_its_drafts() {
     let words = json_script(&rendered, "local-drafts-words");
     assert_eq!(words["communityDenied"], "drafts-local-community-denied");
 }
+
+/// Tegaki is offered on a plain canvas to an account, and never to a guest:
+/// it uploads when it is done and keeps nothing on the device.
+#[test]
+fn only_an_account_is_offered_tegaki() {
+    let env = test_support::env();
+    let dialog = |chrome: minijinja::Value| {
+        let rendered = env
+            .get_template("draft_posts.jinja")
+            .expect("drafts template loads")
+            .render(context! { posts => Serde(Vec::<serde_json::Value>::new()), ..chrome })
+            .expect("drafts render");
+        let start = rendered.find(r#"id="draw-dialog""#).expect("the size dialog");
+        let end = start + rendered[start..].find("</form>").expect("the form closes");
+        rendered[start..end].to_string()
+    };
+
+    let guest = dialog(guest_chrome());
+    assert!(guest.contains(r#"<input type="hidden" name="tool" value="neo" />"#));
+    assert!(!guest.contains("tegaki"));
+
+    let account = dialog(context! {
+        current_user => Serde(json!({"login_name": "someone", "display_name": "Someone"})),
+        ..chrome()
+    });
+    // A minor choice: behind a disclosure that starts closed, after the
+    // size, with Neo Cucumber already picked.
+    let more = account
+        .find(r#"<details class="community-draw-more">"#)
+        .expect("the other painters, behind a disclosure");
+    assert!(more > account.find(r#"<select name="height""#).unwrap());
+    assert!(account.contains(r#"<input type="radio" name="tool" value="neo" checked />"#));
+    assert!(account.contains(r#"<input type="radio" name="tool" value="tegaki" />"#));
+    assert!(!account.contains(r#"type="hidden" name="tool""#));
+}
+
+/// The Tegaki painter sits under the toolbar like every other page, posts
+/// what `/draw/finish` asks for, and hands the form's own values to its
+/// script as JSON rather than inside a quoted string.
+#[test]
+fn the_tegaki_painter_posts_a_tegaki_replay() {
+    let env = test_support::env();
+    let rendered = env
+        .get_template("draw_post_tegaki.jinja")
+        .expect("tegaki template loads")
+        .render(context! {
+            width => 400,
+            height => 300,
+            community_id => r#"x"); alert(1); ("#,
+            community_slug => "open",
+            parent_post => Serde(json!(null)),
+            parent_post_id => Serde(json!(null)),
+            presence => Serde(json!({"activity": "drawing", "community": null, "group": null})),
+            current_user => Serde(json!({"login_name": "someone", "display_name": "Someone"})),
+            ..chrome()
+        })
+        .expect("tegaki painter renders");
+    let nav = rendered.find("<nav class=\"nav-bar\"").expect("the toolbar");
+    assert!(nav < rendered.find("Tegaki.open(").unwrap());
+    assert!(rendered.find("tegaki.css").unwrap() < rendered.find("/static/ds.css").unwrap());
+    assert!(rendered.contains(r#"id="draw-dialog""#));
+    assert!(rendered.contains(r#"form.append("tool", "tegaki");"#));
+    assert!(rendered.contains(r#"form.append("paint_duration_ms""#));
+    // It keeps nothing on the device, so leaving with a drawing asks first.
+    assert!(rendered.contains("Tegaki.onTabClose = function (event) {"));
+    assert!(
+        rendered.find("Tegaki.onTabClose").unwrap() < rendered.find("Tegaki.open(").unwrap(),
+        "replaced before open() hooks it up"
+    );
+    assert!(rendered.contains("width: 400,"));
+    assert!(
+        rendered.contains(r#"form.append("community_id", "x\"); alert(1); (");"#),
+        "community_id stays one string"
+    );
+    assert!(rendered.contains(r#""/communities/@open""#), "Cancel goes back to the community");
+    assert!(!rendered.contains("parent_post_id"));
+}

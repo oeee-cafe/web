@@ -388,6 +388,7 @@ invitation-accepted = 초대를 수락했습니다
 invitation-rejected = 초대를 거절했습니다
 invitation-sent-at = 보낸 시각
 
+community-drawing-other-painters = 다른 그림판
 community-drawing-width = 너비
 community-drawing-height = 높이
 community-drawing-new = 새 그림 그리기

@@ -3941,6 +3941,14 @@ a.ds-handle-supporter:active {
   margin-top: var(--ds-space-2);
 }
 
+/* The painters besides Neo Cucumber: a minor choice, closed until asked
+   for, and quieter than the fields above it. */
+.community-draw-more {
+  margin-top: var(--ds-space-2);
+  color: var(--ds-muted);
+  font-size: var(--ds-text-m);
+}
+
 .community-draw-size {
   display: flex;
   align-items: flex-end;

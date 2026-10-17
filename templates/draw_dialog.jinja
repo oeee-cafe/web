@@ -16,7 +16,6 @@
   <div class="ds-modal-panel">
     <h2 id="draw-dialog-title" tabindex="-1">{{ ftl_get_message("community-drawing-new") }}</h2>
     <form action="/draw" method="post">
-      <input type="hidden" name="tool" value="neo" />
       <div class="form-field community-draw-size">
         <label>
           <span class="ds-label">{{ ftl_get_message('community-drawing-width') }}</span>
@@ -36,6 +35,7 @@
           </select>
         </label>
       </div>
+      {% include "draw_tool_field.jinja" %}
       <div class="form-actions community-draw-actions">
         <button type="button" class="ds-button" data-draw-dialog-cancel>{{ ftl_get_message("cancel") }}</button>
         <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("community-drawing-new") }}</button>

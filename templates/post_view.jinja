@@ -312,7 +312,6 @@
           </form>
         {% else %}
           <form action="/draw" method="post">
-            <input type="hidden" name="tool" value="neo" />
             <input type="hidden" name="parent_post_id" value="{{ post_id }}" />
             {% if post.community_id %}
               <input type="hidden" name="community_id" value="{{ post.community_id }}" />
@@ -336,6 +335,7 @@
                 </select>
               </label>
             </div>
+            {% include "draw_tool_field.jinja" %}
             <div class="form-actions community-draw-actions">
               <button type="button" class="ds-button" onclick="hidePostDrawModal()">{{ ftl_get_message("cancel") }}</button>
               <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-reply-with-drawing") }}</button>
