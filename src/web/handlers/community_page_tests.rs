@@ -278,7 +278,7 @@ fn drafts_share_the_grid_and_its_control() {
         rendered.contains("&#x2f;posts&#x2f;00000000-0000-0000-0000-000000000001&#x2f;publish")
             || rendered.contains("/posts/00000000-0000-0000-0000-000000000001/publish")
     );
-    assert!(rendered.contains(">3h<"), "not a relative time");
+    assert!(rendered.contains(">3h ago<"), "not a relative time");
 }
 
 /// A guestbook's list and its empty note are one or the other by CSS

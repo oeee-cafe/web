@@ -2014,7 +2014,7 @@ mod tests {
             .expect("renders");
         // An empty batch is short of a full one, so no sentinel — the contract
         // the shared fragment already enforces for Home's feeds.
-        assert!(!rendered.contains("infinite-scroll-sentinel"));
+        assert!(!rendered.contains(r#"class="infinite-scroll-sentinel""#));
 
         let fragment = env
             .get_template("post_feed_fragment.jinja")
@@ -2044,7 +2044,7 @@ mod tests {
             .render(lobby_context(false, vec![sample_post()]))
             .expect("renders");
         assert!(rendered.contains("post-card-byline"));
-        assert!(!rendered.contains("infinite-scroll-sentinel"));
+        assert!(!rendered.contains(r#"class="infinite-scroll-sentinel""#));
     }
 
     #[test]

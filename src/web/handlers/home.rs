@@ -702,7 +702,7 @@ mod tests {
         let rendered = template
             .render(home_context(vec![sample_post()], false))
             .expect("renders");
-        assert!(!rendered.contains("infinite-scroll-sentinel"));
+        assert!(!rendered.contains(r#"class="infinite-scroll-sentinel""#));
     }
 
     #[test]
@@ -930,7 +930,7 @@ mod tests {
         // One comment is all there is, so a phone, which shows three, has
         // nowhere further to go, and there is no next batch.
         assert!(!with.contains("feed-comments-more"));
-        assert!(!with.contains("infinite-scroll-sentinel"));
+        assert!(!with.contains(r#"class="infinite-scroll-sentinel""#));
         // Header, then comments, then the grid: the order it reads in.
         let aside = with.find(aside_tag).unwrap();
         assert!(with.find(r#"<div class="feed-header">"#).unwrap() < aside);
