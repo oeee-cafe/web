@@ -441,8 +441,8 @@ pub enum CommentScope {
 /// drawing it is on would: published, not deleted, and sensitive only for
 /// a viewer who shows sensitive drawings or drew it -- the thumbnail is
 /// the drawing, so a list that ignored this would show what the grid
-/// beside it blurs or hides. An artist answering on their own drawing is
-/// left out; what the list is for is what others said.
+/// beside it blurs or hides. Everything said is listed, replies and the
+/// artist's own words on their drawing included.
 ///
 /// `after` is the last comment of the previous batch, for a list that loads
 /// as it is scrolled. Paging by it rather than by offset keeps a batch from
@@ -498,7 +498,6 @@ pub async fn find_recent_comments(
         WHERE posts.published_at IS NOT NULL
         AND posts.deleted_at IS NULL
         AND comments.deleted_at IS NULL
-        AND (actors.user_id IS NULL OR actors.user_id != posts.author_id)
         AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $1 OR posts.author_id = $2)
         AND (NOT $3 OR posts.community_id IS NULL OR communities.visibility = 'public')
         AND ($4::uuid IS NULL OR posts.community_id = $4)
