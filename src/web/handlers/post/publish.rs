@@ -167,7 +167,7 @@ pub async fn post_publish(
     // whichever query ran next and made it unattributable.
     set_post_tags(&mut tx, post_id, form.tags.as_deref()).await?;
 
-    // A first drawing, or a first relay.
+    // A first drawing.
     award_achievements(&mut tx, user_id).await?;
 
     // Find the actor for this user to send ActivityPub activities

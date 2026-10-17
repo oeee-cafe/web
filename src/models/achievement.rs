@@ -1,5 +1,5 @@
-//! Achievements: a first drawing, a first relay, a first collaboration, a
-//! week and a month of drawing every day.
+//! Achievements: a first drawing, a first collaboration, a week and a
+//! month of drawing every day.
 //!
 //! Earned from what is already in the database rather than from events, so
 //! [`award_achievements`] can be called whenever anything might have earned
@@ -24,9 +24,8 @@ use sqlx::{query, Postgres, Transaction};
 /// `user_achievements_achievement_check` constraint; the profile names each
 /// from `achievement-<key>` and `achievement-<key>-description` in every
 /// locale, and a test holds all three together.
-pub const ALL: [&str; 6] = [
+pub const ALL: [&str; 5] = [
     "FIRST_DRAWING",
-    "FIRST_RELAY",
     "FIRST_COLLABORATION",
     "STEAM_SUPPORTER",
     "STREAK_7",
@@ -55,13 +54,6 @@ pub async fn award_achievements(tx: &mut Transaction<'_, Postgres>, user_id: Uui
             WHERE EXISTS (
                 SELECT 1 FROM posts
                 WHERE author_id = $1 AND published_at IS NOT NULL
-            )
-            UNION ALL
-            SELECT 'FIRST_RELAY'
-            WHERE EXISTS (
-                SELECT 1 FROM posts
-                WHERE author_id = $1 AND published_at IS NOT NULL
-                  AND parent_post_id IS NOT NULL
             )
             UNION ALL
             -- Everyone who drew in the room, not only its owner, whose name
@@ -492,7 +484,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn drawings_and_relays_are_earned_once_published() {
+    async fn drawings_are_earned_once_published() {
         let Some(mut tx) = tx().await else { return };
         let artist = user(&mut tx, "achievement_test_a").await;
         let first = post(&mut tx, artist, false, None).await;
@@ -509,13 +501,11 @@ mod tests {
         award_achievements(&mut tx, artist).await.unwrap();
         assert_eq!(earned(&mut tx, artist).await, ["FIRST_DRAWING"]);
 
+        // A relay is a drawing like any other: it earns nothing of its own.
         post(&mut tx, artist, true, Some(first)).await;
         award_achievements(&mut tx, artist).await.unwrap();
         award_achievements(&mut tx, artist).await.unwrap();
-        assert_eq!(
-            earned(&mut tx, artist).await,
-            ["FIRST_DRAWING", "FIRST_RELAY"]
-        );
+        assert_eq!(earned(&mut tx, artist).await, ["FIRST_DRAWING"]);
         tx.rollback().await.unwrap();
     }
 

@@ -808,7 +808,7 @@ mod tests {
             openid_url: String::new(),
         };
 
-        let achievements = ["FIRST_DRAWING".to_string(), "FIRST_RELAY".to_string()];
+        let achievements = ["FIRST_DRAWING".to_string(), "FIRST_COLLABORATION".to_string()];
         set_achievements(&config, STEAM_ID, &achievements, true)
             .await
             .unwrap();
@@ -818,7 +818,7 @@ mod tests {
         assert_eq!(form["count"], "2");
         assert_eq!(form["name[0]"], "FIRST_DRAWING");
         assert_eq!(form["value[0]"], "1");
-        assert_eq!(form["name[1]"], "FIRST_RELAY");
+        assert_eq!(form["name[1]"], "FIRST_COLLABORATION");
         assert_eq!(form["value[1]"], "1");
 
         // Taken back: the same names, locked.
