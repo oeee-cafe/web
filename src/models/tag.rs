@@ -506,16 +506,20 @@ pub async fn find_tag_by_name(
     tx: &mut Transaction<'_, Postgres>,
     name: &str,
 ) -> Result<Option<Tag>> {
+    // The `!`s: sqlx reads nullability off the plan, and against a database
+    // with rows in it the planner turns this into a right join with `tags`
+    // on the nullable side, so the same query checks on an empty database
+    // and fails on one that has been used.
     let tag = sqlx::query_as!(
         Tag,
         r#"
         SELECT
-            h.id,
-            h.name,
-            h.display_name,
+            h.id AS "id!",
+            h.name AS "name!",
+            h.display_name AS "display_name!",
             COALESCE(s.post_count, 0) AS "post_count!",
-            h.created_at,
-            h.updated_at
+            h.created_at AS "created_at!",
+            h.updated_at AS "updated_at!"
         FROM tags h
         LEFT JOIN tag_stats s ON s.tag_id = h.id
         WHERE h.name = $1
