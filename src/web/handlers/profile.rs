@@ -20,8 +20,8 @@ use crate::models::notification::{
 };
 use crate::models::pickle;
 use crate::models::post::{
-    count_profile_posts, find_profile_posts, find_published_public_posts_by_author_id,
-    ProfileDrawings,
+    count_profile_posts, drawing_streaks, find_profile_posts,
+    find_published_public_posts_by_author_id, ProfileDrawings,
 };
 use crate::models::supporter::standings;
 use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession, User};
@@ -411,6 +411,7 @@ async fn render_profile(
     let achievements = list_achievements(tx, user.id).await?;
     let supporter_standings = standings(tx, user.id).await?;
     let pickles_received = pickle::received_by(tx, user.id).await?;
+    let streaks = drawing_streaks(tx, user.id, chrono::Utc::now()).await?;
     let links = find_links_by_user_id(tx, user.id).await?;
     let links = links
         .iter()
@@ -452,6 +453,7 @@ async fn render_profile(
                 achievements => Serde(achievements),
                 supporter_standings => Serde(supporter_standings),
                 pickles_received,
+                streaks => Serde(streaks),
                 user => Serde(Some(user)),
                 domain => state.config.domain.clone(),
                 public_count,

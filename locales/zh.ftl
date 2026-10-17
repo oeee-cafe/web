@@ -612,6 +612,10 @@ achievement-first-collaboration = 第一次合作
 achievement-first-collaboration-description = 第一次与他人一起画画。
 achievement-steam-supporter = Steam 支持者
 achievement-steam-supporter-description = 在 Steam 上支持了黄瓜咖啡馆。
+achievement-streak-7 = 连续画画一周
+achievement-streak-7-description = 连续7天每天发布画作。
+achievement-streak-30 = 连续画画一个月
+achievement-streak-30-description = 连续30天每天发布画作。
 supporter-pack = 支持者礼包
 supporter-pack-lede = 黄瓜咖啡馆是免费的，以后也会是。支持者礼包是一起分担来年开销的方式，买到的是名字旁边的一个标记，和每周一根可以送给喜欢的画的腌黄瓜——仅此而已，其他一切对每个人都一样。
 supporter-pack-year = { $year } 年支持者礼包
@@ -655,6 +659,9 @@ profile-private-community-posts-note = 私密社区的作品不会显示在你�
 profile-member-since = { $year }年{ $month }月加入
 profile-pickles-received = 收到{ $count }根腌黄瓜
 profile-pickles-received-help = 支持者送给此人画作的腌黄瓜。每位支持者每周可以送出一根。
+profile-streak-current = 已连续绘画{ $days }天
+profile-streak-longest = 最长连续{ $days }天
+profile-streak-help = 连续发布所有人可见画作的天数(按韩国时间)。今天结束之前，连续记录不会中断。
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = 要离开此页面吗？

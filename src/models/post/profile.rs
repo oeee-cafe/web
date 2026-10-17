@@ -196,3 +196,114 @@ pub async fn count_profile_posts(
     .await?;
     Ok(count)
 }
+
+/// How many days in a row someone has drawn: the run they are on now, and
+/// the longest they have managed. A day is Seoul's, as every date the site
+/// prints is, and counts once it has one published drawing anyone can see
+/// on the profile -- the public tab's drawings, so everyone who looks is
+/// shown the same numbers and none are drawn from a private community.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct DrawingStreaks {
+    /// The run that ends today or yesterday; a day not yet drawn in has
+    /// not broken it. Nought once a whole day has gone by without one.
+    pub current: i64,
+    pub longest: i64,
+}
+
+pub async fn drawing_streaks(
+    tx: &mut Transaction<'_, Postgres>,
+    author_id: Uuid,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<DrawingStreaks> {
+    let days = sqlx::query_scalar!(
+        r#"
+            SELECT DISTINCT (posts.published_at AT TIME ZONE 'Asia/Seoul')::date AS "day!"
+            FROM posts
+            JOIN images ON posts.image_id = images.id
+            LEFT JOIN communities ON posts.community_id = communities.id
+            WHERE posts.author_id = $1
+            AND posts.published_at IS NOT NULL
+            AND posts.deleted_at IS NULL
+            AND (posts.community_id IS NULL OR communities.visibility = 'public')
+            ORDER BY 1
+        "#,
+        author_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let today = now.with_timezone(&chrono_tz::Asia::Seoul).date_naive();
+    Ok(streaks_from_days(&days, today))
+}
+
+/// The streaks in `days`, which are distinct and in order.
+fn streaks_from_days(days: &[chrono::NaiveDate], today: chrono::NaiveDate) -> DrawingStreaks {
+    let mut longest = 0;
+    let mut run = 0;
+    let mut previous: Option<chrono::NaiveDate> = None;
+    for &day in days {
+        run = match previous {
+            Some(p) if p.succ_opt() == Some(day) => run + 1,
+            _ => 1,
+        };
+        longest = longest.max(run);
+        previous = Some(day);
+    }
+    let current = match previous {
+        Some(last) if last == today || last.succ_opt() == Some(today) => run,
+        _ => 0,
+    };
+    DrawingStreaks { current, longest }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+
+    fn d(day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 10, day).unwrap()
+    }
+
+    #[test]
+    fn nobody_who_has_not_drawn_has_a_streak() {
+        assert_eq!(streaks_from_days(&[], d(17)), DrawingStreaks::default());
+    }
+
+    #[test]
+    fn a_run_lasts_until_a_whole_day_goes_by() {
+        let days = [d(1), d(2), d(3), d(10), d(15), d(16)];
+        // Drawn yesterday, not yet today: still on.
+        assert_eq!(
+            streaks_from_days(&days, d(17)),
+            DrawingStreaks {
+                current: 2,
+                longest: 3
+            }
+        );
+        assert_eq!(streaks_from_days(&days, d(16)).current, 2);
+        // A day missed.
+        assert_eq!(
+            streaks_from_days(&days, d(18)),
+            DrawingStreaks {
+                current: 0,
+                longest: 3
+            }
+        );
+    }
+
+    #[test]
+    fn a_run_crosses_the_end_of_a_month() {
+        let days = [
+            NaiveDate::from_ymd_opt(2026, 9, 29).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 9, 30).unwrap(),
+            d(1),
+        ];
+        assert_eq!(
+            streaks_from_days(&days, d(1)),
+            DrawingStreaks {
+                current: 3,
+                longest: 3
+            }
+        );
+    }
+}

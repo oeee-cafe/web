@@ -3179,6 +3179,17 @@ nav a:visited,
   font-size: var(--ds-text-s);
 }
 
+.profile-streak {
+  margin-top: 2px;
+  color: var(--ds-muted);
+  font-size: var(--ds-text-s);
+}
+
+.profile-streak-current {
+  color: var(--ds-ink);
+  font-weight: 600;
+}
+
 .profile-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3513,6 +3524,13 @@ html[data-store] .supporter-elsewhere {
   font-size: var(--ds-text-s);
   font-weight: 600;
   line-height: 1.2;
+}
+
+/* The day it was earned, after its name and quieter than it. */
+.profile-achievement-date {
+  margin-left: 6px;
+  color: var(--ds-muted);
+  font-weight: 400;
 }
 
 /* The badge at the start, the words beside it. */

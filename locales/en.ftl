@@ -648,6 +648,10 @@ achievement-first-collaboration = First Collaboration
 achievement-first-collaboration-description = Drew together with others for the first time.
 achievement-steam-supporter = Steam Supporter
 achievement-steam-supporter-description = Supported Oeee Cafe on Steam.
+achievement-streak-7 = A Week of Drawing
+achievement-streak-7-description = Drew every day for seven days in a row.
+achievement-streak-30 = A Month of Drawing
+achievement-streak-30-description = Drew every day for thirty days in a row.
 supporter-pack = Supporter Pack
 supporter-pack-lede = Oeee Cafe is free, and stays free. The Supporter Pack is a way to help pay for the year ahead. It buys a mark beside your name and a pickle a week to give to a drawing you love — nothing more. Everything else on the site is the same for everyone.
 supporter-pack-year = { $year } Supporter Pack
@@ -708,6 +712,17 @@ profile-pickles-received =
        *[other] { $count } pickles received
     }
 profile-pickles-received-help = Pickles supporters have given their drawings. Each supporter has one a week to give.
+profile-streak-current =
+    { $days ->
+        [one] Drawn { $days } day in a row
+       *[other] Drawn { $days } days in a row
+    }
+profile-streak-longest =
+    { $days ->
+        [one] Longest streak { $days } day
+       *[other] Longest streak { $days } days
+    }
+profile-streak-help = Days in a row with a drawing anyone can see, in Korea time. Today does not break a streak until it is over.
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = Leave this page?

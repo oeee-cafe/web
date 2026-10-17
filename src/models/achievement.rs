@@ -1,4 +1,5 @@
-//! Achievements: a first drawing, a first relay, a first collaboration.
+//! Achievements: a first drawing, a first relay, a first collaboration, a
+//! week and a month of drawing every day.
 //!
 //! Earned from what is already in the database rather than from events, so
 //! [`award_achievements`] can be called whenever anything might have earned
@@ -23,12 +24,20 @@ use sqlx::{query, Postgres, Transaction};
 /// `user_achievements_achievement_check` constraint; the profile names each
 /// from `achievement-<key>` and `achievement-<key>-description` in every
 /// locale, and a test holds all three together.
-pub const ALL: [&str; 4] = [
+pub const ALL: [&str; 6] = [
     "FIRST_DRAWING",
     "FIRST_RELAY",
     "FIRST_COLLABORATION",
     "STEAM_SUPPORTER",
+    "STREAK_7",
+    "STREAK_30",
 ];
+
+/// The streak achievements and the days in a row each takes, by the
+/// longest run someone has drawn (`models::post::drawing_streaks`), so one
+/// that has ended keeps them. The migration that added them gave them to
+/// everyone whose runs already had.
+const STREAKS: [(&str, i64); 2] = [("STREAK_7", 7), ("STREAK_30", 30)];
 
 /// `FIRST_DRAWING` as the locale files spell it: `first-drawing`.
 pub fn locale_key(achievement: &str) -> String {
@@ -79,6 +88,28 @@ pub async fn award_achievements(tx: &mut Transaction<'_, Postgres>, user_id: Uui
     )
     .execute(&mut **tx)
     .await?;
+
+    let longest = crate::models::post::drawing_streaks(tx, user_id, chrono::Utc::now())
+        .await?
+        .longest;
+    let reached: Vec<String> = STREAKS
+        .iter()
+        .filter(|(_, days)| longest >= *days)
+        .map(|(achievement, _)| achievement.to_string())
+        .collect();
+    if !reached.is_empty() {
+        query!(
+            r#"
+            INSERT INTO user_achievements (user_id, achievement)
+            SELECT $1, unnest($2::text[])
+            ON CONFLICT DO NOTHING
+            "#,
+            user_id,
+            &reached,
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
     Ok(())
 }
 
@@ -485,6 +516,51 @@ mod tests {
             earned(&mut tx, artist).await,
             ["FIRST_DRAWING", "FIRST_RELAY"]
         );
+        tx.rollback().await.unwrap();
+    }
+
+    /// A week of days in a row earns STREAK_7, and keeps it once the run
+    /// has ended; six does not. Only days with a drawing anyone can see
+    /// count, as on the profile.
+    #[tokio::test]
+    async fn a_week_of_drawing_every_day_is_a_streak() {
+        let Some(mut tx) = tx().await else { return };
+        let artist = user(&mut tx, "achievement_test_streak").await;
+        let hidden = query!(
+            "INSERT INTO communities (owner_id, name, slug, description, visibility) VALUES ($1, 'h', 'achievement-test-hidden', '', 'private') RETURNING id",
+            artist
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+        .id;
+        // Six days, ending three weeks ago, and a seventh in a private
+        // community.
+        for days_ago in 21..=27 {
+            let id = post(&mut tx, artist, true, None).await;
+            query!(
+                "UPDATE posts SET published_at = now() - make_interval(days => $2), community_id = CASE WHEN $2 = 27 THEN $3::uuid END WHERE id = $1",
+                id,
+                days_ago,
+                hidden,
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+        award_achievements(&mut tx, artist).await.unwrap();
+        assert_eq!(earned(&mut tx, artist).await, ["FIRST_DRAWING"]);
+
+        let id = post(&mut tx, artist, true, None).await;
+        query!(
+            "UPDATE posts SET published_at = now() - interval '20 days' WHERE id = $1",
+            id
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        award_achievements(&mut tx, artist).await.unwrap();
+        assert_eq!(earned(&mut tx, artist).await, ["FIRST_DRAWING", "STREAK_7"]);
         tx.rollback().await.unwrap();
     }
 

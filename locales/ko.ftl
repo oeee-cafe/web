@@ -612,6 +612,10 @@ achievement-first-collaboration = 첫 함께 그리기
 achievement-first-collaboration-description = 처음으로 다른 사람과 함께 그렸습니다.
 achievement-steam-supporter = Steam 후원자
 achievement-steam-supporter-description = Steam에서 오이카페를 후원했습니다.
+achievement-streak-7 = 일주일 연속 그리기
+achievement-streak-7-description = 7일 연속으로 매일 그림을 올렸습니다.
+achievement-streak-30 = 한 달 연속 그리기
+achievement-streak-30-description = 30일 연속으로 매일 그림을 올렸습니다.
 supporter-pack = 후원 팩
 supporter-pack-lede = 오이카페는 무료이고, 앞으로도 무료입니다. 후원 팩을 구매하셔서 오이카페를 응원해 주세요.
 supporter-pack-year = { $year } 후원 팩
@@ -655,6 +659,9 @@ profile-private-community-posts-note = 비공개 커뮤니티에서 그린 그�
 profile-member-since = { $year }년 { $month }월 가입
 profile-pickles-received = 받은 피클 { $count }개
 profile-pickles-received-help = 후원자들이 이 사람의 그림에 준 피클입니다. 후원자는 일주일에 피클 하나를 줄 수 있습니다.
+profile-streak-current = { $days }일 연속 그리는 중
+profile-streak-longest = 최장 { $days }일 연속
+profile-streak-help = 누구나 볼 수 있는 그림을 올린 날이 연속된 일수입니다(한국 시간 기준). 오늘이 끝나기 전까지는 연속 기록이 끊기지 않습니다.
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = 이 페이지를 떠날까요?

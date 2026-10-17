@@ -69,6 +69,20 @@
                   }) -}}
             </time>
           </div>
+          {# How many days in a row they have drawn (models::post::
+             DrawingStreaks): the run they are on, while it lasts, and the
+             longest they have managed when that is longer. A single day is
+             not a run, so nothing shows until there have been two. #}
+          {% if streaks and streaks.longest >= 2 %}
+            <div class="profile-streak" title="{{ ftl_get_message('profile-streak-help') }}">
+              {%- if streaks.current >= 2 -%}
+                <span class="profile-streak-current">{{ ftl_format_pattern("profile-streak-current", {"days": streaks.current}) }}</span>
+                {%- if streaks.longest > streaks.current %} · {{ ftl_format_pattern("profile-streak-longest", {"days": streaks.longest}) }}{% endif -%}
+              {%- else -%}
+                {{ ftl_format_pattern("profile-streak-longest", {"days": streaks.longest}) }}
+              {%- endif -%}
+            </div>
+          {% endif %}
           {% if supporter_standings or pickles_received or links %}
             <div class="profile-chips">
               {% for standing in supporter_standings %}
@@ -127,17 +141,20 @@
 
       {% if achievements %}
         {# What they have done here: a first drawing, a first relay, a first
-           collaboration, buying the Steam app. The same achievements as on
-           Steam, earned on the site whatever they drew in. A badge each,
-           along the foot of the card; what it was for and when is its
-           tooltip. #}
+           collaboration, buying the Steam app, a week and a month of
+           drawing every day. The same achievements as on Steam, earned on
+           the site whatever they drew in. A badge each, along the foot of
+           the card, with the day it was earned beside its name, in Seoul
+           time like every other date here; what it was for is its tooltip. #}
         <ul class="profile-achievements" aria-label="{{ ftl_get_message('profile-achievements') }}">
           <li class="profile-achievements-label" aria-hidden="true">{{ ftl_get_message("profile-achievements") }}</li>
           {% for earned in achievements %}
             <li class="profile-achievement"
-                title="{{ ftl_get_message('achievement-' ~ earned.key ~ '-description') }} · {{ earned.earned_at|dateformat(format='short', tz='Asia/Seoul') }}">
+                title="{{ ftl_get_message('achievement-' ~ earned.key ~ '-description') }}">
               {{ achievement_icon(earned.key) }}
               <span class="profile-achievement-name">{{ ftl_get_message("achievement-" ~ earned.key) }}</span>
+              {%- set earned_on = earned.earned_at|dateformat(format="short", tz="Asia/Seoul") %}
+              <time class="profile-achievement-date" datetime="{{ earned_on }}">{{ earned_on }}</time>
             </li>
           {% endfor %}
         </ul>

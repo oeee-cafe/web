@@ -612,6 +612,10 @@ achievement-first-collaboration = はじめての共同お絵かき
 achievement-first-collaboration-description = はじめてみんなで一緒に描きました。
 achievement-steam-supporter = Steamサポーター
 achievement-steam-supporter-description = SteamでOEEEカフェを支援しました。
+achievement-streak-7 = 1週間連続お絵かき
+achievement-streak-7-description = 7日連続で毎日絵を投稿しました。
+achievement-streak-30 = 1か月連続お絵かき
+achievement-streak-30-description = 30日連続で毎日絵を投稿しました。
 supporter-pack = サポーターパック
 supporter-pack-lede = OEEEカフェは無料で、これからも無料です。サポーターパックはこれからの一年の費用を一緒に支えるための方法で、お名前の横に付くマークと、好きな絵に贈れる週にひとつのピクルスが付いてきます。それ以上はなく、ほかのことはみんな同じです。
 supporter-pack-year = { $year }年のサポーターパック
@@ -655,6 +659,9 @@ profile-private-community-posts-note = プライベートコミュニティで�
 profile-member-since = { $year }年{ $month }月から参加
 profile-pickles-received = もらったピクルス{ $count }個
 profile-pickles-received-help = サポーターがこの人の絵に贈ったピクルスです。サポーターは週にひとつ贈れます。
+profile-streak-current = { $days }日連続で描いています
+profile-streak-longest = 最長{ $days }日連続
+profile-streak-help = 誰でも見られる絵を投稿した日が続いた日数です(韓国時間)。今日が終わるまでは記録は途切れません。
 
 # Said by the apps in their own dialogs and menus, in the page's language (app_bridge.jinja, words)
 app-leave-title = このページを離れますか？

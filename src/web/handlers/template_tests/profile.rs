@@ -7,9 +7,9 @@ use serde_json::json;
 use super::chrome;
 use minijinja::value::Serde;
 
-/// Achievements along the foot of the profile card, a badge each, named,
-/// with what it was for in its tooltip; no strip at all for someone with
-/// none.
+/// Achievements along the foot of the profile card, a badge each, named
+/// and dated, with what it was for in its tooltip; no strip at all for
+/// someone with none.
 #[test]
 fn the_profile_shows_what_its_owner_has_achieved() {
     let env = test_support::env();
@@ -43,10 +43,18 @@ fn the_profile_shows_what_its_owner_has_achieved() {
     };
     let with = render(json!([
         {"achievement": "FIRST_DRAWING", "key": "first-drawing", "earned_at": "2026-09-22T00:00:00Z"},
-        {"achievement": "STEAM_SUPPORTER", "key": "steam-supporter", "earned_at": "2026-09-22T01:00:00Z"},
+        {"achievement": "STEAM_SUPPORTER", "key": "steam-supporter", "earned_at": "2026-09-22T16:00:00Z"},
     ]));
     assert!(with.contains("profile-achievements"));
     assert!(with.contains(r#"title="achievement-first-drawing-description"#));
+    // The day each was earned, beside its name, in Seoul: 16:00 UTC is
+    // already the next day there.
+    assert!(with.contains(
+        r#"<time class="profile-achievement-date" datetime="2026-09-22">2026-09-22</time>"#
+    ));
+    assert!(with.contains(
+        r#"<time class="profile-achievement-date" datetime="2026-09-23">2026-09-23</time>"#
+    ));
     assert!(with.contains("achievement-steam-supporter"));
     // Each with its own Material Symbols icon: the brush for a first
     // drawing, the game controller for buying on Steam.
@@ -631,4 +639,55 @@ fn follow_and_unfollow_each_carry_the_others_words() {
         unfollow.contains(r#"data-pressed-label="follow""#),
         "got: {unfollow}"
     );
+}
+
+/// Under when they joined, how many days in a row they have drawn: the
+/// run they are on, with their longest beside it when that was longer, or
+/// only the longest once the run has ended. Nothing for someone who has
+/// never drawn two days running.
+#[test]
+fn the_profile_shows_how_many_days_in_a_row_its_owner_has_drawn() {
+    use crate::models::post::DrawingStreaks;
+
+    let env = test_support::env();
+    let render = |current: i64, longest: i64| {
+        let streak = env
+            .get_template("profile.jinja")
+            .expect("profile loads")
+            .render(context! {
+                user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(Vec::<serde_json::Value>::new()),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
+                streaks => Serde(DrawingStreaks { current, longest }),
+                public_count => 0,
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
+                private_count => 0,
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
+                domain => "oeee.cafe",
+                is_following => false,
+                ..chrome()
+            })
+            .expect("profile renders");
+        streak.find(r#"<div class="profile-streak""#).map(|at| {
+            let rest = &streak[at..];
+            rest[..rest.find("</div>").unwrap()].to_string()
+        })
+    };
+
+    let on = render(5, 12).expect("a run on");
+    assert!(on
+        .contains(r#"<span class="profile-streak-current">profile-streak-current(days=5)</span>"#));
+    assert!(on.contains("profile-streak-longest(days=12)"));
+    // Their longest is the run they are on: said once.
+    let best = render(7, 7).expect("their best run");
+    assert!(best.contains("profile-streak-current(days=7)"));
+    assert!(!best.contains("profile-streak-longest"));
+    // Ended: only what it reached.
+    let ended = render(0, 4).expect("an ended run");
+    assert!(!ended.contains("profile-streak-current"));
+    assert!(ended.contains("profile-streak-longest(days=4)"));
+    assert!(render(1, 1).is_none());
+    assert!(render(0, 0).is_none());
 }
