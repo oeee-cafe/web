@@ -39,6 +39,33 @@ fn a_replay_is_on_the_stage_and_the_drawing_is_not_a_link() {
     );
 }
 
+/// Tegaki's replay has a page of its own, and it sits under the toolbar
+/// like the painter it was drawn in, saying what the reader is doing.
+#[test]
+fn a_tegaki_replay_plays_under_the_toolbar() {
+    let env = test_support::env();
+    let mut post = super::replay_post();
+    post["replay_filename"] = json!("abcdef0123.tgkr");
+    let rendered = env
+        .get_template("post_replay_view_tgkr.jinja")
+        .expect("tegaki replay template loads")
+        .render(context! {
+            post => Serde(post),
+            post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+            community_id => Serde(json!(null)),
+            presence => Serde(json!({"activity": "watching_replay", "community": null, "group": null})),
+            ..chrome()
+        })
+        .expect("tegaki replay renders");
+    let nav = rendered.find("<nav class=\"nav-bar\"").expect("the toolbar");
+    assert!(nav < rendered.find("Tegaki.open(").unwrap());
+    assert!(rendered.find("tegaki.css").unwrap() < rendered.find("/static/ds.css").unwrap());
+    assert!(rendered.contains(r#"<meta name="oeee-presence" content="watching_replay""#));
+    assert!(rendered.contains("replayMode: true"));
+    assert!(rendered.contains("abcdef0123.tgkr"));
+    assert!(rendered.contains("fitUnderToolbar();"));
+}
+
 /// A post in a community is linked under the community's slug from its
 /// own page -- its address, its share link and the pages beneath it --
 /// and so is a drawing in its thread, from inside the thread-card macro,

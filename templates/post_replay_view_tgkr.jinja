@@ -4,19 +4,25 @@
 <html lang="{{ ftl_lang }}">
   <head>
     <meta charset="utf-8" />
+    {% include "theme_head.jinja" %}
+    {% include "presence_meta.jinja" %}
     <title>
-      오이카페 |
+      {{ ftl_get_message("brand") }} |
       {% if post.title %}
         {{ post.title }}
       {% else %}
-        무제
+        {{ ftl_get_message("post-no-title") }}
       {% endif %}
-      (리플레이)
+      ({{ ftl_get_message("post-replay") }})
     </title>
-    <meta name="keywords" content="오이카페, 오에카키, 커뮤니티, お絵かき" />
-    <meta name="description" content="오이카페는 오에카키 커뮤니티입니다. お絵かできるOEEEカフェです。" />
     <link rel="stylesheet"
           href="{{ '/static/tegaki/css/tegaki.css' | cachebuster | safe }}" />
+    {# After Tegaki's own, so the toolbar is not restyled by it. #}
+    <link rel="stylesheet"
+          href="{{ '/static/ds.css' | cachebuster | safe }}" />
+    <style>
+      body { margin: 0; }
+    </style>
     <script src="{{ '/static/tegaki/js/strings/en.js' | cachebuster | safe }}"></script>
     <script src="{{ '/static/tegaki/js/tools/tool.js' | cachebuster | safe }}"></script>
     <script src="{{ '/static/tegaki/js/tools/brush.js' | cachebuster | safe }}"></script>
@@ -44,16 +50,39 @@
     <script src="{{ '/static/tegaki/lib/UZIP/UZIP.js' | cachebuster | safe }}"></script>
   </head>
   <body>
+    {% include "toolbar.jinja" %}
     <script type="text/javascript">
-      Tegaki.onCloseViewerClick = function () {
-        window.location.href = "{{ post_url(post, post_id) }}";
-      };
+      (function () {
+        // Tegaki fills the viewport from the top. It starts under the
+        // toolbar instead, as the painter does, so the page has the same
+        // bar as every other; measured, since the bar is taller under a
+        // notch.
+        function fitUnderToolbar() {
+          var bar = document.querySelector(".nav-bar");
+          var tegaki = document.getElementById("tegaki");
+          if (!bar || !tegaki) return;
+          var top = Math.round(bar.getBoundingClientRect().bottom);
+          tegaki.style.top = top + "px";
+          tegaki.style.height = "calc(100% - " + top + "px)";
+          // Tegaki keeps the canvas's place on screen, measured before
+          // this moved it (draw_post_tegaki.jinja).
+          Tegaki.updatePosOffset();
+        }
 
-      Tegaki.open({
-        replayMode: true,
-        replayURL:
-          "{{ stored_url("replay", post.replay_filename) }}",
-      });
+        Tegaki.onCloseViewerClick = function () {
+          window.location.href = "{{ post_url(post, post_id) }}";
+        };
+
+        Tegaki.open({
+          replayMode: true,
+          replayURL:
+            "{{ stored_url("replay", post.replay_filename) }}",
+        });
+        fitUnderToolbar();
+        window.addEventListener("resize", fitUnderToolbar);
+        // The bar can grow once its font arrives.
+        window.addEventListener("load", fitUnderToolbar);
+      })();
     </script>
   </body>
 </html>
