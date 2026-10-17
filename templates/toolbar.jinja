@@ -447,6 +447,26 @@
         } catch (error) {}
         step();
       }
+      // Safari, bringing a page back from the back/forward cache exactly as
+      // it was left, then fires the Navigation API's traverse `navigate` in
+      // it, interceptable. htmx takes that for one of its own trips back and
+      // puts up the address again -- from its history cache, or fetched
+      // fresh -- over the page already showing it: a feed came back as its
+      // first batch, at the top. So htmx is let to restore only an address
+      // the page is not already showing. `shown` follows every swap, which
+      // is where a boosted trip or one of htmx's own restores lands.
+      if (!window.oeeeKnowsShownPage) {
+        window.oeeeKnowsShownPage = true;
+        var shown = location.href;
+        document.addEventListener("htmx:after:swap", function () {
+          shown = location.href;
+        });
+        var alreadyShown = function (event) {
+          if (location.href === shown) event.preventDefault();
+        };
+        document.addEventListener("htmx:history:cache:hit", alreadyShown);
+        document.addEventListener("htmx:before:history:restore", alreadyShown);
+      }
       function settleContent() {
         var content = document.querySelector("main.ds-content");
         if (!content) return;
