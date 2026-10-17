@@ -408,6 +408,37 @@ describe("what the site tells the apps", () => {
     const drawing = message.drawing as Record<string, unknown>;
     expect(drawing.link).toMatch(/\/@artist\/9c881320$/);
     expect(drawing).toMatchObject({ width: 300, height: 200 });
+    expect(message.sideways).toBe(false);
+  });
+
+  it("says when a drag to the right from where a finger lands is the page's own", async () => {
+    const page = await open();
+    const document = page.window.document;
+    const sideways = (target: Element) => {
+      target.dispatchEvent(new page.window.Event("touchstart", { bubbles: true }));
+      return last(page, "pressed").sideways;
+    };
+    const add = (html: string) => {
+      const holder = document.createElement("div");
+      holder.innerHTML = html;
+      document.body.append(holder);
+      return holder.firstElementChild as HTMLElement;
+    };
+
+    expect(sideways(document.body)).toBe(false);
+    expect(sideways(add('<input type="range">'))).toBe(true);
+    // A drawing zoomed closer moves under the finger; one at rest scrolls the page.
+    const stage = add('<div style="touch-action: pan-x pan-y"><span>drawing</span></div>');
+    expect(sideways(stage.firstElementChild!)).toBe(false);
+    stage.style.touchAction = "none";
+    expect(sideways(stage.firstElementChild!)).toBe(true);
+    // A row scrolled along has somewhere to go back to; one at its start does not.
+    const row = add(
+      '<div style="overflow-x: auto; width: 100px; white-space: nowrap"><span style="display: inline-block; width: 400px">tabs</span></div>',
+    );
+    expect(sideways(row.firstElementChild!)).toBe(false);
+    row.scrollLeft = 50;
+    expect(sideways(row.firstElementChild!)).toBe(true);
   });
 
   it("sends a haptic on the bridge", async () => {
@@ -1189,6 +1220,10 @@ describe("what the apps test against (appContract.json)", () => {
     bare.window.oeeeApp.feel("success");
     bare.window.document.querySelector("img")!.dispatchEvent(new bare.window.Event("touchstart", { bubbles: true }));
     bare.window.document.body.dispatchEvent(new bare.window.Event("touchstart", { bubbles: true }));
+    const slider = bare.window.document.createElement("input");
+    slider.type = "range";
+    bare.window.document.body.append(slider);
+    slider.dispatchEvent(new bare.window.Event("touchstart", { bubbles: true }));
     sent.push(...bare.sent.filter((message) => message.type === "haptic" || message.type === "pressed"));
 
     // The painter, offered from the drawing page's own module.

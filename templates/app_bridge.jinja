@@ -73,11 +73,15 @@
    haptic   {name}
             "light", "medium", "selection", "success", "warning" or "error":
             a control that is felt as well as seen.
-   pressed  {drawing: {src, link, width, height} | null}
+   pressed  {drawing: {src, link, width, height} | null, sideways}
             As a finger lands, whether it is on a drawing -- an image marked
             data-oeee-drawing, which is never a sensitive one -- so an app
             that opens its own menu on a long press knows which in time.
             `link` is the post's page, or "" on the post page itself.
+            `sideways` is whether a drag to the right from there is the
+            page's own: a slider, a drawing zoomed closer (touch-action
+            none), or a row scrolled along that can scroll back. An app that
+            goes back on a swipe from anywhere leaves those to the page.
    painter  {state: "ready"}
             The painter can be driven: oeeeApp.painter.command(name) and
             .preferPen() (frontend/shared/appBridge.ts).
@@ -369,8 +373,26 @@
       else if (scheme.addListener) scheme.addListener(report);
     }
 
-    // Which drawing a finger lands on, said as it lands: by the time a long
-    // press is recognised the app can no longer ask the page in time.
+    // Whether a drag to the right from `target` is the page's: a slider, an
+    // element that keeps horizontal pans from the browser (a drawing zoomed
+    // closer, post_zoom.js), or a row scrolled along that has room to scroll
+    // back. A row at its start is not: the drag has nothing there to move.
+    var PANS_SIDEWAYS = /^(auto|manipulation)$|pan-x|pan-left|pan-right/;
+    function takesSideways(target) {
+      for (var element = target; element && element.nodeType === 1; element = element.parentElement) {
+        if (element.matches('input[type="range"]')) return true;
+        var style = window.getComputedStyle(element);
+        if (!PANS_SIDEWAYS.test(style.touchAction || "auto")) return true;
+        if (element.scrollLeft > 0 && element.scrollWidth > element.clientWidth &&
+            /auto|scroll/.test(style.overflowX)) return true;
+      }
+      var scroller = document.scrollingElement;
+      return !!scroller && scroller.scrollLeft > 0;
+    }
+
+    // Which drawing a finger lands on, and whether a sideways drag from
+    // there is the page's, said as it lands: by the time a long press or a
+    // swipe is recognised the app can no longer ask the page in time.
     window.addEventListener("touchstart", function (event) {
       if (!channel()) return;
       var target = event.target;
@@ -382,7 +404,8 @@
           link: link ? link.href : "",
           width: image.naturalWidth || image.width,
           height: image.naturalHeight || image.height
-        } : null
+        } : null,
+        sideways: takesSideways(target)
       }, true);
     }, { capture: true, passive: true });
 

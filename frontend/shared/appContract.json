@@ -235,11 +235,19 @@
           "width": 300,
           "height": 200
         },
+        "sideways": false,
         "v": 1,
         "type": "pressed"
       },
       {
         "drawing": null,
+        "sideways": false,
+        "v": 1,
+        "type": "pressed"
+      },
+      {
+        "drawing": null,
+        "sideways": true,
         "v": 1,
         "type": "pressed"
       }
