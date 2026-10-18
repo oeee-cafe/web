@@ -13,8 +13,8 @@
 // The arrow keys move through the list, Enter or Tab picks, Escape closes
 // it. While it is closed the keys are the box's own.
 //
-// The page loads it as a classic script (mention.ts), built for Firefox 56
-// like every bundle in neo-cucumber.
+// A piece of chrome.js (attachMentions), which post_view.jinja calls for a
+// signed-in reader.
 
 /** One row of the server's answer. */
 export interface Person {
@@ -275,7 +275,16 @@ export function attachMention(box: HTMLTextAreaElement): void {
   }
 }
 
-export function attachAllMentions(): void {
+function attachAllMentions(): void {
   const boxes = document.querySelectorAll<HTMLTextAreaElement>("textarea[data-mention-url]");
   for (let i = 0; i < boxes.length; i++) attachMention(boxes[i]);
+}
+
+/** Every comment box with a mention list, once the page is read. */
+export function attachMentions(): void {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", attachAllMentions);
+  } else {
+    attachAllMentions();
+  }
 }

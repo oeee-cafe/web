@@ -149,22 +149,27 @@ page's inline replay requests, so a checkout that has never been built will 404 
 `pnpm run build:viewer` has run once. The normal drawing routes similarly serve
 `neo-cucumber/dist-offline` at `/static/neo-cucumber/`, and the staff-only
 session replay viewer serves `neo-cucumber/dist-replay` at `/static/replay/`.
-The site's own scripts for server-rendered pages (`frontend/site`: the comment
-box's @ autocomplete, a post's pinch to zoom, the reaction picker) are built
-to `neo-cucumber/dist-site` and served at `/static/site/`; a new one goes there
-rather than into `static/`, so it gets the Firefox 56 build. Everything the
-site's pages run around their content -- the app bridge (`oeeeApp`) and what
-answers the apps, the toolbar, loading bar, Windows caption, toasts, quick
-switcher, live stream, confirm and alert, Draw dialog, segmented thumbs, Per
-row slider -- is one of them, `chrome.js`. `theme_head.jinja` loads it in the
+The site's own scripts for server-rendered pages are TypeScript under
+`frontend/site`, built to `neo-cucumber/dist-site` and served at
+`/static/site/`: `htmx.js`, `reaction_picker.js` (a module, so a browser
+without modules keeps the typed form) and `chrome.js`, which is everything
+else -- the app bridge (`oeeeApp`) and what answers the apps, the chrome
+around every page, and each page's own pieces (`frontend/site/pages`). A new
+script goes there, never into a template or `static/`, so it gets the
+Firefox 56 build and a test. `theme_head.jinja` loads it in the
 head, which a boosted swap keeps, so it is fetched once a document; it sets
 nothing up by itself. Each template keeps a one-line inline `<script>` calling
 its piece (`oeeeChrome.jump()`), where its script used to be. In the body,
 that line is what a boosted swap re-runs, in place. Never move such a call
 into the bundle, and never put a `<script src>` in the body for this: htmx
 re-runs a swapped `<script src>` without waiting for it, so it lands late and
-out of order with the inline scripts after it. `theme_head.jinja`'s own
-script stays inline: it marks the theme and the app before the first paint. A browser test that needs one of
+out of order with the inline scripts after it. A value a script needs from the
+template is an argument of its line, written `|tojson`. What stays inline is
+what must not wait on a fetched file before the first paint --
+`theme_head.jinja`'s theme and app marks, `base.jinja`'s viewport, the per-row
+count in `post_feed_head.jinja` and `admin/posts.jinja` -- and
+`identity_apple_return.jinja`'s one-line submit, a page without the site's
+chrome. `onclick` attributes call functions a page's piece puts on `window`. A browser test that needs one of
 these scripts in a page of its own asks for it built as it ships, with the
 `siteScript` command in `vitest.config.ts` (`appContract.browser.test.ts` does).
 `pnpm run build` builds all of them, and Docker builds them itself.

@@ -36,12 +36,5 @@
          href="oeee-cafe://handoff/done{% if code %}?code={{ code }}{% endif %}">{{ ftl_get_message("handoff-done-return") }}</a>
     </div>
   </div>
-  <script>
-    // Once, and with replace, so going back does not land here again.
-    try {
-      location.replace({{ back|tojson }});
-    } catch (error) {
-      // No app to take it: the page above says what to do instead.
-    }
-  </script>
+  <script>if (window.oeeeChrome) window.oeeeChrome.handoffDone({{ back|tojson }});</script>
 {% endblock content %}

@@ -252,62 +252,7 @@
         </div>
       {% endif %}
       {% if tab_count > 1 %}
-        <script>
-          (function () {
-            // Found at the time rather than kept: a boosted visit to
-            // another profile swaps the body, and the listeners below
-            // outlive it.
-            function select(chosen) {
-              var tabs = document.querySelectorAll("[data-profile-tab]");
-              for (var j = 0; j < tabs.length; j++) {
-                if (tabs[j].getAttribute("data-profile-tab") === chosen) {
-                  tabs[j].setAttribute("aria-current", "page");
-                } else {
-                  tabs[j].removeAttribute("aria-current");
-                }
-              }
-              var panels = document.querySelectorAll("[data-profile-panel]");
-              for (var k = 0; k < panels.length; k++) {
-                panels[k].hidden = panels[k].getAttribute("data-profile-panel") !== chosen;
-              }
-              var notes = document.querySelectorAll("[data-profile-note]");
-              for (var n = 0; n < notes.length; n++) {
-                notes[n].hidden = notes[n].getAttribute("data-profile-note") !== chosen;
-              }
-              // How many a row is a question about drawings only.
-              var perRow = document.querySelector("[data-profile-per-row]");
-              if (perRow) perRow.hidden = chosen === "comments";
-            }
-
-            var tabs = document.querySelectorAll("[data-profile-tab]");
-            for (var i = 0; i < tabs.length; i++) {
-              tabs[i].addEventListener("click", function (event) {
-                // A new tab or window, or a copied link, is the link's.
-                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                event.preventDefault();
-                if (this.getAttribute("aria-current") === "page") return;
-                select(this.getAttribute("data-profile-tab"));
-                history.pushState({ profileTab: true }, "", this.href);
-              });
-            }
-
-            // Back and forward between tabs. htmx restores only the entries
-            // it pushed, so these are left to here; the one the page was
-            // loaded at is htmx's, and it fetches that address afresh.
-            if (!window.oeeeProfileTabsPopstate) {
-              window.oeeeProfileTabsPopstate = true;
-              window.addEventListener("popstate", function () {
-                var tabs = document.querySelectorAll("[data-profile-tab]");
-                for (var i = 0; i < tabs.length; i++) {
-                  if (tabs[i].pathname === location.pathname) {
-                    select(tabs[i].getAttribute("data-profile-tab"));
-                    return;
-                  }
-                }
-              });
-            }
-          })();
-        </script>
+        <script>if (window.oeeeChrome) window.oeeeChrome.profileTabs();</script>
       {% endif %}
     </section>
 
@@ -341,25 +286,7 @@
     </div>
   </div>
 
-  <script>
-    function showProfileReportModal() {
-      const modal = document.getElementById('profile-report-modal');
-      modal.style.display = 'flex';
-      document.getElementById('profile-report-description').value = '';
-      document.getElementById('profile-report-description').focus();
-    }
-
-    function hideProfileReportModal() {
-      document.getElementById('profile-report-modal').style.display = 'none';
-    }
-
-    // Close modal when clicking outside
-    document.getElementById('profile-report-modal').addEventListener('click', function(e) {
-      if (e.target === this) {
-        hideProfileReportModal();
-      }
-    });
-  </script>
+  <script>if (window.oeeeChrome) window.oeeeChrome.profileReport();</script>
 {% endif %}
 </div>
 {% endblock content %}

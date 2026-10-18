@@ -85,35 +85,6 @@
     {% endif %}
     {# Runs where it stands, before the page is painted, so a remembered view
        arrives as itself rather than flashing the public list first. #}
-    <script>
-      (function () {
-        var tabs = document.querySelectorAll("[data-communities-tab]");
-        function show(chosen) {
-          var found = false;
-          for (var i = 0; i < tabs.length; i++) {
-            if (tabs[i].getAttribute("data-communities-tab") === chosen) found = true;
-          }
-          if (!found) chosen = "public";
-          for (var j = 0; j < tabs.length; j++) {
-            tabs[j].setAttribute("aria-pressed", String(tabs[j].getAttribute("data-communities-tab") === chosen));
-          }
-          var parts = document.querySelectorAll("[data-communities-panel], [data-communities-for]");
-          for (var k = 0; k < parts.length; k++) {
-            var owner = parts[k].getAttribute("data-communities-panel") || parts[k].getAttribute("data-communities-for");
-            parts[k].hidden = owner !== chosen;
-          }
-        }
-        var saved = null;
-        try { saved = localStorage.getItem("communitiesTab"); } catch (e) {}
-        if (saved) show(saved);
-        for (var i = 0; i < tabs.length; i++) {
-          tabs[i].addEventListener("click", function () {
-            var chosen = this.getAttribute("data-communities-tab");
-            show(chosen);
-            try { localStorage.setItem("communitiesTab", chosen); } catch (e) {}
-          });
-        }
-      })();
-    </script>
+    <script>if (window.oeeeChrome) window.oeeeChrome.communitiesTabs();</script>
   </div>
 {% endblock content %}

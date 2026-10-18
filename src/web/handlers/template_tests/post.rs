@@ -60,12 +60,13 @@ fn a_tegaki_replay_plays_under_the_toolbar() {
     let nav = rendered
         .find("<nav class=\"nav-bar\"")
         .expect("the toolbar");
-    assert!(nav < rendered.find("Tegaki.open(").unwrap());
+    // Played in replay mode and fitted under the bar by
+    // frontend/site/pages/tegaki.ts; here, what it is handed.
+    assert!(nav < rendered.find("window.oeeeChrome.tegakiReplay(").unwrap());
     assert!(rendered.find("tegaki.css").unwrap() < rendered.find("/static/ds.css").unwrap());
     assert!(rendered.contains(r#"<meta name="oeee-presence" content="watching_replay""#));
-    assert!(rendered.contains("replayMode: true"));
-    assert!(rendered.contains("abcdef0123.tgkr"));
-    assert!(rendered.contains("fitUnderToolbar();"));
+    assert!(rendered.contains(r#"tegakiReplay("/@"#));
+    assert!(rendered.contains(r#"/abcdef0123.tgkr");"#));
 }
 
 /// A post in a community is linked under the community's slug from its

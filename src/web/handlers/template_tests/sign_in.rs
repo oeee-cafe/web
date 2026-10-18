@@ -248,12 +248,12 @@ fn the_browser_hands_the_app_its_code() {
     let with = render(json!(code));
     assert!(with.contains(&format!(r#"href="oeee-cafe://handoff/done?code={code}""#)));
     assert!(with.contains(&format!(
-        r#"location.replace("oeee-cafe://handoff/done?code={code}")"#
+        r#"handoffDone("oeee-cafe://handoff/done?code={code}")"#
     )));
 
     let without = render(json!(null));
     assert!(without.contains(r#"href="oeee-cafe://handoff/done""#));
-    assert!(without.contains(r#"location.replace("oeee-cafe://handoff/done")"#));
+    assert!(without.contains(r#"handoffDone("oeee-cafe://handoff/done")"#));
     // Not `code=` anywhere: the page's own sign-in script (app_sign_in.jinja)
     // describes the link it would carry.
     assert!(!without.contains(r#""oeee-cafe://handoff/done?code"#));

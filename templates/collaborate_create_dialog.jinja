@@ -105,22 +105,4 @@
     </form>
   </div>
 </div>
-<script>
-  function toggleSessionDialog(open) {
-    var dialog = document.getElementById("create-session-dialog");
-    dialog.style.display = open ? "flex" : "none";
-    // Focus the heading, not the first field: on iOS a focused <select>
-    // opens its picker and a focused input raises the keyboard, so
-    // New session would arrive with the canvas-size wheel already up.
-    if (open) document.getElementById("create-session-title").focus();
-  }
-  (function () {
-    var dialog = document.getElementById("create-session-dialog");
-    dialog.addEventListener("click", function (e) {
-      if (e.target === dialog) toggleSessionDialog(false);
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && dialog.style.display !== "none") toggleSessionDialog(false);
-    });
-  })();
-</script>
+<script>if (window.oeeeChrome) window.oeeeChrome.sessionDialog();</script>

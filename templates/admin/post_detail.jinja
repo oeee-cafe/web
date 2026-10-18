@@ -127,22 +127,6 @@
     </div>
   </div>
   {% if inline_replay %}
-    <script>
-      (function () {
-        var box = document.getElementById("admin-post-replay");
-        var script = document.createElement("script");
-        script.src = "{{ '/static/viewer/neo-cucumber-replay.js' | cachebuster | safe }}";
-        script.onload = function () {
-          window.NeoCucumberReplay.mount(box, {
-            replay: box.getAttribute("data-replay"),
-            poster: box.querySelector("img").getAttribute("src"),
-            width: parseInt(box.getAttribute("data-width"), 10),
-            height: parseInt(box.getAttribute("data-height"), 10),
-            lang: box.getAttribute("data-lang")
-          });
-        };
-        document.head.appendChild(script);
-      })();
-    </script>
+    <script>if (window.oeeeChrome) window.oeeeChrome.adminReplay({{ ('/static/viewer/neo-cucumber-replay.js' | cachebuster)|tojson }});</script>
   {% endif %}
 {% endblock admin_content %}

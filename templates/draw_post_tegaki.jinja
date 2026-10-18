@@ -51,95 +51,15 @@
        it is done and keeps nothing on the device. #}
     {% include "toolbar.jinja" %}
     {% include "draw_dialog.jinja" %}
-    <script type="text/javascript">
-      (function () {
-        var securityCount = 0;
-
-        // Tegaki keeps nothing on the device, so leaving -- by the toolbar,
-        // say -- loses the drawing, and Tegaki asks first. It asks even of
-        // an empty canvas; this asks only once there is something on the
-        // undo stack, as the painter answers the apps' wouldLoseWork()
-        // (app_bridge.jinja). Set before open(), which hooks it up; Tegaki
-        // unhooks it itself when Finish or Cancel takes the page away.
-        Tegaki.onTabClose = function (event) {
-          if (TegakiHistory.undoStack.length === 0) return;
-          event.preventDefault();
-          event.returnValue = "";
-        };
-
-        // Tegaki fills the viewport from the top. It starts under the
-        // toolbar instead, so the page has the same bar as every other;
-        // measured, since the bar is taller under a notch.
-        function fitUnderToolbar() {
-          var bar = document.querySelector(".nav-bar");
-          var tegaki = document.getElementById("tegaki");
-          if (!bar || !tegaki) return;
-          var top = Math.round(bar.getBoundingClientRect().bottom);
-          tegaki.style.top = top + "px";
-          tegaki.style.height = "calc(100% - " + top + "px)";
-          // Tegaki keeps the canvas's place on screen to turn a pointer
-          // into a pixel, and measured it before this moved it -- on
-          // open, and on a resize, whose own handler runs before this
-          // one. Unmeasured, every stroke lands a toolbar's height away
-          // from the pen.
-          Tegaki.updatePosOffset();
-          TegakiCursor.updateCanvasSize();
-        }
-
-        function onDone() {
-          Tegaki.replayRecorder.stop();
-          var image = Tegaki.flatten();
-          var animation = Tegaki.replayRecorder.toBlob();
-
-          var form = new FormData();
-          form.append("image", image.toDataURL("image/png"));
-          form.append("animation", animation, "blob");
-          form.append("community_id", {{ (community_id or "") | tojson }});
-          form.append("paint_duration_ms", String(Math.max(0, Date.now() - Tegaki.startTimeStamp)));
-          form.append("security_count", String(securityCount));
-          form.append("width", String(image.width));
-          form.append("height", String(image.height));
-          form.append("tool", "tegaki");
-{% if parent_post_id %}
-          form.append("parent_post_id", {{ parent_post_id | tojson }});
-{% endif %}
-
-          fetch("/draw/finish", { method: "POST", body: form, credentials: "same-origin" })
-            .then(function (response) {
-              if (!response.ok) throw new Error("HTTP " + response.status);
-              return response.json();
-            })
-            .then(function (data) {
-              location.href = "/posts/" + data.post_id + "/publish";
-            })
-            .catch(function () {
-              alert({{ ftl_get_message("community-drawing-post-error") | tojson }});
-              // Done hid the painter; give the drawing back to keep at.
-              Tegaki.resume();
-              fitUnderToolbar();
-            });
-        }
-
-        function onCancel() {
-          location.href = {{ (("/posts/" ~ parent_post_id) if parent_post_id else (("/communities/@" ~ community_slug) if community_slug else "/")) | tojson }};
-        }
-
-        Tegaki.open({
-          saveReplay: true,
-          onDone: onDone,
-          onCancel: onCancel,
-          width: {{ width }},
-          height: {{ height }}
-        });
-        fitUnderToolbar();
-        window.addEventListener("resize", fitUnderToolbar);
-        // The bar can grow once its font arrives.
-        window.addEventListener("load", fitUnderToolbar);
-
-        document.getElementById("tegaki").addEventListener("pointerdown", function () {
-          securityCount++;
-        });
-      })();
+    <script>
+      if (window.oeeeChrome) window.oeeeChrome.tegakiDraw({
+        communityId: {{ (community_id or "") | tojson }},
+        parentPostId: {% if parent_post_id %}{{ parent_post_id | tojson }}{% else %}null{% endif %},
+        cancelTo: {{ (("/posts/" ~ parent_post_id) if parent_post_id else (("/communities/@" ~ community_slug) if community_slug else "/")) | tojson }},
+        postError: {{ ftl_get_message("community-drawing-post-error") | tojson }},
+        width: {{ width }},
+        height: {{ height }}
+      });
     </script>
   </body>
 </html>

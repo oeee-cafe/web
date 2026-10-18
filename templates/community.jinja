@@ -200,31 +200,6 @@
         {% endif %}
       </div>
     </div>
-    <script>
-      function showCommunityDrawModal() {
-        var modal = document.getElementById("community-draw-modal");
-        modal.style.display = "flex";
-        // Focus the heading, not the first field: on iOS a focused <select>
-        // opens its picker, so the width wheel would come up with the modal.
-        document.getElementById("community-draw-title").focus();
-      }
-      function hideCommunityDrawModal() {
-        document.getElementById("community-draw-modal").style.display = "none";
-      }
-      function setOrientationDimensions(form) {
-        var portrait = form.querySelector('input[name="orientation"]:checked').value === "portrait";
-        form.querySelector('input[name="width"]').value = portrait ? "480" : "640";
-        form.querySelector('input[name="height"]').value = portrait ? "640" : "480";
-      }
-      (function () {
-        var modal = document.getElementById("community-draw-modal");
-        modal.addEventListener("click", function (e) {
-          if (e.target === modal) hideCommunityDrawModal();
-        });
-        document.addEventListener("keydown", function (e) {
-          if (e.key === "Escape" && modal.style.display !== "none") hideCommunityDrawModal();
-        });
-      })();
-    </script>
+    <script>if (window.oeeeChrome) window.oeeeChrome.communityDraw();</script>
   {% endif %}
 {% endblock content %}

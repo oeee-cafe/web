@@ -51,38 +51,6 @@
   </head>
   <body>
     {% include "toolbar.jinja" %}
-    <script type="text/javascript">
-      (function () {
-        // Tegaki fills the viewport from the top. It starts under the
-        // toolbar instead, as the painter does, so the page has the same
-        // bar as every other; measured, since the bar is taller under a
-        // notch.
-        function fitUnderToolbar() {
-          var bar = document.querySelector(".nav-bar");
-          var tegaki = document.getElementById("tegaki");
-          if (!bar || !tegaki) return;
-          var top = Math.round(bar.getBoundingClientRect().bottom);
-          tegaki.style.top = top + "px";
-          tegaki.style.height = "calc(100% - " + top + "px)";
-          // Tegaki keeps the canvas's place on screen, measured before
-          // this moved it (draw_post_tegaki.jinja).
-          Tegaki.updatePosOffset();
-        }
-
-        Tegaki.onCloseViewerClick = function () {
-          window.location.href = "{{ post_url(post, post_id) }}";
-        };
-
-        Tegaki.open({
-          replayMode: true,
-          replayURL:
-            "{{ stored_url("replay", post.replay_filename) }}",
-        });
-        fitUnderToolbar();
-        window.addEventListener("resize", fitUnderToolbar);
-        // The bar can grow once its font arrives.
-        window.addEventListener("load", fitUnderToolbar);
-      })();
-    </script>
+    <script>if (window.oeeeChrome) window.oeeeChrome.tegakiReplay({{ post_url(post, post_id)|tojson }}, {{ stored_url("replay", post.replay_filename)|tojson }});</script>
   </body>
 </html>

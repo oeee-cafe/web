@@ -4,7 +4,8 @@
 // the chrome: the toolbar (toolbarControls.ts), the loading bar, the Windows
 // app's caption, the toasts, the reaction and follow guesses, the quick
 // switcher, the live stream, the site's confirm and alert, the Draw dialog,
-// the segmented controls' thumbs and the Per row slider. Built to
+// the segmented controls' thumbs and the Per row slider -- and the pages'
+// own scripts (pages/, and the post page's zoom and mentions). Built to
 // dist-site/chrome.js and loaded by theme_head.jinja, in the head of every
 // page with any of these, before any of them.
 //
@@ -34,6 +35,16 @@ import { installStore } from "./store";
 import { settleThumbs } from "./thumbs";
 import { lookAtToasts } from "./toasts";
 import { installToolbar, showToolbar } from "./toolbarControls";
+import { attachMentions } from "./mentionBox";
+import { postZoom } from "./postZoom";
+import { discordAccount, type DiscordWords } from "./pages/discordAccount";
+import { communityDraw, postPage, profileReport, sessionDialog } from "./pages/modals";
+import { moveToCommunity, tagSuggestions } from "./pages/postForm";
+import { adminReplay, postStage, publishStage } from "./pages/postStage";
+import { handoffDone, indeterminateBoxes, macHeaderHeight, touchActive } from "./pages/small";
+import { supporterPage, type SupporterWords } from "./pages/supporter";
+import { communitiesTabs, profileTabs } from "./pages/tabs";
+import { tegakiDraw, tegakiReplay, type TegakiDrawing } from "./pages/tegaki";
 
 interface Chrome {
   // The head's, once a document (theme_head.jinja and what it includes).
@@ -57,6 +68,28 @@ interface Chrome {
   live(closeLabel: string, newDrawings: string): void;
   confirmDialog(): void;
   alertDialog(): void;
+  touchActive(): void;
+  macHeaderHeight(): void;
+  // The pages' own, where each page's script was (frontend/site/pages).
+  postStage(viewerUrl: string): void;
+  postZoom(): void;
+  mentions(): void;
+  postPage(): void;
+  publishStage(): void;
+  tagSuggestions(): void;
+  moveToCommunity(): void;
+  communityDraw(): void;
+  sessionDialog(): void;
+  communitiesTabs(): void;
+  profileTabs(): void;
+  profileReport(): void;
+  supporter(words: SupporterWords): void;
+  discordAccount(words: DiscordWords): void;
+  adminReplay(viewerUrl: string): void;
+  tegakiDraw(drawing: TegakiDrawing): void;
+  tegakiReplay(postUrl: string, replayUrl: string): void;
+  handoffDone(back: string): void;
+  indeterminateBoxes(): void;
 }
 
 const host = window as unknown as { oeeeChrome?: Chrome };
@@ -87,5 +120,26 @@ if (!host.oeeeChrome) {
     live: startLive,
     confirmDialog: attachConfirm,
     alertDialog: attachAlert,
+    touchActive,
+    macHeaderHeight,
+    postStage,
+    postZoom,
+    mentions: attachMentions,
+    postPage,
+    publishStage,
+    tagSuggestions,
+    moveToCommunity,
+    communityDraw,
+    sessionDialog,
+    communitiesTabs,
+    profileTabs,
+    profileReport,
+    supporter: supporterPage,
+    discordAccount,
+    adminReplay,
+    tegakiDraw,
+    tegakiReplay,
+    handoffDone,
+    indeterminateBoxes,
   };
 }

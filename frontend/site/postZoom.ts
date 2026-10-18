@@ -14,9 +14,9 @@
 // is larger than a pixel of the page it is drawn hard (is-crisp, style.css),
 // as the replay's canvas is; smaller, it is scaled down smoothly.
 //
-// The page loads it as a classic script, built to dist-site/post_zoom.js for
-// Firefox 56 like every bundle in neo-cucumber. No pointer events, which are
-// Firefox 59: that is the API, not the syntax, and no build lowers it.
+// A piece of chrome.js, which post_view.jinja calls after the stage is
+// fitted. No pointer events, which are Firefox 59: that is the API, not the
+// syntax, and no build lowers it.
 
 const MOST = 16; // drawing pixels to a page pixel, at the closest
 
@@ -293,5 +293,8 @@ function attach(stage: Element): void {
   paint(false);
 }
 
-const stages = document.querySelectorAll("[data-post-stage]");
-for (let i = 0; i < stages.length; i++) attach(stages[i]);
+/** Every drawing's stage on the page, pinched closer in its own frame. */
+export function postZoom(): void {
+  const stages = document.querySelectorAll("[data-post-stage]");
+  for (let i = 0; i < stages.length; i++) attach(stages[i]);
+}

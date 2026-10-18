@@ -1,103 +1,7 @@
 {% from "storage_macro.jinja" import stored_url %}
 {% extends "base.jinja" %}
 {% block head %}
-  <script>
-    // The tag field's suggestion menu. It used to answer a click and nothing
-    // else, inside a container that announced itself as a listbox — so anyone
-    // working from the keyboard, and anyone on a screen reader, had a menu they
-    // could neither reach nor dismiss.
-    document.addEventListener('DOMContentLoaded', function () {
-      var input = document.getElementById('tags-input');
-      var menu = document.getElementById('tag-suggestions');
-      if (!input || !menu) return;
-
-      // The separators the server splits on, so the tag being typed is the same
-      // one either side sees. The full-width forms are what an IME emits.
-      var SEPARATORS = /[\s,\u3001\uFF0C#\uFF03]+/;
-      var active = -1;
-
-      function options() {
-        return Array.prototype.slice.call(
-          menu.querySelectorAll('.tag-autocomplete-item')
-        );
-      }
-
-      function highlight(index) {
-        var items = options();
-        active = items.length ? (index + items.length) % items.length : -1;
-        items.forEach(function (item, i) {
-          var on = i === active;
-          item.classList.toggle('is-active', on);
-          item.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-        input.setAttribute(
-          'aria-activedescendant',
-          active >= 0 ? items[active].id : ''
-        );
-      }
-
-      function close() {
-        menu.innerHTML = '';
-        active = -1;
-        input.setAttribute('aria-expanded', 'false');
-        input.setAttribute('aria-activedescendant', '');
-      }
-
-      function choose(item) {
-        var tags = input.value.split(SEPARATORS).filter(function (t) {
-          return t.trim();
-        });
-        tags.pop(); // the partial tag this suggestion replaces
-        tags.push(item.dataset.tag);
-        input.value = tags.join(', ') + ', ';
-        close();
-        if (window.oeeeApp && window.oeeeApp.connected()) window.oeeeApp.feel('selection');
-        input.focus();
-      }
-
-      menu.addEventListener('click', function (e) {
-        var item = e.target.closest('.tag-autocomplete-item');
-        if (item) choose(item);
-      });
-
-      menu.addEventListener('mousemove', function (e) {
-        var item = e.target.closest('.tag-autocomplete-item');
-        if (item) highlight(options().indexOf(item));
-      });
-
-      input.addEventListener('keydown', function (e) {
-        var items = options();
-        if (e.key === 'Escape') {
-          close();
-          return;
-        }
-        if (!items.length) return;
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          highlight(active + 1);
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          highlight(active - 1);
-        } else if (e.key === 'Enter' && active >= 0) {
-          // Only when a suggestion is highlighted: otherwise Enter still
-          // submits the post, which is what it does with the menu closed.
-          e.preventDefault();
-          choose(items[active]);
-        }
-      });
-
-      // A fresh batch of suggestions starts with nothing highlighted.
-      menu.addEventListener('htmx:afterSwap', function () {
-        active = -1;
-        input.setAttribute('aria-expanded', options().length ? 'true' : 'false');
-        input.setAttribute('aria-activedescendant', '');
-      });
-
-      document.addEventListener('click', function (e) {
-        if (!menu.contains(e.target) && e.target !== input) close();
-      });
-    });
-  </script>
+  <script>if (window.oeeeChrome) window.oeeeChrome.tagSuggestions();</script>
 {% endblock head %}
 {% block content %}
   {# Publishing a drawing, laid out as the post it will become: the drawing on
@@ -204,23 +108,5 @@
       </section>
     </div>
   </div>
-  <script>
-    (function () {
-      // The post page's stage: as large as fits.
-      var stageBox = document.querySelector("[data-post-stage]");
-      function fitStage() {
-        var width = parseInt(stageBox.getAttribute("data-width"), 10);
-        var height = parseInt(stageBox.getAttribute("data-height"), 10);
-        var room = stageBox.parentNode.parentNode.clientWidth;
-        var tall = window.innerWidth > 600 ? Math.max(window.innerHeight - 190, height) : Infinity;
-        var shown = Math.min(room, width * 4, (width * tall) / height);
-        stageBox.style.setProperty("--post-stage-shown", shown + "px");
-        document.querySelector(".post-page").style.setProperty("--post-shown", shown + "px");
-        // Drawn hard unless it is shown smaller than its own size.
-        stageBox.classList.toggle("is-crisp", width <= room);
-      }
-      fitStage();
-      window.addEventListener("resize", fitStage);
-    })();
-  </script>
+  <script>if (window.oeeeChrome) window.oeeeChrome.publishStage();</script>
 {% endblock content %}

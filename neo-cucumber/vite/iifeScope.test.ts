@@ -55,8 +55,8 @@ function anything(): unknown {
 }
 
 /*
- * base.jinja, toolbar.jinja and the post page load these as classic scripts
- * beside the page's own inline ones, so none may leave a name on `window`
+ * theme_head.jinja loads these as classic scripts beside the page's own
+ * inline ones, so none may leave a name on `window`
  * but the ones it is there to give the page.
  */
 const GIVES: Record<string, string[]> = {
@@ -81,8 +81,6 @@ describe("the site's own scripts", () => {
     expect(chunks.map((chunk) => chunk.fileName).sort()).toEqual([
       "chrome.js",
       "htmx.js",
-      "mention.js",
-      "post_zoom.js",
       "reaction_picker.js",
     ]);
 

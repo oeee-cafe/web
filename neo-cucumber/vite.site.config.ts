@@ -4,12 +4,11 @@ import { containScripts } from "./vite/iifeScope";
 import { resolve } from "node:path";
 
 /**
- * The site's own small scripts (../frontend/site), each a file of its own that
- * a server-rendered page loads by a script tag: the comment box's @
- * autocomplete, a post's pinch to zoom, the reaction picker, the site's
- * chrome (the toolbar, toasts, quick switcher and the rest), and htmx with
- * its extensions. Kept apart
- * from the painter's build so that none of them pays for React.
+ * The site's own scripts (../frontend/site), for the server-rendered pages:
+ * chrome.js, everything the pages run, loaded once a document by
+ * theme_head.jinja; htmx with its extensions; and the reaction picker, a
+ * module of its own so a browser without modules keeps the typed form. Kept
+ * apart from the painter's build so that none of them pays for React.
  *
  * Emits stable filenames, served at /static/site/; the templates cache-bust
  * them themselves.
@@ -38,11 +37,10 @@ export default defineConfig({
     lib: {
       entry: {
         htmx: resolve(import.meta.dirname, "../frontend/site/htmx.ts"),
-        mention: resolve(import.meta.dirname, "../frontend/site/mention.ts"),
-        // The site's chrome, loaded by toolbar.jinja on every page with a
-        // toolbar: the toolbar's own and the pieces around the page.
+        // Everything else the pages run, loaded once a document by
+        // theme_head.jinja: the app bridge, the chrome around every page,
+        // and each page's own pieces (chrome.ts).
         chrome: resolve(import.meta.dirname, "../frontend/site/chrome.ts"),
-        post_zoom: resolve(import.meta.dirname, "../frontend/site/postZoom.ts"),
         // Loaded as a module, so a browser without modules keeps the typed
         // form instead (reactionPicker.ts).
         reaction_picker: resolve(import.meta.dirname, "../frontend/site/reactionPicker.ts"),

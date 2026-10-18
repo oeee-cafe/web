@@ -56,27 +56,14 @@
     {# Safari on iOS gives nothing :active unless the page listens for
        touches, and the pressed states in ds.css are how a control answers a
        tap there now that the tap highlight is off. #}
-    <script>
-      document.addEventListener("touchstart", function () {}, { passive: true });
-    </script>
+    <script>if (window.oeeeChrome) window.oeeeChrome.touchActive();</script>
     <header>
       {% include "toolbar.jinja" %}
     </header>
     {# In the macOS app the header floats over the content (ds.css), which
        needs its height to start below it -- a height that changes when the
        toolbar stacks or a message arrives. #}
-    <script>
-      (function () {
-        var root = document.documentElement;
-        if (root.getAttribute("data-app") !== "macos" || !window.ResizeObserver) return;
-        var header = document.querySelector(".ds-page > header");
-        function measure() {
-          root.style.setProperty("--ds-header-height", header.offsetHeight + "px");
-        }
-        measure();
-        new ResizeObserver(measure).observe(header);
-      })();
-    </script>
+    <script>if (window.oeeeChrome) window.oeeeChrome.macHeaderHeight();</script>
     {# The content area: what scrolls, below the toolbar, on screens wider
        than a phone (ds.css, "The content area"). Focusable from script only,
        so the keyboard scrolls it without a click first. #}

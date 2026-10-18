@@ -133,7 +133,9 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
     assert!(squashed.contains(
         r#"<span class="supporter-price" data-product="cafe.oeee.supporter.2026"></span>"#
     ));
-    assert!(apple.contains("(app.store = app.store || {}).prices = "));
+    // Which the app fills in through oeeeApp.store.prices
+    // (frontend/site/pages/supporter.ts, appContract.browser.test.ts).
+    assert!(apple.contains("window.oeeeChrome.supporter({"));
     assert!(!apple.contains("supporter-pack-none"));
 
     // On Steam, and in the Microsoft Store: no Restore, which only the
@@ -332,8 +334,9 @@ fn the_apps_discord_account_waits_for_the_app_to_say() {
     assert!(rendered.contains("account-in-this-app"));
     assert!(rendered.contains("account-discord-connect"));
     assert!(rendered.contains("account-discord-disconnect"));
-    // Asked of the app over the bridge, not linked to like a sign-in.
-    assert!(rendered.contains(r#"discord.ask("connect")"#));
+    // Asked of the app over the bridge, not linked to like a sign-in
+    // (frontend/site/pages/discordAccount.ts).
+    assert!(rendered.contains("window.oeeeChrome.discordAccount({"));
     assert!(!rendered.contains("/auth/discord"));
     // Named in the reader's own wording, with the name put in by the page.
     assert!(rendered.contains("account-discord-connected(name={name})"));

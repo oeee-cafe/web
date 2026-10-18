@@ -338,22 +338,17 @@ fn the_tegaki_painter_posts_a_tegaki_replay() {
         })
         .expect("tegaki painter renders");
     let nav = rendered.find("<nav class=\"nav-bar\"").expect("the toolbar");
-    assert!(nav < rendered.find("Tegaki.open(").unwrap());
+    // What it posts, and that leaving with a drawing asks first, is
+    // frontend/site/pages/pages.browser.test.ts's; here, what it is handed.
+    assert!(nav < rendered.find("window.oeeeChrome.tegakiDraw(").unwrap());
     assert!(rendered.find("tegaki.css").unwrap() < rendered.find("/static/ds.css").unwrap());
     assert!(rendered.contains(r#"id="draw-dialog""#));
-    assert!(rendered.contains(r#"form.append("tool", "tegaki");"#));
-    assert!(rendered.contains(r#"form.append("paint_duration_ms""#));
-    // It keeps nothing on the device, so leaving with a drawing asks first.
-    assert!(rendered.contains("Tegaki.onTabClose = function (event) {"));
-    assert!(
-        rendered.find("Tegaki.onTabClose").unwrap() < rendered.find("Tegaki.open(").unwrap(),
-        "replaced before open() hooks it up"
-    );
     assert!(rendered.contains("width: 400,"));
     assert!(
-        rendered.contains(r#"form.append("community_id", "x\"); alert(1); (");"#),
+        rendered.contains(r#"communityId: "x\"); alert(1); (","#),
         "community_id stays one string"
     );
+    assert!(rendered.contains("parentPostId: null,"));
     assert!(rendered.contains(r#""/communities/@open""#), "Cancel goes back to the community");
     assert!(!rendered.contains("parent_post_id"));
 }
