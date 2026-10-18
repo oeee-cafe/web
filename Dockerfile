@@ -51,7 +51,9 @@ COPY neo-cucumber/package.json neo-cucumber/pnpm-lock.yaml neo-cucumber/ ./
 COPY frontend/ /app/frontend/
 RUN npm install --global corepack@latest
 RUN corepack enable pnpm
-RUN corepack use pnpm@latest-10
+# The version mise.toml pins, so the image installs from the lockfile with the
+# pnpm that wrote it.
+RUN corepack use pnpm@12.14.0
 RUN pnpm install --frozen-lockfile
 # The two bundles that report to Sentry (dist/ for the collaborative page,
 # dist-offline/ for the drawing page) are built with a source map beside each

@@ -1,0 +1,9 @@
+# pnpm since 11 refuses to install while a dependency's build script is
+# neither allowed nor denied. Each of these only fetches or checks a native
+# binary that already arrives as an optional platform package, and pnpm 10
+# skipped every one of them without asking, so they stay skipped.
+allowBuilds:
+  '@sentry/cli': false
+  '@swc/core': false
+  '@tailwindcss/oxide': false
+  esbuild: false

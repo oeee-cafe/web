@@ -1,5 +1,6 @@
 [tools]
-pnpm = "10.15.0"
+# The Dockerfile asks corepack for this same version.
+pnpm = "12.14.0"
 python = "3.13"
 # What .github/workflows/image.yml uploads the debug info and source maps to
 # Sentry with (mise-action installs it from here).
