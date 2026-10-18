@@ -220,6 +220,13 @@ post-move-search-placeholder = Search communities...
 post-move-available = Available communities
 post-move-confirm = Are you sure you want to move this post to "{ $communityName }"?
 post-move-no-results = No communities found matching your search.
+post-move-posts-count =
+    { $count ->
+        [one] { $count } post
+       *[other] { $count } posts
+    }
+post-move-more = Only the most active communities are listed. Search to find the others.
+post-move-more-results = Showing the first { $count } matches. Type more to narrow them down.
 post-personal-post = Personal Post
 post-personal-post-description = Move this post to your personal profile (not in any community)
 post-move-confirm-personal = Are you sure you want to move this post to your personal profile?

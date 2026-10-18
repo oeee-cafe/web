@@ -241,9 +241,131 @@ pub async fn get_movable_communities(
     Ok(communities)
 }
 
+/// A community the move page offers, with what its row says about it.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct MoveDestination {
+    pub id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub visibility: CommunityVisibility,
+    pub owner_login_name: LoginName,
+    pub posts_count: i64,
+    /// Owned by the mover or posted in by them: listed whole, ahead of the
+    /// rest, and the only way an unlisted community is offered at all.
+    pub is_known: bool,
+    pub has_participated: bool,
+}
+
+/// How many communities the move page lists beyond the mover's own, most
+/// active first. The rest are a search away.
+pub const MOVE_OTHERS_LIMIT: i64 = 30;
+
+/// Where the author may move a post, narrowed by `query` when there is one.
+///
+/// The same rule `may_move_post_into` enforces -- never private, never
+/// two-tone -- plus: unlisted only where the author owns it or has posted, and
+/// a public community nobody has posted in only when it is one of those. The
+/// mover's own are returned whole; of the others at most `others_limit`, the
+/// ones whose name starts with the query first, then the most recently active.
+/// One more than the limit is fetched, so the caller can tell there are more.
+pub async fn move_destinations(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    exclude: Option<Uuid>,
+    query: &str,
+    others_limit: i64,
+) -> Result<Vec<MoveDestination>> {
+    let query = query.trim();
+    let escaped = crate::models::tag::escape_like(query);
+    let rows = sqlx::query!(
+        r#"
+        WITH candidates AS (
+            SELECT
+                c.id,
+                c.name,
+                c.slug,
+                c.visibility,
+                u.login_name,
+                stats.posts_count,
+                stats.last_posted_at,
+                EXISTS(
+                    SELECT 1 FROM posts p
+                    WHERE p.community_id = c.id AND p.author_id = $1
+                ) AS has_participated,
+                c.owner_id = $1 AS is_owner,
+                ($3 <> '' AND (c.name ILIKE $5 || '%' ESCAPE '\' OR c.slug ILIKE $5 || '%' ESCAPE '\')) AS is_prefix
+            FROM communities c
+            INNER JOIN users u ON u.id = c.owner_id
+            CROSS JOIN LATERAL (
+                SELECT COUNT(*) AS posts_count, MAX(p.published_at) AS last_posted_at
+                FROM posts p
+                WHERE p.community_id = c.id
+                  AND p.published_at IS NOT NULL
+                  AND p.deleted_at IS NULL
+            ) stats
+            WHERE c.deleted_at IS NULL
+              AND c.visibility <> 'private'
+              AND NOT (c.background_color IS NOT NULL AND c.foreground_color IS NOT NULL)
+              AND c.id IS DISTINCT FROM $2
+              AND ($3 = ''
+                   OR c.name ILIKE $4 ESCAPE '\'
+                   OR c.slug ILIKE $4 ESCAPE '\'
+                   OR c.description ILIKE $4 ESCAPE '\')
+        ),
+        offered AS (
+            SELECT *, (has_participated OR is_owner) AS is_known
+            FROM candidates
+            WHERE has_participated OR is_owner
+               OR (visibility = 'public' AND last_posted_at IS NOT NULL)
+        ),
+        ranked AS (
+            SELECT *, ROW_NUMBER() OVER (
+                PARTITION BY is_known
+                ORDER BY is_prefix DESC, last_posted_at DESC NULLS LAST, name
+            ) AS rn
+            FROM offered
+        )
+        SELECT
+            id AS "id!",
+            name AS "name!",
+            slug AS "slug!",
+            visibility AS "visibility!: CommunityVisibility",
+            login_name AS "owner_login_name!",
+            posts_count AS "posts_count!",
+            is_known AS "is_known!",
+            has_participated AS "has_participated!"
+        FROM ranked
+        WHERE is_known OR rn <= $6
+        ORDER BY is_known DESC, rn
+        "#,
+        user_id,
+        exclude,
+        query,
+        format!("%{escaped}%"),
+        escaped,
+        others_limit + 1,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| MoveDestination {
+            id: row.id,
+            name: row.name,
+            slug: row.slug,
+            visibility: row.visibility,
+            owner_login_name: row.owner_login_name.into(),
+            posts_count: row.posts_count,
+            is_known: row.is_known,
+            has_participated: row.has_participated,
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod move_destination_tests {
-    use super::may_move_post_into;
+    use super::{may_move_post_into, move_destinations};
     use sqlx::{Postgres, Transaction};
     use uuid::Uuid;
 
@@ -317,5 +439,110 @@ mod move_destination_tests {
             );
         }
         assert!(!may_move_post_into(&mut tx, Uuid::new_v4()).await.unwrap());
+    }
+
+    /// The move page's list: never private or two-tone, unlisted only for
+    /// whoever owns or has posted in it, never the post's own community,
+    /// the mover's own whole and the rest cut at the limit (one over, so
+    /// the page can say there are more), and the search taken literally.
+    #[tokio::test]
+    async fn the_move_list_offers_what_a_move_would_take() {
+        let Some(mut tx) = tx().await else { return };
+        let tag = Uuid::new_v4().simple().to_string()[..12].to_string();
+        let user = |name: String| {
+            sqlx::query_scalar!(
+                "INSERT INTO users (login_name, display_name) VALUES ($1, $1) RETURNING id",
+                name
+            )
+        };
+        let mover = user(format!("mv_{tag}")).fetch_one(&mut *tx).await.unwrap();
+        let other = user(format!("ot_{tag}")).fetch_one(&mut *tx).await.unwrap();
+
+        let mut ids = std::collections::HashMap::new();
+        for (kind, owner, visibility, two_tone) in [
+            ("mine_unlisted", mover, "unlisted", false),
+            ("their_unlisted", other, "unlisted", false),
+            ("private", mover, "private", false),
+            ("twotone", other, "public", true),
+            ("current", other, "public", false),
+            ("pub_a", other, "public", false),
+            ("pub_b", other, "public", false),
+            ("pub_c", other, "public", false),
+            ("pct_d", other, "public", false),
+        ] {
+            let colour = two_tone.then_some("#000000");
+            let id = sqlx::query_scalar!(
+                r#"INSERT INTO communities
+                   (owner_id, name, description, visibility, slug, foreground_color, background_color)
+                   VALUES ($1, $2, '', $3::text::community_visibility, $2, $4, $4)
+                   RETURNING id"#,
+                owner,
+                format!("{kind}_{tag}"),
+                visibility,
+                colour,
+            )
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+            // Something published, so the public ones are offered at all.
+            let image = sqlx::query_scalar!(
+                "INSERT INTO images (width, height, paint_duration, stroke_count, image_filename, tool)
+                 VALUES (1, 1, '1 second', 1, $1, 'neo') RETURNING id",
+                format!("{kind}_{tag}.png")
+            )
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+            sqlx::query!(
+                "INSERT INTO posts (author_id, community_id, image_id, published_at) VALUES ($1, $2, $3, now())",
+                other,
+                id,
+                image
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+            ids.insert(kind, id);
+        }
+
+        let names = |rows: &[super::MoveDestination]| {
+            rows.iter()
+                .map(|c| c.name.trim_end_matches(&format!("_{tag}")).to_string())
+                .collect::<Vec<_>>()
+        };
+
+        let all = move_destinations(&mut tx, mover, Some(ids["current"]), &tag, 10)
+            .await
+            .unwrap();
+        let mut offered = names(&all);
+        offered.sort();
+        assert_eq!(
+            offered,
+            ["mine_unlisted", "pct_d", "pub_a", "pub_b", "pub_c"]
+        );
+        assert!(all[0].is_known, "the mover's own come first");
+
+        // Two of the four others, plus one to say there are more; the
+        // mover's own are not counted against the limit.
+        let cut = move_destinations(&mut tx, mover, Some(ids["current"]), &tag, 2)
+            .await
+            .unwrap();
+        assert_eq!(cut.iter().filter(|c| !c.is_known).count(), 3);
+        assert_eq!(cut.iter().filter(|c| c.is_known).count(), 1);
+
+        // `pub_` is a prefix of three names; `_` and `%` are characters, not
+        // wildcards, so `pct%` finds nothing and `pub_` not `pct_d`.
+        let pub_ = move_destinations(&mut tx, mover, None, "pub_", 10)
+            .await
+            .unwrap();
+        assert!(
+            names(&pub_).iter().all(|n| n.starts_with("pub_")),
+            "{:?}",
+            names(&pub_)
+        );
+        let pct = move_destinations(&mut tx, mover, None, "pct%", 10)
+            .await
+            .unwrap();
+        assert!(pct.is_empty());
     }
 }

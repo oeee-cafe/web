@@ -2,360 +2,186 @@
 
 use crate::app_error::AppError;
 use crate::models::actor::Actor;
-use crate::models::community::{find_community_by_id, get_known_communities};
+use crate::models::community::{find_community_by_id, CommunityVisibility};
 use crate::models::image::find_image_by_id;
 use crate::models::post::{
     delete_post_with_activity, edit_post, edit_post_community, find_post_by_id,
-    get_draft_post_count,
+    get_draft_post_count, is_post_movable, move_destinations, MoveDestination, MOVE_OTHERS_LIMIT,
 };
 use crate::models::tag::{get_tags_for_post, set_post_tags};
 use crate::models::user::{find_user_by_id, AuthSession};
 use crate::web::context::CommonContext;
+use crate::web::htmx::is_htmx;
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use anyhow::Error;
 use aws_sdk_s3::config::{Credentials as AwsCredentials, Region, SharedCredentialsProvider};
 use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
-use axum::extract::Path;
+use axum::extract::{Path, Query};
+use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Redirect};
 use axum::{extract::State, response::Html, Form};
 use minijinja::context;
 use serde::Deserialize;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::federation::{community_federates, send_post_update_to_followers};
 use super::get_community_slug_url;
 use minijinja::value::Serde;
 
+#[derive(Deserialize)]
+pub struct MoveSearchQuery {
+    #[serde(default)]
+    pub q: String,
+}
+
+/// The move page, and with `HX-Request` just its list, which the search box
+/// asks for as you type. The list is narrowed in the database: there are too
+/// many public communities to send each with its three drawings and filter
+/// them in the browser.
 pub async fn post_edit_community(
     auth_session: AuthSession,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,
     State(state): State<AppState>,
     Path((_login_name, id)): Path<(String, String)>,
+    Query(search): Query<MoveSearchQuery>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     let post_uuid = Uuid::parse_str(&id)?;
+    let user_id = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id;
 
     let db = &state.db_pool;
     let mut tx = db.begin().await?;
-    let post = find_post_by_id(&mut tx, post_uuid).await?;
-    if post.is_none() {
-        return Err(AppError::NotFound("Post".to_string()));
-    }
-    let post = post.ok_or_else(|| AppError::NotFound("Post".to_string()))?;
+    let post = find_post_by_id(&mut tx, post_uuid)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post".to_string()))?;
 
     if *post
         .get("author_id")
         .and_then(|v| v.as_ref())
         .ok_or_else(|| AppError::BadRequest("Missing author_id".to_string()))?
-        != auth_session
-            .user
-            .as_ref()
-            .ok_or(AppError::Unauthorized)?
-            .id
-            .to_string()
+        != user_id.to_string()
     {
         return Err(AppError::Forbidden);
     }
 
-    // Check if post is movable using the helper function
-    use crate::models::post::is_post_movable;
+    // Not part of a thread, and not in a private or two-tone community.
     if !is_post_movable(&mut tx, post_uuid).await? {
-        // Post cannot be moved (part of thread, in private/two-tone community)
         return Err(AppError::Forbidden);
     }
 
-    let post_data = post.clone();
-    let current_community_id = post_data
+    let current_community_id = post
         .get("community_id")
         .and_then(|id| id.as_ref())
         .and_then(|id_str| Uuid::parse_str(id_str).ok());
+    let current_community = match current_community_id {
+        Some(community_id) => find_community_by_id(&mut tx, community_id).await?,
+        None => None,
+    };
 
-    // Get current community details with owner info (if post is in a community)
-    let (current_community_result, current_community_recent_posts) = if let Some(comm_id) =
-        current_community_id
-    {
-        let community_result = sqlx::query!(
-            r#"
-            SELECT
-                c.id AS "id!", c.owner_id AS "owner_id!", c.name, c.slug, c.description,
-                c.visibility as "visibility: crate::models::community::CommunityVisibility", c.updated_at, c.created_at, c.background_color, c.foreground_color,
-                u.login_name AS "owner_login_name?"
-            FROM communities c
-            LEFT JOIN users u ON c.owner_id = u.id
-            WHERE c.id = $1
-            "#,
-            comm_id
-        )
-        .fetch_optional(&mut *tx)
-        .await?;
+    let query = search.q.trim();
+    let mut destinations = move_destinations(
+        &mut tx,
+        user_id,
+        current_community_id,
+        query,
+        MOVE_OTHERS_LIMIT,
+    )
+    .await?;
 
-        // Get recent posts for current community
-        let current_posts = sqlx::query!(
-            r#"
+    // Three latest drawings a row, for every row in one query.
+    let ids: Vec<Uuid> = destinations.iter().map(|c| c.id).collect();
+    let recent_posts = sqlx::query!(
+        r#"
+        SELECT ranked.community_id AS "community_id!", ranked.image_filename
+        FROM (
             SELECT
-                p.id,
+                p.community_id,
                 i.image_filename,
-                i.width as image_width,
-                i.height as image_height,
-                u.login_name as author_login_name
+                ROW_NUMBER() OVER (PARTITION BY p.community_id ORDER BY p.published_at DESC) AS rn
             FROM posts p
             INNER JOIN images i ON p.image_id = i.id
-            INNER JOIN users u ON p.author_id = u.id
-            WHERE p.community_id = $1
+            WHERE p.community_id = ANY($1)
                 AND p.published_at IS NOT NULL
                 AND p.deleted_at IS NULL
-            ORDER BY p.published_at DESC
-            LIMIT 3
-            "#,
-            comm_id
-        )
-        .fetch_all(&mut *tx)
-        .await?;
-
-        let posts: Vec<serde_json::Value> = current_posts
-            .into_iter()
-            .map(|post| {
-                serde_json::json!({
-                    "id": post.id.to_string(),
-                    "image_filename": post.image_filename,
-                    "image_width": post.image_width,
-                    "image_height": post.image_height,
-                    "author_login_name": post.author_login_name,
-                })
-            })
-            .collect();
-
-        (community_result, posts)
-    } else {
-        (None, Vec::new())
-    };
-
-    let current_community = current_community_result.map(|row| {
-        serde_json::json!({
-            "id": row.id.to_string(),
-            "owner_id": row.owner_id.to_string(),
-            "name": row.name,
-            "slug": row.slug,
-            "description": row.description,
-            "visibility": row.visibility,
-            "owner_login_name": row.owner_login_name.unwrap_or_else(|| String::from("")),
-            "recent_posts": current_community_recent_posts,
-        })
-    });
-
-    // Fetch both public and known communities
-    let public_communities = crate::models::community::get_public_communities(&mut tx).await?;
-    let user_id = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?.id;
-    let known_communities = get_known_communities(&mut tx, user_id).await?;
-
-    // Get communities the user has participated in
-    let participated_community_ids: std::collections::HashSet<Uuid> = sqlx::query!(
-        r#"SELECT DISTINCT community_id FROM posts WHERE author_id = $1 AND community_id IS NOT NULL"#,
-        user_id
+        ) ranked
+        WHERE ranked.rn <= 3
+        ORDER BY ranked.community_id, ranked.rn
+        "#,
+        &ids
     )
     .fetch_all(&mut *tx)
-    .await?
-    .into_iter()
-    .filter_map(|row| row.community_id)
-    .collect();
-
-    // Separate known and public-only communities, filtering out current community
-    use std::collections::HashSet;
-    let known_ids: HashSet<Uuid> = known_communities.iter().map(|c| c.id).collect();
-
-    // Get all community IDs for fetching recent posts
-    let mut all_community_ids: Vec<Uuid> = Vec::new();
-    for c in &known_communities {
-        if current_community_id != Some(c.id) {
-            all_community_ids.push(c.id);
-        }
-    }
-    for c in &public_communities {
-        if current_community_id != Some(c.id) && !known_ids.contains(&c.id) {
-            all_community_ids.push(c.id);
-        }
-    }
-
-    // Fetch recent posts (3 per community) for all communities in a single batch query
-    let recent_posts = if !all_community_ids.is_empty() {
-        sqlx::query!(
-            r#"
-            SELECT
-                ranked.id,
-                ranked.community_id,
-                ranked.image_filename,
-                ranked.image_width,
-                ranked.image_height,
-                ranked.author_login_name
-            FROM (
-                SELECT
-                    p.id,
-                    p.community_id,
-                    i.image_filename,
-                    i.width as image_width,
-                    i.height as image_height,
-                    u.login_name as author_login_name,
-                    ROW_NUMBER() OVER (PARTITION BY p.community_id ORDER BY p.published_at DESC) as rn
-                FROM posts p
-                INNER JOIN images i ON p.image_id = i.id
-                INNER JOIN users u ON p.author_id = u.id
-                WHERE p.community_id = ANY($1)
-                    AND p.published_at IS NOT NULL
-                    AND p.deleted_at IS NULL
-            ) ranked
-            WHERE ranked.rn <= 3
-            ORDER BY ranked.community_id, ranked.rn
-            "#,
-            &all_community_ids
-        )
-        .fetch_all(&mut *tx)
-        .await?
-    } else {
-        Vec::new()
-    };
-
-    // Group posts by community_id (already limited to 3 per community by the query)
-    use std::collections::HashMap;
+    .await?;
     let mut posts_by_community: HashMap<Uuid, Vec<serde_json::Value>> = HashMap::new();
-    for post in recent_posts {
-        if let Some(community_id) = post.community_id {
-            let posts = posts_by_community.entry(community_id).or_default();
-            posts.push(serde_json::json!({
-                "id": post.id.to_string(),
-                "image_filename": post.image_filename,
-                "image_width": post.image_width,
-                "image_height": post.image_height,
-                "author_login_name": post.author_login_name,
-            }));
-        }
+    for row in recent_posts {
+        posts_by_community
+            .entry(row.community_id)
+            .or_default()
+            .push(serde_json::json!({ "image_filename": row.image_filename }));
     }
 
-    // Combine all communities (known + public), filtering out current and two-tone communities
-    let mut all_communities: Vec<_> = Vec::new();
+    // `move_destinations` fetched one past the limit to say whether there
+    // are more than the list shows.
+    let others_total = destinations.iter().filter(|c| !c.is_known).count();
+    let has_more = others_total as i64 > MOVE_OTHERS_LIMIT;
+    if has_more {
+        destinations.truncate(destinations.len() - 1);
+    }
 
-    // Add known communities
-    for c in known_communities {
-        if let Some(curr_id) = current_community_id
-            && c.id == curr_id
-        {
-            continue;
-        }
-        // Filter out two-tone communities
-        if c.background_color.is_some() && c.foreground_color.is_some() {
-            continue;
-        }
-        // Filter out private communities - moving to private communities is restricted
-        if matches!(
-            c.visibility,
-            crate::models::community::CommunityVisibility::Private
-        ) {
-            continue;
-        }
-
-        let recent_posts = posts_by_community.get(&c.id).cloned().unwrap_or_default();
-        let has_participated = participated_community_ids.contains(&c.id);
-        all_communities.push(serde_json::json!({
+    let row = |c: &MoveDestination| {
+        serde_json::json!({
             "id": c.id.to_string(),
             "name": c.name,
             "slug": c.slug,
-            "description": c.description,
-            "visibility": c.visibility,
-            "owner_login_name": c.owner_login_name,
-            "posts_count": null,
-            "recent_posts": recent_posts,
-            "has_participated": has_participated,
-        }));
-    }
-
-    // Add public communities (that aren't already in known)
-    for c in public_communities {
-        if let Some(curr_id) = current_community_id
-            && c.id == curr_id
-        {
-            continue;
-        }
-        if known_ids.contains(&c.id) {
-            continue;
-        }
-        // Filter out two-tone communities
-        if c.background_color.is_some() && c.foreground_color.is_some() {
-            continue;
-        }
-
-        let recent_posts = posts_by_community.get(&c.id).cloned().unwrap_or_default();
-        let has_participated = participated_community_ids.contains(&c.id);
-        all_communities.push(serde_json::json!({
-            "id": c.id.to_string(),
-            "name": c.name,
-            "slug": c.slug,
-            "description": c.description,
-            "visibility": c.visibility,
             "owner_login_name": c.owner_login_name,
             "posts_count": c.posts_count,
-            "recent_posts": recent_posts,
-            "has_participated": has_participated,
-        }));
-    }
-
-    // Separate by visibility type and participation
-    let mut unlisted_communities: Vec<_> = all_communities
-        .iter()
-        .filter(|c| c.get("visibility").and_then(|v| v.as_str()) == Some("unlisted"))
-        .cloned()
-        .collect();
-
-    let mut public_participated_communities: Vec<_> = all_communities
-        .iter()
-        .filter(|c| {
-            c.get("visibility").and_then(|v| v.as_str()) == Some("public")
-                && c.get("has_participated").and_then(|v| v.as_bool()) == Some(true)
+            "recent_posts": posts_by_community.get(&c.id).cloned().unwrap_or_default(),
         })
-        .cloned()
-        .collect();
-
-    let mut public_other_communities: Vec<_> = all_communities
+    };
+    let unlisted_communities: Vec<_> = destinations
         .iter()
-        .filter(|c| {
-            c.get("visibility").and_then(|v| v.as_str()) == Some("public")
-                && c.get("has_participated").and_then(|v| v.as_bool()) == Some(false)
-        })
-        .cloned()
+        .filter(|c| c.visibility == CommunityVisibility::Unlisted)
+        .map(row)
+        .collect();
+    let public_participated_communities: Vec<_> = destinations
+        .iter()
+        .filter(|c| c.visibility == CommunityVisibility::Public && c.has_participated)
+        .map(row)
+        .collect();
+    let public_other_communities: Vec<_> = destinations
+        .iter()
+        .filter(|c| c.visibility == CommunityVisibility::Public && !c.has_participated)
+        .map(row)
         .collect();
 
-    // Sort each list alphabetically by name
-    let sort_by_name = |a: &serde_json::Value, b: &serde_json::Value| {
-        a.get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .cmp(b.get("name").and_then(|v| v.as_str()).unwrap_or(""))
+    let ctx = context! {
+        post,
+        post_id => id,
+        current_community => Serde(current_community.map(|c| serde_json::json!({
+            "name": c.name,
+            "slug": c.slug,
+        }))),
+        unlisted_communities => Serde(unlisted_communities),
+        public_participated_communities => Serde(public_participated_communities),
+        public_other_communities => Serde(public_other_communities),
+        has_more,
+        query,
+        r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
     };
 
-    unlisted_communities.sort_by(sort_by_name);
-    public_participated_communities.sort_by(sort_by_name);
-    public_other_communities.sort_by(sort_by_name);
-
     let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
-
     tx.commit().await?;
 
     let template = "post_edit_community.jinja";
-    let rendered = state
-        .render_page(
-            template,
-            common_ctx,
-            context! {
-                post,
-                post_id => id,
-                current_community => Serde(current_community),
-                unlisted_communities => Serde(unlisted_communities),
-                public_participated_communities => Serde(public_participated_communities),
-                public_other_communities => Serde(public_other_communities),
-                r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
-                base_url => state.config.base_url.clone(),
-            },
-        )
-        .await?;
+    let rendered = if is_htmx(&headers) {
+        state
+            .render_page_block(template, "move_list", common_ctx, ctx)
+            .await?
+    } else {
+        state.render_page(template, common_ctx, ctx).await?
+    };
 
     Ok(Html(rendered).into_response())
 }
@@ -412,7 +238,6 @@ pub async fn do_post_edit_community(
     }
 
     // Check if post is movable using the helper function
-    use crate::models::post::is_post_movable;
     if !is_post_movable(&mut tx, post_uuid).await? {
         // Post cannot be moved (part of thread, in private/two-tone community)
         return Err(AppError::Forbidden);

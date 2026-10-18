@@ -13,46 +13,6 @@
   <meta name="robots" content="noindex" />
 {% endblock head %}
 
-{# One place a drawing can go: a row in the list, the whole row the target.
-   Its three latest drawings say what the community is at a glance; the
-   radio beside them is what the form sends. `label` is what the Move
-   button will say once this row is chosen. #}
-{% macro destination(value, name, meta, label, badge, posts, search, group) %}
-  <label class="move-row" data-search="{{ search }}">
-    <input type="radio" name="community_id" value="{{ value }}" data-move-label="{{ label }}" />
-    <span class="move-row-cover" aria-hidden="true">
-      {% if posts %}
-        {% for p in posts[:3] %}
-          <span class="move-row-cell"><img src="{{ stored_url("image", p.image_filename) }}" alt="" loading="lazy" decoding="async" /></span>
-        {% endfor %}
-      {% elif value == "" %}
-        <span class="move-row-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c.8-3.7 3.9-6 7.5-6s6.7 2.3 7.5 6"/></svg>
-        </span>
-      {% endif %}
-    </span>
-    <span class="move-row-text">
-      <span class="move-row-name">
-        <span class="move-row-title">{{ name }}</span>
-        {% if badge %}<span class="community-card-badge">{{ badge }}</span>{% endif %}
-      </span>
-      {% if meta %}<span class="move-row-meta">{{ meta }}</span>{% endif %}
-    </span>
-    <svg class="move-row-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-  </label>
-{% endmacro %}
-
-{% macro community_row(community, badge) %}
-  {{ destination(
-       community.id,
-       community.name,
-       "@" ~ community.owner_login_name ~ ((" · " ~ community.posts_count ~ " " ~ ftl_get_message("community-stats-posts")) if community.posts_count else ""),
-       ftl_format_pattern("post-move-to", {"communityName": community.name}),
-       badge,
-       community.recent_posts,
-       (community.name ~ " " ~ community.slug ~ " " ~ (community.description or ""))|lower) }}
-{% endmacro %}
-
 {% block content %}
   {# Moving a drawing is choosing one place from a list and saying so once:
      the list is a picker, the search narrows it, and a single button at
@@ -80,21 +40,72 @@
     </section>
 
     <form method="post" action="{{ post_url(post, post_id) }}/edit/community" class="move-form" id="move-form">
+      {# Narrowed in the database as you type: the server answers with
+         the move_list block alone, which replaces the list below. #}
       <input type="search"
              id="community-search"
+             name="q"
+             value="{{ query }}"
              class="ds-input move-search"
              placeholder="{{ ftl_get_message('post-move-search-placeholder') }}"
              aria-label="{{ ftl_get_message('post-move-search-placeholder') }}"
-             autocomplete="off" />
+             autocomplete="off"
+             hx-get="{{ post_url(post, post_id) }}/edit/community"
+             hx-trigger="input changed delay:250ms, search"
+             hx-target="#move-list"
+             hx-swap="innerHTML" />
 
-      <div class="move-list" role="radiogroup" aria-label="{{ ftl_get_message('post-move-available') }}">
-        {% if current_community %}
-          <div class="move-group" data-move-group>
-            {{ destination("", ftl_get_message("post-personal-post"), ftl_get_message("post-personal-post-description"), ftl_get_message("post-move-to-personal"), none, none, (ftl_get_message("post-personal-post") ~ " personal")|lower, "personal") }}
+      <div class="move-list" id="move-list" role="radiogroup" aria-label="{{ ftl_get_message('post-move-available') }}">
+        {% block move_list %}
+        {# One place a drawing can go: a row in the list, the whole row the
+           target. Its three latest drawings say what the community is at a
+           glance; the radio beside them is what the form sends. `label` is
+           what the Move button will say once this row is chosen. Defined in
+           the block so the block renders on its own. #}
+        {% macro destination(value, name, meta, label, badge, posts) %}
+          <label class="move-row">
+            <input type="radio" name="community_id" value="{{ value }}" data-move-label="{{ label }}" />
+            <span class="move-row-cover" aria-hidden="true">
+              {% if posts %}
+                {% for p in posts[:3] %}
+                  <span class="move-row-cell"><img src="{{ stored_url("image", p.image_filename) }}" alt="" loading="lazy" decoding="async" /></span>
+                {% endfor %}
+              {% elif value == "" %}
+                <span class="move-row-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c.8-3.7 3.9-6 7.5-6s6.7 2.3 7.5 6"/></svg>
+                </span>
+              {% endif %}
+            </span>
+            <span class="move-row-text">
+              <span class="move-row-name">
+                <span class="move-row-title">{{ name }}</span>
+                {% if badge %}<span class="community-card-badge">{{ badge }}</span>{% endif %}
+              </span>
+              {% if meta %}<span class="move-row-meta">{{ meta }}</span>{% endif %}
+            </span>
+            <svg class="move-row-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+          </label>
+        {% endmacro %}
+
+        {% macro community_row(community, badge) %}
+          {{ destination(
+               community.id,
+               community.name,
+               "@" ~ community.owner_login_name ~ ((" · " ~ ftl_format_pattern("post-move-posts-count", {"count": community.posts_count})) if community.posts_count else ""),
+               ftl_format_pattern("post-move-to", {"communityName": community.name}),
+               badge,
+               community.recent_posts) }}
+        {% endmacro %}
+
+        {% set personal = ftl_get_message("post-personal-post") %}
+        {% set show_personal = current_community and (not query or query|lower in personal|lower) %}
+        {% if show_personal %}
+          <div class="move-group">
+            {{ destination("", personal, ftl_get_message("post-personal-post-description"), ftl_get_message("post-move-to-personal"), none, none) }}
           </div>
         {% endif %}
         {% if unlisted_communities %}
-          <div class="move-group" data-move-group>
+          <div class="move-group">
             <div class="profile-section-label">{{ ftl_get_message("move-section-unlisted") }}</div>
             {% for community in unlisted_communities %}
               {{ community_row(community, ftl_get_message("community-badge-unlisted")) }}
@@ -102,7 +113,7 @@
           </div>
         {% endif %}
         {% if public_participated_communities %}
-          <div class="move-group" data-move-group>
+          <div class="move-group">
             <div class="profile-section-label">{{ ftl_get_message("move-section-public-participated") }}</div>
             {% for community in public_participated_communities %}
               {{ community_row(community, none) }}
@@ -110,14 +121,21 @@
           </div>
         {% endif %}
         {% if public_other_communities %}
-          <div class="move-group" data-move-group>
+          <div class="move-group">
             <div class="profile-section-label">{{ ftl_get_message("move-section-public-other") }}</div>
             {% for community in public_other_communities %}
               {{ community_row(community, none) }}
             {% endfor %}
           </div>
         {% endif %}
-        <p class="profile-empty move-empty" {% if unlisted_communities or public_participated_communities or public_other_communities or current_community %}hidden{% endif %}>{{ ftl_get_message("post-move-no-results") }}</p>
+        {% if has_more %}
+          <p class="profile-empty move-more">
+            {% if query %}{{ ftl_format_pattern("post-move-more-results", {"count": public_other_communities|length}) }}{% else %}{{ ftl_get_message("post-move-more") }}{% endif %}
+          </p>
+        {% elif not (show_personal or unlisted_communities or public_participated_communities or public_other_communities) %}
+          <p class="profile-empty move-empty">{{ ftl_get_message("post-move-no-results") }}</p>
+        {% endif %}
+        {% endblock move_list %}
       </div>
 
       {# The one decision, at the foot of the window while the list scrolls. #}
@@ -134,7 +152,6 @@
       var form = document.getElementById("move-form");
       var submit = document.getElementById("move-submit");
       var search = document.getElementById("community-search");
-      var empty = form.querySelector(".move-empty");
 
       // Choosing a row names it on the button.
       form.addEventListener("change", function (event) {
@@ -142,6 +159,7 @@
         if (radio.name !== "community_id") return;
         submit.disabled = false;
         submit.textContent = radio.getAttribute("data-move-label");
+        submit.setAttribute("data-chosen", radio.value);
         var rows = form.querySelectorAll(".move-row");
         for (var i = 0; i < rows.length; i++) {
           rows[i].classList.toggle("is-chosen", rows[i].contains(radio));
@@ -157,24 +175,23 @@
         if (row) row.classList.remove("has-focus");
       });
 
-      // Narrowing: rows by what they are called and described, groups by
-      // whether a row of theirs is left.
-      search.addEventListener("input", function () {
-        var query = search.value.toLowerCase().trim();
-        var groups = form.querySelectorAll("[data-move-group]");
-        var any = false;
-        for (var g = 0; g < groups.length; g++) {
-          var rows = groups[g].querySelectorAll(".move-row");
-          var shown = 0;
-          for (var r = 0; r < rows.length; r++) {
-            var hit = !query || rows[r].getAttribute("data-search").indexOf(query) !== -1;
-            rows[r].hidden = !hit;
-            if (hit) shown++;
+      // A new list, from the search: the row chosen before is chosen again
+      // when it is in it, and otherwise nothing is, so the button never
+      // names a row that is not on the page. It is remembered, so a search
+      // that brings it back brings the choice back too.
+      document.addEventListener("htmx:after:swap", function () {
+        var chosen = submit.getAttribute("data-chosen");
+        if (chosen === null) return;
+        var radios = form.querySelectorAll("input[name=community_id]");
+        for (var i = 0; i < radios.length; i++) {
+          if (radios[i].value === chosen) {
+            radios[i].checked = true;
+            radios[i].dispatchEvent(new Event("change", { bubbles: true }));
+            return;
           }
-          groups[g].hidden = shown === 0;
-          if (shown) any = true;
         }
-        empty.hidden = any;
+        submit.disabled = true;
+        submit.textContent = submit.getAttribute("data-choose");
       });
 
       // Enter in the search box would send the form with whatever was
@@ -182,7 +199,7 @@
       search.addEventListener("keydown", function (event) {
         if (event.key !== "Enter") return;
         event.preventDefault();
-        var first = form.querySelector(".move-row:not([hidden]) input");
+        var first = form.querySelector(".move-row input");
         if (first) {
           first.checked = true;
           first.dispatchEvent(new Event("change", { bubbles: true }));

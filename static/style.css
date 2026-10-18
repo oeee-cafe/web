@@ -2356,18 +2356,35 @@ nav a:visited,
   outline-offset: -2px;
 }
 
-/* At the window's foot while the list scrolls under it. */
+/* At the window's foot while the list scrolls under it: a raised bar the
+   width of the list, floating a little above the edge. A sticky box sticks
+   inside its scroller's padding, so where main is the scroller (a window
+   wider than a phone) `bottom: 0` left it main's bottom padding up from the
+   edge, with rows passing visibly beneath it; the bar there reaches down
+   into that padding instead. On a phone the page scrolls and has none. */
 .move-bar {
   position: -webkit-sticky;
   position: sticky;
-  bottom: 0;
+  bottom: calc(var(--ds-space-3) + env(safe-area-inset-bottom));
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
-  margin: 0 -8px;
-  padding: 12px 8px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--ds-line);
-  background-color: var(--ds-ground);
+  margin-top: var(--ds-space-4);
+  padding: 8px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-m);
+  background-color: var(--ds-surface);
+  box-shadow: var(--ds-shadow-menu);
+}
+
+@media (min-width: 601px) {
+  html:not([data-form="handheld"]) .move-bar {
+    bottom: calc(var(--ds-space-3) - var(--space-6) - env(safe-area-inset-bottom));
+  }
+}
+
+.move-more {
+  text-align: center;
 }
 
 .move-bar > * + * {

@@ -746,3 +746,69 @@ fn a_pickled_drawing_has_a_jar_on_its_card() {
     assert!(!render(false, false).contains("post-card-pickled"));
     assert!(!render(true, true).contains("post-card-pickled"));
 }
+
+/// The move page's list is its own block, which the search box swaps in
+/// by itself, so the block has to render without the page around it. Its
+/// counts arrive as numbers and are plural; the Personal row answers to the
+/// search like the communities do; and a list cut short says so.
+#[test]
+fn the_move_list_renders_alone_and_answers_to_the_search() {
+    let env = test_support::env();
+    let template = env
+        .get_template("post_edit_community.jinja")
+        .expect("move page loads");
+    let community = |name: &str, posts_count: i64| {
+        json!({
+            "id": "5f0c4f6e-6f0e-4d38-9a3b-2a4c1d7e8f90",
+            "name": name,
+            "slug": "club",
+            "owner_login_name": "owner",
+            "posts_count": posts_count,
+            "recent_posts": [{"image_filename": "abcdef.png"}],
+        })
+    };
+    let ctx = |query: &str, has_more: bool| {
+        context! {
+            post => Serde(post_page("true", "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d")),
+            post_id => "9c881320-2b43-4afa-b2bb-7128c8a3e985",
+            current_community => Serde(json!({"name": "Old", "slug": "old"})),
+            unlisted_communities => Serde(Vec::<serde_json::Value>::new()),
+            public_participated_communities => Serde(vec![community("One", 1)]),
+            public_other_communities => Serde(vec![community("Many", 7), community("None", 0)]),
+            has_more,
+            query,
+            ..chrome()
+        }
+    };
+
+    // As `Templates::render_block` does it.
+    let block = |ctx: minijinja::Value| {
+        template
+            .render_captured_to(ctx, std::io::sink())
+            .and_then(|mut captured| {
+                captured.with_state_mut(|state| state.render_block("move_list"))
+            })
+    };
+
+    let page = template.render(ctx("", true)).expect("move page renders");
+    assert!(page.contains(r#"id="move-list""#));
+    assert!(page.contains(r##"hx-target="#move-list""##));
+
+    let list = block(ctx("", true)).expect("move list renders alone");
+    assert!(!list.contains("<html"));
+    assert!(list.contains("@owner · post-move-posts-count(count=1)<"));
+    assert!(list.contains("@owner · post-move-posts-count(count=7)<"));
+    assert!(
+        list.contains(">@owner</span>"),
+        "no count when there are none"
+    );
+    assert!(list.contains("post-personal-post<"));
+    assert!(list.contains("move-more") && !list.contains("post-move-more-results"));
+
+    let searched = block(ctx("many", false)).unwrap();
+    assert!(!searched.contains("post-personal-post<"));
+    assert!(!searched.contains("move-more"));
+
+    let personal = block(ctx("PERS", false)).unwrap();
+    assert!(personal.contains("post-personal-post<"));
+}
