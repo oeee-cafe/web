@@ -266,6 +266,13 @@ fn the_account_page_asks_what_the_account_can_answer() {
     assert!(with_password.contains("/auth/apple?next=/account"));
     assert!(with_password.contains("/auth/google?next=/account"));
     assert!(with_password.contains("/auth/discord?next=/account"));
+    // Each button to link a provider carries that provider's logo, whole,
+    // before its words, as it does on /login.
+    for provider in ["apple", "google", "steam", "discord"] {
+        let button = super::provider_button(&with_password, provider);
+        assert!(button.contains("auth-provider-mark"), "{provider} has no logo");
+        assert!(button.ends_with(&format!("account-link-{provider}</a>")));
+    }
 
     let without = render(
         false,

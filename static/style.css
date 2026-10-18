@@ -4390,10 +4390,12 @@ html[data-store] .supporter-elsewhere {
 /* A provider's logo before the words, on their line and kept its own
    shape: a margin rather than `gap`, which Firefox 56 has not got for
    flexbox, and which this file, never seeing the legacy build pass, cannot
-   fall back from. */
+   fall back from. Its 18px is taller than the words' line, so it gives
+   back 2px above and below, and a button with a logo stands as tall as
+   one without. */
 .auth-provider-mark {
   display: inline-block;
-  margin-right: 8px;
+  margin: -2px 8px -2px 0;
   vertical-align: middle;
   position: relative;
   top: -1px;
@@ -4740,6 +4742,27 @@ html[data-app] .about-stores {
    card. */
 .settings-row + .settings-row {
   margin-top: var(--ds-space-3);
+}
+
+/* Buttons that add something -- an account to link, the Discord app --
+   one under another across the card, under the rows or the words above
+   them, as /login stacks the same providers' buttons. A row of them broke
+   wherever the words in the reader's language ran out, and left the last
+   one on a line of its own. */
+.settings-actions {
+  margin-top: var(--ds-space-3);
+}
+
+.settings-actions > * {
+  display: block;
+  width: 100%;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.settings-actions > * + * {
+  margin-top: var(--ds-space-2);
 }
 
 .settings-row-text {

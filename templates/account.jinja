@@ -1,5 +1,6 @@
 {% extends "base.jinja" %}
 {% from "supporter_badge_macro.jinja" import supporter_mark, supporter_mark_name %}
+{% from "sign_in_providers_macro.jinja" import provider_mark %}
 {% block title %}
   {{ super() }} | {{ ftl_get_message("account") }}
 {% endblock title %}
@@ -78,22 +79,26 @@
         {% else %}
           <p class="ds-help">{{ ftl_get_message("account-linked-accounts-none") }}</p>
         {% endfor %}
-        {% if apple_enabled and not apple_linked %}
-          {# Not inside most of the apps; see login.jinja. #}
-          <a class="ds-button auth-apple" href="/auth/apple?next=/account">{{ ftl_get_message("account-link-apple") }}</a>
-        {% endif %}
-        {% if google_enabled and not google_linked %}
-          {# Not inside most of the apps; see login.jinja. #}
-          <a class="ds-button auth-google" href="/auth/google?next=/account">{{ ftl_get_message("account-link-google") }}</a>
-        {% endif %}
-        {% if steam_enabled and not steam_linked %}
-          {# A ticket in the Oeee Cafe app on Steam, a browser elsewhere;
-             see sign_in_providers_macro.jinja. #}
-          <a class="ds-button auth-steam" href="/auth/steam?next=/account">{{ ftl_get_message("account-link-steam") }}</a>
-        {% endif %}
-        {% if discord_enabled and not discord_linked %}
-          {# In a browser from inside the apps; see login.jinja. #}
-          <a class="ds-button auth-discord" href="/auth/discord?next=/account"><img class="auth-discord-mark" src="{{ '/static/signin/discord-mark.svg' | cachebuster | safe }}" width="24" height="18" alt="" />{{ ftl_get_message("account-link-discord") }}</a>
+        {% if (apple_enabled and not apple_linked) or (google_enabled and not google_linked) or (steam_enabled and not steam_linked) or (discord_enabled and not discord_linked) %}
+        <div class="settings-actions">
+          {% if apple_enabled and not apple_linked %}
+            {# Not inside most of the apps; see login.jinja. #}
+            <a class="ds-button auth-apple" href="/auth/apple?next=/account">{{ provider_mark("apple") }}{{ ftl_get_message("account-link-apple") }}</a>
+          {% endif %}
+          {% if google_enabled and not google_linked %}
+            {# Not inside most of the apps; see login.jinja. #}
+            <a class="ds-button auth-google" href="/auth/google?next=/account">{{ provider_mark("google") }}{{ ftl_get_message("account-link-google") }}</a>
+          {% endif %}
+          {% if steam_enabled and not steam_linked %}
+            {# A ticket in the Oeee Cafe app on Steam, a browser elsewhere;
+               see sign_in_providers_macro.jinja. #}
+            <a class="ds-button auth-steam" href="/auth/steam?next=/account">{{ provider_mark("steam") }}{{ ftl_get_message("account-link-steam") }}</a>
+          {% endif %}
+          {% if discord_enabled and not discord_linked %}
+            {# In a browser from inside the apps; see login.jinja. #}
+            <a class="ds-button auth-discord" href="/auth/discord?next=/account">{{ provider_mark("discord") }}{{ ftl_get_message("account-link-discord") }}</a>
+          {% endif %}
+        </div>
         {% endif %}
       </div>
     </section>
@@ -105,7 +110,9 @@
       <div class="profile-section-label">{{ ftl_get_message("account-discord-command") }}</div>
       <div class="ds-card settings-card">
         <p class="ds-help">{{ ftl_get_message("account-discord-command-help") }}{% if not discord_linked %} {{ ftl_get_message("account-discord-command-link-first") }}{% endif %}</p>
-        <a class="ds-button auth-discord" href="{{ discord_install_url }}" target="_blank" rel="noopener"><img class="auth-discord-mark" src="{{ '/static/signin/discord-mark.svg' | cachebuster | safe }}" width="24" height="18" alt="" />{{ ftl_get_message("account-discord-command-add") }}</a>
+        <div class="settings-actions">
+          <a class="ds-button auth-discord" href="{{ discord_install_url }}" target="_blank" rel="noopener">{{ provider_mark("discord") }}{{ ftl_get_message("account-discord-command-add") }}</a>
+        </div>
       </div>
     </section>
     {% endif %}

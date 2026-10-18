@@ -28,6 +28,22 @@ mod sign_in;
 mod tags;
 mod toolbar;
 
+/// A provider's button on /login or /account, from its link to its
+/// `</a>`, with any logo drawn inline closed inside it.
+fn provider_button<'a>(page: &'a str, provider: &str) -> &'a str {
+    let start = page
+        .find(&format!(r#"href="/auth/{provider}"#))
+        .unwrap_or_else(|| panic!("{provider} is offered"));
+    let end = start + page[start..].find("</a>").expect("the button closes") + 4;
+    let button = &page[start..end];
+    assert_eq!(
+        button.matches("<svg").count(),
+        button.matches("</svg>").count(),
+        "{provider}'s logo is left open",
+    );
+    button
+}
+
 fn template_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates")
 }

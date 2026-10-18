@@ -124,6 +124,11 @@ fn steam_is_offered_just_above_discord() {
         at(r#"href="/auth/discord"#),
     );
     assert!(apple < google && google < steam && steam < discord);
+    for provider in ["apple", "google", "steam", "discord"] {
+        let button = super::provider_button(&page, provider);
+        assert!(button.contains("auth-provider-mark"), "{provider} has no logo");
+        assert!(button.ends_with(&format!("sign-in-with-{provider}</a>")));
+    }
 }
 
 #[test]
