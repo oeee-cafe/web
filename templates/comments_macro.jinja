@@ -15,7 +15,7 @@
           {% elif comment.content_html %}
             {{ comment.content_html|safe }}
           {% elif comment.content %}
-            {{ comment.content|markdown|safe }}
+            {{ comment.content|comment_markdown }}
           {% else %}
             <span class="comment-deleted">[deleted]</span>
           {% endif %}

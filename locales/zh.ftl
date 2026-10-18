@@ -187,6 +187,7 @@ post-comments = 评论
 post-no-comments = 暂无评论
 post-no-comments-signin = 登录后发表评论
 post-comment = 发表评论
+comment-mention-suggestions = 可提及的人
 post-publish = 发布
 post-move-community = 移动到此社区
 post-move-community-title = 移动帖子到社区

@@ -187,6 +187,7 @@ post-comments = コメント
 post-no-comments = コメントはありません。
 post-no-comments-signin = ログインしてコメントを書いてみてください。
 post-comment = コメント
+comment-mention-suggestions = メンションする人
 post-publish = 公開
 post-move-community = このコミュニティに移動する
 post-move-community-title = コミュニティに投稿を移動

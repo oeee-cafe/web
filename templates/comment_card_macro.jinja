@@ -37,7 +37,7 @@
         {% if comment.content_html %}
           {{ comment.content_html|safe }}
         {% else %}
-          {{ comment.content|markdown|safe }}
+          {{ comment.content|comment_markdown }}
         {% endif %}
       </div>
       {% if not by_drawing %}

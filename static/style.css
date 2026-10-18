@@ -692,6 +692,15 @@ nav a:visited,
   margin-top: 0;
 }
 
+/* An @name in a comment: a link to their profile (web::templates). */
+a.mention {
+  text-decoration: none;
+}
+
+a.mention:hover {
+  text-decoration: underline;
+}
+
 .comment-actions {
   margin-top: var(--space-2);
   display: flex;

@@ -270,8 +270,13 @@
               <button type="button" class="ds-button ds-button-quiet ds-button-small"
                       hx-on:click="document.getElementById('parent_comment_id').value = ''; document.getElementById('reply-info').style.display = 'none';">{{ ftl_get_message("cancel") }}</button>
             </div>
-            <textarea id="comment-content" class="ds-textarea" name="content" rows="3" required
-                      aria-label="{{ ftl_get_message('post-comment') }}"></textarea>
+            {# Typing @ lists who it could be (static/mention.js). #}
+            <div class="combobox">
+              <textarea id="comment-content" class="ds-textarea" name="content" rows="3" required
+                        aria-label="{{ ftl_get_message('post-comment') }}"
+                        data-mention-url="/posts/{{ post_id }}/mentions"
+                        data-mention-label="{{ ftl_get_message('comment-mention-suggestions') }}"></textarea>
+            </div>
             <div class="post-comment-actions">
               <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-comment") }}</button>
             </div>
@@ -433,6 +438,7 @@
   {# After the stage is fitted, so a new size of window is fitted first and
      zoomed from after. #}
   <script src="{{ '/static/post_zoom.js' | cachebuster | safe }}"></script>
+  {% if current_user %}<script src="{{ '/static/mention.js' | cachebuster | safe }}"></script>{% endif %}
   <script>
 
     function modalToggle(id, open) {
@@ -485,9 +491,10 @@
         for (var j = 0; j < modals.length; j++) modalToggle(modals[j], false);
       });
       // Once the list has taken the new comment, the form is emptied and
-      // no longer replying to anyone.
+      // no longer replying to anyone. htmx 4 says so on the form that
+      // asked; htmx 1 said it on the list.
       function afterSwap(e) {
-        if (!e.target || e.target.id !== "comments") return;
+        if (!e.target || (e.target.id !== "comments" && e.target.id !== "comment-form")) return;
         var form = document.getElementById("comment-form");
         if (!form) return;
         form.reset();

@@ -11,6 +11,10 @@
 //! typed rows, `json!`, strings it formatted itself -- a handle that is
 //! printed cannot be missed, and one that is not is not asked about.
 //!
+//! A comment's `@login_name` is drawn the same way, by `comment_markdown`:
+//! each one is a placeholder until the page is rendered, then a link to the
+//! profile if there is such an account, and the words as written if not.
+//!
 //! [`Templates`] is what `AppState` holds instead of the environment, and it
 //! offers no way to render that skips this: a handler that renders a page
 //! goes through [`Templates::render`] or it does not compile.
@@ -24,11 +28,12 @@
 //! or in a script, a style, a title or a textarea -- stops the render rather
 //! than putting a pill there.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use minijinja::value::Value;
 use minijinja::{context, Environment, Error, ErrorKind, State};
 
+use crate::markdown_utils::{escape_markdown, process_markdown_with};
 use crate::models::supporter::marks_for;
 
 /// Where `render` puts the nonce in the page's context. A macro sees the
@@ -43,7 +48,9 @@ const CLOSE: char = '\u{E001}';
 
 /// A handle a render has printed: whose, the text its pill will say,
 /// where the pill leads, if it is a link, whether it is drawn as a chip
-/// (`person_chip()`) rather than a handle's pill, and a chip's title.
+/// (`person_chip()`) rather than a handle's pill, and a chip's title. A
+/// mention is not a pill at all: it is a link to the profile if the account
+/// is there, and its text if not.
 #[derive(Debug)]
 struct Slot {
     login_name: String,
@@ -51,6 +58,7 @@ struct Slot {
     href: Option<String>,
     chip: bool,
     title: Option<String>,
+    mention: bool,
 }
 
 /// The handles a render has printed, in order. Kept as the render's
@@ -86,14 +94,60 @@ pub fn supporter_slot(
             .as_ref()
             .and_then(|chip| chip.as_str())
             .map(str::to_owned),
+        mention: false,
     });
     Value::from_safe_string(format!("{OPEN}{nonce}:{index}{CLOSE}"))
+}
+
+/// `|comment_markdown`: what someone wrote under a post, as `|markdown`
+/// draws it, with each `@login_name` outside a link (crate::mention) a
+/// link to that person's profile -- once the render has asked whether
+/// they are here, so a name nobody has stays words. A plain link rather
+/// than a pill, because it is a word in a sentence. Outside [`Templates`]
+/// there is nobody to ask, and it is `|markdown` alone.
+pub fn comment_markdown(state: &mut State, value: String) -> Value {
+    let nonce = state
+        .lookup(NONCE)
+        .and_then(|nonce| nonce.as_str().map(str::to_owned));
+    let Some(nonce) = nonce else {
+        return Value::from_safe_string(crate::markdown_utils::process_markdown_content(&value));
+    };
+    let printed = &mut state.get_or_insert_extension_with(Printed::default).0;
+    let html = process_markdown_with(&value, &mut |text| {
+        let spans = crate::mention::spans(text);
+        if spans.is_empty() {
+            return text.to_string();
+        }
+        // Around a placeholder, the text is escaped: read as markdown again
+        // it could otherwise make the placeholder a link's address, which is
+        // in a tag, where it stops the page.
+        let mut out = String::with_capacity(text.len() + spans.len() * 48);
+        let mut copied = 0;
+        for span in spans {
+            out.push_str(&escape_markdown(&text[copied..span.start]));
+            let index = printed.len();
+            printed.push(Slot {
+                login_name: text[span.start + 1..span.end].to_string(),
+                text: text[span.clone()].to_string(),
+                href: None,
+                chip: false,
+                title: None,
+                mention: true,
+            });
+            out.push_str(&format!("{OPEN}{nonce}:{index}{CLOSE}"));
+            copied = span.end;
+        }
+        out.push_str(&escape_markdown(&text[copied..]));
+        out
+    });
+    Value::from_safe_string(html)
 }
 
 /// Registers what `handle()` calls. Every environment the templates run in
 /// needs it -- the server's and the tests'.
 pub fn add_to_environment(env: &mut Environment<'_>) {
     env.add_function("supporter_slot", supporter_slot);
+    env.add_filter("comment_markdown", comment_markdown);
 }
 
 /// The server's templates. Clone is cheap: the environment's templates are
@@ -101,6 +155,15 @@ pub fn add_to_environment(env: &mut Environment<'_>) {
 #[derive(Clone)]
 pub struct Templates {
     env: Environment<'static>,
+}
+
+/// What a render asks about the people it printed: the platform each
+/// supporter among the pills bought on, and which of the names mentioned
+/// are accounts here.
+#[derive(Default)]
+struct People {
+    marks: HashMap<String, String>,
+    existing: HashSet<String>,
 }
 
 /// A page rendered and waiting for its pills.
@@ -119,8 +182,8 @@ impl Templates {
     /// is supporting and draws their pills.
     pub async fn render(&self, db: &sqlx::PgPool, name: &str, ctx: Value) -> Result<String, Error> {
         let rendered = self.render_collecting(name, None, ctx)?;
-        let marks = self.look_up(db, &rendered.printed).await;
-        self.fill(rendered, &marks)
+        let people = self.look_up(db, &rendered.printed).await;
+        self.fill(rendered, &people)
     }
 
     /// As [`render`](Self::render), for one block of `name`: what an htmx
@@ -133,8 +196,8 @@ impl Templates {
         ctx: Value,
     ) -> Result<String, Error> {
         let rendered = self.render_collecting(name, Some(block), ctx)?;
-        let marks = self.look_up(db, &rendered.printed).await;
-        self.fill(rendered, &marks)
+        let people = self.look_up(db, &rendered.printed).await;
+        self.fill(rendered, &people)
     }
 
     /// For what is rendered away from a request and its database -- a live
@@ -148,7 +211,7 @@ impl Templates {
                 format!("{name} printed a handle where no supporter can be asked about"),
             ));
         }
-        self.fill(rendered, &HashMap::new())
+        self.fill(rendered, &People::default())
     }
 
     /// The whole of [`render`](Self::render) but the query: for tests, which
@@ -161,16 +224,26 @@ impl Templates {
         ctx: Value,
         look_up: impl FnOnce(&[String]) -> HashMap<String, String>,
     ) -> Result<String, Error> {
+        self.render_with_accounts(name, ctx, look_up, &[])
+    }
+
+    /// As [`render_with`](Self::render_with), with `accounts` the login
+    /// names that are accounts here, for a page that mentions people.
+    #[cfg(test)]
+    pub fn render_with_accounts(
+        &self,
+        name: &str,
+        ctx: Value,
+        look_up: impl FnOnce(&[String]) -> HashMap<String, String>,
+        accounts: &[&str],
+    ) -> Result<String, Error> {
         let rendered = self.render_collecting(name, None, ctx)?;
-        let mut names: Vec<String> = rendered
-            .printed
-            .iter()
-            .map(|slot| slot.login_name.clone())
-            .collect();
-        names.sort();
-        names.dedup();
-        let marks = look_up(&names);
-        self.fill(rendered, &marks)
+        let names = pill_names(&rendered.printed);
+        let people = People {
+            marks: look_up(&names),
+            existing: accounts.iter().map(|name| name.to_string()).collect(),
+        };
+        self.fill(rendered, &people)
     }
 
     fn render_collecting(
@@ -224,34 +297,49 @@ impl Templates {
     /// a transaction while it renders has one connection already, and with
     /// the pool at its limit -- both colours are up during a deploy -- a
     /// request waiting indefinitely for a second could wait on itself.
-    async fn look_up(&self, db: &sqlx::PgPool, printed: &[Slot]) -> HashMap<String, String> {
+    ///
+    /// A mention whose account cannot be asked about stays words, as one
+    /// with no account does.
+    async fn look_up(&self, db: &sqlx::PgPool, printed: &[Slot]) -> People {
         if printed.is_empty() {
-            return HashMap::new();
+            return People::default();
         }
-        let mut names: Vec<String> = printed.iter().map(|slot| slot.login_name.clone()).collect();
-        names.sort();
-        names.dedup();
+        let names = pill_names(printed);
+        let mut mentioned: Vec<String> = printed
+            .iter()
+            .filter(|slot| slot.mention)
+            .map(|slot| slot.login_name.clone())
+            .collect();
+        mentioned.sort();
+        mentioned.dedup();
         let mut connection = match tokio::time::timeout(LOOKUP_WAIT, db.acquire()).await {
             Ok(Ok(connection)) => connection,
             Ok(Err(e)) => {
                 tracing::error!("no connection to look supporters up for a page: {e:#}");
-                return HashMap::new();
+                return People::default();
             }
             Err(_) => {
                 tracing::warn!("no connection within {LOOKUP_WAIT:?} to look supporters up");
-                return HashMap::new();
+                return People::default();
             }
         };
-        match marks_for(&mut *connection, &names).await {
-            Ok(marks) => marks,
-            Err(e) => {
-                tracing::error!("supporters could not be looked up for a page: {e:#}");
-                HashMap::new()
+        let mut people = People::default();
+        if !names.is_empty() {
+            match marks_for(&mut *connection, &names).await {
+                Ok(marks) => people.marks = marks,
+                Err(e) => tracing::error!("supporters could not be looked up for a page: {e:#}"),
             }
         }
+        if !mentioned.is_empty() {
+            match crate::models::comment::existing_login_names(&mut *connection, &mentioned).await {
+                Ok(existing) => people.existing = existing.into_iter().collect(),
+                Err(e) => tracing::error!("mentions could not be looked up for a page: {e:#}"),
+            }
+        }
+        people
     }
 
-    fn fill(&self, rendered: Rendered, marks: &HashMap<String, String>) -> Result<String, Error> {
+    fn fill(&self, rendered: Rendered, people: &People) -> Result<String, Error> {
         if rendered.printed.is_empty() {
             return Ok(rendered.output);
         }
@@ -265,7 +353,10 @@ impl Templates {
                     "a handle's placeholder is out of range",
                 )
             })?;
-            let mark = marks.get(&slot.login_name).cloned();
+            if slot.mention {
+                return Ok(mention_html(slot, &people.existing));
+            }
+            let mark = people.marks.get(&slot.login_name).cloned();
             person.with_state_mut(|state| {
                 state.call_macro(
                     "pill",
@@ -280,6 +371,30 @@ impl Templates {
             })
         };
         replace_placeholders(&rendered.output, &rendered.nonce, pill)
+    }
+}
+
+/// The names drawn as pills, each once: the ones whose supporting is asked.
+fn pill_names(printed: &[Slot]) -> Vec<String> {
+    let mut names: Vec<String> = printed
+        .iter()
+        .filter(|slot| !slot.mention)
+        .map(|slot| slot.login_name.clone())
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// A mention as the page shows it: a link to the profile of the account it
+/// names, or, with no such account, the words that were written.
+fn mention_html(slot: &Slot, existing: &HashSet<String>) -> String {
+    let text = crate::markdown_utils::escape_html(&slot.text);
+    if existing.contains(&slot.login_name) {
+        let name = crate::markdown_utils::escape_html(&slot.login_name);
+        format!(r#"<a class="mention" href="/@{name}">{text}</a>"#)
+    } else {
+        text
     }
 }
 
@@ -458,7 +573,9 @@ mod tests {
         let mut env = crate::web::handlers::test_support::env();
         env.add_template_owned(
             "page.jinja",
-            format!(r#"{{% from "person_macro.jinja" import handle, handle_text, person_chip %}}{page}"#),
+            format!(
+                r#"{{% from "person_macro.jinja" import handle, handle_text, person_chip %}}{page}"#
+            ),
         )
         .unwrap();
         Templates::new(env)
@@ -558,8 +675,11 @@ mod tests {
             .map(|slot| slot.login_name.as_str())
             .collect();
         assert_eq!(names, ["inside", "fan"]);
-        let marks = HashMap::from([("fan".to_string(), "apple".to_string())]);
-        let page = templates.fill(rendered, &marks).unwrap();
+        let people = People {
+            marks: HashMap::from([("fan".to_string(), "apple".to_string())]),
+            existing: HashSet::new(),
+        };
+        let page = templates.fill(rendered, &people).unwrap();
         assert!(page.starts_with(r#"<p><a class="ds-handle" href="&#x2f;@inside">@inside</a> <a class="ds-handle ds-handle-supporter"#));
         assert!(!page.contains("outside"));
     }

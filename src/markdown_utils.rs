@@ -2,6 +2,13 @@ use markdown::{mdast, to_html, to_mdast, ParseOptions};
 
 /// Process markdown content by converting headings to paragraphs and rendering to HTML
 pub fn process_markdown_content(value: &str) -> String {
+    process_markdown_with(value, &mut |text| text.to_string())
+}
+
+/// As [`process_markdown_content`], with each run of text outside a link
+/// handed to `text` on its way back to markdown. What it returns is read
+/// as markdown, so it escapes whatever it does not mean as markup.
+pub fn process_markdown_with(value: &str, text: &mut dyn FnMut(&str) -> String) -> String {
     let ast = match to_mdast(value, &ParseOptions::default()) {
         Ok(ast) => ast,
         // Templates print what this returns with `|safe`, so text that could
@@ -14,7 +21,7 @@ pub fn process_markdown_content(value: &str) -> String {
     let processed_ast = convert_headings_to_paragraphs(ast);
 
     // Convert AST back to markdown string, then to HTML
-    let processed_md = mdast_to_markdown(&processed_ast);
+    let processed_md = mdast_to_markdown(&processed_ast, text);
     to_html(&processed_md)
 }
 
@@ -60,29 +67,29 @@ fn convert_headings_to_paragraphs(node: mdast::Node) -> mdast::Node {
     }
 }
 
-fn mdast_to_markdown(node: &mdast::Node) -> String {
+fn mdast_to_markdown(node: &mdast::Node, text: &mut dyn FnMut(&str) -> String) -> String {
     // Simple converter - for a full implementation, we'd need the markdown-to-mdast crate
     match node {
         mdast::Node::Root(root) => root
             .children
             .iter()
-            .map(mdast_to_markdown)
+            .map(|child| mdast_to_markdown(child, text))
             .collect::<Vec<_>>()
             .join("\n\n"),
         mdast::Node::Paragraph(para) => para
             .children
             .iter()
-            .map(mdast_to_markdown)
+            .map(|child| mdast_to_markdown(child, text))
             .collect::<Vec<_>>()
             .join(""),
-        mdast::Node::Text(text) => text.value.clone(),
+        mdast::Node::Text(node) => text(&node.value),
         mdast::Node::Strong(strong) => {
             format!(
                 "**{}**",
                 strong
                     .children
                     .iter()
-                    .map(mdast_to_markdown)
+                    .map(|child| mdast_to_markdown(child, text))
                     .collect::<Vec<_>>()
                     .join("")
             )
@@ -93,7 +100,7 @@ fn mdast_to_markdown(node: &mdast::Node) -> String {
                 emphasis
                     .children
                     .iter()
-                    .map(mdast_to_markdown)
+                    .map(|child| mdast_to_markdown(child, text))
                     .collect::<Vec<_>>()
                     .join("")
             )
@@ -102,11 +109,13 @@ fn mdast_to_markdown(node: &mdast::Node) -> String {
             format!("`{}`", code.value)
         }
         mdast::Node::Link(link) => {
+            // A link's words are the link's: nothing in them becomes
+            // another link.
             format!(
                 "[{}]({})",
                 link.children
                     .iter()
-                    .map(mdast_to_markdown)
+                    .map(|child| mdast_to_markdown(child, &mut |text| text.to_string()))
                     .collect::<Vec<_>>()
                     .join(""),
                 link.url
@@ -116,9 +125,22 @@ fn mdast_to_markdown(node: &mdast::Node) -> String {
     }
 }
 
+/// `value` as markdown that says only `value`: every ASCII punctuation
+/// mark backslashed, which CommonMark reads as the mark itself.
+pub fn escape_markdown(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for c in value.chars() {
+        if c.is_ascii_punctuation() {
+            escaped.push('\\');
+        }
+        escaped.push(c);
+    }
+    escaped
+}
+
 /// `value` as text in HTML: the five characters that could start or end
 /// markup or an attribute, as entities.
-fn escape_html(value: &str) -> String {
+pub fn escape_html(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len());
     for c in value.chars() {
         match c {

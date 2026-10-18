@@ -731,36 +731,8 @@ pub async fn create_comment_from_activitypub(
     Ok(comment)
 }
 
-/// Extract @mentions from comment content
-/// Returns a list of login names (without the @ prefix)
-pub fn extract_mentions(content: &str) -> Vec<String> {
-    let mut mentions = std::collections::HashSet::new();
-    let mut chars = content.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        if ch == '@' {
-            let mut username = String::new();
-
-            // Extract username: alphanumeric, hyphens, underscores
-            while let Some(&next_ch) = chars.peek() {
-                if next_ch.is_alphanumeric() || next_ch == '-' || next_ch == '_' {
-                    username.push(next_ch);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-
-            if !username.is_empty() {
-                mentions.insert(username);
-            }
-        }
-    }
-
-    mentions.into_iter().collect()
-}
-
-/// Find users by their login names
+/// The accounts among `login_names`, with their ids: whom a comment's
+/// mentions (crate::mention) can notify. A deleted account is nobody.
 pub async fn find_users_by_login_names(
     tx: &mut Transaction<'_, Postgres>,
     login_names: &[String],
@@ -773,7 +745,7 @@ pub async fn find_users_by_login_names(
         r#"
         SELECT id, login_name
         FROM users
-        WHERE login_name = ANY($1)
+        WHERE login_name = ANY($1) AND deleted_at IS NULL
         "#,
         login_names
     )
@@ -781,6 +753,24 @@ pub async fn find_users_by_login_names(
     .await?;
 
     Ok(users.into_iter().map(|u| (u.id, u.login_name)).collect())
+}
+
+/// Which of `login_names` are accounts here, for drawing a comment's
+/// mentions as links to them (web::templates).
+pub async fn existing_login_names(
+    db: impl sqlx::PgExecutor<'_>,
+    login_names: &[String],
+) -> Result<Vec<String>> {
+    Ok(sqlx::query_scalar!(
+        r#"
+        SELECT login_name
+        FROM users
+        WHERE login_name = ANY($1) AND deleted_at IS NULL
+        "#,
+        login_names
+    )
+    .fetch_all(db)
+    .await?)
 }
 
 /// Soft-delete a comment by setting deleted_at and nulling out content

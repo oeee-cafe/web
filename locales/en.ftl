@@ -211,6 +211,7 @@ post-comments = Comments
 post-no-comments = There are no comments.
 post-no-comments-signin = Sign in to add a new comment.
 post-comment = Post comment
+comment-mention-suggestions = People to mention
 post-publish = Publish
 post-move-community = Move to this community
 post-move-community-title = Move Post to Community

@@ -187,6 +187,7 @@ post-comments = 댓글
 post-no-comments = 댓글이 없습니다.
 post-no-comments-signin = 로그인하고 댓글을 달아 보세요.
 post-comment = 댓글 달기
+comment-mention-suggestions = 언급할 사람
 post-publish = 게시
 post-move-community = 이 커뮤니티로 이동
 post-move-community-title = 다른 커뮤니티로 게시물 이동

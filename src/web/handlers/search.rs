@@ -1,5 +1,5 @@
 use crate::app_error::AppError;
-use crate::models::handle::LoginName;
+use crate::models::people::{find_people, PeopleQuery};
 use crate::models::post::SerializablePostForHome;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
@@ -10,60 +10,39 @@ use axum::extract::State;
 use axum::response::{Html, IntoResponse};
 use minijinja::context;
 use minijinja::value::Serde;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 /// Matches of each kind shown on `/search`, which has no load-more.
 const SEARCH_PAGE_LIMIT: i64 = 50;
 
-/// People shown over the drawings. A handle is one person, but the match
-/// ignores case and handles are told apart by it, so there can be a few.
+/// People shown over the drawings: the handle typed, which ignores case,
+/// and the nearby people whose names start with it.
 const SEARCH_PEOPLE_LIMIT: i64 = 5;
 
-/// A person whose handle or name matches, as the profile's follow card
-/// (person_card_macro.jinja) draws them.
-#[derive(Serialize)]
-pub struct SearchPersonRow {
-    pub login_name: LoginName,
-    pub display_name: String,
-    pub banner_image_filename: Option<String>,
-}
+/// A person whose handle or name matches (models::people).
+pub use crate::models::people::PersonMatch as SearchPersonRow;
 
-/// The person whose handle this is, `@` or not, whatever its case -- and
-/// nobody else. Search does not list people by part of a name or a handle:
-/// finding someone takes knowing who they are. The quick switcher finds
-/// people the same way (jump.rs). A banner staff have flagged, or one taken
-/// down, is left off the card, as on /about.
+/// The people `q` finds for `reader`: a handle typed exactly, whoever it
+/// is, and nearby people by the start of a name (models::people). The
+/// quick switcher finds people the same way (jump.rs).
 pub async fn search_people(
     tx: &mut Transaction<'_, Postgres>,
+    reader: Option<Uuid>,
     q: &str,
     limit: i64,
 ) -> Result<Vec<SearchPersonRow>, AppError> {
-    let escaped = crate::models::tag::escape_like(q.trim_start_matches('@'));
-    let people = sqlx::query_as!(
-        SearchPersonRow,
-        r#"
-        SELECT
-            u.login_name,
-            u.display_name,
-            i.image_filename AS "banner_image_filename?"
-        FROM users u
-        LEFT JOIN banners b ON b.id = u.banner_id
-            AND b.deleted_at IS NULL
-            AND b.is_explicit = false
-        LEFT JOIN images i ON i.id = b.image_id
-        WHERE u.deleted_at IS NULL
-          AND u.login_name ILIKE $1 ESCAPE '\'
-        ORDER BY u.login_name ASC
-        LIMIT $2
-        "#,
-        escaped,
-        limit
+    Ok(find_people(
+        tx,
+        &PeopleQuery {
+            reader,
+            q,
+            post: None,
+            limit,
+        },
     )
-    .fetch_all(&mut **tx)
-    .await?;
-    Ok(people)
+    .await?)
 }
 
 #[derive(Deserialize)]
@@ -179,7 +158,10 @@ pub async fn search_page(
     let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let people = match search_query {
-        Some(ref q) => search_people(&mut tx, q, SEARCH_PEOPLE_LIMIT).await?,
+        Some(ref q) => {
+            let reader = auth_session.user.as_ref().map(|user| user.id);
+            search_people(&mut tx, reader, q, SEARCH_PEOPLE_LIMIT).await?
+        }
         None => Vec::new(),
     };
     let posts = match search_query {

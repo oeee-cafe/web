@@ -1,8 +1,8 @@
 //! `/jump`: the quick switcher's list (jump.jinja), as a fragment.
 //!
-//! Places, not drawings: communities, tags, the site's own pages, and the
-//! person whose handle was typed exactly -- people are not found by part of
-//! a name, as on /search (search.rs) -- each a link, in one list the reader
+//! Places, not drawings: communities, tags, the site's own pages, and
+//! people -- a handle typed exactly, or the start of a nearby person's
+//! name, as on /search (models::people) -- each a link, in one list the reader
 //! moves through with the arrow keys. Nothing typed is the reader's own communities and the pages; with
 //! something typed, what matches it, the reader's communities first, and a
 //! last row that searches drawings for it -- the one thing this is not for.
@@ -58,7 +58,7 @@ pub async fn jump(
         (Vec::new(), Vec::new())
     } else {
         (
-            search_people(&mut tx, &q, PER_KIND).await?,
+            search_people(&mut tx, reader, &q, PER_KIND).await?,
             search_tags(&mut tx, &q, PER_KIND).await?,
         )
     };

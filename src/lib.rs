@@ -15,6 +15,7 @@ pub mod jwks;
 pub mod live;
 pub mod locale;
 pub mod markdown_utils;
+pub mod mention;
 pub mod microsoft_store;
 pub mod models;
 pub mod push;

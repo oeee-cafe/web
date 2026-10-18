@@ -57,7 +57,9 @@ fn a_tegaki_replay_plays_under_the_toolbar() {
             ..chrome()
         })
         .expect("tegaki replay renders");
-    let nav = rendered.find("<nav class=\"nav-bar\"").expect("the toolbar");
+    let nav = rendered
+        .find("<nav class=\"nav-bar\"")
+        .expect("the toolbar");
     assert!(nav < rendered.find("Tegaki.open(").unwrap());
     assert!(rendered.find("tegaki.css").unwrap() < rendered.find("/static/ds.css").unwrap());
     assert!(rendered.contains(r#"<meta name="oeee-presence" content="watching_replay""#));
@@ -811,4 +813,81 @@ fn the_move_list_renders_alone_and_answers_to_the_search() {
 
     let personal = block(ctx("PERS", false)).unwrap();
     assert!(personal.contains("post-personal-post<"));
+}
+
+/// An `@login_name` in a comment is a link to that profile when there is
+/// such an account, and the words as written when there is not -- a link
+/// in the sentence, not a pill, even for a supporter. One that
+/// is already a link's words, or that markdown would read into a link's
+/// address, is not made a link inside it -- and does not stop the page.
+#[test]
+fn a_mention_in_a_comment_links_to_the_profile_it_names() {
+    use std::collections::HashMap;
+    let templates = crate::web::templates::Templates::new(test_support::env());
+    let mut said = comment(Some("plain"), "Plain");
+    said["content_html"] = json!(null);
+    said["content"] = json!(
+        "thanks @friend and @nobody, cc @plain! mail@friend.example **@friend** \
+         [@friend](https://example.com/) \\[x\\](@friend) @friend@far.example"
+    );
+    let fragment = templates
+        .render_with_accounts(
+            "post_comments.jinja",
+            context! { comments => Serde(json!([said])), ..chrome() },
+            |names| {
+                // The byline's pill is asked about; a mention is not.
+                assert_eq!(names, ["plain"]);
+                HashMap::from([("plain".to_string(), "steam".to_string())])
+            },
+            &["friend", "plain"],
+        )
+        .expect("post_comments.jinja renders");
+    let link = r#"<a class="mention" href="/@friend">@friend</a>"#;
+    // "thanks @friend", "**@friend**" and the one beside "[x]"; not the
+    // address, the link's own words, or somebody on another server.
+    assert_eq!(fragment.matches(link).count(), 3, "{fragment}");
+    assert!(
+        fragment.contains(&format!("<strong>{link}</strong>")),
+        "{fragment}"
+    );
+    assert!(fragment.contains("and @nobody, cc"), "{fragment}");
+    assert!(
+        fragment.contains(r#"cc <a class="mention" href="/@plain">@plain</a>!"#),
+        "{fragment}"
+    );
+    // Only the byline wears the supporter's lime.
+    assert_eq!(
+        fragment.matches("ds-handle ds-handle-supporter").count(),
+        1,
+        "{fragment}"
+    );
+    assert!(fragment.contains("mail@friend.example"), "{fragment}");
+    assert!(
+        fragment.contains(r#"<a href="https://example.com/">@friend</a>"#),
+        "{fragment}"
+    );
+    assert!(
+        fragment.contains("[x]("),
+        "the brackets stay words: {fragment}"
+    );
+    assert!(!fragment.contains('\u{E000}'));
+
+    // The list of comments under a drawing elsewhere draws them the same.
+    let mut row = comment(Some("plain"), "Plain");
+    row["content_html"] = json!(null);
+    row["content"] = json!("hi @friend");
+    let card = templates.render_with_accounts(
+        "comments_fragment.jinja",
+        context! {
+            comments => context! { rows => Serde(json!([row])), by_drawing => false },
+            r2_public_endpoint_url => "https://images.example",
+            ..chrome()
+        },
+        |_| HashMap::new(),
+        &["friend"],
+    );
+    match card {
+        Ok(card) => assert!(card.contains(link), "{card}"),
+        Err(e) => panic!("comments_fragment.jinja renders: {e:#}"),
+    }
 }
