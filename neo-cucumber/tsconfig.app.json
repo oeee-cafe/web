@@ -22,6 +22,7 @@
       "@sentry/browser": ["./node_modules/@sentry/browser"],
       "@sentry/react": ["./node_modules/@sentry/react"],
       "@iconify/react": ["./node_modules/@iconify/react"],
+      "htmx.org/*": ["./node_modules/htmx.org/*"],
       "vitest": ["./node_modules/vitest"],
       // The hosts under ../frontend have no node_modules of their own to
       // resolve through, and their browser tests import this by name.

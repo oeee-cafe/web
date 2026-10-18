@@ -33,12 +33,34 @@ describe("the replay viewer bundle", () => {
   }, 60_000);
 });
 
+/**
+ * A stand-in for whatever a script's top level asks the page for: any
+ * property is another stand-in, and so is the result of calling one. Lists
+ * are empty and the document is still loading, so nothing is found to work
+ * on and every script waits for DOMContentLoaded, which never comes.
+ */
+function anything(): unknown {
+  const stub: unknown = new Proxy(function () {}, {
+    get(_target, key) {
+      if (key === "readyState") return "loading";
+      if (key === "length") return 0;
+      if (key === Symbol.iterator) return [][Symbol.iterator];
+      if (key === Symbol.toPrimitive) return () => "";
+      return stub;
+    },
+    apply: () => stub,
+    construct: () => stub as object,
+  });
+  return stub;
+}
+
 /*
- * The post page loads mention.js and post_zoom.js as classic scripts beside
- * its own inline ones, so neither may leave a name on `window`.
+ * base.jinja and the post page load these as classic scripts beside the
+ * page's own inline ones, so none may leave a name on `window` -- but htmx,
+ * which the page's scripts and the apps call by that name.
  */
 describe("the site's own scripts", () => {
-  it("declare nothing at the top level", async () => {
+  it("declare nothing at the top level but htmx", async () => {
     const result = await build({
       ...siteConfig,
       configFile: false,
@@ -50,24 +72,27 @@ describe("the site's own scripts", () => {
       .flatMap((bundle) => bundle.output)
       .filter((entry): entry is Rollup.OutputChunk => entry.type === "chunk");
     expect(chunks.map((chunk) => chunk.fileName).sort()).toEqual([
+      "htmx.js",
       "mention.js",
       "post_zoom.js",
       "reaction_picker.js",
     ]);
 
+    const page = ["document", "navigator", "location", "history", "localStorage", "sessionStorage"];
     for (const chunk of chunks) {
-      // Just enough page for each to run its top level against.
-      const page = {
-        window: { addEventListener() {} },
-        document: {
-          readyState: "loading",
-          addEventListener() {},
-          querySelectorAll: () => [],
-        },
-      };
-      const globals: Record<string, unknown> = { ...page };
+      const globals: Record<string, unknown> = Object.fromEntries(page.map((name) => [name, anything()]));
+      // `window` is the global object itself, as it is in a browser, so a
+      // name a script puts on it is found among the globals.
+      globals.window = globals;
+      // What htmx's top level reaches for, and the others' listeners.
+      const reached = ["CSSStyleSheet", "XPathEvaluator", "addEventListener", "matchMedia"];
+      for (const name of [...reached, "setTimeout", "requestAnimationFrame"]) {
+        globals[name] = anything();
+      }
+      const before = Object.keys(globals);
       runInNewContext(chunk.code, globals);
-      expect(Object.keys(globals), chunk.fileName).toEqual(Object.keys(page));
+      const added = Object.keys(globals).filter((name) => !before.includes(name));
+      expect(added, chunk.fileName).toEqual(chunk.fileName === "htmx.js" ? ["htmx"] : []);
     }
   }, 60_000);
 });

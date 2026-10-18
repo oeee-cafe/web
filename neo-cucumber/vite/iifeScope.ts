@@ -1,4 +1,4 @@
-import type { Plugin } from "vite";
+import { transformWithEsbuild, type Plugin } from "vite";
 
 /**
  * Keeps a library-mode IIFE to the one global it is named for.
@@ -36,19 +36,31 @@ export function containIife(name: string): Plugin {
  * stay out of `window` there and nothing changes for the one loaded as a
  * module. A chunk that shares code or exports something could not be loaded
  * that way at all, so it fails the build rather than the page.
+ *
+ * Vite also leaves an ES library's whitespace in, for whoever bundles it
+ * next. Nobody does here, and htmx alone is 30 kB of it, so it goes once
+ * the chunk is wrapped. Only the whitespace: the syntax was lowered and the
+ * names shortened already.
  */
 export function containScripts(): Plugin {
   return {
     name: "contain-scripts",
     apply: "build",
     enforce: "post",
-    generateBundle(_options, bundle) {
+    async generateBundle(_options, bundle) {
       for (const file of Object.values(bundle)) {
         if (file.type !== "chunk") continue;
         if (!file.isEntry || file.imports.length || file.exports.length) {
           throw new Error(`${file.fileName} is not a standalone script`);
         }
-        file.code = `(function(){${file.code}\n})();\n`;
+        const wrapped = `(function(){${file.code}\n})();\n`;
+        const { code } = await transformWithEsbuild(wrapped, file.fileName, {
+          loader: "js",
+          minifyWhitespace: true,
+          // As vite.site.config.ts says: served with no charset.
+          charset: "ascii",
+        });
+        file.code = code;
       }
     },
   };
