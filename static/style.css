@@ -1809,18 +1809,22 @@ a.mention:hover {
   left: 0;
   right: 0;
   z-index: 1000;
-  background-color: var(--main-bg-color);
-  border: 1px solid var(--main-border-color);
-  border-top: none;
-  max-height: 200px;
-  overflow-y: auto;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* The frame is the list's, not the container's: the container is always in
+   the page, empty until someone types, and a border on an empty box is a
+   stray line under the field. A query with no matches swaps in whitespace,
+   which :empty does not match, so the list is what has to carry it. */
 .tag-autocomplete-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  background-color: var(--main-bg-color);
+  border: 1px solid var(--main-border-color);
+  border-top: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .tag-autocomplete-item {
@@ -1843,12 +1847,6 @@ a.mention:hover {
   .tag-autocomplete-item:hover {
     background-color: var(--main-nav-bg-color);
   }
-}
-
-.tag-autocomplete-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 /* Empty State Styling */
