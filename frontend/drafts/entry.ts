@@ -146,7 +146,7 @@ function offerDestinations(sessionId: string, card: HTMLElement, who: HTMLElemen
       actions.before(row);
       card.dataset.community = "";
       mountCommunitySearch(row, {
-        sessionId,
+        fetchChoices: (query) => fetchSaveDestinations(sessionId, query).then((found) => found.choices),
         suggestions: destinations.choices,
         value: "",
         onChange: (community) => {
@@ -155,7 +155,7 @@ function offerDestinations(sessionId: string, card: HTMLElement, who: HTMLElemen
         id,
         words: {
           search: words.searchCommunities || "Search communities",
-          ownPosts: words.personal || "Personal post",
+          none: words.personal || "Personal post",
           member: words.member || "member",
           drawn: words.drawn || "drawn here",
           noMatches: words.noMatches || "No matching communities",

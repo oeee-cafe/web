@@ -282,25 +282,6 @@ pub struct AdminCommunity {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-pub async fn find_all_communities(
-    tx: &mut Transaction<'_, Postgres>,
-) -> Result<Vec<AdminCommunity>> {
-    let rows = query_as!(
-        AdminCommunity,
-        r#"
-        SELECT
-            id,
-            slug,
-            name,
-            visibility AS "visibility: CommunityVisibility",
-            deleted_at
-        FROM communities
-        ORDER BY name ASC
-        "#,
-    );
-    Ok(rows.fetch_all(&mut **tx).await?)
-}
-
 pub async fn find_community_by_slug(
     tx: &mut Transaction<'_, Postgres>,
     slug: &str,
@@ -322,9 +303,7 @@ pub async fn find_community_by_slug(
     Ok(row.fetch_optional(&mut **tx).await?)
 }
 
-/// Community list with activity, for the communities page. Kept separate from
-/// `find_all_communities` because that one feeds the filter dropdown on every
-/// `/admin/posts` render and does not need the correlated subqueries.
+/// Community list with activity, for the communities page.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AdminCommunityActivity {
     pub id: Uuid,

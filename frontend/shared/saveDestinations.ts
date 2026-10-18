@@ -13,6 +13,8 @@ export interface Place {
   member?: boolean;
   /** The owner has posted a drawing there. */
   drawn?: boolean;
+  /** Said beside the name in place of member or drawn, when there is one. */
+  note?: string;
 }
 
 /**
@@ -28,8 +30,8 @@ export interface SaveDestinations {
 
 /**
  * With no `query`, the owner's suggestions: the public communities they
- * belong to or have drawn in. With one, any public community whose name or
- * handle has it in, theirs first.
+ * belong to or have drawn in. With one, any public community whose name,
+ * handle or description has it in, theirs first.
  */
 export async function fetchSaveDestinations(sessionId: string, query = ""): Promise<SaveDestinations> {
   const search = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";

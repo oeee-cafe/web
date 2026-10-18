@@ -1,6 +1,7 @@
 //! Picking a community: the one query behind every place a person chooses or
 //! looks up a community by what they type -- moving a post, saving a room
-//! opened in none, the quick switcher, and the directory's search.
+//! opened in none, the quick switcher, the directory's search, and the staff
+//! pages' community filter.
 //!
 //! They used to be four queries that disagreed: two escaped what was typed
 //! and two let `%` and `_` through as wildcards, one searched descriptions
@@ -17,7 +18,8 @@ use serde::Serialize;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
-/// Which communities a picker offers. Every rule leaves out deleted ones.
+/// Which communities a picker offers. Every rule but `Admin` leaves out
+/// deleted ones.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChoiceRule {
     /// Where an author may move a post: never private, never two-tone;
@@ -35,6 +37,9 @@ pub enum ChoiceRule {
     /// The public directory's search: every public community, and nobody's
     /// own first -- it is the same list for everyone.
     Directory,
+    /// Staff looking a community up: every one there is, private, two-tone
+    /// and deleted ones too, nobody's own first.
+    Admin,
 }
 
 impl ChoiceRule {
@@ -46,6 +51,7 @@ impl ChoiceRule {
             ChoiceRule::LobbySave => "lobby_save",
             ChoiceRule::Jump => "jump",
             ChoiceRule::Directory => "directory",
+            ChoiceRule::Admin => "admin",
         }
     }
 }
@@ -99,9 +105,11 @@ pub struct CommunityChoice {
     /// The chooser has posted there.
     pub has_participated: bool,
     pub is_owner: bool,
-    /// Member, owner or has posted there, under any rule but `Directory`:
-    /// listed first, and whole.
+    /// Member, owner or has posted there, under any rule but `Directory`
+    /// and `Admin`: listed first, and whole.
     pub is_mine: bool,
+    /// Only ever under `Admin`.
+    pub is_deleted: bool,
 }
 
 /// The communities `q.rule` lets `q.chooser` pick that match `q.query`: their
@@ -161,7 +169,7 @@ async fn query(
                   AND p.published_at IS NOT NULL
                   AND p.deleted_at IS NULL
             ) stats
-            WHERE c.deleted_at IS NULL
+            WHERE (c.deleted_at IS NULL OR $1 = 'admin')
               AND c.id IS DISTINCT FROM $6
               AND ($7::uuid IS NULL OR c.id = $7)
               AND ($3 = ''
@@ -171,7 +179,8 @@ async fn query(
         ),
         mine AS (
             SELECT *,
-                $1 <> 'directory' AND (is_member OR has_participated OR is_owner) AS is_mine
+                $1 NOT IN ('directory', 'admin')
+                    AND (is_member OR has_participated OR is_owner) AS is_mine
             FROM candidates
         ),
         offered AS (
@@ -180,14 +189,14 @@ async fn query(
               -- Two-tone communities take no drawings from elsewhere.
               NOT ($1 IN ('move', 'lobby_save')
                    AND background_color IS NOT NULL AND foreground_color IS NOT NULL)
-              AND CASE visibility
+              AND CASE WHEN $1 = 'admin' THEN true ELSE CASE visibility
                 WHEN 'public' THEN
                   $1 <> 'move' OR is_mine OR last_posted_at IS NOT NULL
                 WHEN 'unlisted' THEN
                   $1 IN ('move', 'jump') AND is_mine
                 ELSE
                   $1 = 'jump' AND is_member
-              END
+              END END
               -- Nothing typed suggests only the chooser's own, where a list
               -- of everybody's would bury them. A check of one id is not a list.
               AND ($7::uuid IS NOT NULL OR $3 <> '' OR $1 NOT IN ('lobby_save', 'jump') OR is_mine)
@@ -216,7 +225,8 @@ async fn query(
             is_member AS "is_member!",
             has_participated AS "has_participated!",
             is_owner AS "is_owner!",
-            is_mine AS "is_mine!"
+            is_mine AS "is_mine!",
+            deleted_at IS NOT NULL AS "is_deleted!"
         FROM ranked
         WHERE is_mine OR (rn > $9 AND rn <= $9 + $8)
         ORDER BY is_mine DESC, rn
@@ -253,6 +263,7 @@ async fn query(
             has_participated: row.has_participated,
             is_owner: row.is_owner,
             is_mine: row.is_mine,
+            is_deleted: row.is_deleted,
         })
         .collect())
 }
@@ -429,6 +440,21 @@ mod tests {
         assert_eq!(
             w.names(&mut tx, Directory, me, "TAG").await,
             w.names(&mut tx, Directory, stranger, "TAG").await
+        );
+
+        // Staff: every community, and nobody's own first.
+        assert_eq!(
+            w.names(&mut tx, Admin, me, "TAG").await,
+            [
+                "empty",
+                "mine_unlisted",
+                "pct_c",
+                "private",
+                "pub_a",
+                "pub_b",
+                "their_unlisted",
+                "twotone"
+            ]
         );
 
         // `_` and `%` are characters, not wildcards.

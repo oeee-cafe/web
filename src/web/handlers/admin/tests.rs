@@ -70,7 +70,11 @@ fn renders_posts_list() {
         .render(context! {
             current_user => Serde(current_user()),
             posts => Serde(vec![sample_post()]),
-            communities => Serde(sample_communities()),
+            filter_community_choice => Serde(json!({
+                "id": "00000000-0000-0000-0000-000000000003",
+                "name": "Secret Club",
+                "slug": "secret",
+            })),
             total => 1,
             has_more => true,
             next_url => "/admin/posts-fragment?offset=60",
@@ -98,6 +102,14 @@ fn renders_posts_list() {
     // its section in the pill and no other.
     assert!(rendered.contains("href=\"/admin/posts\" aria-current=\"page\""));
     assert!(!rendered.contains("href=\"/admin/users\" aria-current"));
+    // The community filter is searched, not a list of every community: the
+    // picker starts on the one filtered by, and the form still sends its
+    // handle.
+    assert!(rendered.contains("data-admin-community-filter"));
+    assert!(rendered.contains("data-name=\"Secret Club\""));
+    assert!(rendered.contains("name=\"community\""));
+    assert!(rendered.contains("value=\"secret\""));
+    assert!(rendered.contains("/static/neo-cucumber/admin.js"));
 }
 
 #[test]
@@ -110,7 +122,7 @@ fn renders_posts_list_when_empty() {
         .render(context! {
             current_user => Serde(current_user()),
             posts => Serde(Vec::<serde_json::Value>::new()),
-            communities => Serde(sample_communities()),
+            filter_community_choice => Serde(json!(null)),
             total => 0,
             has_more => false,
             next_url => "/admin/posts-fragment?offset=60",

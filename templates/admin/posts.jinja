@@ -34,18 +34,19 @@
              spellcheck="false"
              value="{{ filter_author or '' }}" />
     </label>
-    <label>
-      <span class="ds-label">Community</span>
-      <select name="community">
-        <option value="">All communities</option>
-        {% for community in communities %}
-          <option value="{{ community.slug }}"
-                  {% if community.slug == filter_community %}selected{% endif %}>
-            {{ community.name }} ({{ community.visibility }})
-          </option>
-        {% endfor %}
-      </select>
-    </label>
+    {# Picked by searching (frontend/admin/communityFilter.ts), which turns
+       the text box into a hidden field it fills with the handle. #}
+    <div class="admin-community-filter"
+         data-admin-community-filter
+         {% if filter_community_choice %}data-id="{{ filter_community_choice.id }}" data-name="{{ filter_community_choice.name }}" data-slug="{{ filter_community_choice.slug }}" data-note="{{ filter_community_choice.note }}"{% endif %}>
+      <label class="ds-label" for="admin-community-filter">Community</label>
+      <input type="text"
+             name="community"
+             placeholder="community handle"
+             autocapitalize="none"
+             spellcheck="false"
+             value="{{ filter_community or '' }}" />
+    </div>
     <label class="admin-check">
       <input type="checkbox"
              name="drafts"
@@ -60,6 +61,8 @@
     </label>
     <input type="submit" value="Filter" />
   </form>
+
+  <script type="module" src="{{ '/static/neo-cucumber/admin.js' | cachebuster | safe }}"></script>
 
   {% if posts %}
     {# The grid is the htmx swap target: the sentinel replaces itself with the

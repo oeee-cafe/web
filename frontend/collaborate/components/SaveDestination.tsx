@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { NEO_CHECKBOX, NEO_FIELD, NEO_WELL } from "neo-cucumber";
-import type { SaveDestinations } from "../../shared/saveDestinations";
+import { fetchSaveDestinations, type SaveDestinations } from "../../shared/saveDestinations";
 import { mountCommunitySearch } from "../../shared/communitySearch";
 
 export interface SaveDestinationProps {
@@ -30,14 +30,14 @@ export const SaveDestination = ({ sessionId, destinations, value, onChange }: Sa
   useEffect(() => {
     if (!host.current || !choices) return;
     return mountCommunitySearch(host.current, {
-      sessionId,
+      fetchChoices: (query) => fetchSaveDestinations(sessionId, query).then((found) => found.choices),
       suggestions: choices,
       value: latest.current.value,
       onChange: (community) => latest.current.onChange(community),
       id: "save-destination",
       words: {
         search: t`Search communities`,
-        ownPosts: t`My own posts`,
+        none: t`My own posts`,
         member: t`member`,
         drawn: t`drawn here`,
         noMatches: t`No matching communities`,

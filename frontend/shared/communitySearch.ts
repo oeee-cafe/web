@@ -1,26 +1,32 @@
 /**
- * The search box a collaborative room's owner picks where its drawing is
- * posted with, in the room's save dialog and on the drafts page: a field,
- * and under it -- in the page, not a drop-down over it -- the owner's own
- * posts and the communities that match. Untyped, those are the communities
- * the owner belongs to or has drawn in; typed, the public communities the
- * server finds (`GET /collaborate/{id}/destinations?q=`).
+ * A search box to pick a community with: a field, and under it -- in the
+ * page, not a drop-down over it -- a choice of no community and the
+ * communities that match. Untyped, the host's suggestions; typed, what the
+ * host's `fetchChoices` finds, which asks the server: every one of these
+ * searches is `models::community::choice` on the server, under the rule of
+ * whoever is picking.
  *
- * Plain DOM, so the drafts page, which has no React, uses the same one. Each
- * host passes its own class names and words.
+ * Used where a collaborative room's owner picks where its drawing is
+ * posted, in the room's save dialog and on the drafts page (no community is
+ * their own posts), and for the staff posts list's community filter (no
+ * community is all of them).
+ *
+ * Plain DOM, so pages without React use the same one. Each host passes its
+ * own class names and words.
  */
-import { fetchSaveDestinations, type Place } from "./saveDestinations";
+import type { Place } from "./saveDestinations";
 
 export interface CommunitySearchWords {
   /** The field's placeholder and accessible name. */
   search: string;
-  /** The choice that posts to the owner's own posts. */
-  ownPosts: string;
+  /** The choice that is no community: the owner's own posts, or in a
+   * filter, every community. */
+  none: string;
   /** Beside a community the owner belongs to. */
   member: string;
   /** Beside one they have drawn in. */
   drawn: string;
-  /** Under the own-posts choice when a search found nothing. */
+  /** Under the no-community choice when a search found nothing. */
   noMatches: string;
 }
 
@@ -39,12 +45,15 @@ export interface CommunitySearchClasses {
 }
 
 export interface CommunitySearchOptions {
-  sessionId: string;
-  /** What to list before anything is typed: the owner's suggestions. */
+  /** The communities matching what was typed, asked of the server. */
+  fetchChoices: (query: string) => Promise<Place[]>;
+  /** What to list before anything is typed. */
   suggestions: Place[];
-  /** The chosen community's id, or "" for the owner's own posts. */
+  /** The chosen community's id, or "" for no community. */
   value: string;
-  onChange: (community: string) => void;
+  /** The chosen community, when it may not be among the suggestions. */
+  chosen?: Place;
+  onChange: (community: string, place: Place | null) => void;
   words: CommunitySearchWords;
   classes: CommunitySearchClasses;
   /** For the field's id, so a label can point at it. */
@@ -83,7 +92,8 @@ export function mountCommunitySearch(container: HTMLElement, options: CommunityS
   let value = options.value;
   // The community chosen, kept so it stays listed while a search that does
   // not find it is showing.
-  let chosen: Place | null = options.suggestions.find((place) => place.id === value) ?? null;
+  let chosen: Place | null =
+    options.suggestions.find((place) => place.id === value) ?? (options.chosen?.id === value ? options.chosen : null);
   let results = options.suggestions;
   let searched = "";
   let active = -1;
@@ -115,9 +125,9 @@ export function mountCommunitySearch(container: HTMLElement, options: CommunityS
       check.setAttribute("aria-hidden", "true");
       const name = document.createElement("span");
       name.className = classes.name;
-      name.textContent = place ? place.name : words.ownPosts;
+      name.textContent = place ? place.name : words.none;
       option.append(check, name);
-      const note = place?.member ? words.member : place?.drawn ? words.drawn : "";
+      const note = place?.note ?? (place?.member ? words.member : place?.drawn ? words.drawn : "");
       if (note) {
         const meta = document.createElement("span");
         meta.className = classes.meta;
@@ -150,18 +160,19 @@ export function mountCommunitySearch(container: HTMLElement, options: CommunityS
     if (place === undefined) return;
     value = place?.id ?? "";
     chosen = place;
-    options.onChange(value);
+    options.onChange(value, place);
     render();
   }
 
   function search(query: string): void {
     const ticket = ++asked;
-    fetchSaveDestinations(options.sessionId, query)
-      .then((destinations) => {
+    options
+      .fetchChoices(query)
+      .then((choices) => {
         // An answer to something since typed over is not this one's.
         if (ticket !== asked) return;
         searched = query.trim();
-        results = searched ? destinations.choices : options.suggestions;
+        results = searched ? choices : options.suggestions;
         active = -1;
         render();
       })

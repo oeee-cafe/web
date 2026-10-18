@@ -77,6 +77,12 @@
   margin: 0;
 }
 
+/* The community search lists its choices under its field, so it is taller
+   than the fields beside it would be: it takes a line of its own. */
+.admin-community-filter {
+  flex: 1 0 100%;
+}
+
 /* A checkbox and its words, on the fields' line. */
 .admin-check {
   display: flex;

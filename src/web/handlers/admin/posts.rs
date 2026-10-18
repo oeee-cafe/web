@@ -2,9 +2,11 @@
 
 use crate::app_error::AppError;
 use crate::models::admin::{
-    count_all_posts, find_all_communities, find_all_posts, find_community_by_slug, find_post_by_id,
-    set_post_explicit, AdminCommunity, AdminPostFilter,
+    count_all_posts, find_all_posts, find_community_by_slug, find_post_by_id, set_post_explicit,
+    AdminCommunity, AdminPostFilter,
 };
+use crate::models::community::choice::{choose_communities, ChoiceQuery, ChoiceRule};
+use crate::models::community::CommunityVisibility;
 use crate::models::handle::LoginName;
 use crate::models::user::find_user_by_login_name;
 use crate::web::context::CommonContext;
@@ -12,7 +14,7 @@ use crate::web::handlers::AdminUser;
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::{Path, Query, State};
-use axum::response::Html;
+use axum::response::{Html, Json};
 use axum::Form;
 use minijinja::context;
 use minijinja::value::Serde;
@@ -41,7 +43,8 @@ pub struct AdminPostsQuery {
 struct ResolvedFilter {
     filter: AdminPostFilter,
     author_login_name: Option<LoginName>,
-    community_slug: Option<String>,
+    /// The community filtered by, which the filter's picker starts on.
+    community: Option<AdminCommunity>,
 }
 
 /// Turns login_name/slug into ids. An unknown name yields a filter that matches
@@ -65,19 +68,19 @@ async fn resolve_filter(
         author_login_name = Some(user.login_name);
     }
 
-    let mut community_slug = None;
+    let mut community = None;
     if let Some(slug) = query.community.as_deref().filter(|s| !s.is_empty()) {
-        let community = find_community_by_slug(tx, slug)
+        let found = find_community_by_slug(tx, slug)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Community @{}", slug)))?;
-        filter.community_id = Some(community.id);
-        community_slug = Some(community.slug);
+        filter.community_id = Some(found.id);
+        community = Some(found);
     }
 
     Ok(ResolvedFilter {
         filter,
         author_login_name,
-        community_slug,
+        community,
     })
 }
 
@@ -88,7 +91,7 @@ fn fragment_url(resolved: &ResolvedFilter, next_offset: i64) -> String {
     if let Some(author) = &resolved.author_login_name {
         url.push_str(&format!("&author={}", urlencoding::encode(author)));
     }
-    if let Some(slug) = &resolved.community_slug {
+    if let Some(slug) = &resolved.community.as_ref().map(|c| c.slug.clone()) {
         url.push_str(&format!("&community={}", urlencoding::encode(slug)));
     }
     if resolved.filter.include_drafts {
@@ -124,7 +127,6 @@ async fn render_posts(
     ftl_lang: String,
     query: AdminPostsQuery,
     resolved: ResolvedFilter,
-    communities: Vec<AdminCommunity>,
     mut tx: Transaction<'_, Postgres>,
 ) -> Result<Html<String>, AppError> {
     let (posts, has_more, next_url) = load_batch(&mut tx, &query, &resolved).await?;
@@ -139,12 +141,17 @@ async fn render_posts(
             common_ctx,
             context! {
                 posts => Serde(posts),
-                communities => Serde(communities),
+                filter_community_choice => Serde(resolved.community.as_ref().map(|c| serde_json::json!({
+                    "id": c.id.to_string(),
+                    "name": c.name,
+                    "slug": c.slug,
+                    "note": visibility_note(c.visibility, c.deleted_at.is_some()),
+                }))),
                 total => total,
                 has_more => has_more,
                 next_url => next_url,
                 filter_author => Serde(resolved.author_login_name),
-                filter_community => resolved.community_slug,
+                filter_community => resolved.community.as_ref().map(|c| c.slug.clone()),
                 include_drafts => resolved.filter.include_drafts,
                 include_deleted => resolved.filter.include_deleted,
                 r2_public_endpoint_url => state.config.r2_public_endpoint_url.clone(),
@@ -193,8 +200,7 @@ pub async fn admin_posts(
 ) -> Result<Html<String>, AppError> {
     let mut tx = state.db_pool.begin().await?;
     let resolved = resolve_filter(&mut tx, &query).await?;
-    let communities = find_all_communities(&mut tx).await?;
-    render_posts(admin, &state, ftl_lang, query, resolved, communities, tx).await
+    render_posts(admin, &state, ftl_lang, query, resolved, tx).await
 }
 
 /// GET /admin/users/:login_name/posts — the global list scoped to one author,
@@ -217,8 +223,7 @@ pub async fn admin_user_posts(
 
     let mut tx = state.db_pool.begin().await?;
     let resolved = resolve_filter(&mut tx, &query).await?;
-    let communities = find_all_communities(&mut tx).await?;
-    render_posts(admin, &state, ftl_lang, query, resolved, communities, tx).await
+    render_posts(admin, &state, ftl_lang, query, resolved, tx).await
 }
 
 /// GET /admin/communities/:slug/posts — scoped to one community regardless of
@@ -239,8 +244,61 @@ pub async fn admin_community_posts(
 
     let mut tx = state.db_pool.begin().await?;
     let resolved = resolve_filter(&mut tx, &query).await?;
-    let communities = find_all_communities(&mut tx).await?;
-    render_posts(admin, &state, ftl_lang, query, resolved, communities, tx).await
+    render_posts(admin, &state, ftl_lang, query, resolved, tx).await
+}
+
+#[derive(Deserialize)]
+pub struct AdminCommunityChoicesQuery {
+    #[serde(default)]
+    q: String,
+}
+
+/// What the filter's picker says beside a community's name.
+fn visibility_note(visibility: CommunityVisibility, deleted: bool) -> String {
+    let visibility = match visibility {
+        CommunityVisibility::Public => "public",
+        CommunityVisibility::Unlisted => "unlisted",
+        CommunityVisibility::Private => "private",
+    };
+    if deleted {
+        format!("{visibility} · deleted")
+    } else {
+        visibility.to_string()
+    }
+}
+
+/// How many communities one answer of the filter's search lists.
+const COMMUNITY_CHOICES: i64 = 20;
+
+/// GET /admin/community-choices?q= — communities for the posts filter's
+/// picker (frontend/admin/communityFilter.ts): any community at all, private,
+/// two-tone and deleted ones too, by what was typed, or the most recently
+/// active with nothing typed. It used to be a `<select>` of every community
+/// there is, on every render of the page.
+pub async fn admin_community_choices(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Query(query): Query<AdminCommunityChoicesQuery>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let found = choose_communities(
+        &mut tx,
+        &ChoiceQuery::new(ChoiceRule::Admin, None, &query.q, COMMUNITY_CHOICES),
+    )
+    .await?;
+    tx.commit().await?;
+    let choices: Vec<_> = found
+        .into_iter()
+        .map(|c| {
+            serde_json::json!({
+                "id": c.id.to_string(),
+                "name": c.name,
+                "slug": c.slug,
+                "note": visibility_note(c.visibility, c.is_deleted),
+            })
+        })
+        .collect();
+    Ok(Json(serde_json::json!({ "choices": choices })))
 }
 
 /// GET /admin/posts/:post_id — full detail for one post, soft-deleted included.

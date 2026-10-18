@@ -12,7 +12,7 @@ use crate::web::handlers::activitypub::{
 };
 use crate::web::handlers::admin::{
     admin_add_store_product, admin_banners, admin_banners_fragment, admin_collaborative_sessions,
-    admin_communities, admin_community_posts, admin_flag_banner, admin_flag_post, admin_overview,
+    admin_communities, admin_community_choices, admin_community_posts, admin_flag_banner, admin_flag_post, admin_overview,
     admin_post_detail, admin_posts, admin_posts_fragment, admin_set_store_product_details,
     admin_set_store_product_on_sale, admin_set_store_product_sale_window, admin_store,
     admin_user_detail, admin_user_posts, admin_users, collaborative_archive_manifest,
@@ -334,6 +334,7 @@ impl App {
             .route("/admin", get(admin_overview))
             .route("/admin/posts", get(admin_posts))
             .route("/admin/posts-fragment", get(admin_posts_fragment))
+            .route("/admin/community-choices", get(admin_community_choices))
             .route("/admin/posts/{post_id}", get(admin_post_detail))
             .route("/admin/posts/{post_id}/explicit", post(admin_flag_post))
             .route("/admin/users", get(admin_users))

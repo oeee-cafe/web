@@ -53,6 +53,9 @@ export default defineConfig({
       entry: {
         offline: resolve(import.meta.dirname, "../frontend/painter/entry.ts"),
         drafts: resolve(import.meta.dirname, "../frontend/drafts/entry.ts"),
+        // The staff posts list's community filter, which shares the drafts
+        // page's community search (frontend/shared/communitySearch.ts).
+        admin: resolve(import.meta.dirname, "../frontend/admin/communityFilter.ts"),
         // The painter page's error reporter, kept out of offline.js so that
         // an engine the SDK does not run on loses the reporter and not the
         // painter; see frontend/painter/sentry.ts.
