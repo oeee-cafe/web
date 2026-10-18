@@ -17,57 +17,5 @@
    The other apps' web views do both themselves: WKWebView has Web Share and
    WKDownload, and WebView2 has both. A web view that one day has Web Share
    keeps its own. #}
-<script>
-  (function () {
-    var app = window.oeeeApp;
-    if (!app || document.documentElement.getAttribute("data-app") !== "android" || !app.connected()) return;
-
-    if (!navigator.share) {
-      var shareable = function (data) {
-        return !!data && !(data.files && data.files.length) && !!(data.url || data.text || data.title);
-      };
-      navigator.share = function (data) {
-        if (!shareable(data)) return Promise.reject(new TypeError("Nothing this app can share"));
-        var text = [data.text, data.url].filter(Boolean).join("\n");
-        app.post("share", { title: data.title || "", text: text || data.title }, true);
-        return Promise.resolve();
-      };
-      navigator.canShare = shareable;
-    }
-
-    var local = function (link) {
-      return link.hasAttribute("download") && /^(blob|data):/i.test(link.href);
-    };
-    // Read now, inside the click: the painter revokes the blob's URL the
-    // moment after it.
-    var save = function (link) {
-      var name = link.getAttribute("download") || "";
-      fetch(link.href)
-        .then(function (response) { return response.blob(); })
-        .then(function (blob) {
-          var reader = new FileReader();
-          reader.onload = function () {
-            app.post("download", { name: name, mime: blob.type || "", data: reader.result }, true);
-          };
-          reader.readAsDataURL(blob);
-        });
-    };
-    // A link made and clicked from script, never put in the page, as the
-    // painter's is.
-    var click = HTMLAnchorElement.prototype.click;
-    HTMLAnchorElement.prototype.click = function () {
-      if (local(this)) {
-        save(this);
-        return;
-      }
-      return click.apply(this, arguments);
-    };
-    // A link in the page, pressed by a finger.
-    document.addEventListener("click", function (event) {
-      var link = event.target && event.target.closest ? event.target.closest("a[download]") : null;
-      if (!link || !local(link) || event.defaultPrevented) return;
-      event.preventDefault();
-      save(link);
-    }, true);
-  })();
-</script>
+{# The script is frontend/site/polyfills.ts, in chrome.js (theme_head.jinja). #}
+<script>if (window.oeeeChrome) window.oeeeChrome.polyfills();</script>

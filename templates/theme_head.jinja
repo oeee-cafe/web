@@ -6,6 +6,10 @@
    ahead of the system setting. It has to run here, in the head: a page that
    paints first and then turns dark flashes. Boosted navigation keeps the
    root element, so the mark survives it. #}
+{# The site's own script (frontend/site/chrome.ts): it sets nothing up, and
+   each template below, and in the body, calls its piece where its script
+   was. In the head, so it is fetched once a document. #}
+<script src="{{ '/static/site/chrome.js' | cachebuster | safe }}"></script>
 {% include "app_bridge.jinja" %}
 <script>
   // Which app, if any, this page is in -- the one place anything asks. Each
@@ -276,40 +280,7 @@
 {% include "app_saved_password.jinja" %}
 {% include "app_store.jinja" %}
 {% include "app_polyfills.jinja" %}
-<script>
-  // A page htmx could not fetch is fetched again as an ordinary navigation.
-  //
-  // htmx fetches the site's pages itself (hx-boost, toolbar.jinja). When
-  // nothing answers it does nothing at all, and when a gateway answers in
-  // the site's place -- a proxy's 502, 503 or 504 during a deploy,
-  // Cloudflare's 52x and 530 when the Mac mini is out of reach -- it swaps
-  // the gateway's page into the body. Either way the reader is left on a
-  // page that is not the one they asked for and cannot tell why. Asked
-  // again as a navigation, the failure is the browser's to show -- and in
-  // the apps, each of which puts up its own "can't be reached" screen when
-  // a page fails to load (Unreachable.swift, Unreachable.kt, offline.rs in
-  // oeee-cafe-desktop), the app's. Each app used to watch htmx for this
-  // itself, or not at all.
-  //
-  // Only a page: the whole body, by GET. A part of a page that fails is the
-  // page's to show, and an error page of the site's own -- a 404, a 500 --
-  // is the site speaking, and is swapped in as usual.
-  (function () {
-    var GATEWAY = [502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 530];
-    function page(ctx) {
-      return !!ctx && ctx.target === document.body && !!ctx.request &&
-        String(ctx.request.method).toUpperCase() === "GET";
-    }
-    document.addEventListener("htmx:before:swap", function (event) {
-      var ctx = event.detail && event.detail.ctx;
-      if (!page(ctx) || !ctx.response || GATEWAY.indexOf(ctx.response.status) < 0) return;
-      event.preventDefault();
-      location.assign(ctx.request.action);
-    });
-    document.addEventListener("htmx:error", function (event) {
-      var ctx = event.detail && event.detail.ctx;
-      if (!page(ctx) || ctx.response) return;
-      location.assign(ctx.request.action);
-    });
-  })();
-</script>
+{# A page htmx could not fetch -- nothing answered, or a gateway in the
+   site's place -- is fetched again as an ordinary navigation, so the failure
+   is the browser's or the app's to show (frontend/site/gatewayRetry.ts). #}
+<script>if (window.oeeeChrome) window.oeeeChrome.gatewayRetry();</script>

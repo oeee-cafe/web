@@ -44,7 +44,12 @@ fn the_apps_are_given_their_words_in_every_language() {
     // A string the page hands a script is a JSON literal, not text
     // pasted between quotes.
     assert!(head.contains(r#"leaveTitle: "app-leave-title","#), "{head}");
-    assert!(head.contains("window.oeeeApp.signIn = {"));
+    // The script that answers them (frontend/site/chrome.ts), and the line
+    // that hands sign-in its words.
+    assert!(head.contains(r#"<script src="/static/site/chrome.js"></script>"#));
+    assert!(head.contains(
+        r#"window.oeeeChrome.signIn("app-steam-sign-in-failed", "ok");"#
+    ));
     assert!(head.contains(r#"OeeeCafe((?: (?:platform|store)\/\w+)+)"#));
 }
 
@@ -81,7 +86,6 @@ fn the_apps_are_told_the_unread_count_and_who_is_signed_in() {
     // What the apps call on the page is on one object (app_bridge.jinja);
     // the toolbar's script adds its commands to it
     // (frontend/site/toolbar.browser.test.ts).
-    assert!(signed_in.contains(r#"<script src="/static/site/chrome.js"></script>"#));
     assert!(signed_in.contains("window.oeeeChrome.toolbar();"));
 }
 

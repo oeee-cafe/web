@@ -274,15 +274,12 @@
       </dl>
     </div>
   </div>
-  {# The script for the site's chrome (frontend/site/chrome.ts): this
-     toolbar's -- which item is the page you are on, signing in coming back
-     here, one row or two, keeping the reader's place, the theme switch, the
-     commands and keys, closing the menus, the next page's skeleton, the
-     drafts kept in this browser (toolbarControls.ts) -- and the pieces that
-     follow it in the page, each set up by a line of its own where it is.
-     The line here shows this toolbar, and is what a boosted swap re-runs in
-     place (chrome.ts says why). #}
-  <script src="{{ '/static/site/chrome.js' | cachebuster | safe }}"></script>
+  {# This toolbar's script (frontend/site/toolbarControls.ts, in chrome.js,
+     which theme_head.jinja loads): which item is the page you are on,
+     signing in coming back here, one row or two, keeping the reader's
+     place, the theme switch, the commands and keys, closing the menus, the
+     next page's skeleton, the drafts kept in this browser. A boosted swap
+     re-runs this line in place (chrome.ts says why). #}
   <script>if (window.oeeeChrome) window.oeeeChrome.toolbar();</script>
   {% include "loading_bar.jinja" %}
   {% include "app_caption.jinja" %}

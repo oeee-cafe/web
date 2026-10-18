@@ -243,253 +243,28 @@
    two calls around leaving, word for word. appContract.browser.test.ts
    captures the page again and fails when the file no longer says what it
    does, so a change here that an app has to follow shows up as a change to
-   that file, which each app fetches with its scripts/sync-app-contract.sh. #}
+   that file, which each app fetches with its scripts/sync-app-contract.sh.
+
+   The script is frontend/site/bridge.ts, in chrome.js (theme_head.jinja);
+   the words are the one thing it is handed from here. #}
 <script>
-  (function () {
-    var root = document.documentElement;
-    function channel() {
-      var handlers = window.webkit && window.webkit.messageHandlers;
-      var target = (handlers && handlers.oeeeBridge) || window.oeeeBridge;
-      return target && target.postMessage ? target : null;
-    }
-    var last = {};
-    // Sends a message of `type`, unless it is the same as the last one of
-    // that type and `always` is not set. Returns whether an app heard it.
-    function post(type, data, always) {
-      var target = channel();
-      if (!target) return false;
-      // The envelope is written last, so a field of the message's own that
-      // happens to share its name -- a file's MIME type, say -- can never
-      // make it another kind of message.
-      var message = {};
-      for (var key in data) message[key] = data[key];
-      message.v = 1;
-      message.type = type;
-      var text = JSON.stringify(message);
-      // Only what is compared is kept: a download can be megabytes.
-      if (!always) {
-        if (last[type] === text) return true;
-        last[type] = text;
-      }
-      try {
-        target.postMessage(text);
-      } catch (error) {
-        return false;
-      }
-      return true;
-    }
-
-    // A boosted navigation keeps the head it arrived in (toolbar.jinja), so
-    // the presence meta a painter page was loaded with is still there on the
-    // page after it. Boosted links only ever lead to pages without one.
-    var boosted = false;
-    var PAINTING = /^(drawing|relaying|drawing-banner|collaborating)$/;
-    function pageState() {
-      var meta = boosted ? null : document.querySelector('meta[name="oeee-presence"]');
-      var presence = meta ? meta.getAttribute("content") : null;
-      var bar = document.querySelector(".nav-bar");
-      var join = (meta && meta.getAttribute("data-join")) || null;
-      return {
-        path: location.pathname,
-        signedIn: bar ? bar.hasAttribute("data-signed-in") : null,
-        presence: presence,
-        community: (meta && meta.getAttribute("data-community")) || null,
-        group: (meta && meta.getAttribute("data-group")) || null,
-        join: join,
-        seats: join ? parseInt(meta.getAttribute("data-seats"), 10) || null : null,
-        party: join ? parseInt(meta.getAttribute("data-party"), 10) || null : null,
-        since: (meta && parseInt(meta.getAttribute("data-since"), 10)) || null,
-        painting: PAINTING.test(presence || ""),
-        refreshable: !presence
-      };
-    }
-
-    function themeState() {
-      return {
-        choice: root.getAttribute("data-theme") || "system",
-        ground: token("--ds-ground"),
-        grid: token("--ds-grid"),
-        toolbar: token("--ds-toolbar")
-      };
-    }
-    // A design-system colour as the root resolves it now, theme included;
-    // null on a page without the design system's stylesheet.
-    function token(name) {
-      var value = getComputedStyle(root).getPropertyValue(name);
-      return value ? value.trim() || null : null;
-    }
-
-    var WORDS = {
-      leaveTitle: {{ ftl_get_message("app-leave-title")|tojson }},
-      leaveBody: {{ ftl_get_message("app-leave-body")|tojson }},
-      leave: {{ ftl_get_message("app-leave")|tojson }},
-      stay: {{ ftl_get_message("app-stay")|tojson }},
-      saveImage: {{ ftl_get_message("app-save-image")|tojson }},
-      copyImage: {{ ftl_get_message("app-copy-image")|tojson }},
-      share: {{ ftl_get_message("app-share")|tojson }},
-      copyLink: {{ ftl_get_message("app-copy-link")|tojson }},
-      savedImage: {{ ftl_get_message("app-saved-image")|tojson }},
-      savedFile: {{ ftl_get_message("app-saved-file")|tojson }},
-      saveFailed: {{ ftl_get_message("app-save-failed")|tojson }},
-      presenceBrowsing: {{ ftl_get_message("app-presence-browsing")|tojson }},
-      presenceDrawing: {{ ftl_get_message("app-presence-drawing")|tojson }},
-      presenceRelaying: {{ ftl_get_message("app-presence-relaying")|tojson }},
-      presenceCollaborating: {{ ftl_get_message("app-presence-collaborating")|tojson }},
-      presenceDrawingBanner: {{ ftl_get_message("app-presence-drawing-banner")|tojson }},
-      presenceWatchingReplay: {{ ftl_get_message("app-presence-watching-replay")|tojson }}
-    };
-
-    function report() {
-      if (!channel()) return;
-      post("words", WORDS);
-      post("page", pageState());
-      post("theme", themeState());
-      var bell = document.getElementById("nav-notifications");
-      if (bell) post("unread", { count: parseInt(bell.getAttribute("data-unread"), 10) || 0 });
-    }
-
-    document.addEventListener("DOMContentLoaded", report);
-    // The bell put in place by a live event (live.jinja), not by a swap.
-    document.addEventListener("oeee:bell", report);
-    // Someone came into or left a collaborative room (presence_meta.jinja).
-    document.addEventListener("oeee:presence", report);
-    window.addEventListener("load", report);
-    window.addEventListener("pageshow", function (event) {
-      if (event.persisted) boosted = false;
-      report();
-    });
-    window.addEventListener("popstate", function () { setTimeout(report, 0); });
-    document.addEventListener("htmx:after:swap", function (event) {
-      var ctx = event.detail && event.detail.ctx;
-      if (event.target === document.body || (ctx && ctx.target === document.body)) boosted = true;
-      report();
-    });
-    if (window.MutationObserver) {
-      new MutationObserver(report).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-    }
-    if (window.matchMedia) {
-      var scheme = window.matchMedia("(prefers-color-scheme: dark)");
-      if (scheme.addEventListener) scheme.addEventListener("change", report);
-      else if (scheme.addListener) scheme.addListener(report);
-    }
-
-    // Whether a drag to the right from `target` is the page's: a slider, an
-    // element that keeps horizontal pans from the browser (a drawing zoomed
-    // closer, frontend/site/postZoom.ts), or a row scrolled along that has room to scroll
-    // back. A row at its start is not: the drag has nothing there to move.
-    var PANS_SIDEWAYS = /^(auto|manipulation)$|pan-x|pan-left|pan-right/;
-    function takesSideways(target) {
-      for (var element = target; element && element.nodeType === 1; element = element.parentElement) {
-        if (element.matches('input[type="range"]')) return true;
-        var style = window.getComputedStyle(element);
-        if (!PANS_SIDEWAYS.test(style.touchAction || "auto")) return true;
-        if (element.scrollLeft > 0 && element.scrollWidth > element.clientWidth &&
-            /auto|scroll/.test(style.overflowX)) return true;
-      }
-      var scroller = document.scrollingElement;
-      return !!scroller && scroller.scrollLeft > 0;
-    }
-
-    // Which drawing a finger lands on, and whether a sideways drag from
-    // there is the page's, said as it lands: by the time a long press or a
-    // swipe is recognised the app can no longer ask the page in time.
-    window.addEventListener("touchstart", function (event) {
-      if (!channel()) return;
-      var target = event.target;
-      var image = target && target.closest ? target.closest("img[data-oeee-drawing]") : null;
-      var link = image ? image.closest("a[href]") : null;
-      post("pressed", {
-        drawing: image ? {
-          src: image.currentSrc || image.src,
-          link: link ? link.href : "",
-          width: image.naturalWidth || image.width,
-          height: image.naturalHeight || image.height
-        } : null,
-        sideways: takesSideways(target)
-      }, true);
-    }, { capture: true, passive: true });
-
-    // The push token the app handed over, registered for whoever the page is
-    // signed in as. Once a document: signing in or out loads a new one, and
-    // the account signed in then takes the token over.
-    var registered = null;
-    var PLATFORMS = { ios: "ios", android: "android", macos: "macos" };
-    function pushToken(token) {
-      if (typeof token !== "string" || !token || registered === token) return;
-      var bar = document.querySelector(".nav-bar");
-      if (!bar || !bar.hasAttribute("data-signed-in")) return;
-      var platform = PLATFORMS[root.getAttribute("data-app")];
-      if (!platform) return;
-      registered = token;
-      fetch("/devices", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_token: token, platform: platform })
-      }).then(function (response) {
-        if (!response.ok) registered = null;
-      }, function () {
-        registered = null;
-      });
-    }
-
-    // The reader's Discord account in the Windows app, as it last said, for
-    // whatever part of the page asks after it was told.
-    var discord = { state: null, friends: null, requests: null };
-    function heardFromDiscord(kind, value) {
-      if (kind !== "invited") discord[kind] = value;
-      document.dispatchEvent(new CustomEvent("oeee:discord", { detail: { kind: kind, value: value } }));
-    }
-
-    window.oeeeApp = {
-      // Whether an app is listening at all.
-      connected: function () { return !!channel(); },
-      discord: {
-        state: function (linked) { heardFromDiscord("state", linked); },
-        friends: function (list) { heardFromDiscord("friends", list); },
-        requests: function (list) { heardFromDiscord("requests", list); },
-        invited: function (result) { heardFromDiscord("invited", result); },
-        known: function () { return discord; },
-        ask: function (action, user) {
-          var data = { action: action };
-          if (user) data.user = user;
-          return post("discord", data, true);
-        }
-      },
-      steam: {
-        invite: function (join) {
-          return post("steam", { action: "invite", join: join }, true);
-        }
-      },
-      post: post,
-      // A control felt as well as seen.
-      feel: function (name) {
-        if (name) post("haptic", { name: name }, true);
-      },
-      // Said again after something the page changed by itself.
-      report: report,
-      pushToken: pushToken,
-      // Whether the page would stop a browser from leaving it. Its value is
-      // the answer, so an app evaluates the call and reads it.
-      wouldLoseWork: function () {
-        var event;
-        try {
-          event = document.createEvent("BeforeUnloadEvent");
-          event.initEvent("beforeunload", false, true);
-        } catch (error) {
-          event = new Event("beforeunload", { cancelable: true });
-        }
-        window.dispatchEvent(event);
-        return event.defaultPrevented ||
-          (typeof event.returnValue === "string" && event.returnValue !== "");
-      },
-      // The reader said Leave in the app's own dialog, and the app is about
-      // to load the next page: the loading bar goes up (loading_bar.jinja),
-      // and the promise settles when the load may begin.
-      leaving: function () {
-        var bar = window.oeeeLoadingBar;
-        return bar ? bar.leaving() : Promise.resolve();
-      }
-    };
-  })();
+  if (window.oeeeChrome) window.oeeeChrome.bridge({
+    leaveTitle: {{ ftl_get_message("app-leave-title")|tojson }},
+    leaveBody: {{ ftl_get_message("app-leave-body")|tojson }},
+    leave: {{ ftl_get_message("app-leave")|tojson }},
+    stay: {{ ftl_get_message("app-stay")|tojson }},
+    saveImage: {{ ftl_get_message("app-save-image")|tojson }},
+    copyImage: {{ ftl_get_message("app-copy-image")|tojson }},
+    share: {{ ftl_get_message("app-share")|tojson }},
+    copyLink: {{ ftl_get_message("app-copy-link")|tojson }},
+    savedImage: {{ ftl_get_message("app-saved-image")|tojson }},
+    savedFile: {{ ftl_get_message("app-saved-file")|tojson }},
+    saveFailed: {{ ftl_get_message("app-save-failed")|tojson }},
+    presenceBrowsing: {{ ftl_get_message("app-presence-browsing")|tojson }},
+    presenceDrawing: {{ ftl_get_message("app-presence-drawing")|tojson }},
+    presenceRelaying: {{ ftl_get_message("app-presence-relaying")|tojson }},
+    presenceCollaborating: {{ ftl_get_message("app-presence-collaborating")|tojson }},
+    presenceDrawingBanner: {{ ftl_get_message("app-presence-drawing-banner")|tojson }},
+    presenceWatchingReplay: {{ ftl_get_message("app-presence-watching-replay")|tojson }}
+  });
 </script>

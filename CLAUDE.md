@@ -152,15 +152,19 @@ session replay viewer serves `neo-cucumber/dist-replay` at `/static/replay/`.
 The site's own scripts for server-rendered pages (`frontend/site`: the comment
 box's @ autocomplete, a post's pinch to zoom, the reaction picker) are built
 to `neo-cucumber/dist-site` and served at `/static/site/`; a new one goes there
-rather than into `static/`, so it gets the Firefox 56 build. The chrome around
-every page -- the toolbar, loading bar, Windows caption, toasts, quick
+rather than into `static/`, so it gets the Firefox 56 build. Everything the
+site's pages run around their content -- the app bridge (`oeeeApp`) and what
+answers the apps, the toolbar, loading bar, Windows caption, toasts, quick
 switcher, live stream, confirm and alert, Draw dialog, segmented thumbs, Per
-row slider -- is one of them, `chrome.js`, which `toolbar.jinja`
-loads and which sets nothing up by itself: each template keeps a one-line
-inline `<script>` calling its piece (`oeeeChrome.jump()`). That line is what
-a boosted swap re-runs, in place. Never move such a call into the bundle: htmx
+row slider -- is one of them, `chrome.js`. `theme_head.jinja` loads it in the
+head, which a boosted swap keeps, so it is fetched once a document; it sets
+nothing up by itself. Each template keeps a one-line inline `<script>` calling
+its piece (`oeeeChrome.jump()`), where its script used to be. In the body,
+that line is what a boosted swap re-runs, in place. Never move such a call
+into the bundle, and never put a `<script src>` in the body for this: htmx
 re-runs a swapped `<script src>` without waiting for it, so it lands late and
-out of order with the inline scripts after it. A browser test that needs one of
+out of order with the inline scripts after it. `theme_head.jinja`'s own
+script stays inline: it marks the theme and the app before the first paint. A browser test that needs one of
 these scripts in a page of its own asks for it built as it ships, with the
 `siteScript` command in `vitest.config.ts` (`appContract.browser.test.ts` does).
 `pnpm run build` builds all of them, and Docker builds them itself.
