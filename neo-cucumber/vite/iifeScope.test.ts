@@ -55,12 +55,26 @@ function anything(): unknown {
 }
 
 /*
- * base.jinja and the post page load these as classic scripts beside the
- * page's own inline ones, so none may leave a name on `window` -- but htmx,
- * which the page's scripts and the apps call by that name.
+ * base.jinja, toolbar.jinja and the post page load these as classic scripts
+ * beside the page's own inline ones, so none may leave a name on `window`
+ * but the ones it is there to give the page.
  */
+const GIVES: Record<string, string[]> = {
+  "htmx.js": ["htmx"],
+  // The page's own scripts and the quick switcher call these (jump.jinja,
+  // feed_switch.jinja, segmented.jinja); toolbar.jinja calls oeeeToolbar.
+  "toolbar.js": [
+    "oeeeMarkCurrent",
+    "oeeeFitToolbar",
+    "oeeeCommand",
+    "oeeeGo",
+    "oeeeShowSkeleton",
+    "oeeeToolbar",
+  ],
+};
+
 describe("the site's own scripts", () => {
-  it("declare nothing at the top level but htmx", async () => {
+  it("declare nothing at the top level but what they give the page", async () => {
     const result = await build({
       ...siteConfig,
       configFile: false,
@@ -76,6 +90,7 @@ describe("the site's own scripts", () => {
       "mention.js",
       "post_zoom.js",
       "reaction_picker.js",
+      "toolbar.js",
     ]);
 
     const page = ["document", "navigator", "location", "history", "localStorage", "sessionStorage"];
@@ -92,7 +107,7 @@ describe("the site's own scripts", () => {
       const before = Object.keys(globals);
       runInNewContext(chunk.code, globals);
       const added = Object.keys(globals).filter((name) => !before.includes(name));
-      expect(added, chunk.fileName).toEqual(chunk.fileName === "htmx.js" ? ["htmx"] : []);
+      expect(added.sort(), chunk.fileName).toEqual((GIVES[chunk.fileName] ?? []).sort());
     }
   }, 60_000);
 });

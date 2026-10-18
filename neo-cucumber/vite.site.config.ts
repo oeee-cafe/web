@@ -6,8 +6,8 @@ import { resolve } from "node:path";
 /**
  * The site's own small scripts (../frontend/site), each a file of its own that
  * a server-rendered page loads by a script tag: the comment box's @
- * autocomplete, a post's pinch to zoom, the reaction picker, and htmx with
- * its extensions. Kept apart
+ * autocomplete, a post's pinch to zoom, the reaction picker, the toolbar's
+ * controls, and htmx with its extensions. Kept apart
  * from the painter's build so that none of them pays for React.
  *
  * Emits stable filenames, served at /static/site/; the templates cache-bust
@@ -38,6 +38,8 @@ export default defineConfig({
       entry: {
         htmx: resolve(import.meta.dirname, "../frontend/site/htmx.ts"),
         mention: resolve(import.meta.dirname, "../frontend/site/mention.ts"),
+        // The toolbar's, loaded inside the nav on every page that has one.
+        toolbar: resolve(import.meta.dirname, "../frontend/site/toolbar.ts"),
         post_zoom: resolve(import.meta.dirname, "../frontend/site/postZoom.ts"),
         // Loaded as a module, so a browser without modules keeps the typed
         // form instead (reactionPicker.ts).

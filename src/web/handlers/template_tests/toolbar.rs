@@ -84,7 +84,8 @@ fn the_bars_search_button_opens_the_quick_switcher() {
         bar.contains(r#"href="/search""#),
         "somewhere to go with no script"
     );
-    assert!(bar.contains("window.oeeeJump.open()"));
+    // Its script takes the click (frontend/site/toolbar.browser.test.ts).
+    assert!(bar.contains(r#"<script src="/static/site/toolbar.js"></script>"#));
     assert!(
         !bar.contains("toolbar-search-field") && !bar.contains(r#"type="search""#),
         "the bar holds no search field of its own"

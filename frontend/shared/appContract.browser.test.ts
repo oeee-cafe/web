@@ -21,6 +21,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { offerPainterToApp } from "./appBridge";
+import { COMMAND_NAMES } from "../site/toolbarControls";
 import contract from "./appContract.json";
 
 const sources = import.meta.glob("../../templates/*.jinja", {
@@ -1389,14 +1390,9 @@ describe("what the apps test against (appContract.json)", () => {
     } finally {
       delete host.oeeeApp;
     }
-    // The toolbar's commands need the server to render it; the Rust tests
-    // hold it to adding `command` (the_apps_are_told_the_unread_count_and_who_is_signed_in),
-    // and its table is read here for the names it takes.
-    const toolbar = template("toolbar.jinja");
-    expect(toolbar).toContain("window.oeeeApp.command = command;");
-    const table = /var commands = \{([\s\S]*?)\n\s*\};/.exec(toolbar)![1];
-    const named = [...table.matchAll(/^\s*"([a-z-]+)": function/gm)].map((match) => match[1]);
-    expect(named.sort()).toEqual([...contract.commands].sort());
+    // The toolbar adds `command` (frontend/site/toolbar.browser.test.ts holds
+    // it to that), and these are the names it takes.
+    expect([...COMMAND_NAMES].sort()).toEqual([...contract.commands].sort());
     const found = (path: string) =>
       path.split(".").reduce<unknown>((at, name) => (at as Record<string, unknown> | undefined)?.[name], page.window.oeeeApp);
     for (const member of contract.members) {
