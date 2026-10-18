@@ -36,8 +36,8 @@
           <button type="button" class="ds-button ds-button-small comment-delete-btn"
                   hx-delete="/comments/{{ comment.id }}"
                   hx-confirm="{{ ftl_get_message('comment-delete-confirm') }}"
-                  hx-target="closest .comment-wrapper"
-                  hx-swap="outerHTML"
+                  hx-target="#comments"
+                  hx-swap="innerHTML"
                   hx-disable="this">
             {{ ftl_get_message("delete") }}
           </button>

@@ -1,2 +1,11 @@
+{# A post's comments, as #comments holds them (post_view.jinja): drawn
+   with the page, and sent back alone when a comment is posted or deleted. #}
 {% import "comments_macro.jinja" as comments_macro %}
-{{ comments_macro.comments(comments, current_user) }}
+{% if comments %}
+  {{ comments_macro.comments(comments, current_user) }}
+{% else %}
+  <p class="profile-empty">
+    {{ ftl_get_message("post-no-comments") }}
+    {% if not current_user %}{{ ftl_get_message("post-no-comments-signin") }}{% endif %}
+  </p>
+{% endif %}

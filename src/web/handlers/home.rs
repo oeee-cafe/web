@@ -10,7 +10,6 @@ use crate::web::context::CommonContext;
 use crate::web::i18n::ExtractFtlLang;
 use crate::web::state::AppState;
 use axum::extract::{Path, Query};
-use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{extract::State, response::Html};
 use axum_messages::Messages;
@@ -460,9 +459,14 @@ pub async fn load_more_community_feed_posts(
     feed_batch(Feed::Communities, auth_session, state, ftl_lang, query).await
 }
 
+/// DELETE /comments/{comment_id} -- the post's comments drawn again, for
+/// the Delete button to put in place of the list (comments_macro.jinja).
+/// htmx swaps nothing on a 204, so the comment used to stay on screen with
+/// no sign it had gone.
 pub async fn do_delete_comment(
     auth_session: AuthSession,
     State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
     Path(comment_id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     // Require authentication
@@ -498,32 +502,41 @@ pub async fn do_delete_comment(
         None => return Err(AppError::NotFound("Comment".to_string())),
     };
 
-    // Check if comment is already deleted
-    if comment.deleted_at.is_some() {
-        return Ok(StatusCode::GONE.into_response());
-    }
-
     // Check if the user is the comment author
     if comment.actor_id != actor.id {
         return Err(AppError::Forbidden);
     }
 
-    // Delete the comment
-    let falls = crate::models::comment::delete_comment(
-        &mut tx,
-        comment_uuid,
-        crate::models::comment::CommentDeletionReason::UserDeleted,
-    )
-    .await?;
+    // Already gone, from another tab: the list is still worth sending.
+    if comment.deleted_at.is_none() {
+        let falls = crate::models::comment::delete_comment(
+            &mut tx,
+            comment_uuid,
+            crate::models::comment::CommentDeletionReason::UserDeleted,
+        )
+        .await?;
+        state.push_service.badges_fell(falls);
+    }
 
+    let comments =
+        crate::models::comment::build_comment_thread_tree(&mut tx, comment.post_id).await?;
     tx.commit().await?;
-    state.push_service.badges_fell(falls);
     state.live.publish(crate::live::LiveEvent::Comments {
         post_id: comment.post_id,
         by: Some(user.id),
     });
 
-    Ok(StatusCode::NO_CONTENT.into_response())
+    let rendered = state
+        .render(
+            "post_comments.jinja",
+            context! {
+                comments => Serde(comments),
+                current_user => Serde(user),
+                ftl_lang
+            },
+        )
+        .await?;
+    Ok(Html(rendered).into_response())
 }
 
 #[derive(Deserialize)]

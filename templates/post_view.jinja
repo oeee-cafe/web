@@ -1,6 +1,5 @@
 {% from "post_url_macro.jinja" import post_url %}
 {% from "storage_macro.jinja" import stored_url %}
-{% import "comments_macro.jinja" as comments_macro %}
 {% from "person_macro.jinja" import person %}
 
 {# A drawing in a thread -- the one this replies to, or one replying to it:
@@ -249,14 +248,7 @@
            there was nowhere to write the next without reloading. #}
         {# data-live-post: fetched again when someone else comments (live.jinja). #}
         <div id="comments" class="ds-selectable" data-live-post="{{ post_id }}">
-          {% if comments %}
-            {{ comments_macro.comments(comments, current_user) }}
-          {% else %}
-            <p class="profile-empty">
-              {{ ftl_get_message("post-no-comments") }}
-              {% if not current_user %}{{ ftl_get_message("post-no-comments-signin") }}{% endif %}
-            </p>
-          {% endif %}
+          {% include "post_comments.jinja" %}
         </div>
         {% if current_user %}
           <form id="comment-form" class="post-comment-form" hx-post="/comments" hx-target="#comments" hx-swap="innerHTML"
