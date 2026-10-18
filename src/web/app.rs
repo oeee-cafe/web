@@ -123,6 +123,9 @@ fn static_router() -> Router {
         // every other bundle; what it can read is not, because the endpoints
         // it fetches from are behind the admin extractor.
         .nest_service("/static/replay", ServeDir::new("neo-cucumber/dist-replay"))
+        // The site's own small scripts: the comment box's @ autocomplete, a
+        // post's pinch to zoom, the reaction picker (frontend/site).
+        .nest_service("/static/site", ServeDir::new("neo-cucumber/dist-site"))
         // tegaki is MIT, which asks that its notice travel with the copies.
         // Only css/js/lib are mounted and none of those files carry a header,
         // so without this the notice is in the repository but not reachable

@@ -48,6 +48,7 @@
     "../frontend/replay",
     "../frontend/shared",
     "../frontend/admin",
+    "../frontend/site",
     "vite/**/*.browser.test.ts"
   ]
 }

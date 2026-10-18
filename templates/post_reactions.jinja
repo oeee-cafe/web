@@ -48,7 +48,7 @@
     {% endif %}
   {% endfor %}
   {% if current_user %}
-    {# Any other emoji. /static/reaction_picker.js mounts a picker in the
+    {# Any other emoji. frontend/site/reactionPicker.ts mounts a picker in the
        panel the first time it opens and hides the form; the form is what a
        browser without modules, or without the CDN, gets. Its `pattern` is
        compiled with the `v` flag, which is what makes \p{RGI_Emoji} (one

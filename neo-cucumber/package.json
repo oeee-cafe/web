@@ -26,7 +26,7 @@
   "scripts": {
     "dev": "vite",
     "dev:collaborate": "vite --config vite.collaborate.config.ts",
-    "build": "tsc -b && vite build --config vite.collaborate.config.ts && vite build && vite build --config vite.viewer.config.ts && vite build --config vite.offline.config.ts && vite build --config vite.replay.config.ts && pnpm run build:library",
+    "build": "tsc -b && vite build --config vite.collaborate.config.ts && vite build && vite build --config vite.viewer.config.ts && vite build --config vite.offline.config.ts && vite build --config vite.replay.config.ts && vite build --config vite.site.config.ts && pnpm run build:library",
     "build:library": "vite build --config vite.library.config.ts && tsc -p tsconfig.lib.json",
     "build:icons": "node scripts/buildIconCollection.ts",
     "lint": "cd .. && eslint --config neo-cucumber/eslint.config.js neo-cucumber frontend",
@@ -38,7 +38,8 @@
     "test:node": "vitest run --project node",
     "test:browser": "vitest run --project browser",
     "build:viewer": "vite build --config vite.viewer.config.ts",
-    "build:replay": "vite build --config vite.replay.config.ts"
+    "build:replay": "vite build --config vite.replay.config.ts",
+    "build:site": "vite build --config vite.site.config.ts"
   },
   "dependencies": {
     "@lingui/core": "^5.4.1",

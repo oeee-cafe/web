@@ -143,12 +143,16 @@ else survives a pause only by accident.
 
 Don't try to run the development server. Just run `pnpm run build` if you need to check if the code compiles.
 
-`dist/`, `dist-viewer/`, `dist-offline/`, and `dist-replay/` are build output and are not tracked. The Rust
+`dist/`, `dist-viewer/`, `dist-offline/`, `dist-replay/` and `dist-site/` are build output and are not tracked. The Rust
 server serves `neo-cucumber/dist-viewer` at `/static/viewer/`, which the post
 page's inline replay requests, so a checkout that has never been built will 404 there until
 `pnpm run build:viewer` has run once. The normal drawing routes similarly serve
 `neo-cucumber/dist-offline` at `/static/neo-cucumber/`, and the staff-only
-session replay viewer serves `neo-cucumber/dist-replay` at `/static/replay/`;
+session replay viewer serves `neo-cucumber/dist-replay` at `/static/replay/`.
+The site's own scripts for server-rendered pages (`frontend/site`: the comment
+box's @ autocomplete, a post's pinch to zoom, the reaction picker) are built
+to `neo-cucumber/dist-site` and served at `/static/site/`; a new one goes there
+rather than into `static/`, so it gets the Firefox 56 build.
 `pnpm run build` builds all of them, and Docker builds them itself.
 
 The drawing page's error reporter is `dist-offline/sentry.js`, a bundle of

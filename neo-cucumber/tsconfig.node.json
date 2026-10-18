@@ -28,6 +28,7 @@
     "vite.library.config.ts",
     "vite.collaborate.config.ts",
     "vite.replay.config.ts",
+    "vite.site.config.ts",
     "vite/**/*.ts"
   ],
   // The DOM-measuring test beside them belongs to the app project, which is

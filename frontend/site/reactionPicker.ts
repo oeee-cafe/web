@@ -6,20 +6,28 @@
 // not with the page. Everything here is delegated from the document, because
 // the reactions block is swapped out whole after every reaction and a boosted
 // navigation swaps the body around it; a module in the head runs once.
+//
+// Built to dist-site/reaction_picker.js.
+import { feelInApp } from "../shared/appBridge";
 
 const PICKER = "https://cdn.jsdelivr.net/npm/emoji-picker-element@1.29.1/";
 const DATA = "https://cdn.jsdelivr.net/npm/emoji-picker-element-data@1.8.0/";
 
+type Lang = "en" | "ja" | "zh" | "ko";
+
 // Emojibase has no Korean names; CLDR's are the same shape.
-const SOURCES = {
+const SOURCES: Record<Lang, string> = {
   en: "en/emojibase/data.json",
   ja: "ja/emojibase/data.json",
   zh: "zh/emojibase/data.json",
   ko: "ko/cldr/data.json",
 };
 
+// The picker's chrome, in whatever shape it takes; it is handed over whole.
+type I18n = Record<string, unknown>;
+
 // The picker ships Japanese and Chinese chrome but no Korean.
-const KO = {
+const KO: I18n = {
   categoriesLabel: "카테고리",
   emojiUnsupportedMessage: "이 브라우저에서는 컬러 이모지를 표시할 수 없습니다.",
   favoritesLabel: "자주 쓰는 이모지",
@@ -60,11 +68,27 @@ const NAV_STYLE = `
   .nav-button[aria-selected="true"] .nav-emoji { filter: none; opacity: 1; }
 `;
 
-let loading = null;
+// What of emoji-picker-element is used here; it is fetched, not bundled.
+interface EmojiPicker extends HTMLElement {
+  locale: string;
+  dataSource: string;
+  i18n: I18n;
+}
 
-function load() {
+interface EmojiClick extends Event {
+  detail: { unicode: string };
+}
+
+// From the CDN at run time, never from the bundle.
+function fetchModule<T>(url: string): Promise<T> {
+  return import(/* @vite-ignore */ url) as Promise<T>;
+}
+
+let loading: Promise<unknown> | null = null;
+
+function load(): Promise<unknown> {
   if (!loading) {
-    loading = import(PICKER + "index.js").catch((error) => {
+    loading = fetchModule(PICKER + "index.js").catch((error) => {
       loading = null;
       throw error;
     });
@@ -72,34 +96,34 @@ function load() {
   return loading;
 }
 
-function language() {
+function language(): Lang {
   const lang = (document.documentElement.lang || "en").slice(0, 2);
-  return SOURCES[lang] ? lang : "en";
+  return Object.prototype.hasOwnProperty.call(SOURCES, lang) ? (lang as Lang) : "en";
 }
 
-async function chrome(lang) {
+async function chrome(lang: Lang): Promise<I18n | null> {
   if (lang === "ko") return KO;
-  if (lang === "ja") return (await import(PICKER + "i18n/ja.js")).default;
-  if (lang === "zh") return (await import(PICKER + "i18n/zh_CN.js")).default;
+  if (lang === "ja") return (await fetchModule<{ default: I18n }>(PICKER + "i18n/ja.js")).default;
+  if (lang === "zh") return (await fetchModule<{ default: I18n }>(PICKER + "i18n/zh_CN.js")).default;
   return null;
 }
 
 // The site's own switch wins over the system's, as it does for every token.
-function dark() {
+function dark(): boolean {
   const theme = document.documentElement.getAttribute("data-theme");
   if (theme) return theme === "dark";
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
-function submit(form) {
+function submit(form: HTMLFormElement): void {
   if (form.requestSubmit) form.requestSubmit();
   else form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
 }
 
 // Keep the panel on screen when the chip is near the right edge. On a phone
 // it is a sheet along the bottom instead (style.css) and needs nothing.
-function place(details) {
-  const panel = details.querySelector(".reaction-custom-panel");
+function place(details: HTMLDetailsElement): void {
+  const panel = details.querySelector<HTMLElement>(".reaction-custom-panel");
   if (!panel) return;
   panel.style.left = "";
   if (window.matchMedia("(max-width: 480px)").matches) return;
@@ -107,23 +131,23 @@ function place(details) {
   if (overflow > 0) panel.style.left = -overflow + "px";
 }
 
-async function mount(details) {
+async function mount(details: HTMLDetailsElement): Promise<void> {
   const slot = details.querySelector(".reaction-picker");
-  const form = details.querySelector(".reaction-custom-form");
+  const form = details.querySelector<HTMLFormElement>(".reaction-custom-form");
   if (!slot || !form || slot.firstChild) return;
 
   const lang = language();
   const [, i18n] = await Promise.all([load(), chrome(lang)]);
   if (slot.firstChild || !details.isConnected) return;
 
-  const picker = document.createElement("emoji-picker");
+  const picker = document.createElement("emoji-picker") as EmojiPicker;
   picker.className = dark() ? "dark" : "light";
   picker.locale = lang;
   picker.dataSource = DATA + SOURCES[lang];
   if (i18n) picker.i18n = i18n;
   picker.addEventListener("emoji-click", (event) => {
-    const input = form.querySelector("input[name=emoji]");
-    input.value = event.detail.unicode;
+    const input = form.querySelector<HTMLInputElement>("input[name=emoji]")!;
+    input.value = (event as EmojiClick).detail.unicode;
     details.open = false;
     submit(form);
   });
@@ -135,9 +159,10 @@ async function mount(details) {
     // The category tabs tick as a segmented control's do (theme_head.jinja).
     // That listener sees only the picker itself, from outside its shadow.
     picker.shadowRoot.addEventListener("click", (event) => {
-      const tab = event.target.closest && event.target.closest(".nav-button");
+      const target = event.target as Element | null;
+      const tab = target && target.closest && target.closest(".nav-button");
       if (!tab || tab.getAttribute("aria-selected") === "true") return;
-      if (window.oeeeApp && window.oeeeApp.connected()) window.oeeeApp.feel("selection");
+      feelInApp("selection");
     });
   }
   // The typed form is only for when there is no picker. Its pattern is for a
@@ -164,7 +189,7 @@ document.addEventListener(
     place(details);
     mount(details).catch(() => {
       // Offline, or the CDN is unreachable: the typed form is still there.
-      const input = details.querySelector(".reaction-custom-form input[name=emoji]");
+      const input = details.querySelector<HTMLInputElement>(".reaction-custom-form input[name=emoji]");
       if (input) input.focus();
     });
   },
@@ -179,14 +204,14 @@ document.addEventListener("pointerover", (event) => {
 });
 
 document.addEventListener("click", (event) => {
-  for (const details of document.querySelectorAll("details.reaction-custom[open]")) {
-    if (!details.contains(event.target)) details.open = false;
+  for (const details of document.querySelectorAll<HTMLDetailsElement>("details.reaction-custom[open]")) {
+    if (!details.contains(event.target as Node | null)) details.open = false;
   }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
-  for (const details of document.querySelectorAll("details.reaction-custom[open]")) {
+  for (const details of document.querySelectorAll<HTMLDetailsElement>("details.reaction-custom[open]")) {
     details.open = false;
     const summary = details.querySelector("summary");
     if (summary) summary.focus();

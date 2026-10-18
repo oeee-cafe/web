@@ -101,7 +101,7 @@
                data-poster="{{ image_url }}"
                data-lang="{{ ftl_lang }}"
              {% endif %}>
-          {# Pinched closer inside this frame and no further (post_zoom.js).
+          {# Pinched closer inside this frame and no further (frontend/site/postZoom.ts).
              The viewer swaps the poster for its canvas in place, so the
              canvas is moved and clipped as the drawing was. #}
           <div class="post-stage-view" data-post-zoom>
@@ -260,7 +260,7 @@
               <button type="button" class="ds-button ds-button-quiet ds-button-small"
                       hx-on:click="document.getElementById('parent_comment_id').value = ''; document.getElementById('reply-info').style.display = 'none';">{{ ftl_get_message("cancel") }}</button>
             </div>
-            {# Typing @ lists who it could be (static/mention.js). #}
+            {# Typing @ lists who it could be (frontend/site/mentionBox.ts). #}
             <div class="combobox">
               <textarea id="comment-content" class="ds-textarea" name="content" rows="3" required
                         aria-label="{{ ftl_get_message('post-comment') }}"
@@ -427,8 +427,8 @@
   </script>
   {# After the stage is fitted, so a new size of window is fitted first and
      zoomed from after. #}
-  <script src="{{ '/static/post_zoom.js' | cachebuster | safe }}"></script>
-  {% if current_user %}<script src="{{ '/static/mention.js' | cachebuster | safe }}"></script>{% endif %}
+  <script src="{{ '/static/site/post_zoom.js' | cachebuster | safe }}"></script>
+  {% if current_user %}<script src="{{ '/static/site/mention.js' | cachebuster | safe }}"></script>{% endif %}
   <script>
 
     function modalToggle(id, open) {

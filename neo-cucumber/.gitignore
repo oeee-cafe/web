@@ -28,6 +28,7 @@ dist-ssr
 dist-viewer
 dist-offline
 dist-replay
+dist-site
 dist-lib
 *.local
 

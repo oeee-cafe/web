@@ -1158,7 +1158,7 @@ a.mention:hover {
   image-rendering: pixelated;
 }
 
-/* The frame a pinch zooms inside (post_zoom.js): the drawing grows within
+/* The frame a pinch zooms inside (frontend/site/postZoom.ts): the drawing grows within
    it and is clipped to it. Two fingers on it are the drawing's pinch and
    not the page's; one still scrolls the page until the drawing is closer,
    when it moves the drawing instead. */
@@ -1620,7 +1620,7 @@ a.mention:hover {
 }
 
 /* "+": any emoji beyond the defaults, from a picker that opens under the
-   chip (static/reaction_picker.js), or a typed one where there is none. */
+   chip (frontend/site/reactionPicker.ts), or a typed one where there is none. */
 .reaction-custom {
   position: relative;
   display: inline-block;
