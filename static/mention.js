@@ -4,9 +4,11 @@
 //
 // Who is listed is the server's to say (GET data-mention-url?q=, which is
 // models::people): a handle typed exactly, whoever it is, and the people
-// near the writer by the start of a name. What counts as a mention is
-// crate::mention's rule, which this follows: an @ that does not continue a
-// word, then the letters a login name is made of.
+// near the writer by the start of a name. What is asked about is an @ that
+// does not continue a word (crate::mention's rule) and what follows it up
+// to a space or a punctuation mark: a login name, or the start of a display
+// name in any script -- `@그림` as much as `@neo`. What is written in is
+// always the login name, which is all a mention is.
 //
 // The arrow keys move through the list, Enter or Tab picks, Escape closes
 // it. While it is closed the keys are the box's own.
@@ -24,9 +26,18 @@
   var WIDE_GAP = /[\s\u2000-\u206f\u3000-\u303f\uff01-\uff0f\uff1a-\uff20\uff3b-\uff40\uff5b-\uff65]/;
   var MAX_NAME = 50;
 
-  function continuesWord(c) {
-    if (BEFORE_WORD.test(c)) return true;
+  // A letter past ASCII: Hangul, kana, Han and the rest.
+  function isWideLetter(c) {
     return c.charCodeAt(0) > 127 && !WIDE_GAP.test(c);
+  }
+
+  function continuesWord(c) {
+    return BEFORE_WORD.test(c) || isWideLetter(c);
+  }
+
+  // What may follow the @: a login name's letters, or a display name's.
+  function isQueryChar(c) {
+    return NAME.test(c) || isWideLetter(c);
   }
 
   function attach(box) {
@@ -53,18 +64,19 @@
     var timer = null;
     var asked = 0; // the newest request; older answers are dropped
 
-    // The @name the caret is in or just after, or null.
+    // The @name the caret is in or just after, or null. Hangul being
+    // composed is in the box already, so `@그` is asked about mid-syllable.
     function current() {
       if (box.selectionStart !== box.selectionEnd) return null;
       var text = box.value;
       var caret = box.selectionStart;
       var at = caret;
-      while (at > 0 && NAME.test(text.charAt(at - 1))) at--;
+      while (at > 0 && isQueryChar(text.charAt(at - 1))) at--;
       if (at === 0 || text.charAt(at - 1) !== "@") return null;
       var start = at - 1;
       if (start > 0 && continuesWord(text.charAt(start - 1))) return null;
       var end = caret;
-      while (end < text.length && NAME.test(text.charAt(end))) end++;
+      while (end < text.length && isQueryChar(text.charAt(end))) end++;
       if (end - start - 1 > MAX_NAME) return null;
       return { start: start, end: end, q: text.slice(start + 1, caret) };
     }

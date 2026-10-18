@@ -261,7 +261,7 @@ mod tests {
         let (reader, reader_actor) = person(&mut tx, &format!("r{t}"), "Reader").await;
         let (_, followed) = person(&mut tx, &format!("p{t}a"), "Followed").await;
         let (_, follower) = person(&mut tx, &format!("p{t}b"), "Follower").await;
-        let (author, _) = person(&mut tx, &format!("p{t}c"), "Author").await;
+        let (author, _) = person(&mut tx, &format!("p{t}c"), "그림쟁이 작가").await;
         let (_, commenter) = person(&mut tx, &format!("p{t}d"), "Commenter").await;
         person(&mut tx, &format!("p{t}e"), "Stranger").await;
         let (gone, _) = person(&mut tx, &format!("p{t}f"), "Gone").await;
@@ -306,6 +306,13 @@ mod tests {
         );
         // A display name begun, any case.
         assert_eq!(names(&mut tx, reader, "follo", None).await.len(), 2);
+        // In any script: Hangul, for the author under their post, and not
+        // away from it, where they are nobody nearby.
+        assert_eq!(
+            names(&mut tx, reader, "@그림", Some(drawing)).await,
+            [format!("p{t}c")]
+        );
+        assert!(names(&mut tx, reader, "그림", None).await.is_empty());
         // A stranger's handle in full, in any case, and first.
         assert_eq!(
             names(&mut tx, reader, &format!("P{t}E"), Some(drawing)).await,
