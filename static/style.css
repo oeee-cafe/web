@@ -4557,14 +4557,20 @@ html[data-app] .about-stores {
   margin: -10px 0;
 }
 
-/* Four banners a row at every width, each scaled to a quarter of it in
-   hard pixels, framed, lifting a little under the pointer. Banners are
-   200 by 40, so the row keeps their shape. */
+/* Four banners a row, two on a narrow screen, each scaled to its share
+   of the width in hard pixels, framed, lifting a little under the
+   pointer. Banners are 200 by 40, so the row keeps their shape. */
 .about-banners {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-gap: 8px;
   gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .about-banners {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .about-banner {
