@@ -242,6 +242,7 @@ post-reply-with-drawing = Reply with Drawing
 post-reply-select-tool = Select tool and canvas size
 post-child-posts = Replies
 post-replying-to = Replying to:
+comment-reply = Reply
 post-tags = Tags
 post-tags-placeholder = art, drawing, sketch
 post-tags-hint = Separate tags with commas or spaces

@@ -22,16 +22,18 @@
         </div>
         {% if not comment.deleted_at %}
         <div class="comment-actions">
-          <button class="ds-button ds-button-quiet ds-button-small comment-reply-btn"
-                  hx-on:click="document.getElementById('parent_comment_id').value = '{{ comment.id }}';
-                               document.getElementById('reply-to-text').textContent = 'Replying to {{ comment.actor_name }}';
-                               document.getElementById('reply-info').style.display = 'block';
-                               document.getElementById('comment-content').focus();
-                               document.getElementById('comment-form').scrollIntoView({ behavior: 'smooth', block: 'center' });">
-            Reply
+          {# Who is being replied to goes in as text, through data-: a name
+             written into the handler's script could end its string. #}
+          {% if current_user %}
+          <button type="button" class="ds-button ds-button-small comment-reply-btn"
+                  data-comment-id="{{ comment.id }}"
+                  data-replying-to="{{ ftl_get_message('post-replying-to') }} {{ comment.actor_name }}"
+                  onclick="replyToComment(this)">
+            {{ ftl_get_message("comment-reply") }}
           </button>
+          {% endif %}
           {% if current_user and comment.handle.login_name and comment.handle.login_name == current_user.login_name %}
-          <button class="ds-button ds-button-quiet ds-button-small comment-delete-btn"
+          <button type="button" class="ds-button ds-button-small comment-delete-btn"
                   hx-delete="/comments/{{ comment.id }}"
                   hx-confirm="{{ ftl_get_message('comment-delete-confirm') }}"
                   hx-target="closest .comment-wrapper"

@@ -214,6 +214,7 @@ post-reply-with-drawing = 用画回复
 post-reply-select-tool = 选择工具和画布尺寸
 post-child-posts = 回复
 post-replying-to = 回复给:
+comment-reply = 回复
 post-tags = 标签
 post-tags-placeholder = 艺术, 绘画, 素描
 post-tags-hint = 用逗号或空格分隔标签

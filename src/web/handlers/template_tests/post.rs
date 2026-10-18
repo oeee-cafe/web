@@ -891,3 +891,71 @@ fn a_mention_in_a_comment_links_to_the_profile_it_names() {
         Err(e) => panic!("comments_fragment.jinja renders: {e:#}"),
     }
 }
+
+/// A comment's Reply and Delete are buttons that look like buttons, in the
+/// reader's language. Whom Reply answers goes to the form as text, from a
+/// data- attribute: a display name written into the handler's script could
+/// end its string and run the rest.
+#[test]
+fn a_comments_reply_names_its_author_as_text_not_script() {
+    let viewer = json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "user", "login_name": "plain"});
+    let name = r#"O'Neil');alert(1)//"#;
+    let fragment = test_support::env()
+        .get_template("post_comments.jinja")
+        .unwrap()
+        .render(context! {
+            comments => Serde(json!([comment(Some("plain"), name)])),
+            current_user => Serde(viewer),
+            ..chrome()
+        })
+        .unwrap();
+    assert!(
+        fragment.contains(r#"onclick="replyToComment(this)""#),
+        "{fragment}"
+    );
+    assert!(
+        fragment.contains(r#"data-replying-to="post-replying-to O&#x27;Neil&#x27;);alert(1)&#x2f;&#x2f;""#),
+        "{fragment}"
+    );
+    assert!(!fragment.contains("Replying to"), "{fragment}");
+    assert!(!fragment.contains("ds-button-quiet"), "{fragment}");
+    assert_eq!(fragment.matches(r#"class="ds-button ds-button-small"#).count(), 2);
+
+    // Signed out there is no form to reply with, so no Reply.
+    let signed_out = test_support::env()
+        .get_template("post_comments.jinja")
+        .unwrap()
+        .render(context! {
+            comments => Serde(json!([comment(Some("plain"), "Plain")])),
+            current_user => Serde(json!(null)),
+            ..chrome()
+        })
+        .unwrap();
+    assert!(!signed_out.contains("comment-reply-btn"), "{signed_out}");
+}
+
+/// Moving a drawing to a community is one of its author's buttons, beside
+/// Edit, rather than a link among the facts; nobody else is offered it.
+#[test]
+fn moving_a_drawing_is_its_authors_button() {
+    let author = "b95e3d1e-5a25-4d0a-9d3a-3a0b0a9b1c2d";
+    let move_button = r#"<a class="ds-button" href="/@someone/9c881320-2b43-4afa-b2bb-7128c8a3e985/edit/community">"#;
+    let own = render_post_page(
+        "true",
+        author,
+        json!({"id": author, "role": "user", "login_name": "someone"}),
+    )
+    .replace("&#x2f;", "/");
+    let actions = own.find("post-inspector-actions").expect("actions");
+    let at = own.find(move_button).unwrap_or_else(|| panic!("{own}"));
+    assert!(at > actions, "the button is among the actions");
+    assert!(!own.contains("post-inspector-inline\" href=\"/@someone/9c881320-2b43-4afa-b2bb-7128c8a3e985/edit/community"));
+
+    let theirs = render_post_page(
+        "true",
+        author,
+        json!({"id": "0d2a2b4c-7e8f-4a1b-8c9d-1e2f3a4b5c6d", "role": "user", "login_name": "viewer"}),
+    )
+    .replace("&#x2f;", "/");
+    assert!(!theirs.contains("/edit/community"));
+}

@@ -214,6 +214,7 @@ post-reply-with-drawing = 絵で返信
 post-reply-select-tool = ツールとキャンバスサイズを選択
 post-child-posts = 返信
 post-replying-to = 返信先:
+comment-reply = 返信
 post-tags = タグ
 post-tags-placeholder = イラスト, お絵かき, スケッチ
 post-tags-hint = カンマまたはスペースでタグを区切る

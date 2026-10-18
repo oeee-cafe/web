@@ -214,6 +214,7 @@ post-reply-with-drawing = 그림으로 답글
 post-reply-select-tool = 도구와 캔버스 크기 선택
 post-child-posts = 답글
 post-replying-to = 답글 대상:
+comment-reply = 답글
 post-tags = 태그
 post-tags-placeholder = 그림, 일러스트, 스케치
 post-tags-hint = 쉼표나 공백으로 태그 구분

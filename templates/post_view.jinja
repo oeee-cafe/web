@@ -187,18 +187,9 @@
               {% endif %}
             {% endif %}
           </dd>
-          {% if post.community_slug or (current_user.id == post.author_id and not post.parent_post_id) %}
+          {% if post.community_slug %}
             <dt>{{ ftl_get_message("community") }}</dt>
-            <dd>
-              {% if post.community_slug %}
-                <a href="/@{{ post.community_slug }}">{{ post.community_name }}</a>
-                {% if current_user.id == post.author_id and (not post_community or post_community.visibility != "private") and not post.parent_post_id and not two_tone %}
-                  <a class="post-inspector-inline" href="{{ post_url(post, post_id) }}/edit/community">{{ ftl_get_message("edit") }}</a>
-                {% endif %}
-              {% else %}
-                <a class="post-inspector-inline" href="{{ post_url(post, post_id) }}/edit/community">{{ ftl_get_message("edit-community-button") }}</a>
-              {% endif %}
-            </dd>
+            <dd><a href="/@{{ post.community_slug }}">{{ post.community_name }}</a></dd>
           {% endif %}
           <dt>HIT</dt>
           <dd>{{ post.viewer_count }}</dd>
@@ -223,6 +214,13 @@
                   onclick="sharePost(this)">{{ ftl_get_message("post-share") }}</button>
           {% if current_user and current_user.id == post.author_id %}
             <button type="button" class="ds-button" hx-get="/posts/{{ post_id }}/edit" hx-target="#post-edit-container" hx-swap="outerHTML">{{ ftl_get_message("edit") }}</button>
+            {# Moving is something the author does, so it is with the other
+               things they do rather than among the facts. Not out of a
+               private community, nor a reply drawing, which goes where its
+               parent is, nor a two-tone community's drawing. #}
+            {% if not post.parent_post_id and (not post.community_slug or ((not post_community or post_community.visibility != "private") and not two_tone)) %}
+              <a class="ds-button" href="{{ post_url(post, post_id) }}/edit/community">{{ ftl_get_message("edit-community-button") }}</a>
+            {% endif %}
             <form hx-delete="/posts/{{ post_id }}"
                   hx-confirm="{{ ftl_get_message('post-delete-confirm') }}"
                   hx-target="body"
@@ -452,6 +450,17 @@
         var first = modal.querySelector("textarea") || modal.querySelector("h2");
         if (first) first.focus();
       }
+    }
+    // A comment's Reply (comments_macro.jinja): the form answers that
+    // comment, says whom, and comes into view.
+    function replyToComment(button) {
+      var form = document.getElementById("comment-form");
+      if (!form) return;
+      document.getElementById("parent_comment_id").value = button.getAttribute("data-comment-id");
+      document.getElementById("reply-to-text").textContent = button.getAttribute("data-replying-to");
+      document.getElementById("reply-info").style.display = "block";
+      document.getElementById("comment-content").focus();
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     function showPostDrawModal() { modalToggle("post-draw-modal", true); }
     function hidePostDrawModal() { modalToggle("post-draw-modal", false); }
