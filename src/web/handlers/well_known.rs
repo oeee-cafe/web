@@ -75,7 +75,7 @@ pub async fn android_assetlinks() -> impl IntoResponse {
                 "namespace": "android_app",
                 "package_name": "cafe.oeee",
                 "sha256_cert_fingerprints": [
-                    "35:C4:51:56:59:EB:B9:B6:08:30:0F:51:44:29:95:74:4A:2F:3C:1A:23:01:A5:C6:24:C5:0F:2E:DC:2D:72:49",
+                    "88:38:43:CA:FD:8D:47:33:04:10:BE:37:2D:AC:F4:04:EC:B1:11:04:F9:17:27:65:6E:26:4E:47:C2:EE:04:7D",
                 ]
             }
         }
