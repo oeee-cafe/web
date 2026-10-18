@@ -116,11 +116,11 @@ fn main() {
             // In production the asset URL has to be *stable*, or browsers and
             // the CDN re-fetch every file on every page view — which is what a
             // fresh `now()` per render used to do. Versioning by build id means
-            // assets cache indefinitely and a deploy invalidates them all at
-            // once. In development we want the opposite: a new value per render,
+            // assets cache indefinitely -- the server says so, for this
+            // release's version only (static_router, app.rs) -- and a deploy
+            // invalidates them all at once. In development we want the opposite: a new value per render,
             // so editing style.css shows up without restarting the server.
-            let asset_version: Option<String> =
-                (cfg.env == "production").then(|| oeee_cafe::build_info::build_id().to_string());
+            let asset_version = oeee_cafe::build_info::asset_version(&cfg.env);
             env.add_filter("cachebuster", move |value: String| match &asset_version {
                 Some(version) => format!("{}?{}", value, version),
                 None => {

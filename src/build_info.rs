@@ -25,6 +25,18 @@ pub fn build_id() -> &'static str {
     })
 }
 
+/// The version static asset URLs carry (the `cachebuster` filter, main.rs),
+/// or `None` where each render stamps its own.
+///
+/// In production it is the build id, so a URL is stable for a release and a
+/// deploy moves every one of them at once; the server marks a file asked for
+/// under exactly this version as never changing (`static_router`, app.rs).
+/// In development each render stamps the time instead, so an edited
+/// stylesheet shows up without a restart, and nothing is marked.
+pub fn asset_version(env: &str) -> Option<&'static str> {
+    (env == "production").then(build_id)
+}
+
 /// The full commit this build was made from, as the image workflow passed it
 /// to the image in `GIT_COMMIT`. `None` outside a deployed image, where there is no
 /// commit to speak of: a local build may have uncommitted changes in it.

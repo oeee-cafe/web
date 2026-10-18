@@ -111,12 +111,50 @@ use tower_http::services::{ServeDir, ServeFile};
 use tower_sessions::cookie::SameSite;
 use tower_sessions::{session_store::ExpiredDeletion, Expiry, SessionManagerLayer};
 
+/// How long a static file may be kept, by what its URL asks for.
+///
+/// A file asked for under this build's own version (`?<build id>`, the
+/// `cachebuster` filter) never changes at that URL -- the next deploy asks
+/// for a new one -- so browsers and Cloudflare keep it a year and never ask
+/// again. Asked for under any other version, it is not marked to keep: that
+/// is a page from the other colour while a deploy drains, whose old
+/// connections still reach the old colour through Caddy, and kept, the wrong
+/// release's file would stay under that URL for a year, or two hours at
+/// Cloudflare's edge, which keeps a file it is told nothing about. A URL
+/// with no version is left as it was.
+async fn cache_by_version(
+    asset_version: Option<&'static str>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let asked = request.uri().query().map(str::to_owned);
+    let mut response = next.run(request).await;
+    let Some(asked) = asked else {
+        return response;
+    };
+    let status = response.status();
+    if !(status.is_success() || status == axum::http::StatusCode::NOT_MODIFIED) {
+        return response;
+    }
+    let keep = if Some(asked.as_str()) == asset_version {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-cache"
+    };
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static(keep),
+    );
+    response
+}
+
 /// Everything served straight off disk.
 ///
 /// Its own function so that a test can ask the real thing for a file rather
 /// than assembling a second copy of these mounts and asking that -- a copy
-/// agrees with itself no matter what happens here.
-fn static_router() -> Router {
+/// agrees with itself no matter what happens here. `asset_version` is
+/// `build_info::asset_version`: what a URL this release wrote asks for.
+fn static_router(asset_version: Option<&'static str>) -> Router {
     Router::new()
         .nest_service("/static/viewer", ServeDir::new("neo-cucumber/dist-viewer"))
         // The staff-only session replay viewer. Its assets are public, like
@@ -143,6 +181,9 @@ fn static_router() -> Router {
             ServeDir::new("neo-cucumber/dist-offline"),
         )
         .nest_service("/static", ServeDir::new("static"))
+        .layer(axum::middleware::from_fn(move |request, next| {
+            cache_by_version(asset_version, request, next)
+        }))
 }
 
 pub struct App {
@@ -235,7 +276,9 @@ impl App {
 
         let auth_layer = AuthManagerLayerBuilder::new(authn_backend, session_layer).build();
 
-        let static_router = static_router();
+        let static_router = static_router(crate::build_info::asset_version(
+            &self.state.config.env,
+        ));
 
         let protected_router = Router::new()
             .route("/following", get(my_timeline))
@@ -812,4 +855,65 @@ async fn shutdown_signal(
     // Tell live drawing sessions to wind down now, in parallel with axum
     // draining the plain HTTP connections.
     shutdown.signal();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::static_router;
+    use axum::body::Body;
+    use axum::http::{header::CACHE_CONTROL, Request, StatusCode};
+    use tower::ServiceExt;
+
+    /// What the real static router says a file may be kept for, asked for at
+    /// `uri` by a release whose URLs carry `version`.
+    async fn kept(version: Option<&'static str>, uri: &str) -> (StatusCode, Option<String>) {
+        let response = static_router(version)
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .expect("request completes");
+        let cache = response
+            .headers()
+            .get(CACHE_CONTROL)
+            .map(|value| value.to_str().unwrap().to_owned());
+        (response.status(), cache)
+    }
+
+    /// A file under this release's own version never changes at that URL,
+    /// so it is kept for good; under any other -- the other colour's page
+    /// while a deploy drains -- it is not kept at all, or the wrong release's
+    /// file would stay there. A URL with no version, and a file that is not
+    /// there, are left as they were.
+    #[tokio::test]
+    async fn a_file_is_kept_for_good_only_under_this_releases_version() {
+        let release = Some("0123456789ab");
+        assert_eq!(
+            kept(release, "/static/ds.css?0123456789ab").await,
+            (StatusCode::OK, Some("public, max-age=31536000, immutable".into()))
+        );
+        assert_eq!(
+            kept(release, "/static/ds.css?ba9876543210").await,
+            (StatusCode::OK, Some("no-cache".into()))
+        );
+        assert_eq!(kept(release, "/static/ds.css").await, (StatusCode::OK, None));
+        assert_eq!(
+            kept(release, "/static/no-such-file.css?0123456789ab").await,
+            (StatusCode::NOT_FOUND, None)
+        );
+        // An image as much as a stylesheet: the layer is the whole router's,
+        // the bundles' mounts included.
+        assert_eq!(
+            kept(release, "/static/favicon.png?0123456789ab").await.1.as_deref(),
+            Some("public, max-age=31536000, immutable")
+        );
+    }
+
+    /// In development each render stamps its own time on a URL, so no URL is
+    /// this release's and nothing is kept for good.
+    #[tokio::test]
+    async fn nothing_is_kept_for_good_in_development() {
+        assert_eq!(
+            kept(None, "/static/ds.css?1792307407").await,
+            (StatusCode::OK, Some("no-cache".into()))
+        );
+    }
 }
