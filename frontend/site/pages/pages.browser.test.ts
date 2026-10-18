@@ -250,6 +250,38 @@ describe("the publish page and Move to community", () => {
     expect(document.getElementById("tag-suggestions")!.children.length).toBe(0);
   });
 
+  it("starts a new batch of suggestions with nothing highlighted", async () => {
+    document.body.innerHTML = `
+      <input id="tags-input" value="do" aria-expanded="false" />
+      <div id="tag-suggestions">
+        <div class="tag-autocomplete-item" id="t1" data-tag="dog">dog</div>
+        <div class="tag-autocomplete-item" id="t2" data-tag="dolphin">dolphin</div>
+      </div>`;
+    tagSuggestions();
+    document.dispatchEvent(new Event("DOMContentLoaded"));
+    const input = document.getElementById("tags-input") as HTMLInputElement;
+    const menu = document.getElementById("tag-suggestions")!;
+    input.focus();
+    await userEvent.keyboard("{ArrowDown}");
+    expect(input.getAttribute("aria-activedescendant")).toBe("t1");
+
+    // As htmx 4 says it: on the input that asked, bubbling, once the menu
+    // has the new batch.
+    const swap = (html: string) => {
+      menu.innerHTML = html;
+      input.dispatchEvent(new CustomEvent("htmx:after:swap", { bubbles: true, detail: { ctx: { target: menu } } }));
+    };
+    swap(`<div class="tag-autocomplete-item" id="t3" data-tag="door">door</div>`);
+    expect(input.getAttribute("aria-activedescendant")).toBe("");
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    // The first press goes to the first of the new batch, not past it.
+    await userEvent.keyboard("{ArrowDown}");
+    expect(input.getAttribute("aria-activedescendant")).toBe("t3");
+
+    swap("");
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("names the community chosen on the button, and Enter in the search picks the first", async () => {
     document.body.innerHTML = `
       <form id="move-form">

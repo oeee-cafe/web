@@ -84,10 +84,14 @@ export function tagSuggestions(): void {
       }
     });
 
-    // A fresh batch of suggestions starts with nothing highlighted. Kept on
-    // htmx 2's name for the event, as it was written; htmx 4 calls it
-    // htmx:after:swap, so this does not run today.
-    menu.addEventListener("htmx:afterSwap", () => {
+    // A fresh batch of suggestions starts with nothing highlighted. htmx 4
+    // says a swap is done on the element that asked -- the field, whose
+    // hx-get fills the menu -- and not on the menu, which is only where the
+    // answer went; this listened on the menu, under htmx 2's name for the
+    // event, and never ran.
+    input.addEventListener("htmx:after:swap", (event) => {
+      const detail = (event as CustomEvent<{ ctx?: { target?: Element } }>).detail;
+      if (!detail || !detail.ctx || detail.ctx.target !== menu) return;
       active = -1;
       input!.setAttribute("aria-expanded", options().length ? "true" : "false");
       input!.setAttribute("aria-activedescendant", "");
