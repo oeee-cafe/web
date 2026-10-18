@@ -20,6 +20,7 @@
  * records what it is told.
  */
 import { afterEach, describe, expect, it } from "vitest";
+import { commands } from "vitest/browser";
 import { offerPainterToApp } from "./appBridge";
 import { COMMAND_NAMES } from "../site/toolbarControls";
 import contract from "./appContract.json";
@@ -43,6 +44,21 @@ function template(name: string): string {
 }
 
 const HEAD = template("theme_head.jinja");
+
+/**
+ * The site's chrome (frontend/site/chrome.ts), built as it ships -- by the
+ * siteScript command in vitest.config.ts -- for the page's templates to call:
+ * loading_bar.jinja, app_caption.jinja, confirm_dialog.jinja and live.jinja
+ * are each a line asking it for their piece. Inline, where toolbar.jinja's
+ * script tag would be, and with nothing in it able to end the tag.
+ */
+let chrome: Promise<string> | null = null;
+function chromeScript(): Promise<string> {
+  chrome ??= (commands as unknown as { siteScript(name: string): Promise<string> })
+    .siteScript("chrome.js")
+    .then((code) => `<script>${code.replace(/<\/(script)/gi, "<\\/$1")}</script>`);
+  return chrome;
+}
 
 type Message = { v: number; type: string } & Record<string, unknown>;
 
@@ -190,6 +206,7 @@ async function open(options: Options = {}): Promise<Page> {
     ? `<meta name="oeee-presence" content="${options.presence}" data-community="오이카페 &quot;모에화&quot;" data-group="0123456789abcdef" data-since="1760140800000" data-join="/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985" data-seats="4" data-party="2">`
     : "";
   const body = `
+    ${await chromeScript()}
     <nav class="nav-bar" data-window-drag${options.signedIn ? " data-signed-in" : ""}
          style="background-color: rgb(250, 250, 252)">
       <a id="nav-notifications" data-unread="${options.unread ?? 0}"></a>

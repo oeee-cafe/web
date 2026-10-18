@@ -153,13 +153,16 @@ The site's own scripts for server-rendered pages (`frontend/site`: the comment
 box's @ autocomplete, a post's pinch to zoom, the reaction picker) are built
 to `neo-cucumber/dist-site` and served at `/static/site/`; a new one goes there
 rather than into `static/`, so it gets the Firefox 56 build. The chrome around
-every page -- the toolbar, toasts, quick switcher, Draw dialog, segmented
-thumbs, Per row slider -- is one of them, `chrome.js`, which `toolbar.jinja`
+every page -- the toolbar, loading bar, Windows caption, toasts, quick
+switcher, live stream, confirm and alert, Draw dialog, segmented thumbs, Per
+row slider -- is one of them, `chrome.js`, which `toolbar.jinja`
 loads and which sets nothing up by itself: each template keeps a one-line
 inline `<script>` calling its piece (`oeeeChrome.jump()`). That line is what
 a boosted swap re-runs, in place. Never move such a call into the bundle: htmx
 re-runs a swapped `<script src>` without waiting for it, so it lands late and
-out of order with the inline scripts after it.
+out of order with the inline scripts after it. A browser test that needs one of
+these scripts in a page of its own asks for it built as it ships, with the
+`siteScript` command in `vitest.config.ts` (`appContract.browser.test.ts` does).
 `pnpm run build` builds all of them, and Docker builds them itself.
 
 The drawing page's error reporter is `dist-offline/sentry.js`, a bundle of

@@ -4,6 +4,7 @@
 // again as a boosted swap would.
 import { afterEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
+import { attachAlert, attachConfirm } from "./alerts";
 import { attachDrawDialog } from "./drawDialog";
 import { installOptimistic } from "./optimistic";
 import { attachPerRow } from "./perRow";
@@ -177,5 +178,65 @@ describe("the Per row slider", () => {
     localStorage.removeItem("testCols");
     document.documentElement.style.removeProperty("--test-cols");
     document.documentElement.removeAttribute("data-testCols-density");
+  });
+});
+
+describe("the site's confirm", () => {
+  const DIALOG = `
+    <button id="opener">Delete</button>
+    <div id="ds-confirm" style="display: none;">
+      <p id="ds-confirm-message"></p>
+      <button type="button" data-confirm-cancel>Cancel</button>
+      <button type="button" data-confirm-ok>Delete</button>
+    </div>
+    <div id="ds-alert" style="display: none;">
+      <p id="ds-alert-message"></p>
+      <button type="button" data-alert-ok>OK</button>
+    </div>`;
+
+  it("asks once and is answered once, however many swaps came before", async () => {
+    const felt: string[] = [];
+    const host = window as unknown as { oeeeApp?: unknown };
+    host.oeeeApp = { connected: () => true, feel: (name: string) => felt.push(name) };
+    try {
+      for (let swap = 0; swap < 3; swap++) {
+        document.body.innerHTML = DIALOG;
+        attachConfirm();
+        attachAlert();
+      }
+      const opener = document.getElementById("opener")!;
+      opener.focus();
+      let issued = 0;
+      let dropped = 0;
+      // As htmx asks it: from the control, bubbling to the document.
+      const question = new CustomEvent("htmx:confirm", {
+        bubbles: true,
+        cancelable: true,
+        detail: { ctx: { confirm: "Delete it?" }, issueRequest: () => issued++, dropRequest: () => dropped++ },
+      });
+      opener.dispatchEvent(question);
+      expect(question.defaultPrevented).toBe(true);
+      const dialog = document.getElementById("ds-confirm")!;
+      expect(dialog.style.display).toBe("flex");
+      expect(document.getElementById("ds-confirm-message")!.textContent).toBe("Delete it?");
+      expect(felt).toEqual(["warning"]);
+      await userEvent.click(dialog.querySelector("[data-confirm-ok]")!);
+      expect([issued, dropped]).toEqual([1, 0]);
+      expect(dialog.style.display).toBe("none");
+      expect(document.activeElement).toBe(opener);
+
+      // A script's question, through the same dialog.
+      const answer = (window as unknown as { dsConfirm(text: string): Promise<boolean> }).dsConfirm("Leave?");
+      await userEvent.keyboard("{Escape}");
+      expect(await answer).toBe(false);
+
+      (window as unknown as { dsAlert(text: string): void }).dsAlert("Copied");
+      const alert = document.getElementById("ds-alert")!;
+      expect(alert.style.display).toBe("flex");
+      await userEvent.keyboard("{Enter}");
+      expect(alert.style.display).toBe("none");
+    } finally {
+      delete host.oeeeApp;
+    }
   });
 });

@@ -4,6 +4,33 @@ import tailwindcss from "@tailwindcss/vite";
 import { playwright } from "@vitest/browser-playwright";
 import path from "node:path";
 import { lingui } from "@lingui/vite-plugin";
+import { build, type Rollup } from "vite";
+import siteConfig from "./vite.site.config";
+
+/**
+ * The site's own scripts (vite.site.config.ts), built as they ship, by file
+ * name. For a browser test that puts one into a page of its own the way a
+ * template's script tag does -- the app contract's page (appContract.browser
+ * .test.ts) runs the templates' lines against the real chrome.js. Built once
+ * a run, on the first ask.
+ */
+let siteScripts: Promise<Record<string, string>> | null = null;
+function builtSiteScripts(): Promise<Record<string, string>> {
+  siteScripts ??= build({
+    ...siteConfig,
+    configFile: false,
+    logLevel: "silent",
+    build: { ...siteConfig.build, write: false },
+  }).then((result) => {
+    const outputs = (Array.isArray(result) ? result : [result]) as Rollup.RollupOutput[];
+    const scripts: Record<string, string> = {};
+    for (const output of outputs) {
+      for (const file of output.output) if (file.type === "chunk") scripts[file.fileName] = file.code;
+    }
+    return scripts;
+  });
+  return siteScripts;
+}
 
 // The canonical NEO sources live outside this package and are loaded as raw
 // text by the fidelity tests, so Vite has to be allowed to serve them.
@@ -121,6 +148,13 @@ export default defineConfig({
             enabled: true,
             provider: playwright(),
             headless: true,
+            commands: {
+              async siteScript(_context, name: string) {
+                const code = (await builtSiteScripts())[name];
+                if (code === undefined) throw new Error(`${name} is not one of the site's scripts`);
+                return code;
+              },
+            },
             instances: [{ browser: "chromium" }],
           },
         },

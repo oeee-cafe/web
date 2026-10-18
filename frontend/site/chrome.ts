@@ -1,7 +1,8 @@
 // The site's chrome around a page, as one classic script: the toolbar
-// (toolbarControls.ts), the toasts, the reaction and follow guesses, the
-// quick switcher, the Draw dialog, the segmented controls' thumbs and the
-// Per row slider. Built to dist-site/chrome.js and loaded by toolbar.jinja,
+// (toolbarControls.ts), the loading bar, the Windows app's caption, the
+// toasts, the reaction and follow guesses, the quick switcher, the live
+// stream, the site's confirm and alert, the Draw dialog, the segmented
+// controls' thumbs and the Per row slider. Built to dist-site/chrome.js and loaded by toolbar.jinja,
 // which every page with any of these has, before any of them.
 //
 // Loading it sets nothing up. Each template keeps a one-line inline script
@@ -13,8 +14,12 @@
 // is not waited for: it would run late, out of order with the lines after
 // it. So this file does its work the first time and nothing after, and
 // re-running it costs only the fetch.
+import { attachAlert, attachConfirm } from "./alerts";
+import { attachCaption } from "./caption";
 import { attachDrawDialog } from "./drawDialog";
 import { installJump } from "./jump";
+import { startLive } from "./live";
+import { installLoadingBar } from "./loadingBar";
 import { installOptimistic } from "./optimistic";
 import { attachPerRow } from "./perRow";
 import { settleThumbs } from "./thumbs";
@@ -24,12 +29,17 @@ import { installToolbar, showToolbar } from "./toolbarControls";
 interface Chrome {
   /** Each toolbar the page gets (toolbar.jinja). */
   toolbar(): void;
+  loadingBar(): void;
+  caption(): void;
   toasts(): void;
   optimistic(): void;
   jump(): void;
   drawDialog(): void;
   thumbs(): void;
   perRow(): void;
+  live(closeLabel: string, newDrawings: string): void;
+  confirmDialog(): void;
+  alertDialog(): void;
 }
 
 const host = window as unknown as { oeeeChrome?: Chrome };
@@ -43,11 +53,16 @@ if (!host.oeeeChrome) {
       toolbarInstalled = true;
       installToolbar();
     },
+    loadingBar: installLoadingBar,
+    caption: attachCaption,
     toasts: lookAtToasts,
     optimistic: installOptimistic,
     jump: installJump,
     drawDialog: attachDrawDialog,
     thumbs: settleThumbs,
     perRow: attachPerRow,
+    live: startLive,
+    confirmDialog: attachConfirm,
+    alertDialog: attachAlert,
   };
 }
