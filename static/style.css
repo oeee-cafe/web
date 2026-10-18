@@ -1918,11 +1918,20 @@ a.mention:hover {
   font-weight: 500;
 }
 
+/* Packed to the left: a draft kept in this browser has three buttons, and
+   spread across the card they sat at odd distances from each other. */
 .draft-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  gap: 4px;
   margin-top: 6px;
+}
+
+@supports not (row-gap: 1px) {
+  .draft-actions > * {
+    margin: 0 4px 4px 0;
+  }
 }
 
 /* Where a kept collaborative room will be posted, chosen above Post: a
