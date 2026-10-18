@@ -1,10 +1,10 @@
 //! The list of communities, and searching it.
 
 use crate::app_error::AppError;
+use crate::models::community::choice::{choose_communities, ChoiceQuery, ChoiceRule};
 use crate::models::community::{
     get_communities_members_count, get_own_communities, get_participating_communities,
-    get_public_communities, get_public_communities_paginated, search_public_communities,
-    CommunitySort,
+    get_public_communities, get_public_communities_paginated, CommunitySort, PublicCommunity,
 };
 use crate::models::post::find_recent_posts_by_communities;
 use crate::models::user::AuthSession;
@@ -110,9 +110,30 @@ pub async fn communities_fragment(
 
     let mut tx = state.db_pool.begin().await?;
     let rows = match term {
-        Some(term) => {
-            search_public_communities(&mut tx, term, COMMUNITIES_PER_BATCH, offset).await?
-        }
+        Some(term) => choose_communities(
+            &mut tx,
+            &ChoiceQuery {
+                offset,
+                ..ChoiceQuery::new(ChoiceRule::Directory, None, term, COMMUNITIES_PER_BATCH)
+            },
+        )
+        .await?
+        .into_iter()
+        .map(|c| PublicCommunity {
+            id: c.id,
+            owner_id: c.owner_id,
+            owner_login_name: c.owner_login_name,
+            name: c.name,
+            slug: c.slug,
+            description: c.description,
+            visibility: c.visibility,
+            updated_at: c.updated_at,
+            created_at: c.created_at,
+            posts_count: Some(c.posts_count),
+            background_color: c.background_color,
+            foreground_color: c.foreground_color,
+        })
+        .collect(),
         None => {
             get_public_communities_paginated(&mut tx, query.sort, COMMUNITIES_PER_BATCH, offset)
                 .await?

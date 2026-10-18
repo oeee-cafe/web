@@ -15,7 +15,8 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::app_error::AppError;
-use crate::models::tag::{escape_like, search_tags};
+use crate::models::community::choice::{choose_communities, ChoiceQuery, ChoiceRule};
+use crate::models::tag::search_tags;
 use crate::models::user::AuthSession;
 use crate::web::handlers::search::search_people;
 use crate::web::i18n::ExtractFtlLang;
@@ -86,35 +87,19 @@ async fn communities(
     q: &str,
     reader: Option<Uuid>,
 ) -> Result<Vec<JumpCommunity>, AppError> {
-    let pattern = format!("%{}%", escape_like(q));
-    let rows = sqlx::query_as!(
-        JumpCommunity,
-        r#"
-        SELECT
-            c.name,
-            c.slug,
-            (m.user_id IS NOT NULL) AS "is_member!"
-        FROM communities c
-        LEFT JOIN community_members m ON m.community_id = c.id AND m.user_id = $2
-        WHERE c.deleted_at IS NULL
-          AND (m.user_id IS NOT NULL OR ($1 <> '' AND c.visibility = 'public'))
-          AND ($1 = '' OR c.name ILIKE $3 ESCAPE '\' OR c.slug ILIKE $3 ESCAPE '\')
-        ORDER BY
-          (m.user_id IS NOT NULL) DESC,
-          (c.name ILIKE $4 || '%' ESCAPE '\' OR c.slug ILIKE $4 || '%' ESCAPE '\') DESC,
-          c.updated_at DESC
-        LIMIT $5
-        "#,
-        q,
-        reader,
-        pattern,
-        escape_like(q),
-        // Nothing typed lists the reader's communities, so it can be longer.
-        if q.is_empty() { PER_KIND * 2 } else { PER_KIND },
-    )
-    .fetch_all(&mut **tx)
-    .await?;
-    Ok(rows)
+    // Nothing typed lists the reader's communities, so it can be longer.
+    let limit = if q.is_empty() { PER_KIND * 2 } else { PER_KIND };
+    let found =
+        choose_communities(tx, &ChoiceQuery::new(ChoiceRule::Jump, reader, q, limit)).await?;
+    Ok(found
+        .into_iter()
+        .take(limit as usize)
+        .map(|community| JumpCommunity {
+            name: community.name,
+            slug: community.slug,
+            is_member: community.is_member,
+        })
+        .collect())
 }
 
 #[cfg(test)]

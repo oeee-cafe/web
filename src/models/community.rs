@@ -13,6 +13,8 @@ use uuid::Uuid;
 use super::notification::BadgeFalls;
 use super::post::SerializablePost;
 
+pub mod choice;
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[sqlx(type_name = "community_visibility", rename_all = "snake_case")]
 #[serde(rename_all = "lowercase")]
@@ -224,54 +226,6 @@ pub async fn get_public_communities_paginated(
             LIMIT $2 OFFSET $3
         "#,
         sort.as_sql(),
-        limit,
-        offset
-    );
-
-    Ok(q.fetch_all(&mut **tx).await?)
-}
-
-pub async fn search_public_communities(
-    tx: &mut Transaction<'_, Postgres>,
-    query: &str,
-    limit: i64,
-    offset: i64,
-) -> Result<Vec<PublicCommunity>> {
-    // Prepare search pattern
-    let pattern = format!("%{}%", query);
-    let exact_pattern = query.to_string();
-
-    // Search communities by name, slug, or description with ranking
-    let q = query_as!(
-        PublicCommunity,
-        r#"
-            SELECT communities.id, communities.owner_id, users.login_name AS owner_login_name,
-                   communities.name, communities.slug, communities.description,
-                   communities.visibility as "visibility: _", communities.updated_at, communities.created_at,
-                   communities.background_color, communities.foreground_color,
-                   COALESCE(COUNT(posts.id), 0) AS posts_count
-            FROM communities
-            LEFT JOIN posts ON communities.id = posts.community_id AND posts.published_at IS NOT NULL AND posts.deleted_at IS NULL
-            LEFT JOIN users ON communities.owner_id = users.id
-            WHERE communities.visibility = 'public' AND communities.deleted_at IS NULL
-              AND (communities.name ILIKE $1
-                   OR communities.slug ILIKE $1
-                   OR communities.description ILIKE $1)
-            GROUP BY communities.id, users.login_name
-            ORDER BY
-                CASE
-                    WHEN communities.name ILIKE $2 THEN 0  -- Exact match
-                    WHEN communities.slug ILIKE $2 THEN 1  -- Slug match
-                    WHEN communities.name ILIKE $3 THEN 2  -- Starts with match (name)
-                    WHEN communities.slug ILIKE $3 THEN 3  -- Starts with match (slug)
-                    ELSE 4
-                END,
-                communities.name
-            LIMIT $4 OFFSET $5
-        "#,
-        pattern,
-        exact_pattern,
-        format!("{}%", query),
         limit,
         offset
     );

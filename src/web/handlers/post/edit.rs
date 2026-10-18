@@ -2,11 +2,14 @@
 
 use crate::app_error::AppError;
 use crate::models::actor::Actor;
+use crate::models::community::choice::{
+    choose_communities, ChoiceQuery, ChoiceRule, CommunityChoice,
+};
 use crate::models::community::{find_community_by_id, CommunityVisibility};
 use crate::models::image::find_image_by_id;
 use crate::models::post::{
     delete_post_with_activity, edit_post, edit_post_community, find_post_by_id,
-    get_draft_post_count, is_post_movable, move_destinations, MoveDestination, MOVE_OTHERS_LIMIT,
+    get_draft_post_count, is_post_movable,
 };
 use crate::models::tag::{get_tags_for_post, set_post_tags};
 use crate::models::user::{find_user_by_id, AuthSession};
@@ -30,6 +33,10 @@ use uuid::Uuid;
 use super::federation::{community_federates, send_post_update_to_followers};
 use super::get_community_slug_url;
 use minijinja::value::Serde;
+
+/// How many communities the move page lists beyond the mover's own, most
+/// active first. The rest are a search away.
+const MOVE_OTHERS_LIMIT: i64 = 30;
 
 #[derive(Deserialize)]
 pub struct MoveSearchQuery {
@@ -82,12 +89,18 @@ pub async fn post_edit_community(
     };
 
     let query = search.q.trim();
-    let mut destinations = move_destinations(
+    // One past the limit, to say whether there are more than the list shows.
+    let mut destinations = choose_communities(
         &mut tx,
-        user_id,
-        current_community_id,
-        query,
-        MOVE_OTHERS_LIMIT,
+        &ChoiceQuery {
+            exclude: current_community_id,
+            ..ChoiceQuery::new(
+                ChoiceRule::Move,
+                Some(user_id),
+                query,
+                MOVE_OTHERS_LIMIT + 1,
+            )
+        },
     )
     .await?;
 
@@ -122,15 +135,13 @@ pub async fn post_edit_community(
             .push(serde_json::json!({ "image_filename": row.image_filename }));
     }
 
-    // `move_destinations` fetched one past the limit to say whether there
-    // are more than the list shows.
-    let others_total = destinations.iter().filter(|c| !c.is_known).count();
+    let others_total = destinations.iter().filter(|c| !c.is_mine).count();
     let has_more = others_total as i64 > MOVE_OTHERS_LIMIT;
     if has_more {
         destinations.truncate(destinations.len() - 1);
     }
 
-    let row = |c: &MoveDestination| {
+    let row = |c: &CommunityChoice| {
         serde_json::json!({
             "id": c.id.to_string(),
             "name": c.name,

@@ -1,4 +1,5 @@
 use crate::app_error::AppError;
+use crate::models::community::choice::{choose_communities, may_choose, ChoiceQuery, ChoiceRule};
 use crate::models::community::find_community_by_id;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
@@ -644,23 +645,18 @@ pub struct CreateSessionForm {
     nickname: Option<String>,
 }
 
-/// Where an account may post a room opened in no community: its own posts,
-/// or a public community (`get_movable_communities`, which leaves out two-tone
-/// ones). Only public, because such a room let in whoever a public
-/// community's room would have -- guests, and anybody with the link -- and an
-/// unlisted or private community's drawing is drawn by the people its own
-/// rules let in, from a room opened on its page.
-pub(super) async fn save_destinations(
+/// Whether an account may post a room opened in no community to
+/// `community`. Only a public one, because such a room let in whoever a
+/// public community's room would have -- guests, and anybody with the link --
+/// and an unlisted or private community's drawing is drawn by the people its
+/// own rules let in, from a room opened on its page. (Its own posts need no
+/// asking.)
+pub(super) async fn may_save_to(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user_id: Uuid,
-) -> Result<Vec<crate::models::post::PostableCommunity>, AppError> {
-    Ok(crate::models::post::get_movable_communities(tx, user_id)
-        .await?
-        .into_iter()
-        .filter(|community| {
-            community.visibility == crate::models::community::CommunityVisibility::Public
-        })
-        .collect())
+    community: Uuid,
+) -> Result<bool, AppError> {
+    Ok(may_choose(tx, ChoiceRule::LobbySave, Some(user_id), community).await?)
 }
 
 /// How many communities one answer of the destination search lists.
@@ -673,67 +669,34 @@ pub struct DestinationQuery {
 }
 
 /// Public communities an account may post a lobby room's drawing to (the
-/// rule `save_destinations` holds the save to), those they belong to first
-/// and then those they have drawn in. With nothing to search for, only those
-/// two kinds -- what they most likely mean; with a search, any public
-/// community whose name or handle has it in.
+/// rule `may_save_to` holds the save to), their own first. With nothing to
+/// search for, only their own -- what they most likely mean; with a search,
+/// any public community whose name, handle or description has it in.
 pub(super) async fn search_save_destinations(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user_id: Uuid,
     query: Option<&str>,
 ) -> Result<Vec<serde_json::Value>, AppError> {
-    // Taken literally: a % or _ typed is looked for, not a wildcard.
-    let pattern = query.map(|query| {
-        let escaped = query
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_");
-        format!("%{escaped}%")
-    });
-    let rows = sqlx::query!(
-        r#"
-        SELECT c.id, c.name, c.slug,
-            EXISTS(
-                SELECT 1 FROM community_members cm
-                WHERE cm.community_id = c.id AND cm.user_id = $1
-            ) AS "member!",
-            EXISTS(
-                SELECT 1 FROM posts p
-                WHERE p.community_id = c.id AND p.author_id = $1
-            ) AS "drawn!"
-        FROM communities c
-        WHERE c.deleted_at IS NULL
-          AND c.visibility = 'public'
-          AND NOT (c.background_color IS NOT NULL AND c.foreground_color IS NOT NULL)
-          AND CASE WHEN $2::text IS NULL THEN
-                EXISTS(
-                    SELECT 1 FROM community_members cm
-                    WHERE cm.community_id = c.id AND cm.user_id = $1
-                )
-                OR EXISTS(
-                    SELECT 1 FROM posts p
-                    WHERE p.community_id = c.id AND p.author_id = $1
-                )
-              ELSE c.name ILIKE $2 OR c.slug ILIKE $2
-              END
-        ORDER BY 4 DESC, 5 DESC, c.name ASC
-        LIMIT $3
-        "#,
-        user_id,
-        pattern,
-        DESTINATION_LIMIT,
+    let found = choose_communities(
+        tx,
+        &ChoiceQuery::new(
+            ChoiceRule::LobbySave,
+            Some(user_id),
+            query.unwrap_or(""),
+            DESTINATION_LIMIT,
+        ),
     )
-    .fetch_all(&mut **tx)
     .await?;
-    Ok(rows
+    Ok(found
         .into_iter()
-        .map(|row| {
+        .take(DESTINATION_LIMIT as usize)
+        .map(|community| {
             serde_json::json!({
-                "id": row.id.to_string(),
-                "name": row.name,
-                "slug": row.slug,
-                "member": row.member,
-                "drawn": row.drawn,
+                "id": community.id.to_string(),
+                "name": community.name,
+                "slug": community.slug,
+                "member": community.is_member,
+                "drawn": community.has_participated,
             })
         })
         .collect())
@@ -1026,10 +989,7 @@ pub async fn save_collaborative_session(
                 .parse::<Uuid>()
                 .map_err(|_| AppError::BadRequest("community is not an id".to_string()))?;
             let mut tx = db.begin().await?;
-            let allowed = save_destinations(&mut tx, user.id)
-                .await?
-                .iter()
-                .any(|community| community.id == id);
+            let allowed = may_save_to(&mut tx, user.id, id).await?;
             tx.commit().await?;
             if !allowed {
                 return Err(AppError::Forbidden);

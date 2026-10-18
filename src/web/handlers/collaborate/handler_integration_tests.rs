@@ -1061,15 +1061,11 @@ async fn a_room_in_no_community_is_saved_only_to_a_public_one() {
         let community = room.community_id.expect("a community");
         let mut tx = room.db.begin().await.expect("tx");
         // The community's owner and member: belonging is not enough.
-        let destinations = super::http_handlers::save_destinations(&mut tx, room.users[0])
+        let allowed = super::http_handlers::may_save_to(&mut tx, room.users[0], community)
             .await
-            .expect("destinations");
+            .expect("may save");
         tx.rollback().await.expect("rollback");
-        assert_eq!(
-            destinations.iter().any(|c| c.id == community),
-            offered,
-            "{visibility}"
-        );
+        assert_eq!(allowed, offered, "{visibility}");
         room.teardown().await;
     }
 }
