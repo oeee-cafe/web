@@ -132,7 +132,7 @@
                 <span class="ds-button profile-more-button" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M6 14q-.825 0-1.412-.587T4 12t.588-1.412T6 10t1.413.588T8 12t-.587 1.413T6 14m6 0q-.825 0-1.412-.587T10 12t.588-1.412T12 10t1.413.588T14 12t-.587 1.413T12 14m6 0q-.825 0-1.412-.587T16 12t.588-1.412T18 10t1.413.588T20 12t-.587 1.413T18 14"/></svg></span>
               </summary>
               <div class="toolbar-menu-items">
-                <button type="button" class="profile-more-item" onclick="this.closest('details').removeAttribute('open'); showProfileReportModal()">{{ ftl_get_message("profile-report") }}</button>
+                <button type="button" class="profile-more-item" data-action="profile-report-open">{{ ftl_get_message("profile-report") }}</button>
               </div>
             </details>
           {% endif %}
@@ -279,7 +279,7 @@
                   style="width: 100%"
                   placeholder="{{ ftl_get_message('profile-report-description-placeholder') }}"></textarea>
         <div class="ds-actions" style="justify-content: flex-end">
-          <button type="button" class="ds-button" onclick="hideProfileReportModal()">{{ ftl_get_message("cancel") }}</button>
+          <button type="button" class="ds-button" data-action="profile-report-close">{{ ftl_get_message("cancel") }}</button>
           <button type="submit" class="ds-button ds-button-danger">{{ ftl_get_message("profile-report-submit") }}</button>
         </div>
       </form>

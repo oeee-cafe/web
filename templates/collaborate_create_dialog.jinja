@@ -20,8 +20,7 @@
           action="/collaborate"
           hx-post="/collaborate"
           hx-disable="find button[type=submit]"
-          data-network-error="{{ ftl_get_message("collaborate-create-network-error") }}"
-          hx-on::error="if (!(event.detail.ctx && event.detail.ctx.response)) dsAlert(this.dataset.networkError)">
+          data-network-error="{{ ftl_get_message("collaborate-create-network-error") }}">
       {% if create_community %}
         <input type="hidden" name="community_id" value="{{ create_community.id }}">
       {% endif %}
@@ -99,7 +98,7 @@
       <p class="field field-wide field-help">{% if create_community %}{{ ftl_format_pattern("collaborate-create-posts-to", {"community": create_community.name}) }}{% else %}{{ ftl_get_message("collaborate-create-posts-later") }}{% endif %}</p>
 
       <div class="field field-wide form-actions session-form-actions">
-        <button type="button" class="ds-button" onclick="toggleSessionDialog(false)">{{ ftl_get_message("cancel") }}</button>
+        <button type="button" class="ds-button" data-action="session-dialog-close">{{ ftl_get_message("cancel") }}</button>
         <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("collaborate-create-button") }}</button>
       </div>
     </form>

@@ -18,6 +18,7 @@
 // lines are what a boosted swap re-runs, in place, as it re-ran the scripts
 // they replace; each piece knows which of its work is for each page and
 // which is for the document.
+import { installActions } from "./actions";
 import { attachAlert, attachConfirm } from "./alerts";
 import { installBridge, type Words } from "./bridge";
 import { attachCaption } from "./caption";
@@ -54,6 +55,7 @@ interface Chrome {
   store(): void;
   polyfills(): void;
   gatewayRetry(): void;
+  actions(): void;
   // The body's, each again on a boosted swap.
   /** Each toolbar the page gets (toolbar.jinja). */
   toolbar(): void;
@@ -103,6 +105,7 @@ if (!host.oeeeChrome) {
     store: installStore,
     polyfills: installPolyfills,
     gatewayRetry: installGatewayRetry,
+    actions: installActions,
     toolbar() {
       showToolbar();
       if (toolbarInstalled) return;

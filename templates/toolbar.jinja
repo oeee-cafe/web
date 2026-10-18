@@ -32,7 +32,7 @@
          and the toolbar's script moves the mark to Auto when nothing was
          chosen (frontend/site/toolbarControls.ts). #}
       {% set chosen = (current_user.preferred_language|lower if current_user.preferred_language else "auto") if current_user else ftl_lang %}
-      <select class="ds-select" id="toolbar-language" name="language" onchange="this.form.submit()"{% if not current_user %} data-guest{% endif %}>
+      <select class="ds-select" id="toolbar-language" name="language" data-submit-on-change{% if not current_user %} data-guest{% endif %}>
         <option value="auto"{% if chosen == "auto" %} selected{% endif %}>{{ ftl_get_message("account-language-auto") }}</option>
         {% for code, name in [("ko", "한국어"), ("ja", "日本語"), ("en", "English"), ("zh", "中文")] %}
           <option value="{{ code }}" lang="{{ code }}"{% if chosen == code %} selected{% endif %}>{{ name }}</option>

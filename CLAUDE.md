@@ -169,7 +169,11 @@ what must not wait on a fetched file before the first paint --
 `theme_head.jinja`'s theme and app marks, `base.jinja`'s viewport, the per-row
 count in `post_feed_head.jinja` and `admin/posts.jinja` -- and
 `identity_apple_return.jinja`'s one-line submit, a page without the site's
-chrome. `onclick` attributes call functions a page's piece puts on `window`. A browser test that needs one of
+chrome. Markup never carries code either -- no `onclick`, `oninput`,
+`onsubmit`, `onchange` or `hx-on`: a control says what it does with
+`data-action` or one of the other markers `frontend/site/actions.ts` lists,
+and that one listener, set up from the head, answers it, swapped-in markup
+included. A browser test that needs one of
 these scripts in a page of its own asks for it built as it ships, with the
 `siteScript` command in `vitest.config.ts` (`appContract.browser.test.ts` does).
 `pnpm run build` builds all of them, and Docker builds them itself.

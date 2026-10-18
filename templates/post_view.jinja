@@ -202,7 +202,7 @@
 
         <div class="post-inspector-actions">
           {% if current_user %}
-            <button type="button" class="ds-button ds-button-primary" onclick="showPostDrawModal()">{{ ftl_get_message("post-reply-with-drawing") }}</button>
+            <button type="button" class="ds-button ds-button-primary" data-action="post-draw-open">{{ ftl_get_message("post-reply-with-drawing") }}</button>
             {% if can_relay %}
               <a class="ds-button" href="{{ post_url(post, post_id) }}/relay">{{ ftl_get_message("post-relay") }}</a>
             {% endif %}
@@ -210,7 +210,7 @@
           <button type="button" class="ds-button" data-share-url="{{ base_url|safe }}{{ post_url(post, post_id) }}"
                   data-share-title="{{ post.title or ftl_get_message('post-no-title') }}"
                   data-share-copied="{{ ftl_get_message('post-share-copied') }}"
-                  onclick="sharePost(this)">{{ ftl_get_message("post-share") }}</button>
+                  data-action="share-post">{{ ftl_get_message("post-share") }}</button>
           {% if current_user and current_user.id == post.author_id %}
             <button type="button" class="ds-button" hx-get="/posts/{{ post_id }}/edit" hx-target="#post-edit-container" hx-swap="outerHTML">{{ ftl_get_message("edit") }}</button>
             {# Moving is something the author does, so it is with the other
@@ -227,7 +227,7 @@
               <button type="submit" class="ds-button ds-button-danger">{{ ftl_get_message("delete") }}</button>
             </form>
           {% elif current_user %}
-            <button type="button" class="ds-button" onclick="showReportModal()">{{ ftl_get_message("post-report") }}</button>
+            <button type="button" class="ds-button" data-action="post-report-open">{{ ftl_get_message("post-report") }}</button>
           {% endif %}
         </div>
       </section>
@@ -258,7 +258,7 @@
             <div id="reply-info" class="post-comment-replying" style="display: none;">
               <span id="reply-to-text"></span>
               <button type="button" class="ds-button ds-button-quiet ds-button-small"
-                      hx-on:click="document.getElementById('parent_comment_id').value = ''; document.getElementById('reply-info').style.display = 'none';">{{ ftl_get_message("cancel") }}</button>
+                      data-action="cancel-reply">{{ ftl_get_message("cancel") }}</button>
             </div>
             {# Typing @ lists who it could be (frontend/site/mentionBox.ts). #}
             <div class="combobox">
@@ -283,7 +283,7 @@
       <div class="ds-modal-panel">
         <h2 id="post-draw-title" tabindex="-1">{{ ftl_get_message("post-reply-with-drawing") }}</h2>
         {% if two_tone %}
-          <form action="/draw" method="post" onsubmit="setOrientationDimensions(this)">
+          <form action="/draw" method="post" data-orientation-size>
             <input type="hidden" name="tool" value="neo" />
             <input type="hidden" name="community_id" value="{{ post.community_id }}" />
             <input type="hidden" name="parent_post_id" value="{{ post_id }}" />
@@ -301,7 +301,7 @@
               </label>
             </div>
             <div class="form-actions community-draw-actions">
-              <button type="button" class="ds-button" onclick="hidePostDrawModal()">{{ ftl_get_message("cancel") }}</button>
+              <button type="button" class="ds-button" data-action="post-draw-close">{{ ftl_get_message("cancel") }}</button>
               <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-reply-with-drawing") }}</button>
             </div>
           </form>
@@ -332,7 +332,7 @@
             </div>
             {% include "draw_tool_field.jinja" %}
             <div class="form-actions community-draw-actions">
-              <button type="button" class="ds-button" onclick="hidePostDrawModal()">{{ ftl_get_message("cancel") }}</button>
+              <button type="button" class="ds-button" data-action="post-draw-close">{{ ftl_get_message("cancel") }}</button>
               <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-reply-with-drawing") }}</button>
             </div>
           </form>
@@ -361,7 +361,7 @@
                     style="width: 100%"
                     placeholder="{{ ftl_get_message('post-report-description-placeholder') }}"></textarea>
           <div class="form-actions community-draw-actions">
-            <button type="button" class="ds-button" onclick="hideReportModal()">{{ ftl_get_message("cancel") }}</button>
+            <button type="button" class="ds-button" data-action="post-report-close">{{ ftl_get_message("cancel") }}</button>
             <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("post-report-submit") }}</button>
           </div>
         </form>

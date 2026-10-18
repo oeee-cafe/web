@@ -18,7 +18,7 @@
       <h1 class="collaborate-title">{{ ftl_get_message("collaborate-title") }}</h1>
       {# Anybody can start a session. Somebody without an account names
          themselves in the form and opens it as a guest. #}
-      <button type="button" class="ds-button ds-button-primary" onclick="toggleSessionDialog(true)">{{ ftl_get_message("collaborate-create-session") }}</button>
+      <button type="button" class="ds-button ds-button-primary" data-action="session-dialog-open">{{ ftl_get_message("collaborate-create-session") }}</button>
     </div>
     {% include "collaborate_create_dialog.jinja" %}
     {% include "collaborate_sessions_fragment.jinja" %}

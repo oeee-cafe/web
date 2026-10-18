@@ -16,7 +16,7 @@
         <label class="ds-label" for="community-form-slug">ID</label>
         <input class="ds-input" type="text" name="slug" id="community-form-slug" required
                autocomplete="off" autocapitalize="off" spellcheck="false"
-               oninput="document.getElementById('community-form-slug-path').textContent = '/@' + this.value" />
+               data-slug-preview="community-form-slug-path" />
         {# Where the community will live, as it is typed. #}
         <span class="ds-help" id="community-form-slug-path">/@</span>
       </div>

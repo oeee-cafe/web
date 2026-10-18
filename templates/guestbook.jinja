@@ -21,7 +21,7 @@
             hx-target="#guestbook-entries"
             hx-swap="afterbegin"
             hx-disable="find button"
-            hx-on::after-request="if (event.detail.ctx.response && event.detail.ctx.response.status < 400) this.reset()">
+            data-reset-after-request>
         <textarea class="ds-textarea" name="content" rows="3" required
                   aria-label="{{ ftl_get_message("guestbook") }}"></textarea>
         <div class="guestbook-form-actions">

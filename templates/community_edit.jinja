@@ -80,7 +80,7 @@
              autocapitalize="off"
              spellcheck="false"
              data-slug="{{ community.slug }}"
-             oninput="document.getElementById('delete-community-btn').disabled = this.value !== this.getAttribute('data-slug')" />
+             data-confirms-slug="delete-community-btn" />
       <button type="button"
               id="delete-community-btn"
               class="ds-button ds-button-danger"

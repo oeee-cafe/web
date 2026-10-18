@@ -545,7 +545,7 @@ fn a_profile_keeps_reporting_behind_its_menu() {
     };
     assert!(at("/@oeee/follow") < at("/@oeee/guestbook"));
     assert!(at("/@oeee/guestbook") < at(r#"<details class="toolbar-menu profile-more">"#));
-    assert!(at(r#"<details class="toolbar-menu profile-more">"#) < at("showProfileReportModal()"));
+    assert!(at(r#"<details class="toolbar-menu profile-more">"#) < at(r#"data-action="profile-report-open""#));
     // Their banner, not a link for someone who cannot redraw it.
     assert!(visitor.contains(r#"<span class="profile-banner">"#));
 

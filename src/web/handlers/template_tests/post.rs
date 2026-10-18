@@ -916,7 +916,7 @@ fn a_comments_reply_names_its_author_as_text_not_script() {
         })
         .unwrap();
     assert!(
-        fragment.contains(r#"onclick="replyToComment(this)""#),
+        fragment.contains(r#"data-action="reply-to-comment""#),
         "{fragment}"
     );
     assert!(

@@ -190,7 +190,7 @@ fn the_header_credits_the_owner_and_drawing_opens_a_dialog() {
     assert!(size > dialog, "the drawing form is back on the page");
     // Draw together opens the new-session dialog here, with this community
     // fixed, rather than going to the lobby.
-    assert!(rendered.contains(r#"onclick="toggleSessionDialog(true)""#));
+    assert!(rendered.contains(r#"data-action="session-dialog-open""#));
     assert!(rendered.contains(
         r#"<input type="hidden" name="community_id" value="00000000-0000-0000-0000-000000000001">"#
     ));

@@ -92,14 +92,14 @@
              together, and anything unlisted or private, is for someone
              signed in (draw.rs, may_draw_in). #}
           {% if current_user or community.visibility == "public" %}
-            <button type="button" class="ds-button ds-button-primary" onclick="showCommunityDrawModal()">{{ ftl_get_message("community-drawing-new") }}</button>
+            <button type="button" class="ds-button ds-button-primary" data-action="community-draw-open">{{ ftl_get_message("community-drawing-new") }}</button>
           {% endif %}
           {# A room in this community: its dialog is on this page, with the
              community fixed. Offered to whoever may open one here
              (header.draw_together, the rule collaborate::insert_session
              holds it to) -- never in a two-tone community. #}
           {% if header is defined and header.draw_together %}
-            <button type="button" class="ds-button" onclick="toggleSessionDialog(true)">{{ ftl_get_message("community-draw-together") }}</button>
+            <button type="button" class="ds-button" data-action="session-dialog-open">{{ ftl_get_message("community-draw-together") }}</button>
           {% endif %}
           {% if current_user and community.visibility == "private" %}
             <a href="/communities/@{{ community.slug }}/members" class="ds-button">{{ ftl_get_message("community-members") }}</a>
@@ -148,7 +148,7 @@
         {% if community.background_color %}
           {# Two-tone communities draw offline in the fixed pair of colours
              the community was created with, at one of two sizes. #}
-          <form action="/draw" method="post" onsubmit="setOrientationDimensions(this)">
+          <form action="/draw" method="post" data-orientation-size>
             <input type="hidden" name="tool" value="neo" />
             <input type="hidden" name="community_id" value="{{ community_id }}" />
             <input type="hidden" name="width" value="640" />
@@ -165,7 +165,7 @@
               </label>
             </div>
             <div class="form-actions community-draw-actions">
-              <button type="button" class="ds-button" onclick="hideCommunityDrawModal()">{{ ftl_get_message("cancel") }}</button>
+              <button type="button" class="ds-button" data-action="community-draw-close">{{ ftl_get_message("cancel") }}</button>
               <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("community-drawing-new") }}</button>
             </div>
           </form>
@@ -193,7 +193,7 @@
             </div>
             {% include "draw_tool_field.jinja" %}
             <div class="form-actions community-draw-actions">
-              <button type="button" class="ds-button" onclick="hideCommunityDrawModal()">{{ ftl_get_message("cancel") }}</button>
+              <button type="button" class="ds-button" data-action="community-draw-close">{{ ftl_get_message("cancel") }}</button>
               <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("community-drawing-new") }}</button>
             </div>
           </form>

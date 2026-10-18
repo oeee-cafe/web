@@ -28,7 +28,7 @@
           <button type="button" class="ds-button ds-button-small comment-reply-btn"
                   data-comment-id="{{ comment.id }}"
                   data-replying-to="{{ ftl_get_message('post-replying-to') }} {{ comment.actor_name }}"
-                  onclick="replyToComment(this)">
+                  data-action="reply-to-comment">
             {{ ftl_get_message("comment-reply") }}
           </button>
           {% endif %}

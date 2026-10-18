@@ -1566,7 +1566,9 @@ mod tests {
             .expect("renders");
         assert!(rendered.contains("id=\"post-cols\""));
         assert!(rendered.contains("id=\"post-feed-grid\""));
-        assert!(rendered.contains("class=\"center-wide\""));
+        // The lobby's own column. This once matched the same words in the
+        // toolbar's inline skeleton script, which is no longer in the page.
+        assert!(rendered.contains("class=\"center-wide collaborate-lobby\""));
         assert!(rendered.contains("class=\"feed-header\""));
     }
 

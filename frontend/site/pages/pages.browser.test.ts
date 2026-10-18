@@ -2,6 +2,7 @@
 // runs it, against just enough of its page.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
+import { installActions } from "../actions";
 import { discordAccount } from "./discordAccount";
 import { communityDraw, postPage, sessionDialog } from "./modals";
 import { moveToCommunity, tagSuggestions } from "./postForm";
@@ -10,6 +11,10 @@ import { tegakiDraw, tegakiReplay } from "./tegaki";
 
 type Page = Window & typeof globalThis & Record<string, unknown>;
 const page = window as Page;
+
+// The document's listeners for every declared control, as theme_head.jinja
+// sets them up before any page.
+installActions();
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -128,20 +133,28 @@ describe("the Windows app's Discord account", () => {
 });
 
 describe("the post page", () => {
-  it("replies to a comment, and empties the form once the comment is in", () => {
+  it("replies to a comment from its button, cancels, and empties the form once the comment is in", async () => {
     document.body.innerHTML = `
       <div id="comments"></div>
       <form id="comment-form">
         <input id="parent_comment_id" value="" />
-        <div id="reply-info" style="display: none"><span id="reply-to-text"></span></div>
+        <div id="reply-info" style="display: none">
+          <span id="reply-to-text"></span>
+          <button type="button" id="cancel" data-action="cancel-reply">Cancel</button>
+        </div>
         <textarea id="comment-content">Hello</textarea>
       </form>
-      <button id="reply" data-comment-id="c9" data-replying-to="@neo">Reply</button>`;
+      <button type="button" id="reply" data-comment-id="c9" data-replying-to="@neo" data-action="reply-to-comment">Reply</button>`;
     postPage();
-    (page.replyToComment as (button: Element) => void)(document.getElementById("reply")!);
+    await userEvent.click(document.getElementById("reply")!);
     expect((document.getElementById("parent_comment_id") as HTMLInputElement).value).toBe("c9");
     expect(document.getElementById("reply-to-text")!.textContent).toBe("@neo");
     expect(document.activeElement).toBe(document.getElementById("comment-content"));
+    await userEvent.click(document.getElementById("cancel")!);
+    expect((document.getElementById("parent_comment_id") as HTMLInputElement).value).toBe("");
+    expect(document.getElementById("reply-info")!.style.display).toBe("none");
+
+    await userEvent.click(document.getElementById("reply")!);
     document.getElementById("comment-form")!.dispatchEvent(new Event("htmx:after:swap", { bubbles: true }));
     expect((document.getElementById("parent_comment_id") as HTMLInputElement).value).toBe("");
     expect(document.getElementById("reply-info")!.style.display).toBe("none");
@@ -149,9 +162,10 @@ describe("the post page", () => {
 
   it("opens its report with the description focused, and Escape closes it", async () => {
     document.body.innerHTML = `
+      <button type="button" id="report" data-action="post-report-open">Report</button>
       <div id="report-modal" style="display: none"><h2>Report</h2><textarea id="report-description">old</textarea></div>`;
     postPage();
-    (page.showReportModal as () => void)();
+    await userEvent.click(document.getElementById("report")!);
     const modal = document.getElementById("report-modal")!;
     expect(modal.style.display).toBe("flex");
     expect((document.getElementById("report-description") as HTMLTextAreaElement).value).toBe("");
@@ -160,36 +174,123 @@ describe("the post page", () => {
     expect(modal.style.display).toBe("none");
   });
 
-  it("sizes a New drawing by its orientation", () => {
+  it("sizes a New drawing by its orientation as it is sent, and opens and closes from its buttons", async () => {
     document.body.innerHTML = `
-      <form id="draw">
-        <input type="radio" name="orientation" value="portrait" checked />
-        <input type="radio" name="orientation" value="landscape" />
-        <input name="width" /><input name="height" />
-      </form>`;
-    // A community's page defines it too, for its own New drawing.
-    document.body.insertAdjacentHTML("beforeend", `<div id="community-draw-modal" style="display: none"><h2 id="community-draw-title" tabindex="-1"></h2></div>`);
+      <button type="button" id="open" data-action="community-draw-open">New drawing</button>
+      <div id="community-draw-modal" style="display: none">
+        <h2 id="community-draw-title" tabindex="-1"></h2>
+        <form id="draw" data-orientation-size>
+          <input type="radio" name="orientation" value="portrait" checked />
+          <input type="radio" name="orientation" value="landscape" />
+          <input name="width" /><input name="height" />
+          <button type="button" id="close" data-action="community-draw-close">Cancel</button>
+        </form>
+      </div>`;
     communityDraw();
     const form = document.getElementById("draw") as HTMLFormElement;
-    (page.setOrientationDimensions as (form: HTMLFormElement) => void)(form);
+    // Sent, as far as the page's listeners are concerned, and no further.
+    form.addEventListener("submit", (event) => event.preventDefault());
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     const value = (name: string) => (form.elements.namedItem(name) as HTMLInputElement).value;
     expect([value("width"), value("height")]).toEqual(["480", "640"]);
-    (page.showCommunityDrawModal as () => void)();
+    await userEvent.click(document.getElementById("open")!);
     expect(document.getElementById("community-draw-modal")!.style.display).toBe("flex");
-    (page.hideCommunityDrawModal as () => void)();
+    expect(document.activeElement).toBe(document.getElementById("community-draw-title"));
+    await userEvent.click(document.getElementById("close")!);
     expect(document.getElementById("community-draw-modal")!.style.display).toBe("none");
   });
 
-  it("opens New session from a button and closes it on a press outside", () => {
+  it("opens New session from a button and closes it on a press outside", async () => {
     document.body.innerHTML = `
+      <button type="button" id="open" data-action="session-dialog-open">New session</button>
       <div id="create-session-dialog" style="display: none"><h2 id="create-session-title" tabindex="-1"></h2></div>`;
     sessionDialog();
-    (page.toggleSessionDialog as (open: boolean) => void)(true);
+    await userEvent.click(document.getElementById("open")!);
     const dialog = document.getElementById("create-session-dialog")!;
     expect(dialog.style.display).toBe("flex");
     expect(document.activeElement).toBe(document.getElementById("create-session-title"));
     dialog.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(dialog.style.display).toBe("none");
+  });
+
+  it("leaves no globals for the markup to call", () => {
+    for (const name of ["modalToggle", "replyToComment", "sharePost", "showReportModal", "toggleSessionDialog", "showCommunityDrawModal", "showProfileReportModal"]) {
+      expect(name in window, name).toBe(false);
+    }
+  });
+});
+
+describe("the pages' other declared controls", () => {
+  it("puts a notice away, and the list with its last one", async () => {
+    document.body.innerHTML = `
+      <div id="toasts">
+        <div class="ds-notice" id="a">A<button type="button" data-action="dismiss-notice">x</button></div>
+        <div class="ds-notice" id="b">B<button type="button" data-action="dismiss-notice">x</button></div>
+      </div>`;
+    await userEvent.click(document.querySelector("#a button")!);
+    expect(document.getElementById("a")).toBeNull();
+    expect(document.getElementById("toasts")!.innerHTML).not.toBe("");
+    await userEvent.click(document.querySelector("#b button")!);
+    expect(document.getElementById("toasts")!.innerHTML).toBe("");
+  });
+
+  it("closes a report's outcome, swapped in after the page was set up", async () => {
+    document.body.innerHTML = `<div id="profile-report-modal" style="display: flex"><div id="slot"></div></div>`;
+    document.getElementById("slot")!.innerHTML = `<button type="button" data-action="close-report">Close</button>`;
+    await userEvent.click(document.querySelector("#slot button")!);
+    expect(document.getElementById("profile-report-modal")!.style.display).toBe("none");
+  });
+
+  it("enables deleting a community once its slug is typed, and previews a new one's address", async () => {
+    document.body.innerHTML = `
+      <input id="confirm" data-slug="club" data-confirms-slug="delete" /><button id="delete" disabled>Delete</button>
+      <input id="slug" data-slug-preview="where" /><span id="where"></span>`;
+    await userEvent.type(document.getElementById("confirm")!, "clu");
+    expect((document.getElementById("delete") as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(document.getElementById("confirm")!, "b");
+    expect((document.getElementById("delete") as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.type(document.getElementById("slug")!, "art");
+    expect(document.getElementById("where")!.textContent).toBe("/@art");
+  });
+
+  it("sends the language form on a choice, and keeps a form for show from being sent", () => {
+    document.body.innerHTML = `
+      <form id="language"><select id="pick" data-submit-on-change><option>a</option><option>b</option></select></form>
+      <form id="show" data-no-submit><button>Send</button></form>`;
+    let sent = 0;
+    (document.getElementById("language") as HTMLFormElement).submit = () => {
+      sent++;
+    };
+    const pick = document.getElementById("pick") as HTMLSelectElement;
+    pick.value = "b";
+    pick.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(sent).toBe(1);
+    const send = new Event("submit", { bubbles: true, cancelable: true });
+    document.getElementById("show")!.dispatchEvent(send);
+    expect(send.defaultPrevented).toBe(true);
+  });
+
+  it("empties the guestbook's form once its entry is taken, and says a request that never arrived", () => {
+    document.body.innerHTML = `
+      <form id="guestbook" data-reset-after-request><textarea name="content">Hi</textarea></form>
+      <form id="session" data-network-error="No connection"></form>`;
+    const alerted: string[] = [];
+    vi.stubGlobal("dsAlert", (text: string) => alerted.push(text));
+    const guestbook = document.getElementById("guestbook") as HTMLFormElement;
+    const textarea = guestbook.querySelector("textarea")!;
+    textarea.value = "Hello";
+    const after = (status: number) =>
+      guestbook.dispatchEvent(new CustomEvent("htmx:after:request", { bubbles: true, detail: { ctx: { response: { status } } } }));
+    after(422);
+    expect(textarea.value).toBe("Hello");
+    after(200);
+    expect(textarea.value).toBe("Hi");
+
+    const session = document.getElementById("session")!;
+    session.dispatchEvent(new CustomEvent("htmx:error", { bubbles: true, detail: { ctx: { response: { status: 500 } } } }));
+    expect(alerted).toEqual([]);
+    session.dispatchEvent(new CustomEvent("htmx:error", { bubbles: true, detail: { ctx: {} } }));
+    expect(alerted).toEqual(["No connection"]);
   });
 });
 
