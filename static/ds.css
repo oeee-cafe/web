@@ -910,28 +910,21 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   margin-left: auto;
 }
 
-/* Drafts, shown only while there are some, signed in or out: the square
-   is tinted and edged as 넷캔 is, and 넷캔's own light sits on its top
-   right corner -- centred on it, as the unverified-email dot is on the
-   initial. */
+/* Drafts, shown only while there are some, signed in or out: filled as
+   Draw is, the accent's lime with its dark ink, so the work waiting and
+   the button that makes more read as one pair. */
 .nav-bar .toolbar-end .toolbar-drafts,
 .nav-bar .toolbar-end .toolbar-drafts:visited {
-  position: relative;
-  border-color: rgba(60, 103, 18, 0.5);
-  background-image: linear-gradient(rgba(122, 190, 40, 0.14), rgba(122, 190, 40, 0.14));
+  border: 1px solid var(--ds-line-strong);
+  background-color: var(--ds-accent);
+  color: var(--ds-accent-ink);
+  box-shadow: var(--ds-shadow-raise);
 }
 
 @media (hover: hover), (min--moz-device-pixel-ratio: 0) {
   .nav-bar .toolbar-end .toolbar-drafts:hover {
-    background-image: linear-gradient(rgba(122, 190, 40, 0.24), rgba(122, 190, 40, 0.24));
+    background-color: var(--ds-accent-hover);
   }
-}
-
-.toolbar-drafts .toolbar-live-dot {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  margin: 0;
 }
 
 .toolbar-end > * + * {

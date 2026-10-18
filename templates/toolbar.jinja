@@ -157,13 +157,12 @@
          account's on the server, and the drawings kept in this browser,
          which is the only place a guest's are. The server's count shows
          it from the first paint; the script at the foot of this nav shows
-         it for this browser's, and puts the sum in its label. Lit as 넷캔
-         is, with 넷캔's own light on its corner. Beside Draw, whose
-         work it holds. Unboosted for the reason the account menu's link
+         it for this browser's, and puts the sum in its label. Filled as
+         Draw is, beside it, whose work it holds. Unboosted for the reason the account menu's link
          is. A page with a folded corner, stroked like the bell. #}
       {%- set drafts_count = draft_post_count|default(0) %}
       {%- set drafts_label = ftl_get_message("drafts") ~ (" (" ~ drafts_count ~ ")" if drafts_count > 0 else "") %}
-      <a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="{{ drafts_count }}"{% if not drafts_count > 0 %} hidden{% endif %} aria-label="{{ drafts_label }}" title="{{ drafts_label }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h9l5 5v14h-14z"/><path d="M14.5 2.5v5h5"/></svg><span class="toolbar-live-dot" aria-hidden="true"></span></a>
+      <a class="toolbar-square toolbar-button toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="{{ drafts_count }}"{% if not drafts_count > 0 %} hidden{% endif %} aria-label="{{ drafts_label }}" title="{{ drafts_label }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h9l5 5v14h-14z"/><path d="M14.5 2.5v5h5"/></svg></a>
         {# The one control in this nav that loads a module bundle.
            Boosting it would mount the painter once per session and never
            again. Signed out too: a guest can draw, and the drawing is kept
