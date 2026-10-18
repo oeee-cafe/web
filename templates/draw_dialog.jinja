@@ -7,11 +7,9 @@
    does without script. With it, the press opens this instead
    (`oeeeDrawDialog`), as do the `new-drawing` command and its key.
 
-   A boosted swap runs this again; the document listener is added once, and
-   finds the dialog by id each time.
-
-   Written for Firefox 56, which reads this script as written: no arrow
-   functions, no `let`. #}
+   The script is frontend/site/drawDialog.ts. A boosted swap runs the line
+   at the foot again, which wires the new dialog; the document listener is
+   added once, and finds the dialog by id each time. #}
 <div id="draw-dialog" class="ds-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="draw-dialog-title">
   <div class="ds-modal-panel">
     <h2 id="draw-dialog-title" tabindex="-1">{{ ftl_get_message("community-drawing-new") }}</h2>
@@ -43,48 +41,4 @@
     </form>
   </div>
 </div>
-<script>
-  (function () {
-    var opener = null;
-
-    function dialog() { return document.getElementById("draw-dialog"); }
-    function open() {
-      var modal = dialog();
-      if (!modal) return false;
-      opener = document.activeElement;
-      modal.style.display = "flex";
-      // The heading, not the first field: on iOS a focused <select> opens
-      // its picker, so the width wheel would come up with the dialog.
-      document.getElementById("draw-dialog-title").focus();
-      return true;
-    }
-    function close() {
-      var modal = dialog();
-      if (!modal || modal.style.display === "none") return;
-      modal.style.display = "none";
-      if (opener && document.body.contains(opener)) opener.focus();
-      opener = null;
-    }
-
-    var modal = dialog();
-    modal.querySelector("[data-draw-dialog-cancel]").addEventListener("click", close);
-    modal.addEventListener("mousedown", function (event) {
-      // Pressing the dimmed page is a Cancel.
-      if (event.target === modal) close();
-    });
-    modal.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" || event.key === "Esc") {
-        event.preventDefault();
-        close();
-      }
-    });
-
-    if (window.oeeeDrawDialog) return;
-    window.oeeeDrawDialog = { open: open, close: close };
-    document.addEventListener("click", function (event) {
-      if (event.defaultPrevented || event.button !== 0) return;
-      var button = event.target && event.target.closest ? event.target.closest("#nav-draw-button") : null;
-      if (button && open()) event.preventDefault();
-    });
-  })();
-</script>
+<script>if (window.oeeeChrome) window.oeeeChrome.drawDialog();</script>

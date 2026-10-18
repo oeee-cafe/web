@@ -61,16 +61,9 @@ function anything(): unknown {
  */
 const GIVES: Record<string, string[]> = {
   "htmx.js": ["htmx"],
-  // The page's own scripts and the quick switcher call these (jump.jinja,
-  // feed_switch.jinja, segmented.jinja); toolbar.jinja calls oeeeToolbar.
-  "toolbar.js": [
-    "oeeeMarkCurrent",
-    "oeeeFitToolbar",
-    "oeeeCommand",
-    "oeeeGo",
-    "oeeeShowSkeleton",
-    "oeeeToolbar",
-  ],
+  // Loading it only gives the templates' lines something to call
+  // (chrome.ts); each piece's own names arrive when its line runs.
+  "chrome.js": ["oeeeChrome"],
 };
 
 describe("the site's own scripts", () => {
@@ -86,11 +79,11 @@ describe("the site's own scripts", () => {
       .flatMap((bundle) => bundle.output)
       .filter((entry): entry is Rollup.OutputChunk => entry.type === "chunk");
     expect(chunks.map((chunk) => chunk.fileName).sort()).toEqual([
+      "chrome.js",
       "htmx.js",
       "mention.js",
       "post_zoom.js",
       "reaction_picker.js",
-      "toolbar.js",
     ]);
 
     const page = ["document", "navigator", "location", "history", "localStorage", "sessionStorage"];

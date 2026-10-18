@@ -274,14 +274,16 @@
       </dl>
     </div>
   </div>
-  {# The toolbar's script (frontend/site/toolbar.ts): which item is the page
-     you are on, signing in coming back here, one row or two, keeping the
-     reader's place, the theme switch, the commands and keys, closing the
-     menus, the next page's skeleton, and the drafts kept in this browser.
-     The first tag sets up the document once; the second shows this toolbar,
-     and is the one a boosted swap re-runs in place (toolbar.ts says why). #}
-  <script src="{{ '/static/site/toolbar.js' | cachebuster | safe }}"></script>
-  <script>if (window.oeeeToolbar) window.oeeeToolbar.show();</script>
+  {# The script for the site's chrome (frontend/site/chrome.ts): this
+     toolbar's -- which item is the page you are on, signing in coming back
+     here, one row or two, keeping the reader's place, the theme switch, the
+     commands and keys, closing the menus, the next page's skeleton, the
+     drafts kept in this browser (toolbarControls.ts) -- and the pieces that
+     follow it in the page, each set up by a line of its own where it is.
+     The line here shows this toolbar, and is what a boosted swap re-runs in
+     place (chrome.ts says why). #}
+  <script src="{{ '/static/site/chrome.js' | cachebuster | safe }}"></script>
+  <script>if (window.oeeeChrome) window.oeeeChrome.toolbar();</script>
   {% include "loading_bar.jinja" %}
   {% include "app_caption.jinja" %}
 </nav>

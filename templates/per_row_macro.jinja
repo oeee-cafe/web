@@ -9,7 +9,8 @@
    say less as the squares get narrower. Several controls for the same key on
    one page -- the profile's two tabs -- stay in step.
 
-   Hidden on a phone, which keeps three a row whatever was chosen (style.css). #}
+   Hidden on a phone, which keeps three a row whatever was chosen (style.css).
+   The script is frontend/site/perRow.ts. #}
 {% macro per_row(id="post-cols", var="--home-cols", key="homeCols", default=6) %}
   <div class="ds-per-row" data-per-row data-var="{{ var }}" data-key="{{ key }}" data-default="{{ default }}">
     <svg class="ds-per-row-few" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
@@ -17,50 +18,5 @@
     <svg class="ds-per-row-many" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="1" y="1" width="3.6" height="3.6" rx=".6"/><rect x="6.2" y="1" width="3.6" height="3.6" rx=".6"/><rect x="11.4" y="1" width="3.6" height="3.6" rx=".6"/><rect x="1" y="6.2" width="3.6" height="3.6" rx=".6"/><rect x="6.2" y="6.2" width="3.6" height="3.6" rx=".6"/><rect x="11.4" y="6.2" width="3.6" height="3.6" rx=".6"/><rect x="1" y="11.4" width="3.6" height="3.6" rx=".6"/><rect x="6.2" y="11.4" width="3.6" height="3.6" rx=".6"/><rect x="11.4" y="11.4" width="3.6" height="3.6" rx=".6"/></g></svg>
     <output class="ds-per-row-value" for="{{ id }}"></output>
   </div>
-  <script>
-    (function () {
-      function density(cols) {
-        return cols > 9 ? "bare" : cols > 6 ? "dense" : "";
-      }
-      function show(control, cols) {
-        var slider = control.querySelector("input");
-        slider.value = cols;
-        control.querySelector("output").textContent = cols;
-        // The filled part of the track, for engines that have no
-        // ::-moz-range-progress of their own.
-        slider.style.setProperty("--ds-range-fill", ((cols - 1) / 11 * 100) + "%");
-      }
-      function init() {
-        var controls = document.querySelectorAll("[data-per-row]:not([data-ready])");
-        for (var i = 0; i < controls.length; i++) {
-          (function (control) {
-            control.setAttribute("data-ready", "");
-            var key = control.getAttribute("data-key");
-            var cssVar = control.getAttribute("data-var");
-            var cols = parseInt(control.getAttribute("data-default"), 10);
-            try {
-              var saved = parseInt(localStorage.getItem(key), 10);
-              if (saved >= 1 && saved <= 12) cols = saved;
-            } catch (error) {}
-            show(control, cols);
-            control.querySelector("input").addEventListener("input", function () {
-              var value = parseInt(this.value, 10);
-              var root = document.documentElement;
-              root.style.setProperty(cssVar, value);
-              root.setAttribute("data-" + key + "-density", density(value));
-              var same = document.querySelectorAll('[data-per-row][data-key="' + key + '"]');
-              for (var j = 0; j < same.length; j++) show(same[j], value);
-              try {
-                localStorage.setItem(key, value);
-              } catch (error) {
-                // Not remembering it is not a reason to refuse the change.
-              }
-            });
-          })(controls[i]);
-        }
-      }
-      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-      else init();
-    })();
-  </script>
+  <script>if (window.oeeeChrome) window.oeeeChrome.perRow();</script>
 {% endmacro %}

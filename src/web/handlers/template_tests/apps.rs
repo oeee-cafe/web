@@ -81,8 +81,8 @@ fn the_apps_are_told_the_unread_count_and_who_is_signed_in() {
     // What the apps call on the page is on one object (app_bridge.jinja);
     // the toolbar's script adds its commands to it
     // (frontend/site/toolbar.browser.test.ts).
-    assert!(signed_in.contains(r#"<script src="/static/site/toolbar.js"></script>"#));
-    assert!(signed_in.contains("window.oeeeToolbar.show();"));
+    assert!(signed_in.contains(r#"<script src="/static/site/chrome.js"></script>"#));
+    assert!(signed_in.contains("window.oeeeChrome.toolbar();"));
 }
 
 /// Only a drawing that is not blurred is offered to an app's long-press

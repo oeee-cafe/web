@@ -22,59 +22,7 @@
    Only the three newest are kept, so a run of clicks does not build a
    tower. Looked for on load and after every htmx swap -- partials included,
    since htmx fires the swap event once all of a response's tasks are done --
-   and a toast is timed once, however many swaps see it. Installed once: a
-   swap of the whole body runs this again, and only needs the look. #}
-<script>
-  (function () {
-    var SHOWN_MS = 5000;
-    var KEPT = 3;
-    function leave(toast) {
-      if (!toast.parentNode) return;
-      toast.className += " is-leaving";
-      setTimeout(function () {
-        if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 200);
-    }
-    // The time starts when the page is being looked at: a toast that
-    // arrives in a tab in the background -- a live notification, most
-    // often (live.jinja) -- waits there to be read rather than going
-    // before anyone was there to see it.
-    function time(toast) {
-      var timer = null;
-      function start() {
-        clearTimeout(timer);
-        timer = setTimeout(function () { leave(toast); }, SHOWN_MS);
-      }
-      function whenSeen() {
-        if (document.hidden) return;
-        document.removeEventListener("visibilitychange", whenSeen);
-        start();
-      }
-      toast.addEventListener("mouseenter", function () { clearTimeout(timer); });
-      toast.addEventListener("mouseleave", start);
-      if (document.hidden) document.addEventListener("visibilitychange", whenSeen);
-      else start();
-    }
-    function look() {
-      var stack = document.getElementById("toasts");
-      if (!stack) return;
-      var toasts = stack.querySelectorAll(".ds-notice");
-      for (var i = 0; i < toasts.length; i++) {
-        var toast = toasts[i];
-        if (i < toasts.length - KEPT) {
-          leave(toast);
-          continue;
-        }
-        if (toast.getAttribute("data-timed")) continue;
-        toast.setAttribute("data-timed", "1");
-        if (toast.className.indexOf("ds-toast") < 0) toast.className += " ds-toast";
-        if (toast.className.indexOf("ds-notice-error") < 0) time(toast);
-      }
-    }
-    look();
-    if (window.oeeeToasts) return;
-    // For a toast put up by script rather than by a swap (live.jinja).
-    window.oeeeToasts = { look: look };
-    document.addEventListener("htmx:after:swap", look);
-  })();
-</script>
+   and a toast is timed once, however many swaps see it (frontend/site/
+   toasts.ts). Installed once: a swap of the whole body runs the line below
+   again, and only needs the look. #}
+<script>if (window.oeeeChrome) window.oeeeChrome.toasts();</script>
