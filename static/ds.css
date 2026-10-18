@@ -420,16 +420,9 @@ html[data-app] .ds-page a {
   cursor: default;
 }
 
-/* A drawing in a grid is a thing you open, like an icon, not a link you
-   follow. */
-.ds-page .posts-grid a,
+/* A drawing in a grid, its title and who drew it and where are all links,
+   and keep the hand every link has. */
 .ds-page .posts-grid img {
-  cursor: default;
-}
-
-/* Who drew it and where are links you follow, under the drawing, and keep
-   the hand every link has. */
-.ds-page .posts-grid .post-card-byline a {
   cursor: pointer;
 }
 

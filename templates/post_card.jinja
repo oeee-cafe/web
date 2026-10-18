@@ -13,9 +13,10 @@
 {% macro post_card(post, r2_public_endpoint_url, admin) %}
   {% set handle = post.user_login_name or post.author_login_name %}
   {% set title = post.title if post.title else ftl_get_message("post-untitled") %}
+  {% set href = "/admin/posts/" ~ post.id if admin else post_url(post) %}
   <div class="posts-grid-item{% if admin and post.deleted_at %} deleted{% endif %}">
     <a class="post-card-image"
-       href="{% if admin %}/admin/posts/{{ post.id }}{% else %}{{ post_url(post) }}{% endif %}"
+       href="{{ href }}"
        aria-label="{{ title }} by {{ handle }}">
       <img width="{{ post.image_width }}"
            height="{{ post.image_height }}"
@@ -52,11 +53,13 @@
          however many, since a grid of counts reads as a ranking, and before
          the title rather than on the drawing, which it would cover. Its
          tooltip says what it is. #}
+      {# The title opens the post too. The drawing's link already says so to
+         a screen reader and the keyboard, so this one is left out of both. #}
       <div class="post-card-title" title="{{ post.title }}">
         {%- if post.pickled and not admin -%}
           <span class="post-card-pickled" role="img" aria-label="{{ ftl_get_message('post-card-pickled') }}" title="{{ ftl_get_message('post-card-pickled') }}">{% include "pickle_icon.jinja" %}</span>
         {%- endif -%}
-        {{ title }}
+        <a href="{{ href }}" tabindex="-1" aria-hidden="true">{{ title }}</a>
       </div>
       {# One line for who, where and when. When is how long ago -- "3h ago",
          "2d ago" -- since the only question it answers here is how recent;

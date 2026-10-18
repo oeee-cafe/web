@@ -743,8 +743,13 @@ fn a_pickled_drawing_has_a_jar_on_its_card() {
         "{pickled}"
     );
     assert!(pickled.contains("pickle-icon"));
-    // Before the title, inside its line.
-    assert!(pickled.contains("</svg></span>Cat"), "{pickled}");
+    // Before the title, inside its line; the title opens the post.
+    assert!(
+        pickled.contains(
+            r#"</svg></span><a href="/@artist/p" tabindex="-1" aria-hidden="true">Cat</a>"#
+        ),
+        "{pickled}"
+    );
     assert!(!render(false, false).contains("post-card-pickled"));
     assert!(!render(true, true).contains("post-card-pickled"));
 }

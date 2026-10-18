@@ -413,6 +413,12 @@ nav a:visited,
   line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
+.post-card-meta .post-card-title a,
+.post-card-meta .post-card-title a:visited {
+  color: inherit;
+  text-decoration: none;
+}
+
 .post-card-title,
 .post-card-date {
   white-space: nowrap;
@@ -4929,8 +4935,8 @@ html[data-app] .about-stores {
   min-width: 0;
 }
 
-/* The whole row is the way to the drawing; links in what was said sit
-   above the stretch. */
+/* The whole row is the way to the drawing, what was said included; only
+   the links in it, and the commenter's handle, sit above the stretch. */
 .comment-row-link::after {
   content: "";
   position: absolute;
@@ -4940,9 +4946,13 @@ html[data-app] .about-stores {
   left: 0;
 }
 
-.comment-row-content {
+.comment-row-content a,
+.comment-row-meta a {
   position: relative;
   z-index: 1;
+}
+
+.comment-row-content {
   margin-top: 2px;
   font-size: var(--ds-text-base);
   line-height: 1.5;
