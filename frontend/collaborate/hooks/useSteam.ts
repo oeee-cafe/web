@@ -1,25 +1,23 @@
 import { useEffect, useState } from "react";
 
-import { askSteam, onSteam, steamKnown, type SteamFriend } from "../../shared/appBridge";
+import { askSteam, onSteam, steamCanInvite, steamFriendsKnown, type SteamFriend } from "../../shared/appBridge";
 import { roomJoin, type InvitationFate } from "./useDiscord";
 
 /**
- * Steam, as the Steam build of the Windows app last said: whether it can
- * list the reader's Steam friends, and the friends once asked for. Not
- * ready is anywhere else -- a browser, another app or store, or a Steam
- * build from before the picker -- where the room offers nothing of Steam.
+ * Steam, in the Steam build of the Windows app: whether there is Steam to
+ * ask, and the friends once asked for. Anywhere else -- a browser, another
+ * app or store -- the room offers nothing of Steam.
  */
 export function useSteam() {
-  const [ready, setReady] = useState(() => steamKnown().ready);
-  const [friends, setFriends] = useState<SteamFriend[] | null>(() => steamKnown().friends);
+  const ready = steamCanInvite();
+  const [friends, setFriends] = useState<SteamFriend[] | null>(steamFriendsKnown);
   // By the friend's id.
   const [invitations, setInvitations] = useState<Record<string, InvitationFate>>({});
 
   useEffect(
     () =>
       onSteam((heard) => {
-        if (heard.kind === "ready") setReady(steamKnown().ready);
-        else if (heard.kind === "friends") setFriends(heard.value);
+        if (heard.kind === "friends") setFriends(heard.value);
         else {
           const { user, sent } = heard.value;
           setInvitations((current) => ({ ...current, [user]: sent ? "sent" : "failed" }));

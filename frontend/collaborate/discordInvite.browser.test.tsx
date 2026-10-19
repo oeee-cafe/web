@@ -280,17 +280,15 @@ describe("inviting Discord friends from the session", () => {
 
 describe("inviting Steam friends from the session", () => {
   let askedSteam: { action: string; user?: string; join?: string }[] = [];
-  let steamReady = false;
 
-  /** The Steam build, as app_bridge.jinja stands for it: ready once told. */
-  function steamApp(ready: boolean, discord: DiscordLinked | null = null) {
+  /** The Steam build, as app_bridge.jinja stands for it. */
+  function steamApp(discord: DiscordLinked | null = null) {
     askedSteam = [];
-    steamReady = ready;
     (window as unknown as { oeeeApp: unknown }).oeeeApp = {
       connected: () => true,
       discord: { known: () => ({ state: discord, friends: null }), ask: () => true },
       steam: {
-        known: () => ({ ready: steamReady, friends: null }),
+        known: () => ({ friends: null }),
         ask: (action: string, user?: string, join?: string) => {
           askedSteam.push({ action, ...(user ? { user } : {}), ...(join ? { join } : {}) });
           return true;
@@ -299,7 +297,7 @@ describe("inviting Steam friends from the session", () => {
     };
   }
 
-  async function sayFromSteam(kind: "ready" | "friends" | "invited", value: unknown) {
+  async function sayFromSteam(kind: "friends" | "invited", value: unknown) {
     await act(async () => {
       document.dispatchEvent(new CustomEvent("oeee:steam", { detail: { kind, value } }));
     });
@@ -309,7 +307,7 @@ describe("inviting Steam friends from the session", () => {
 
   it("lists the Steam friends in the page, and sends each one Steam's invitation to the room", async () => {
     document.documentElement.setAttribute("data-store", "steam");
-    steamApp(true);
+    steamApp();
     room(true);
     await render();
     expect(button("Invite")).toBeUndefined();
@@ -346,7 +344,7 @@ describe("inviting Steam friends from the session", () => {
 
   it("says when there is nobody to invite", async () => {
     document.documentElement.setAttribute("data-store", "steam");
-    steamApp(true);
+    steamApp();
     room(true);
     await render();
     await press("Steam");
@@ -356,7 +354,7 @@ describe("inviting Steam friends from the session", () => {
 
   it("swaps the one friends window between Discord's and Steam's", async () => {
     document.documentElement.setAttribute("data-store", "steam");
-    steamApp(true, { connected: true, connecting: false, name: "oeee" });
+    steamApp({ connected: true, connecting: false, name: "oeee" });
     room(true);
     await render();
     await press("Invite");
@@ -369,25 +367,10 @@ describe("inviting Steam friends from the session", () => {
     expect(button("Invite")!.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("waits for a Steam build that says it can list them", async () => {
-    // A Steam build from before the picker never says so: its button opened
-    // Steam's invitation over the window, which never showed.
-    document.documentElement.setAttribute("data-store", "steam");
-    steamApp(false);
-    room(true);
-    await render();
-    expect(button("Steam")).toBeUndefined();
-
-    // Told after the room had drawn, as a page's first `page` is answered.
-    steamReady = true;
-    await sayFromSteam("ready", true);
-    expect(button("Steam")).toBeDefined();
-  });
-
   it("is offered nowhere else, nor in a session a friend could not enter", async () => {
     // The Microsoft Store's build has no Steam.
     document.documentElement.setAttribute("data-store", "microsoft");
-    steamApp(true);
+    steamApp();
     room(true);
     await render();
     expect(button("Steam")).toBeUndefined();

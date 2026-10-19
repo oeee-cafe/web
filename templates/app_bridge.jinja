@@ -130,10 +130,9 @@
             (below), or "invite" `user`, a Steam id as a string, into the
             room `join` opens -- the page's `join`, above -- answered with
             steam.invited. A friend who accepts has Steam open their own app
-            on it (steam.rs in oeee-cafe-desktop). Asked only on a page the
-            app has told steam.ready: Steam's own invitation, over the
-            window, never showed, as Steam's overlay cannot draw over the
-            web view.
+            on it (steam.rs in oeee-cafe-desktop). The picker is the page's
+            because Steam's own invitation, over the window, never showed:
+            Steam's overlay cannot draw over the web view.
    share    {title, text}
    download {name, mime, data}
             What Android's web view cannot do itself (app_polyfills.jinja).
@@ -217,12 +216,11 @@
                              the oeee:discord event, for the room
                              (frontend/shared/appBridge.ts) and the account
                              page (account_discord_app.jinja).
-     steam.ready(), steam.friends(list), steam.invited(result)
-                             here: the Steam build of the Windows app, which
-                             tells every page it shows that it can list the
-                             reader's Steam friends; the friends it was asked
-                             for, [{id, name, status, playing}] as Discord's
-                             are; and {user, sent} for an invitation. Kept
+     steam.friends(list), steam.invited(result)
+                             here: the Steam build of the Windows app's
+                             answers: the friends it was asked for,
+                             [{id, name, status, playing}] as Discord's are,
+                             and {user, sent} for an invitation. Kept
                              for what loads after (steam.known()) and said as
                              the oeee:steam event, for the room
                              (frontend/shared/appBridge.ts).

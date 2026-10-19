@@ -412,7 +412,6 @@
     "discord.friends",
     "discord.requests",
     "discord.invited",
-    "steam.ready",
     "steam.friends",
     "steam.invited"
   ],

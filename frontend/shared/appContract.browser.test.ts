@@ -95,10 +95,9 @@ type PageWindow = Window &
         ask(action: string, user?: string): boolean;
       };
       steam: {
-        ready(): void;
         friends(list: unknown): void;
         invited(result: unknown): void;
-        known(): { ready: boolean; friends: unknown };
+        known(): { friends: unknown };
         ask(action: string, user?: string, join?: string): boolean;
       };
     };
@@ -1456,14 +1455,12 @@ describe("what the apps test against (appContract.json)", () => {
     const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
     const heard: unknown[] = [];
     page.window.document.addEventListener("oeee:steam", (event: Event) => heard.push((event as CustomEvent).detail));
-    expect(page.window.oeeeApp.steam.known()).toEqual({ ready: false, friends: null });
+    expect(page.window.oeeeApp.steam.known()).toEqual({ friends: null });
     const friends = [{ id: "76561197960287930", name: "a", status: "online", playing: true }];
-    page.window.oeeeApp.steam.ready();
     page.window.oeeeApp.steam.friends(friends);
     page.window.oeeeApp.steam.invited({ user: "76561197960287930", sent: true });
-    expect(page.window.oeeeApp.steam.known()).toEqual({ ready: true, friends });
+    expect(page.window.oeeeApp.steam.known()).toEqual({ friends });
     expect(heard).toEqual([
-      { kind: "ready", value: true },
       { kind: "friends", value: friends },
       { kind: "invited", value: { user: "76561197960287930", sent: true } },
     ]);

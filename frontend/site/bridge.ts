@@ -23,7 +23,6 @@ interface DiscordKnown {
 }
 
 interface SteamKnown {
-  ready: boolean;
   friends: unknown;
 }
 
@@ -38,7 +37,6 @@ export interface OeeeApp {
     ask(action: string, user?: string): boolean;
   };
   steam: {
-    ready(): void;
     friends(list: unknown): void;
     invited(result: unknown): void;
     known(): SteamKnown;
@@ -263,12 +261,11 @@ export function installBridge(WORDS: Words): void {
     document.dispatchEvent(new CustomEvent("oeee:discord", { detail: { kind, value } }));
   }
 
-  // What the Steam build last said: that it can list the friends to ask into
-  // a room, and the friends it was asked for.
-  const steam: SteamKnown = { ready: false, friends: null };
-  function heardFromSteam(kind: "ready" | "friends" | "invited", value: unknown): void {
-    if (kind === "ready") steam.ready = true;
-    else if (kind === "friends") steam.friends = value;
+  // The Steam friends the Steam build last listed, for whatever part of the
+  // page asks after it was told.
+  const steam: SteamKnown = { friends: null };
+  function heardFromSteam(kind: "friends" | "invited", value: unknown): void {
+    if (kind === "friends") steam.friends = value;
     document.dispatchEvent(new CustomEvent("oeee:steam", { detail: { kind, value } }));
   }
 
@@ -288,7 +285,6 @@ export function installBridge(WORDS: Words): void {
       },
     },
     steam: {
-      ready: () => heardFromSteam("ready", true),
       friends: (list) => heardFromSteam("friends", list),
       invited: (result) => heardFromSteam("invited", result),
       known: () => steam,

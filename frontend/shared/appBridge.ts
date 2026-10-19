@@ -131,7 +131,6 @@ export function askDiscord(action: DiscordAction, user?: string): boolean {
 export type SteamFriend = DiscordFriend;
 
 export type SteamHeard =
-  | { kind: "ready"; value: true }
   | { kind: "friends"; value: SteamFriend[] }
   | { kind: "invited"; value: { user: string; sent: boolean } };
 
@@ -139,25 +138,27 @@ export type SteamHeard =
 export type SteamAction = "friends" | "invite";
 
 interface SteamMembers {
-  known(): { ready: boolean; friends: SteamFriend[] | null };
+  known(): { friends: SteamFriend[] | null };
   ask(action: SteamAction, user?: string, join?: string): boolean;
 }
 
 function steamMembers(): SteamMembers | undefined {
-  return (window as unknown as { oeeeApp?: { steam?: SteamMembers } }).oeeeApp?.steam;
+  const app = (window as unknown as { oeeeApp?: { connected(): boolean; steam?: SteamMembers } }).oeeeApp;
+  return app && app.connected() ? app.steam : undefined;
 }
 
 /**
- * What the Steam build last said (app_bridge.jinja keeps it): whether it
- * can list the reader's Steam friends, and the friends once asked for.
- * Ready only in the Steam build of the Windows app (data-store="steam",
- * theme_head.jinja), and only in one that says so: the builds before it
- * opened Steam's own invitation over the window, which never showed.
+ * Whether Steam's friends can be offered: in the Steam build of the Windows
+ * app only (data-store="steam", theme_head.jinja), which is the one with
+ * Steam to ask (steam.rs in oeee-cafe-desktop).
  */
-export function steamKnown(): { ready: boolean; friends: SteamFriend[] | null } {
-  const known = steamMembers()?.known();
-  const steam = document.documentElement.getAttribute("data-store") === "steam";
-  return { ready: steam && (known?.ready ?? false), friends: known?.friends ?? null };
+export function steamCanInvite(): boolean {
+  return document.documentElement.getAttribute("data-store") === "steam" && steamMembers() !== undefined;
+}
+
+/** The Steam friends the app last listed (app_bridge.jinja keeps them), or null. */
+export function steamFriendsKnown(): SteamFriend[] | null {
+  return steamCanInvite() ? (steamMembers()?.known().friends ?? null) : null;
 }
 
 /** Hears whatever the app says of Steam from now on. Returns the stop. */
