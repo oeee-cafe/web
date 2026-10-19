@@ -252,7 +252,6 @@ pub async fn find_public_posts(
             LEFT JOIN communities ON posts.community_id = communities.id
             LEFT JOIN users ON posts.author_id = users.id
             WHERE (communities.visibility = 'public' OR posts.community_id IS NULL)
-            AND posts.parent_post_id IS NULL
             AND posts.published_at IS NOT NULL
             AND posts.deleted_at IS NULL
             AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $3 = true OR posts.author_id = $4)
@@ -333,8 +332,7 @@ pub async fn find_member_community_posts(
             LEFT JOIN images ON posts.image_id = images.id
             LEFT JOIN communities ON posts.community_id = communities.id
             LEFT JOIN users ON posts.author_id = users.id
-            WHERE posts.parent_post_id IS NULL
-            AND posts.published_at IS NOT NULL
+            WHERE posts.published_at IS NOT NULL
             AND posts.deleted_at IS NULL
             AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $2 = true OR posts.author_id = $1)
             AND NOT EXISTS (
