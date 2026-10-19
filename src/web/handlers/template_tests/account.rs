@@ -123,10 +123,18 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
             .count(),
         2
     );
-    assert!(squashed
-        .contains(r#"data-product="cafe.oeee.supporter.2026">supporter-pack-buy(year=2026)<span"#));
-    assert!(squashed
-        .contains(r#"data-product="cafe.oeee.supporter.2026.more">Support twice as much<span"#));
+    // Each wears the mark of the store it buys through, and the line under
+    // them names that store: somebody who already has a pack from another
+    // store is told this one is a second, and from where.
+    let apple_mark = r#"<span class="supporter-mark ds-mark" aria-hidden="true">🍎</span>"#;
+    assert!(squashed.contains(&format!(
+        r#"data-product="cafe.oeee.supporter.2026">{apple_mark}supporter-pack-buy(year=2026)<span"#
+    )));
+    assert!(squashed.contains(&format!(
+        r#"data-product="cafe.oeee.supporter.2026.more">{apple_mark}Support twice as much<span"#
+    )));
+    assert!(apple.contains(r#"id="supporter-sold-here">supporter-pack-sold-here(store=supporter-store-apple)<"#));
+    assert_eq!(apple.matches(r#"aria-describedby="supporter-sold-here""#).count(), 2);
     assert!(apple.contains(r#"class="ds-button supporter-restore""#));
     // Room for the price the app will fill in, keyed by the product it
     // belongs to, and empty until then.
@@ -150,6 +158,10 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
         );
         assert!(page.contains(r#"data-product="481""#), "{store}");
         assert!(
+            page.contains(&format!("supporter-pack-sold-here(store=supporter-store-{store})")),
+            "{store}"
+        );
+        assert!(
             !page.contains(r#"class="ds-button supporter-restore""#),
             "{store}"
         );
@@ -161,6 +173,7 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
     assert!(!browser.contains(r#"data-product="#));
     assert!(!browser.contains(r#"class="ds-button supporter-restore""#));
     assert!(browser.contains("supporter-pack-elsewhere"));
+    assert!(!browser.contains("supporter-pack-sold-here"));
 
     // Nothing for this year yet: the page says so instead.
     let nothing = render(
@@ -188,6 +201,7 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
     );
     assert!(owned.contains("supporter-pack-have(year=2026)"));
     assert!(!owned.contains(r#"data-product="#));
+    assert!(!owned.contains("supporter-pack-sold-here"));
     assert!(!owned.contains("supporter-pack-none"));
     assert_eq!(owned.matches("supporter-chip").count(), 3, "one per year");
     assert!(owned.contains("🎮</span>2025"));

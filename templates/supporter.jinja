@@ -52,11 +52,17 @@
           {# Drawn only when there is a button to put in it: a row with
              nothing in it would still be a gap in the stack. #}
           {% if offers|length > 0 or restorable %}
+            {# Each button wears the mark of the store it buys through, and
+               the line under the row names that store: somebody who bought
+               this year's pack in one app and opens another sees a button
+               to buy one here, and should know it is a second pack, from
+               this store, and not the one they have. #}
             <div class="supporter-actions">
               {% for offer in offers %}
                 <button type="button"
-                        class="ds-button ds-button-primary supporter-buy"
-                        data-product="{{ offer.product }}">{{ offer.label or ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ offer.product }}"></span></button>
+                        class="ds-button ds-button-primary supporter-buy ds-marked"
+                        aria-describedby="supporter-sold-here"
+                        data-product="{{ offer.product }}">{{ supporter_mark(store) }}{{ offer.label or ftl_format_pattern("supporter-pack-buy", {"year": this_year}) }}<span class="supporter-price" data-product="{{ offer.product }}"></span></button>
               {% endfor %}
               {# Restoring is the App Store's word for it: the same purchase
                  handed over again, which gives a pack back to whoever is
@@ -69,6 +75,13 @@
                 <button type="button" class="ds-button supporter-restore">{{ ftl_get_message("supporter-pack-restore") }}</button>
               {% endif %}
             </div>
+          {% endif %}
+          {# Which store the buttons above sell through, and that every
+             store's pack counts. It names only the store this app sells
+             through: an App Store build naming another store is the
+             steering App Review reads for (supporter-pack-elsewhere). #}
+          {% if offers|length > 0 %}
+            <p class="ds-help" id="supporter-sold-here">{{ ftl_format_pattern("supporter-pack-sold-here", {"store": ftl_get_message("supporter-store-" ~ store)}) }}</p>
           {% endif %}
           {# What the last press is waiting on, and then what became of it
              once the store or the site has answered (the script below).
