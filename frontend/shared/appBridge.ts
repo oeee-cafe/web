@@ -123,30 +123,51 @@ export function askDiscord(action: DiscordAction, user?: string): boolean {
   return discordMembers()?.ask(action, user) ?? false;
 }
 
+/**
+ * A Steam friend the reader can invite into the room, as the Steam build
+ * of the Windows app lists them (steam.rs in oeee-cafe-desktop): the same
+ * as a Discord friend, an id a Steam id.
+ */
+export type SteamFriend = DiscordFriend;
+
+export type SteamHeard =
+  | { kind: "ready"; value: true }
+  | { kind: "friends"; value: SteamFriend[] }
+  | { kind: "invited"; value: { user: string; sent: boolean } };
+
+/** What the page asks of Steam (app_bridge.jinja). */
+export type SteamAction = "friends" | "invite";
+
 interface SteamMembers {
-  invite(join: string): boolean;
+  known(): { ready: boolean; friends: SteamFriend[] | null };
+  ask(action: SteamAction, user?: string, join?: string): boolean;
 }
 
 function steamMembers(): SteamMembers | undefined {
-  const app = (window as unknown as { oeeeApp?: { connected(): boolean; steam?: SteamMembers } }).oeeeApp;
-  return app && app.connected() ? app.steam : undefined;
+  return (window as unknown as { oeeeApp?: { steam?: SteamMembers } }).oeeeApp?.steam;
 }
 
 /**
- * Whether Steam's invitation can be offered: in the Steam build of the
- * Windows app only (data-store="steam", theme_head.jinja), which is the
- * one with Steam to ask (steam.rs in oeee-cafe-desktop).
+ * What the Steam build last said (app_bridge.jinja keeps it): whether it
+ * can list the reader's Steam friends, and the friends once asked for.
+ * Ready only in the Steam build of the Windows app (data-store="steam",
+ * theme_head.jinja), and only in one that says so: the builds before it
+ * opened Steam's own invitation over the window, which never showed.
  */
-export function steamCanInvite(): boolean {
-  return document.documentElement.getAttribute("data-store") === "steam" && steamMembers() !== undefined;
+export function steamKnown(): { ready: boolean; friends: SteamFriend[] | null } {
+  const known = steamMembers()?.known();
+  const steam = document.documentElement.getAttribute("data-store") === "steam";
+  return { ready: steam && (known?.ready ?? false), friends: known?.friends ?? null };
 }
 
-/**
- * Opens Steam's own invitation over the window, for the room `join` opens.
- * Steam lists the friends and sends it; nothing comes back. False outside
- * the Steam build.
- */
-export function inviteSteamFriends(join: string): boolean {
-  if (!steamCanInvite()) return false;
-  return steamMembers()?.invite(join) ?? false;
+/** Hears whatever the app says of Steam from now on. Returns the stop. */
+export function onSteam(listener: (heard: SteamHeard) => void): () => void {
+  const heard = (event: Event) => listener((event as CustomEvent<SteamHeard>).detail);
+  document.addEventListener("oeee:steam", heard);
+  return () => document.removeEventListener("oeee:steam", heard);
+}
+
+/** Asks the Steam build something; false outside it. */
+export function askSteam(action: SteamAction, user?: string, join?: string): boolean {
+  return steamMembers()?.ask(action, user, join) ?? false;
 }

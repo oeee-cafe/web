@@ -3,10 +3,11 @@ import { Icon, NEO_BUTTON, NEO_BUTTON_ON, NEO_CHECKBOX, PANEL_MARGIN } from "neo
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { inviteSteamFriends, steamCanInvite } from "../../shared/appBridge";
-import { FRIENDS_WINDOW_SIZE, roomIsJoinable, roomJoin, useDiscord } from "../hooks/useDiscord";
-import { DiscordMark } from "./DiscordInvite";
-import { DiscordFriendsWindow, type WindowOrigin } from "./DiscordFriendsWindow";
+import { FRIENDS_WINDOW_SIZE, roomIsJoinable, useDiscord } from "../hooks/useDiscord";
+import { useSteam } from "../hooks/useSteam";
+import { DiscordInvite, DiscordMark } from "./DiscordInvite";
+import { FriendsWindow, type WindowOrigin } from "./FriendsWindow";
+import { SteamInvite } from "./SteamInvite";
 
 interface CollaborationMeta {
   title: string;
@@ -103,7 +104,7 @@ const SteamMark = () => (
  *
  * In the Windows app with Discord, Invite sits beside Share and opens the
  * Discord friends to ask in, in a window of their own beside the chat
- * (DiscordFriendsWindow), when the room is one a friend could enter. Share
+ * (FriendsWindow), when the room is one a friend could enter. Share
  * stays for everyone else. The window is put on the page rather than in the
  * chat, whose frame clips what it holds and is moved by a transform while it
  * is dragged.
@@ -113,10 +114,12 @@ const SteamMark = () => (
  * their request with an invitation, as Discord's own notification would, and
  * Not now only takes them off the list.
  *
- * In the Steam build, Steam's own Invite sits there too: it opens Steam's
- * invitation over the window, where Steam lists the friends, and a friend
- * who accepts has Steam open their app on the room. Only friends with
- * Oeee Cafe on Steam can come in that way.
+ * In the Steam build, a Steam button sits there too and opens the Steam
+ * friends the same way, in the same place: one friends window at a time,
+ * the other button swapping it. Steam sends the invitation, and a friend who
+ * accepts has Steam open their app on the room. Only friends with Oeee Cafe
+ * on Steam can come in that way. It was Steam's own invitation over the
+ * window, which never showed: Steam's overlay cannot draw over the web view.
  */
 export const SessionHeader = ({
   canvasMeta,
@@ -130,11 +133,18 @@ export const SessionHeader = ({
 }: SessionHeaderProps) => {
   const { t } = useLingui();
   const discord = useDiscord();
-  // Where the friends window opened, while it is open.
-  const [inviting, setInviting] = useState<WindowOrigin | null>(null);
+  const steam = useSteam();
+  // Whose friends window is open, and where it opened.
+  const [inviting, setInviting] = useState<{ from: "discord" | "steam"; origin: WindowOrigin } | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const canInvite = discord.state !== null && roomIsJoinable();
-  const steamJoin = steamCanInvite() ? roomJoin() : null;
+  const canInviteSteam = steam.ready && roomIsJoinable();
+  // Pressed again, it puts its window away; pressed with the other's open,
+  // it opens its own where that one is.
+  const toggle = (from: "discord" | "steam") =>
+    setInviting((open) =>
+      open?.from === from ? null : { from, origin: open?.origin ?? besideChat(headerRef.current, ceiling) },
+    );
 
   const handleShare = () => {
     if (navigator.share) {
@@ -205,20 +215,21 @@ export const SessionHeader = ({
       {canInvite && (
         <button
           type="button"
-          onClick={() => setInviting((open) => (open ? null : besideChat(headerRef.current, ceiling)))}
-          aria-expanded={inviting !== null}
-          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] ${inviting ? NEO_BUTTON_ON : ""}`}
+          onClick={() => toggle("discord")}
+          aria-expanded={inviting?.from === "discord"}
+          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] ${inviting?.from === "discord" ? NEO_BUTTON_ON : ""}`}
           title={t`Invite Discord friends`}
         >
           <DiscordMark />
           <Trans>Invite</Trans>
         </button>
       )}
-      {steamJoin && (
+      {canInviteSteam && (
         <button
           type="button"
-          onClick={() => inviteSteamFriends(steamJoin)}
-          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px]`}
+          onClick={() => toggle("steam")}
+          aria-expanded={inviting?.from === "steam"}
+          className={`${NEO_BUTTON} flex min-w-0 flex-1 items-center justify-center gap-[4px] ${inviting?.from === "steam" ? NEO_BUTTON_ON : ""}`}
           title={t`Invite Steam friends`}
         >
           <SteamMark />
@@ -346,15 +357,23 @@ export const SessionHeader = ({
           </div>
         );
       })}
-    {canInvite &&
-      inviting &&
+    {/* One window, which keeps where it was dragged to and its size as the
+        other button swaps what it holds. */}
+    {((inviting?.from === "discord" && canInvite) || (inviting?.from === "steam" && canInviteSteam)) &&
       createPortal(
-        <DiscordFriendsWindow
-          discord={discord}
-          origin={inviting}
+        <FriendsWindow
+          title={inviting.from === "discord" ? t`Discord friends` : t`Steam friends`}
+          label={inviting.from === "discord" ? t`Invite Discord friends` : t`Invite Steam friends`}
+          origin={inviting.origin}
           minimumY={ceiling}
           onClose={() => setInviting(null)}
-        />,
+        >
+          {inviting.from === "discord" ? (
+            <DiscordInvite discord={discord} onClose={() => setInviting(null)} />
+          ) : (
+            <SteamInvite steam={steam} />
+          )}
+        </FriendsWindow>,
         document.body,
       )}
     </div>

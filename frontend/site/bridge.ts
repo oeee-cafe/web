@@ -22,6 +22,11 @@ interface DiscordKnown {
   requests: unknown;
 }
 
+interface SteamKnown {
+  ready: boolean;
+  friends: unknown;
+}
+
 export interface OeeeApp {
   connected(): boolean;
   discord: {
@@ -32,7 +37,13 @@ export interface OeeeApp {
     known(): DiscordKnown;
     ask(action: string, user?: string): boolean;
   };
-  steam: { invite(join: string): boolean };
+  steam: {
+    ready(): void;
+    friends(list: unknown): void;
+    invited(result: unknown): void;
+    known(): SteamKnown;
+    ask(action: string, user?: string, join?: string): boolean;
+  };
   post(type: string, data: Data, always?: boolean): boolean;
   feel(name: string): void;
   report(): void;
@@ -252,6 +263,15 @@ export function installBridge(WORDS: Words): void {
     document.dispatchEvent(new CustomEvent("oeee:discord", { detail: { kind, value } }));
   }
 
+  // What the Steam build last said: that it can list the friends to ask into
+  // a room, and the friends it was asked for.
+  const steam: SteamKnown = { ready: false, friends: null };
+  function heardFromSteam(kind: "ready" | "friends" | "invited", value: unknown): void {
+    if (kind === "ready") steam.ready = true;
+    else if (kind === "friends") steam.friends = value;
+    document.dispatchEvent(new CustomEvent("oeee:steam", { detail: { kind, value } }));
+  }
+
   page.oeeeApp = {
     // Whether an app is listening at all.
     connected: () => !!channel(),
@@ -268,7 +288,16 @@ export function installBridge(WORDS: Words): void {
       },
     },
     steam: {
-      invite: (join) => post("steam", { action: "invite", join }, true),
+      ready: () => heardFromSteam("ready", true),
+      friends: (list) => heardFromSteam("friends", list),
+      invited: (result) => heardFromSteam("invited", result),
+      known: () => steam,
+      ask: (action, user, join) => {
+        const data: Data = { action };
+        if (user) data.user = user;
+        if (join) data.join = join;
+        return post("steam", data, true);
+      },
     },
     post,
     // A control felt as well as seen.

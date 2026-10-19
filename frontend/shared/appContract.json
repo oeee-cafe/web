@@ -367,7 +367,13 @@
     ],
     "steam": [
       {
+        "action": "friends",
+        "v": 1,
+        "type": "steam"
+      },
+      {
         "action": "invite",
+        "user": "76561197960287930",
         "join": "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985",
         "v": 1,
         "type": "steam"
@@ -405,7 +411,10 @@
     "discord.state",
     "discord.friends",
     "discord.requests",
-    "discord.invited"
+    "discord.invited",
+    "steam.ready",
+    "steam.friends",
+    "steam.invited"
   ],
   "commands": [
     "recent",

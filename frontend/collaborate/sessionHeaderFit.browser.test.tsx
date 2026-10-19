@@ -26,7 +26,7 @@ function inTheApp() {
   document.documentElement.setAttribute("data-store", "steam");
   (window as unknown as { oeeeApp: unknown }).oeeeApp = {
     connected: () => true,
-    steam: { invite: () => true },
+    steam: { known: () => ({ ready: true, friends: null }), ask: () => true },
     discord: {
       known: () => ({ state: { connected: true, connecting: false, name: "oeee" }, friends: null }),
       ask: () => true,

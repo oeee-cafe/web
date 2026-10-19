@@ -95,7 +95,11 @@ type PageWindow = Window &
         ask(action: string, user?: string): boolean;
       };
       steam: {
-        invite(join: string): boolean;
+        ready(): void;
+        friends(list: unknown): void;
+        invited(result: unknown): void;
+        known(): { ready: boolean; friends: unknown };
+        ask(action: string, user?: string, join?: string): boolean;
       };
     };
   };
@@ -1333,10 +1337,11 @@ describe("what the apps test against (appContract.json)", () => {
     discord.window.oeeeApp.discord.ask("letIn", "80351110224678912");
     sent.push(...discord.sent.filter((message) => message.type === "discord"));
 
-    // The room's Steam Invite, in the Steam build.
+    // The room's Steam picker, in the Steam build.
     const steamRoom = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
-    steamRoom.window.oeeeApp.steam.invite("/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985");
-    sent.push(last(steamRoom, "steam"));
+    steamRoom.window.oeeeApp.steam.ask("friends");
+    steamRoom.window.oeeeApp.steam.ask("invite", "76561197960287930", "/collaborate/9c881320-2b43-4afa-b2bb-7128c8a3e985");
+    sent.push(...steamRoom.sent.filter((message) => message.type === "steam"));
 
     // One example of each distinct message, in the order first sent.
     const byType: Record<string, Message[]> = {};
@@ -1445,6 +1450,27 @@ describe("what the apps test against (appContract.json)", () => {
     page.window.oeeeApp.discord.ask("friends");
     page.window.oeeeApp.discord.ask("friends");
     expect(page.sent.filter((message) => message.type === "discord")).toHaveLength(2);
+  });
+
+  it("keeps what the Steam build said for what asks after, and says it as it comes", async () => {
+    const page = await open({ userAgent: "Mozilla/5.0 OeeeCafe platform/windows", store: "steam" });
+    const heard: unknown[] = [];
+    page.window.document.addEventListener("oeee:steam", (event: Event) => heard.push((event as CustomEvent).detail));
+    expect(page.window.oeeeApp.steam.known()).toEqual({ ready: false, friends: null });
+    const friends = [{ id: "76561197960287930", name: "a", status: "online", playing: true }];
+    page.window.oeeeApp.steam.ready();
+    page.window.oeeeApp.steam.friends(friends);
+    page.window.oeeeApp.steam.invited({ user: "76561197960287930", sent: true });
+    expect(page.window.oeeeApp.steam.known()).toEqual({ ready: true, friends });
+    expect(heard).toEqual([
+      { kind: "ready", value: true },
+      { kind: "friends", value: friends },
+      { kind: "invited", value: { user: "76561197960287930", sent: true } },
+    ]);
+    // Asked again, it is said again.
+    page.window.oeeeApp.steam.ask("friends");
+    page.window.oeeeApp.steam.ask("friends");
+    expect(page.sent.filter((message) => message.type === "steam")).toHaveLength(2);
   });
 
   it("asks whether leaving would lose work, and shows the page is being left, in the words every app uses", async () => {

@@ -61,7 +61,7 @@ export function useDiscord() {
 export type Discord = ReturnType<typeof useDiscord>;
 
 /** The friends window's size as it opens: wide enough for a name beside its
- *  Invite button, at the chat's text size (DiscordFriendsWindow). */
+ *  Invite button, at the chat's text size (FriendsWindow). */
 export const FRIENDS_WINDOW_SIZE = { width: 220, height: 260 };
 
 /**

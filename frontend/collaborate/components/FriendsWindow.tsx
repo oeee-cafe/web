@@ -1,4 +1,4 @@
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import {
   attachWindowDrag,
   attachWindowResize,
@@ -8,10 +8,9 @@ import {
   NEO_TITLEBAR_DOT,
   NEO_TITLEBAR_HANDLE,
 } from "neo-cucumber";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { FRIENDS_WINDOW_SIZE, type Discord } from "../hooks/useDiscord";
-import { DiscordInvite } from "./DiscordInvite";
+import { FRIENDS_WINDOW_SIZE } from "../hooks/useDiscord";
 
 /** Where the window opens, from the top left of the viewport. */
 export interface WindowOrigin {
@@ -19,21 +18,26 @@ export interface WindowOrigin {
   y: number;
 }
 
-export interface DiscordFriendsWindowProps {
-  discord: Discord;
+export interface FriendsWindowProps {
+  /** In the title bar: whose friends they are. */
+  title: string;
+  /** What the window is, said to a screen reader. */
+  label: string;
   origin: WindowOrigin;
   /** The highest it may be dragged: under the site's toolbar, as the chat is. */
   minimumY: number;
   onClose: () => void;
+  children: ReactNode;
 }
 
 /**
- * The Discord friends to invite, in a window of their own beside the chat
- * rather than inside it, where they squeezed the conversation into a strip:
- * a NEO window like the chat's, dragged by its title bar and sized by its
- * corner, put away by the × in its title bar or by Invite again.
+ * The friends to invite, Discord's (DiscordInvite) or Steam's
+ * (SteamInvite), in a window of their own beside the chat rather than
+ * inside it, where they squeezed the conversation into a strip: a NEO
+ * window like the chat's, dragged by its title bar and sized by its corner,
+ * put away by the × in its title bar or by the button that opened it.
  */
-export const DiscordFriendsWindow = ({ discord, origin, minimumY, onClose }: DiscordFriendsWindowProps) => {
+export const FriendsWindow = ({ title, label, origin, minimumY, onClose, children }: FriendsWindowProps) => {
   const { t } = useLingui();
   const [position, setPosition] = useState(origin);
   const [size, setSize] = useState(FRIENDS_WINDOW_SIZE);
@@ -62,7 +66,7 @@ export const DiscordFriendsWindow = ({ discord, origin, minimumY, onClose }: Dis
     <div
       ref={frameRef}
       role="dialog"
-      aria-label={t`Invite Discord friends`}
+      aria-label={label}
       className={`${NEO_PANEL} fixed z-40 flex flex-col overflow-hidden shadow-lg`}
       style={{
         left: `${position.x}px`,
@@ -82,7 +86,7 @@ export const DiscordFriendsWindow = ({ discord, origin, minimumY, onClose }: Dis
           <span className={NEO_TITLEBAR_DOT} />
           <span className={NEO_TITLEBAR_DOT} />
           <span className="ml-[4px] min-w-0 flex-1 truncate text-[11px] leading-[14px]">
-            <Trans>Discord friends</Trans>
+            {title}
           </span>
         </div>
         <button
@@ -94,7 +98,7 @@ export const DiscordFriendsWindow = ({ discord, origin, minimumY, onClose }: Dis
           ×
         </button>
       </div>
-      <DiscordInvite discord={discord} onClose={onClose} />
+      {children}
       <div ref={resizeRef} aria-hidden="true" className={NEO_RESIZE_HANDLE}>
         <span className={NEO_RESIZE_GRIP} />
       </div>
