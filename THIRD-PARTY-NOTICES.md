@@ -64,7 +64,7 @@ inline, the path as Simple Icons publishes it
 
 <https://partner.steamgames.com/doc/marketing/branding> — the Steam logo is
 Valve's trademark; not covered by this repository's licence. The button on
-`/login` draws it inline, the path as Simple Icons publishes it
+`/login` and the collaborative room's Steam button draw it inline, the path as Simple Icons publishes it
 (<https://simpleicons.org>, CC0).
 
 ## PaintBBS NEO
