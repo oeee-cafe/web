@@ -295,8 +295,8 @@ pub async fn find_public_posts(
 
 /// New drawings in the communities the viewer is a member of -- Home's
 /// Communities. Whatever the community's visibility, since a member reads its
-/// drawings on its own page anyway; otherwise the public feed's rules, newest
-/// first.
+/// drawings on its own page anyway, and collaborative drawings included, as
+/// that page shows them too; otherwise the public feed's rules, newest first.
 pub async fn find_member_community_posts(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
@@ -335,9 +335,6 @@ pub async fn find_member_community_posts(
             WHERE posts.published_at IS NOT NULL
             AND posts.deleted_at IS NULL
             AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $2 = true OR posts.author_id = $1)
-            AND NOT EXISTS (
-                SELECT 1 FROM collaborative_sessions cs WHERE cs.saved_post_id = posts.id
-            )
             ORDER BY posts.published_at DESC
             LIMIT $3 OFFSET $4
         ",
@@ -452,7 +449,8 @@ pub async fn find_collaborative_posts(
         .collect())
 }
 
-/// Posts from people the viewer follows. Returns the same shape as
+/// Posts from people the viewer follows, in public communities or in none.
+/// Returns the same shape as
 /// `find_public_posts` so the timeline renders through the shared feed card,
 /// community label and all.
 pub async fn find_following_posts_by_user_id(
@@ -491,7 +489,7 @@ pub async fn find_following_posts_by_user_id(
             LEFT JOIN actors follower_actor ON follows.follower_actor_id = follower_actor.id
             LEFT JOIN communities ON posts.community_id = communities.id
             WHERE follower_actor.user_id = $1
-            AND communities.visibility = 'public'
+            AND (communities.visibility = 'public' OR posts.community_id IS NULL)
             AND posts.published_at IS NOT NULL
             AND posts.deleted_at IS NULL
             AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $2 = true OR posts.author_id = $1)
