@@ -119,20 +119,27 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
     let squashed = apple.split_whitespace().collect::<Vec<_>>().join(" ");
     assert_eq!(
         apple
-            .matches(r#"class="ds-button ds-button-primary supporter-buy""#)
+            .matches(r#"class="ds-button ds-button-primary supporter-buy ds-marked""#)
             .count(),
         2
     );
-    // Each wears the mark of the store it buys through, and the line under
-    // them names that store: somebody who already has a pack from another
-    // store is told this one is a second, and from where.
-    let apple_mark = r#"<span class="supporter-mark ds-mark" aria-hidden="true">🍎</span>"#;
-    assert!(squashed.contains(&format!(
-        r#"data-product="cafe.oeee.supporter.2026">{apple_mark}supporter-pack-buy(year=2026)<span"#
-    )));
-    assert!(squashed.contains(&format!(
-        r#"data-product="cafe.oeee.supporter.2026.more">{apple_mark}Support twice as much<span"#
-    )));
+    // Each wears the logo of the store it buys through, the one /login's
+    // button for it wears, and the line under them names that store:
+    // somebody who already has a pack from another store is told this one
+    // is a second, and from where.
+    let apple_mark = r#"<svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12.152 6.896"#;
+    for (product, words) in [
+        ("cafe.oeee.supporter.2026", "supporter-pack-buy(year=2026)"),
+        ("cafe.oeee.supporter.2026.more", "Support twice as much"),
+    ] {
+        let button = squashed
+            .split(&format!(r#"data-product="{product}">"#))
+            .nth(1)
+            .unwrap();
+        assert!(button.starts_with(apple_mark), "{product}");
+        assert!(button.contains(&format!("</svg>{words}<span")), "{product}");
+    }
+    assert!(!apple.contains("🍎"));
     assert!(apple.contains(r#"id="supporter-sold-here">supporter-pack-sold-here(store=supporter-store-apple)<"#));
     assert_eq!(apple.matches(r#"aria-describedby="supporter-sold-here""#).count(), 2);
     assert!(apple.contains(r#"class="ds-button supporter-restore""#));
@@ -146,9 +153,9 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
     assert!(apple.contains("window.oeeeChrome.supporter({"));
     assert!(!apple.contains("supporter-pack-none"));
 
-    // On Steam, and in the Microsoft Store: no Restore, which only the
-    // App Store has.
-    for store in ["steam", "microsoft"] {
+    // On Steam, in the Microsoft Store and on Google Play: no Restore,
+    // which only the App Store has.
+    for store in ["steam", "microsoft", "google"] {
         let page = render(
             signed_in.clone(),
             json!(store),
@@ -157,6 +164,14 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
             json!([]),
         );
         assert!(page.contains(r#"data-product="481""#), "{store}");
+        // Each store's own logo, never the emoji mark a supporter wears.
+        let mark = match store {
+            "steam" => r#"data-product="481"><svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 24 24""#,
+            "microsoft" => r#"data-product="481"><svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 23 23""#,
+            _ => r#"data-product="481"><img class="auth-provider-mark" src="/static/signin/google-mark.svg"#,
+        };
+        assert!(page.contains(mark), "{store}");
+        assert!(!page.contains("supporter-mark"), "{store}");
         assert!(
             page.contains(&format!("supporter-pack-sold-here(store=supporter-store-{store})")),
             "{store}"

@@ -3460,6 +3460,13 @@ html[data-store] .supporter-elsewhere {
   gap: var(--ds-space-2);
 }
 
+/* A buy button's store logo (provider_mark) is centred on its words by
+   .ds-marked, so the 1px nudge it takes on an inline-block /login button
+   would only lift it. */
+.supporter-buy > .auth-provider-mark {
+  top: 0;
+}
+
 /* The price the store told the app, after the button's words. Empty until
    it has -- and empty is nothing at all, not a gap. */
 .supporter-price:not(:empty)::before {
