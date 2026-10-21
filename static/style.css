@@ -3346,8 +3346,12 @@ a.mention:hover {
 /* Report, behind the actions' last button. A .toolbar-menu for the
    toolbar's closing script; the square is a .ds-button of its own. */
 .profile-more summary .profile-more-button {
+  display: -webkit-box;
+  display: flex;
   width: var(--ds-control-height);
   padding: 0;
+  -webkit-box-align: center;
+  align-items: center;
   -webkit-box-pack: center;
   justify-content: center;
 }
