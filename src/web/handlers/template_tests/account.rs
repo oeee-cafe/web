@@ -140,8 +140,15 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
         assert!(button.contains(&format!("</svg>{words}<span")), "{product}");
     }
     assert!(!apple.contains("🍎"));
-    assert!(apple.contains(r#"id="supporter-sold-here">supporter-pack-sold-here(store=supporter-store-apple)<"#));
-    assert_eq!(apple.matches(r#"aria-describedby="supporter-sold-here""#).count(), 2);
+    assert!(apple.contains(
+        r#"id="supporter-sold-here">supporter-pack-sold-here(store=supporter-store-apple)<"#
+    ));
+    assert_eq!(
+        apple
+            .matches(r#"aria-describedby="supporter-sold-here""#)
+            .count(),
+        2
+    );
     assert!(apple.contains(r#"class="ds-button supporter-restore""#));
     // Room for the price the app will fill in, keyed by the product it
     // belongs to, and empty until then.
@@ -166,14 +173,22 @@ fn the_supporter_page_offers_what_there_is_to_buy() {
         assert!(page.contains(r#"data-product="481""#), "{store}");
         // Each store's own logo, never the emoji mark a supporter wears.
         let mark = match store {
-            "steam" => r#"data-product="481"><svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 24 24""#,
-            "microsoft" => r#"data-product="481"><svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 23 23""#,
-            _ => r#"data-product="481"><img class="auth-provider-mark" src="/static/signin/google-mark.svg"#,
+            "steam" => {
+                r#"data-product="481"><svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 24 24""#
+            }
+            "microsoft" => {
+                r#"data-product="481"><svg class="auth-provider-mark" width="18" height="18" viewBox="0 0 23 23""#
+            }
+            _ => {
+                r#"data-product="481"><img class="auth-provider-mark" src="/static/signin/google-mark.svg"#
+            }
         };
         assert!(page.contains(mark), "{store}");
         assert!(!page.contains("supporter-mark"), "{store}");
         assert!(
-            page.contains(&format!("supporter-pack-sold-here(store=supporter-store-{store})")),
+            page.contains(&format!(
+                "supporter-pack-sold-here(store=supporter-store-{store})"
+            )),
             "{store}"
         );
         assert!(
@@ -301,7 +316,10 @@ fn the_account_page_asks_what_the_account_can_answer() {
     // before its words, as it does on /login.
     for provider in ["apple", "google", "steam", "discord"] {
         let button = super::provider_button(&with_password, provider);
-        assert!(button.contains("auth-provider-mark"), "{provider} has no logo");
+        assert!(
+            button.contains("auth-provider-mark"),
+            "{provider} has no logo"
+        );
         assert!(button.ends_with(&format!("account-link-{provider}</a>")));
     }
 

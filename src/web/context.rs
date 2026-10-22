@@ -36,8 +36,7 @@ impl CommonContext {
         user: Option<&User>,
         ftl_lang: &str,
     ) -> Result<Self, AppError> {
-        let (draft_post_count, unread_notification_count, current_user_is_supporter) = match user
-        {
+        let (draft_post_count, unread_notification_count, current_user_is_supporter) = match user {
             Some(user) => (
                 get_draft_post_count(tx, user.id).await?,
                 get_badge_count(tx, user.id).await?,

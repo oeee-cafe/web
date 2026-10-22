@@ -47,9 +47,7 @@ fn the_apps_are_given_their_words_in_every_language() {
     // The script that answers them (frontend/site/chrome.ts), and the line
     // that hands sign-in its words.
     assert!(head.contains(r#"<script src="/static/site/chrome.js"></script>"#));
-    assert!(head.contains(
-        r#"window.oeeeChrome.signIn("app-steam-sign-in-failed", "ok");"#
-    ));
+    assert!(head.contains(r#"window.oeeeChrome.signIn("app-steam-sign-in-failed", "ok");"#));
     assert!(head.contains(r#"OeeeCafe((?: (?:platform|store)\/\w+)+)"#));
 }
 

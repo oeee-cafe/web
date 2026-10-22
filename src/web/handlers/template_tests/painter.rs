@@ -292,7 +292,9 @@ fn only_an_account_is_offered_tegaki() {
             .expect("drafts template loads")
             .render(context! { posts => Serde(Vec::<serde_json::Value>::new()), ..chrome })
             .expect("drafts render");
-        let start = rendered.find(r#"id="draw-dialog""#).expect("the size dialog");
+        let start = rendered
+            .find(r#"id="draw-dialog""#)
+            .expect("the size dialog");
         let end = start + rendered[start..].find("</form>").expect("the form closes");
         rendered[start..end].to_string()
     };
@@ -337,7 +339,9 @@ fn the_tegaki_painter_posts_a_tegaki_replay() {
             ..chrome()
         })
         .expect("tegaki painter renders");
-    let nav = rendered.find("<nav class=\"nav-bar\"").expect("the toolbar");
+    let nav = rendered
+        .find("<nav class=\"nav-bar\"")
+        .expect("the toolbar");
     // What it posts, and that leaving with a drawing asks first, is
     // frontend/site/pages/pages.browser.test.ts's; here, what it is handed.
     assert!(nav < rendered.find("window.oeeeChrome.tegakiDraw(").unwrap());
@@ -349,6 +353,9 @@ fn the_tegaki_painter_posts_a_tegaki_replay() {
         "community_id stays one string"
     );
     assert!(rendered.contains("parentPostId: null,"));
-    assert!(rendered.contains(r#""/communities/@open""#), "Cancel goes back to the community");
+    assert!(
+        rendered.contains(r#""/communities/@open""#),
+        "Cancel goes back to the community"
+    );
     assert!(!rendered.contains("parent_post_id"));
 }

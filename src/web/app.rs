@@ -12,14 +12,14 @@ use crate::web::handlers::activitypub::{
 };
 use crate::web::handlers::admin::{
     admin_add_store_product, admin_banners, admin_banners_fragment, admin_collaborative_sessions,
-    admin_communities, admin_community_choices, admin_community_posts, admin_flag_banner, admin_flag_post, admin_set_user_email, admin_overview,
-    admin_post_detail, admin_posts, admin_posts_fragment, admin_set_store_product_details,
-    admin_set_store_product_on_sale, admin_set_store_product_sale_window, admin_store,
-    admin_user_detail, admin_user_posts, admin_users, collaborative_archive_manifest,
-    collaborative_archive_tail, collaborative_session_chat, collaborative_session_details,
-    collaborative_session_reference, download_collaborative_archive,
-    download_collaborative_diagnostics, record_collaborative_session_check,
-    replay_collaborative_session,
+    admin_communities, admin_community_choices, admin_community_posts, admin_flag_banner,
+    admin_flag_post, admin_overview, admin_post_detail, admin_posts, admin_posts_fragment,
+    admin_set_store_product_details, admin_set_store_product_on_sale,
+    admin_set_store_product_sale_window, admin_set_user_email, admin_store, admin_user_detail,
+    admin_user_posts, admin_users, collaborative_archive_manifest, collaborative_archive_tail,
+    collaborative_session_chat, collaborative_session_details, collaborative_session_reference,
+    download_collaborative_archive, download_collaborative_diagnostics,
+    record_collaborative_session_check, replay_collaborative_session,
 };
 use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, require_login, signup};
 use crate::web::handlers::collaborate::{
@@ -276,9 +276,7 @@ impl App {
 
         let auth_layer = AuthManagerLayerBuilder::new(authn_backend, session_layer).build();
 
-        let static_router = static_router(crate::build_info::asset_version(
-            &self.state.config.env,
-        ));
+        let static_router = static_router(crate::build_info::asset_version(&self.state.config.env));
 
         let protected_router = Router::new()
             .route("/following", get(my_timeline))
@@ -387,7 +385,10 @@ impl App {
             .route("/admin/posts/{post_id}/explicit", post(admin_flag_post))
             .route("/admin/users", get(admin_users))
             .route("/admin/users/{login_name}", get(admin_user_detail))
-            .route("/admin/users/{login_name}/email", post(admin_set_user_email))
+            .route(
+                "/admin/users/{login_name}/email",
+                post(admin_set_user_email),
+            )
             .route("/admin/users/{login_name}/posts", get(admin_user_posts))
             .route("/admin/communities", get(admin_communities))
             .route(
@@ -889,13 +890,19 @@ mod tests {
         let release = Some("0123456789ab");
         assert_eq!(
             kept(release, "/static/ds.css?0123456789ab").await,
-            (StatusCode::OK, Some("public, max-age=31536000, immutable".into()))
+            (
+                StatusCode::OK,
+                Some("public, max-age=31536000, immutable".into())
+            )
         );
         assert_eq!(
             kept(release, "/static/ds.css?ba9876543210").await,
             (StatusCode::OK, Some("no-cache".into()))
         );
-        assert_eq!(kept(release, "/static/ds.css").await, (StatusCode::OK, None));
+        assert_eq!(
+            kept(release, "/static/ds.css").await,
+            (StatusCode::OK, None)
+        );
         assert_eq!(
             kept(release, "/static/no-such-file.css?0123456789ab").await,
             (StatusCode::NOT_FOUND, None)
@@ -903,7 +910,10 @@ mod tests {
         // An image as much as a stylesheet: the layer is the whole router's,
         // the bundles' mounts included.
         assert_eq!(
-            kept(release, "/static/favicon.png?0123456789ab").await.1.as_deref(),
+            kept(release, "/static/favicon.png?0123456789ab")
+                .await
+                .1
+                .as_deref(),
             Some("public, max-age=31536000, immutable")
         );
     }

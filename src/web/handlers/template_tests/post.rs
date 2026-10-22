@@ -920,12 +920,19 @@ fn a_comments_reply_names_its_author_as_text_not_script() {
         "{fragment}"
     );
     assert!(
-        fragment.contains(r#"data-replying-to="post-replying-to O&#x27;Neil&#x27;);alert(1)&#x2f;&#x2f;""#),
+        fragment.contains(
+            r#"data-replying-to="post-replying-to O&#x27;Neil&#x27;);alert(1)&#x2f;&#x2f;""#
+        ),
         "{fragment}"
     );
     assert!(!fragment.contains("Replying to"), "{fragment}");
     assert!(!fragment.contains("ds-button-quiet"), "{fragment}");
-    assert_eq!(fragment.matches(r#"class="ds-button ds-button-small"#).count(), 2);
+    assert_eq!(
+        fragment
+            .matches(r#"class="ds-button ds-button-small"#)
+            .count(),
+        2
+    );
 
     // Signed out there is no form to reply with, so no Reply.
     let signed_out = test_support::env()

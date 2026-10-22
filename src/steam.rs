@@ -808,7 +808,10 @@ mod tests {
             openid_url: String::new(),
         };
 
-        let achievements = ["FIRST_DRAWING".to_string(), "FIRST_COLLABORATION".to_string()];
+        let achievements = [
+            "FIRST_DRAWING".to_string(),
+            "FIRST_COLLABORATION".to_string(),
+        ];
         set_achievements(&config, STEAM_ID, &achievements, true)
             .await
             .unwrap();

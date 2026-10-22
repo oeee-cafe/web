@@ -259,11 +259,7 @@ pub async fn hx_do_edit_community(
             // Check if slug changed - if so, redirect entire page to new URL
             if form.slug != original_slug {
                 // Use HTMX redirect to navigate to new slug URL
-                Ok(([(
-                    "HX-Redirect",
-                    format!("/@{}", form.slug).as_str(),
-                )],)
-                    .into_response())
+                Ok(([("HX-Redirect", format!("/@{}", form.slug).as_str())],).into_response())
             } else {
                 // Slug didn't change - return updated content block
                 let template = "community.jinja";
