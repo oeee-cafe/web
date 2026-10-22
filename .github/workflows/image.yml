@@ -30,7 +30,18 @@ env:
   SENTRY_JS_PROJECT: neo-cucumber
 
 jobs:
+  # Unformatted Rust does not ship: a commit cargo fmt would change builds no
+  # image. Seconds, with no database and no compile.
+  format:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup component add rustfmt
+      - run: cargo fmt --check
+
   build:
+    needs: format
     # The server is arm64 too, so this builds natively rather than under QEMU.
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 90

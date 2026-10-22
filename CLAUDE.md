@@ -23,6 +23,10 @@ To federate with a server on the same machine, which the client otherwise
 refuses to reach, add `federation_allow_private_networks = ["127.0.0.0/8",
 "::1/128"]` to `dev.toml`; production leaves it out.
 
+Run `cargo fmt` before committing. A commit it would change builds no image
+(`.github/workflows/image.yml`), and `.githooks/pre-commit` refuses one
+locally once a clone has `git config core.hooksPath .githooks`.
+
 Don't run `cargo sqlx prepare`.
 
 When running cargo commands, use the environment variable `DATABASE_URL=postgresql:///oeee_cafe`.

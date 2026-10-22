@@ -1,0 +1,8 @@
+#!/bin/sh
+# Refuses a commit of Rust that cargo fmt would change; image.yml refuses to
+# build one. Enabled per clone: git config core.hooksPath .githooks
+git diff --cached --name-only --diff-filter=ACMR | grep -q '\.rs$' || exit 0
+if ! cargo fmt --check >/dev/null 2>&1; then
+  echo "cargo fmt would change this tree: run cargo fmt, then commit again." >&2
+  exit 1
+fi
