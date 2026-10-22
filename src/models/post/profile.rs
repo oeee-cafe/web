@@ -72,10 +72,27 @@ pub async fn find_published_public_posts_by_author_id(
 /// Which of a person's drawings a profile tab shows: those anyone can see --
 /// outside any community, or in a public one -- or those only they see on
 /// their own profile, in communities that are unlisted or private.
+///
+/// `Shared` is the private tab as somebody else sees it: the drawings in
+/// private communities that viewer and artist are both members of now, which
+/// the viewer could already find on each community's page. Never an
+/// unlisted community's: unlisted lets any account in, and what it promises
+/// is not being listed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProfileDrawings {
     Public,
     Private,
+    Shared,
+}
+
+impl ProfileDrawings {
+    fn key(self) -> &'static str {
+        match self {
+            ProfileDrawings::Public => "public",
+            ProfileDrawings::Private => "private",
+            ProfileDrawings::Shared => "shared",
+        }
+    }
 }
 
 /// A batch of a person's published drawings for a profile tab, newest
@@ -91,7 +108,6 @@ pub async fn find_profile_posts(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<SerializablePostForHome>> {
-    let private = which == ProfileDrawings::Private;
     let result = query!(
         "
             SELECT
@@ -120,8 +136,14 @@ pub async fn find_profile_posts(
             WHERE posts.author_id = $1
             AND posts.published_at IS NOT NULL
             AND posts.deleted_at IS NULL
-            AND (CASE WHEN $2
-                THEN posts.community_id IS NOT NULL AND communities.visibility <> 'public'
+            AND (CASE $2::text
+                WHEN 'private' THEN posts.community_id IS NOT NULL AND communities.visibility <> 'public'
+                WHEN 'shared' THEN communities.visibility = 'private'
+                    AND communities.deleted_at IS NULL
+                    AND EXISTS (SELECT 1 FROM community_members m
+                        WHERE m.community_id = posts.community_id AND m.user_id = $4)
+                    AND EXISTS (SELECT 1 FROM community_members m
+                        WHERE m.community_id = posts.community_id AND m.user_id = posts.author_id)
                 ELSE posts.community_id IS NULL OR communities.visibility = 'public'
             END)
             AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $3 = true OR posts.author_id = $4)
@@ -129,7 +151,7 @@ pub async fn find_profile_posts(
             LIMIT $5 OFFSET $6
         ",
         author_id,
-        private,
+        which.key(),
         viewer_show_sensitive,
         viewer_user_id,
         limit,
@@ -171,7 +193,6 @@ pub async fn count_profile_posts(
     viewer_user_id: Option<Uuid>,
     viewer_show_sensitive: bool,
 ) -> Result<i64> {
-    let private = which == ProfileDrawings::Private;
     let count = sqlx::query_scalar!(
         r#"
             SELECT COUNT(*) AS "count!"
@@ -181,14 +202,20 @@ pub async fn count_profile_posts(
             WHERE posts.author_id = $1
             AND posts.published_at IS NOT NULL
             AND posts.deleted_at IS NULL
-            AND (CASE WHEN $2
-                THEN posts.community_id IS NOT NULL AND communities.visibility <> 'public'
+            AND (CASE $2::text
+                WHEN 'private' THEN posts.community_id IS NOT NULL AND communities.visibility <> 'public'
+                WHEN 'shared' THEN communities.visibility = 'private'
+                    AND communities.deleted_at IS NULL
+                    AND EXISTS (SELECT 1 FROM community_members m
+                        WHERE m.community_id = posts.community_id AND m.user_id = $4)
+                    AND EXISTS (SELECT 1 FROM community_members m
+                        WHERE m.community_id = posts.community_id AND m.user_id = posts.author_id)
                 ELSE posts.community_id IS NULL OR communities.visibility = 'public'
             END)
             AND ((posts.is_sensitive = false AND posts.is_explicit = false) OR $3 = true OR posts.author_id = $4)
         "#,
         author_id,
-        private,
+        which.key(),
         viewer_show_sensitive,
         viewer_user_id
     )
@@ -304,6 +331,145 @@ mod tests {
                 current: 3,
                 longest: 3
             }
+        );
+    }
+}
+
+#[cfg(test)]
+mod shared_tests {
+    use super::{count_profile_posts, find_profile_posts, ProfileDrawings};
+    use sqlx::{Postgres, Transaction};
+    use uuid::Uuid;
+
+    async fn tx() -> Option<Transaction<'static, Postgres>> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        let pool = sqlx::PgPool::connect(&url).await.ok()?;
+        pool.begin().await.ok()
+    }
+
+    /// Of an artist's drawings, a visitor's tab holds only those in a
+    /// private community both of them are in now: not one only the artist
+    /// is in, not one the artist has left, not an unlisted one they share.
+    #[tokio::test]
+    async fn a_visitor_sees_only_the_private_communities_they_share() {
+        let Some(mut tx) = tx().await else { return };
+        let tag = Uuid::new_v4().simple().to_string()[..12].to_string();
+        let mut users = Vec::new();
+        for who in ["artist", "visitor", "stranger"] {
+            users.push(
+                sqlx::query_scalar!(
+                    "INSERT INTO users (login_name, display_name) VALUES ($1, $1) RETURNING id",
+                    format!("{who}_{tag}")
+                )
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap(),
+            );
+        }
+        let (artist, visitor, stranger) = (users[0], users[1], users[2]);
+
+        // Each community, its visibility, and who is a member of it.
+        let communities = [
+            ("shared", "private", vec![artist, visitor]),
+            ("theirs", "private", vec![artist]),
+            ("left", "private", vec![visitor]),
+            ("unlisted", "unlisted", vec![artist, visitor]),
+        ];
+        for (kind, visibility, members) in communities {
+            let slug = format!("{kind}_{tag}");
+            let community = sqlx::query_scalar!(
+                r#"INSERT INTO communities (owner_id, name, description, visibility, slug)
+                   VALUES ($1, $2, '', $3::text::community_visibility, $2)
+                   RETURNING id"#,
+                artist,
+                slug,
+                visibility
+            )
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+            for member in members {
+                sqlx::query!(
+                    "INSERT INTO community_members (community_id, user_id) VALUES ($1, $2)",
+                    community,
+                    member
+                )
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+            }
+            let image = sqlx::query_scalar!(
+                r#"INSERT INTO images (width, height, paint_duration, stroke_count, image_filename, tool)
+                   VALUES (10, 10, '0'::interval, 0, $1, 'neo')
+                   RETURNING id"#,
+                format!("{slug}.png")
+            )
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+            sqlx::query!(
+                r#"INSERT INTO posts (author_id, image_id, community_id, title, published_at)
+                   VALUES ($1, $2, $3, $4, now())"#,
+                artist,
+                image,
+                community,
+                kind
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+
+        let titles = |posts: Vec<crate::models::post::SerializablePostForHome>| {
+            posts
+                .into_iter()
+                .filter_map(|p| p.title)
+                .collect::<Vec<_>>()
+        };
+        let shared = find_profile_posts(
+            &mut tx,
+            artist,
+            ProfileDrawings::Shared,
+            Some(visitor),
+            false,
+            10,
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(titles(shared), ["shared"]);
+        assert_eq!(
+            count_profile_posts(
+                &mut tx,
+                artist,
+                ProfileDrawings::Shared,
+                Some(visitor),
+                false
+            )
+            .await
+            .unwrap(),
+            1
+        );
+        for viewer in [Some(stranger), None] {
+            assert_eq!(
+                count_profile_posts(&mut tx, artist, ProfileDrawings::Shared, viewer, false)
+                    .await
+                    .unwrap(),
+                0
+            );
+        }
+        // The artist's own tab is still all four.
+        assert_eq!(
+            count_profile_posts(
+                &mut tx,
+                artist,
+                ProfileDrawings::Private,
+                Some(artist),
+                false
+            )
+            .await
+            .unwrap(),
+            4
         );
     }
 }

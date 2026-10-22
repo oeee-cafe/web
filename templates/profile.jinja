@@ -180,37 +180,40 @@
     <section class="profile-section">
       {# One switch, one grid. Everyone sees their drawings and, when there
          are any, what they have said; on their own profile the drawings are
-         split in two -- what everyone sees, and what only they do. With
-         nothing to switch between, the one grid is simply named.
+         split in two -- what everyone sees, and what only they do. Somebody
+         signed in who shares a private community with them gets the second
+         tab too, holding that community's drawings (ProfileDrawings::Shared).
+         With nothing to switch between, the one grid is simply named.
 
          Each tab is a link to its own address -- /@name, /@name/comments,
          /@name/private -- and `tab` is the one the address asked for, so a
          tab can be shared, reloaded and gone back to. A plain click is
          taken here and switches in place, pushing the address as it goes. #}
       {% set tab = tab or "public" %}
-      {% set tab_count = 1 + (1 if is_owner else 0) + (1 if comment_count else 0) %}
+      {% set has_private_tab = is_owner or private_count %}
+      {% set tab_count = 1 + (1 if has_private_tab else 0) + (1 if comment_count else 0) %}
       <div class="grid-header">
         {% if tab_count > 1 %}
           <div class="profile-tabs-bar">
             <nav class="ds-segmented profile-tabs" aria-label="{{ ftl_get_message('profile-tabs-label') }}">
               <a href="/@{{ user.login_name }}" data-profile-tab="public"{% if tab == "public" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-public" if is_owner else "profile-tab-drawings") }}<span class="profile-tab-count">{{ public_count }}</span></a>
-              {% if is_owner %}
-                <a href="/@{{ user.login_name }}/private" data-profile-tab="private"{% if tab == "private" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-private") }}<span class="profile-tab-count">{{ private_count }}</span></a>
+              {% if has_private_tab %}
+                <a href="/@{{ user.login_name }}/private" data-profile-tab="private"{% if tab == "private" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-private" if is_owner else "profile-tab-shared") }}<span class="profile-tab-count">{{ private_count }}</span></a>
               {% endif %}
               {% if comment_count %}
                 <a href="/@{{ user.login_name }}/comments" data-profile-tab="comments"{% if tab == "comments" %} aria-current="page"{% endif %}>{{ ftl_get_message("profile-tab-comments") }}<span class="profile-tab-count">{{ comment_count }}</span></a>
               {% endif %}
             </nav>
-            {% if is_owner %}
+            {% if has_private_tab %}
               {# Beside the switch, and only while it is on the private
                  drawings: what that tab means, where it is chosen. #}
-              <p class="profile-panel-note" data-profile-note="private"{% if tab != "private" %} hidden{% endif %}>{{ ftl_get_message("profile-private-community-posts-note") }}</p>
+              <p class="profile-panel-note" data-profile-note="private"{% if tab != "private" %} hidden{% endif %}>{{ ftl_get_message("profile-private-community-posts-note" if is_owner else "profile-shared-community-posts-note") }}</p>
             {% endif %}
           </div>
         {% else %}
           <div class="profile-section-label">{{ ftl_get_message("profile-tab-drawings") }}</div>
         {% endif %}
-        {% if public_count or is_owner %}<div data-profile-per-row{% if tab == "comments" %} hidden{% endif %}>{{ per_row() }}</div>{% endif %}
+        {% if public_count or has_private_tab %}<div data-profile-per-row{% if tab == "comments" %} hidden{% endif %}>{{ per_row() }}</div>{% endif %}
       </div>
       {# Their drawings in the feeds' own grid and cards: the same
          sensitive blur, captions and Per row, headed by month, and loading
@@ -226,7 +229,7 @@
           <p class="profile-empty">{{ ftl_get_message("profile-public-community-posts-nil") }}</p>
         {% endif %}
       </div>
-      {% if is_owner %}
+      {% if has_private_tab %}
         <div class="profile-drawings" data-profile-panel="private"{% if tab != "private" %} hidden{% endif %}>
           {% if private_feed.posts %}
             <div class="posts-grid">

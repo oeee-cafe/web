@@ -210,12 +210,16 @@ async fn comments_batch(
 fn profile_posts_path(login_name: &str, which: ProfileDrawings) -> String {
     match which {
         ProfileDrawings::Public => format!("/api/profiles/@{login_name}/posts"),
-        ProfileDrawings::Private => format!("/api/profiles/@{login_name}/private/posts"),
+        ProfileDrawings::Private | ProfileDrawings::Shared => {
+            format!("/api/profiles/@{login_name}/private/posts")
+        }
     }
 }
 
 /// The next batch of a profile tab's drawings and the sentinel for the one
-/// after. The private tab is its owner's alone, here as on the page.
+/// after. The private tab is everything to its owner and, to anyone else
+/// signed in, what is in the private communities they share
+/// (`ProfileDrawings::Shared`), here as on the page.
 async fn profile_posts_batch(
     which: ProfileDrawings,
     auth_session: AuthSession,
@@ -229,9 +233,11 @@ async fn profile_posts_batch(
         .await?
         .ok_or_else(|| AppError::NotFound("User".to_string()))?;
     let viewer_id = auth_session.user.as_ref().map(|u| u.id);
-    if which == ProfileDrawings::Private && viewer_id != Some(user.id) {
-        return Err(AppError::Forbidden);
-    }
+    let which = match which {
+        ProfileDrawings::Private if viewer_id.is_none() => return Err(AppError::Forbidden),
+        ProfileDrawings::Private if viewer_id != Some(user.id) => ProfileDrawings::Shared,
+        which => which,
+    };
     let posts = find_profile_posts(
         &mut tx,
         user.id,
@@ -322,9 +328,10 @@ impl ProfileTab {
 }
 
 /// A person's profile, showing `tab`. A tab that is not there to show --
-/// someone else's private drawings, the comments of someone who has said
-/// nothing -- sends the address back to the profile itself, so no link
-/// lands on a switch with nothing chosen.
+/// someone else's private drawings when no private community has both of
+/// them in it, the comments of someone who has said nothing -- sends the
+/// address back to the profile itself, so no link lands on a switch with
+/// nothing chosen.
 async fn render_profile(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     state: &AppState,
@@ -333,8 +340,26 @@ async fn render_profile(
     user: User,
     tab: ProfileTab,
 ) -> Result<axum::response::Response, AppError> {
-    let is_owner = auth_session.user.as_ref().map(|u| u.id) == Some(user.id);
-    if tab == ProfileTab::Private && !is_owner {
+    let viewer_id = auth_session.user.as_ref().map(|u| u.id);
+    let show_sensitive = auth_session
+        .user
+        .as_ref()
+        .is_some_and(|u| u.show_sensitive_content);
+    // The private tab: all of it to its owner, and to anyone else signed in,
+    // what is in the private communities they share.
+    let private_which = match viewer_id {
+        Some(id) if id == user.id => Some(ProfileDrawings::Private),
+        Some(_) => Some(ProfileDrawings::Shared),
+        None => None,
+    };
+    let private_count = match private_which {
+        Some(which) => count_profile_posts(tx, user.id, which, viewer_id, show_sensitive).await?,
+        None => 0,
+    };
+    if tab == ProfileTab::Private
+        && private_which != Some(ProfileDrawings::Private)
+        && private_count == 0
+    {
         return Ok(Redirect::to(&format!("/@{}", user.login_name)).into_response());
     }
 
@@ -345,12 +370,7 @@ async fn render_profile(
 
     // Their drawings in the feeds' own grid (post_feed_fragment.jinja): a
     // batch a tab, each loading on from its own endpoint, headed by month,
-    // counted over the same filter. Only they see the private tab.
-    let viewer_id = auth_session.user.as_ref().map(|u| u.id);
-    let show_sensitive = auth_session
-        .user
-        .as_ref()
-        .is_some_and(|u| u.show_sensitive_content);
+    // counted over the same filter.
     let public_count = count_profile_posts(
         tx,
         user.id,
@@ -369,28 +389,20 @@ async fn render_profile(
         0,
     )
     .await?;
-    let (private_count, private_posts) = if is_owner {
-        let count = count_profile_posts(
-            tx,
-            user.id,
-            ProfileDrawings::Private,
-            viewer_id,
-            show_sensitive,
-        )
-        .await?;
-        let posts = find_profile_posts(
-            tx,
-            user.id,
-            ProfileDrawings::Private,
-            viewer_id,
-            show_sensitive,
-            HOME_POSTS_PER_BATCH,
-            0,
-        )
-        .await?;
-        (count, posts)
-    } else {
-        (0, Vec::new())
+    let private_posts = match private_which {
+        Some(which) if private_count > 0 => {
+            find_profile_posts(
+                tx,
+                user.id,
+                which,
+                viewer_id,
+                show_sensitive,
+                HOME_POSTS_PER_BATCH,
+                0,
+            )
+            .await?
+        }
+        _ => Vec::new(),
     };
 
     let common_ctx = CommonContext::build(tx, auth_session.user.as_ref(), &ftl_lang).await?;
@@ -515,8 +527,9 @@ pub async fn profile_comments(
     Ok(Html(rendered).into_response())
 }
 
-/// GET /@{login_name}/private -- their own profile with the drawings only
-/// they see showing.
+/// GET /@{login_name}/private -- the profile with its private tab showing:
+/// to its owner, the drawings only they see; to somebody else signed in,
+/// those in the private communities they share.
 pub async fn profile_private(
     auth_session: AuthSession,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,

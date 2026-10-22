@@ -144,6 +144,59 @@ fn a_profiles_drawings_are_the_shared_grid() {
     )));
 }
 
+/// Somebody else signed in gets the private tab only when a private
+/// community has both of them in it, named for what it holds rather than
+/// as the owner's "Private"; with none, there is nothing to switch to.
+#[test]
+fn a_visitor_sees_the_private_tab_only_for_communities_they_share() {
+    let empty = || json!({"posts": [], "headings": [], "has_more": false, "next_url": ""});
+    let render = |private_count: i64| {
+        test_support::env()
+            .get_template("profile.jinja")
+            .expect("profile loads")
+            .render(context! {
+                current_user => Serde(json!({
+                    "id": "u2",
+                    "login_name": "visitor",
+                    "display_name": "visitor",
+                    "created_at": "2026-09-22T00:00:00Z",
+                    "show_sensitive_content": false,
+                    "role": "user",
+                })),
+                user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이", "created_at": "2024-03-05T12:00:00Z"})),
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(Vec::<serde_json::Value>::new()),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
+                comments => Serde(json!({"rows": [], "next_url": null, "by_drawing": true})),
+                comment_count => 0,
+                public_count => 3,
+                public_feed => Serde(empty()),
+                private_count,
+                private_feed => Serde(empty()),
+                domain => "oeee.cafe",
+                is_following => false,
+                tab => "public",
+                ..chrome()
+            })
+            .expect("profile renders")
+    };
+
+    let sharing = render(2);
+    assert!(
+        sharing.contains(r#"data-profile-tab="private""#),
+        "{sharing}"
+    );
+    assert!(sharing.contains("profile-tab-shared"), "{sharing}");
+    assert!(!sharing.contains(">profile-tab-private<"), "{sharing}");
+    assert!(sharing.contains("profile-shared-community-posts-note"));
+    assert!(sharing.contains(r#"data-profile-panel="private""#));
+
+    let not_sharing = render(0);
+    assert!(!not_sharing.contains(r#"data-profile-tab="private""#));
+    assert!(!not_sharing.contains(r#"data-profile-panel="private""#));
+}
+
 /// What they have said gets its own tab, counted in full, a row per
 /// comment leading to the drawing it is on, and a sentinel that scrolls
 /// in the next batch while there is one; someone who has said nothing

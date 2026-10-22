@@ -701,10 +701,12 @@ account-supporter-see-credits = See the supporters
 profile-tabs-label = Drawings
 profile-tab-public = Public
 profile-tab-private = Private
+profile-tab-shared = In common
 profile-tab-drawings = Drawings
 profile-tab-comments = Comments
 profile-more = More
-profile-private-community-posts-note = Drawings from private communities are not shown on your public profile.
+profile-private-community-posts-note = Drawings from private communities are not shown on your public profile. Members of a private community you are in see its drawings here.
+profile-shared-community-posts-note = Drawings from private communities you are both in. Only their members see these.
 profile-member-since = Member since { $month ->
         [1] January
         [2] February
