@@ -705,8 +705,8 @@ profile-tab-shared = In common
 profile-tab-drawings = Drawings
 profile-tab-comments = Comments
 profile-more = More
-profile-private-community-posts-note = Drawings from private communities are not shown on your public profile. Members of a private community you are in see its drawings here.
-profile-shared-community-posts-note = Drawings from private communities you are both in. Only their members see these.
+profile-private-community-posts-note = Drawings from private and unlisted communities are not shown on your public profile. Members of a private community you are in, and people who have drawn in an unlisted one you have, see that community's drawings here.
+profile-shared-community-posts-note = Drawings from private communities you are both in, and unlisted communities you have both drawn in. Nobody else sees them here.
 profile-member-since = Member since { $month ->
         [1] January
         [2] February
