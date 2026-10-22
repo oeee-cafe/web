@@ -1166,7 +1166,8 @@ fn renders_user_detail() {
         })
         .expect("user_detail.jinja renders");
     assert!(
-        rendered.contains(r#"<h1 class="admin-title">Fan &lt;3 <span class="ds-handle">@fan</span>"#),
+        rendered
+            .contains(r#"<h1 class="admin-title">Fan &lt;3 <span class="ds-handle">@fan</span>"#),
         "{rendered}"
     );
     assert!(rendered.contains("Fan &lt;3"), "{rendered}");
@@ -1181,4 +1182,86 @@ fn renders_user_detail() {
     );
     assert!(rendered.contains("2026-10-12"), "{rendered}");
     assert!(rendered.contains("abcdef01…789xyz"), "{rendered}");
+    assert!(
+        rendered.contains(r#"hx-post="/admin/users/fan/email""#),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(r#"value="fan@example.test""#),
+        "{rendered}"
+    );
+}
+
+/// The email panel as its endpoint answers: a refusal keeps what was typed
+/// in the field and says why, and a deleted account offers no form.
+#[test]
+fn renders_user_email_panel() {
+    use crate::models::admin::AdminUserDetail;
+    use crate::models::user::UserRole;
+    use chrono::{TimeZone, Utc};
+    use uuid::Uuid;
+
+    let at = Utc.with_ymd_and_hms(2026, 10, 12, 3, 4, 5).unwrap();
+    let user = |deleted: bool| AdminUserDetail {
+        id: Uuid::nil(),
+        login_name: "fan".to_string(),
+        display_name: "Fan".to_string(),
+        email: None,
+        email_verified_at: None,
+        has_password: true,
+        role: UserRole::User,
+        preferred_language: None,
+        show_sensitive_content: false,
+        show_in_credits: true,
+        supporter_mark: None,
+        created_at: at,
+        updated_at: at,
+        deleted_at: deleted.then_some(at),
+        published_count: 0,
+        draft_count: 0,
+        deleted_count: 0,
+        comment_count: 0,
+        pickles_received: 0,
+        last_active_at: None,
+    };
+    let env = test_env();
+    let template = env
+        .get_template("admin/user_email_panel.jinja")
+        .expect("template loads");
+
+    let refused = template
+        .render(context! {
+            user => Serde(user(false)),
+            email => Some("taken@example.test"),
+            saved => false,
+            error => Some("@other already has that address."),
+        })
+        .expect("user_email_panel.jinja renders");
+    assert!(
+        refused.contains(r#"value="taken@example.test""#),
+        "{refused}"
+    );
+    assert!(
+        refused.contains("@other already has that address."),
+        "{refused}"
+    );
+    assert!(refused.contains("no email"), "{refused}");
+    assert!(!refused.contains(">saved<"), "{refused}");
+
+    let saved = template
+        .render(context! {
+            user => Serde(user(false)),
+            email => None::<&str>,
+            saved => true,
+            error => None::<String>,
+        })
+        .expect("user_email_panel.jinja renders");
+    assert!(saved.contains(">saved<"), "{saved}");
+    assert!(saved.contains(r#"value="""#), "{saved}");
+    assert!(!saved.contains("none"), "{saved}");
+
+    let deleted = template
+        .render(context! { user => Serde(user(true)) })
+        .expect("user_email_panel.jinja renders");
+    assert!(!deleted.contains("<form"), "{deleted}");
 }

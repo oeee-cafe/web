@@ -17,6 +17,8 @@ mod sessions;
 pub use sessions::*;
 mod store;
 pub use store::*;
+mod users;
+pub use users::*;
 
 #[cfg(test)]
 mod tests;

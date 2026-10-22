@@ -1,0 +1,43 @@
+{# The account's address, and staff setting it. Rendered inside
+   user_detail.jinja and returned standalone by the email endpoint
+   (handlers/admin/users.rs), which swaps it via hx-swap="outerHTML". #}
+<section id="user-email-panel" class="ds-card ds-stack">
+  <p>
+    {% if user.email %}
+      {{ user.email }}
+      {% if user.email_verified_at %}
+        <span class="muted">· verified {{ user.email_verified_at|datetimeformat(format="short", tz="Asia/Seoul") }}</span>
+      {% else %}
+        <span class="muted">· not verified</span>
+      {% endif %}
+    {% else %}
+      <span class="muted">no email</span>
+    {% endif %}
+  </p>
+  {% if error %}<p class="admin-tag deleted">{{ error }}</p>{% endif %}
+  {% if saved %}<p class="admin-tag ok">saved</p>{% endif %}
+  {% if not user.deleted_at %}
+  <form class="admin-filters"
+        hx-post="/admin/users/{{ user.login_name }}/email"
+        hx-target="#user-email-panel"
+        hx-swap="outerHTML"
+        hx-disable="find button">
+    <input class="ds-input"
+           type="email"
+           name="email"
+           value="{{ email or user.email or '' }}"
+           placeholder="empty takes it off"
+           aria-label="Email" />
+    <label class="admin-check">
+      <input type="checkbox" name="verified" value="true" checked />
+      Mark verified
+    </label>
+    <button type="submit" class="ds-button">Set email</button>
+  </form>
+  <p class="ds-help">
+    Sent no code and not asked of the owner. A verified address is where a
+    password reset goes, and a Google, Apple or Discord sign-in with the same
+    address finds this account.
+  </p>
+  {% endif %}
+</section>

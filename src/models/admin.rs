@@ -1381,6 +1381,51 @@ pub async fn find_user_detail(
     Ok(row.fetch_optional(&mut **tx).await?)
 }
 
+/// Staff setting an account's address over the owner's head, without the
+/// code the account page mails. `None` takes the address off. `verified`
+/// stamps it verified now, which is what lets a password reset go to it and
+/// a sign-in with the same address find the account
+/// (`identity::find_user_by_verified_email`); otherwise it is left unverified
+/// for the owner to confirm. An address another account holds, in any case,
+/// is refused with that account's name rather than left to the unique index.
+pub async fn set_user_email(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    email: Option<&str>,
+    verified: bool,
+) -> Result<Result<(), String>> {
+    if let Some(email) = email {
+        let holder = query!(
+            r#"
+            SELECT login_name FROM users
+            WHERE lower(email) = lower($1) AND id <> $2
+            "#,
+            email,
+            user_id,
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if let Some(holder) = holder {
+            return Ok(Err(holder.login_name));
+        }
+    }
+    query!(
+        r#"
+        UPDATE users
+        SET email = $2::varchar,
+            email_verified_at = CASE WHEN $2::varchar IS NOT NULL AND $3 THEN now() END,
+            updated_at = now()
+        WHERE id = $1
+        "#,
+        user_id,
+        email,
+        verified,
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(Ok(()))
+}
+
 /// A sign-in the account has linked: Steam, Apple, Google, Discord.
 #[derive(Clone, Debug, Serialize)]
 pub struct AdminUserIdentity {

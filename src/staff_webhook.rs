@@ -220,6 +220,14 @@ pub enum Event {
         by: String,
         explicit: bool,
     },
+    /// Staff set or took off an account's address from its admin page. The
+    /// address itself stays out of the channel.
+    EmailSet {
+        login_name: String,
+        by: String,
+        removed: bool,
+        verified: bool,
+    },
 }
 
 impl Event {
@@ -324,6 +332,23 @@ impl Event {
                     "took the explicit mark off"
                 },
             ),
+            Event::EmailSet {
+                login_name,
+                by,
+                removed,
+                verified,
+            } => {
+                let whose = account(base, login_name);
+                format!(
+                    "✉️ {} {}",
+                    account(base, by),
+                    match (removed, verified) {
+                        (true, _) => format!("took {whose}'s email off"),
+                        (false, true) => format!("set {whose}'s email, verified"),
+                        (false, false) => format!("set {whose}'s email, unverified"),
+                    },
+                )
+            }
         }
     }
 }
@@ -447,6 +472,21 @@ mod tests {
         assert_eq!(
             line,
             "💖 [@oi](https://oeee.cafe/admin/users/oi) bought the 2026 Supporter Pack on Google Play (supporter\\_2026)"
+        );
+    }
+
+    #[test]
+    fn a_set_email_names_both_accounts_and_not_the_address() {
+        let line = Event::EmailSet {
+            login_name: "fan".to_string(),
+            by: "oi".to_string(),
+            removed: false,
+            verified: true,
+        }
+        .line(BASE);
+        assert_eq!(
+            line,
+            "✉️ [@oi](https://oeee.cafe/admin/users/oi) set [@fan](https://oeee.cafe/admin/users/fan)'s email, verified"
         );
     }
 

@@ -26,17 +26,6 @@
       <table>
         <tr><th scope="row">User ID</th><td><code>{{ user.id }}</code></td></tr>
         <tr><th scope="row">Display name</th><td>{{ user.display_name }}</td></tr>
-        <tr>
-          <th scope="row">Email</th>
-          <td>
-            {% if user.email %}
-              {{ user.email }}
-              {% if user.email_verified_at %}<span class="muted">· verified {{ when(user.email_verified_at) }}</span>{% else %}<span class="muted">· not verified</span>{% endif %}
-            {% else %}
-              <span class="muted">none</span>
-            {% endif %}
-          </td>
-        </tr>
         <tr><th scope="row">Password</th><td>{% if user.has_password %}set{% else %}<span class="muted">none</span>{% endif %}</td></tr>
         <tr><th scope="row">Language</th><td>{{ user.preferred_language or "from the browser" }}</td></tr>
         <tr><th scope="row">Shows sensitive</th><td>{{ "yes" if user.show_sensitive_content else "no" }}</td></tr>
@@ -53,6 +42,11 @@
         <tr><th scope="row">Pickles received</th><td>{{ user.pickles_received }}</td></tr>
       </table>
     </div>
+  </section>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Email</h2>
+    {% include "admin/user_email_panel.jinja" %}
   </section>
 
   <section class="admin-section">
