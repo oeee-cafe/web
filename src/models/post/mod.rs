@@ -122,6 +122,8 @@ pub struct SerializableDraftPost {
     pub image_width: i32,
     pub image_height: i32,
     pub updated_at: DateTime<Utc>,
+    /// Whether it can be drawn on again (`is_continuable`).
+    pub continuable: bool,
 }
 
 // Minimal structs for post thumbnails (grid/list views)

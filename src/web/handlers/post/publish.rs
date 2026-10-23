@@ -8,7 +8,9 @@ use crate::models::notification::{
     create_notification, get_badge_count, get_notification_by_id, push_post_to_followers,
     send_push_for_notification, CreateNotificationParams, NotificationType,
 };
-use crate::models::post::{find_draft_posts_by_author_id, find_post_by_id, publish_post};
+use crate::models::post::{
+    find_draft_posts_by_author_id, find_post_by_id, is_continuable, publish_post,
+};
 use crate::models::tag::set_post_tags;
 use crate::models::user::AuthSession;
 use crate::web::context::CommonContext;
@@ -77,6 +79,13 @@ pub async fn post_publish_form(
         None
     };
 
+    let continuable = is_continuable(
+        post.get("image_tool")
+            .and_then(|tool| tool.as_deref())
+            .unwrap_or(""),
+        post.get("replay_filename").and_then(|name| name.as_deref()),
+    );
+
     let rendered = state
         .render_page(
             "post_form.jinja",
@@ -84,6 +93,7 @@ pub async fn post_publish_form(
             context! {
                 post_id => id,
                 link,
+                continuable,
                 post => {
                     post
                 },

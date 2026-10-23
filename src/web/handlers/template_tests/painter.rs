@@ -359,3 +359,117 @@ fn the_tegaki_painter_posts_a_tegaki_replay() {
     );
     assert!(!rendered.contains("parent_post_id"));
 }
+
+/// A draft this site's painter recorded can be drawn on again, from the
+/// drafts and from its publish page; one it cannot read back -- Tegaki's, an
+/// applet's -- offers no such thing.
+#[test]
+fn a_draft_is_continued_from_the_drafts_and_its_publish_page() {
+    let env = test_support::env();
+    let signed_in = context! {
+        current_user => Serde(json!({
+            "id": "00000000-0000-0000-0000-000000000001",
+            "login_name": "someone",
+            "display_name": "Someone",
+        })),
+        messages => Serde(Vec::<serde_json::Value>::new()),
+        draft_post_count => 2,
+        unread_notification_count => 0,
+        ftl_lang => "en",
+    };
+    // Shaped as `SerializableDraftPost` serialises.
+    let draft = |id: &str, continuable: bool| {
+        json!({
+            "id": id,
+            "title": null,
+            "content": null,
+            "community_id": null,
+            "community_name": null,
+            "image_filename": "abcdef0123.png",
+            "image_width": 300,
+            "image_height": 300,
+            "updated_at": "2026-10-20T10:00:00Z",
+            "continuable": continuable,
+        })
+    };
+    let drafts = env
+        .get_template("draft_posts.jinja")
+        .expect("drafts template loads")
+        .render(context! {
+            posts => Serde(vec![
+                draft("11111111-1111-1111-1111-111111111111", true),
+                draft("22222222-2222-2222-2222-222222222222", false),
+            ]),
+            r2_public_endpoint_url => "https://r2.example",
+            ..signed_in.clone()
+        })
+        .expect("drafts render");
+    assert!(drafts.contains(r#"href="/posts/11111111-1111-1111-1111-111111111111/continue""#));
+    assert!(!drafts.contains("/posts/22222222-2222-2222-2222-222222222222/continue"));
+    // And for the drawings only this browser has, which its script lists.
+    assert_eq!(
+        json_script(&drafts, "local-drafts-words")["continue"],
+        "draft-continue"
+    );
+
+    let publish = |continuable: bool| {
+        env.get_template("post_form.jinja")
+            .expect("publish template loads")
+            .render(context! {
+                post_id => "11111111-1111-1111-1111-111111111111",
+                link => Serde(json!(null)),
+                continuable,
+                post => Serde(json!({
+                    "id": "11111111-1111-1111-1111-111111111111",
+                    "image_width": "300",
+                    "image_height": "300",
+                    "image_filename": "abcdef0123.png",
+                    "created_at": "2026-10-20 19:00",
+                    "paint_duration": "5m",
+                })),
+                r2_public_endpoint_url => "https://r2.example",
+                ..signed_in.clone()
+            })
+            .expect("publish page renders")
+    };
+    assert!(
+        publish(true).contains(r#"href="/posts/11111111-1111-1111-1111-111111111111/continue""#)
+    );
+    assert!(!publish(false).contains("/continue"));
+}
+
+/// What the painter is told when it opens a drawing to carry on with: the
+/// page hands it over as it is, and the words for a drawing that will not
+/// open are among the painter's own.
+#[test]
+fn a_continued_drawing_reaches_the_painter() {
+    let env = test_support::env();
+    let config = json!({
+        "width": 300,
+        "height": 300,
+        "mode": { "kind": "standard" },
+        "resume": {
+            "postId": "11111111-1111-1111-1111-111111111111",
+            "replayUrl": "https://r2.example/replay/ab/abcdef.pch",
+            "paintDurationMs": 90000,
+        },
+    });
+    let rendered = env
+        .get_template("draw_post_cucumber.jinja")
+        .expect("painter template loads")
+        .render(context! {
+            width => 300,
+            height => 300,
+            painter_config => serde_json::to_string(&config).unwrap(),
+            ..chrome()
+        })
+        .expect("painter renders");
+    assert_eq!(
+        json_script(&rendered, "neo-cucumber-config")["resume"],
+        config["resume"]
+    );
+    assert_eq!(
+        json_script(&rendered, "oeee-painter-words")["resumeFailed"],
+        "draw-resume-failed"
+    );
+}

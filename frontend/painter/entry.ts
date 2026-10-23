@@ -13,6 +13,7 @@ import { say } from "../shared/siteDialog";
 import {
   blobToArrayBuffer,
   deleteLocalDraft,
+  getLocalDraft,
   GUEST_OWNER,
   newDraftId,
   putLocalDraft,
@@ -44,7 +45,17 @@ interface OeeePainterConfig {
     | { kind: "post" }
     | { kind: "banner"; profileUrl: string };
   mode: PainterMode;
+  resume?: PainterResume;
 }
+
+/**
+ * A drawing the page opens to carry on with, rather than a blank canvas: a
+ * draft post (`/posts/{id}/continue`), whose replay the server names, or one
+ * kept in this browser, from the drafts page.
+ */
+type PainterResume =
+  | { postId: string; replayUrl: string; paintDurationMs: number }
+  | { localDraftId: string };
 
 /** The page's words for what saving says, rendered by the server. */
 interface PainterWords {
@@ -58,6 +69,7 @@ interface PainterWords {
   ok: string;
   keepDrawing: string;
   saving: string;
+  resumeFailed: string;
 }
 
 /** Where a guest's drawing waits for them. */
@@ -66,9 +78,16 @@ const DRAFTS_PATH = "/posts/drafts";
 /**
  * One id for every save this page makes. A drawing saved again -- after a
  * failed upload, or by a guest who kept drawing -- replaces its earlier copy
- * in this browser rather than sitting beside it.
+ * in this browser rather than sitting beside it. A drawing carried on from
+ * this browser keeps the id it was kept under, for the same reason.
  */
-const draftId = newDraftId();
+let draftId = newDraftId();
+
+/** The draft post this drawing carries on, whose drawing saving replaces. */
+let continuesPostId: string | null = null;
+
+/** How long the drawing had been worked on before this page opened it. */
+let earlierPaintMs = 0;
 
 async function submitBanner(
   painter: PainterHandle,
@@ -112,12 +131,13 @@ async function submitPost(
     width: snapshot.width,
     height: snapshot.height,
     tool: config.mode.kind === "two-tone" ? "cucumber" : "neo-cucumber-offline",
-    paintDurationMs: Date.now() - startedAt,
+    paintDurationMs: earlierPaintMs + (Date.now() - startedAt),
     strokeCount: snapshot.strokeCount,
     communityId: config.communityId ?? null,
     communityName: config.communityName ?? null,
     parentPostId: config.parentPostId ?? null,
   };
+  if (continuesPostId) draft.continuesPostId = continuesPostId;
 
   let kept = false;
   try {
@@ -233,8 +253,55 @@ function movePageActionsIntoExtraToolbox(): void {
   extraTools.append(helpProxy, pageSaveButton);
 }
 
+/**
+ * Opens the drawing being carried on. A drawing kept in this browser is only
+ * this reader's to open -- one saved signed out, or by this account -- as the
+ * drafts page only offers those.
+ */
+async function resumeDrawing(resume: PainterResume): Promise<void> {
+  if ("localDraftId" in resume) {
+    const kept = await getLocalDraft(resume.localDraftId);
+    if (!kept || (kept.owner !== GUEST_OWNER && kept.owner !== config.userId)) {
+      throw new Error("No such drawing kept in this browser");
+    }
+    await painter.resume(kept.replay);
+    draftId = kept.id;
+    earlierPaintMs = kept.paintDurationMs;
+    continuesPostId = kept.continuesPostId ?? null;
+  } else {
+    const response = await fetch(resume.replayUrl);
+    if (!response.ok) throw new Error(`Replay request failed: ${response.status}`);
+    await painter.resume(await response.arrayBuffer());
+    continuesPostId = resume.postId;
+    earlierPaintMs = resume.paintDurationMs;
+  }
+  // What is on the canvas is what was saved; leaving now loses nothing.
+  markKept();
+}
+
+/**
+ * A drawing that would not open is not drawn on: saving a blank canvas over
+ * the draft it stood for would lose it. Back to the drafts, where it still is.
+ */
+async function resumeFailed(): Promise<void> {
+  await askInPainter(saveLabel, words.resumeFailed || "Couldn't open this drawing to carry on with it.", [
+    { key: "ok", label: words.ok || "OK" },
+  ]);
+  leaving = true;
+  window.location.href = DRAFTS_PATH;
+}
+
 void painter.ready
   .then(async () => {
+    if (config.resume) {
+      try {
+        await resumeDrawing(config.resume);
+      } catch (error) {
+        console.error(error);
+        await resumeFailed();
+        return;
+      }
+    }
     if (config.initialImageUrl) await painter.loadImage(config.initialImageUrl);
     if (config.mode.kind === "standard") movePageActionsIntoExtraToolbox();
     // Hidden by the page until now: for a standard painter its place is the

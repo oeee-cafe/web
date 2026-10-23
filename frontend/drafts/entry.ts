@@ -24,6 +24,7 @@ interface DraftsWords {
   untitled: string;
   personal: string;
   post: string;
+  continue: string;
   signIn: string;
   download: string;
   delete: string;
@@ -62,6 +63,36 @@ function signInLink(): HTMLAnchorElement {
   link.href = `/login?next=${encodeURIComponent(DRAFTS_PATH)}`;
   link.textContent = words.signIn || "Sign in";
   return link;
+}
+
+/**
+ * Back into the painter with a drawing, to carry on with it: the same request
+ * the New drawing dialog makes, for the same canvas, naming the drawing the
+ * painter is to open (`resume` in frontend/painter/entry.ts). A drawing kept
+ * by a collaborative session has no replay to carry on from.
+ */
+function continueDrawing(draft: LocalDraft): void {
+  const form = document.createElement("form");
+  form.method = "post";
+  form.action = "/draw";
+  const fields: Record<string, string> = {
+    width: String(draft.width),
+    height: String(draft.height),
+    community_id: draft.communityId ?? "",
+    local_draft_id: draft.id,
+  };
+  if (draft.parentPostId) fields.parent_post_id = draft.parentPostId;
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.append(input);
+  }
+  // Firefox submits only a form that is in the document.
+  form.hidden = true;
+  document.body.append(form);
+  form.submit();
 }
 
 function removeCard(card: HTMLElement): void {
@@ -262,6 +293,14 @@ function card(draft: LocalDraft): HTMLElement {
     actions.append(postButton);
   } else {
     actions.append(signInLink());
+  }
+  if (draft.tool !== "collaborative" && !draft.collaborativeSessionId) {
+    const continueButton = button(words.continue || "Continue drawing");
+    continueButton.addEventListener("click", () => {
+      continueButton.disabled = true;
+      continueDrawing(draft);
+    });
+    actions.append(continueButton);
   }
   const downloadButton = button(words.download || "Download PNG");
   downloadButton.addEventListener("click", () => downloadPng(png, draft.savedAt));

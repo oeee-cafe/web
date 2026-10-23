@@ -208,6 +208,96 @@ describe("public painter lifecycle", () => {
   });
 
   /**
+   * A draft continued on another page: the second painter opens on the PNG
+   * the first saved, says so to its host before `resume` settles -- the
+   * drawing page takes that as "nothing unsaved yet" -- and saves a replay
+   * with both sittings' strokes in it.
+   */
+  it("resumes a saved drawing through the public handle", async () => {
+    const mountAt = (onChange?: (change: import("./public").PainterChange) => void) => {
+      const element = document.createElement("div");
+      document.body.appendChild(element);
+      let painter!: ReturnType<typeof mount>;
+      act(() => {
+        painter = mount(element, {
+          width: 64,
+          height: 48,
+          mode: { kind: "standard" },
+          controls: { kind: "none" },
+          onChange,
+        });
+      });
+      const canvas = () => element.querySelector("#canvas") as HTMLCanvasElement;
+      const stroke = async (from: [number, number], to: [number, number]) => {
+        const box = canvas().getBoundingClientRect();
+        for (const [type, [x, y]] of [
+          ["pointerdown", from],
+          ["pointermove", to],
+          ["pointerup", to],
+        ] as const) {
+          await act(async () => {
+            canvas().dispatchEvent(new PointerEvent(type, {
+              pointerId: 1,
+              pointerType: "mouse",
+              button: 0,
+              buttons: type === "pointerup" ? 0 : 1,
+              clientX: box.left + x,
+              clientY: box.top + y,
+              bubbles: true,
+            }));
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          });
+        }
+      };
+      return { painter: () => painter, stroke, element };
+    };
+    const pixels = async (png: Blob) => {
+      const bitmap = await createImageBitmap(png);
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 48;
+      const context = canvas.getContext("2d")!;
+      context.drawImage(bitmap, 0, 0);
+      return Array.from(context.getImageData(0, 0, 64, 48).data);
+    };
+
+    const first = mountAt();
+    await act(async () => first.painter().ready);
+    await first.stroke([8, 8], [50, 30]);
+    let saved!: Awaited<ReturnType<ReturnType<typeof first.painter>["save"]>>;
+    await act(async () => {
+      saved = await first.painter().save();
+    });
+    expect(saved.strokeCount).toBe(1);
+    act(() => first.painter().unmount());
+
+    const changes: number[] = [];
+    const second = mountAt(({ strokeCount }) => changes.push(strokeCount));
+    await act(async () => second.painter().ready);
+    let heardBeforeSettling = -1;
+    await act(async () => {
+      await second.painter().resume(saved.replay);
+      heardBeforeSettling = changes[changes.length - 1];
+    });
+    // The file's stroke and its closing restore.
+    expect(heardBeforeSettling).toBe(2);
+
+    let reopened!: Blob;
+    await act(async () => {
+      reopened = await second.painter().exportPng();
+    });
+    expect(await pixels(reopened)).toEqual(await pixels(saved.png));
+
+    await second.stroke([10, 40], [60, 4]);
+    let again!: Awaited<ReturnType<ReturnType<typeof second.painter>["save"]>>;
+    await act(async () => {
+      again = await second.painter().save();
+    });
+    expect(again.strokeCount).toBe(2);
+    act(() => second.painter().unmount());
+  });
+
+  /**
    * Undo in a painter with no session reverts the canvas.
    *
    * The drawing hook decides which of the two histories owns undo by whether

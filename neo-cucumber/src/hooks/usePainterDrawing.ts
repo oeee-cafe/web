@@ -10,6 +10,10 @@ import type { DrawingEngine } from "../DrawingEngine";
 import { clampRgba, type DrawingSink, type Layer, type Rgba } from "./drawingModes/DrawingSink";
 import { ReplayRecorder } from "./drawingModes/ReplayRecorder";
 import { SessionEmitter } from "./drawingModes/SessionEmitter";
+import { decodePCH, NeoReplay } from "../neo/NeoReplay";
+import { readRestore } from "../neo/pchFrames";
+import { layerFromPngDataUrl } from "../utils/layerDataUrl";
+import type { ActionItem } from "../utils/ActionRecorder";
 
 export { lineTypeForBrush } from "./drawingModes/ReplayRecorder";
 
@@ -289,8 +293,11 @@ export const usePainterDrawing = (options: PainterDrawingOptions) => {
       session.undo(false);
       return;
     }
-    baseDrawing.undo();
-    replay?.undo();
+    // The replay's head follows the snapshot stack, and only when it moved:
+    // at the bottom of the stack -- thirty strokes back, or where a resumed
+    // drawing begins -- there is nothing on screen to take away, and moving
+    // the head anyway left a stroke out of the saved file.
+    if (baseDrawing.undo()) replay?.undo();
   }, [baseDrawing, mayUndo, session, replay]);
 
   const redo = useCallback(() => {
@@ -299,8 +306,7 @@ export const usePainterDrawing = (options: PainterDrawingOptions) => {
       session.undo(true);
       return;
     }
-    baseDrawing.redo();
-    replay?.redo();
+    if (baseDrawing.redo()) replay?.redo();
   }, [baseDrawing, mayUndo, session, replay]);
 
   // Track if we've already initialized to prevent double-init
@@ -351,6 +357,66 @@ export const usePainterDrawing = (options: PainterDrawingOptions) => {
     }
   }, [baseDrawing.drawingEngine, baseDrawing.history, replay]);
 
+  /**
+   * Carry on with a drawing from the `.pch` it was saved as, the way NEO's
+   * "continue drawing" does (`Neo.Painter.loadAnimation`): the file's frames
+   * become the start of this replay, and what is drawn next is added after
+   * them. Undo starts from there.
+   *
+   * The layers come from the restore every save closes the file with, which
+   * this painter writes losslessly (`layerDataUrl`), so the canvas is the one
+   * that was saved to the last bit -- where playing the strokes would not be:
+   * the painter keeps a translucent pixel more exactly than NEO's canvas can
+   * (`PixelSurface`). That restore stays where it is, so a viewer playing the
+   * file is put back on the artist's canvas where the second sitting began.
+   * A file that does not end on a restore is played instead.
+   */
+  const resumeFromReplay = useCallback(async (raw: ArrayBuffer | Uint8Array) => {
+    const engine = baseDrawing.drawingEngine;
+    const history = baseDrawing.history;
+    if (!engine || !history) throw new Error("Painter is not ready");
+    if (!replay?.isRecording) {
+      throw new Error("This painter was mounted without replay recording");
+    }
+    const decoded = decodePCH(raw);
+    if (!decoded) throw new Error("Not a NEO replay");
+    const width = optionsRef.current.canvasWidth || 300;
+    const height = optionsRef.current.canvasHeight || 300;
+    if (decoded.width !== width || decoded.height !== height) {
+      throw new Error(
+        `Replay is ${decoded.width}×${decoded.height}, the canvas ${width}×${height}`,
+      );
+    }
+
+    const items = decoded.items;
+    const last = items[items.length - 1];
+    if (last && last[0] === "restore") {
+      const { background, foreground } = readRestore(last);
+      const [backgroundLayer, foregroundLayer] = await Promise.all([
+        layerFromPngDataUrl(background, width, height),
+        layerFromPngDataUrl(foreground, width, height),
+      ]);
+      engine.layers.background.set(backgroundLayer);
+      engine.layers.foreground.set(foregroundLayer);
+    } else {
+      const neo = new NeoReplay(width, height);
+      await neo.playAll(items);
+      engine.layers.background.set(neo.getLayerPixels(0));
+      engine.layers.foreground.set(neo.getLayerPixels(1));
+    }
+    engine.updateAllDOMCanvasesImmediate();
+    history.clearHistory();
+    history.saveState(
+      engine.layers.foreground,
+      engine.layers.background,
+      engine.imageWidth,
+      engine.imageHeight,
+      false,
+    );
+    replay.resumeFrom(items as ActionItem[][]);
+    optionsRef.current.onHistoryChange?.(false, false);
+  }, [baseDrawing.drawingEngine, baseDrawing.history, replay]);
+
   // Initialize two-tone canvas with background color fill
   const initializeTwoToneCanvas = useCallback((backgroundColor: string) => {
     // Guard against double initialization
@@ -398,5 +464,6 @@ export const usePainterDrawing = (options: PainterDrawingOptions) => {
     session,
     initializeFromImage,
     initializeTwoToneCanvas,
+    resumeFromReplay,
   };
 };

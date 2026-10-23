@@ -97,6 +97,9 @@
 
         <div class="publish-foot">
           <a class="ds-button" href="/posts/drafts">{{ ftl_get_message("drafts") }}</a>
+          {# Back into the painter with it, to carry on where it was saved
+             (draw.rs `continue_draft`). #}
+          {% if continuable %}<a class="ds-button" href="/posts/{{ post_id }}/continue">{{ ftl_get_message("draft-continue") }}</a>{% endif %}
           <form hx-delete="/posts/{{ post_id }}"
                 hx-confirm="{{ ftl_get_message("post-delete-confirm") }}"
                 hx-target="body"

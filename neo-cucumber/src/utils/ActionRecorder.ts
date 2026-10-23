@@ -3,7 +3,7 @@ import { NO_MASK, type Mask } from "../neo/mask";
 import { AFTER_DRAWING_STATE, DRAWING_STATE_AT } from "../neo/pchFrames";
 
 // Type for action items - can be strings, numbers, or nested arrays
-type ActionItem = string | number | ActionItem[];
+export type ActionItem = string | number | ActionItem[];
 
 /**
  * The mask a stroke was drawn through. Every verb that carries the drawing
@@ -211,6 +211,27 @@ export class ActionRecorder {
    */
   getActionCount(): number {
     return this.head;
+  }
+
+  /**
+   * Carry on from the frames of a file this recorder once wrote, as NEO's
+   * loadAnimation does: they become the start of this recording, and what is
+   * drawn next is added after them. Nothing of them can be undone -- the
+   * history a drawing is resumed with starts where they end.
+   */
+  load(items: ActionItem[][]): void {
+    if (!this.recording) return;
+    this.items = items.map((item) => item.slice());
+    this.head = this.items.length;
+  }
+
+  /** How many frames up to the head have `verb` for their name. */
+  countWithinHead(verb: string): number {
+    let count = 0;
+    for (let i = 0; i < this.head; i++) {
+      if (this.items[i][0] === verb) count++;
+    }
+    return count;
   }
 
   /**

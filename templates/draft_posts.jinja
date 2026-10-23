@@ -32,6 +32,7 @@
       "untitled": ftl_get_message("post-untitled"),
       "personal": ftl_get_message("personal-post"),
       "post": ftl_get_message("drafts-local-post"),
+      "continue": ftl_get_message("draft-continue"),
       "signIn": ftl_get_message("sign-in"),
       "download": ftl_get_message("draw-download-png"),
       "delete": ftl_get_message("delete"),
@@ -82,6 +83,7 @@
                 </div>
                 <div class="draft-actions">
                   <a class="ds-button ds-button-primary ds-button-small" href="/posts/{{ post.id }}/publish">{{ ftl_get_message("post-publish") }}</a>
+                  {% if post.continuable %}<a class="ds-button ds-button-small" href="/posts/{{ post.id }}/continue" aria-label="{{ ftl_get_message('draft-continue') }}: {{ title }}">{{ ftl_get_message("draft-continue") }}</a>{% endif %}
                   {# Taken off the page where it stands (?in_place), rather than
                      sending the reader to wherever the draft would have lived. #}
                   <button type="button"

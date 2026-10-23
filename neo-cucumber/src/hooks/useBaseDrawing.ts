@@ -1604,8 +1604,10 @@ export const useBaseDrawing = (
     callbacks?.onPastePreview?.(null);
   }, [callbacks]);
 
-  const handleUndo = useCallback(() => {
+  /** Whether there was anything to undo; the replay's head moves only if so. */
+  const handleUndo = useCallback((): boolean => {
     const previousState = history.undo();
+    const undone = previousState !== null;
     if (previousState && contextRef.current && drawingEngineRef.current) {
       history.restoreInto(
         previousState,
@@ -1620,11 +1622,13 @@ export const useBaseDrawing = (
       onHistoryChangeRef.current?.(history.canUndo(), history.canRedo());
     }
     clearPasteMarks();
+    return undone;
   }, [history, onDrawingChange, clearPasteMarks]);
 
   // Redo function
-  const handleRedo = useCallback(() => {
+  const handleRedo = useCallback((): boolean => {
     const nextState = history.redo();
+    const redone = nextState !== null;
     if (nextState && contextRef.current && drawingEngineRef.current) {
       history.restoreInto(
         nextState,
@@ -1639,6 +1643,7 @@ export const useBaseDrawing = (
       onHistoryChangeRef.current?.(history.canUndo(), history.canRedo());
     }
     clearPasteMarks();
+    return redone;
   }, [history, onDrawingChange, clearPasteMarks]);
 
   // Update canvas zoom

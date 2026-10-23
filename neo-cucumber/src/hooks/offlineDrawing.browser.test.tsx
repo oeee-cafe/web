@@ -336,3 +336,205 @@ describe("offline drawing end to end", () => {
     expectMatch(api, replayed);
   });
 });
+
+/**
+ * Continuing a saved drawing (`resumeFromReplay`), as a draft is continued:
+ * one mount draws and saves, a second -- a new page, days later -- opens the
+ * file and draws on, through real pointer events both times. The file it
+ * saves has to be the whole drawing, and NEO has to play it to what the
+ * second canvas shows.
+ *
+ * The strokes NEO is held to are opaque, as everywhere in this file: the
+ * painter keeps a translucent pixel more exactly than NEO's canvas can
+ * (`PixelSurface`), so on a translucent one only the restore frames agree.
+ * The translucent strokes here are what the resumed canvas is held to, bit
+ * for bit, against the one that was saved.
+ */
+describe("resuming a saved drawing", () => {
+  /** What a save writes: the closing restore, then the file. */
+  async function saved(api: OfflineApi): Promise<ArrayBuffer> {
+    await act(async () => {
+      api.replay!.addRestoreAction(api.drawingEngine!);
+    });
+    return api.replay!.getReplayBlob().arrayBuffer();
+  }
+
+  function layersOf(api: OfflineApi) {
+    const engine = api.drawingEngine!;
+    return {
+      background: new Uint8ClampedArray(engine.layers.background),
+      foreground: new Uint8ClampedArray(engine.layers.foreground),
+    };
+  }
+
+  function expectSameLayer(ours: Uint8ClampedArray, theirs: Uint8ClampedArray) {
+    expect(firstPixelDifference(ours, theirs), describeDifference(ours, theirs, W)).toBe(-1);
+  }
+
+  function expectSameLayers(
+    ours: { background: Uint8ClampedArray; foreground: Uint8ClampedArray },
+    theirs: { background: Uint8ClampedArray; foreground: Uint8ClampedArray },
+  ) {
+    expectSameLayer(ours.background, theirs.background);
+    expectSameLayer(ours.foreground, theirs.foreground);
+  }
+
+  /** The file played as a viewer plays it: restores and all, in order. */
+  async function playedWhole(file: ArrayBuffer) {
+    const decoded = await decodePCH(new Blob([file]));
+    const neo = new NeoReplay(W, H);
+    await neo.playAll(decoded.items);
+    return {
+      background: neo.getLayerPixels(LAYER.BACKGROUND),
+      foreground: neo.getLayerPixels(LAYER.FOREGROUND),
+      items: decoded.items,
+    };
+  }
+
+  async function resumed(file: ArrayBuffer, state = drawingState()) {
+    const sitting = await mountOfflineDrawing(state);
+    await act(async () => {
+      await sitting.api.resumeFromReplay(file);
+    });
+    return sitting;
+  }
+
+  /** The first sitting: an opaque stroke behind, a translucent one in front. */
+  async function firstSitting() {
+    const first = await mountOfflineDrawing(drawingState());
+    await first.strokeThrough([
+      [8, 10],
+      [30, 40],
+      [52, 12],
+    ]);
+    await first.updateDrawingState({
+      layerType: "foreground",
+      brushType: "brush",
+      brushSize: 9,
+      color: "#2050c0",
+      opacity: 128,
+    });
+    await first.strokeThrough([
+      [10, 30],
+      [70, 34],
+    ]);
+    const file = await saved(first.api);
+    return { first, file, layers: layersOf(first.api) };
+  }
+
+  it("opens on exactly the canvas that was saved", async () => {
+    const { file, layers } = await firstSitting();
+    const second = await resumed(file);
+    expectSameLayers(layersOf(second.api), layers);
+  });
+
+  it("saves the whole drawing, which NEO renders to the canvas it was drawn on", async () => {
+    const { file, layers } = await firstSitting();
+
+    const second = await resumed(file, drawingState({ color: "#106020" }));
+    await second.strokeThrough([
+      [20, 50],
+      [44, 6],
+      [76, 52],
+    ]);
+    await second.updateDrawingState({ brushType: "fill", color: "#e0c040" });
+    await second.strokeThrough([[70, 8]]);
+    const whole = await saved(second.api);
+    const ours = layersOf(second.api);
+
+    const played = await playedWhole(whole);
+    // The first sitting's strokes and the restore that closed it, then the
+    // second's and the restore that closes this one: NEO's continue, which
+    // keeps the frames it loaded and adds to them.
+    expect(played.items.map((item) => item[0])).toEqual([
+      "freeHand",
+      "freeHand",
+      "restore",
+      "freeHand",
+      "floodFill",
+      "restore",
+    ]);
+    expectSameLayer(ours.background, played.background);
+    // NEO itself, drawing every stroke of both sittings with the restores
+    // passed over, arrives at the same background.
+    expectSameLayer(ours.background, (await replayThroughNeo(second.api)).background);
+    // Nothing was drawn in front, which is still the first sitting's.
+    expectSameLayer(ours.foreground, layers.foreground);
+  });
+
+  it("comes back exactly from a second save, translucent strokes and all", async () => {
+    const { file } = await firstSitting();
+
+    const second = await resumed(
+      file,
+      drawingState({
+        layerType: "foreground",
+        brushType: "brush",
+        brushSize: 7,
+        color: "#c03010",
+        opacity: 100,
+      }),
+    );
+    // Across the first sitting's translucent stroke, so the two blend.
+    await second.strokeThrough([
+      [40, 4],
+      [40, 56],
+    ]);
+    const again = await saved(second.api);
+    const ours = layersOf(second.api);
+
+    const third = await resumed(again);
+    expectSameLayers(layersOf(third.api), ours);
+  });
+
+  it("counts the strokes of both sittings", async () => {
+    const { file } = await firstSitting();
+
+    const second = await resumed(file);
+    expect(second.api.replay!.strokeCount()).toBe(2);
+    await second.strokeThrough([
+      [20, 20],
+      [60, 20],
+    ]);
+    await saved(second.api);
+    expect(second.api.replay!.strokeCount()).toBe(3);
+  });
+
+  it("undoes back to where it was resumed, and no further", async () => {
+    const { file, layers } = await firstSitting();
+
+    const second = await resumed(file);
+    await second.strokeThrough([
+      [6, 6],
+      [74, 54],
+    ]);
+    // One undo for the stroke, and two more that have nothing to take.
+    await act(async () => {
+      second.api.undo();
+      second.api.undo();
+      second.api.undo();
+    });
+    expectSameLayers(layersOf(second.api), layers);
+
+    const played = await playedWhole(await saved(second.api));
+    // Saving again with nothing new replaces the closing restore rather than
+    // adding a second one.
+    expect(played.items.map((item) => item[0])).toEqual(["freeHand", "freeHand", "restore"]);
+    expectSameLayer(layers.background, (await replayThroughNeo(second.api)).background);
+  });
+
+  it("refuses a replay of another size", async () => {
+    const { file } = await firstSitting();
+    const bytes = new Uint8Array(file.slice(0));
+    bytes[4] = W + 1;
+
+    const second = await mountOfflineDrawing(drawingState());
+    let error: unknown = null;
+    await act(async () => {
+      await second.api.resumeFromReplay(bytes.buffer).catch((e: unknown) => {
+        error = e;
+      });
+    });
+    expect(String(error)).toMatch(/canvas/);
+  });
+});

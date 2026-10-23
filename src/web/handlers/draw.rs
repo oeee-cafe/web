@@ -6,7 +6,8 @@ use crate::models::community::{
     find_community_by_id, is_user_member, Community, CommunityVisibility,
 };
 use crate::models::post::{
-    create_post, find_post_by_id, find_post_id_by_client_draft_id, PostDraft, Tool,
+    create_post, find_continuable_draft, find_post_by_id, find_post_id_by_client_draft_id,
+    replace_draft_drawing, DraftReplacement, PostDraft, Tool,
 };
 use crate::models::user::{AuthSession, User};
 use crate::web::context::CommonContext;
@@ -23,7 +24,7 @@ use aws_sdk_s3::Client;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
 use axum::{
-    extract::{Multipart, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     response::Html,
     Form,
@@ -48,6 +49,10 @@ pub struct Input {
     tool: Option<String>,
     community_id: Option<String>,
     parent_post_id: Option<String>,
+    /// A drawing kept in this browser to carry on with (`LocalDraft.id`),
+    /// from the drafts page. The painter finds it there itself; the server
+    /// only passes it on, as it knows nothing of the browser's drafts.
+    local_draft_id: Option<String>,
 }
 
 /// Whether `user` may draw for `community`, and so post what they drew there.
@@ -248,14 +253,25 @@ pub async fn start_draw(
         _ => "draw_post_cucumber.jinja",
     };
 
-    let painter_config = serde_json::to_string(&post_painter_config(
+    let mut painter_config = post_painter_config(
         input.width.parse::<u32>()?,
         input.height.parse::<u32>()?,
         community.as_ref(),
         input.parent_post_id.as_deref(),
         &ftl_lang,
         user,
-    ))?;
+    );
+    // Only the painter that wrote it can carry a drawing on; Tegaki keeps
+    // nothing in the browser to carry on with.
+    if template_filename == "draw_post_cucumber.jinja"
+        && let Some(local_draft_id) = input
+            .local_draft_id
+            .as_deref()
+            .and_then(|id| Uuid::parse_str(id).ok())
+    {
+        painter_config["resume"] = json!({ "localDraftId": local_draft_id.to_string() });
+    }
+    let painter_config = serde_json::to_string(&painter_config)?;
     let presence = Presence::new(if parent_post.is_some() {
         Activity::Relaying
     } else {
@@ -284,6 +300,100 @@ pub async fn start_draw(
         .await?;
 
     Ok(Html(rendered).into_response())
+}
+
+/// GET /posts/{id}/continue: the painter, open on a draft to draw on it
+/// again. It loads the draft's replay and carries on from its end
+/// (`PainterHandle.resume`), and saving replaces the draft's drawing rather
+/// than making another post (`continues_post_id` in [`draw_finish`]).
+///
+/// Only the author's own drafts, and only those this painter recorded; see
+/// `ContinuableDraft`. A published drawing is finished, so it is sent to its
+/// post, as its publish page sends it.
+pub async fn continue_draft(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    Path(id): Path<Uuid>,
+) -> Result<Response, AppError> {
+    let user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
+    let mut tx = state.db_pool.begin().await?;
+    let Some(draft) = find_continuable_draft(&mut tx, user.id, id).await? else {
+        return match find_post_by_id(&mut tx, id).await? {
+            Some(post)
+                if post.get("author_id").cloned().flatten() == Some(user.id.to_string())
+                    && post.get("published_at").cloned().flatten().is_some() =>
+            {
+                Ok(Redirect::to(&format!("/posts/{}", id)).into_response())
+            }
+            _ => Err(AppError::NotFound("Draft".to_string())),
+        };
+    };
+
+    let community = match draft.community_id {
+        Some(cid) => find_community_by_id(&mut tx, cid).await?,
+        None => None,
+    };
+    if let Some(ref community) = community
+        && !may_draw_in(&mut tx, Some(user), community).await?
+    {
+        return Err(AppError::Forbidden);
+    }
+    let parent_post = match draft.parent_post_id {
+        Some(parent_id) => find_post_by_id(&mut tx, parent_id).await?,
+        None => None,
+    };
+    let common_ctx = CommonContext::build(&mut tx, Some(user), &ftl_lang).await?;
+
+    let width = u32::try_from(draft.width)?;
+    let height = u32::try_from(draft.height)?;
+    let parent_post_id = draft.parent_post_id.map(|id| id.to_string());
+    let mut painter_config = post_painter_config(
+        width,
+        height,
+        community.as_ref(),
+        parent_post_id.as_deref(),
+        &ftl_lang,
+        Some(user),
+    );
+    painter_config["resume"] = json!({
+        "postId": draft.post_id.to_string(),
+        "replayUrl": stored_replay_url(&state.config.r2_public_endpoint_url, &draft.replay_filename),
+        "paintDurationMs": draft.paint_duration_ms.max(0),
+    });
+    let painter_config = serde_json::to_string(&painter_config)?;
+
+    let presence = Presence::new(if parent_post.is_some() {
+        Activity::Relaying
+    } else {
+        Activity::Drawing
+    })
+    .in_community(community.as_ref());
+    let rendered = state
+        .render_page(
+            "draw_post_cucumber.jinja",
+            common_ctx,
+            context! {
+                presence => Serde(presence),
+                community_name => community.as_ref().map(|c| c.name.clone()),
+                width,
+                height,
+                community_id => draft.community_id.map(|id| id.to_string()),
+                community_slug => community.as_ref().map(|c| c.slug.clone()),
+                parent_post => parent_post,
+                parent_post_id,
+                painter_config
+            },
+        )
+        .await?;
+    Ok(Html(rendered).into_response())
+}
+
+/// Where the public bucket serves a replay, as `storage_macro.jinja`'s
+/// `stored_url` writes it.
+fn stored_replay_url(public_endpoint_url: &str, replay_filename: &str) -> String {
+    let prefix: String = replay_filename.chars().take(2).collect();
+    format!("{public_endpoint_url}/replay/{prefix}/{replay_filename}")
 }
 
 /// Writes `bytes` to the public bucket as `content_type`, which is what the
@@ -350,6 +460,7 @@ pub async fn draw_finish(
     let mut tool = String::new();
     let mut parent_post_id = None;
     let mut client_draft_id = None;
+    let mut continues_post_id = None;
 
     while let Some(field) = multipart.next_field().await? {
         let name = field
@@ -444,6 +555,11 @@ pub async fn draw_finish(
                 AppError::BadRequest(format!("Invalid UTF-8 in client_draft_id: {}", e))
             })?;
             client_draft_id = Some(safe_parse_uuid(draft_id_str)?);
+        } else if name == "continues_post_id" && !data.is_empty() {
+            let post_id_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
+                AppError::BadRequest(format!("Invalid UTF-8 in continues_post_id: {}", e))
+            })?;
+            continues_post_id = Some(safe_parse_uuid(post_id_str)?);
         }
     }
     let paint_duration_ms = paint_duration_ms
@@ -490,6 +606,49 @@ pub async fn draw_finish(
 
     let replay_filename = format!("{}.{}", replay_sha256, replay_extension);
 
+    // A draft drawn on again: its drawing is replaced, and the post stays the
+    // one it was. One that has been published or thrown away since the page
+    // opened is no draft to replace, and the drawing is kept as a new one
+    // rather than lost.
+    let continued = match continues_post_id {
+        Some(post_id) => find_continuable_draft(&mut tx, current_user.id, post_id).await?,
+        None => None,
+    };
+    if let Some(draft) = continued {
+        if let Some(cid) = draft.community_id {
+            let allowed = match find_community_by_id(&mut tx, cid).await? {
+                Some(community) => may_draw_in(&mut tx, Some(current_user), &community).await?,
+                None => false,
+            };
+            if !allowed {
+                return Ok(community_not_allowed());
+            }
+        }
+        replace_draft_drawing(
+            &mut tx,
+            &draft,
+            DraftReplacement {
+                paint_duration: PgInterval::try_from(
+                    Duration::try_milliseconds(i64::from(paint_duration_ms)).unwrap_or_default(),
+                )
+                .unwrap_or_default(),
+                stroke_count: security_count,
+                width,
+                height,
+                image_filename: format!("{}.png", image_sha256),
+                replay_filename,
+                tool: tool_enum,
+                client_draft_id,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+        return Ok(Json(DrawFinishResponse {
+            post_id: draft.post_id.to_string(),
+        })
+        .into_response());
+    }
+
     // If creating a reply but community_id is not provided, inherit from parent post
 
     if community_id.is_none()
@@ -507,14 +666,7 @@ pub async fn draw_finish(
             None => false,
         };
         if !allowed {
-            return Ok((
-                StatusCode::FORBIDDEN,
-                Json(ErrorResponse::new(
-                    error_codes::COMMUNITY_NOT_ALLOWED,
-                    "This account cannot post in that community",
-                )),
-            )
-                .into_response());
+            return Ok(community_not_allowed());
         }
     }
 
@@ -571,6 +723,19 @@ async fn existing_post_response(
         post_id: post_id.to_string(),
     })
     .into_response())
+}
+
+/// What `draw_finish` answers a drawing for a community this account may not
+/// post in.
+fn community_not_allowed() -> Response {
+    (
+        StatusCode::FORBIDDEN,
+        Json(ErrorResponse::new(
+            error_codes::COMMUNITY_NOT_ALLOWED,
+            "This account cannot post in that community",
+        )),
+    )
+        .into_response()
 }
 
 fn is_unique_violation(error: &anyhow::Error) -> bool {
@@ -823,5 +988,32 @@ mod painter_config_tests {
         assert!(config["userId"].is_null());
         assert!(config["communityName"].is_null());
         assert_eq!(config["mode"]["kind"], "standard");
+    }
+
+    /// The painter fetches a continued draft's replay from where the pages
+    /// link it, so the two have to agree on where that is.
+    #[test]
+    fn a_continued_replay_is_fetched_from_where_the_pages_link_it() {
+        let env = crate::web::handlers::test_support::env();
+        let linked = env
+            .render_str(
+                r#"{% from "storage_macro.jinja" import stored_url %}{{ stored_url("replay", name) }}"#,
+                minijinja::context! { r2_public_endpoint_url => "https://r2.example", name => "abcdef.pch" },
+            )
+            .expect("the macro renders");
+        assert_eq!(
+            super::stored_replay_url("https://r2.example", "abcdef.pch"),
+            linked
+        );
+    }
+
+    #[test]
+    fn only_this_painters_replays_are_continued() {
+        use crate::models::post::is_continuable;
+        assert!(is_continuable("neo-cucumber", Some("ab.pch")));
+        assert!(is_continuable("cucumber", Some("ab.pch")));
+        assert!(!is_continuable("neo", Some("ab.pch")));
+        assert!(!is_continuable("tegaki", Some("ab.tgkr")));
+        assert!(!is_continuable("neo-cucumber", None));
     }
 }

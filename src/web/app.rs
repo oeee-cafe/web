@@ -41,8 +41,8 @@ use crate::web::handlers::community::{
 };
 use crate::web::handlers::devices::register_device_handler;
 use crate::web::handlers::draw::{
-    banner_draw_finish, draw_communities, draw_finish, start_banner_draw, start_draw,
-    start_draw_get,
+    banner_draw_finish, continue_draft, draw_communities, draw_finish, start_banner_draw,
+    start_draw, start_draw_get,
 };
 use crate::web::handlers::home::{
     do_delete_comment, following_comments_page, home, joined_comments_page,
@@ -363,6 +363,8 @@ impl App {
             .route("/banners/draw", get(start_banner_draw))
             .route("/banners/draw/finish", post(banner_draw_finish))
             .route("/posts/{id}/publish", get(post_publish_form))
+            // A draft drawn on again (draw.rs `continue_draft`).
+            .route("/posts/{id}/continue", get(continue_draft))
             .route("/@{login_name}/follow", post(do_follow_profile))
             .route("/@{login_name}/unfollow", post(do_unfollow_profile))
             .route("/@{login_name}/guestbook", post(do_write_guestbook_entry))

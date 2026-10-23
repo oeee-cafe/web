@@ -61,6 +61,12 @@ export interface LocalDraft {
   collaborativeSessionId?: string;
   /** The session's title, for a collaborative drawing that has one. */
   title?: string;
+  /**
+   * The draft post this drawing carries on, when it was opened from one
+   * (`/posts/{id}/continue`) and its upload has yet to go through: posting
+   * it replaces that draft's drawing rather than making another.
+   */
+  continuesPostId?: string;
 }
 
 function request<T>(req: IDBRequest<T>): Promise<T> {

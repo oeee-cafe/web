@@ -120,6 +120,9 @@ export function mountOfflinePainter(
     async loadImage(source: ImageSource) {
       return (await liveController()).loadImage(source);
     },
+    async resume(replay: Blob | ArrayBuffer) {
+      return (await liveController()).resume(replay);
+    },
     undo() {
       synchronousController().undo();
     },

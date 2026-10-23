@@ -1,9 +1,10 @@
-import { ActionRecorder } from "../../utils/ActionRecorder";
+import { ActionRecorder, type ActionItem } from "../../utils/ActionRecorder";
 import type { Mask } from "../../neo/mask";
 import type { BrushType } from "../../types/drawing";
 import { fillToolTypeFor, frameShapeFor, type RegionTool } from "../../neo/tools";
 import type { RegionRect } from "../../neo/regionDrag";
 import type { DrawingEngine } from "../../DrawingEngine";
+import { layerToPngDataUrl } from "../../utils/layerDataUrl";
 import type { DrawingSink, Layer, Point, Rgba } from "./DrawingSink";
 
 // Constants matching Neo's LINETYPE values
@@ -53,7 +54,8 @@ export class ReplayRecorder implements DrawingSink {
   private readonly size: () => { width: number; height: number };
   /** Whether the stroke in progress has opened its frame yet. */
   private frameOpen = false;
-  private initializationActions = 0;
+  /** The two-tone background flood the drawing opened with: 0 or 1. */
+  private openingFills = 0;
 
   constructor(recordReplay: boolean, size: () => { width: number; height: number }) {
     this.recorder = new ActionRecorder(recordReplay);
@@ -250,30 +252,50 @@ export class ReplayRecorder implements DrawingSink {
     this.recorder.push("text", layerIndex(layer), x, y, packedColor, alpha, text, fontSize, fontFamily);
   }
 
-  /** A restore frame of both layers as they are on screen, closing the file. */
+  /**
+   * A restore frame of both layers, closing the file. Written from the
+   * buffers rather than the canvases on screen, so it holds exactly what was
+   * drawn -- which is what a resumed drawing carries on from (see
+   * `layerDataUrl`) -- and nothing a repaint has yet to catch up with.
+   */
   addRestoreAction(engine: DrawingEngine): void {
-    const bgCanvas = engine.getLayerCanvas("background");
-    const fgCanvas = engine.getLayerCanvas("foreground");
-    if (bgCanvas && fgCanvas) {
-      this.recorder.addRestoreAction(
-        bgCanvas.toDataURL("image/png"),
-        fgCanvas.toDataURL("image/png"),
-      );
-    }
+    const { imageWidth: width, imageHeight: height } = engine;
+    this.recorder.addRestoreAction(
+      layerToPngDataUrl(engine.layers.background, width, height),
+      layerToPngDataUrl(engine.layers.foreground, width, height),
+    );
   }
 
   /** A restore frame the drawing opened with, which is not a stroke. */
   recordOpeningRestore(backgroundDataUrl: string, foregroundDataUrl: string): void {
     this.recorder.step();
     this.recorder.push("restore", backgroundDataUrl, foregroundDataUrl);
-    this.initializationActions += 1;
   }
 
   /** A flood the drawing opened with, which is not a stroke. */
   recordOpeningFill(packedColor: number): void {
     this.recorder.step();
     this.recorder.push("floodFill", 0, 0, 0, packedColor);
-    this.initializationActions += 1;
+    this.openingFills += 1;
+  }
+
+  /**
+   * Carry on recording after the frames of a `.pch` this painter saved.
+   *
+   * The two-tone flood this mount opened with is replaced along with
+   * everything else, and the file's own -- its first frame, if it has one --
+   * counts in its place.
+   */
+  resumeFrom(items: ActionItem[][]): void {
+    const first = items[0];
+    const opensWithFill =
+      first !== undefined &&
+      first[0] === "floodFill" &&
+      first[1] === 0 &&
+      first[2] === 0 &&
+      first[3] === 0;
+    this.openingFills = this.openingFills > 0 && opensWithFill ? 1 : 0;
+    this.recorder.load(items);
   }
 
   getReplayBlob(): Blob {
@@ -281,11 +303,26 @@ export class ReplayRecorder implements DrawingSink {
     return this.recorder.getReplayBlob(width, height);
   }
 
+  /** Whether a replay is being kept at all. */
+  get isRecording(): boolean {
+    return this.recorder.isRecording;
+  }
+
   actionCount(): number {
     return this.recorder.getActionCount();
   }
 
-  initializationActionCount(): number {
-    return this.initializationActions;
+  /**
+   * The strokes in the replay: every frame but the restores -- the image a
+   * drawing was opened on, the end of each save -- and the two-tone flood
+   * it opened with.
+   */
+  strokeCount(): number {
+    return Math.max(
+      0,
+      this.recorder.getActionCount() -
+        this.recorder.countWithinHead("restore") -
+        this.openingFills,
+    );
   }
 }

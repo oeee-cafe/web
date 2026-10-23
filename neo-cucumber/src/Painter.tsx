@@ -571,6 +571,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     session,
     initializeFromImage,
     initializeTwoToneCanvas,
+    resumeFromReplay,
     isDrawingRef,
     freehandRef,
     setInteractionSuspended,
@@ -826,13 +827,12 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
     const pngPromise = exportPng();
     const replayPromise = exportReplay();
     const [png, replayBlob] = await Promise.all([pngPromise, replayPromise]);
-    const nonStrokeActions = 1 + (replay?.initializationActionCount() ?? 0);
     return {
       png,
       replay: replayBlob,
       width: canvasWidth,
       height: canvasHeight,
-      strokeCount: Math.max(0, (replay?.actionCount() ?? 0) - nonStrokeActions),
+      strokeCount: replay?.strokeCount() ?? 0,
     };
   }, [exportPng, exportReplay, canvasWidth, canvasHeight, replay]);
 
@@ -852,6 +852,28 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       }
     },
     [initializeFromImage],
+  );
+
+  /**
+   * Bumped when a resume has replaced the replay, whose length is read while
+   * rendering: the history it resets reports the same can't-undo it did
+   * before, so nothing else would render again.
+   */
+  const [, noticeResume] = useState(0);
+
+  const resume = useCallback(
+    async (source: Blob | ArrayBuffer): Promise<void> => {
+      // Through a Response: `Blob.arrayBuffer` is Firefox 69.
+      const raw = source instanceof Blob ? await new Response(source).arrayBuffer() : source;
+      await resumeFromReplay(raw);
+      noticeResume((count) => count + 1);
+      // Told now, and not only from the effect that render will run: a host
+      // that awaits this to say "nothing here is unsaved" has to have heard
+      // of the frames that came with the file first.
+      const count = replay?.actionCount() ?? 0;
+      config?.onChange?.({ canUndo: false, canRedo: false, strokeCount: count, dirty: count > 0 });
+    },
+    [resumeFromReplay, replay, config],
   );
 
   const applyCanonicalOperation = useCallback(
@@ -1058,6 +1080,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       exportPng,
       exportReplay,
       loadImage,
+      resume,
       undo,
       redo,
       command,
@@ -1079,7 +1102,7 @@ const Painter = forwardRef<PainterHandle, PainterProps>(function Painter(
       // The owning mount adapter replaces this with its React-root teardown.
       unmount: () => {},
     }),
-    [save, exportPng, exportReplay, loadImage, undo, redo, command, setLocalActorId, setParticipants, setHiddenParticipants, setLayersOrigin, applyCanonicalOperation, exportCheckpoint, checkpointCut, applyCheckpoint, exportSessionArchive, compactCanonicalHistory, isSynchronizationSettled, synchronizationTrace],
+    [save, exportPng, exportReplay, loadImage, resume, undo, redo, command, setLocalActorId, setParticipants, setHiddenParticipants, setLayersOrigin, applyCanonicalOperation, exportCheckpoint, checkpointCut, applyCheckpoint, exportSessionArchive, compactCanonicalHistory, isSynchronizationSettled, synchronizationTrace],
   );
 
   // Point the engine, the history and the emitter at the selected participant

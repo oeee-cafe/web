@@ -72,6 +72,7 @@ export async function uploadLocalDraft(
   form.append("security_count", String(draft.strokeCount));
   form.append("tool", draft.tool);
   form.append("client_draft_id", draft.id);
+  if (draft.continuesPostId) form.append("continues_post_id", draft.continuesPostId);
   if (draft.communityId && !withoutCommunity) form.append("community_id", draft.communityId);
   if (draft.parentPostId) form.append("parent_post_id", draft.parentPostId);
   return postDrawing<DrawFinishResult>("/draw/finish", form);

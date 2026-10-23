@@ -269,6 +269,19 @@ export interface PainterHandle {
    */
   loadImage(source: ImageSource): Promise<void>;
 
+  /**
+   * Carry on with a drawing from the `.pch` this painter saved it as: the
+   * canvas becomes the drawing exactly as it was saved, and what is drawn
+   * next is recorded after it, so the replay saved next is the whole
+   * drawing. Undo reaches back only to where it was resumed, as NEO's
+   * continue does.
+   *
+   * Call it once, after `ready` and before the first edit; it replaces
+   * whatever is on the canvas. Rejects for a file that is not NEO's, or is
+   * for a canvas of another size, and in a painter without replay recording.
+   */
+  resume(replay: Blob | ArrayBuffer): Promise<void>;
+
   /** Undo or redo through the painter's active history policy. */
   undo(): void;
   redo(): void;
