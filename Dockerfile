@@ -1,4 +1,8 @@
-# Build Rust binary
+# Build Rust binary. The image workflow builds it on the runner instead, where
+# its compiler cache is cheaper to keep, and hands the result in as the
+# rust-binary stage below (`--build-context rust-binary=DIR`), so in CI this
+# stage is never built. A plain `docker build` still builds it here, which
+# needs a database at host.docker.internal:5433 for sqlx's checks.
 FROM rust:1.99 AS rust-builder
 WORKDIR /app
 
@@ -28,13 +32,13 @@ ENV DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5433/oeee_c
 # /app/target is a cache mount, so anything needed later must be copied out
 # inside this RUN.
 #
-# The release profile builds full debug info, and it is split off here: the
-# image gets the binary without it, and the image workflow takes
+# The release profile builds line tables, and they are split off here: the
+# image gets the binary without them, and the image workflow takes
 # oeee-cafe.debug from the debug-files stage below and uploads it to Sentry,
-# which puts file, line
-# and inlined frames back into its stack traces by the GNU build id the two
-# share. The symbol table stays in, so a backtrace in `docker logs` still
-# names its functions.
+# which puts file, line and inlined frames back into its stack traces by the
+# GNU build id the two share. The symbol table stays in, so a backtrace in
+# `docker logs` still names its functions. The workflow does the same on its
+# runner (.github/workflows/image.yml); keep the two alike.
 RUN --mount=type=cache,target=/sccache \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
@@ -69,17 +73,24 @@ RUN pnpm run build && \
     cp -r dist-offline /app/sourcemaps/offline && \
     find dist dist-offline -name '*.map' -delete
 
+# The server and its split-off debug info, from the stage above or, in the
+# image workflow, a directory of the two the runner built
+# (`--build-context rust-binary=DIR` takes the place of this stage).
+FROM scratch AS rust-binary
+COPY --from=rust-builder /app/oeee-cafe /app/oeee-cafe.debug /
+
 # `docker build --target debug-files --output type=local,dest=DIR` writes
 # oeee-cafe.debug and sourcemaps/ to DIR for uploading, from the same cached
 # build as the image.
 FROM scratch AS debug-files
-COPY --from=rust-builder /app/oeee-cafe.debug /
+COPY --from=rust-binary /oeee-cafe.debug /
 COPY --from=node-builder-neo-cucumber /app/sourcemaps/ /sourcemaps/
 
 # Build runtime image. The last stage, so it is what a plain `docker build` makes.
 #
-# A glibc at least as new as rust-builder's (bookworm, 2.36) is all the binary
-# asks of it. This was ubuntu:25.10 until it was noticed that an interim
+# A glibc at least as new as the builder's is all the binary asks of it:
+# rust-builder's bookworm has 2.36, and the image workflow's Ubuntu 24.04
+# runner, which builds the one that ships, 2.39. Trixie has 2.41. This was ubuntu:25.10 until it was noticed that an interim
 # release had gone out of support months before and was getting no security
 # updates; a Debian stable does not do that without a year's warning.
 FROM debian:trixie-slim
@@ -97,7 +108,7 @@ COPY templates/ ./templates/
 # Admin/ops commands are `./oeee-cafe cli ...`, run in whichever blue/green
 # colour is serving, e.g.
 #   ./oeee-cafe cli -c config/config.toml set-role <login_name> admin
-COPY --from=rust-builder /app/oeee-cafe ./
+COPY --from=rust-binary /oeee-cafe ./
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist/ ./neo-cucumber/dist/
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-viewer/ ./neo-cucumber/dist-viewer/
 COPY --from=node-builder-neo-cucumber /app/neo-cucumber/dist-offline/ ./neo-cucumber/dist-offline/

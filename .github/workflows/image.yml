@@ -50,15 +50,12 @@ jobs:
         with:
           submodules: recursive
 
-      # sqlx checks every query against a real schema at compile time, and the
-      # Dockerfile reaches it as host.docker.internal:5433. On Linux that name
-      # means nothing, so the build is handed this container's address for it
-      # instead; the builder is a container on the same bridge. Postgres
-      # listens on 5433 itself so no published port is involved.
+      # sqlx checks every query against a real schema at compile time. The
+      # compile runs on this runner, so the database is published on
+      # localhost:5433.
       - name: Start the build database
-        id: db
         run: |
-          docker run -d --quiet --name build-db \
+          docker run -d --quiet --name build-db -p 5433:5433 \
             -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=oeee_cafe \
             postgres:18 -c port=5433
           # Over TCP: while the image initialises the database it runs a server
@@ -68,7 +65,6 @@ jobs:
             sleep 1
           done
           docker exec build-db pg_isready -h 127.0.0.1 -p 5433 -U postgres
-          echo "ip=$(docker inspect -f '{{.NetworkSettings.IPAddress}}' build-db)" >> "$GITHUB_OUTPUT"
 
       # With psql rather than sqlx-cli, which would be a compile of its own.
       # Each file in a transaction of its own, as sqlx runs them.
@@ -79,40 +75,50 @@ jobs:
               -h 127.0.0.1 -p 5433 -U postgres oeee_cafe < "$migration"
           done
 
-      - uses: docker/setup-buildx-action@v4
-        id: buildx
+      # The Rust binary is built here rather than in the Dockerfile. In
+      # BuildKit its compiler cache had to be carried in and out of the
+      # builder whole: 9 GB by October, most of it dependencies no longer in
+      # Cargo.lock, which took three and a half minutes to load before every
+      # build and nine to save after. rust-cache keeps target/ with only what
+      # this lockfile builds. The toolchain is the Dockerfile's rust image's.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.99"
+      - name: Install mold and OpenSSL's headers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends mold libssl-dev pkg-config
+      - uses: Swatinem/rust-cache@v2
 
-      # The Dockerfile's cache mounts live in the builder, which is new every
-      # run. sccache's is carried between runs here; that is what keeps a
-      # change to our own code from recompiling every dependency. Keyed by
-      # commit so each run saves what it added, restoring the newest before it.
-      - name: Restore the compiler cache
-        uses: actions/cache@v6
-        id: cache
-        with:
-          path: cache-mounts
-          key: cache-mounts-${{ github.sha }}
-          restore-keys: cache-mounts-
-      - uses: reproducible-containers/buildkit-cache-dance@v3
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          # The keys are where each mount is extracted to, relative to the
-          # workspace; cache-dir is not consulted once there is a cache-map.
-          cache-map: |
-            {
-              "cache-mounts/sccache": "/sccache",
-              "cache-mounts/cargo-registry": "/usr/local/cargo/registry"
-            }
-          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+      # What the Dockerfile's rust-builder makes, into a directory outside the
+      # checkout (target/ is not the image's context's business either), which
+      # the image builds below take in place of that stage (build-contexts).
+      # The release profile's debug info is split off as there: the image gets
+      # the binary without it, and oeee-cafe.debug goes to Sentry, which puts
+      # file, line and inlined frames back into its stack traces by the GNU
+      # build id the two share. The symbol table stays in, so a backtrace in
+      # `docker logs` still names its functions.
+      - name: Build the server
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/oeee_cafe
+        run: |
+          mold -run cargo build --release --locked
+          out="$RUNNER_TEMP/rust-binary"
+          mkdir -p "$out"
+          cp target/release/oeee-cafe "$out/oeee-cafe"
+          objcopy --only-keep-debug --compress-debug-sections=zlib "$out/oeee-cafe" "$out/oeee-cafe.debug"
+          objcopy --strip-debug "$out/oeee-cafe"
+
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build the debug info and source maps
         uses: docker/build-push-action@v7
         with:
           context: .
+          build-contexts: rust-binary=${{ runner.temp }}/rust-binary
           platforms: linux/arm64
           target: debug-files
           outputs: type=local,dest=debug-files
-          add-hosts: host.docker.internal:${{ steps.db.outputs.ip }}
           cache-from: type=gha
 
       - uses: jdx/mise-action@v4
@@ -146,8 +152,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          build-contexts: rust-binary=${{ runner.temp }}/rust-binary
           platforms: linux/arm64
-          add-hosts: host.docker.internal:${{ steps.db.outputs.ip }}
           build-args: GIT_COMMIT=${{ github.sha }}
           tags: ${{ env.IMAGE }}:${{ github.sha }}
           labels: |

@@ -9,10 +9,12 @@ publish = false
 build = "build.rs"
 
 [profile.release]
-# Full debug info, which the Dockerfile splits off the binary before it goes
-# into the image and deploy.sh uploads to Sentry. Left in, it made the binary
-# 700MB and every image 1.4GB.
-debug = true
+# Line tables and inlined frames, which the image build splits off the binary
+# and uploads to Sentry: everything its stack traces use (file, line, the
+# frames inlining folded away). Full debug info added types and variables
+# nothing reads, and its share of the compile and link was most of a minute
+# on every build. Left in, it made the binary 700MB and every image 1.4GB.
+debug = "line-tables-only"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
