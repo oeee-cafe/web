@@ -3984,6 +3984,74 @@ a.ds-handle-supporter:active {
   margin-left: 4px;
 }
 
+/* The community search (shared/communitySearch.ts): the drafts page, the
+   staff filter, and the New drawing dialog, which the painter pages ask
+   for with this sheet alone. The list is in the field's size of type, not
+   whatever the box around it has. */
+.community-search-input {
+  width: 100%;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.community-search-list {
+  font-size: var(--ds-text-base);
+  max-height: 9.5em;
+  margin-top: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-s);
+}
+
+.community-search-option {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+/* Drawn only: the option is what is clicked (shared/communitySearch.ts). */
+.community-search-check {
+  flex: none;
+  margin: 0 8px 0 0;
+  pointer-events: none;
+}
+
+.community-search-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-search-option[data-active] {
+  outline: 1px solid var(--ds-line-strong);
+  outline-offset: -1px;
+}
+
+.community-search-meta {
+  flex: none;
+  margin-left: 8px;
+  padding: 3px 8px;
+  color: var(--ds-faint);
+}
+
+.community-search-option .community-search-meta {
+  padding: 0;
+}
+
+/* Where the toolbar's New drawing is for (draw_dialog.jinja). Not a
+   .form-field: that caps a text field at 420px, under its list. */
+.draw-dialog-community {
+  margin-bottom: var(--ds-space-4);
+}
+
+.draw-dialog-community > .ds-label {
+  display: block;
+  margin-bottom: 4px;
+}
+
 /* An alert: one question, Cancel, and the action named for what it does
    (confirm_dialog.jinja). Narrower than a dialog, since it holds a sentence
    and two buttons, and the buttons sit at its foot on the right, the

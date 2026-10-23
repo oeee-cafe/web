@@ -1944,58 +1944,6 @@ a.mention:hover {
   margin-top: 6px;
 }
 
-.community-search-input {
-  width: 100%;
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-}
-
-.community-search-list {
-  max-height: 9.5em;
-  margin-top: 4px;
-  overflow-y: auto;
-  border: 1px solid var(--ds-line);
-  border-radius: var(--ds-radius-s);
-}
-
-.community-search-option {
-  display: flex;
-  align-items: center;
-  padding: 3px 8px;
-  cursor: pointer;
-}
-
-/* Drawn only: the option is what is clicked (shared/communitySearch.ts). */
-.community-search-check {
-  flex: none;
-  margin: 0 8px 0 0;
-  pointer-events: none;
-}
-
-.community-search-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.community-search-option[data-active] {
-  outline: 1px solid var(--ds-line-strong);
-  outline-offset: -1px;
-}
-
-.community-search-meta {
-  flex: none;
-  margin-left: 8px;
-  padding: 3px 8px;
-  color: var(--ds-faint);
-}
-
-.community-search-option .community-search-meta {
-  padding: 0;
-}
-
 :root[data-homecols-density="bare"] .draft-item .post-card-meta {
   display: block;
 }
