@@ -2007,6 +2007,124 @@ async fn an_idle_room_pauses_and_the_next_person_in_picks_it_up() {
     outcome.expect("the scenario finished in time");
 }
 
+/// A paused room's lobby card keeps its picture: the preview goes into the
+/// bucket with the room, is listed and served from there while it waits, and
+/// is back in Redis at the same version once somebody comes back.
+#[tokio::test]
+async fn a_paused_room_keeps_its_preview_and_brings_it_back() {
+    use super::pause::{pause_idle_room, paused_preview, preview_is_stored, Idled};
+    use super::preview::{preview_versions, ImageKind, PreviewStore};
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        let (alice_id, _) = opening(&mut alice).await;
+        send(&mut alice, fill(alice_id, 10)).await;
+        next_of_type(&mut alice, SEQUENCED).await;
+
+        // The header is all anybody reads of it: a PNG's signature and IHDR.
+        let mut png = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+        png.extend_from_slice(&13u32.to_be_bytes());
+        png.extend_from_slice(b"IHDR");
+        png.extend_from_slice(&400u32.to_be_bytes());
+        png.extend_from_slice(&300u32.to_be_bytes());
+        png.extend_from_slice(b"the rest of it");
+        let previews = PreviewStore::new(room.state.redis_pool.clone());
+        let token = previews
+            .claim(room.room)
+            .await
+            .expect("claim")
+            .expect("token");
+        let version = previews
+            .store(room.room, &token, ImageKind::Png, &png)
+            .await
+            .expect("store")
+            .expect("stored");
+
+        assert_eq!(
+            pause_idle_room(&room.state, room.room)
+                .await
+                .expect("pause"),
+            Idled::Paused
+        );
+        assert!(
+            previews.load(room.room).await.expect("load").is_none(),
+            "out of Redis"
+        );
+        assert!(preview_is_stored(room.room));
+        assert_eq!(
+            preview_versions(&room.state, &[Uuid::new_v4(), room.room]).await,
+            vec![None, Some(version)],
+            "still listed, at the version it had"
+        );
+        let kept = paused_preview(&room.state, room.room)
+            .await
+            .expect("read")
+            .expect("kept");
+        assert_eq!(kept.bytes, png);
+        assert_eq!(kept.kind, ImageKind::Png);
+        assert_eq!(kept.version, version);
+
+        let mut back = room.connect(0, None).await;
+        opening(&mut back).await;
+        let restored = previews
+            .load(room.room)
+            .await
+            .expect("load")
+            .expect("back in Redis");
+        assert_eq!(restored.bytes, png);
+        assert_eq!(restored.version, version);
+        assert!(!preview_is_stored(room.room), "the kept copy is let go");
+        let column = sqlx::query_scalar!(
+            "SELECT paused_preview_version FROM collaborative_sessions WHERE id = $1",
+            room.room
+        )
+        .fetch_one(&room.db)
+        .await
+        .expect("row");
+        assert_eq!(column, None);
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
+/// A room paused with no preview has none to show: no version, so its card
+/// draws the canvas size rather than a broken image.
+#[tokio::test]
+async fn a_room_paused_without_a_preview_lists_none() {
+    use super::pause::{pause_idle_room, paused_preview, preview_is_stored, Idled};
+    use super::preview::preview_versions;
+    let Some(room) = open_room(4).await else {
+        return;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut alice = room.connect(0, None).await;
+        let (alice_id, _) = opening(&mut alice).await;
+        send(&mut alice, fill(alice_id, 10)).await;
+        next_of_type(&mut alice, SEQUENCED).await;
+        assert_eq!(
+            pause_idle_room(&room.state, room.room)
+                .await
+                .expect("pause"),
+            Idled::Paused
+        );
+        assert!(!preview_is_stored(room.room));
+        assert_eq!(
+            preview_versions(&room.state, &[room.room]).await,
+            vec![None]
+        );
+        assert!(paused_preview(&room.state, room.room)
+            .await
+            .expect("read")
+            .is_none());
+    })
+    .await;
+    room.teardown().await;
+    outcome.expect("the scenario finished in time");
+}
+
 /// A pause flushes the room's recording while it holds the session row, and
 /// the flush writes through the pool. The first recording row for a room
 /// checks its foreign key against that row; under `FOR UPDATE` it waited on

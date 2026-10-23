@@ -1,0 +1,1 @@
+ALTER TABLE collaborative_sessions DROP COLUMN paused_preview_version;

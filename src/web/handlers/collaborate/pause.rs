@@ -50,6 +50,7 @@
 //! room (its page was sent away first) or a resuming one (joins wait on the
 //! session row), so its keys do not change underneath.
 
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::time::Duration;
 
@@ -59,6 +60,7 @@ use flate2::Compression;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+use super::preview::{inspect_image, PreviewStore, StoredPreview};
 use super::redis_messages::{self, HISTORY_TTL};
 use super::websocket::{send_away_everyone, Departure};
 use crate::web::state::AppState;
@@ -99,6 +101,13 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 /// Where a paused room's state is kept in the bucket.
 fn object_key(room_uuid: Uuid) -> String {
     format!("paused/{room_uuid}")
+}
+
+/// Where its lobby preview is kept, beside it and apart from it: a card asks
+/// for the picture every time the lobby repaints, and the state is megabytes
+/// that would have to be fetched and unpacked to get at thirty kilobytes.
+fn preview_object_key(room_uuid: Uuid) -> String {
+    format!("paused/{room_uuid}.preview")
 }
 
 /// The keys a pause carries: the room's drawing, and its recording's chat
@@ -362,6 +371,15 @@ pub(crate) fn is_stored(room_uuid: Uuid) -> bool {
     OBJECTS.lock().unwrap().contains_key(&object_key(room_uuid))
 }
 
+/// Whether a paused room's preview is kept in the bucket, for the tests.
+#[cfg(test)]
+pub(crate) fn preview_is_stored(room_uuid: Uuid) -> bool {
+    OBJECTS
+        .lock()
+        .unwrap()
+        .contains_key(&preview_object_key(room_uuid))
+}
+
 /// Whether a room has anything drawn in it: a position past the start.
 async fn has_drawing(state: &AppState, room_uuid: Uuid) -> Result<bool, Error> {
     let store = redis_messages::RedisMessageStore::new(state.redis_pool.clone());
@@ -455,11 +473,12 @@ pub async fn pause_idle_room(state: &AppState, room_uuid: Uuid) -> Result<Idled,
     let body = encode(&kept)?;
     let size = body.len();
     put_object(state, &object_key(room_uuid), body).await?;
+    let preview = keep_preview(state, room_uuid).await;
 
     unlink(state, &keys).await?;
     for cleaned in [
         state.redis_state.cleanup_room_state(room_uuid).await,
-        super::preview::PreviewStore::new(state.redis_pool.clone())
+        PreviewStore::new(state.redis_pool.clone())
             .cleanup(room_uuid)
             .await
             .map_err(|e| -> Error { format!("{e}").into() }),
@@ -471,8 +490,9 @@ pub async fn pause_idle_room(state: &AppState, room_uuid: Uuid) -> Result<Idled,
 
     let paused = async {
         sqlx::query!(
-            "UPDATE collaborative_sessions SET paused_at = NOW() WHERE id = $1",
-            room_uuid
+            "UPDATE collaborative_sessions SET paused_at = NOW(), paused_preview_version = $2 WHERE id = $1",
+            room_uuid,
+            preview.as_ref().map(|preview| preview.version as i64),
         )
         .execute(&mut *tx)
         .await?;
@@ -495,6 +515,9 @@ pub async fn pause_idle_room(state: &AppState, room_uuid: Uuid) -> Result<Idled,
             // The drawing is out of Redis and the room is not marked paused:
             // put it back, so the room is as it was.
             drop(tx);
+            if let Some(preview) = &preview {
+                put_back_preview(state, room_uuid, preview).await;
+            }
             if let Err(restore) = restore(state, room_uuid, Stored::Kept(kept)).await {
                 error!(
                     "Room {room_uuid} could not be marked paused ({e}) nor put back ({restore}); its drawing is in the bucket at {}",
@@ -589,21 +612,133 @@ pub async fn resume_if_paused(state: &AppState, room_uuid: Uuid) -> Result<(), E
     }
     let stored = get_object(state, &object_key(room_uuid)).await?;
     restore(state, room_uuid, decode(&stored)?).await?;
+    let preview_version = sqlx::query_scalar!(
+        "SELECT paused_preview_version FROM collaborative_sessions WHERE id = $1",
+        room_uuid
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    // The lobby's picture comes back with the room, rather than leaving its
+    // card blank until somebody draws and a browser uploads a new one.
+    if let Some(version) = preview_version {
+        match stored_preview(state, room_uuid, version as u64).await {
+            Ok(preview) => put_back_preview(state, room_uuid, &preview).await,
+            Err(e) => warn!("Failed to bring back room {room_uuid}'s preview: {e}"),
+        }
+    }
     // Fresh activity, or the next sweep would find it idle and pause it
     // again under the person who just came back.
     sqlx::query!(
-        "UPDATE collaborative_sessions SET paused_at = NULL, last_activity = NOW() WHERE id = $1",
+        r#"
+        UPDATE collaborative_sessions
+        SET paused_at = NULL, paused_preview_version = NULL, last_activity = NOW()
+        WHERE id = $1
+        "#,
         room_uuid
     )
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
-    if let Err(e) = delete_object(state, &object_key(room_uuid)).await {
-        // Harmless: the room is back, and the next pause overwrites it.
-        warn!("Failed to remove room {room_uuid}'s stored pause: {e}");
+    let mut stored_keys = vec![object_key(room_uuid)];
+    if preview_version.is_some() {
+        stored_keys.push(preview_object_key(room_uuid));
+    }
+    for key in stored_keys {
+        if let Err(e) = delete_object(state, &key).await {
+            // Harmless: the room is back, and the next pause overwrites it.
+            warn!("Failed to remove room {room_uuid}'s stored {key}: {e}");
+        }
     }
     info!("Resumed room {room_uuid}");
     Ok(())
+}
+
+/// Copies a pausing room's lobby preview into the bucket, so its card goes on
+/// showing which drawing it is. None when it has none, or it could not be
+/// kept: that costs the card its picture, never the pause.
+async fn keep_preview(state: &AppState, room_uuid: Uuid) -> Option<StoredPreview> {
+    let preview = match PreviewStore::new(state.redis_pool.clone())
+        .load(room_uuid)
+        .await
+    {
+        Ok(preview) => preview?,
+        Err(e) => {
+            warn!("Failed to read pausing room {room_uuid}'s preview: {e}");
+            return None;
+        }
+    };
+    match put_object(state, &preview_object_key(room_uuid), preview.bytes.clone()).await {
+        Ok(()) => Some(preview),
+        Err(e) => {
+            warn!("Failed to keep pausing room {room_uuid}'s preview: {e}");
+            None
+        }
+    }
+}
+
+async fn put_back_preview(state: &AppState, room_uuid: Uuid, preview: &StoredPreview) {
+    if let Err(e) = PreviewStore::new(state.redis_pool.clone())
+        .put(room_uuid, preview)
+        .await
+    {
+        warn!("Failed to put back room {room_uuid}'s preview: {e}");
+    }
+}
+
+/// A kept preview, read back. Its format is read off the bytes, which were
+/// checked by `inspect_image` when they were first uploaded.
+async fn stored_preview(
+    state: &AppState,
+    room_uuid: Uuid,
+    version: u64,
+) -> Result<StoredPreview, Error> {
+    let bytes = get_object(state, &preview_object_key(room_uuid)).await?;
+    let (kind, _, _) = inspect_image(&bytes).ok_or("a kept preview that is not an image")?;
+    Ok(StoredPreview {
+        bytes,
+        kind,
+        version,
+    })
+}
+
+/// The preview versions that those of these rooms which are paused took with
+/// them, by room. A room absent had none, or is not paused.
+pub async fn paused_preview_versions(
+    db: &sqlx::Pool<sqlx::Postgres>,
+    room_uuids: &[Uuid],
+) -> Result<HashMap<Uuid, u64>, sqlx::Error> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT id, paused_preview_version AS "version!"
+        FROM collaborative_sessions
+        WHERE id = ANY($1)
+          AND paused_at IS NOT NULL
+          AND ended_at IS NULL
+          AND paused_preview_version IS NOT NULL
+        "#,
+        room_uuids
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| (row.id, row.version as u64))
+        .collect())
+}
+
+/// A paused room's lobby preview, from the bucket. None when the room is not
+/// paused or took no preview with it.
+pub async fn paused_preview(
+    state: &AppState,
+    room_uuid: Uuid,
+) -> Result<Option<StoredPreview>, Error> {
+    let Some(version) = paused_preview_versions(&state.db_pool, &[room_uuid])
+        .await?
+        .remove(&room_uuid)
+    else {
+        return Ok(None);
+    };
+    Ok(Some(stored_preview(state, room_uuid, version).await?))
 }
 
 /// Ends the rooms that have been paused longer than [`PAUSED_RETENTION`],
@@ -621,8 +756,10 @@ pub async fn end_abandoned(state: &AppState) -> Result<usize, Error> {
     .fetch_all(&state.db_pool)
     .await?;
     for room_uuid in &ended {
-        if let Err(e) = delete_object(state, &object_key(*room_uuid)).await {
-            warn!("Failed to remove abandoned room {room_uuid}'s stored pause: {e}");
+        for key in [object_key(*room_uuid), preview_object_key(*room_uuid)] {
+            if let Err(e) = delete_object(state, &key).await {
+                warn!("Failed to remove abandoned room {room_uuid}'s stored {key}: {e}");
+            }
         }
         info!("Ended room {room_uuid}: paused for longer than its retention");
         crate::staff_webhook::notify(crate::staff_webhook::Event::RoomAbandoned {

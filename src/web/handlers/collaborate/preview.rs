@@ -304,6 +304,23 @@ return 1
         Ok((stored == 1).then_some(version))
     }
 
+    /// Puts back a preview the room had before, at the version it had: for a
+    /// paused room coming back. No claim, because nobody rendered it -- it is
+    /// the picture the lobby was already showing.
+    pub async fn put(&self, room_uuid: Uuid, preview: &StoredPreview) -> StoreResult<()> {
+        let mut conn = self.pool.get().await?;
+        redis::pipe()
+            .set_ex(preview_key(room_uuid), &preview.bytes, PREVIEW_TTL)
+            .set_ex(
+                preview_meta_key(room_uuid),
+                format!("{}:{}", preview.version, preview.kind.content_type()),
+                PREVIEW_TTL,
+            )
+            .query_async::<()>(&mut *conn)
+            .await?;
+        Ok(())
+    }
+
     /// The version of each room's preview, in the order asked for, for a lobby
     /// deciding which cards have a picture to show. None where there is none.
     ///
@@ -374,6 +391,11 @@ fn parse_meta(meta: &str) -> Option<(u64, String)> {
 /// Preview versions for a batch of rooms, in the order asked for, for any page
 /// that lists sessions.
 ///
+/// A paused room's preview is not in Redis but in the bucket, where the pause
+/// took it (`pause::paused_preview`), so the rooms Redis has nothing for are
+/// asked after there too: a paused room is exactly the one whose owner needs
+/// the picture to tell which drawing it was.
+///
 /// Never fails: a missing preview is ordinary -- a session nobody has drawn in
 /// has none -- and a Redis that is unwell should cost a page its pictures
 /// rather than the page.
@@ -382,13 +404,33 @@ pub async fn preview_versions(state: &AppState, room_uuids: &[Uuid]) -> Vec<Opti
         return Vec::new();
     }
     let store = PreviewStore::new(state.redis_pool.clone());
-    match store.versions(room_uuids).await {
+    let mut versions = match store.versions(room_uuids).await {
         Ok(versions) => versions,
         Err(e) => {
             warn!("Failed to read preview versions: {}", e);
             vec![None; room_uuids.len()]
         }
+    };
+    let without: Vec<Uuid> = room_uuids
+        .iter()
+        .zip(&versions)
+        .filter(|(_, version)| version.is_none())
+        .map(|(room_uuid, _)| *room_uuid)
+        .collect();
+    if without.is_empty() {
+        return versions;
     }
+    match super::pause::paused_preview_versions(&state.db_pool, &without).await {
+        Ok(paused) => {
+            for (room_uuid, version) in room_uuids.iter().zip(versions.iter_mut()) {
+                if version.is_none() {
+                    *version = paused.get(room_uuid).copied();
+                }
+            }
+        }
+        Err(e) => warn!("Failed to read paused preview versions: {}", e),
+    }
+    versions
 }
 
 /// Whether this viewer is allowed to see the session's canvas at all.
@@ -790,20 +832,33 @@ pub async fn serve_session_preview(
         .map(|value| value.trim().to_string());
 
     if let Some(requested_etag) = requested_etag.as_deref() {
-        let current = store
+        let current = match store
             .version(room_uuid)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to read a preview version: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to read a preview version: {}", e))?
+        {
+            Some(version) => Some(version),
+            None => super::pause::paused_preview_versions(&state.db_pool, &[room_uuid])
+                .await?
+                .remove(&room_uuid),
+        };
         if current.map(etag_for) == Some(requested_etag.to_string()) {
             return Ok(not_modified(requested_etag.to_string()));
         }
     }
 
-    let Some(preview) = store
+    let preview = match store
         .load(room_uuid)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to read a preview: {}", e))?
-    else {
+    {
+        Some(preview) => Some(preview),
+        // Paused: the picture went into the bucket with the room.
+        None => super::pause::paused_preview(&state, room_uuid)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to read a paused preview: {}", e))?,
+    };
+    let Some(preview) = preview else {
         return Err(AppError::NotFound("No preview yet".to_string()));
     };
 
