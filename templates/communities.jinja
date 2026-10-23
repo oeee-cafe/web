@@ -8,20 +8,22 @@
      shows one list of a thing and lets you switch which. This was three
      headed sections stacked down the page, so the directory -- the only part
      that changes -- started below everything you already knew. #}
+  {# Signed in, your own communities come first and are what the page opens
+     on; signed out, the public directory. #}
   <div class="center-wide communities-page">
     <div class="communities-bar">
       <div class="ds-segmented" role="group" aria-label="{{ ftl_get_message('community') }}">
-        <button type="button" aria-pressed="true" data-communities-tab="public">{{ ftl_get_message("communities-tab-public") }}</button>
+        {% if current_user %}
+          <button type="button" aria-pressed="true" data-communities-tab="yours">{{ ftl_get_message("communities-tab-yours") }}</button>
+        {% endif %}
+        <button type="button" aria-pressed="{{ 'false' if current_user else 'true' }}" data-communities-tab="public">{{ ftl_get_message("communities-tab-public") }}</button>
         {% if official_communities %}
           <button type="button" aria-pressed="false" data-communities-tab="official">{{ ftl_get_message("communities-tab-official") }}</button>
-        {% endif %}
-        {% if current_user %}
-          <button type="button" aria-pressed="false" data-communities-tab="yours">{{ ftl_get_message("communities-tab-yours") }}</button>
         {% endif %}
       </div>
       {# Search and sort belong to the public list: their hx-target has always
          been that list alone, so they are only there while it is. #}
-      <div class="communities-filters" data-communities-for="public">
+      <div class="communities-filters" data-communities-for="public"{% if current_user %} hidden{% endif %}>
         <input type="search"
                id="community-search"
                name="q"
@@ -54,7 +56,7 @@
 
     {# Cards live in community_cards_fragment.jinja so the first batch, search
        results and every scrolled batch share one definition. #}
-    <div data-communities-panel="public">
+    <div data-communities-panel="public"{% if current_user %} hidden{% endif %}>
       <div class="community-grid" id="public-communities-list">
         {% include "community_cards_fragment.jinja" %}
       </div>
@@ -71,7 +73,7 @@
     {# Yours: owned and joined in one list. They were two, and both matched
        for any community you own and are a member of. #}
     {% if current_user %}
-      <div data-communities-panel="yours" hidden>
+      <div data-communities-panel="yours">
         {% if your_communities %}
           <div class="community-grid">
             {% for community in your_communities %}
@@ -84,7 +86,7 @@
       </div>
     {% endif %}
     {# Runs where it stands, before the page is painted, so a remembered view
-       arrives as itself rather than flashing the public list first. #}
+       arrives as itself rather than flashing the first one. #}
     <script>if (window.oeeeChrome) window.oeeeChrome.communitiesTabs();</script>
   </div>
 {% endblock content %}

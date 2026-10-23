@@ -4,7 +4,7 @@
 /**
  * The community directory's tabs, the one chosen last remembered in this
  * browser. Runs where it stands, before the page is painted, so a remembered
- * view arrives as itself rather than flashing the public list first.
+ * view arrives as itself rather than flashing the first one.
  */
 export function communitiesTabs(): void {
   const tabs = document.querySelectorAll("[data-communities-tab]");
@@ -13,7 +13,8 @@ export function communitiesTabs(): void {
     for (let i = 0; i < tabs.length; i++) {
       if (tabs[i].getAttribute("data-communities-tab") === chosen) found = true;
     }
-    if (!found) chosen = "public";
+    // A remembered view the page no longer has: the first one.
+    if (!found) chosen = tabs[0].getAttribute("data-communities-tab")!;
     for (let j = 0; j < tabs.length; j++) {
       tabs[j].setAttribute("aria-pressed", String(tabs[j].getAttribute("data-communities-tab") === chosen));
     }
@@ -27,9 +28,9 @@ export function communitiesTabs(): void {
   try {
     saved = localStorage.getItem("communitiesTab");
   } catch {
-    // No storage: the public list.
+    // No storage: the first view, as the page drew it.
   }
-  if (saved) show(saved);
+  if (saved && tabs.length) show(saved);
   for (let i = 0; i < tabs.length; i++) {
     tabs[i].addEventListener("click", function (this: Element) {
       const chosen = this.getAttribute("data-communities-tab")!;

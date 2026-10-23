@@ -578,11 +578,18 @@ mod tests {
                 json!({"login_name": "someone"}),
             ))
             .expect("renders");
-        // One view at a time: the public directory shows first and the
-        // others wait behind their tabs.
-        assert!(rendered.contains("data-communities-tab=\"yours\""));
-        assert!(rendered.contains("data-communities-panel=\"yours\" hidden"));
-        assert!(rendered.contains("data-communities-panel=\"public\">"));
+        // One view at a time: signed in, yours is the first tab and the one
+        // shown, and the others wait behind their tabs.
+        let yours = rendered
+            .find("data-communities-tab=\"yours\"")
+            .expect("a Yours tab");
+        let public = rendered
+            .find("data-communities-tab=\"public\"")
+            .expect("a Public tab");
+        assert!(yours < public);
+        assert!(rendered.contains("aria-pressed=\"true\" data-communities-tab=\"yours\""));
+        assert!(rendered.contains("data-communities-panel=\"yours\">"));
+        assert!(rendered.contains("data-communities-panel=\"public\" hidden"));
         // One list, not two: the participating section was a second copy of
         // every community you both own and are a member of.
         assert!(!rendered.contains("participating-community"));
@@ -591,6 +598,8 @@ mod tests {
             .render(directory_context(Vec::new(), json!(null)))
             .expect("renders");
         assert!(!rendered.contains("data-communities-tab=\"yours\""));
+        assert!(rendered.contains("aria-pressed=\"true\" data-communities-tab=\"public\""));
+        assert!(rendered.contains("data-communities-panel=\"public\">"));
         assert!(!rendered.contains("/communities/new"));
     }
 
