@@ -21,6 +21,7 @@ keyboard-shortcuts = Keyboard shortcuts
 keyboard-shortcuts-show = Show keyboard shortcuts
 keyboard-shortcuts-then = then
 nav-home = Home
+nav-communities = Communities
 feed-switch = Feed
 feed-recent = Recent
 feed-following = Following

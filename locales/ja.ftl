@@ -23,6 +23,7 @@ keyboard-shortcuts = キーボードショートカット
 keyboard-shortcuts-show = キーボードショートカットを表示
 keyboard-shortcuts-then = の次に
 nav-home = ホーム
+nav-communities = コミュニティ
 feed-switch = フィード
 feed-recent = 新着
 feed-following = 同盟

@@ -23,6 +23,7 @@ keyboard-shortcuts = 키보드 단축키
 keyboard-shortcuts-show = 키보드 단축키 보기
 keyboard-shortcuts-then = 다음에
 nav-home = 홈
+nav-communities = 커뮤니티
 feed-switch = 피드
 feed-recent = 최신
 feed-following = 동맹

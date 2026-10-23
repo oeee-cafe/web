@@ -92,7 +92,7 @@
         {# Home is all of the feeds -- Recent, Following, Communities:
            which one is a switch on the page (feed_switch.jinja). #}
         <a href="/">{{ ftl_get_message("nav-home") }}</a>
-        <a href="/communities">{{ ftl_get_message("community") }}</a>
+        <a href="/communities">{{ ftl_get_message("nav-communities") }}</a>
         <a href="/tags">{{ ftl_get_message("tag-discovery") }}</a>
       </div>
       {# Drawing together, live: its own button beside the sections rather
@@ -261,7 +261,7 @@
         {% if current_user %}
           <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>F</kbd></dt><dd>{{ ftl_get_message("feed-following") }}</dd>
         {% endif %}
-        <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>C</kbd></dt><dd>{{ ftl_get_message("community") }}</dd>
+        <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>C</kbd></dt><dd>{{ ftl_get_message("nav-communities") }}</dd>
         <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>T</kbd></dt><dd>{{ ftl_get_message("collaborate") }}</dd>
         <dt><kbd>G</kbd> {{ ftl_get_message("keyboard-shortcuts-then") }} <kbd>H</kbd></dt><dd>{{ ftl_get_message("tag-discovery") }}</dd>
         {% if current_user %}

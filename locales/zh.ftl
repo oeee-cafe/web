@@ -23,6 +23,7 @@ keyboard-shortcuts = 键盘快捷键
 keyboard-shortcuts-show = 显示键盘快捷键
 keyboard-shortcuts-then = 然后
 nav-home = 首页
+nav-communities = 社区
 feed-switch = 动态
 feed-recent = 最新
 feed-following = 关注

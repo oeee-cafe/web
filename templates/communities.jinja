@@ -1,7 +1,7 @@
 {% extends "base.jinja" %}
 {% import "community_card_macro.jinja" as card %}
 {% block title %}
-  {{ super() }} | {{ ftl_get_message("community") }}
+  {{ super() }} | {{ ftl_get_message("nav-communities") }}
 {% endblock title %}
 {% block content %}
   {# One view at a time, chosen in the bar at the top, the way an application
@@ -12,7 +12,7 @@
      on; signed out, the public directory. #}
   <div class="center-wide communities-page">
     <div class="communities-bar">
-      <div class="ds-segmented" role="group" aria-label="{{ ftl_get_message('community') }}">
+      <div class="ds-segmented" role="group" aria-label="{{ ftl_get_message('nav-communities') }}">
         {% if current_user %}
           <button type="button" aria-pressed="true" data-communities-tab="yours">{{ ftl_get_message("communities-tab-yours") }}</button>
         {% endif %}
