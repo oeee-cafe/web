@@ -156,6 +156,7 @@ draw-guest-saved-title = 이 기기에 저장됨
 draw-guest-saved = 이 그림은 사이트가 아니라 이 기기에만 있습니다. 로그인하면 임시 보관함에서 게시할 수 있고, 사본을 내려받아 둘 수도 있습니다.
 draw-download-png = PNG 내려받기
 draw-keep-drawing = 계속 그리기
+draw-saving = 저장하는 중…
 draw-local-save-failed = 지금은 이 기기에 그림을 보관할 수 없습니다. 사본을 남기려면 PNG를 내려받으세요.
 draw-upload-failed-kept = 그림을 게시하지 못했습니다. 이 기기의 임시 보관함에 남아 있으니 거기서 게시할 수 있습니다.
 draw-upload-failed-lost = 그림을 게시하지 못했고, 이 기기에 보관할 수도 없습니다. 다시 시도하거나 PNG를 내려받으세요.

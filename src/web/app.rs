@@ -41,7 +41,8 @@ use crate::web::handlers::community::{
 };
 use crate::web::handlers::devices::register_device_handler;
 use crate::web::handlers::draw::{
-    banner_draw_finish, draw_finish, start_banner_draw, start_draw, start_draw_get,
+    banner_draw_finish, draw_communities, draw_finish, start_banner_draw, start_draw,
+    start_draw_get,
 };
 use crate::web::handlers::home::{
     do_delete_comment, following_comments_page, home, joined_comments_page,
@@ -480,6 +481,8 @@ impl App {
             // uploading it (/draw/finish) is still for someone signed in.
             .route("/draw", get(start_draw_get))
             .route("/draw", post(start_draw))
+            // The New drawing dialog's community search (draw_dialog.jinja).
+            .route("/draw/communities", get(draw_communities))
             .route("/posts/drafts", get(draft_posts))
             .route("/health", get(health))
             .route("/robots.txt", get(robots_txt))

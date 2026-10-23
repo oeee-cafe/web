@@ -180,6 +180,7 @@ draw-guest-saved-title = Saved on this device
 draw-guest-saved = This drawing is only on this device, not on the site. Sign in to post it from your drafts, or download a copy.
 draw-download-png = Download PNG
 draw-keep-drawing = Keep drawing
+draw-saving = Saving…
 draw-local-save-failed = Drawings can't be kept on this device right now. Download the PNG to keep a copy.
 draw-upload-failed-kept = Couldn't post this drawing. It's kept in your drafts on this device, and you can post it from there.
 draw-upload-failed-lost = Couldn't post this drawing, and it can't be kept on this device. Try again, or download the PNG.

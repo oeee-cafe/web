@@ -30,6 +30,13 @@ pub enum ChoiceRule {
     /// two-tone, because such a room let in whoever a public community's
     /// room would have. Nothing typed suggests the chooser's own only.
     LobbySave,
+    /// Where the toolbar's New drawing may be drawn for: what
+    /// `draw::may_draw_in` lets the chooser open, less the unlisted
+    /// communities that are not theirs (a link opens those; a list would
+    /// give their names away), and less the two-tone ones, whose canvas is
+    /// one of two fixed sizes that dialog does not offer. Nothing typed
+    /// suggests the chooser's own only.
+    Draw,
     /// The quick switcher: places to go, two-tone ones too. The chooser's
     /// private communities when they are a member, their unlisted ones,
     /// and public ones. Nothing typed lists the chooser's own only.
@@ -49,6 +56,7 @@ impl ChoiceRule {
         match self {
             ChoiceRule::Move => "move",
             ChoiceRule::LobbySave => "lobby_save",
+            ChoiceRule::Draw => "draw",
             ChoiceRule::Jump => "jump",
             ChoiceRule::Directory => "directory",
             ChoiceRule::Admin => "admin",
@@ -187,19 +195,19 @@ async fn query(
             SELECT * FROM mine
             WHERE
               -- Two-tone communities take no drawings from elsewhere.
-              NOT ($1 IN ('move', 'lobby_save')
+              NOT ($1 IN ('move', 'lobby_save', 'draw')
                    AND background_color IS NOT NULL AND foreground_color IS NOT NULL)
               AND CASE WHEN $1 = 'admin' THEN true ELSE CASE visibility
                 WHEN 'public' THEN
                   $1 <> 'move' OR is_mine OR last_posted_at IS NOT NULL
                 WHEN 'unlisted' THEN
-                  $1 IN ('move', 'jump') AND is_mine
+                  $1 IN ('move', 'jump', 'draw') AND is_mine
                 ELSE
-                  $1 = 'jump' AND is_member
+                  $1 IN ('jump', 'draw') AND is_member
               END END
               -- Nothing typed suggests only the chooser's own, where a list
               -- of everybody's would bury them. A check of one id is not a list.
-              AND ($7::uuid IS NOT NULL OR $3 <> '' OR $1 NOT IN ('lobby_save', 'jump') OR is_mine)
+              AND ($7::uuid IS NOT NULL OR $3 <> '' OR $1 NOT IN ('lobby_save', 'jump', 'draw') OR is_mine)
         ),
         ranked AS (
             SELECT *, ROW_NUMBER() OVER (
@@ -435,6 +443,26 @@ mod tests {
         assert_eq!(
             w.names(&mut tx, Jump, stranger, "TAG").await,
             ["empty", "pct_c", "pub_a", "pub_b", "twotone"]
+        );
+        // New drawing: the switcher's, less two-tone; a guest's are public.
+        assert_eq!(
+            w.names(&mut tx, Draw, me, "TAG").await,
+            [
+                "empty",
+                "mine_unlisted",
+                "pct_c",
+                "private",
+                "pub_a",
+                "pub_b"
+            ]
+        );
+        assert_eq!(
+            w.names(&mut tx, Draw, me, "").await,
+            ["mine_unlisted", "private"]
+        );
+        assert_eq!(
+            w.names(&mut tx, Draw, stranger, "TAG").await,
+            ["empty", "pct_c", "pub_a", "pub_b"]
         );
         // The directory: every public community, the same for anybody.
         assert_eq!(

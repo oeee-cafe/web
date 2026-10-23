@@ -57,6 +57,7 @@ interface PainterWords {
   downloadPng: string;
   ok: string;
   keepDrawing: string;
+  saving: string;
 }
 
 /** Where a guest's drawing waits for them. */
@@ -338,6 +339,51 @@ function askInPainter(
 }
 
 /**
+ * What is up while a confirmed save is under way: the drawing being taken off
+ * the canvas, kept in this browser and uploaded, which on a slow connection
+ * is long enough to look like nothing happened and to invite a second press
+ * or a stroke that will not be in it. It cannot be dismissed, and it keeps
+ * the painter's shortcuts from the keyboard while it is up. After a post it
+ * stays until the browser has left for the publish page; the returned
+ * function takes it down when the save stops short of that.
+ */
+function showSaving(): () => void {
+  const backdrop = document.createElement("div");
+  backdrop.className =
+    "fixed inset-0 z-[9999] flex items-center justify-center bg-black/70";
+  backdrop.setAttribute("role", "alertdialog");
+  backdrop.setAttribute("aria-modal", "true");
+  backdrop.setAttribute("aria-busy", "true");
+
+  const panel = document.createElement("div");
+  panel.className = `${NEO_PANEL} max-w-sm shadow-lg`;
+
+  const titleBar = document.createElement("div");
+  titleBar.className = `${NEO_TITLEBAR} px-[4px] text-[11px] leading-[14px]`;
+  titleBar.textContent = saveLabel;
+
+  const message = document.createElement("p");
+  message.className = "m-0 px-[24px] py-[16px] text-center";
+  message.setAttribute("role", "status");
+  message.textContent = words.saving || "Saving…";
+  backdrop.setAttribute("aria-label", message.textContent);
+
+  function onKey(event: KeyboardEvent): void {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  document.addEventListener("keydown", onKey, true);
+
+  panel.append(titleBar, message);
+  backdrop.append(panel);
+  document.body.append(backdrop);
+  return () => {
+    document.removeEventListener("keydown", onKey, true);
+    backdrop.remove();
+  };
+}
+
+/**
  * Asked before a drawing is sent.
  *
  * Saving is the end of this page for someone signed in: the drawing goes to
@@ -413,11 +459,13 @@ saveButton.addEventListener("click", () => {
       return;
     }
     const submission = config.submission ?? { kind: "post" as const };
+    const hideSaving = showSaving();
     if (submission.kind === "banner") {
       await submitBanner(painter, submission.profileUrl, startedAt, () => {
         leaving = true;
       }).catch((error) => {
         console.error(error);
+        hideSaving();
         feelInApp("error");
         say("Failed to save drawing. Please try again.");
       });
@@ -430,6 +478,7 @@ saveButton.addEventListener("click", () => {
         leaving = true;
       });
       if (posted) return;
+      hideSaving();
       if (!config.userId) {
         feelInApp(kept ? "success" : "error");
         await afterGuestSave(draft, kept);
@@ -444,6 +493,7 @@ saveButton.addEventListener("click", () => {
       }
     } catch (error) {
       console.error(error);
+      hideSaving();
       feelInApp("error");
       say("Failed to save drawing. Please try again.");
     }

@@ -59,6 +59,47 @@ describe("the Draw dialog", () => {
     expect(shown()).toBe(false);
     expect(document.activeElement).toBe(draw);
   });
+
+  it("asks for the communities on the first open, and a choice is what the form sends", async () => {
+    document.body.innerHTML = `
+      <form action="/draw" method="post"><button type="submit" id="nav-draw-button">Draw</button></form>
+      <div id="draw-dialog" class="ds-modal" style="display: none;">
+        <div class="ds-modal-panel">
+          <h2 id="draw-dialog-title" tabindex="-1">New drawing</h2>
+          <form action="/draw" method="post">
+            <input type="hidden" name="community_id" value="" data-draw-dialog-community />
+            <div data-draw-dialog-search hidden></div>
+          </form>
+          <button type="button" data-draw-dialog-cancel>Cancel</button>
+        </div>
+      </div>`;
+    const asked: string[] = [];
+    const realFetch = window.fetch;
+    window.fetch = (async (input: RequestInfo | URL) => {
+      asked.push(String(input));
+      return new Response(JSON.stringify({ choices: [{ id: "c1", name: "Club", slug: "club", member: true }] }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      attachDrawDialog({ none: "Personal" });
+      expect(asked).toEqual([]);
+      await userEvent.click(document.getElementById("nav-draw-button")!);
+      const search = document.querySelector<HTMLElement>("[data-draw-dialog-search]")!;
+      await expect.poll(() => search.hidden).toBe(false);
+      expect(asked).toEqual(["/draw/communities"]);
+      const options = [...search.querySelectorAll<HTMLElement>("[role=option]")];
+      expect(options.map((o) => o.textContent)).toEqual(["Personal", "Clubmember"]);
+      options[1]!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      expect(document.querySelector<HTMLInputElement>("[data-draw-dialog-community]")!.value).toBe("c1");
+
+      await userEvent.keyboard("{Escape}");
+      await userEvent.click(document.getElementById("nav-draw-button")!);
+      expect(asked).toHaveLength(1);
+    } finally {
+      window.fetch = realFetch;
+    }
+  });
 });
 
 describe("the toasts", () => {

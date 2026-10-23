@@ -7,6 +7,12 @@
    does without script. With it, the press opens this instead
    (`oeeeDrawDialog`), as do the `new-drawing` command and its key.
 
+   Where it is drawn for is asked here too: a personal post, or a community
+   found by the search the script builds into the field (`/draw/communities`,
+   the communities `draw::may_draw_in` would open for this reader, two-tone
+   ones aside). Without script the hidden field stays empty, which is a
+   personal post, as it always was.
+
    The script is frontend/site/drawDialog.ts. A boosted swap runs the line
    at the foot again, which wires the new dialog; the document listener is
    added once, and finds the dialog by id each time. #}
@@ -14,6 +20,10 @@
   <div class="ds-modal-panel">
     <h2 id="draw-dialog-title" tabindex="-1">{{ ftl_get_message("community-drawing-new") }}</h2>
     <form action="/draw" method="post">
+      <input type="hidden" name="community_id" value="" data-draw-dialog-community />
+      <div class="form-field draw-dialog-community" data-draw-dialog-search hidden>
+        <label class="ds-label" for="draw-dialog-community-search">{{ ftl_get_message("drafts-local-post-to") }}</label>
+      </div>
       <div class="form-field community-draw-size">
         <label>
           <span class="ds-label">{{ ftl_get_message('community-drawing-width') }}</span>
@@ -41,4 +51,10 @@
     </form>
   </div>
 </div>
-<script>if (window.oeeeChrome) window.oeeeChrome.drawDialog();</script>
+<script>if (window.oeeeChrome) window.oeeeChrome.drawDialog({{ {
+  "search": ftl_get_message("drafts-local-search-communities"),
+  "none": ftl_get_message("personal-post"),
+  "member": ftl_get_message("drafts-local-community-member"),
+  "drawn": ftl_get_message("drafts-local-community-drawn"),
+  "noMatches": ftl_get_message("drafts-local-community-no-matches"),
+}|tojson }});</script>

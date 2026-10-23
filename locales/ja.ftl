@@ -156,6 +156,7 @@ draw-guest-saved-title = この端末に保存しました
 draw-guest-saved = この絵はサイトではなく、この端末にだけあります。ログインすると下書きから投稿できます。コピーをダウンロードしておくこともできます。
 draw-download-png = PNG をダウンロード
 draw-keep-drawing = 描き続ける
+draw-saving = 保存しています…
 draw-local-save-failed = 今はこの端末に絵を保存できません。コピーを残すには PNG をダウンロードしてください。
 draw-upload-failed-kept = 絵を投稿できませんでした。この端末の下書きに残っているので、そこから投稿できます。
 draw-upload-failed-lost = 絵を投稿できず、この端末にも保存できません。もう一度試すか、PNG をダウンロードしてください。

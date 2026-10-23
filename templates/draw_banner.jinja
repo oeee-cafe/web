@@ -28,6 +28,10 @@
             data-cancel="{{ ftl_get_message("cancel") }}">{{ ftl_get_message("save") }}</button>
   </div>
   <script id="neo-cucumber-config" type="application/json">{{ painter_config | safe }}</script>
+  {# What saving says, beyond the button's own words (frontend/painter/entry.ts). #}
+  <script id="oeee-painter-words" type="application/json">{{ {
+    "saving": ftl_get_message("draw-saving"),
+  }|tojson }}</script>
   <script type="module"
           src="{{ '/static/neo-cucumber/offline.js' | cachebuster | safe }}"></script>
 {% endblock content %}

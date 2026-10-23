@@ -156,6 +156,7 @@ draw-guest-saved-title = 已保存在此设备上
 draw-guest-saved = 这幅画只在此设备上，不在网站上。登录后可以从草稿中发布，也可以先下载一份副本。
 draw-download-png = 下载 PNG
 draw-keep-drawing = 继续绘制
+draw-saving = 正在保存…
 draw-local-save-failed = 目前无法在此设备上保存画作。请下载 PNG 以保留副本。
 draw-upload-failed-kept = 无法发布这幅画。它已保存在此设备的草稿中，可以在那里发布。
 draw-upload-failed-lost = 无法发布这幅画，也无法保存在此设备上。请重试，或下载 PNG。

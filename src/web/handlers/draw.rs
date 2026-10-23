@@ -1,6 +1,7 @@
 use crate::app_error::{error_codes, AppError};
 use crate::image_store;
 use crate::models::banner::{create_banner, BannerDraft};
+use crate::models::community::choice::{choose_communities, ChoiceQuery, ChoiceRule};
 use crate::models::community::{
     find_community_by_id, is_user_member, Community, CommunityVisibility,
 };
@@ -22,7 +23,7 @@ use aws_sdk_s3::Client;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
 use axum::{
-    extract::{Multipart, State},
+    extract::{Multipart, Query, State},
     http::StatusCode,
     response::Html,
     Form,
@@ -130,6 +131,51 @@ pub(crate) fn post_painter_config(
         "mode": mode,
         "userId": user.map(|u| u.id.to_string()),
     })
+}
+
+/// How many communities one answer of the New drawing search lists.
+const COMMUNITY_CHOICES: i64 = 20;
+
+/// `?q=`, what has been typed into the New drawing dialog's community search.
+#[derive(Deserialize, Default)]
+pub struct CommunitySearch {
+    q: Option<String>,
+}
+
+/// GET /draw/communities: where the toolbar's New drawing may be drawn for
+/// (`ChoiceRule::Draw`), for the dialog's search (draw_dialog.jinja). With
+/// nothing typed, the reader's own; with something, any they may draw in
+/// whose name, handle or description has it in, theirs first. A guest has
+/// no own, and finds public ones. No community at all is the dialog's own
+/// first choice: a personal post.
+pub async fn draw_communities(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Query(search): Query<CommunitySearch>,
+) -> Result<Response, AppError> {
+    let reader = auth_session.user.as_ref().map(|user| user.id);
+    let query = search.q.as_deref().unwrap_or("");
+    let mut tx = state.db_pool.begin().await?;
+    let found = choose_communities(
+        &mut tx,
+        &ChoiceQuery::new(ChoiceRule::Draw, reader, query, COMMUNITY_CHOICES),
+    )
+    .await?;
+    tx.commit().await?;
+    let choices: Vec<_> = found
+        .into_iter()
+        .take(COMMUNITY_CHOICES as usize)
+        .map(|community| {
+            json!({
+                "id": community.id.to_string(),
+                "name": community.name,
+                "slug": community.slug,
+                "member": community.is_member,
+                "drawn": community.has_participated,
+            })
+        })
+        .collect();
+    Ok(Json(json!({ "choices": choices })).into_response())
 }
 
 pub async fn start_draw_get() -> Redirect {

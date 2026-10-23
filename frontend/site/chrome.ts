@@ -23,6 +23,7 @@ import { attachAlert, attachConfirm } from "./alerts";
 import { installBridge, type Words } from "./bridge";
 import { attachCaption } from "./caption";
 import { attachDrawDialog } from "./drawDialog";
+import type { CommunitySearchWords } from "../shared/communitySearch";
 import { installGatewayRetry } from "./gatewayRetry";
 import { installJump } from "./jump";
 import { startLive } from "./live";
@@ -64,7 +65,7 @@ interface Chrome {
   toasts(): void;
   optimistic(): void;
   jump(): void;
-  drawDialog(): void;
+  drawDialog(words?: Partial<CommunitySearchWords>): void;
   thumbs(): void;
   perRow(): void;
   live(closeLabel: string, newDrawings: string): void;
