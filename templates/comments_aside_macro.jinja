@@ -23,8 +23,16 @@
         <div class="feed-comments-list">
           {% include "comments_fragment.jinja" %}
         </div>
-        {# Only when there is something past the three a phone shows. #}
-        {% if comments.rows|length > 3 or comments.next_url %}
+        {# Only when there is something past the three rows a phone shows:
+           a row is a run of comments on one drawing, as
+           comments_fragment.jinja groups them. #}
+        {% set runs = namespace(count=0) %}
+        {% for comment in comments.rows %}
+          {% if not loop.previtem or loop.previtem.post_id != comment.post_id %}
+            {% set runs.count = runs.count + 1 %}
+          {% endif %}
+        {% endfor %}
+        {% if runs.count > 3 or comments.next_url %}
           <a class="feed-comments-more" href="{{ more_url }}">{{ ftl_get_message("recent-comments-more") }}</a>
         {% endif %}
       </div>

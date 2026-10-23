@@ -4924,6 +4924,11 @@ html[data-app] .about-stores {
   margin: 0;
 }
 
+/* The next of several said in a row on one drawing (comment_card_macro.jinja). */
+.comment-row-entry + .comment-row-entry {
+  margin-top: 8px;
+}
+
 .comment-row-post {
   margin-top: 4px;
   color: var(--ds-faint);
@@ -5003,6 +5008,13 @@ html[data-app] .about-stores {
 
 .feed-comments-list > .comment-row:nth-child(n+4),
 .feed-comments-list > .infinite-scroll-sentinel {
+  display: none;
+}
+
+/* And of several said in a row on one drawing, only the latest: three
+   rows of whole conversations would push the drawings as far down as the
+   list this replaces. */
+.feed-comments-list .comment-row-entry + .comment-row-entry {
   display: none;
 }
 
@@ -5129,6 +5141,10 @@ html[data-app] .about-stores {
 
   .feed-layout.has-comments .feed-comments-list > .comment-row:nth-child(n+4) {
     display: flex;
+  }
+
+  .feed-layout.has-comments .feed-comments-list .comment-row-entry + .comment-row-entry {
+    display: block;
   }
 
   .feed-layout.has-comments .feed-comments-list > .infinite-scroll-sentinel {

@@ -956,6 +956,74 @@ mod tests {
         assert!(without.contains(r#"<section class="feed-layout" role="region""#));
     }
 
+    /// Comments said one after another on the same drawing share its row:
+    /// one thumbnail and one title under them all, each still saying who
+    /// and what. One on another drawing between them starts a row of its own.
+    #[test]
+    fn consecutive_comments_on_one_drawing_share_a_row() {
+        let on = |id: u128, post: u128, content: &str| NotificationComment {
+            id: uuid::Uuid::from_u128(id),
+            post_id: uuid::Uuid::from_u128(post),
+            content: Some(content.to_string()),
+            ..sample_comment()
+        };
+        let rows = vec![
+            on(20, 1, "First"),
+            on(21, 1, "Second"),
+            on(22, 2, "Elsewhere"),
+            on(23, 1, "Back again"),
+        ];
+        let rendered = test_support::env()
+            .get_template("comments_fragment.jinja")
+            .expect("template loads")
+            .render(context! {
+                comments => super::comments_context(rows, "/api/home/comments"),
+                r2_public_endpoint_url => "https://images.example",
+            })
+            .expect("renders");
+        assert_eq!(rendered.matches(r#"<div class="comment-row">"#).count(), 3);
+        assert_eq!(rendered.matches("notification-post-image").count(), 3);
+        assert_eq!(rendered.matches("comment-row-post").count(), 3);
+        assert_eq!(rendered.matches("comment-row-content").count(), 4);
+        let second_row = rendered
+            .match_indices(r#"<div class="comment-row">"#)
+            .nth(1)
+            .unwrap()
+            .0;
+        let first_row = &rendered[..second_row];
+        assert!(first_row.contains("First") && first_row.contains("Second"));
+        assert_eq!(first_row.matches("comment-row-head").count(), 2);
+    }
+
+    /// A phone shows three rows beside the feed, and a row is a run of
+    /// comments on one drawing, so it is sent on to the rest only when there
+    /// are more than three runs, not more than three comments.
+    #[test]
+    fn the_link_to_more_comments_counts_rows_not_comments() {
+        let render = |posts: &[u128]| {
+            let rows = posts
+                .iter()
+                .enumerate()
+                .map(|(i, post)| NotificationComment {
+                    id: uuid::Uuid::from_u128(200 + i as u128),
+                    post_id: uuid::Uuid::from_u128(*post),
+                    ..sample_comment()
+                })
+                .collect();
+            test_support::env()
+                .get_template("home.jinja")
+                .expect("template loads")
+                .render(context! {
+                    comments => super::comments_context(rows, "/api/home/comments"),
+                    ..home_context(vec![sample_post()], false)
+                })
+                .expect("renders")
+        };
+        assert!(!render(&[1, 1, 1, 2, 2]).contains("feed-comments-more"));
+        assert!(!render(&[1, 2, 3]).contains("feed-comments-more"));
+        assert!(render(&[1, 2, 3, 1]).contains("feed-comments-more"));
+    }
+
     /// A commenter from this site is named by their login name alone; one
     /// from elsewhere keeps the domain that tells them apart.
     #[test]

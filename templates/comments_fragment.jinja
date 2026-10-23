@@ -3,7 +3,11 @@
    comments_context() in handlers/home.rs: `rows`, and `next_url` while a
    full batch says there may be more. A profile's (handlers/profile.rs)
    also says `by_drawing`: every row there is by the same person, so each
-   is headed by the drawing it is on instead (comment_card_macro.jinja). Rendered inline for the first batch
+   is headed by the drawing it is on instead (comment_card_macro.jinja).
+   Comments one after another on the same drawing share a row, so a
+   conversation under one drawing does not fill the list with its
+   thumbnail; a run a batch ends in carries on in a row of its own in the
+   next. Rendered inline for the first batch
    -- beside a feed (comments_aside_macro.jinja), on a feed's comments page
    (home_comments.jinja), a community's, a tag's, a profile's tab --
    and standalone by the load-more handlers for the rest, so it must not
@@ -13,8 +17,16 @@
    when that list is scrolled to it: htmx watches with an
    IntersectionObserver, which counts the list's own clipping. #}
 {% import "comment_card_macro.jinja" as comment_card_macro %}
+{% set runs = namespace(rows=[]) %}
 {% for comment in comments.rows %}
-  {{ comment_card_macro.comment_card(comment, r2_public_endpoint_url, ftl_get_message, by_drawing=comments.by_drawing) }}
+  {% if loop.previtem and loop.previtem.post_id == comment.post_id %}
+    {% set runs.rows = runs.rows[:-1] + [runs.rows[-1] + [comment]] %}
+  {% else %}
+    {% set runs.rows = runs.rows + [[comment]] %}
+  {% endif %}
+{% endfor %}
+{% for run in runs.rows %}
+  {{ comment_card_macro.comment_card(run, r2_public_endpoint_url, ftl_get_message, by_drawing=comments.by_drawing) }}
 {% endfor %}
 {% if comments.next_url %}
   <div class="infinite-scroll-sentinel"
