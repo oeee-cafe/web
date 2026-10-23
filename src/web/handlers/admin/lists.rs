@@ -181,7 +181,7 @@ pub async fn admin_communities(
     Query(query): Query<AdminListQuery>,
 ) -> Result<Html<String>, AppError> {
     let mut tx = state.db_pool.begin().await?;
-    let communities = find_all_communities_with_activity(&mut tx, query.sort).await?;
+    let communities = find_all_communities_with_activity(&mut tx, query.sort, None).await?;
     let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
     tx.commit().await?;
 

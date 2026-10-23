@@ -318,9 +318,12 @@ pub struct AdminCommunityActivity {
     pub last_active_at: Option<DateTime<Utc>>,
 }
 
+/// `only` narrows the list to one community, for the row its slug form
+/// swaps back in.
 pub async fn find_all_communities_with_activity(
     tx: &mut Transaction<'_, Postgres>,
     sort: AdminSort,
+    only: Option<Uuid>,
 ) -> Result<Vec<AdminCommunityActivity>> {
     let rows = query_as!(
         AdminCommunityActivity,
@@ -353,6 +356,7 @@ pub async fn find_all_communities_with_activity(
                     WHERE p.community_id = c.id AND p.deleted_at IS NULL
                 ) AS last_active_at
             FROM communities c
+            WHERE $2::uuid IS NULL OR c.id = $2
         ) c
         ORDER BY
             CASE WHEN $1 = 'created' THEN c.created_at END DESC,
@@ -360,8 +364,67 @@ pub async fn find_all_communities_with_activity(
             c.last_active_at DESC NULLS LAST
         "#,
         sort.as_sql(),
+        only,
     );
     Ok(rows.fetch_all(&mut **tx).await?)
+}
+
+/// Whose a slug already is, when it cannot be given to a community.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlugTaken {
+    /// Another community's, deleted ones included: the column is unique.
+    Community,
+    /// An account's login name, which `/@{slug}` would answer for instead.
+    Account,
+}
+
+/// Give a community a new slug, and its ActivityPub actor the username,
+/// handle and page that go with it. The old `/@{slug}` stops answering;
+/// nothing redirects from it. Telling followers is the caller's, after
+/// commit.
+pub async fn set_community_slug(
+    tx: &mut Transaction<'_, Postgres>,
+    community_id: Uuid,
+    slug: &str,
+    config: &crate::AppConfig,
+) -> Result<std::result::Result<(), SlugTaken>> {
+    let taken = query!(
+        r#"SELECT EXISTS(SELECT 1 FROM communities WHERE slug = $1 AND id <> $2) AS "exists!""#,
+        slug,
+        community_id,
+    )
+    .fetch_one(&mut **tx)
+    .await?
+    .exists;
+    if taken {
+        return Ok(Err(SlugTaken::Community));
+    }
+    if crate::models::community::slug_conflicts_with_user(tx, slug).await? {
+        return Ok(Err(SlugTaken::Account));
+    }
+
+    let community = query!(
+        r#"
+        UPDATE communities SET slug = $2, updated_at = now()
+        WHERE id = $1
+        RETURNING name, description
+        "#,
+        community_id,
+        slug,
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    // A private community has no actor, and this finds none to update.
+    crate::models::actor::update_actor_for_community(
+        tx,
+        community_id,
+        slug.to_string(),
+        community.name,
+        community.description,
+        config,
+    )
+    .await?;
+    Ok(Ok(()))
 }
 
 /// Which slice of the session list to show.

@@ -702,7 +702,7 @@ fn renders_communities_list() {
     let template = env
         .get_template("admin/communities.jinja")
         .expect("template loads");
-    template
+    let rendered = template
         .render(context! {
             current_user => Serde(current_user()),
             communities => Serde(sample_communities()),
@@ -712,6 +712,53 @@ fn renders_communities_list() {
             ftl_lang => "en",
         })
         .expect("communities.jinja renders");
+    // Each row's slug form is addressed by id, since the slug is what changes.
+    assert!(
+        rendered
+            .contains(r#"hx-post="/admin/communities/00000000-0000-0000-0000-000000000003/slug""#),
+        "{rendered}"
+    );
+    assert!(rendered.contains(r#"value="secret""#), "{rendered}");
+    assert!(!rendered.contains(">saved<"), "{rendered}");
+}
+
+#[test]
+fn a_refused_slug_stays_in_its_row() {
+    let env = test_env();
+    let template = env
+        .get_template("admin/community_row.jinja")
+        .expect("template loads");
+    let community = sample_communities()[0].clone();
+
+    let refused = template
+        .render(context! {
+            community => Serde(&community),
+            slug => Some("taken"),
+            saved => false,
+            error => Some("Another community has @taken."),
+        })
+        .expect("community_row.jinja renders");
+    assert!(refused.contains(r#"value="taken""#), "{refused}");
+    assert!(
+        refused.contains("Another community has @taken."),
+        "{refused}"
+    );
+    // The posts link still goes by the slug the community actually has.
+    assert!(
+        refused.contains("/admin/communities/secret/posts"),
+        "{refused}"
+    );
+
+    let saved = template
+        .render(context! {
+            community => Serde(&community),
+            slug => None::<&str>,
+            saved => true,
+            error => None::<String>,
+        })
+        .expect("community_row.jinja renders");
+    assert!(saved.contains(r#"value="secret""#), "{saved}");
+    assert!(saved.contains(">saved<"), "{saved}");
 }
 
 /// The catalogue as the handler hands it over: `StoreProduct`s grouped

@@ -8,6 +8,8 @@ mod posts;
 pub use posts::*;
 mod banners;
 pub use banners::*;
+mod communities;
+pub use communities::*;
 mod lists;
 pub use lists::*;
 mod overview;

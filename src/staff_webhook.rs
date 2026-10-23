@@ -228,6 +228,12 @@ pub enum Event {
         removed: bool,
         verified: bool,
     },
+    /// Staff gave a community a new slug from the communities list.
+    CommunitySlugSet {
+        from: String,
+        to: String,
+        by: String,
+    },
 }
 
 impl Event {
@@ -331,6 +337,13 @@ impl Event {
                 } else {
                     "took the explicit mark off"
                 },
+            ),
+            Event::CommunitySlugSet { from, to, by } => format!(
+                "🏷️ {} moved community @{} to [@{}]({base}/@{})",
+                account(base, by),
+                quote(from),
+                quote(to),
+                urlencoding::encode(to),
             ),
             Event::EmailSet {
                 login_name,
@@ -487,6 +500,20 @@ mod tests {
         assert_eq!(
             line,
             "✉️ [@oi](https://oeee.cafe/admin/users/oi) set [@fan](https://oeee.cafe/admin/users/fan)'s email, verified"
+        );
+    }
+
+    #[test]
+    fn a_community_slug_change_links_the_new_page() {
+        let line = Event::CommunitySlugSet {
+            from: "old_club".to_string(),
+            to: "new-club".to_string(),
+            by: "oi".to_string(),
+        }
+        .line(BASE);
+        assert_eq!(
+            line,
+            "🏷️ [@oi](https://oeee.cafe/admin/users/oi) moved community @old\\_club to [@new\\-club](https://oeee.cafe/@new-club)"
         );
     }
 

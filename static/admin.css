@@ -575,3 +575,15 @@ a.admin-figure.alert .admin-figure-label {
 .admin-user-filter > p {
   font-size: var(--ds-text-base);
 }
+
+/* The slug field in each row of the communities list. */
+.admin-slug-form {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin: 0;
+}
+
+.admin-slug-form .ds-input {
+  width: 12em;
+}

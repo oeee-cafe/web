@@ -1,0 +1,52 @@
+{# One community in communities.jinja, and what the slug endpoint
+   (handlers/admin/communities.rs) answers with, swapped in over the row. #}
+<tr>
+  <td>{{ community.name }}</td>
+  <td>
+    <form class="admin-slug-form"
+          hx-post="/admin/communities/{{ community.id }}/slug"
+          hx-target="closest tr"
+          hx-swap="outerHTML"
+          hx-disable="find button">
+      <span aria-hidden="true">@</span>
+      <input class="ds-input"
+             name="slug"
+             value="{{ slug or community.slug }}"
+             required
+             maxlength="50"
+             pattern="[A-Za-z0-9_\-]{1,50}"
+             spellcheck="false"
+             autocomplete="off"
+             aria-label="Slug of {{ community.name }}" />
+      <button type="submit" class="ds-button">Save</button>
+    </form>
+    {% if error %}<p class="admin-tag deleted">{{ error }}</p>{% endif %}
+    {% if saved %}<p class="admin-tag ok">saved</p>{% endif %}
+  </td>
+  <td>
+    {% if community.visibility != "public" %}
+      <span class="admin-tag {{ community.visibility }}">{{ community.visibility }}</span>
+    {% else %}
+      {{ community.visibility }}
+    {% endif %}
+  </td>
+  <td>{{ community.post_count }}</td>
+  <td>
+    {% if community.last_active_at %}
+      {{ community.last_active_at|datetimeformat(format="short", tz="Asia/Seoul") }}
+    {% else %}
+      <span class="muted">never</span>
+    {% endif %}
+  </td>
+  <td>{{ community.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
+  <td>
+    {% if community.deleted_at %}
+      <span class="admin-tag deleted">deleted</span>
+    {% else %}
+      active
+    {% endif %}
+  </td>
+  <td>
+    <a href="/admin/communities/{{ community.slug }}/posts">posts →</a>
+  </td>
+</tr>

@@ -12,6 +12,11 @@
       Includes unlisted and private communities. "Last active" is the most recent
       post; live collaborative sessions are not counted.
     </p>
+    <p class="ds-help">
+      A new slug moves the community's page to /@slug and its fediverse
+      handle with it. Nothing redirects from the old one, and links to it
+      stop working.
+    </p>
   </div>
   <div class="admin-table-scroll">
     <table>
@@ -29,36 +34,7 @@
       </thead>
       <tbody>
         {% for community in communities %}
-          <tr>
-            <td>{{ community.name }}</td>
-            <td>@{{ community.slug }}</td>
-            <td>
-              {% if community.visibility != "public" %}
-                <span class="admin-tag {{ community.visibility }}">{{ community.visibility }}</span>
-              {% else %}
-                {{ community.visibility }}
-              {% endif %}
-            </td>
-            <td>{{ community.post_count }}</td>
-            <td>
-              {% if community.last_active_at %}
-                {{ community.last_active_at|datetimeformat(format="short", tz="Asia/Seoul") }}
-              {% else %}
-                <span class="muted">never</span>
-              {% endif %}
-            </td>
-            <td>{{ community.created_at|dateformat(format="short", tz="Asia/Seoul") }}</td>
-            <td>
-              {% if community.deleted_at %}
-                <span class="admin-tag deleted">deleted</span>
-              {% else %}
-                active
-              {% endif %}
-            </td>
-            <td>
-              <a href="/admin/communities/{{ community.slug }}/posts">posts →</a>
-            </td>
-          </tr>
+          {% include "admin/community_row.jinja" %}
         {% endfor %}
       </tbody>
     </table>
