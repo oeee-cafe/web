@@ -3,7 +3,40 @@
    listbox. Every row is a link, so a click, a middle click and Enter all do
    what a link does; a row that is an action rather than a place carries
    `data-command`, a name from the toolbar's command registry, and runs that
-   instead. The script there selects the first row after each swap. #}
+   instead. The script there selects the first row after each swap.
+
+   A pasted address of the site's own (`is_link`) is the one row it names,
+   or a line saying there is nothing there the reader may open -- never the
+   name of something they may not. #}
+{%- if is_link %}
+  {%- if link %}
+  <li class="jump-heading" role="presentation">{{ ftl_get_message("jump-link") }}</li>
+  <li role="presentation">
+    <a class="jump-item" role="option" href="{{ link.href }}">
+      {%- if link.kind == "tag" %}
+      <span class="jump-chip jump-chip-tag" aria-hidden="true">#</span>
+      {%- elif link.kind == "post" %}
+      <span class="jump-chip jump-chip-page" aria-hidden="true">◧</span>
+      {%- elif link.kind == "room" %}
+      <span class="jump-chip jump-chip-page" aria-hidden="true">✎</span>
+      {%- else %}
+      <span class="jump-chip jump-chip-person" aria-hidden="true">@</span>
+      {%- endif %}
+      <span class="jump-name">{{ link.name or ftl_get_message("post-untitled") }}</span>
+      {%- set detail = link.detail or (ftl_get_message("collaborate") if link.kind == "room" else none) %}
+      {%- if link.login_name or detail %}
+      <span class="jump-detail">
+        {%- if link.login_name %}{{ handle(link.login_name, link=false) }}{% endif %}
+        {%- if link.login_name and detail %} · {% endif %}
+        {%- if detail %}{{ detail }}{% endif -%}
+      </span>
+      {%- endif %}
+    </a>
+  </li>
+  {%- else %}
+  <li class="jump-empty" role="presentation">{{ ftl_get_message("jump-link-none") }}</li>
+  {%- endif %}
+{%- else %}
 {%- set pages = [
   ("/", ftl_get_message("nav-home"), none),
   ("/communities", ftl_get_message("nav-communities"), none),
@@ -87,4 +120,5 @@
   </li>
 {%- elif not communities and not pages %}
   <li class="jump-empty" role="presentation">{{ ftl_get_message("jump-empty") }}</li>
+{%- endif %}
 {%- endif %}

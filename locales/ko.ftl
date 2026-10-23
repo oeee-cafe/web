@@ -268,11 +268,13 @@ tag-search-placeholder = 태그 검색...
 search = 검색
 
 jump-title = 바로 가기
-jump-placeholder = 어디로 갈까요? 커뮤니티, 사람, 태그…
+jump-placeholder = 어디로 갈까요? 커뮤니티, 사람, 태그, 링크…
 jump-communities = 커뮤니티
 jump-people = 사람
 jump-tags = 태그
 jump-pages = 페이지
+jump-link = 링크
+jump-link-none = 열 수 있는 게 없어요
 jump-search-drawings = 그림 검색:
 jump-empty = 그런 이름은 없어요
 jump-hint = ↑↓ 선택 · Enter 이동 · Esc 닫기

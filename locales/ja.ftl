@@ -268,11 +268,13 @@ tag-search-placeholder = タグを検索...
 search = 検索
 
 jump-title = ジャンプ
-jump-placeholder = どこへ？コミュニティ、人、タグ…
+jump-placeholder = どこへ？コミュニティ、人、タグ、リンク…
 jump-communities = コミュニティ
 jump-people = 人
 jump-tags = タグ
 jump-pages = ページ
+jump-link = リンク
+jump-link-none = 開けるものはありません
 jump-search-drawings = お絵かきを検索:
 jump-empty = その名前は見つかりません
 jump-hint = ↑↓ で選ぶ · Enter で移動 · Esc で閉じる

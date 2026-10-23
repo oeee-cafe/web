@@ -308,11 +308,13 @@ tag-search-placeholder = Search tags...
 search = Search
 
 jump-title = Jump to
-jump-placeholder = Where to? A community, a person, a tag…
+jump-placeholder = Where to? A community, a person, a tag, or a link…
 jump-communities = Communities
 jump-people = People
 jump-tags = Tags
 jump-pages = Pages
+jump-link = Link
+jump-link-none = Nothing here you can open
 jump-search-drawings = Search drawings for
 jump-empty = Nothing by that name
 jump-hint = ↑↓ to choose · Enter to go · Esc to close

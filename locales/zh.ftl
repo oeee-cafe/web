@@ -268,11 +268,13 @@ tag-search-placeholder = 搜索标签...
 search = 搜索
 
 jump-title = 快速跳转
-jump-placeholder = 去哪里？社区、用户、标签…
+jump-placeholder = 去哪里？社区、用户、标签、链接…
 jump-communities = 社区
 jump-people = 用户
 jump-tags = 标签
 jump-pages = 页面
+jump-link = 链接
+jump-link-none = 这里没有你能打开的内容
 jump-search-drawings = 搜索作品：
 jump-empty = 没有这个名字
 jump-hint = ↑↓ 选择 · Enter 前往 · Esc 关闭
