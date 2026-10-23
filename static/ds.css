@@ -4052,6 +4052,12 @@ a.ds-handle-supporter:active {
   margin-bottom: 4px;
 }
 
+/* As tall from the first paint as with the suggestions in it, so their
+   arriving moves nothing below (frontend/site/drawDialog.ts). */
+.draw-dialog-community .community-search-list {
+  height: 9.5em;
+}
+
 /* An alert: one question, Cancel, and the action named for what it does
    (confirm_dialog.jinja). Narrower than a dialog, since it holds a sentence
    and two buttons, and the buttons sit at its foot on the right, the

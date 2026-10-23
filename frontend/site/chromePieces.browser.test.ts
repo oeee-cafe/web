@@ -86,10 +86,12 @@ describe("the Draw dialog", () => {
       expect(asked).toEqual([]);
       await userEvent.click(document.getElementById("nav-draw-button")!);
       const search = document.querySelector<HTMLElement>("[data-draw-dialog-search]")!;
-      await expect.poll(() => search.hidden).toBe(false);
+      // There at once, before the server answers, so nothing moves when it does.
+      expect(search.hidden).toBe(false);
       expect(asked).toEqual(["/draw/communities"]);
+      const names = () => [...search.querySelectorAll<HTMLElement>("[role=option]")].map((o) => o.textContent);
+      await expect.poll(names).toEqual(["Personal", "Clubmember"]);
       const options = [...search.querySelectorAll<HTMLElement>("[role=option]")];
-      expect(options.map((o) => o.textContent)).toEqual(["Personal", "Clubmember"]);
       options[1]!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
       expect(document.querySelector<HTMLInputElement>("[data-draw-dialog-community]")!.value).toBe("c1");
 
