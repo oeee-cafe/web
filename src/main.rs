@@ -102,7 +102,13 @@ fn main() {
             tracing::debug!("config: {:?}", cfg);
             oeee_cafe::staff_webhook::start(&cfg);
 
-            let template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates");
+            // From the working directory, as static/ and the bundles are
+            // served (web/app.rs): the image's /app, or the checkout under
+            // `cargo run`. Never CARGO_MANIFEST_DIR, which is where the binary
+            // was compiled -- /app only while the Dockerfile compiled it; on
+            // the image workflow's runner it named a directory the image does
+            // not have, and every page was a 500.
+            let template_path = PathBuf::from("templates");
             let mut env = Environment::new();
             // minijinja picks escaping from the file extension by default, and
             // only .html/.htm/.xml get it — every template here is .jinja, so
