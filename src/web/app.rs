@@ -76,10 +76,11 @@ use crate::web::handlers::post::{
 use crate::web::handlers::privacy::privacy;
 use crate::web::handlers::profile::{
     banner_management, do_activate_banner, do_add_link, do_delete_banner,
-    do_delete_guestbook_entry, do_delete_link, do_follow_profile, do_move_link_down,
-    do_move_link_up, do_reply_guestbook_entry, do_unfollow_profile, do_write_guestbook_entry,
-    guestbook, load_more_profile_posts, load_more_profile_private_posts, profile_banners_iframe,
-    profile_comments, profile_iframe, profile_or_community, profile_private, profile_settings,
+    do_delete_guestbook_entry, do_delete_link, do_edit_profile, do_follow_profile,
+    do_move_link_down, do_move_link_up, do_reply_guestbook_entry, do_unfollow_profile,
+    do_write_guestbook_entry, guestbook, load_more_profile_posts, load_more_profile_private_posts,
+    profile_banners_iframe, profile_comments, profile_iframe, profile_or_community,
+    profile_private, profile_settings,
 };
 use crate::web::handlers::report::{hx_report_post, hx_report_profile};
 use crate::web::handlers::search::search_page;
@@ -556,6 +557,7 @@ impl App {
                 post(do_move_link_down),
             )
             .route("/@{login_name}/settings", get(profile_settings))
+            .route("/@{login_name}/settings/profile", post(do_edit_profile))
             .route("/@{login_name}/settings/banners", get(banner_management))
             .route("/banners/{banner_id}/activate", post(do_activate_banner))
             .route("/banners/{banner_id}", delete(do_delete_banner))

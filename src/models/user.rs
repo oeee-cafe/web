@@ -432,6 +432,73 @@ pub async fn update_user_with_activity(
     Ok(updated_user)
 }
 
+/// The longest a profile description may be, in characters. The column's
+/// own check holds it to the same.
+pub const BIO_MAX_CHARS: usize = 1000;
+
+/// What a person says about themselves on their profile, as they typed it.
+pub async fn find_user_bio(tx: &mut Transaction<'_, Postgres>, id: Uuid) -> Result<String> {
+    let result = query!("SELECT bio FROM users WHERE id = $1", id)
+        .fetch_one(&mut **tx)
+        .await?;
+    Ok(result.bio)
+}
+
+/// A profile description as the HTML its actor's `summary` carries: the
+/// text escaped, a blank line between paragraphs, and a line break where
+/// they pressed return.
+pub fn bio_html(bio: &str) -> String {
+    let bio = bio.replace("\r\n", "\n");
+    bio.split("\n\n")
+        .map(str::trim)
+        .filter(|paragraph| !paragraph.is_empty())
+        .map(|paragraph| {
+            let lines: Vec<String> = paragraph
+                .lines()
+                .map(crate::markdown_utils::escape_html)
+                .collect();
+            format!("<p>{}</p>", lines.join("<br>"))
+        })
+        .collect()
+}
+
+/// Sets the name a person goes by and what they say about themselves, on
+/// their account and on their actor, and tells their followers' servers.
+/// The login name stays as it is; that is changed from the account page.
+pub async fn update_profile_with_activity(
+    tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
+    display_name: &str,
+    bio: &str,
+    state: &crate::web::state::AppState,
+) -> Result<()> {
+    query!(
+        "UPDATE users SET display_name = $1, bio = $2, updated_at = now() WHERE id = $3",
+        display_name,
+        bio,
+        id,
+    )
+    .execute(&mut **tx)
+    .await?;
+    query!(
+        "UPDATE actors SET name = $1, bio_html = $2, updated_at = now() WHERE user_id = $3",
+        display_name,
+        bio_html(bio),
+        id,
+    )
+    .execute(&mut **tx)
+    .await?;
+
+    if let Some(actor) = super::actor::Actor::find_by_user_id(tx, id).await? {
+        if let Err(e) = crate::web::handlers::activitypub::send_update_activity(&actor, state).await
+        {
+            tracing::warn!("Failed to send Update activity for user {}: {:?}", id, e);
+        }
+    }
+
+    Ok(())
+}
+
 /// Check if a login_name conflicts with any existing community slug
 pub async fn login_name_conflicts_with_community(
     tx: &mut Transaction<'_, Postgres>,
@@ -876,6 +943,20 @@ impl AuthnBackend for Backend {
 }
 
 pub type AuthSession = axum_login::AuthSession<Backend>;
+
+#[cfg(test)]
+mod bio_tests {
+    use super::bio_html;
+
+    #[test]
+    fn a_bio_is_paragraphs_and_line_breaks_of_escaped_text() {
+        assert_eq!(
+            bio_html("I draw <cats>\r\nmostly\n\n\n& dogs\n"),
+            "<p>I draw &lt;cats&gt;<br>mostly</p><p>&amp; dogs</p>"
+        );
+        assert_eq!(bio_html("  \n\n "), "");
+    }
+}
 
 #[cfg(test)]
 mod password_tests {

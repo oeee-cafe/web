@@ -747,3 +747,102 @@ fn the_profile_shows_how_many_days_in_a_row_its_owner_has_drawn() {
     assert!(render(1, 1).is_none());
     assert!(render(0, 0).is_none());
 }
+
+/// What its owner says about themselves, under their handle, as text: its
+/// markup shown rather than read, and none of it there when they have
+/// said nothing.
+#[test]
+fn the_profile_shows_its_owners_description_as_text() {
+    let env = test_support::env();
+    let render = |bio: &str| {
+        env.get_template("profile.jinja")
+            .expect("profile loads")
+            .render(context! {
+                user => Serde(json!({
+                    "id": "u1",
+                    "login_name": "oeee",
+                    "display_name": "오이",
+                    "created_at": "2024-02-29T16:30:00Z",
+                })),
+                bio,
+                banner => Serde(json!(null)),
+                links => Serde(Vec::<serde_json::Value>::new()),
+                followings => Serde(Vec::<serde_json::Value>::new()),
+                achievements => Serde(Vec::<serde_json::Value>::new()),
+                public_count => 0,
+                public_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
+                private_count => 0,
+                private_feed => Serde(json!({"posts": [], "headings": [], "has_more": false, "next_url": ""})),
+                domain => "oeee.cafe",
+                is_following => false,
+                ..chrome()
+            })
+            .expect("profile renders")
+    };
+    let with = render("고양이를 <b>그려요</b>");
+    assert!(
+        with.contains(r#"<p class="profile-bio">고양이를 &lt;b&gt;그려요&lt;&#x2f;b&gt;</p>"#),
+        "{with}"
+    );
+    assert!(with.contains(r#"content="고양이를 &lt;b&gt;그려요&lt;&#x2f;b&gt;" />"#));
+    let without = render("");
+    assert!(!without.contains("profile-bio"));
+    assert!(
+        without.contains(r#"content="오이 @oeee@oeee.cafe""#),
+        "{without}"
+    );
+}
+
+/// The settings page's own form for the name they go by and what they say
+/// about themselves, which comes back alone from saving it: saying so, or
+/// saying what was wrong with what they typed and keeping it.
+#[test]
+fn the_profile_form_comes_back_saying_how_it_went() {
+    let env = test_support::env();
+    let template = env
+        .get_template("profile_settings.jinja")
+        .expect("profile settings loads");
+    let user = json!({"login_name": "oeee", "display_name": "오이", "email_verified_at": "2024-01-01T00:00:00Z"});
+
+    let page = template
+        .render(context! {
+            user => Serde(user.clone()),
+            bio => "안녕",
+            links => Serde(Vec::<serde_json::Value>::new()),
+            ..chrome()
+        })
+        .expect("profile settings renders");
+    assert!(page.contains(r#"hx-post="/@oeee/settings/profile""#));
+    assert!(page.contains(r#"value="오이""#));
+    assert!(page.contains(">안녕</textarea>"));
+    assert!(!page.contains("settings-status is-"));
+
+    // As `Templates::render_block` does it.
+    let block = |ctx: minijinja::Value| {
+        template
+            .render_captured_to(ctx, std::io::sink())
+            .and_then(|mut captured| captured.with_state_mut(|state| state.render_block("profile")))
+            .expect("profile form renders alone")
+    };
+    let refused = block(context! {
+        user => Serde(user.clone()),
+        display_name => "   ",
+        bio => "안녕",
+        profile_error => "display-name-required",
+        profile_saved => false,
+        ..chrome()
+    });
+    assert!(!refused.contains("<html"));
+    assert!(refused.contains(r#"<p class="settings-status is-danger">display-name-required</p>"#));
+    assert!(refused.contains(r#"value="   ""#));
+    let saved = block(context! {
+        user => Serde(user),
+        display_name => "오이2",
+        bio => "",
+        profile_error => (),
+        profile_saved => true,
+        ..chrome()
+    });
+    assert!(saved.contains("profile-about-saved"));
+    assert!(saved.contains(r#"value="오이2""#));
+}

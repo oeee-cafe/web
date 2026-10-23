@@ -15,6 +15,41 @@
     </div>
 
     <section class="settings-group">
+      <div class="profile-section-label">{{ ftl_get_message("profile-about") }}</div>
+      {% block profile %}
+        {# The name they go by and what they say about themselves; the login
+           name is the account page's. The form swaps itself for the one the
+           server sends back, which says whether it was saved. #}
+        <form method="post"
+              action="/@{{ user.login_name }}/settings/profile"
+              class="ds-card settings-card"
+              hx-post="/@{{ user.login_name }}/settings/profile"
+              hx-target="this"
+              hx-swap="outerHTML"
+              hx-disable="find button">
+          {% if profile_error %}
+            <p class="settings-status is-danger">{{ ftl_get_message(profile_error) }}</p>
+          {% elif profile_saved %}
+            <p class="settings-status is-good">{{ ftl_get_message("profile-about-saved") }}</p>
+          {% endif %}
+          <div class="form-field">
+            <label class="ds-label" for="display_name">{{ ftl_get_message("display-name") }}</label>
+            <input class="ds-input" name="display_name" id="display_name" required maxlength="255"
+                   value="{{ display_name if display_name is defined else user.display_name }}" />
+          </div>
+          <div class="form-field">
+            <label class="ds-label" for="bio">{{ ftl_get_message("profile-bio") }}</label>
+            <textarea class="ds-textarea" name="bio" id="bio" rows="4" maxlength="1000">{{ bio }}</textarea>
+          </div>
+          <div class="settings-foot">
+            <span></span>
+            <button type="submit" class="ds-button ds-button-primary">{{ ftl_get_message("profile-about-save") }}</button>
+          </div>
+        </form>
+      {% endblock profile %}
+    </section>
+
+    <section class="settings-group">
       <div class="profile-section-label">{{ ftl_get_message("banner-management-title") }}</div>
       <div class="ds-card settings-card settings-row">
         <span class="settings-row-text">{{ ftl_get_message("banner-management-title") }}</span>

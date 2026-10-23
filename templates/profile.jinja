@@ -12,7 +12,7 @@
   <meta property="og:title"
         content="{{ user.display_name }} (@{{ user.login_name }})" />
   <meta property="og:description"
-        content="{{ user.display_name }} @{{ user.login_name }}@{{ domain }}" />
+        content="{{ bio if bio else user.display_name ~ ' @' ~ user.login_name ~ '@' ~ domain }}" />
   <meta property="og:url" content="{{ base_url|safe }}/@{{ user.login_name }}" />
   {# The banner is the one image that belongs to a profile; fall back to the
      site mark when the user has not drawn one. #}
@@ -57,6 +57,11 @@
         <div class="profile-identity">
           <h1 class="profile-name">{{ user.display_name }}</h1>
           <div class="profile-handle">@{{ user.login_name }}@{{ domain }}</div>
+          {# What they say about themselves, as they typed it: its line
+             breaks kept by the stylesheet, nothing in it read as markup. #}
+          {% if bio %}
+            <p class="profile-bio">{{ bio }}</p>
+          {% endif %}
           {# The month they joined, in Seoul time like every other date on
              the site. Year and month go to the locale as numbers, so each
              language words and orders them itself. #}

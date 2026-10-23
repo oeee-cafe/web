@@ -24,7 +24,10 @@ use crate::models::post::{
     find_published_public_posts_by_author_id, ProfileDrawings,
 };
 use crate::models::supporter::standings;
-use crate::models::user::{find_user_by_id, find_user_by_login_name, AuthSession, User};
+use crate::models::user::{
+    find_user_bio, find_user_by_id, find_user_by_login_name, update_profile_with_activity,
+    AuthSession, User, BIO_MAX_CHARS,
+};
 use crate::web::context::CommonContext;
 use crate::web::handlers::community::render_community_page;
 use crate::web::handlers::home::{feed_context, LoadMoreQuery, HOME_POSTS_PER_BATCH};
@@ -424,6 +427,7 @@ async fn render_profile(
     let supporter_standings = standings(tx, user.id).await?;
     let pickles_received = pickle::received_by(tx, user.id).await?;
     let streaks = drawing_streaks(tx, user.id, chrono::Utc::now()).await?;
+    let bio = find_user_bio(tx, user.id).await?;
     let links = find_links_by_user_id(tx, user.id).await?;
     let links = links
         .iter()
@@ -466,6 +470,7 @@ async fn render_profile(
                 supporter_standings => Serde(supporter_standings),
                 pickles_received,
                 streaks => Serde(streaks),
+                bio,
                 user => Serde(Some(user)),
                 domain => state.config.domain.clone(),
                 public_count,
@@ -867,6 +872,7 @@ pub async fn profile_settings(
     let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
 
     let links = find_links_by_user_id(&mut tx, user.id).await?;
+    let bio = find_user_bio(&mut tx, user.id).await?;
 
     let rendered = state
         .render_page(
@@ -874,11 +880,88 @@ pub async fn profile_settings(
             common_ctx,
             context! {
                 links => Serde(links),
+                bio,
                 user => Serde(Some(user)),
             },
         )
         .await?;
 
+    Ok(Html(rendered).into_response())
+}
+
+#[derive(Deserialize)]
+pub struct EditProfileForm {
+    pub display_name: String,
+    pub bio: String,
+}
+
+/// The name someone goes by and what they say about themselves, from their
+/// profile settings. Answers htmx with the form again, saying whether it
+/// was saved; a browser without it is sent back to the settings page.
+pub async fn do_edit_profile(
+    auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+    headers: HeaderMap,
+    Form(form): Form<EditProfileForm>,
+) -> Result<impl IntoResponse, AppError> {
+    let current_user = auth_session.user.as_ref().ok_or(AppError::Unauthorized)?;
+
+    let db = &state.db_pool;
+    let mut tx = db.begin().await?;
+
+    let user = find_user_by_login_name(&mut tx, &login_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+
+    if user.id != current_user.id {
+        return Err(AppError::Forbidden);
+    }
+
+    let display_name = form.display_name.trim();
+    let bio = form.bio.trim();
+    let error = if display_name.is_empty() {
+        Some("display-name-required")
+    } else if display_name.chars().count() > 255 {
+        Some("display-name-too-long")
+    } else if bio.chars().count() > BIO_MAX_CHARS {
+        Some("profile-bio-too-long")
+    } else {
+        None
+    };
+
+    let user = if error.is_none() {
+        update_profile_with_activity(&mut tx, user.id, display_name, bio, &state).await?;
+        let user = find_user_by_id(&mut tx, user.id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+        tx.commit().await?;
+        user
+    } else {
+        user
+    };
+
+    if !crate::web::htmx::is_htmx(&headers) {
+        return Ok(Redirect::to(&format!("/@{}/settings", user.login_name)).into_response());
+    }
+
+    let rendered = state
+        .render_block(
+            "profile_settings.jinja",
+            "profile",
+            context! {
+                // What was saved, or what they typed when it was refused,
+                // so they need not type it again.
+                display_name => if error.is_none() { display_name } else { &form.display_name },
+                bio => if error.is_none() { bio } else { &form.bio },
+                user => Serde(user),
+                profile_error => error,
+                profile_saved => error.is_none(),
+                ftl_lang,
+            },
+        )
+        .await?;
     Ok(Html(rendered).into_response())
 }
 

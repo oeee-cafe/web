@@ -34,6 +34,9 @@ pub struct Person {
     followers: Url,
     manually_approves_followers: bool,
     pub(super) url: Url,
+    /// What they say about themselves, as HTML (`models::user::bio_html`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    summary: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -231,6 +234,7 @@ pub fn actor_object(actor: Actor, uris: &Uris) -> Result<ActorObject, AppError> 
             outbox: format!("{}/outbox", actor.iri).parse()?,
             preferred_username: actor.username,
             url: actor.url.parse()?,
+            summary: (!actor.bio_html.is_empty()).then_some(actor.bio_html),
         })),
     }
 }

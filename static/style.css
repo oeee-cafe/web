@@ -3160,6 +3160,13 @@ a.mention:hover {
   font-size: var(--ds-text-m);
 }
 
+.profile-bio {
+  margin: var(--ds-space-2) 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  font-size: var(--ds-text-m);
+}
+
 .profile-joined {
   margin-top: 2px;
   color: var(--ds-muted);
