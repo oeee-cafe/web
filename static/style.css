@@ -4916,6 +4916,14 @@ html[data-app] .about-stores {
   z-index: 1;
 }
 
+/* A mention from another server, or from the apps, arrives as markup of
+   its own without the `mention` class, so it underlines here as one does. */
+@media (hover: hover), (min--moz-device-pixel-ratio: 0) {
+  .comment-row-content a:hover {
+    text-decoration: underline;
+  }
+}
+
 .comment-row-content {
   margin-top: 2px;
   font-size: var(--ds-text-base);
