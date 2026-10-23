@@ -93,6 +93,7 @@ push-notification-comment-reply-body = { $name }さんがコメントに返信�
 push-notification-community-post-title = 新しいコミュニティ投稿
 push-notification-community-post-body = { $name }さんがコミュニティに絵を描きました
 push-notification-community-post-body-with-title = { $name }さんがコミュニティに絵を描きました: { $title }
+push-notification-following-post-title = { $name }さんが新しい絵を投稿しました
 push-notification-pickle-title = { $name }さんがピクルスを贈りました
 push-notification-pickle-body = 今週ひとつだけのピクルスがあなたの絵に届きました
 push-notification-pickle-body-with-title = 今週ひとつだけのピクルスが{ $title }に届きました

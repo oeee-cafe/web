@@ -1009,6 +1009,14 @@ pub async fn save_collaborative_session(
     .await
     .map_err(|e| anyhow::anyhow!("Save failed: {}", e))?;
 
+    // The owner's followers, other than the people who were in the room.
+    crate::models::notification::push_post_to_followers(
+        &state.push_service,
+        db,
+        post_id,
+        Vec::new(),
+    );
+
     // Where the post lives now that it exists, community and all.
     let post_url = db::saved_post_path(db, session_uuid)
         .await?

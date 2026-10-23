@@ -93,6 +93,7 @@ push-notification-comment-reply-body = { $name }님이 댓글에 답글을 남�
 push-notification-community-post-title = 새 커뮤니티 게시물
 push-notification-community-post-body = { $name }님이 커뮤니티에 그림을 그렸습니다
 push-notification-community-post-body-with-title = { $name }님이 커뮤니티에 그림을 그렸습니다: { $title }
+push-notification-following-post-title = { $name }님이 새 그림을 올렸습니다
 push-notification-pickle-title = { $name }님이 피클을 주었습니다
 push-notification-pickle-body = 이번 주 단 하나의 피클이 내 그림에 왔습니다
 push-notification-pickle-body-with-title = 이번 주 단 하나의 피클이 { $title }에 왔습니다

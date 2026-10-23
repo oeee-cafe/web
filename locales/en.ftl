@@ -117,6 +117,7 @@ push-notification-comment-reply-body = { $name } replied to your comment
 push-notification-community-post-title = New community post
 push-notification-community-post-body = { $name } posted in your community
 push-notification-community-post-body-with-title = { $name } posted in your community: { $title }
+push-notification-following-post-title = { $name } posted a new drawing
 push-notification-pickle-title = { $name } gave you a pickle
 push-notification-pickle-body = Their one pickle this week went to your drawing
 push-notification-pickle-body-with-title = Their one pickle this week went to { $title }

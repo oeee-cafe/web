@@ -93,6 +93,7 @@ push-notification-comment-reply-body = { $name }回复了您的评论
 push-notification-community-post-title = 新社区作品
 push-notification-community-post-body = { $name }在您的社区发布了作品
 push-notification-community-post-body-with-title = { $name }在您的社区发布了作品：{ $title }
+push-notification-following-post-title = { $name }发布了新作品
 push-notification-pickle-title = { $name }送了你一根腌黄瓜
 push-notification-pickle-body = 本周唯一的一根腌黄瓜送给了你的画
 push-notification-pickle-body-with-title = 本周唯一的一根腌黄瓜送给了{ $title }

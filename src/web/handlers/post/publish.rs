@@ -5,8 +5,8 @@ use crate::models::achievement::award_achievements;
 use crate::models::actor::Actor;
 use crate::models::community::{find_community_by_id, is_user_member};
 use crate::models::notification::{
-    create_notification, get_badge_count, get_notification_by_id, send_push_for_notification,
-    CreateNotificationParams, NotificationType,
+    create_notification, get_badge_count, get_notification_by_id, push_post_to_followers,
+    send_push_for_notification, CreateNotificationParams, NotificationType,
 };
 use crate::models::post::{find_draft_posts_by_author_id, find_post_by_id, publish_post};
 use crate::models::tag::set_post_tags;
@@ -338,6 +338,17 @@ pub async fn post_publish(
             by: user_id,
         });
     }
+
+    // The author's followers, but not anybody this publish notified already.
+    push_post_to_followers(
+        &state.push_service,
+        &state.db_pool,
+        post_id,
+        notification_info
+            .iter()
+            .map(|(_, recipient_id)| *recipient_id)
+            .collect(),
+    );
 
     // Send push notifications for created notifications
     if !notification_info.is_empty() {

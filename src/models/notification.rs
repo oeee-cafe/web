@@ -680,6 +680,171 @@ pub fn push_later(
     });
 }
 
+/// Push a drawing just published to the author's followers here, once the
+/// transaction that published it has committed, in a task of its own.
+///
+/// Only a push: no row on anyone's bell, which would make the notifications
+/// page a second copy of the following feed. So it carries no badge, and
+/// tapping it opens the post itself rather than `/notifications/{id}/open`.
+///
+/// Only to followers the post is for: a personal post or one in a public
+/// community reaches them all, one in an unlisted or private community only
+/// those who are its members, so a push never shows somebody a community
+/// they had no way to find. A reply goes to nobody (its parent's author has
+/// a notification of their own, and no feed shows replies), nor does a
+/// sensitive drawing to a follower who has chosen not to see them. Nor does
+/// it go to anybody who drew in it or watched it being drawn, or to the
+/// people in `already_told`, whom this publish has notified already.
+pub fn push_post_to_followers(
+    push_service: &std::sync::Arc<crate::push::PushService>,
+    db_pool: &sqlx::PgPool,
+    post_id: Uuid,
+    already_told: Vec<Uuid>,
+) {
+    let push_service = push_service.clone();
+    let db_pool = db_pool.clone();
+    tokio::spawn(async move {
+        if let Err(e) =
+            push_post_to_followers_now(&push_service, &db_pool, post_id, &already_told).await
+        {
+            tracing::warn!("Failed to push post {} to followers: {:?}", post_id, e);
+        }
+    });
+}
+
+async fn push_post_to_followers_now(
+    push_service: &crate::push::PushService,
+    db_pool: &sqlx::PgPool,
+    post_id: Uuid,
+    already_told: &[Uuid],
+) -> Result<()> {
+    let Some(post) = sqlx::query!(
+        r#"
+        SELECT
+            posts.title,
+            users.login_name,
+            users.display_name,
+            communities.slug AS "community_slug?"
+        FROM posts
+        JOIN users ON users.id = posts.author_id
+        LEFT JOIN communities ON communities.id = posts.community_id
+        WHERE posts.id = $1
+        "#,
+        post_id
+    )
+    .fetch_optional(db_pool)
+    .await?
+    else {
+        return Ok(());
+    };
+
+    let followers = {
+        let mut conn = db_pool.acquire().await?;
+        followers_to_push(&mut conn, post_id, already_told).await?
+    };
+
+    let url = crate::models::post::post_page_path(
+        &post.login_name,
+        post.community_slug.as_deref(),
+        post_id,
+    );
+    for (follower_id, preferred_language) in followers {
+        let bundle = get_fluent_bundle(preferred_language);
+        let mut args = FluentArgs::new();
+        args.set("name", post.display_name.clone());
+        let title = get_localized_message(
+            &bundle,
+            "push-notification-following-post-title",
+            Some(&args),
+        );
+        let body = post.title.clone().unwrap_or_default();
+
+        let mut data = serde_json::Map::new();
+        data.insert(
+            "notification_type".to_string(),
+            serde_json::json!("FollowingPost"),
+        );
+        data.insert(
+            "post_id".to_string(),
+            serde_json::json!(post_id.to_string()),
+        );
+        data.insert(
+            "actor_login_name".to_string(),
+            serde_json::json!(post.login_name),
+        );
+
+        if let Err(e) = push_service
+            .send_notification_to_user(follower_id, &title, &body, None, &url, data)
+            .await
+        {
+            tracing::warn!(
+                "Failed to push post {} to follower {}: {:?}",
+                post_id,
+                follower_id,
+                e
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Whom [`push_post_to_followers`] tells about `post_id`, each with the
+/// language to tell them in.
+async fn followers_to_push(
+    conn: &mut sqlx::PgConnection,
+    post_id: Uuid,
+    already_told: &[Uuid],
+) -> Result<Vec<(Uuid, Option<Language>)>> {
+    let followers = sqlx::query!(
+        r#"
+        SELECT
+            follower.id,
+            follower.preferred_language AS "preferred_language: Language"
+        FROM posts
+        JOIN actors author_actor ON author_actor.user_id = posts.author_id
+        JOIN follows ON follows.following_actor_id = author_actor.id
+        JOIN actors follower_actor ON follower_actor.id = follows.follower_actor_id
+        JOIN users follower ON follower.id = follower_actor.user_id
+        LEFT JOIN communities ON communities.id = posts.community_id
+        WHERE posts.id = $1
+          AND posts.published_at IS NOT NULL
+          AND posts.deleted_at IS NULL
+          AND posts.parent_post_id IS NULL
+          AND follower.id <> posts.author_id
+          AND follower.id <> ALL($2)
+          AND (
+              communities.id IS NULL
+              OR communities.visibility = 'public'
+              OR EXISTS (
+                  SELECT 1 FROM community_members
+                  WHERE community_members.community_id = communities.id
+                    AND community_members.user_id = follower.id
+              )
+          )
+          AND (
+              (NOT posts.is_sensitive AND NOT posts.is_explicit)
+              OR follower.show_sensitive_content
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM collaborative_sessions
+              JOIN collaborative_sessions_participants
+                ON collaborative_sessions_participants.session_id = collaborative_sessions.id
+              WHERE collaborative_sessions.saved_post_id = posts.id
+                AND collaborative_sessions_participants.user_id = follower.id
+          )
+        "#,
+        post_id,
+        already_told
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(followers
+        .into_iter()
+        .map(|row| (row.id, row.preferred_language))
+        .collect())
+}
+
 /// Send push notification for a newly created notification
 /// This should be called after create_notification() succeeds and the transaction is committed
 pub async fn send_push_for_notification(
@@ -1327,5 +1492,135 @@ mod tests {
         let mut remote = notification(NotificationType::Follow);
         remote.handle = Handle::Remote("@far@example.social".to_string());
         assert_eq!(notification_url(&remote, "me"), "/notifications");
+    }
+
+    /// A new drawing is pushed to the followers it is for: everybody for a
+    /// personal one, a private community's members for one there, nobody
+    /// for a reply, and a sensitive one only to whoever has chosen to see
+    /// them. Never to anybody already told, or to anybody who was in the
+    /// room it was drawn in.
+    #[tokio::test]
+    async fn a_new_post_is_pushed_to_the_followers_it_is_for() {
+        async fn pushed(
+            tx: &mut Transaction<'_, Postgres>,
+            post: Uuid,
+            already_told: Vec<Uuid>,
+        ) -> BTreeSet<Uuid> {
+            followers_to_push(tx, post, &already_told)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect()
+        }
+
+        use crate::models::people::fixtures::{person, post, tag, tx};
+        let Some(mut tx) = tx().await else { return };
+        let tag = tag();
+        let (author, author_actor) = person(&mut tx, &format!("author_{tag}"), "Author").await;
+        let mut followers = Vec::new();
+        for name in ["member", "outsider", "squeamish", "told", "drew"] {
+            let (user, actor) = person(&mut tx, &format!("{name}_{tag}"), name).await;
+            sqlx::query!(
+                "INSERT INTO follows (follower_actor_id, following_actor_id) VALUES ($1, $2)",
+                actor,
+                author_actor
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+            followers.push(user);
+        }
+        let [member, outsider, squeamish, told, drew] = followers[..] else {
+            unreachable!()
+        };
+        // Somebody who does not follow the author is told nothing.
+        person(&mut tx, &format!("stranger_{tag}"), "stranger").await;
+        sqlx::query!(
+            "UPDATE users SET show_sensitive_content = (id <> $1) WHERE id = ANY($2)",
+            squeamish,
+            &followers
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+
+        let personal = post(&mut tx, author).await;
+        let collaborative = sqlx::query_scalar!(
+            "INSERT INTO collaborative_sessions (owner_id, max_participants, width, height, is_public, saved_post_id)
+             VALUES ($1, 2, 10, 10, true, $2) RETURNING id",
+            author,
+            personal
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query!(
+            "INSERT INTO collaborative_sessions_participants (session_id, user_id) VALUES ($1, $2)",
+            collaborative,
+            drew
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        assert_eq!(
+            pushed(&mut tx, personal, vec![told]).await,
+            BTreeSet::from([member, outsider, squeamish])
+        );
+
+        let private = sqlx::query_scalar!(
+            "INSERT INTO communities (owner_id, name, description, visibility, slug)
+             VALUES ($1, $2, '', 'private', $2) RETURNING id",
+            author,
+            format!("private_{tag}")
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query!(
+            "INSERT INTO community_members (community_id, user_id) VALUES ($1, $2)",
+            private,
+            member
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        let in_private = post(&mut tx, author).await;
+        let sensitive = post(&mut tx, author).await;
+        let reply = post(&mut tx, author).await;
+        sqlx::query!(
+            "UPDATE posts SET community_id = $2 WHERE id = $1",
+            in_private,
+            private
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query!(
+            "UPDATE posts SET is_sensitive = true WHERE id = $1",
+            sensitive
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query!(
+            "UPDATE posts SET parent_post_id = $2 WHERE id = $1",
+            reply,
+            personal
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        assert_eq!(
+            pushed(&mut tx, in_private, vec![]).await,
+            BTreeSet::from([member])
+        );
+        assert_eq!(
+            pushed(&mut tx, sensitive, vec![]).await,
+            BTreeSet::from([member, outsider, told, drew])
+        );
+        assert_eq!(pushed(&mut tx, reply, vec![]).await, BTreeSet::new());
+
+        tx.rollback().await.unwrap();
     }
 }
