@@ -1,9 +1,10 @@
 {% from "storage_macro.jinja" import stored_url %}
 {% from "person_macro.jinja" import handle %}
 {# Comments in a list of them, one row for each run said in a row on the
-   same drawing (comments_fragment.jinja groups them): the drawing they are
-   on, framed, then for each who said it and when and what they said, and
-   the drawing's title once under them all. The whole row goes to the
+   same drawing (comments_fragment.jinja groups them, oldest first): the
+   drawing they are on, framed, then for each who said it and when and
+   what they said, and the drawing's title once under them all. All but
+   the latest are marked earlier, for a phone to leave out. The whole row goes to the
    drawing, through one stretched link, so links inside what was said
    still work.
 
@@ -15,6 +16,7 @@
    a commenter from elsewhere needs the domain to be told apart. #}
 {% macro comment_card(comments, r2_public_endpoint_url, ftl_get_message, by_drawing=false) %}
   {% set first = comments[0] %}
+  {% set latest = comments[-1] %}
   <div class="comment-row">
     {% if first.post_image_filename %}
       <span class="notification-figure">
@@ -31,13 +33,13 @@
     {% endif %}
     <div class="comment-row-body">
       {% for comment in comments %}
-        <div class="comment-row-entry">
+        <div class="comment-row-entry{% if not loop.last %} comment-row-entry-earlier{% endif %}">
           {% if not by_drawing or loop.first %}
             <div class="comment-row-head">
               <a class="comment-row-link" href="/@{{ first.post_community_slug or first.post_author_login_name }}/{{ first.post_id }}">
                 {%- if by_drawing %}{{ comment.post_title or ftl_get_message("post-no-title") }}{% else %}{{ comment.actor_name }}{% endif -%}
               </a>
-              <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}{{ handle(comment.post_author_login_name) }}{% else %}{{ handle(comment.handle, true if comment.handle.login_name else comment.actor_url) }}{% endif %} · </span><span title="{{ comment.created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ comment.created_at|ago }}</span></span>
+              <span class="comment-row-meta"><span class="comment-row-handle">{% if by_drawing %}{{ handle(comment.post_author_login_name) }}{% else %}{{ handle(comment.handle, true if comment.handle.login_name else comment.actor_url) }}{% endif %} · </span><span title="{{ (latest if by_drawing else comment).created_at|datetimeformat(format="short", tz="Asia/Seoul") }}">{{ (latest if by_drawing else comment).created_at|ago }}</span></span>
             </div>
           {% endif %}
           <div class="comment-row-content ds-selectable">

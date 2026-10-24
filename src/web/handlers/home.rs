@@ -968,8 +968,8 @@ mod tests {
             ..sample_comment()
         };
         let rows = vec![
-            on(20, 1, "First"),
-            on(21, 1, "Second"),
+            on(20, 1, "Latest"),
+            on(21, 1, "Earlier"),
             on(22, 2, "Elsewhere"),
             on(23, 1, "Back again"),
         ];
@@ -991,8 +991,16 @@ mod tests {
             .unwrap()
             .0;
         let first_row = &rendered[..second_row];
-        assert!(first_row.contains("First") && first_row.contains("Second"));
         assert_eq!(first_row.matches("comment-row-head").count(), 2);
+        // The rows are newest first, as the comments arrive, and a row's
+        // comments oldest first, as the conversation went; all but the
+        // latest are the ones a phone leaves out.
+        assert!(first_row.find("Earlier").unwrap() < first_row.find("Latest").unwrap());
+        assert_eq!(first_row.matches("comment-row-entry-earlier").count(), 1);
+        assert!(
+            first_row.find("comment-row-entry-earlier").unwrap()
+                < first_row.find("Earlier").unwrap()
+        );
     }
 
     /// A phone shows three rows beside the feed, and a row is a run of

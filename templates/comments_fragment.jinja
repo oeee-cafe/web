@@ -7,7 +7,8 @@
    Comments one after another on the same drawing share a row, so a
    conversation under one drawing does not fill the list with its
    thumbnail; a run a batch ends in carries on in a row of its own in the
-   next. Rendered inline for the first batch
+   next. The rows come newest first, and a row's comments oldest first,
+   to read as the conversation they were. Rendered inline for the first batch
    -- beside a feed (comments_aside_macro.jinja), on a feed's comments page
    (home_comments.jinja), a community's, a tag's, a profile's tab --
    and standalone by the load-more handlers for the rest, so it must not
@@ -20,7 +21,7 @@
 {% set runs = namespace(rows=[]) %}
 {% for comment in comments.rows %}
   {% if loop.previtem and loop.previtem.post_id == comment.post_id %}
-    {% set runs.rows = runs.rows[:-1] + [runs.rows[-1] + [comment]] %}
+    {% set runs.rows = runs.rows[:-1] + [[comment] + runs.rows[-1]] %}
   {% else %}
     {% set runs.rows = runs.rows + [[comment]] %}
   {% endif %}

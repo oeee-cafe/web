@@ -5026,11 +5026,15 @@ html[data-app] .about-stores {
   display: none;
 }
 
-/* And of several said in a row on one drawing, only the latest: three
-   rows of whole conversations would push the drawings as far down as the
-   list this replaces. */
-.feed-comments-list .comment-row-entry + .comment-row-entry {
+/* And of several said in a row on one drawing, only the latest, which
+   is the last of them: three rows of whole conversations would push the
+   drawings as far down as the list this replaces. */
+.feed-comments-list .comment-row-entry-earlier {
   display: none;
+}
+
+.feed-comments-list .comment-row-entry + .comment-row-entry {
+  margin-top: 0;
 }
 
 /* Beside a feed a line holds the name and when, and the full handle
@@ -5158,8 +5162,12 @@ html[data-app] .about-stores {
     display: flex;
   }
 
-  .feed-layout.has-comments .feed-comments-list .comment-row-entry + .comment-row-entry {
+  .feed-layout.has-comments .feed-comments-list .comment-row-entry-earlier {
     display: block;
+  }
+
+  .feed-layout.has-comments .feed-comments-list .comment-row-entry + .comment-row-entry {
+    margin-top: 8px;
   }
 
   .feed-layout.has-comments .feed-comments-list > .infinite-scroll-sentinel {
