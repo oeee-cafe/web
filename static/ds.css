@@ -2755,8 +2755,12 @@ a.ds-handle:active {
    else about the mark's alignment is written anywhere.
 
    Under .ds-page, so a page's own rule for the element's display (a chip's
-   inline-block, a label's block) does not quietly undo the row. */
-.ds-page .ds-marked {
+   inline-block, a label's block) does not quietly undo the row. And in the
+   toolbar's menu, which is also on the painter and replay pages, whose
+   bodies are not .ds-page: there the block mark put a supporter's handle
+   on a line below it. */
+.ds-page .ds-marked,
+.toolbar-menu-who .ds-marked {
   display: -webkit-inline-box;
   display: inline-flex;
   -webkit-box-align: center;
