@@ -1043,7 +1043,7 @@ fn overview_is_its_own_section() {
 }
 
 /// The range is chosen above the figures, by preset or by hand, and the
-/// figures are headed by it.
+/// figures are headed by it, what is waiting on staff among them.
 #[test]
 fn overview_has_a_range_to_choose() {
     let rendered = unescape(&render_overview(0, vec![]));
@@ -1052,6 +1052,7 @@ fn overview_has_a_range_to_choose() {
     assert!(rendered.contains(r#"name="from" value="2026-10-05""#));
     assert!(rendered.contains(r#"name="to" value="2026-10-11""#));
     assert!(rendered.contains("Activity, 2026-10-05 – 2026-10-11"));
+    assert!(rendered.contains("Waiting on staff, 2026-10-05 – 2026-10-11"));
 }
 
 /// Every figure but a zero opens the accounts it counted, over the same

@@ -36,15 +36,6 @@
     </p>
   </div>
 
-  <section class="admin-section">
-    <h2 class="profile-section-label">Waiting on staff</h2>
-    <div class="admin-figures">
-      {{ waiting(overview.flagged_sessions, "collaborations need a look", "/admin/collaborative-sessions?status=flagged", true) }}
-      {{ waiting(overview.live_sessions, "collaborations live now", "/admin/collaborative-sessions?status=live") }}
-      {{ waiting(overview.new_banners, "banners put up this week", "/admin/banners") }}
-    </div>
-  </section>
-
   <form class="ds-card admin-filters admin-range" method="get" action="/admin">
     <nav class="ds-segmented" aria-label="Range">
       {%- for preset in presets -%}
@@ -61,6 +52,15 @@
     </label>
     <input type="submit" value="Show" />
   </form>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Waiting on staff, {{ range.description }}</h2>
+    <div class="admin-figures">
+      {{ waiting(overview.flagged_sessions, "collaborations need a look", "/admin/collaborative-sessions?status=flagged", true) }}
+      {{ waiting(overview.live_sessions, "collaborations still live", "/admin/collaborative-sessions?status=live") }}
+      {{ waiting(overview.new_banners, "banners put up", "/admin/banners") }}
+    </div>
+  </section>
 
   <section class="admin-section">
     <h2 class="profile-section-label">Activity, {{ range.description }}</h2>

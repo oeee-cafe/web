@@ -1122,14 +1122,16 @@ pub struct AdminOverview {
     pub collaborations: AdminActivity,
     /// Supporter purchases by when they were made, revoked ones excluded.
     pub purchases: AdminActivity,
-    /// Sessions nobody has ended, the same `ended_at IS NULL` the lobby lists.
+    /// Sessions started in the range that nobody has ended, the same
+    /// `ended_at IS NULL` the lobby lists.
     pub live_sessions: i64,
-    /// The collaborations list's "Needs a look": a report was filed or the
-    /// replay check came out different. Counts every such session, looked at
-    /// or not -- there is no "reviewed" mark to subtract.
+    /// Sessions started in the range that the collaborations list calls
+    /// "Needs a look": a report was filed or the replay check came out
+    /// different. Counts every such session, looked at or not -- there is no
+    /// "reviewed" mark to subtract -- and by when it started, since a
+    /// recording keeps no time it was flagged at.
     pub flagged_sessions: i64,
-    /// Banners put up this week, which is how far back the queue is worth
-    /// paging after a quiet week.
+    /// Banners put up in the range.
     pub new_banners: i64,
 }
 
@@ -1176,13 +1178,18 @@ pub async fn find_overview(
                     COUNT(*) FILTER (WHERE created_at::timestamptz >= r.start
                         AND created_at::timestamptz < r.finish) AS in_range,
                     COUNT(*) AS total,
-                    COUNT(*) FILTER (WHERE ended_at IS NULL) AS live
+                    COUNT(*) FILTER (WHERE ended_at IS NULL
+                        AND created_at::timestamptz >= r.start
+                        AND created_at::timestamptz < r.finish) AS live
                 FROM collaborative_sessions, r
             ),
             f AS (
                 SELECT COUNT(*) AS flagged
-                FROM collaborative_session_recordings
-                WHERE reports > 0 OR check_outcome = 'differs'
+                FROM collaborative_session_recordings rec
+                JOIN collaborative_sessions cs ON cs.id = rec.session_id, r
+                WHERE (rec.reports > 0 OR rec.check_outcome = 'differs')
+                    AND cs.created_at::timestamptz >= r.start
+                    AND cs.created_at::timestamptz < r.finish
             ),
             sp AS (
                 SELECT
@@ -1193,8 +1200,9 @@ pub async fn find_overview(
             ),
             b AS (
                 SELECT COUNT(*) AS new
-                FROM banners
-                WHERE created_at > now() - interval '7 days' AND deleted_at IS NULL
+                FROM banners, r
+                WHERE created_at >= r.start AND created_at < r.finish
+                    AND deleted_at IS NULL
             )
         SELECT
             u.in_range AS "signups_in_range!", u.total AS "signups_total!",
