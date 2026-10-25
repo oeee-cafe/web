@@ -1170,7 +1170,18 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   box-shadow: var(--ds-shadow-menu);
 }
 
+/* The name and then the handle's pill, as a byline has them, in a row
+   that wraps: a name too long for the menu sends the pill, whole, to the
+   next line. Centred on each other, because an inline pill's
+   vertical-align: middle finds the middle of the x-height above the
+   baseline, which is not the middle of the name's line, and the pill sat
+   visibly low beside it. */
 .toolbar-menu-who {
+  display: -webkit-box;
+  display: flex;
+  flex-wrap: wrap;
+  -webkit-box-align: center;
+  align-items: center;
   padding: 8px 10px;
   border-bottom: 1px solid var(--ds-line);
   margin-bottom: 4px;
@@ -1178,14 +1189,33 @@ html:not([data-app="windows"]):has(> body.ds-page) {
   line-height: calc(18px * var(--ds-text-scale, 1));
 }
 
+.toolbar-menu-who > * + * {
+  margin-left: 6px;
+}
+
+/* Where flex rows have a gap (Firefox 63 on), it is the gap, so a pill
+   that wraps starts flush with the name above it. */
+@supports (column-gap: 1px) {
+  .toolbar-menu-who {
+    column-gap: 6px;
+  }
+
+  .toolbar-menu-who > * + * {
+    margin-left: 0;
+  }
+}
+
 /* The line that holds the handle, and only that: a descendant selector
    also reached the pill and the mark inside it, outranked
    .ds-handle-supporter's ink, and left a supporter's handle in the muted
    grey on the accent's lime, which in the dark theme is barely there.
-   Inline, after the name as a byline has it, so the pill is not a line of
-   its own; a name too long for the menu still sends it, whole, to the
-   next. */
+   A flex row of its own, so its height is the pill's and not a line box
+   the pill is placed in. */
 .toolbar-menu-who > span {
+  display: -webkit-box;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
   color: var(--ds-muted);
 }
 
