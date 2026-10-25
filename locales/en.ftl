@@ -155,6 +155,7 @@ password-reset-email-body = Click the link below to reset your password:
 back-to-login = Back to login
 
 account = Account
+nav-admin = Admin
 email-not-verified = Email not verified
 email = Email
 login-name = Username

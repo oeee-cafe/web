@@ -131,6 +131,7 @@ password-reset-email-body = 아래 링크를 클릭하여 비밀번호를 재설
 back-to-login = 로그인으로 돌아가기
 
 account = 계정
+nav-admin = 관리
 email-not-verified = 이메일 미인증
 email = 이메일
 login-name = 아이디

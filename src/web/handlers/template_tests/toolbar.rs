@@ -166,7 +166,8 @@ fn the_account_menu_has_admin_for_admins_only() {
             })
             .expect("toolbar renders")
     };
-    let admin_link = r#"<a class="toolbar-menu-admin" href="/admin" hx-boost="false">Admin</a>"#;
+    let admin_link =
+        r#"<a class="toolbar-menu-admin" href="/admin" hx-boost="false">nav-admin</a>"#;
 
     let admin = render(json!({"login_name": "oeee", "display_name": "오이", "role": "admin"}));
     assert!(

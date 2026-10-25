@@ -131,6 +131,7 @@ password-reset-email-body = 以下のリンクをクリックしてパスワー�
 back-to-login = ログインに戻る
 
 account = アカウント
+nav-admin = 管理
 email-not-verified = メール未認証
 email = メール
 login-name = ID

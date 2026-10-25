@@ -131,6 +131,7 @@ password-reset-email-body = 点击以下链接重置密码：
 back-to-login = 返回登录
 
 account = 账户
+nav-admin = 管理
 email-not-verified = 邮箱未验证
 email = 邮箱
 login-name = 用户名
