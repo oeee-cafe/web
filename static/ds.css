@@ -617,13 +617,16 @@ html:not([data-app="windows"]):has(> body.ds-page) {
    moment, so a page fetched ahead, which arrives at once, never flashes it.
    It hangs from the header's bottom edge, inside the header, so it moves
    when the header does; the header is sticky (or, in the Mac app,
-   absolute), so the bar has a box to hang from. */
+   absolute), so the bar has a box to hang from. Under the toolbar (50),
+   its sibling there: the account menu and the other toolbar menus drop
+   down across the header's bottom edge, and a page that starts loading
+   with one open would otherwise draw the bar over it. */
 .ds-loading-bar {
   position: absolute;
   top: 100%;
   right: 0;
   left: 0;
-  z-index: 51;
+  z-index: 49;
   height: 3px;
   background-color: var(--ds-accent);
   box-shadow: 0 1px 0 var(--ds-accent-line);
