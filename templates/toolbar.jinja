@@ -208,6 +208,13 @@
                 <span class="dangerous">({{ ftl_get_message("email-not-verified") }})</span>
               {% endif %}
             </a>
+            {# The staff pages, for the accounts that may open them (AdminUser
+               turns everyone else away). In English, as those pages are.
+               Unboosted: they bring admin.css in their head, which a boosted
+               swap would throw away. #}
+            {% if current_user.role == "admin" %}
+              <a class="toolbar-menu-admin" href="/admin" hx-boost="false">Admin</a>
+            {% endif %}
             {# Signing out: here rather than at the foot of /account, where
                it was, because it belongs beside the name it ends. A POST,
                so it is a form and not a link; unboosted, so the signed out

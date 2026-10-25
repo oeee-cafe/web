@@ -149,6 +149,42 @@ fn about_is_in_the_bar_signed_out_and_in_the_account_menu_signed_in() {
     assert!(signed_in.contains(r#"toolbar-drafts" href="/posts/drafts" hx-boost="false" data-server-count="0" hidden aria-label="drafts""#));
 }
 
+/// Admin is in the account menu of an account that may open it, and of
+/// no other: not a moderator's, not signed out.
+#[test]
+fn the_account_menu_has_admin_for_admins_only() {
+    let env = test_support::env();
+    let render = |current_user: serde_json::Value| {
+        env.get_template("toolbar.jinja")
+            .expect("toolbar loads")
+            .render(context! {
+                current_user => Serde(current_user),
+                messages => Serde(Vec::<serde_json::Value>::new()),
+                draft_post_count => 0,
+                unread_notification_count => 0,
+                ftl_lang => "en",
+            })
+            .expect("toolbar renders")
+    };
+    let admin_link = r#"<a class="toolbar-menu-admin" href="/admin" hx-boost="false">Admin</a>"#;
+
+    let admin = render(json!({"login_name": "oeee", "display_name": "오이", "role": "admin"}));
+    assert!(
+        admin.contains(admin_link),
+        "an admin's menu links to /admin"
+    );
+    for current_user in [
+        json!(null),
+        json!({"login_name": "oeee", "display_name": "오이", "role": "user"}),
+        json!({"login_name": "oeee", "display_name": "오이", "role": "moderator"}),
+    ] {
+        assert!(
+            !render(current_user.clone()).contains(r#"href="/admin""#),
+            "no link to /admin for {current_user}"
+        );
+    }
+}
+
 /// Drafts on the server show the drafts square from the first paint,
 /// counted in its label, beside the account menu's line for them.
 #[test]
