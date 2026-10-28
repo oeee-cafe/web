@@ -3767,7 +3767,7 @@ dependencies = [
 [[package]]
 name = "ojak"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=b54c41560359cdd1c88eb82567f0c3723af4f56e#b54c41560359cdd1c88eb82567f0c3723af4f56e"
+source = "git+https://github.com/eunha-space/ojak.git?rev=b348dcbd3cdf5915dd856ffb1a1052536c39e2d9#b348dcbd3cdf5915dd856ffb1a1052536c39e2d9"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -3794,7 +3794,7 @@ dependencies = [
 [[package]]
 name = "ojak-axum"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=b54c41560359cdd1c88eb82567f0c3723af4f56e#b54c41560359cdd1c88eb82567f0c3723af4f56e"
+source = "git+https://github.com/eunha-space/ojak.git?rev=b348dcbd3cdf5915dd856ffb1a1052536c39e2d9#b348dcbd3cdf5915dd856ffb1a1052536c39e2d9"
 dependencies = [
  "axum",
  "ojak",
@@ -3803,7 +3803,7 @@ dependencies = [
 [[package]]
 name = "ojak-jsonld"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=b54c41560359cdd1c88eb82567f0c3723af4f56e#b54c41560359cdd1c88eb82567f0c3723af4f56e"
+source = "git+https://github.com/eunha-space/ojak.git?rev=b348dcbd3cdf5915dd856ffb1a1052536c39e2d9#b348dcbd3cdf5915dd856ffb1a1052536c39e2d9"
 dependencies = [
  "iri-string",
  "serde_json",
@@ -3813,7 +3813,7 @@ dependencies = [
 [[package]]
 name = "ojak-postgres"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=b54c41560359cdd1c88eb82567f0c3723af4f56e#b54c41560359cdd1c88eb82567f0c3723af4f56e"
+source = "git+https://github.com/eunha-space/ojak.git?rev=b348dcbd3cdf5915dd856ffb1a1052536c39e2d9#b348dcbd3cdf5915dd856ffb1a1052536c39e2d9"
 dependencies = [
  "ojak",
  "serde_json",
@@ -3823,7 +3823,7 @@ dependencies = [
 [[package]]
 name = "ojak-sig"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=b54c41560359cdd1c88eb82567f0c3723af4f56e#b54c41560359cdd1c88eb82567f0c3723af4f56e"
+source = "git+https://github.com/eunha-space/ojak.git?rev=b348dcbd3cdf5915dd856ffb1a1052536c39e2d9#b348dcbd3cdf5915dd856ffb1a1052536c39e2d9"
 dependencies = [
  "base64 0.23.1",
  "bs58",
@@ -3844,7 +3844,7 @@ dependencies = [
 [[package]]
 name = "ojak-vocab"
 version = "0.1.0"
-source = "git+https://github.com/eunha-space/ojak.git?rev=b54c41560359cdd1c88eb82567f0c3723af4f56e#b54c41560359cdd1c88eb82567f0c3723af4f56e"
+source = "git+https://github.com/eunha-space/ojak.git?rev=b348dcbd3cdf5915dd856ffb1a1052536c39e2d9#b348dcbd3cdf5915dd856ffb1a1052536c39e2d9"
 dependencies = [
  "iri-string",
  "ojak-jsonld",
