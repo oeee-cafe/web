@@ -185,6 +185,7 @@ fn shared_card_switches_targets_for_admin() {
             r2_public_endpoint_url => "https://example.test",
         })
         .expect("renders");
+    let rendered = unescape(&rendered);
 
     // Admin targets, not public ones.
     assert!(rendered.contains("/admin/posts/"));
@@ -1034,7 +1035,7 @@ fn unescape(rendered: &str) -> String {
 /// marked there.
 #[test]
 fn overview_is_its_own_section() {
-    let rendered = render_overview(0, vec![]);
+    let rendered = unescape(&render_overview(0, vec![]));
     assert!(rendered.contains(r#"href="/admin" aria-current="page""#));
     assert!(!rendered.contains(r#"href="/admin/posts" aria-current"#));
     assert!(rendered.contains("@newcomer"));

@@ -1408,7 +1408,15 @@ mod tests {
             .expect("template loads")
             .render(lobby_context(true, vec![]))
             .expect("renders signed in");
-        assert!(!rendered.contains(r#"name="community_id""#));
+        // The session form's own fields only: every signed-in page also
+        // carries the toolbar's New drawing dialog (`draw_dialog.jinja`),
+        // whose form has a community field of its own.
+        let form_start = rendered
+            .find(r#"id="create-session-form""#)
+            .expect("the create form is on the lobby");
+        let form = &rendered[form_start..];
+        let form = &form[..form.find("</form>").expect("the create form ends")];
+        assert!(!form.contains(r#"name="community_id""#));
         assert!(rendered.contains("collaborate-create-posts-later"));
         assert!(rendered.contains(r#"name="is_public" checked"#));
     }
