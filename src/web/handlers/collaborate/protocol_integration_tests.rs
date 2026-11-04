@@ -1638,3 +1638,166 @@ async fn a_lost_room_subscription_closes_its_listeners_and_the_next_join_starts_
     fanout.release(fresh.subscription()).await;
     assert_eq!(fanout.subscribed_rooms().await, 0);
 }
+
+/// A history longer than one slice of the read, behind a checkpoint of more
+/// than one participant, comes back whole and in order, from the front and
+/// from any position a client resumes at.
+#[tokio::test]
+async fn a_history_read_in_slices_comes_back_whole() {
+    let harness = start_harness().await;
+    let store = RedisMessageStore::new(harness.pool.clone());
+    let channel = format!("oeee:pubsub:{}", harness.room);
+    let sequences =
+        |entries: &[(u64, AxumMessage)]| entries.iter().map(|(seq, _)| *seq).collect::<Vec<_>>();
+
+    let (history_id, _) = store
+        .get_history_snapshot(harness.room)
+        .await
+        .expect("identity");
+    for index in 0..700u16 {
+        let [low, high] = index.to_le_bytes();
+        store
+            .sequence_and_publish(harness.room, &[0x16, low, high], "conn-a", &channel)
+            .await
+            .expect("sequence");
+    }
+    let snapshots: Vec<Vec<u8>> = (1..=3u8)
+        .flat_map(|owner| [vec![0x02, 1, owner, 0], vec![0x02, 1, owner, 1]])
+        .collect();
+    store
+        .apply_reset(harness.room, 100, &snapshots)
+        .await
+        .expect("checkpoint");
+
+    let whole = store
+        .get_history_since(harness.room, None)
+        .await
+        .expect("whole");
+    let mut expected = vec![100; 6];
+    expected.extend(101..=700);
+    assert_eq!(sequences(&whole.entries), expected);
+    assert_eq!(whole.max_seq, 700);
+    for (index, (_, message)) in whole.entries.iter().take(6).enumerate() {
+        let AxumMessage::Binary(payload) = message else {
+            panic!("binary entry")
+        };
+        assert_eq!(&payload[..], &snapshots[index][..], "snapshot {index}");
+    }
+    let AxumMessage::Binary(last) = &whole.entries.last().unwrap().1 else {
+        panic!("binary entry")
+    };
+    assert_eq!(&last[..], &[0x16, 0xbb, 0x02], "the 700th message sent");
+
+    for after in [100u64, 101, 355, 356, 699, 700] {
+        let since = store
+            .get_history_since(harness.room, Some((history_id, after)))
+            .await
+            .expect("since");
+        assert_eq!(since.after_seq, after);
+        assert_eq!(
+            sequences(&since.entries),
+            ((after + 1)..=700).collect::<Vec<_>>(),
+            "resuming after {after}"
+        );
+    }
+    // Before the checkpoint, a client is sent the checkpoint again.
+    let behind = store
+        .get_history_since(harness.room, Some((history_id, 50)))
+        .await
+        .expect("since");
+    assert_eq!(sequences(&behind.entries), expected);
+}
+
+/// A refused checkpoint takes its staged snapshots with it, and leaves the
+/// history it was refused for as it found it.
+#[tokio::test]
+async fn a_refused_checkpoint_leaves_nothing_staged() {
+    let harness = start_harness().await;
+    let store = RedisMessageStore::new(harness.pool.clone());
+    let channel = format!("oeee:pubsub:{}", harness.room);
+    for index in 0..4u8 {
+        store
+            .sequence_and_publish(harness.room, &[0x16, index], "conn-a", &channel)
+            .await
+            .expect("sequence");
+    }
+    let snapshots = [vec![0x02, 1, 1, 0], vec![0x02, 1, 1, 1]];
+    store
+        .apply_reset(harness.room, 3, &snapshots)
+        .await
+        .expect("first checkpoint");
+    let before = store.history_size(harness.room).await.expect("size");
+
+    assert!(store
+        .apply_reset(harness.room, 99, &snapshots)
+        .await
+        .is_err());
+    assert!(store
+        .apply_reset(harness.room, 2, &snapshots)
+        .await
+        .is_err());
+
+    let mut conn = harness.pool.get().await.expect("Redis connection");
+    let staged: Vec<String> = conn.keys("oeee:msg_reset_staging:*").await.expect("keys");
+    assert!(staged.is_empty(), "left staged: {staged:?}");
+    assert_eq!(
+        store.history_size(harness.room).await.expect("size"),
+        before
+    );
+    let all = store
+        .get_history_since(harness.room, None)
+        .await
+        .expect("since");
+    assert_eq!(
+        all.entries.iter().map(|(seq, _)| *seq).collect::<Vec<_>>(),
+        vec![3, 3, 4]
+    );
+}
+
+/// The snapshot count a resume leans on is the checkpoint's record of
+/// itself. Wrong, it must cost a slower read, never a wrong one.
+#[tokio::test]
+async fn a_resume_is_right_whatever_the_checkpoint_says_of_itself() {
+    let harness = start_harness().await;
+    let store = RedisMessageStore::new(harness.pool.clone());
+    let channel = format!("oeee:pubsub:{}", harness.room);
+    let (history_id, _) = store
+        .get_history_snapshot(harness.room)
+        .await
+        .expect("identity");
+    for index in 0..8u8 {
+        store
+            .sequence_and_publish(harness.room, &[0x16, index], "conn-a", &channel)
+            .await
+            .expect("sequence");
+    }
+    store
+        .apply_reset(harness.room, 4, &[vec![0x02, 1, 1, 0], vec![0x02, 1, 1, 1]])
+        .await
+        .expect("checkpoint");
+
+    let mut conn = harness.pool.get().await.expect("Redis connection");
+    for record in ["0:8", "1:4", "3:12", "40:0", "garbage"] {
+        let _: () = conn
+            .set(format!("oeee:msg_reset_base:v4:{}", harness.room), record)
+            .await
+            .expect("misreport the checkpoint");
+        for after in [3u64, 4, 5, 8] {
+            let since = store
+                .get_history_since(harness.room, Some((history_id, after)))
+                .await
+                .expect("since");
+            let mut expected: Vec<u64> = if after < 4 { vec![4, 4] } else { vec![] };
+            expected.extend((after.max(4) + 1)..=8);
+            assert_eq!(
+                since
+                    .entries
+                    .iter()
+                    .map(|(seq, _)| *seq)
+                    .collect::<Vec<_>>(),
+                expected,
+                "after {after} with the checkpoint recorded as {record:?}"
+            );
+        }
+    }
+}
