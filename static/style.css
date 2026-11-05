@@ -3672,15 +3672,9 @@ html[data-store] .supporter-elsewhere {
 /* The way to those they follow who have no banner (profile_following.jinja). */
 .profile-follows-more,
 .profile-follows-more:visited {
-  display: inline-block;
-  margin-top: var(--ds-space-3);
   color: var(--ds-muted);
   font-size: var(--ds-text-s);
   text-decoration: none;
-}
-
-.profile-follows + .profile-follows-more {
-  display: block;
 }
 
 @media (hover: hover), (min--moz-device-pixel-ratio: 0) {

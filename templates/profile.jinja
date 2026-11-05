@@ -171,21 +171,23 @@
       {# Everyone they follow, under the card and over the drawings: those
          with a banner, framed in hard pixels. Those without one would each
          be the same empty frame with a name in it, so they are folded into
-         a page of their own (/@name/following), one link at the foot of
-         the list saying how many. #}
+         a page of their own (/@name/following), one link opposite the
+         heading saying how many. #}
       {% set bannered = followings|selectattr("banner_image_filename")|list %}
       {% set unbannered_count = followings|length - bannered|length %}
       <section class="profile-section">
-        <div class="profile-section-label">{{ ftl_get_message("profile-following") }}<span class="profile-tab-count">{{ followings|length }}</span></div>
+        <div class="grid-header">
+          <div class="profile-section-label">{{ ftl_get_message("profile-following") }}<span class="profile-tab-count">{{ followings|length }}</span></div>
+          {% if unbannered_count %}
+            <a class="profile-follows-more" href="/@{{ user.login_name }}/following">{{ ftl_get_message("profile-following-without-banner") }}<span class="profile-tab-count">{{ unbannered_count }}</span></a>
+          {% endif %}
+        </div>
       {% if bannered %}
         <ul class="profile-follows">
           {% for following in bannered %}
             <li>{{ person_card(following, r2_public_endpoint_url) }}</li>
           {% endfor %}
         </ul>
-      {% endif %}
-      {% if unbannered_count %}
-        <a class="profile-follows-more" href="/@{{ user.login_name }}/following">{{ ftl_get_message("profile-following-without-banner") }}<span class="profile-tab-count">{{ unbannered_count }}</span></a>
       {% endif %}
       </section>
     {% endif %}
