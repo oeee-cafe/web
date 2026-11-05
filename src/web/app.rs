@@ -13,13 +13,14 @@ use crate::web::handlers::activitypub::{
 use crate::web::handlers::admin::{
     admin_add_store_product, admin_banners, admin_banners_fragment, admin_collaborative_sessions,
     admin_communities, admin_community_choices, admin_community_posts, admin_flag_banner,
-    admin_flag_post, admin_overview, admin_post_detail, admin_posts, admin_posts_fragment,
-    admin_set_community_slug, admin_set_store_product_details, admin_set_store_product_on_sale,
-    admin_set_store_product_sale_window, admin_set_user_email, admin_store, admin_user_detail,
-    admin_user_posts, admin_users, collaborative_archive_manifest, collaborative_archive_tail,
-    collaborative_session_chat, collaborative_session_details, collaborative_session_reference,
-    download_collaborative_archive, download_collaborative_diagnostics,
-    record_collaborative_session_check, replay_collaborative_session,
+    admin_flag_post, admin_masquerade, admin_overview, admin_post_detail, admin_posts,
+    admin_posts_fragment, admin_set_community_slug, admin_set_store_product_details,
+    admin_set_store_product_on_sale, admin_set_store_product_sale_window, admin_set_user_email,
+    admin_store, admin_user_detail, admin_user_posts, admin_users, collaborative_archive_manifest,
+    collaborative_archive_tail, collaborative_session_chat, collaborative_session_details,
+    collaborative_session_reference, download_collaborative_archive,
+    download_collaborative_diagnostics, record_collaborative_session_check,
+    replay_collaborative_session,
 };
 use crate::web::handlers::auth::{do_login, do_logout, do_signup, login, require_login, signup};
 use crate::web::handlers::collaborate::{
@@ -393,6 +394,10 @@ impl App {
                 "/admin/users/{login_name}/email",
                 post(admin_set_user_email),
             )
+            .route(
+                "/admin/users/{login_name}/masquerade",
+                post(admin_masquerade),
+            )
             .route("/admin/users/{login_name}/posts", get(admin_user_posts))
             .route("/admin/communities", get(admin_communities))
             .route(
@@ -680,6 +685,8 @@ impl App {
             // Outside the protected routes: signing out when already signed
             // out is just going home.
             .route("/logout", post(do_logout))
+            // Outside the login gate too: see `masquerade::end`.
+            .route("/masquerade/end", post(crate::web::masquerade::end))
             .route("/auth/steam/app", get(steam_sign_in))
             .route("/auth/steam", get(steam_sign_in))
             .route("/auth/steam", post(do_steam_sign_in))
@@ -712,6 +719,9 @@ impl App {
             // Inside the auth layer, so the session is already in the
             // extensions and a failed request can be explained in the
             // language the reader chose rather than the one they asked for.
+            // Inside the auth layer, whose session it reads; under the
+            // banner and the error pages, which explain what it refuses.
+            .layer(axum::middleware::from_fn(crate::web::masquerade::layer))
             .layer(axum::middleware::from_fn(crate::web::htmx::error_banner))
             // Beside the banner, for the requests it does not take: a browser
             // navigating gets a page for an `AppError`, not its JSON.

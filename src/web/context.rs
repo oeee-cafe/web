@@ -23,6 +23,9 @@ pub struct CommonContext {
     /// heart in: the bar's thanks, where everyone else has an outline.
     pub current_user_is_supporter: bool,
     pub ftl_lang: String,
+    /// The admin signed in as `current_user` (`web::masquerade`), whose
+    /// name the banner under the toolbar gives with the way back.
+    pub masquerading_from: Option<String>,
 }
 
 impl CommonContext {
@@ -51,6 +54,9 @@ impl CommonContext {
             unread_notification_count,
             current_user_is_supporter,
             ftl_lang: ftl_lang.to_string(),
+            masquerading_from: user
+                .and(crate::web::masquerade::current())
+                .map(|masquerade| masquerade.admin_login_name),
         })
     }
 
@@ -69,6 +75,7 @@ impl CommonContext {
             unread_notification_count: 0,
             current_user_is_supporter: false,
             ftl_lang: ftl_lang.to_string(),
+            masquerading_from: None,
         }
     }
 }
@@ -110,6 +117,7 @@ mod tests {
             unread_notification_count: 0,
             current_user_is_supporter: false,
             ftl_lang: "ja".to_string(),
+            masquerading_from: None,
         };
         let rendered = test_support::env()
             .get_template("404.jinja")

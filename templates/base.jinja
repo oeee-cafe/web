@@ -59,6 +59,18 @@
     <script>if (window.oeeeChrome) window.oeeeChrome.touchActive();</script>
     <header>
       {% include "toolbar.jinja" %}
+      {# Staff signed in as this account (web/masquerade.rs). Staff-only, so
+         untranslated, as the admin pages are. #}
+      {% if masquerading_from and current_user %}
+        <ul class="ds-notices">
+          <li class="ds-notice ds-notice-warning">
+            <form class="ds-notice-body" action="/masquerade/end" method="post" hx-boost="false">
+              Signed in as @{{ current_user.login_name }} by @{{ masquerading_from }}.
+              <button type="submit" class="ds-button ds-button-small">Back to @{{ masquerading_from }}</button>
+            </form>
+          </li>
+        </ul>
+      {% endif %}
     </header>
     {# In the macOS app the header floats over the content (ds.css), which
        needs its height to start below it -- a height that changes when the

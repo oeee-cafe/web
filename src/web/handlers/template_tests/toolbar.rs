@@ -526,3 +526,28 @@ fn a_pickle_notification_names_the_giver_and_the_drawing() {
         "the jar badge is drawn"
     );
 }
+
+/// Staff signed in as somebody (web/masquerade.rs) see whose account it is
+/// under the toolbar on every page, with the way back; nobody else sees a
+/// banner at all.
+#[test]
+fn a_masquerade_says_so_under_the_toolbar() {
+    let env = test_support::env();
+    let render = |masquerading_from: Option<&str>| {
+        env.get_template("404.jinja")
+            .expect("404 loads")
+            .render(context! {
+                current_user => Serde(json!({"login_name": "fan", "display_name": "팬"})),
+                masquerading_from,
+                messages => Vec::<()>::new(),
+                ..chrome()
+            })
+            .expect("404 renders")
+    };
+
+    let masked = render(Some("oi"));
+    assert!(masked.contains("Signed in as @fan by @oi."));
+    assert!(masked.contains(r#"action="/masquerade/end" method="post""#));
+
+    assert!(!render(None).contains("/masquerade/end"));
+}

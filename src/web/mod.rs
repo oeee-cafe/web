@@ -5,6 +5,7 @@ pub mod handlers;
 pub mod htmx;
 pub mod i18n;
 pub mod language;
+pub mod masquerade;
 pub mod presence;
 pub mod rate_limit;
 pub mod responses;

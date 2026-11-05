@@ -44,6 +44,22 @@
     </div>
   </section>
 
+  {% if not user.deleted_at and user.role == "user" %}
+  <section class="admin-section">
+    <h2 class="profile-section-label">Sign in as</h2>
+    {# web/masquerade.rs: unboosted, since the whole page becomes theirs. #}
+    <form class="ds-card ds-stack" action="/admin/users/{{ user.login_name }}/masquerade" method="post" hx-boost="false">
+      <p class="ds-help">
+        See the site as @{{ user.login_name }} does and act for them, until
+        you go back from the banner under the toolbar. Their sign-ins,
+        password, address and purchases stay out of reach, and staff hear
+        that you did.
+      </p>
+      <p><button type="submit" class="ds-button">Sign in as @{{ user.login_name }}</button></p>
+    </form>
+  </section>
+  {% endif %}
+
   <section class="admin-section">
     <h2 class="profile-section-label">Email</h2>
     {% include "admin/user_email_panel.jinja" %}

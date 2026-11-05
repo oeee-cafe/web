@@ -228,6 +228,9 @@ pub enum Event {
         removed: bool,
         verified: bool,
     },
+    /// Staff signed in as an account from its admin page
+    /// (`web::masquerade`).
+    Masquerade { login_name: String, by: String },
     /// Staff gave a community a new slug from the communities list.
     CommunitySlugSet {
         from: String,
@@ -344,6 +347,11 @@ impl Event {
                 quote(from),
                 quote(to),
                 urlencoding::encode(to),
+            ),
+            Event::Masquerade { login_name, by } => format!(
+                "🎭 {} signed in as {}",
+                account(base, by),
+                account(base, login_name),
             ),
             Event::EmailSet {
                 login_name,

@@ -2,14 +2,16 @@
 
 use crate::app_error::AppError;
 use crate::models::admin::{find_user_detail, set_user_email};
+use crate::models::user::{find_user_by_login_name, AuthSession, UserRole};
 use crate::web::handlers::AdminUser;
 use crate::web::state::AppState;
 use axum::extract::{Path, State};
-use axum::response::Html;
+use axum::response::{Html, Redirect};
 use axum::Form;
 use minijinja::context;
 use minijinja::value::Serde;
 use serde::Deserialize;
+use tower_sessions::Session;
 
 #[derive(Deserialize)]
 pub struct SetEmailForm {
@@ -79,4 +81,45 @@ pub async fn admin_set_user_email(
         .await?;
 
     Ok(Html(rendered))
+}
+
+/// POST /admin/users/:login_name/masquerade — sign in as the account, to see
+/// the site as they do and act for them, with a banner on every page for the
+/// way back (`web::masquerade`). Not as another member of staff, whose
+/// powers are not the admin's to borrow, nor a deleted account.
+pub async fn admin_masquerade(
+    admin: AdminUser,
+    mut auth_session: AuthSession,
+    session: Session,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+) -> Result<Redirect, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let target = find_user_by_login_name(&mut tx, &login_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+    tx.commit().await?;
+
+    if target.deleted_at.is_some() {
+        return Err(AppError::BadRequest(
+            "A deleted account cannot be signed in as.".to_string(),
+        ));
+    }
+    if !matches!(target.role, UserRole::User) {
+        return Err(AppError::BadRequest(
+            "Staff accounts cannot be signed in as.".to_string(),
+        ));
+    }
+
+    crate::web::masquerade::begin(&mut auth_session, &session, &admin.0, &target).await?;
+    tracing::info!("{} signed in as {}", admin.0.login_name, target.login_name);
+    crate::staff_webhook::notify(crate::staff_webhook::Event::Masquerade {
+        login_name: target.login_name.to_string(),
+        by: admin.0.login_name.to_string(),
+    });
+
+    Ok(Redirect::to(&format!(
+        "/@{}",
+        urlencoding::encode(&target.login_name)
+    )))
 }

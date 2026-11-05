@@ -260,9 +260,18 @@ fn device_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
 
 pub async fn do_logout(
     mut auth_session: AuthSession,
+    session: Session,
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-) -> impl IntoResponse {
+) -> axum::response::Response {
+    // Signing out of somebody else's account is going back to one's own; the
+    // device cookie is the admin's phone, never registered to them.
+    if crate::web::masquerade::is_on(&session).await {
+        return match crate::web::masquerade::end(auth_session, session, State(state)).await {
+            Ok(response) => response,
+            Err(e) => e.into_response(),
+        };
+    }
     if let (Some(user), Some(token)) = (auth_session.user.as_ref(), device_cookie(&headers))
         && let Ok(mut tx) = state.db_pool.begin().await
     {
