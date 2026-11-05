@@ -44,7 +44,7 @@ use uuid::Uuid;
 
 use crate::app_store::{may_ask_of, Asked};
 use crate::config::{GooglePlayConfig, KeyFile};
-use crate::models::supporter::OwnedProduct;
+use crate::models::supporter::{OwnedProduct, Price, Sale};
 
 /// What the site's tokens are good for: the Google Play Developer API.
 const SCOPE: &str = "https://www.googleapis.com/auth/androidpublisher";
@@ -207,6 +207,13 @@ struct ProductPurchase {
     purchase_state_context: Option<PurchaseStateContext>,
     /// `ACKNOWLEDGEMENT_STATE_PENDING` until someone acknowledges it.
     acknowledgement_state: Option<String>,
+    /// The order it was, `GPA.…`: what Play Console and the Orders API
+    /// know it by.
+    order_id: Option<String>,
+    /// Where it was bought, ISO 3166 alpha-2.
+    region_code: Option<String>,
+    /// Present for a licence tester's purchase, which nobody paid for.
+    test_purchase_context: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -288,6 +295,12 @@ pub struct Purchase {
     /// Whether it has been acknowledged, so that Play will not refund it by
     /// itself.
     pub acknowledged: bool,
+    /// The order, which [`sale`] asks the price of.
+    pub order_id: Option<String>,
+    /// Where it was bought, ISO 3166 alpha-2.
+    pub region: Option<String>,
+    /// A licence tester's purchase.
+    pub test: bool,
 }
 
 /// What Google Play says about `token`, against `packs`: every product the
@@ -335,6 +348,101 @@ pub async fn look_up(
         owned: purchased && !refunded,
         acknowledged: purchase.acknowledgement_state.as_deref()
             == Some("ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"),
+        order_id: purchase.order_id.filter(|order| !order.is_empty()),
+        region: purchase.region_code,
+        test: purchase.test_purchase_context.is_some(),
+    }))
+}
+
+/// The fields of Google's `Order` this cares about.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Order {
+    /// What the buyer paid, tax included where the region includes it.
+    total: Option<Money>,
+    /// What Google pays the developer, before currency conversion.
+    developer_revenue_in_buyer_currency: Option<Money>,
+}
+
+/// Google's `Money`: whole units as a string, and billionths beside them.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Money {
+    currency_code: String,
+    #[serde(default)]
+    units: Option<String>,
+    #[serde(default)]
+    nanos: Option<i64>,
+}
+
+impl Money {
+    fn micros(&self) -> Option<i64> {
+        let units: i64 = match self.units.as_deref() {
+            None | Some("") => 0,
+            Some(units) => units.parse().ok()?,
+        };
+        units
+            .checked_mul(1_000_000)?
+            .checked_add(self.nanos.unwrap_or(0) / 1000)
+    }
+}
+
+/// What a purchase sold for: its order, from the Orders API, which the
+/// service account reads with "View financial data". A purchase with no
+/// order Google will show -- some licence testers' -- is still a sale,
+/// without a price.
+pub async fn sale(config: &GooglePlayConfig, purchase: &Purchase) -> Result<Sale> {
+    let price = match &purchase.order_id {
+        Some(order_id) => order_price(config, order_id).await?,
+        None => None,
+    };
+    Ok(Sale {
+        test: purchase.test,
+        order_id: purchase.order_id.clone(),
+        country: purchase.region.clone(),
+        price,
+    })
+}
+
+async fn order_price(config: &GooglePlayConfig, order_id: &str) -> Result<Option<Price>> {
+    let url = format!(
+        "{}/androidpublisher/v3/applications/{}/orders/{}",
+        config.api_url.trim_end_matches('/'),
+        urlencoding::encode(&config.package_name),
+        urlencoding::encode(order_id)
+    );
+    let response = http()
+        .get(url)
+        .bearer_auth(access_token(config).await?)
+        .send()
+        .await?;
+    let status = response.status();
+    if matches!(status.as_u16(), 400 | 404) {
+        return Ok(None);
+    }
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(anyhow!(
+            "Google Play would not show order {order_id} ({status}): {body}"
+        ));
+    }
+    let order: Order = response.json().await?;
+    let Some(total) = order.total else {
+        return Ok(None);
+    };
+    let Some(micros) = total.micros() else {
+        return Ok(None);
+    };
+    // Revenue in another currency than the buyer's would not add up with
+    // the price, so it is left out rather than mixed in.
+    let proceeds_micros = order
+        .developer_revenue_in_buyer_currency
+        .filter(|revenue| revenue.currency_code == total.currency_code)
+        .and_then(|revenue| revenue.micros());
+    Ok(Some(Price {
+        currency: total.currency_code,
+        micros,
+        proceeds_micros,
     }))
 }
 
@@ -468,6 +576,59 @@ pub async fn recheck_supporters(db: sqlx::PgPool, config: GooglePlayConfig) {
     }
 }
 
+/// Asks Google Play, once an hour, what each purchase it has not priced yet
+/// sold for: those recorded before the site kept prices, and any whose
+/// order could not be read when it was handed over. A purchase Google no
+/// longer knows, or one no longer in the catalogue, is left for the next
+/// round rather than guessed at.
+pub async fn price_unpriced(db: sqlx::PgPool, config: GooglePlayConfig) {
+    use crate::models::store_product;
+    use crate::models::supporter::{purchases_without_sale, record_sale, Store};
+
+    let mut every = tokio::time::interval(Duration::from_secs(60 * 60));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        every.tick().await;
+        let priced = async {
+            let unpriced = {
+                let mut tx = db.begin().await?;
+                purchases_without_sale(&mut tx, Store::Google, 50).await?
+            };
+            if unpriced.is_empty() {
+                return anyhow::Ok(());
+            }
+            let packs = store_product::packs_in(&db, Store::Google).await?;
+            for unpriced in unpriced {
+                let priced = async {
+                    let Some(purchase) = look_up(&config, &packs, &unpriced.transaction).await?
+                    else {
+                        return anyhow::Ok(());
+                    };
+                    let sale = sale(&config, &purchase).await?;
+                    let mut tx = db.begin().await?;
+                    record_sale(
+                        &mut tx,
+                        Store::Google,
+                        &unpriced.transaction,
+                        &unpriced.product,
+                        &sale,
+                    )
+                    .await?;
+                    tx.commit().await?;
+                    anyhow::Ok(())
+                };
+                if let Err(error) = priced.await {
+                    tracing::warn!("could not price a purchase: {error:#}");
+                }
+            }
+            anyhow::Ok(())
+        };
+        if let Err(error) = priced.await {
+            tracing::warn!("could not price Google Play purchases: {error:#}");
+        }
+    }
+}
+
 /// Against a stand-in for Google's token endpoint and the Developer API, on
 /// localhost: the assertion is checked there with the key's public half, so
 /// a request Google would turn away fails here too. Nothing here reaches
@@ -511,9 +672,12 @@ mod tests {
             } else {
                 "ACKNOWLEDGEMENT_STATE_PENDING"
             },
-            "orderId": "GPA.0000-0000-0000-00000",
+            "orderId": ORDER_ID,
+            "regionCode": "KR",
         })
     }
+
+    const ORDER_ID: &str = "GPA.0000-0000-0000-00000";
 
     /// What Google knows, by token.
     fn known(token: &str) -> Option<Value> {
@@ -523,6 +687,13 @@ mod tests {
             "refunded" => Some(purchase(PRODUCT_ID, "PURCHASED", 0, true)),
             "cancelled" => Some(purchase(PRODUCT_ID, "CANCELLED", 1, false)),
             "pending" => Some(purchase(PRODUCT_ID, "PENDING", 1, false)),
+            // A licence tester's, whose order Google will not show.
+            "tester" => {
+                let mut tested = purchase(PRODUCT_ID, "PURCHASED", 1, true);
+                tested["testPurchaseContext"] = json!({"fopType": "TEST"});
+                tested["orderId"] = json!("GPA.0000-0000-0000-99999");
+                Some(tested)
+            }
             // Another year's pack, which this deployment does not sell.
             "elsewhere" => Some(purchase("supporter_pack_2019", "PURCHASED", 1, true)),
             _ => None,
@@ -630,6 +801,27 @@ mod tests {
                 ),
             )
             .route(
+                "/androidpublisher/v3/applications/{package}/orders/{order}",
+                get(
+                    |headers: HeaderMap, Path((package, order)): Path<(String, String)>| async move {
+                        if !bearer_is_ours(&headers) {
+                            return StatusCode::UNAUTHORIZED.into_response();
+                        }
+                        if package != PACKAGE || order != ORDER_ID {
+                            return StatusCode::NOT_FOUND.into_response();
+                        }
+                        Json(json!({
+                            "orderId": ORDER_ID,
+                            "state": "PROCESSED",
+                            "total": {"currencyCode": "KRW", "units": "14000"},
+                            "tax": {"currencyCode": "KRW"},
+                            "developerRevenueInBuyerCurrency": {"currencyCode": "KRW", "units": "11900"},
+                        }))
+                        .into_response()
+                    },
+                ),
+            )
+            .route(
                 "/androidpublisher/v3/applications/{package}/purchases/products/{product}/tokens/{acknowledge}",
                 post(
                     |State(seen): State<Arc<Seen>>,
@@ -715,6 +907,60 @@ mod tests {
     /// A refund, a cancellation and a purchase still waiting on its money
     /// are answers, not silence: they take standing away rather than
     /// leaving it as it was.
+    /// The price is the order's, and what Google pays is beside it.
+    #[tokio::test]
+    async fn a_purchase_says_what_it_sold_for() {
+        let fake = fake_google_play().await;
+        let purchase = look_up(&fake.config, &packs(), "bought")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            sale(&fake.config, &purchase).await.unwrap(),
+            Sale {
+                test: false,
+                order_id: Some(ORDER_ID.to_string()),
+                country: Some("KR".to_string()),
+                price: Some(Price {
+                    currency: "KRW".to_string(),
+                    micros: 14_000_000_000,
+                    proceeds_micros: Some(11_900_000_000),
+                }),
+            }
+        );
+    }
+
+    /// A licence tester's purchase is a test, and one whose order Google
+    /// will not show is a sale without a price rather than an error.
+    #[tokio::test]
+    async fn a_testers_purchase_is_a_test() {
+        let fake = fake_google_play().await;
+        let purchase = look_up(&fake.config, &packs(), "tester")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(purchase.owned, "it counts for its buyer");
+        let sale = sale(&fake.config, &purchase).await.unwrap();
+        assert!(sale.test);
+        assert_eq!(sale.price, None);
+    }
+
+    #[test]
+    fn money_is_units_and_nanos() {
+        let money = |units: Option<&str>, nanos: Option<i64>| Money {
+            currency_code: "USD".to_string(),
+            units: units.map(str::to_string),
+            nanos,
+        };
+        assert_eq!(
+            money(Some("9"), Some(990_000_000)).micros(),
+            Some(9_990_000)
+        );
+        assert_eq!(money(None, Some(500_000_000)).micros(), Some(500_000));
+        assert_eq!(money(Some("12"), None).micros(), Some(12_000_000));
+        assert_eq!(money(Some("lots"), None).micros(), None);
+    }
+
     #[tokio::test]
     async fn a_refund_a_cancellation_and_a_pending_purchase_are_not_owned() {
         let fake = fake_google_play().await;

@@ -54,7 +54,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::config::{AppStoreConfig, KeyFile};
-use crate::models::supporter::OwnedProduct;
+use crate::models::supporter::{OwnedProduct, Price, Sale};
 
 /// Who the App Store Server API tokens are for, in every request Apple
 /// accepts.
@@ -85,6 +85,9 @@ pub struct Purchase {
     pub transaction: String,
     /// Whether it counts now: bought outright and not since refunded.
     pub owned: bool,
+    /// What Apple says about the sale; nothing for a copy shared with the
+    /// family, which nobody bought.
+    pub sale: Option<Sale>,
 }
 
 #[derive(Deserialize)]
@@ -105,6 +108,37 @@ struct Transaction {
     /// `PURCHASED` for the buyer; `FAMILY_SHARED` for somebody they share
     /// with, who bought nothing.
     in_app_ownership_type: Option<String>,
+    /// `Production` or `Sandbox`.
+    environment: Option<String>,
+    /// What the buyer paid, in thousandths of `currency`.
+    price: Option<i64>,
+    currency: Option<String>,
+    /// The App Store country it was bought in, ISO 3166 alpha-3.
+    storefront: Option<String>,
+}
+
+impl Transaction {
+    /// What it sold for, if Apple said. Somebody it is shared with bought
+    /// nothing, whatever the transaction says the buyer paid.
+    fn sale(&self) -> Option<Sale> {
+        if self.in_app_ownership_type.as_deref() == Some("FAMILY_SHARED") {
+            return None;
+        }
+        let price = match (&self.currency, self.price) {
+            (Some(currency), Some(thousandths)) => Some(Price {
+                currency: currency.clone(),
+                micros: thousandths.checked_mul(1000)?,
+                proceeds_micros: None,
+            }),
+            _ => None,
+        };
+        Some(Sale {
+            test: self.environment.as_deref() == Some("Sandbox"),
+            order_id: None,
+            country: self.storefront.clone(),
+            price,
+        })
+    }
 }
 
 impl AppStoreConfig {
@@ -362,10 +396,12 @@ pub async fn look_up(
     };
     let owned = transaction.revocation_date.is_none()
         && transaction.in_app_ownership_type.as_deref() != Some("FAMILY_SHARED");
+    let sale = transaction.sale();
     Ok(Some(Purchase {
         pack: pack.clone(),
         transaction: transaction.original_transaction_id,
         owned,
+        sale,
     }))
 }
 
@@ -511,7 +547,7 @@ pub async fn heed(
     product: &str,
 ) -> Result<Heeded> {
     use crate::models::store_product;
-    use crate::models::supporter::{record_recheck, Store};
+    use crate::models::supporter::{record_recheck, record_sale, Store};
 
     let packs = store_product::packs_in(db, Store::Apple).await?;
     if !packs.iter().any(|pack| pack.product == product) {
@@ -529,10 +565,72 @@ pub async fn heed(
         purchase.owned,
     )
     .await?;
+    if let Some(sale) = &purchase.sale {
+        record_sale(
+            &mut tx,
+            Store::Apple,
+            &purchase.transaction,
+            &purchase.pack.product,
+            sale,
+        )
+        .await?;
+    }
     tx.commit().await?;
     Ok(Heeded::Recorded {
         owned: purchase.owned,
     })
+}
+
+/// Asks Apple, once an hour, what each purchase it has not priced yet sold
+/// for: those recorded before the site kept prices. A transaction Apple no
+/// longer knows is left for the next round rather than guessed at.
+pub async fn price_unpriced(db: sqlx::PgPool, config: AppStoreConfig) {
+    use crate::models::store_product;
+    use crate::models::supporter::{purchases_without_sale, record_sale, Store};
+
+    let mut every = tokio::time::interval(Duration::from_secs(60 * 60));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        every.tick().await;
+        let priced = async {
+            let unpriced = {
+                let mut tx = db.begin().await?;
+                purchases_without_sale(&mut tx, Store::Apple, 50).await?
+            };
+            if unpriced.is_empty() {
+                return anyhow::Ok(());
+            }
+            let packs = store_product::packs_in(&db, Store::Apple).await?;
+            for unpriced in unpriced {
+                let priced = async {
+                    let Some(sale) = look_up(&config, &packs, &unpriced.transaction)
+                        .await?
+                        .and_then(|purchase| purchase.sale)
+                    else {
+                        return anyhow::Ok(());
+                    };
+                    let mut tx = db.begin().await?;
+                    record_sale(
+                        &mut tx,
+                        Store::Apple,
+                        &unpriced.transaction,
+                        &unpriced.product,
+                        &sale,
+                    )
+                    .await?;
+                    tx.commit().await?;
+                    anyhow::Ok(())
+                };
+                if let Err(error) = priced.await {
+                    tracing::warn!("could not price a purchase: {error:#}");
+                }
+            }
+            anyhow::Ok(())
+        };
+        if let Err(error) = priced.await {
+            tracing::warn!("could not price App Store purchases: {error:#}");
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -794,6 +892,10 @@ mod tests {
             "originalTransactionId": id,
             "type": "Non-Consumable",
             "inAppOwnershipType": "PURCHASED",
+            "environment": "Production",
+            "price": 17_000_000,
+            "currency": "KRW",
+            "storefront": "KOR",
         });
         for (key, value) in overrides.as_object().expect("an object") {
             if value.is_null() {
@@ -812,7 +914,16 @@ mod tests {
             return None;
         }
         match id {
-            "1000" | "2000" => Some(transaction(id, json!({}))),
+            "1000" => Some(transaction(id, json!({}))),
+            "2000" => Some(transaction(
+                id,
+                json!({"environment": "Sandbox", "price": 9990, "currency": "USD", "storefront": "USA"}),
+            )),
+            // From before Apple put prices in transactions.
+            "1005" => Some(transaction(
+                id,
+                json!({"price": null, "currency": null, "storefront": null}),
+            )),
             // Refunded.
             "1001" => Some(transaction(
                 id,
@@ -1010,6 +1121,40 @@ mod tests {
         assert_eq!(purchase.pack.year, PACK_YEAR, "the year it supports");
         assert_eq!(purchase.transaction, "1000", "what a restore names");
         assert!(purchase.owned);
+    }
+
+    /// Apple's thousandths become the site's millionths, and a sandbox
+    /// purchase is marked as the test it is.
+    #[tokio::test]
+    async fn a_purchase_says_what_it_sold_for() {
+        let config = fake_app_store().await;
+        let sold = look_up(&config, &packs(), "1000").await.unwrap().unwrap();
+        assert_eq!(
+            sold.sale,
+            Some(Sale {
+                test: false,
+                order_id: None,
+                country: Some("KOR".to_string()),
+                price: Some(Price {
+                    currency: "KRW".to_string(),
+                    micros: 17_000_000_000,
+                    proceeds_micros: None,
+                }),
+            })
+        );
+        let tried = look_up(&config, &packs(), "2000").await.unwrap().unwrap();
+        let tried = tried.sale.expect("a sandbox purchase is a sale");
+        assert!(tried.test, "bought in the sandbox");
+        let price = tried.price.expect("with a price");
+        assert_eq!((price.currency.as_str(), price.micros), ("USD", 9_990_000));
+        // Without a price there is none to record, and the purchase stands
+        // all the same.
+        let old = look_up(&config, &packs(), "1005").await.unwrap().unwrap();
+        assert!(old.owned);
+        assert_eq!(old.sale.and_then(|sale| sale.price), None);
+        // Somebody in the family paid nothing.
+        let shared = look_up(&config, &packs(), "1002").await.unwrap().unwrap();
+        assert_eq!(shared.sale, None);
     }
 
     /// A refund and a copy shared with the family are answers, not silence:

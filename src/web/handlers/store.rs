@@ -54,7 +54,7 @@ use crate::google_play;
 use crate::microsoft_store::{self, KeyRejected};
 use crate::models::identity::{find_user_by_identity, refresh_standing, Provider};
 use crate::models::store_product;
-use crate::models::supporter::{record_purchase, Store};
+use crate::models::supporter::{has_sale, record_purchase, record_sale, Store};
 use crate::models::user::AuthSession;
 use crate::steam::{self, TicketRejected};
 use crate::web::handlers::identity::from_this_site;
@@ -182,6 +182,16 @@ async fn apple_purchase(
         purchase.owned,
     )
     .await?;
+    if let Some(sale) = &purchase.sale {
+        record_sale(
+            &mut tx,
+            Store::Apple,
+            &purchase.transaction,
+            &purchase.pack.product,
+            sale,
+        )
+        .await?;
+    }
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
@@ -342,7 +352,21 @@ async fn google_play_purchase(
         purchase.owned,
     )
     .await?;
+    let priced = has_sale(
+        &mut tx,
+        Store::Google,
+        &purchase.token,
+        &purchase.pack.product,
+    )
+    .await?;
     tx.commit().await?;
+
+    // What it sold for is the Orders API's to say, a second request; asked
+    // once, and a failure costs the buyer nothing -- the hourly
+    // `google_play::price_unpriced` asks again.
+    if !priced {
+        record_google_sale(state, config, &purchase).await;
+    }
 
     // Only a purchase that went through is Play's to refund by itself; one
     // still pending cannot be acknowledged yet.
@@ -354,6 +378,32 @@ async fn google_play_purchase(
         return Ok(StatusCode::BAD_GATEWAY.into_response());
     }
     Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+/// Asks Google Play what `purchase` sold for and records it, logging rather
+/// than failing: the purchase itself is already recorded.
+async fn record_google_sale(
+    state: &AppState,
+    config: &crate::config::GooglePlayConfig,
+    purchase: &google_play::Purchase,
+) {
+    let recorded = async {
+        let sale = google_play::sale(config, purchase).await?;
+        let mut tx = state.db_pool.begin().await?;
+        record_sale(
+            &mut tx,
+            Store::Google,
+            &purchase.token,
+            &purchase.pack.product,
+            &sale,
+        )
+        .await?;
+        tx.commit().await?;
+        anyhow::Ok(())
+    };
+    if let Err(error) = recorded.await {
+        tracing::warn!("what a Google Play purchase sold for is not known yet: {error:#}");
+    }
 }
 
 #[derive(Deserialize)]

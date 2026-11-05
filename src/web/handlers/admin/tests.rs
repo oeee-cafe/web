@@ -1169,6 +1169,13 @@ fn renders_user_detail() {
         purchased_at: at,
         checked_at: at,
         revoked_at: revoked.then_some(at),
+        test: store == "apple",
+        manual: false,
+        order_id: (store == "google").then(|| "GPA.3343-0000".to_string()),
+        country: Some("KR".to_string()),
+        price: (store != "steam").then(|| "KRW 14,000".to_string()),
+        proceeds: (store == "google").then(|| "KRW 11,900".to_string()),
+        login_name: "fan".to_string(),
     };
     let env = test_env();
     let rendered = env
@@ -1189,7 +1196,11 @@ fn renders_user_detail() {
                 last_used_at: at,
                 supporter_checked_at: Some(at),
             }]),
-            purchases => Serde(vec![purchase("steam", false), purchase("apple", true)]),
+            purchases => Serde(vec![
+                purchase("steam", false),
+                purchase("apple", true),
+                purchase("google", false),
+            ]),
             pickles_given => Serde(vec![AdminPickleGiven {
                 week: NaiveDate::from_ymd_opt(2026, 10, 12),
                 created_at: at,
@@ -1221,6 +1232,18 @@ fn renders_user_detail() {
     );
     assert!(rendered.contains("Fan &lt;3"), "{rendered}");
     assert!(rendered.contains("<code>steam-owner</code>"), "{rendered}");
+    // What each sold for, where its store said, and which were tests.
+    assert!(rendered.contains("KRW 14,000"), "{rendered}");
+    assert!(rendered.contains("KRW 11,900"), "{rendered}");
+    assert!(
+        rendered.contains("<code>GPA.3343-0000</code>"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(r#"<span class="admin-tag">test</span>"#),
+        "{rendered}"
+    );
+    assert!(rendered.contains(r#"href="/admin/sales""#), "{rendered}");
     assert!(rendered.contains(">live<"), "{rendered}");
     assert!(rendered.contains("revoked"), "{rendered}");
     assert!(
@@ -1313,4 +1336,80 @@ fn renders_user_email_panel() {
         .render(context! { user => Serde(user(true)) })
         .expect("user_email_panel.jinja renders");
     assert!(!deleted.contains("<form"), "{deleted}");
+}
+
+/// The sales page as its handler hands it over: amounts already written
+/// out, a currency that may be missing, and every kind of row the list
+/// can hold.
+#[test]
+fn renders_sales() {
+    let sale = |login_name: &str, overrides: serde_json::Value| {
+        let mut sale = json!({
+            "store": "google", "product": "cafe.oeee.supporter.2026", "year": 2026,
+            "owner": "token", "purchased_at": "2026-11-05T08:25:54Z",
+            "checked_at": "2026-11-05T08:25:54Z", "revoked_at": null,
+            "test": false, "manual": false, "order_id": "GPA.3343-1886",
+            "country": "KR", "price": "KRW 14,000", "proceeds": "KRW 11,900",
+            "login_name": login_name,
+        });
+        for (key, value) in overrides.as_object().unwrap() {
+            sale[key] = value.clone();
+        }
+        sale
+    };
+    let rendered = test_env()
+        .get_template("admin/sales.jinja")
+        .expect("template loads")
+        .render(context! {
+            current_user => Serde(current_user()),
+            draft_post_count => 0,
+            unread_notification_count => 0,
+            ftl_lang => "en",
+            totals => Serde(json!([
+                {"month": null, "store": null, "currency": "KRW", "sold": 2, "refunded": 1,
+                 "gross": "KRW 31,000", "proceeds": "KRW 11,900", "proceeds_unknown": 1},
+                {"month": null, "store": null, "currency": null, "sold": 1, "refunded": 0,
+                 "gross": null, "proceeds": null, "proceeds_unknown": 0},
+            ])),
+            months => Serde(json!([
+                {"month": "2026-11", "store": "google", "currency": "KRW", "sold": 1,
+                 "refunded": 0, "gross": "KRW 14,000", "proceeds": "KRW 11,900",
+                 "proceeds_unknown": 0},
+            ])),
+            sales => Serde(json!([
+                sale("buyer", json!({})),
+                sale("tester", json!({"test": true, "price": null, "proceeds": null})),
+                sale("granted", json!({"manual": true, "store": "apple", "order_id": null,
+                                       "price": null, "proceeds": null, "country": null})),
+                sale("refunder", json!({"revoked_at": "2026-11-06T00:00:00Z"})),
+            ])),
+            sales_listed => 200,
+        })
+        .expect("sales.jinja renders");
+    assert!(rendered.contains("KRW 31,000"), "{rendered}");
+    assert!(rendered.contains("(1 not reported)"), "{rendered}");
+    assert!(rendered.contains("2026-11"), "{rendered}");
+    assert!(
+        rendered.contains("<code>GPA.3343-1886</code>"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(
+            r#"<a class="ds-handle" href="&#x2f;admin&#x2f;users&#x2f;buyer">@buyer</a>"#
+        ),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(r#"<span class="admin-tag">test</span>"#),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(r#"<span class="admin-tag">granted</span>"#),
+        "{rendered}"
+    );
+    assert!(rendered.contains("refunded"), "{rendered}");
+    assert!(
+        rendered.contains(r#"href="/admin/sales" aria-current="page""#),
+        "in the nav"
+    );
 }

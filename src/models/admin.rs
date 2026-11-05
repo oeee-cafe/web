@@ -1530,7 +1530,8 @@ pub async fn find_user_identities(
 /// A Supporter Pack bought in a store, revoked ones included: `owner` is
 /// the store's own name for the buyer or the purchase (a SteamID, an
 /// original transaction id, a purchase token), which is what to quote to
-/// the store about it.
+/// the store about it. What it sold for is written out (`KRW 14,000`) where
+/// the store said, and empty where it did not.
 #[derive(Clone, Debug, Serialize)]
 pub struct AdminSupporterPurchase {
     pub store: String,
@@ -1540,6 +1541,61 @@ pub struct AdminSupporterPurchase {
     pub purchased_at: DateTime<Utc>,
     pub checked_at: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
+    /// Apple's sandbox or a Play licence tester.
+    pub test: bool,
+    /// Granted by staff rather than bought: an owner of `manual:…`.
+    pub manual: bool,
+    pub order_id: Option<String>,
+    pub country: Option<String>,
+    pub price: Option<String>,
+    pub proceeds: Option<String>,
+    /// Who holds it, for the list of every sale.
+    pub login_name: String,
+}
+
+/// The columns both lists read, before the amounts are written out.
+struct PurchaseRow {
+    store: String,
+    product: String,
+    year: i32,
+    owner: String,
+    purchased_at: DateTime<Utc>,
+    checked_at: DateTime<Utc>,
+    revoked_at: Option<DateTime<Utc>>,
+    test: bool,
+    order_id: Option<String>,
+    country: Option<String>,
+    currency: Option<String>,
+    price_micros: Option<i64>,
+    proceeds_micros: Option<i64>,
+    login_name: String,
+}
+
+impl From<PurchaseRow> for AdminSupporterPurchase {
+    fn from(row: PurchaseRow) -> Self {
+        use crate::models::supporter::format_money;
+        let money = |micros: Option<i64>| {
+            micros
+                .zip(row.currency.as_deref())
+                .map(|(micros, currency)| format_money(micros, currency))
+        };
+        AdminSupporterPurchase {
+            price: money(row.price_micros),
+            proceeds: money(row.proceeds_micros),
+            manual: row.owner.starts_with("manual:"),
+            store: row.store,
+            product: row.product,
+            year: row.year,
+            owner: row.owner,
+            purchased_at: row.purchased_at,
+            checked_at: row.checked_at,
+            revoked_at: row.revoked_at,
+            test: row.test,
+            order_id: row.order_id,
+            country: row.country,
+            login_name: row.login_name,
+        }
+    }
 }
 
 pub async fn find_user_supporter_purchases(
@@ -1547,14 +1603,92 @@ pub async fn find_user_supporter_purchases(
     user_id: Uuid,
 ) -> Result<Vec<AdminSupporterPurchase>> {
     let rows = query_as!(
-        AdminSupporterPurchase,
+        PurchaseRow,
         r#"
-        SELECT store, product, year, owner, purchased_at, checked_at, revoked_at
-        FROM supporter_purchases
-        WHERE user_id = $1
-        ORDER BY year DESC, purchased_at DESC
+        SELECT p.store, p.product, p.year, p.owner, p.purchased_at, p.checked_at, p.revoked_at,
+               p.test, p.order_id, p.country, p.currency, p.price_micros, p.proceeds_micros,
+               u.login_name
+        FROM supporter_purchases p JOIN users u ON u.id = p.user_id
+        WHERE p.user_id = $1
+        ORDER BY p.year DESC, p.purchased_at DESC
         "#,
         user_id,
+    );
+    Ok(rows
+        .fetch_all(&mut **tx)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect())
+}
+
+/// Every purchase, newest first: the sales list at /admin/sales, tests and
+/// packs granted by hand included and marked.
+pub async fn list_supporter_purchases(
+    tx: &mut Transaction<'_, Postgres>,
+    limit: i64,
+) -> Result<Vec<AdminSupporterPurchase>> {
+    let rows = query_as!(
+        PurchaseRow,
+        r#"
+        SELECT p.store, p.product, p.year, p.owner, p.purchased_at, p.checked_at, p.revoked_at,
+               p.test, p.order_id, p.country, p.currency, p.price_micros, p.proceeds_micros,
+               u.login_name
+        FROM supporter_purchases p JOIN users u ON u.id = p.user_id
+        ORDER BY p.purchased_at DESC
+        LIMIT $1
+        "#,
+        limit,
+    );
+    Ok(rows
+        .fetch_all(&mut **tx)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect())
+}
+
+/// One month's takings in one store and one currency, in Seoul time: what
+/// was sold and still stands, what was refunded, and what the standing ones
+/// came to. Tests and packs granted by hand are not takings and are left
+/// out. `currency` is empty for what was sold where the store says nothing
+/// about money (the Microsoft Store, Steam), and for a sale not priced yet.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminSalesMonth {
+    pub month: String,
+    pub store: String,
+    pub currency: Option<String>,
+    pub sold: i64,
+    pub refunded: i64,
+    pub gross_micros: Option<i64>,
+    pub proceeds_micros: Option<i64>,
+    /// Standing sales with a price but no proceeds reported: the App
+    /// Store's, whose API says what the buyer paid and not what Apple pays.
+    pub proceeds_unknown: i64,
+}
+
+pub async fn supporter_sales_by_month(
+    tx: &mut Transaction<'_, Postgres>,
+) -> Result<Vec<AdminSalesMonth>> {
+    let rows = query_as!(
+        AdminSalesMonth,
+        r#"
+        SELECT
+            to_char(purchased_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM') AS "month!",
+            store,
+            currency,
+            count(*) FILTER (WHERE revoked_at IS NULL) AS "sold!",
+            count(*) FILTER (WHERE revoked_at IS NOT NULL) AS "refunded!",
+            (sum(price_micros) FILTER (WHERE revoked_at IS NULL))::bigint AS gross_micros,
+            (sum(proceeds_micros) FILTER (WHERE revoked_at IS NULL))::bigint AS proceeds_micros,
+            count(*) FILTER (
+                WHERE revoked_at IS NULL AND price_micros IS NOT NULL AND proceeds_micros IS NULL
+            ) AS "proceeds_unknown!"
+        FROM supporter_purchases
+        WHERE NOT test AND owner NOT LIKE 'manual:%'
+        GROUP BY 1, store, currency
+        ORDER BY 1 DESC, store, currency
+        "#,
     );
     Ok(rows.fetch_all(&mut **tx).await?)
 }

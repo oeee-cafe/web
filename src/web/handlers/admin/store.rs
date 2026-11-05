@@ -1,6 +1,7 @@
 //! The store's catalogue of supporter products.
 
 use crate::app_error::AppError;
+use crate::models::admin::{list_supporter_purchases, supporter_sales_by_month, AdminSalesMonth};
 use crate::models::store_product::{
     self, add as add_store_product, find as find_store_product, list_all as list_store_products,
     purchase_counts as store_purchase_counts, set_details as set_store_product_details,
@@ -474,4 +475,98 @@ pub async fn admin_set_store_product_details(
         "changed a product's year or button"
     );
     Ok(Redirect::to("/admin/store").into_response())
+}
+
+/// How many sales /admin/sales lists, newest first. The takings above it
+/// count every one.
+const SALES_LISTED: i64 = 200;
+
+/// Takings in one currency, written out for the page: a month's in one
+/// store, or every month's in every store.
+#[derive(serde::Serialize)]
+struct Takings {
+    month: Option<String>,
+    store: Option<String>,
+    /// Empty for sales whose store says nothing about money.
+    currency: Option<String>,
+    sold: i64,
+    refunded: i64,
+    gross: Option<String>,
+    proceeds: Option<String>,
+    proceeds_unknown: i64,
+}
+
+fn takings(month: Option<String>, store: Option<String>, rows: &[&AdminSalesMonth]) -> Takings {
+    use crate::models::supporter::format_money;
+    let currency = rows.first().and_then(|row| row.currency.clone());
+    let sum = |field: fn(&AdminSalesMonth) -> Option<i64>| {
+        rows.iter()
+            .filter_map(|row| field(row))
+            .reduce(|a, b| a.saturating_add(b))
+    };
+    let money = |micros: Option<i64>| {
+        micros
+            .zip(currency.as_deref())
+            .map(|(micros, currency)| format_money(micros, currency))
+    };
+    Takings {
+        gross: money(sum(|row| row.gross_micros)),
+        proceeds: money(sum(|row| row.proceeds_micros)),
+        sold: rows.iter().map(|row| row.sold).sum(),
+        refunded: rows.iter().map(|row| row.refunded).sum(),
+        proceeds_unknown: rows.iter().map(|row| row.proceeds_unknown).sum(),
+        month,
+        store,
+        currency,
+    }
+}
+
+/// GET /admin/sales -- what the Supporter Packs have taken: in each
+/// currency all told, month by month in each store, and every sale, newest
+/// first. Amounts are never added across currencies, since nothing here
+/// knows the rate a store paid out at.
+pub async fn admin_sales(
+    admin: AdminUser,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+) -> Result<Html<String>, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let months = supporter_sales_by_month(&mut tx).await?;
+    let sales = list_supporter_purchases(&mut tx, SALES_LISTED).await?;
+    let common_ctx = CommonContext::build(&mut tx, Some(&admin.0), &ftl_lang).await?;
+    tx.commit().await?;
+
+    let mut currencies: Vec<Option<String>> =
+        months.iter().map(|row| row.currency.clone()).collect();
+    // Priced currencies first, alphabetically; the unpriced line last.
+    currencies.sort_by_key(|currency| (currency.is_none(), currency.clone()));
+    currencies.dedup();
+    let totals: Vec<Takings> = currencies
+        .iter()
+        .map(|currency| {
+            let rows: Vec<&AdminSalesMonth> = months
+                .iter()
+                .filter(|row| &row.currency == currency)
+                .collect();
+            takings(None, None, &rows)
+        })
+        .collect();
+    let by_month: Vec<Takings> = months
+        .iter()
+        .map(|row| takings(Some(row.month.clone()), Some(row.store.clone()), &[row]))
+        .collect();
+
+    let rendered = state
+        .render_page(
+            "admin/sales.jinja",
+            common_ctx,
+            context! {
+                totals => Serde(totals),
+                months => Serde(by_month),
+                sales => Serde(sales),
+                sales_listed => SALES_LISTED,
+            },
+        )
+        .await?;
+    Ok(Html(rendered))
 }

@@ -362,6 +362,164 @@ pub async fn record_recheck(
     Ok(())
 }
 
+/// What the store says about a sale: whether it was a test, where it was
+/// bought, and for how much. Only the App Store and Google Play say: the
+/// Microsoft Store and Steam answer whether a pack is owned and nothing
+/// else.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Sale {
+    /// Bought in Apple's sandbox or by a Play licence tester: it counts for
+    /// its buyer, and for nothing in the takings.
+    pub test: bool,
+    /// The store's order, where it has one apart from the purchase's owner
+    /// (Google Play's `GPA.…`).
+    pub order_id: Option<String>,
+    /// Where it was bought, as the store names it.
+    pub country: Option<String>,
+    /// What it cost, when the store says. Google Play shows no order for
+    /// some test purchases, and Apple's oldest transactions carry no price.
+    pub price: Option<Price>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Price {
+    /// ISO 4217.
+    pub currency: String,
+    /// What the buyer paid, in millionths of `currency`.
+    pub micros: i64,
+    /// What the store pays the site, where it says (Google Play does).
+    pub proceeds_micros: Option<i64>,
+}
+
+/// Records what a purchase sold for. A purchase the site has not recorded
+/// is left alone: this is about the row [`record_purchase`] made.
+pub async fn record_sale(
+    tx: &mut Transaction<'_, Postgres>,
+    store: Store,
+    owner: &str,
+    product: &str,
+    sale: &Sale,
+) -> Result<()> {
+    query!(
+        r#"
+        UPDATE supporter_purchases
+        SET test = $4, order_id = $5, country = $6, currency = $7, price_micros = $8,
+            proceeds_micros = $9
+        WHERE store = $1 AND owner = $2 AND product = $3
+        "#,
+        store.as_str(),
+        owner,
+        product,
+        sale.test,
+        sale.order_id,
+        sale.country,
+        sale.price.as_ref().map(|price| price.currency.as_str()),
+        sale.price.as_ref().map(|price| price.micros),
+        sale.price.as_ref().and_then(|price| price.proceeds_micros),
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// Whether what a purchase sold for is already known, so it need not be
+/// asked about again: its price, or that it was a test with none.
+pub async fn has_sale(
+    tx: &mut Transaction<'_, Postgres>,
+    store: Store,
+    owner: &str,
+    product: &str,
+) -> Result<bool> {
+    Ok(query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM supporter_purchases
+            WHERE store = $1 AND owner = $2 AND product = $3
+              AND (currency IS NOT NULL OR test)
+        ) AS "known!"
+        "#,
+        store.as_str(),
+        owner,
+        product,
+    )
+    .fetch_one(&mut **tx)
+    .await?)
+}
+
+/// Purchases in `store` whose price is not known yet, oldest first: ones
+/// recorded before prices were, or whose store could not be asked at the
+/// time. A test with no price is not asked about again, and a pack granted
+/// by hand (`manual:`) was never sold.
+pub async fn purchases_without_sale(
+    tx: &mut Transaction<'_, Postgres>,
+    store: Store,
+    limit: i64,
+) -> Result<Vec<DuePurchase>> {
+    let rows = query!(
+        r#"
+        SELECT owner, product
+        FROM supporter_purchases
+        WHERE store = $1 AND currency IS NULL AND NOT test AND owner NOT LIKE 'manual:%'
+        ORDER BY purchased_at
+        LIMIT $2
+        "#,
+        store.as_str(),
+        limit,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| DuePurchase {
+            transaction: row.owner,
+            product: row.product,
+        })
+        .collect())
+}
+
+/// How many digits after the point `currency` is written with (ISO 4217's
+/// minor unit): none for the won and the yen, three for the dinars, two for
+/// everything else.
+fn minor_digits(currency: &str) -> u32 {
+    match currency {
+        "BIF" | "CLP" | "DJF" | "GNF" | "ISK" | "JPY" | "KMF" | "KRW" | "PYG" | "RWF" | "UGX"
+        | "UYI" | "VND" | "VUV" | "XAF" | "XOF" | "XPF" => 0,
+        "BHD" | "IQD" | "JOD" | "KWD" | "LYD" | "OMR" | "TND" => 3,
+        _ => 2,
+    }
+}
+
+/// An amount for a person to read: `KRW 17,000`, `USD 9.99`. Rounded to the
+/// currency's minor unit, which is all any store charges in.
+pub fn format_money(micros: i64, currency: &str) -> String {
+    let digits = minor_digits(currency);
+    let scale = 10_i64.pow(6 - digits);
+    let minor = (micros + micros.signum() * scale / 2) / scale;
+    let (sign, minor) = if minor < 0 {
+        ("-", -minor)
+    } else {
+        ("", minor)
+    };
+    let per_major = 10_i64.pow(digits);
+    let major = (minor / per_major).to_string();
+    let mut grouped = String::with_capacity(major.len() + major.len() / 3);
+    for (i, digit) in major.chars().enumerate() {
+        if i > 0 && (major.len() - i) % 3 == 0 {
+            grouped.push(',');
+        }
+        grouped.push(digit);
+    }
+    if digits == 0 {
+        format!("{currency} {sign}{grouped}")
+    } else {
+        let fraction = minor % per_major;
+        format!(
+            "{currency} {sign}{grouped}.{fraction:0width$}",
+            width = digits as usize
+        )
+    }
+}
+
 /// Tells staff a pack is owned that was not, or is not that was
 /// (`crate::staff_webhook`). Called from inside the transaction that records
 /// it, which is the only place the change is seen.
@@ -780,6 +938,140 @@ mod tests {
             "supporter_test_a"
         ));
         tx.rollback().await.unwrap();
+    }
+
+    /// A sale is recorded against the purchase it is, and only a purchase
+    /// that was neither priced, nor a test, nor granted by hand is asked
+    /// about again. The takings count the standing sale and leave out the
+    /// test, the grant and the refund's amount.
+    #[tokio::test]
+    async fn sales_are_kept_and_counted_apart_from_tests() {
+        use crate::models::admin::supporter_sales_by_month;
+        let Some(mut tx) = tx().await else { return };
+        let id = user(&mut tx, "supporter_test_sales").await;
+        let bought = pack(this_year());
+        // XTS is ISO 4217's code for testing, which no real sale is in.
+        let price = |micros| Price {
+            currency: "XTS".to_string(),
+            micros,
+            proceeds_micros: Some(micros / 100 * 85),
+        };
+        async fn xts(tx: &mut Transaction<'_, Postgres>) -> (i64, i64, i64, i64) {
+            supporter_sales_by_month(tx)
+                .await
+                .unwrap()
+                .into_iter()
+                .filter(|row| row.currency.as_deref() == Some("XTS"))
+                .fold((0, 0, 0, 0), |(sold, refunded, gross, proceeds), row| {
+                    (
+                        sold + row.sold,
+                        refunded + row.refunded,
+                        gross + row.gross_micros.unwrap_or(0),
+                        proceeds + row.proceeds_micros.unwrap_or(0),
+                    )
+                })
+        }
+        let before = xts(&mut tx).await;
+
+        for owner in [
+            "GPA.sold",
+            "GPA.refunded",
+            "GPA.tester",
+            "GPA.unpriced",
+            "manual:fan:1",
+        ] {
+            record_purchase(&mut tx, id, Store::Google, owner, &bought, true)
+                .await
+                .unwrap();
+        }
+        let sale = |test, price| Sale {
+            test,
+            order_id: Some("GPA.0000".to_string()),
+            country: Some("KR".to_string()),
+            price,
+        };
+        record_sale(
+            &mut tx,
+            Store::Google,
+            "GPA.sold",
+            &bought.product,
+            &sale(false, Some(price(14_000_000_000))),
+        )
+        .await
+        .unwrap();
+        record_sale(
+            &mut tx,
+            Store::Google,
+            "GPA.refunded",
+            &bought.product,
+            &sale(false, Some(price(1_000_000))),
+        )
+        .await
+        .unwrap();
+        record_recheck(
+            &mut tx,
+            Store::Google,
+            "GPA.refunded",
+            &bought.product,
+            false,
+        )
+        .await
+        .unwrap();
+        record_sale(
+            &mut tx,
+            Store::Google,
+            "GPA.tester",
+            &bought.product,
+            &sale(true, None),
+        )
+        .await
+        .unwrap();
+
+        for (owner, known) in [
+            ("GPA.sold", true),
+            ("GPA.tester", true),
+            ("GPA.unpriced", false),
+        ] {
+            assert_eq!(
+                has_sale(&mut tx, Store::Google, owner, &bought.product)
+                    .await
+                    .unwrap(),
+                known,
+                "{owner}"
+            );
+        }
+        let unpriced: Vec<String> = purchases_without_sale(&mut tx, Store::Google, 1000)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|due| due.transaction)
+            .collect();
+        assert!(unpriced.contains(&"GPA.unpriced".to_string()));
+        for asked_enough in ["GPA.sold", "GPA.refunded", "GPA.tester", "manual:fan:1"] {
+            assert!(
+                !unpriced.contains(&asked_enough.to_string()),
+                "{asked_enough}"
+            );
+        }
+
+        let (sold, refunded, gross, proceeds) = xts(&mut tx).await;
+        assert_eq!(sold - before.0, 1, "the tester's is not a sale");
+        assert_eq!(refunded - before.1, 1);
+        assert_eq!(gross - before.2, 14_000_000_000, "the refund is not taken");
+        assert_eq!(proceeds - before.3, 11_900_000_000);
+        tx.rollback().await.unwrap();
+    }
+
+    #[test]
+    fn money_is_written_in_its_currencys_own_digits() {
+        assert_eq!(format_money(17_000_000_000, "KRW"), "KRW 17,000");
+        assert_eq!(format_money(1_500_000_000, "JPY"), "JPY 1,500");
+        assert_eq!(format_money(9_990_000, "USD"), "USD 9.99");
+        assert_eq!(format_money(1_234_567_890_000, "EUR"), "EUR 1,234,567.89");
+        assert_eq!(format_money(1_500, "KWD"), "KWD 0.002", "rounded to fils");
+        assert_eq!(format_money(0, "USD"), "USD 0.00");
+        assert_eq!(format_money(-9_990_000, "USD"), "USD -9.99");
+        assert_eq!(format_money(999_999, "KRW"), "KRW 1");
     }
 
     /// A pack is a year's: last year's is still theirs, and says so on their

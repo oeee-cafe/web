@@ -14,7 +14,7 @@ use crate::web::handlers::admin::{
     admin_add_store_product, admin_banners, admin_banners_fragment, admin_collaborative_sessions,
     admin_communities, admin_community_choices, admin_community_posts, admin_flag_banner,
     admin_flag_post, admin_masquerade, admin_overview, admin_post_detail, admin_posts,
-    admin_posts_fragment, admin_set_community_slug, admin_set_store_product_details,
+    admin_posts_fragment, admin_sales, admin_set_community_slug, admin_set_store_product_details,
     admin_set_store_product_on_sale, admin_set_store_product_sale_window, admin_set_user_email,
     admin_store, admin_user_detail, admin_user_posts, admin_users, collaborative_archive_manifest,
     collaborative_archive_tail, collaborative_session_chat, collaborative_session_details,
@@ -260,6 +260,11 @@ impl App {
         if let Some(app_store) = self.state.config.app_store.clone() {
             tokio::task::spawn(crate::app_store::sweep_notifications(
                 self.state.db_pool.clone(),
+                app_store.clone(),
+            ));
+            // What each purchase sold for, where it was recorded without.
+            tokio::task::spawn(crate::app_store::price_unpriced(
+                self.state.db_pool.clone(),
                 app_store,
             ));
         }
@@ -267,6 +272,10 @@ impl App {
         // And for the purchase tokens the Android app has handed over.
         if let Some(google_play) = self.state.config.google_play.clone() {
             tokio::task::spawn(crate::google_play::recheck_supporters(
+                self.state.db_pool.clone(),
+                google_play.clone(),
+            ));
+            tokio::task::spawn(crate::google_play::price_unpriced(
                 self.state.db_pool.clone(),
                 google_play,
             ));
@@ -464,6 +473,7 @@ impl App {
                 "/admin/store",
                 get(admin_store).post(admin_add_store_product),
             )
+            .route("/admin/sales", get(admin_sales))
             .route(
                 "/admin/store/{store}/{product}/on-sale",
                 post(admin_set_store_product_on_sale),

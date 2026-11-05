@@ -1,0 +1,122 @@
+{% extends "admin/base.jinja" %}
+{% from "person_macro.jinja" import handle %}
+{# What the Supporter Packs have taken (handlers/admin/store.rs,
+   admin_sales). Every amount arrives written out; nothing is added across
+   currencies here, because nothing knows the rate a store paid out at.
+   Tests and packs granted by hand are listed but are not takings. #}
+{% set admin_section = "sales" %}
+{% macro when(at) %}{% if at %}{{ at|datetimeformat(format="short", tz="Asia/Seoul") }}{% else %}<span class="muted">never</span>{% endif %}{% endmacro %}
+{% macro amount(value) %}{% if value %}{{ value }}{% else %}<span class="muted">—</span>{% endif %}{% endmacro %}
+{% macro currency_name(row) %}{% if row.currency %}{{ row.currency }}{% else %}<span class="muted">not reported</span>{% endif %}{% endmacro %}
+{% block admin_content %}
+  <div class="admin-head">
+    <h1 class="admin-title">Sales</h1>
+    <p class="ds-help">
+      Supporter Packs sold, as each store reports them. Price is what the
+      buyer paid, tax included where the store includes it. Proceeds are what
+      the store pays out, and only Google Play reports them; the App Store
+      says what the buyer paid and not what Apple keeps. The Microsoft Store
+      and Steam report no amounts at all. Refunded sales are counted apart
+      and left out of the amounts; tests and packs granted by hand are left
+      out entirely. Months are Seoul's.
+    </p>
+  </div>
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">All told</h2>
+    {% if totals %}
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr><th>Currency</th><th>Sold</th><th>Refunded</th><th>Price</th><th>Proceeds</th></tr>
+          </thead>
+          <tbody>
+            {% for row in totals %}
+              <tr>
+                <td>{{ currency_name(row) }}</td>
+                <td>{{ row.sold }}</td>
+                <td>{{ row.refunded }}</td>
+                <td>{{ amount(row.gross) }}</td>
+                <td>
+                  {{ amount(row.proceeds) }}
+                  {% if row.proceeds_unknown > 0 %}
+                    <span class="muted">({{ row.proceeds_unknown }} not reported)</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">Nothing sold yet.</p>
+    {% endif %}
+  </section>
+
+  {% if months %}
+    <section class="admin-section">
+      <h2 class="profile-section-label">By month</h2>
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr><th>Month</th><th>Store</th><th>Currency</th><th>Sold</th><th>Refunded</th><th>Price</th><th>Proceeds</th></tr>
+          </thead>
+          <tbody>
+            {% for row in months %}
+              <tr>
+                <td>{{ row.month }}</td>
+                <td>{{ row.store }}</td>
+                <td>{{ currency_name(row) }}</td>
+                <td>{{ row.sold }}</td>
+                <td>{{ row.refunded }}</td>
+                <td>{{ amount(row.gross) }}</td>
+                <td>{{ amount(row.proceeds) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="admin-section">
+    <h2 class="profile-section-label">Every sale</h2>
+    {% if sales %}
+      {% if sales|length >= sales_listed %}
+        <p class="ds-help admin-section-help">The newest {{ sales_listed }}.</p>
+      {% endif %}
+      <div class="admin-table-scroll">
+        <table>
+          <thead>
+            <tr><th>Bought</th><th>Account</th><th>Store</th><th>Product</th><th>Country</th><th>Price</th><th>Proceeds</th><th>Order</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for sale in sales %}
+              <tr>
+                <td>{{ when(sale.purchased_at) }}</td>
+                <td>{{ handle(sale.login_name, "/admin/users/" ~ sale.login_name) }}</td>
+                <td>{{ sale.store }}</td>
+                <td><code>{{ sale.product }}</code></td>
+                <td>{{ sale.country or "" }}</td>
+                <td>{{ amount(sale.price) }}</td>
+                <td>{{ amount(sale.proceeds) }}</td>
+                <td>{% if sale.order_id %}<code>{{ sale.order_id }}</code>{% endif %}</td>
+                <td>
+                  {% if sale.manual %}<span class="admin-tag">granted</span>{% endif %}
+                  {% if sale.test %}<span class="admin-tag">test</span>{% endif %}
+                  {% if sale.revoked_at %}
+                    <span class="admin-tag deleted">refunded {{ when(sale.revoked_at) }}</span>
+                  {% else %}
+                    <span class="admin-tag ok">live</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="ds-card admin-empty">Nothing sold yet.</p>
+    {% endif %}
+  </section>
+{% endblock admin_content %}

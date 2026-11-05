@@ -66,14 +66,19 @@
   </section>
 
   <section class="admin-section">
-    <h2 class="profile-section-label">Supporter Packs</h2>
+    <div class="admin-section-head">
+      <h2 class="profile-section-label">Supporter Packs</h2>
+      <a href="/admin/sales">all sales →</a>
+    </div>
     {% if purchases %}
       {# `owner` is the store's own name for the purchase or its buyer, the
-         thing to quote to the store about it. #}
+         thing to quote to the store about it. Price and proceeds arrive
+         written out, and empty where the store says nothing about money
+         (models/admin.rs, AdminSupporterPurchase). #}
       <div class="admin-table-scroll">
         <table>
           <thead>
-            <tr><th>Year</th><th>Store</th><th>Product</th><th>Store owner</th><th>Bought</th><th>Last checked</th><th>Status</th></tr>
+            <tr><th>Year</th><th>Store</th><th>Product</th><th>Bought</th><th>Price</th><th>Proceeds</th><th>Country</th><th>Store owner</th><th>Order</th><th>Last checked</th><th>Status</th></tr>
           </thead>
           <tbody>
             {% for purchase in purchases %}
@@ -81,10 +86,16 @@
                 <td>{{ purchase.year }}</td>
                 <td>{{ purchase.store }}</td>
                 <td><code>{{ purchase.product }}</code></td>
-                <td><code>{{ purchase.owner }}</code></td>
                 <td>{{ when(purchase.purchased_at) }}</td>
+                <td>{% if purchase.price %}{{ purchase.price }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td>{% if purchase.proceeds %}{{ purchase.proceeds }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td>{{ purchase.country or "" }}</td>
+                <td><code>{{ purchase.owner }}</code></td>
+                <td>{% if purchase.order_id %}<code>{{ purchase.order_id }}</code>{% endif %}</td>
                 <td>{{ when(purchase.checked_at) }}</td>
                 <td>
+                  {% if purchase.manual %}<span class="admin-tag">granted</span>{% endif %}
+                  {% if purchase.test %}<span class="admin-tag">test</span>{% endif %}
                   {% if purchase.revoked_at %}
                     <span class="admin-tag deleted">revoked {{ when(purchase.revoked_at) }}</span>
                   {% else %}
