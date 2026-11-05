@@ -562,50 +562,24 @@ privacy-content = We respect your privacy. By default, we do not collect any per
   If you have any questions about this privacy policy, please contact us.
 
 community-guidelines = Community Guidelines
-community-guidelines-content = Effective November 5, 2026
+community-guidelines-content = { brand } is committed to providing a safe, welcoming, and respectful environment for all users. We have zero tolerance for objectionable content and abusive behavior.
 
-  { brand } is an oekaki board where anyone can draw and share their drawings. Please respect each other's drawings and spaces, and keep to the commitments below so that everyone can feel safe here. These guidelines apply to everything that happens on { brand }: drawings and replays, comments, profiles, communities, collaborative drawing sessions and their chat, and posts sent to the fediverse.
+  Prohibited Content and Behavior:
+  • Harassment, threats, or bullying of other users
+  • Hate speech or discrimination based on race, ethnicity, religion, gender, sexual orientation, disability, or any other protected characteristic
+  • Sexual content involving minors or non-consensual sexual content
+  • Illegal content or activities, including but not limited to: promotion of violence, distribution of controlled substances, copyright infringement
+  • Spam, malware, or phishing attempts
+  • Impersonation or identity fraud
+  • Doxxing or sharing others' private information without consent
 
-  Prohibited content and behavior
-  • Harassing, threatening, bullying, or stalking other people
-  • Hate speech or discrimination based on race, ethnicity, nationality, religion, sex, sexual orientation, gender identity, disability, age, or similar grounds
-  • Sexual content involving minors, including drawings; sexual content made or spread without consent; and synthetic sexual content such as deepfakes
-  • Adult or violent content not marked as sensitive
-  • Promoting violence or self-harm; trading or promoting drugs, illegal gambling, or illegal weapons; and any other content or activity that breaks the law
-  • Content that infringes copyright, trademarks, or other rights. Only post what you drew yourself or have the right to use.
-  • Phishing, malware or its distribution, and impersonating other services to obtain information
-  • Spam, advertising floods, and posts made to manipulate search rankings
-  • Impersonating other people or organizations, or identity fraud
-  • Publishing other people's personal information (real names, contact details, addresses, photos, and so on) without consent
-  • Damaging other people's reputations with false statements
+  Enforcement:
+  Violations of these guidelines may result in immediate and permanent account termination without warning. We reserve the right to report illegal activities to law enforcement authorities.
 
-  Please use the service with care
-  • { brand } is a place for drawings. Please don't use it to store files or data unrelated to drawing.
-  • Please don't use it in ways that burden { brand } or others, such as attacks on other services or automated bulk requests or posts.
-  • Please don't circumvent { brand }'s limits or access other people's accounts without authorization.
-  • Please don't buy, sell, or transfer accounts.
+  Reporting:
+  If you encounter content or behavior that violates these guidelines, please report it immediately. We take all reports seriously and will investigate promptly.
 
-  Community and session owners' responsibilities
-  • If you run a community, please remove members who break these guidelines and report posts that do.
-  • If you open a collaborative drawing session, please ban participants who break these guidelines.
-
-  AI policy
-  { brand } cheers on and welcomes people who draw stroke by stroke and people who create with AI alike.
-  • Please say so when something was made with AI.
-  • Please don't imitate other people's creative work.
-
-  Enforcement
-  Content that breaks these guidelines may be deleted, made private, or marked as sensitive without notice. Depending on the severity of the violation, we may issue a warning, limit some features, or suspend an account temporarily or permanently. Serious violations, such as child sexual exploitation material or phishing, result in immediate permanent suspension without warning. We may report illegal activity to law enforcement.
-
-  If you disagree with an action, let us know at hello@naru.pub. We will review it and respond.
-
-  Reporting
-  If you find a post or profile that breaks these guidelines, use the Report button on its page. For anything else, send the address in question and your reason to hello@naru.pub. We check every report and handle it promptly. Information about the person reporting is used only to handle the report and is not disclosed to the person reported.
-
-  If your rights have been infringed, for example by copyright infringement or defamation, send hello@naru.pub the right infringed, the address of the infringing content, and material showing that you hold the right. Under Korea's Act on Promotion of Information and Communications Network Utilization and Information Protection, we will delete the content or temporarily block access to it, and let you know the result.
-
-  Changes to these guidelines
-  By using { brand }, you agree to these guidelines. They may change along with the service, and any change will be announced on this page with its effective date. For personal information, please see the Privacy Policy.
+  By using { brand }, you agree to abide by these community guidelines. We reserve the right to update these guidelines at any time.
 
 personal-post = Personal post
 communities-tab-public = Public

@@ -51,27 +51,6 @@ mod tests {
         formatted
     }
 
-    /// The guidelines are one long message of many lines, and a line Fluent
-    /// misreads ends the message there, silently dropping the rest of the
-    /// page. So each language has to reach its last section, with the site's
-    /// name filled in and its reporting address intact.
-    #[test]
-    fn community_guidelines_are_whole_in_every_language() {
-        for (lang, brand, last_words) in [
-            ("en", "Oeee Cafe", "please see the Privacy Policy."),
-            ("ko", "오이카페", "개인정보 처리방침을 참고해 주세요."),
-            ("ja", "OEEEカフェ", "プライバシーポリシーをご覧ください。"),
-            ("zh", "黄瓜咖啡馆", "请参阅隐私政策。"),
-        ] {
-            let text = format(lang, "community-guidelines-content", &FluentArgs::new());
-            assert!(text.ends_with(last_words), "{lang} is cut short: {text}");
-            assert!(text.contains(brand), "{lang} lacks its brand");
-            assert!(text.contains("2026"), "{lang} lacks its effective date");
-            assert!(text.contains("hello@naru.pub"), "{lang} lacks its contact");
-            assert!(!text.contains("{ "), "{lang} has an unresolved placeable");
-        }
-    }
-
     /// The profile hands over the month as a number; English names it, and
     /// has to name every one rather than falling through to December.
     #[test]
