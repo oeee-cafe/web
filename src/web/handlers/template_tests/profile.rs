@@ -468,11 +468,10 @@ fn a_profile_counts_the_pickles_its_drawings_were_given() {
     assert!(!render(0).contains("pickle-received-chip"));
 }
 
-/// Following, in its own section under the card with its count:
-/// everyone the same shape, a banner where they have drawn one and a
-/// frame of the same size holding their name where they have not. No
-/// section for someone who follows nobody, and following is never a
-/// tab, so with only drawings there is no switch.
+/// Following, in its own section under the card with the count of
+/// everyone: those with a banner as cards, those without folded into a
+/// link to /@name/following. No section for someone who follows nobody,
+/// and following is never a tab, so with only drawings there is no switch.
 #[test]
 fn the_profile_shows_everyone_followed_the_same_way() {
     let env = test_support::env();
@@ -504,11 +503,17 @@ fn the_profile_shows_everyone_followed_the_same_way() {
     let both = render(json!([banner, plain]));
     assert!(both.contains(r#"<div class="profile-section-label">profile-following<span class="profile-tab-count">2</span></div>"#));
     assert!(!both.contains("data-profile-tab"), "following is not a tab");
-    assert_eq!(both.matches(r#"class="profile-follow""#).count(), 2);
+    assert_eq!(both.matches(r#"class="profile-follow""#).count(), 1);
     assert!(both.contains(r#"<a class="profile-follow" href="/@a""#));
     assert!(both.contains("/image/ab/abcdef.png"));
-    assert!(both.contains(r#"<a class="profile-follow" href="/@b""#));
-    assert!(both.contains(r#"profile-follow-blank" aria-hidden="true">비</span>"#));
+    assert!(!both.contains(r#"href="/@b""#), "folded away");
+    assert!(!both.contains("profile-follow-blank"));
+    assert!(both.contains(
+        r#"<a class="profile-follows-more" href="/@oeee/following">profile-following-without-banner<span class="profile-tab-count">1</span></a>"#
+    ));
+
+    let only_banners = render(json!([banner]));
+    assert!(!only_banners.contains("profile-follows-more"));
 
     let nobody = render(json!([]));
     assert!(!nobody.contains("data-profile-tab"), "one grid, no switch");
@@ -845,4 +850,32 @@ fn the_profile_form_comes_back_saying_how_it_went() {
     });
     assert!(saved.contains("profile-about-saved"));
     assert!(saved.contains(r#"value="오이2""#));
+}
+
+/// Those they follow without a banner, on the page the profile folds
+/// them into: the blank frames, and not the ones with banners.
+#[test]
+fn followings_without_a_banner_have_their_own_page() {
+    let followings = json!([
+        {"login_name": "a", "display_name": "에이", "banner_image_filename": "abcdef.png"},
+        {"login_name": "b", "display_name": "비", "banner_image_filename": null},
+        {"login_name": "c", "display_name": "씨", "banner_image_filename": null},
+    ]);
+    let render = |followings: serde_json::Value| {
+        test_support::env()
+            .get_template("profile_following.jinja")
+            .expect("page loads")
+            .render(context! {
+                user => Serde(json!({"id": "u1", "login_name": "oeee", "display_name": "오이"})),
+                followings => Serde(followings),
+                ..chrome()
+            })
+            .expect("page renders")
+    };
+    let page = render(followings);
+    assert!(!page.contains(r#"href="/@a""#));
+    assert!(page.contains(r#"profile-follow-blank" aria-hidden="true">비</span>"#));
+    assert!(page.contains(r#"href="/@c""#));
+    assert!(page.contains(r#"href="/@oeee""#), "back to the profile");
+    assert!(render(json!([])).contains("profile-following-without-banner-empty"));
 }

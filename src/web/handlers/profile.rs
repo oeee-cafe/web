@@ -1282,6 +1282,34 @@ pub async fn do_write_guestbook_entry(
     Ok(Html(rendered).into_response())
 }
 
+/// Who someone follows that has no banner: folded off their profile, where
+/// each would be an empty frame with a name in it, onto a page of its own.
+pub async fn profile_following(
+    auth_session: AuthSession,
+    ExtractFtlLang(ftl_lang): ExtractFtlLang,
+    State(state): State<AppState>,
+    Path(login_name): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let mut tx = state.db_pool.begin().await?;
+    let user = find_user_by_login_name(&mut tx, &login_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+    let followings = find_followings_by_user_id(&mut tx, user.id, 9999, 0, false).await?;
+    let common_ctx = CommonContext::build(&mut tx, auth_session.user.as_ref(), &ftl_lang).await?;
+
+    let rendered = state
+        .render_page(
+            "profile_following.jinja",
+            common_ctx,
+            context! {
+                user => Serde(Some(user)),
+                followings => Serde(followings),
+            },
+        )
+        .await?;
+    Ok(Html(rendered).into_response())
+}
+
 pub async fn guestbook(
     auth_session: AuthSession,
     ExtractFtlLang(ftl_lang): ExtractFtlLang,

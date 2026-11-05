@@ -1,0 +1,28 @@
+{% from "person_card_macro.jinja" import person_card %}
+{% extends "base.jinja" %}
+{% block title %}
+  {{ super() }} | {{ ftl_get_message("profile-following-without-banner") }} | {{ user.display_name }} (@{{ user.login_name }})
+{% endblock title %}
+{% block content %}
+  {# Who they follow that has not drawn a banner, folded out of the
+     profile, where each would be an empty frame with a name in it. The
+     same cards, back to their profile above them. #}
+  {% set unbannered = followings|rejectattr("banner_image_filename")|list %}
+  <div class="notifications-page">
+    <div class="members-header">
+      <div>
+        <a class="profile-chip" href="/@{{ user.login_name }}">← {{ user.display_name }}</a>
+        <h1 class="settings-title">{{ ftl_get_message("profile-following-without-banner") }}</h1>
+      </div>
+    </div>
+    {% if unbannered %}
+      <ul class="profile-follows">
+        {% for following in unbannered %}
+          <li>{{ person_card(following, r2_public_endpoint_url) }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="ds-card notifications-empty"><p>{{ ftl_get_message("profile-following-without-banner-empty") }}</p></div>
+    {% endif %}
+  </div>
+{% endblock content %}
